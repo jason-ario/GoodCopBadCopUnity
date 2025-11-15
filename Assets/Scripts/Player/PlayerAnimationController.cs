@@ -3,7 +3,8 @@ using UnityEngine;
 [RequireComponent(typeof(Animator))]
 public class PlayerAnimationController : MonoBehaviour
 {
-    private Animator _animator;
+    [SerializeField] private Animator bodyAnimator;
+    [SerializeField] private Animator armsAnimator;
     private PlayerMovementController _playerMovementController;
     
     [SerializeField] private float animLerpSpeed = 5f;
@@ -13,7 +14,6 @@ public class PlayerAnimationController : MonoBehaviour
     
     private void Awake()
     {
-        _animator = GetComponent<Animator>();
         _playerMovementController = GetComponent<PlayerMovementController>();
     }
     
@@ -29,7 +29,9 @@ public class PlayerAnimationController : MonoBehaviour
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
         
         // Set the smoothed values to the animator
-        _animator.SetFloat("MoveX", currentMoveX);
-        _animator.SetFloat("MoveZ", currentMoveZ);
+        bodyAnimator.SetFloat("MoveX", currentMoveX);
+        bodyAnimator.SetFloat("MoveZ", currentMoveZ);
+        //armsAnimator.SetFloat("MoveX", currentMoveX);
+        //armsAnimator.SetFloat("MoveZ", currentMoveZ);
     }
 }
