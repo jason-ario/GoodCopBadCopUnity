@@ -31,7 +31,7 @@ public class PlayerAnimationController : MonoBehaviour
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);
         bodyAnimator.SetFloat("MoveZ", currentMoveZ);
-        //armsAnimator.SetFloat("MoveX", currentMoveX);
-        //armsAnimator.SetFloat("MoveZ", currentMoveZ);
+        armsAnimator.SetFloat("MoveX", currentMoveX);
+        armsAnimator.SetFloat("MoveZ", currentMoveZ);
     }
 }
