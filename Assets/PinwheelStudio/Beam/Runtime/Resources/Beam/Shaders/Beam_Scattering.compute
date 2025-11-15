@@ -1,0 +1,176 @@
+#pragma kernel ComputeLightScattering
+#pragma target 4.5
+
+#pragma multi_compile_local _ BEAM_LIGHT_COOKIES
+#pragma multi_compile_local _ BEAM_ADDITIONAL_LIGHTS
+#pragma multi_compile_local _ BEAM_FOGS_LOCAL
+
+#pragma multi_compile _ _ADDITIONAL_LIGHTS
+#pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+#pragma multi_compile _ _LIGHT_COOKIES
+
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+
+#include "Beam_Constants.hlsl"
+#if defined(UNITY_6000_1_OR_NEWER)
+#define _CLUSTER_LIGHT_LOOP
+#else
+#define _FORWARD_PLUS
+#endif
+
+#define REQUIRE_DEPTH_TEXTURE
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+#include "Beam_SceneDepth.hlsl"
+#include "Beam_VolumetricRealtimeLights.hlsl"
+#include "Beam_VolumetricFog.hlsl"
+#include "Beam_NoiseGen.hlsl"
+
+RWTexture3D<float4> _ScatteringTexture;
+
+float4 _CameraParams; //near, far, fov, aspect
+#define CAMERA_NEAR_PLANE _CameraParams.x
+#define CAMERA_FAR_PLANE _CameraParams.y
+#define CAMERA_FOV _CameraParams.z
+#define CAMERA_ASPECT _CameraParams.w
+
+#define DEPTH_LINEAR_POW 2
+#define SQR(x) x * x
+
+float4 _FroxelCount;
+float _Intensity;
+float _Anisotropic;
+float _FroxelSampleCount;
+float _SliceStartIndex;
+float _BeamTime;
+float _DepthBiasEye;
+
+float4 _HeightFogParams;
+#define USE_FOGS_HEIGHT_ATTEN _HeightFogParams.x
+#define HEIGHT_FOG_MIN_HEIGHT _HeightFogParams.y
+#define HEIGHT_FOG_MAX_HEIGHT _HeightFogParams.z
+#define HEIGHT_FOG_FACTOR _HeightFogParams.w
+
+float4 _NoiseFogParams;
+#define USE_FOGS_NOISE_ATTEN _NoiseFogParams.x
+#define NOISE_FOG_FREQUENCY _NoiseFogParams.y
+
+float4 _NoiseFogWindParams;
+#define NOISE_FOG_WIND _NoiseFogWindParams.xyz*_NoiseFogWindParams.w
+
+struct Froxel
+{
+	float3 positionCS;
+	float3 positionWS;
+	float3 radiance;
+	float4 fog;
+	float depthTestMask;
+};
+
+float3 LightingHG(Light light, float3 viewDirection)
+{
+	float3 lightDirection = normalize(light.direction);
+	float vDotL = dot(viewDirection, lightDirection);
+	float g = 1 - _Anisotropic;
+	float phaseHG = (1 - g * g) / (pow(abs(1 + g * g - 2 * g * vDotL), 1.5) * 4 * PI);
+	return light.color * phaseHG * light.distanceAttenuation * light.shadowAttenuation;
+}
+
+Froxel ComputeFroxel(uint3 index, float zIndexBias = 0)
+{
+	Froxel froxel = (Froxel)0;
+	froxel.positionCS = float3
+	(
+		index.x / (_FroxelCount.x - 1),
+		index.y / (_FroxelCount.y - 1),
+		(index.z + zIndexBias) / (_FroxelCount.z - 1)
+	);
+
+	float froxelDepthEye = lerp(CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, SQR(froxel.positionCS.z));
+	froxel.positionWS = EyeDepthToWorldPosition(froxelDepthEye, froxel.positionCS.xy, CAMERA_FOV, CAMERA_ASPECT);
+
+	float sceneDepthEye = GetSceneDepthEye(froxel.positionCS.xy);
+	froxel.depthTestMask =  saturate((sceneDepthEye - froxelDepthEye) / _DepthBiasEye);
+
+	float3 viewDirection = normalize(froxel.positionWS - _WorldSpaceCameraPos.xyz);
+
+	if (!Beam_IsMainLightExcluded()) 
+	{
+		Light mainLight = Beam_GetMainLight(froxel.positionWS);
+		froxel.radiance = LightingHG(mainLight, viewDirection);
+	}
+
+#if defined(BEAM_ADDITIONAL_LIGHTS) && defined(_ADDITIONAL_LIGHTS)
+	uint pixelLightsCount = Beam_GetAdditionalLightsCount();
+	[loop]
+	for (uint iLight = 0; iLight < pixelLightsCount; ++iLight)
+	{
+		if (!Beam_IsAdditionalLightExcluded(iLight))
+		{
+			Light additionalLight = Beam_GetAdditionalLight(iLight, froxel.positionWS);
+			additionalLight.distanceAttenuation = clamp(additionalLight.distanceAttenuation * 2, 0, 0.75);
+			froxel.radiance += LightingHG(additionalLight, viewDirection);
+		}
+	}
+#endif
+
+	float distanceAttenFar = 1 - froxelDepthEye / 100;
+	float distanceAttenNear = saturate((froxelDepthEye - CAMERA_NEAR_PLANE) / 1);
+
+	float4 fogColor = float4(0, 0, 0, 0);
+#if defined(BEAM_FOGS_LOCAL)
+	uint fogsCount = Beam_GetFogsCount();
+	[loop]
+	for (uint iFog = 0; iFog < fogsCount; ++iFog)
+	{
+		BeamFog f = Beam_GetFog(iFog, froxel.positionWS);
+		fogColor.rgb += f.color * f.density;
+		fogColor.a += (f.density > 0);
+	}
+	fogColor.rgb /= max(1, fogColor.a);
+	fogColor.rgb = max(fogColor.rgb, float3(0, 0, 0));
+#else
+	fogColor = float4(1, 1, 1, 1);
+#endif
+
+	float fogHeightAttenuation = 1;
+	if (USE_FOGS_HEIGHT_ATTEN)
+	{
+		float fHeight = 1 - saturate((froxel.positionWS.y - HEIGHT_FOG_MIN_HEIGHT) / max(0.01, HEIGHT_FOG_MAX_HEIGHT - HEIGHT_FOG_MIN_HEIGHT));
+		fogHeightAttenuation = pow(abs(fHeight), max(0.01, HEIGHT_FOG_FACTOR));
+	}
+
+	float fogNoiseAttenuation = 1;
+	if (USE_FOGS_NOISE_ATTEN)
+	{
+		fogNoiseAttenuation = SimpleNoise(froxel.positionWS - NOISE_FOG_WIND * _BeamTime, NOISE_FOG_FREQUENCY);
+	}
+
+	froxel.radiance *= distanceAttenFar * distanceAttenNear * _Intensity;
+	froxel.radiance *= fogColor.rgb * fogHeightAttenuation * fogNoiseAttenuation;
+	return froxel;
+}
+
+[numthreads(8, 8, 8)]
+void ComputeLightScattering(uint3 id : SV_DispatchThreadID)
+{
+	id.z += _SliceStartIndex;
+	float div = 0;
+	float4 scattering = float4(0, 0, 0, 0);
+	[loop]
+	for (int i = 0; i < _FroxelSampleCount; ++i)
+	{
+		Froxel froxel = ComputeFroxel(id, i / _FroxelSampleCount);
+		scattering += float4(froxel.radiance, 1) * froxel.depthTestMask;
+		div += froxel.depthTestMask>0;
+	}
+
+	scattering /= max(1, div);
+	_ScatteringTexture[id] = scattering;
+}

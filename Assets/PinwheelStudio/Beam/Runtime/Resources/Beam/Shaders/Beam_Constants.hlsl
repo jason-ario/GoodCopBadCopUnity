@@ -1,0 +1,12 @@
+//This file was generated, don't edit by hand
+
+#ifndef BEAM_CONSTANTS_DEFINED
+#define BEAM_CONSTANTS_DEFINED
+
+#define BEAM_FROXEL_COUNT_Z 64
+#define BEAM_ACCUM_MUL 0.015625
+#define BEAM_MAX_VISIBLE_LIGHT 256
+#define BEAM_MAX_VISIBLE_FOG_VOLUME 256
+
+#define UNITY_6000_1_OR_NEWER
+#endif

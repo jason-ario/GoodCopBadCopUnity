@@ -1,0 +1,24 @@
+#pragma kernel Accumulate
+#pragma target 4.5
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Beam_Constants.hlsl"
+
+Texture3D<float4> _ScatteringTexture;
+RWTexture2D<float4> _AccumulationTexture;
+
+[numthreads(8, 8, 1)]
+void Accumulate(uint3 id : SV_DispatchThreadID)
+{
+	half4 accum = half4(0, 0, 0, 0);
+	for (float z = 0; z < BEAM_FROXEL_COUNT_Z; ++z)
+	{
+		int4 samplePos = int4(id.x, id.y, z, 0);
+		half4 s = _ScatteringTexture.Load(samplePos);
+
+		accum += s;
+	}
+	accum *= BEAM_ACCUM_MUL;
+
+	_AccumulationTexture[id.xy] = accum;
+}

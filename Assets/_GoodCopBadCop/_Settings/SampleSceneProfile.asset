@@ -92,6 +92,7 @@ MonoBehaviour:
   - {fileID: -7893295128165547882}
   - {fileID: 7391319092446245454}
   - {fileID: -3357603926938260329}
+  - {fileID: 3198921072016714699}
 --- !u!114 &849379129802519247
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -132,6 +133,58 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 1
     m_Value: 647
+--- !u!114 &3198921072016714699
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc0f44244a63bee488b82d48af81f45f, type: 3}
+  m_Name: VolumetricLightingVolumeComponent
+  m_EditorClassIdentifier: Pinwheel.Beam.Runtime::Pinwheel.Beam.VolumetricLightingVolumeComponent
+  active: 0
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1036.9
+  anisotropic:
+    m_OverrideState: 0
+    m_Value: 0.85
+  maxDistance:
+    m_OverrideState: 0
+    m_Value: 64
+  fogMinHeight:
+    m_OverrideState: 0
+    m_Value: 0
+  fogMaxHeight:
+    m_OverrideState: 0
+    m_Value: 100
+  fogHeightAttenuationFactor:
+    m_OverrideState: 0
+    m_Value: 1
+  fogNoiseFrequency:
+    m_OverrideState: 0
+    m_Value: 5
+  fogNoiseWindDirection:
+    m_OverrideState: 0
+    m_Value: {x: 0, y: 1, z: 0}
+  fogNoiseWindStrength:
+    m_OverrideState: 0
+    m_Value: 1
+  softness:
+    m_OverrideState: 0
+    m_Value: 0.35
+  depthBias:
+    m_OverrideState: 0
+    m_Value: 0.4
+  dark:
+    m_OverrideState: 0
+    m_Value: 0
+  bright:
+    m_OverrideState: 0
+    m_Value: 0
 --- !u!114 &7391319092446245454
 MonoBehaviour:
   m_ObjectHideFlags: 3

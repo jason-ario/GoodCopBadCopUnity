@@ -17,6 +17,12 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 		_RampSmoothing ("Smoothing", Range(0.001,1)) = 0.5
 		[TCP2Separator]
 		
+		[TCP2HeaderHelp(Specular)]
+		[Toggle(TCP2_SPECULAR)] _UseSpecular ("Enable Specular", Float) = 0
+		[TCP2ColorNoAlpha] _SpecularColor ("Specular Color", Color) = (0.5,0.5,0.5,1)
+		_SpecularRoughnessPBR ("Roughness", Range(0,1)) = 0.5
+		[TCP2Separator]
+		
 		[TCP2HeaderHelp(Triplanar Mapping)]
 		_TriGround ("Ground", 2D) = "white" {}
 		_TriSide ("Walls", 2D) = "white" {}
@@ -77,10 +83,34 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 			fixed4 _BaseColor;
 			float _RampThreshold;
 			float _RampSmoothing;
+			float _SpecularRoughnessPBR;
+			fixed4 _SpecularColor;
 			fixed4 _SColor;
 			fixed4 _HColor;
 		CBUFFER_END
 
+		//Specular help functions (from UnityStandardBRDF.cginc)
+		inline float3 SpecSafeNormalize(float3 inVec)
+		{
+			half dp3 = max(0.001f, dot(inVec, inVec));
+			return inVec * rsqrt(dp3);
+		}
+		
+			//GGX
+			#define TCP2_PI			3.14159265359
+			#define TCP2_INV_PI		0.31830988618f
+			#if defined(SHADER_API_MOBILE)
+				#define TCP2_EPSILON 1e-4f
+			#else
+				#define TCP2_EPSILON 1e-7f
+			#endif
+			inline half GGX(half NdotH, half roughness)
+			{
+				half a2 = roughness * roughness;
+				half d = (NdotH * a2 - NdotH) * NdotH + 1.0f;
+				return TCP2_INV_PI * a2 / (d * d + TCP2_EPSILON);
+			}
+		
 		// Built-in renderer (CG) to SRP (HLSL) bindings
 		#define UnityObjectToClipPos TransformObjectToHClip
 		#define _WorldSpaceLightPos0 _MainLightPosition
@@ -119,6 +149,7 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
 
 			// -------------------------------------
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
 
 			//--------------------------------------
 			// GPU Instancing
@@ -126,6 +157,10 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 
 			#pragma vertex Vertex
 			#pragma fragment Fragment
+
+			//--------------------------------------
+			// Toony Colors Pro 2 keywords
+			#pragma shader_feature_local_fragment TCP2_SPECULAR
 
 			// vertex input
 			struct Attributes
@@ -149,6 +184,7 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				half3 vertexLights : TEXCOORD2;
 			#endif
 				float2 pack0 : TEXCOORD3; /* pack0.xy = texcoord0 */
+				float pack1 : TEXCOORD4; /* pack1.x = fogFactor */
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -188,6 +224,9 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				// world position
 				output.worldPosAndFog = float4(vertexInput.positionWS.xyz, 0);
 
+				// Computes fog factor per-vertex
+				output.worldPosAndFog.w = ComputeFogFactor(vertexInput.positionCS.z);
+
 				// normal
 				output.normal = normalize(vertexNormalInput.normalWS);
 
@@ -206,6 +245,7 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
 				float3 normalWS_Vertex = normalWS;
+				half3 viewDirWS = GetWorldSpaceNormalizeViewDir(positionWS);
 
 				// Shader Properties Sampling
 				float4 __triplanarParameters = ( _TriplanarBlendStrength.xyzw );
@@ -213,6 +253,8 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				float __ambientIntensity = ( 1.0 );
 				float __rampThreshold = ( _RampThreshold );
 				float __rampSmoothing = ( _RampSmoothing );
+				float __specularRoughnessPbr = ( _SpecularRoughnessPBR );
+				float3 __specularColor = ( _SpecularColor.rgb );
 				float3 __shadowColor = ( _SColor.rgb );
 				float3 __highlightColor = ( _HColor.rgb );
 
@@ -303,6 +345,28 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				half3 accumulatedRamp = ramp * max(lightColor.r, max(lightColor.g, lightColor.b));
 				half3 accumulatedColors = ramp * lightColor.rgb;
 
+				half3 halfDir = SpecSafeNormalize(float3(lightDir) + float3(viewDirWS));
+				
+				#if defined(TCP2_SPECULAR)
+				//Specular: GGX
+				half roughness = __specularRoughnessPbr*__specularRoughnessPbr;
+				half nh = saturate(dot(normalWS, halfDir));
+				half spec = GGX(nh, saturate(roughness));
+				spec *= TCP2_PI * 0.05;
+				#ifdef UNITY_COLORSPACE_GAMMA
+					spec = max(0, sqrt(max(1e-4h, spec)));
+					half surfaceReduction = 1.0 - 0.28 * roughness * __specularRoughnessPbr;
+				#else
+					half surfaceReduction = 1.0 / (roughness*roughness + 1.0);
+				#endif
+				spec = max(0, spec * ndl);
+				spec *= surfaceReduction;
+				spec *= atten;
+				
+				//Apply specular
+				emission.rgb += spec * lightColor.rgb * __specularColor;
+				#endif
+
 				// Additional lights loop
 			#ifdef _ADDITIONAL_LIGHTS
 				uint pixelLightCount = GetAdditionalLightsCount();
@@ -346,6 +410,27 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 							accumulatedRamp += ramp * max(lightColor.r, max(lightColor.g, lightColor.b));
 							accumulatedColors += ramp * lightColor.rgb;
 
+							half3 halfDir = SpecSafeNormalize(float3(lightDir) + float3(viewDirWS));
+							
+							#if defined(TCP2_SPECULAR)
+							//Specular: GGX
+							half roughness = __specularRoughnessPbr*__specularRoughnessPbr;
+							half nh = saturate(dot(normalWS, halfDir));
+							half spec = GGX(nh, saturate(roughness));
+							spec *= TCP2_PI * 0.05;
+							#ifdef UNITY_COLORSPACE_GAMMA
+								spec = max(0, sqrt(max(1e-4h, spec)));
+								half surfaceReduction = 1.0 - 0.28 * roughness * __specularRoughnessPbr;
+							#else
+								half surfaceReduction = 1.0 / (roughness*roughness + 1.0);
+							#endif
+							spec = max(0, spec * ndl);
+							spec *= surfaceReduction;
+							spec *= atten;
+							
+							//Apply specular
+							emission.rgb += spec * lightColor.rgb * __specularColor;
+							#endif
 						}
 					}
 
@@ -389,6 +474,27 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 					accumulatedRamp += ramp * max(lightColor.r, max(lightColor.g, lightColor.b));
 					accumulatedColors += ramp * lightColor.rgb;
 
+					half3 halfDir = SpecSafeNormalize(float3(lightDir) + float3(viewDirWS));
+					
+					#if defined(TCP2_SPECULAR)
+					//Specular: GGX
+					half roughness = __specularRoughnessPbr*__specularRoughnessPbr;
+					half nh = saturate(dot(normalWS, halfDir));
+					half spec = GGX(nh, saturate(roughness));
+					spec *= TCP2_PI * 0.05;
+					#ifdef UNITY_COLORSPACE_GAMMA
+						spec = max(0, sqrt(max(1e-4h, spec)));
+						half surfaceReduction = 1.0 - 0.28 * roughness * __specularRoughnessPbr;
+					#else
+						half surfaceReduction = 1.0 / (roughness*roughness + 1.0);
+					#endif
+					spec = max(0, spec * ndl);
+					spec *= surfaceReduction;
+					spec *= atten;
+					
+					//Apply specular
+					emission.rgb += spec * lightColor.rgb * __specularColor;
+					#endif
 				}
 				LIGHT_LOOP_END
 			#endif
@@ -405,6 +511,10 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 				color += indirectDiffuse;
 
 				color += emission;
+
+				// Mix the pixel color with fogColor. You can optionally use MixFogColor to override the fogColor with a custom one.
+				float fogFactor = input.worldPosAndFog.w;
+				color = MixFog(color, fogFactor);
 
 				return half4(color, alpha);
 			}
@@ -509,6 +619,7 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 
 				float3 positionWS = input.pack0.xyz;
 
+				half3 viewDirWS = GetWorldSpaceNormalizeViewDir(positionWS);
 				half3 albedo = half3(1,1,1);
 				half alpha = 1;
 				half3 emission = half3(0,0,0);
@@ -632,5 +743,5 @@ Shader "Toony Colors Pro 2/User/My TCP2 Shader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","TRIPLANAR","TEMPLATE_LWRP"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,sp(name:"Ground Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriGround";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"2b7974b6-2487-4d16-9592-600487944c92";op:Multiply;lbl:"Ground";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False),sp(name:"Walls Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriSide";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"b0895622-f43d-4c4e-b954-959451e618e3";op:Multiply;lbl:"Walls";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH 9d7b41083b335970464f80297d10a16a */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","TRIPLANAR","FOG","SPEC_PBR_GGX","SPECULAR","SPECULAR_SHADER_FEATURE","TEMPLATE_LWRP"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,sp(name:"Ground Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriGround";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"2b7974b6-2487-4d16-9592-600487944c92";op:Multiply;lbl:"Ground";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False),sp(name:"Walls Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriSide";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"b0895622-f43d-4c4e-b954-959451e618e3";op:Multiply;lbl:"Walls";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
+/* TCP_HASH fc4274fd5972054786ffd6139b4b27fb */
