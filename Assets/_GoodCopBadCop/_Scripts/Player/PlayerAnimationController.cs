@@ -34,4 +34,17 @@ public class PlayerAnimationController : MonoBehaviour
         armsAnimator.SetFloat("MoveX", currentMoveX);
         armsAnimator.SetFloat("MoveZ", currentMoveZ);
     }
+
+    public void EnableHoldObjectMask()
+    {
+        bodyAnimator.SetLayerWeight(1, 1);
+        armsAnimator.SetLayerWeight(1,1);
+    }
+    
+    public void DisableHoldObjectMask()
+    {
+        bodyAnimator.SetLayerWeight(1, 0);
+        armsAnimator.SetLayerWeight(1,0);
+
+    }
 }

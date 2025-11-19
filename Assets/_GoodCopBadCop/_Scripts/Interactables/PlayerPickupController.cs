@@ -43,7 +43,8 @@ public class PlayerPickupController : MonoBehaviour
         obj.OnPickedUp();
         Destroy(obj.gameObject);
         //Despawn
-
+        _playerAnimationController.EnableHoldObjectMask();
+        
         foreach (var objectContainer in objectContainers)
         {
             objectContainer.EquipItem(obj);
@@ -55,7 +56,6 @@ public class PlayerPickupController : MonoBehaviour
         if (heldObject == null) return;
 
         GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, holdPoint.position, Quaternion.identity);
-        heldObject = null;
         // Re-enable physics & collider
         if (spawnedPickup.TryGetComponent<Rigidbody>(out var rb))
         {
@@ -72,6 +72,12 @@ public class PlayerPickupController : MonoBehaviour
 
         // Notify item-specific logic
         spawnedPickup.GetComponent<PickableObject>().OnDropped();
+
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.UnequipItem(heldObject);
+        }
+        _playerAnimationController.DisableHoldObjectMask();
 
         heldObject = null;
     }

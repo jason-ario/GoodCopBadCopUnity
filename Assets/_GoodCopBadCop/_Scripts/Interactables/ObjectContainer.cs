@@ -57,4 +57,15 @@ public class ObjectContainer : MonoBehaviour
             }
         }
     }
+
+    public void UnequipItem(PickableItemData item)
+    {
+        // Found matching item, equip it
+        if (currentlyEquippedItem != null)
+        {
+            currentlyEquippedItem.gameObject.SetActive(false);
+        }
+            
+        currentlyEquippedItem = null;
+    }
 }
