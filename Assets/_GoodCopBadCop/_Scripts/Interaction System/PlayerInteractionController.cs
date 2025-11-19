@@ -6,14 +6,35 @@ public class PlayerInteractionController : MonoBehaviour
     public float interactDistance = 3f;
     public LayerMask interactLayer;
 
-    public PlayerPickupController pickupController;  
+    public PlayerPickupController pickupController;
+    public ReticleController reticle;
 
     void Update()
     {
+        HandleReticle();
+
         if (Input.GetKeyDown(KeyCode.E))
         {
             TryInteract();
         }
+    }
+
+    void HandleReticle()
+    {
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+
+        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
+        {
+            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
+
+            if (interactable != null)
+            {
+                reticle.SetInteractState(true);
+                return;
+            }
+        }
+
+        reticle.SetInteractState(false);
     }
 
     void TryInteract()
