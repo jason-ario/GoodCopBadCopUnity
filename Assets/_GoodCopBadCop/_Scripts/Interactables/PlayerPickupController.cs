@@ -22,7 +22,7 @@ public class PlayerPickupController : MonoBehaviour
         if (heldObject != null)
         {
             // Drop with E or right-click
-            if (Input.GetKeyDown(KeyCode.E) || Input.GetMouseButtonDown(1))
+            if (Input.GetMouseButtonDown(1))
             {
                 DropObject();
             }
