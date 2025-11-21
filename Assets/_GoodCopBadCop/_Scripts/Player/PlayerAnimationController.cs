@@ -45,6 +45,11 @@ public class PlayerAnimationController : MonoBehaviour
     {
         bodyAnimator.SetLayerWeight(1, 0);
         armsAnimator.SetLayerWeight(1,0);
+    }
 
+    public void OpenDoor()
+    {
+        bodyAnimator.SetTrigger("OpenDoor");
+        armsAnimator.SetTrigger("OpenDoor");
     }
 }

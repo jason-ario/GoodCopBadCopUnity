@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class PlayerInteractionController : MonoBehaviour
@@ -8,6 +9,12 @@ public class PlayerInteractionController : MonoBehaviour
 
     public PlayerPickupController pickupController;
     public ReticleController reticle;
+    public PlayerAnimationController playerAnimationController;
+
+    private void Awake()
+    {
+        playerAnimationController = GetComponent<PlayerAnimationController>();
+    }
 
     void Update()
     {

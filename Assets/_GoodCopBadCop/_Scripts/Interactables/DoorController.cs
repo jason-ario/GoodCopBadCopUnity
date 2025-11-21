@@ -1,17 +1,25 @@
+using System.Collections;
 using UnityEngine;
 
 public class DoorController : MonoBehaviour, IInteractable
 {
     bool doorOpen = false;
     [SerializeField] private Animator _animator;
+    bool beingInteractedWith = false;
+    [SerializeField] private float waitDelay = .5f;
     
     public void Interact(PlayerInteractionController player)
     {
-        ToggleDoor(player);
+        if (beingInteractedWith == false)
+        {
+            StartCoroutine(WaitAndToggleDoor(player));
+        }
     }
 
     void ToggleDoor(PlayerInteractionController player)
     {
+        
+        
         if (doorOpen)
         {
             doorOpen = false;
@@ -41,5 +49,15 @@ public class DoorController : MonoBehaviour, IInteractable
                 _animator.SetBool("OpenedOut", true);
             }
         }
+    }
+
+    IEnumerator WaitAndToggleDoor(PlayerInteractionController player)
+    {
+        beingInteractedWith = true;
+        player.playerAnimationController.OpenDoor();
+        yield return new WaitForSeconds(waitDelay);
+        ToggleDoor(player);
+        yield return new WaitForSeconds(waitDelay);
+        beingInteractedWith = false;
     }
 }
