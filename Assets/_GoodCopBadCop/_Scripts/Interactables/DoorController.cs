@@ -7,7 +7,10 @@ public class DoorController : MonoBehaviour, IInteractable
     [SerializeField] private Animator _animator;
     bool beingInteractedWith = false;
     [SerializeField] private float waitDelay = .5f;
-    
+    [SerializeField] AudioSource audioSource;
+    [SerializeField] AudioClip doorOpenClip;
+    [SerializeField] AudioClip doorCloseClip;
+
     public void Interact(PlayerInteractionController player)
     {
         if (beingInteractedWith == false)
@@ -18,18 +21,18 @@ public class DoorController : MonoBehaviour, IInteractable
 
     void ToggleDoor(PlayerInteractionController player)
     {
-        
-        
         if (doorOpen)
         {
             doorOpen = false;
             _animator.SetBool("OpenedIn", false);
             _animator.SetBool("OpenedOut", false);
+          
+            audioSource.PlayOneShot(doorCloseClip);
         }
         else
         {
             doorOpen = true;
-            
+
             // Calculate if player is in front or behind the door
             Vector3 doorForward = transform.forward;
             Vector3 playerToDoor = transform.position - player.transform.position;
@@ -53,9 +56,15 @@ public class DoorController : MonoBehaviour, IInteractable
 
     IEnumerator WaitAndToggleDoor(PlayerInteractionController player)
     {
+        if (doorOpen == false)
+        {
+            audioSource.PlayOneShot(doorOpenClip);
+        }
+        
         beingInteractedWith = true;
         player.playerAnimationController.OpenDoor();
         yield return new WaitForSeconds(waitDelay);
+    
         ToggleDoor(player);
         yield return new WaitForSeconds(waitDelay);
         beingInteractedWith = false;
