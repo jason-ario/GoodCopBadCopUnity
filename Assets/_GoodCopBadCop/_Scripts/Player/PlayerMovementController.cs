@@ -17,6 +17,9 @@ public class PlayerMovementController : MonoBehaviour
     // Public properties for animation controller to access
     public float MoveXRaw { get; private set; }
     public float MoveZRaw { get; private set; }
+    
+    bool canControl = true;
+    public bool CanControl => canControl;
 
     private void Awake()
     {
@@ -26,7 +29,12 @@ public class PlayerMovementController : MonoBehaviour
     }
 
     private void Update()
-    { 
+    {
+        if (canControl == false)
+        {
+            return;
+        }
+        
         Move();
         Rotate();
     }
@@ -60,5 +68,12 @@ public class PlayerMovementController : MonoBehaviour
             _cameraPitch = Mathf.Clamp(_cameraPitch, -maxLookAngle, maxLookAngle);
             cameraTransform.localEulerAngles = new Vector3(_cameraPitch, 0f, 0f);
         }
+    }
+
+    public void SetCanControl(bool value)
+    {
+        canControl = value;
+        MoveXRaw = 0;
+        MoveZRaw = 0;
     }
 }

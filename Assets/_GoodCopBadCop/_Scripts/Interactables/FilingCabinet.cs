@@ -1,16 +1,13 @@
 using UnityEngine;
 
-public class FilingCabinet : MonoBehaviour
+public class FilingCabinet : MonoBehaviour, IInteractable
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    [SerializeField] private GameObject levelSelectUI;
+    
+    public void Interact(PlayerInteractionController player)
     {
+        player.GetComponent<PlayerMovementController>().SetCanControl(false);
         
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        UIController.Instance.OpenLevelSelectUI();
     }
 }
