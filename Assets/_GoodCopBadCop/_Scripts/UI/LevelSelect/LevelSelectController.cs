@@ -6,8 +6,6 @@ public class LevelSelectController : MonoBehaviour
 {
     public static LevelSelectController Instance;
     
-    public UnityAction OnLevelSelected;
-
     private void Awake()
     {
         Instance = this;
@@ -19,8 +17,10 @@ public class LevelSelectController : MonoBehaviour
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 
-    public void ChooseLevel()
+    public void StartInterrogation()
     {
-        OnLevelSelected.Invoke();
+        FindObjectOfType<SceneContextController>().OnLevelSelected(); 
+        UIController.Instance.CloseLevelSelectUI();
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 }
