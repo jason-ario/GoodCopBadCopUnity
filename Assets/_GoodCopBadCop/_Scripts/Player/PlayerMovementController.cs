@@ -35,7 +35,6 @@ public class PlayerMovementController : MonoBehaviour
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
-                Debug.Log("Player is not controllable");
             }
         }
     }
