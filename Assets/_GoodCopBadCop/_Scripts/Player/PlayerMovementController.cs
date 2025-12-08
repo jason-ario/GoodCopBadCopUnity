@@ -19,7 +19,26 @@ public class PlayerMovementController : MonoBehaviour
     public float MoveZRaw { get; private set; }
     
     bool canControl = true;
-    public bool CanControl => canControl;
+    public bool CanControl
+    {
+        get { return canControl; }
+        set
+        {
+            canControl = value;
+
+            if (canControl)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                Debug.Log("Player is not controllable");
+            }
+        }
+    }
 
     private void Awake()
     {
@@ -72,7 +91,7 @@ public class PlayerMovementController : MonoBehaviour
 
     public void SetCanControl(bool value)
     {
-        canControl = value;
+        CanControl = value;
         MoveXRaw = 0;
         MoveZRaw = 0;
     }

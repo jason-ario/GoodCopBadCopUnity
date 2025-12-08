@@ -23,6 +23,5 @@ public class UIController : MonoBehaviour
     {
         levelSelectUI.SetActive(false);
         playerUI.SetActive(true);
-
     }
 }
