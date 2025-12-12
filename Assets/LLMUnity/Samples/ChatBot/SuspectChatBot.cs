@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -31,6 +32,7 @@ namespace LLMUnitySamples
 
         [Header("UI (set in Inspector)")]
         [SerializeField] private TMP_InputField inputFieldTMP;
+        [SerializeField] float timeToClearChat = 1f;
 
         void Start()
         {
@@ -112,6 +114,16 @@ namespace LLMUnitySamples
             inputFieldTMP.interactable = true;
             inputFieldTMP.ActivateInputField();
             inputFieldTMP.Select();
+            StartCoroutine(WaitAndClearChat());
+        }
+
+        IEnumerator WaitAndClearChat()
+        {
+            yield return new WaitForSeconds(timeToClearChat);
+            if (blockInput == false)
+            {
+                subtitles.SetText("");
+            }
         }
 
         public void CancelRequests()
@@ -137,7 +149,11 @@ namespace LLMUnitySamples
             if (Input.GetKey(KeyCode.Return))
             {
                 if (inputFieldTMP.text.Trim() == "")
+                {
                     inputFieldTMP.text = "";
+                }
+                
+                UIController.Instance.ToggleChatUI();
             }
         }
 
