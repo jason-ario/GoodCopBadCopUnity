@@ -30,11 +30,13 @@ public class PlayerMovementController : MonoBehaviour
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
+                GetComponent<PlayerInteractionController>().SetReticleActive(true);
             }
             else
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                GetComponent<PlayerInteractionController>().SetReticleActive(false);
             }
         }
     }

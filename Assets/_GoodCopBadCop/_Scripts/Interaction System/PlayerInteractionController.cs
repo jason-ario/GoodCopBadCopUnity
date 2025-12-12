@@ -58,5 +58,9 @@ public class PlayerInteractionController : MonoBehaviour
             }
         }
     }
-    
+
+    public void SetReticleActive(bool value)
+    {
+        reticle.gameObject.SetActive(value);
+    }
 }

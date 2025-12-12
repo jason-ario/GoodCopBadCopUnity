@@ -40,6 +40,7 @@ namespace LLMUnitySamples
         protected GameObject bubbleObject;
         protected GameObject imageObject;
         public BubbleUI bubbleUI;
+        private Canvas bubbleCanvas;
 
         public Bubble(Transform parent, BubbleUI ui, string name, string message)
         {
@@ -48,6 +49,7 @@ namespace LLMUnitySamples
             imageObject = CreateImageObject(bubbleObject.transform, "Image");
             SetBubblePosition(bubbleObject.GetComponent<RectTransform>(), imageObject.GetComponent<RectTransform>(), bubbleUI);
             SetSortingOrder(bubbleObject, imageObject);
+            bubbleCanvas = bubbleObject.GetComponent<Canvas>();
         }
 
         public void SyncParentRectTransform(RectTransform rectTransform)
@@ -116,8 +118,9 @@ namespace LLMUnitySamples
 
         void SetSortingOrder(GameObject bubbleObject, GameObject imageObject)
         {
+            if (bubbleCanvas == null) return;
+            
             // Set the sorting order to make bubbleObject render behind textObject
-            Canvas bubbleCanvas = bubbleObject.GetComponent<Canvas>();
             bubbleCanvas.overrideSorting = true;
             bubbleCanvas.sortingOrder = 2;
             Canvas imageCanvas = imageObject.GetComponent<Canvas>();
@@ -168,6 +171,7 @@ namespace LLMUnitySamples
         protected GameObject inputFieldObject;
         protected InputField inputField;
         protected GameObject placeholderObject;
+        private Canvas caretCanvas;
 
         public InputBubble(Transform parent, BubbleUI ui, string name, string message, int lineHeight = 4) :
         base(parent, ui, name, emptyLines(message, lineHeight))
@@ -220,12 +224,17 @@ namespace LLMUnitySamples
         public void FixCaretSorting()
         {
             GameObject caret = GameObject.Find($"{inputField.name} Input Caret");
-            Canvas bubbleCanvas = caret.GetComponent<Canvas>();
-            if (bubbleCanvas == null)
+
+            if (caret == null)
             {
-                bubbleCanvas = caret.AddComponent<Canvas>();
-                bubbleCanvas.overrideSorting = true;
-                bubbleCanvas.sortingOrder = 3;
+                return;
+            }
+            
+            if (caretCanvas == null)
+            {
+                caretCanvas = caret.AddComponent<Canvas>();
+                caretCanvas.overrideSorting = true;
+                caretCanvas.sortingOrder = 3;
             }
         }
 
