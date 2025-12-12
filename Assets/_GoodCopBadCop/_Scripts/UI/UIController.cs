@@ -32,7 +32,6 @@ public class UIController : MonoBehaviour
         _textChat.SetActive(!_textChat.activeSelf);
 
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(!_textChat.activeSelf);
-        
     }
 
     public void OpenLevelSelectUI()

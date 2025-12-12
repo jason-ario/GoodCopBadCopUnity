@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using LLMUnity;
 using TMPro;
 using UnityEngine.UI;
+using NotImplementedException = System.NotImplementedException;
 
 namespace LLMUnitySamples
 {
@@ -80,7 +81,12 @@ namespace LLMUnitySamples
                 inputFieldTMP.onValueChanged.RemoveListener(onValueChanged);
             }
         }
-        
+
+        private void OnDisable()
+        {
+            inputFieldTMP.text = "";
+        }
+
         void onInputFieldSubmit(string newText)
         {
             inputFieldTMP.ActivateInputField();
