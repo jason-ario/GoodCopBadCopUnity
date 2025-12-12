@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using LLMUnity;
 using TMPro;
@@ -101,7 +102,10 @@ namespace LLMUnitySamples
 
             // replace vertical_tab
             string message = inputFieldTMP.text.Replace("\v", "\n");
-
+            
+            if (!message.StartsWith("Detective: "))
+                message = "Detective: " + message;
+            
             Task chatTask = llmCharacter.Chat(message, subtitles.SetText, AllowInput);
             audioSource.PlayOneShot(voiceSounds[Random.Range(0, voiceSounds.Length)]);
             inputFieldTMP.text = "";

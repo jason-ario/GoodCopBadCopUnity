@@ -8,7 +8,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject _textChat;
-    
+    [SerializeField] private GameObject toolShopUI;
+
     private void Awake()
     {
         Instance = this;
@@ -17,6 +18,7 @@ public class UIController : MonoBehaviour
     private void Start()
     {
         _textChat.SetActive(false);
+        playerUI.SetActive(true);
     }
 
     private void Update()
@@ -44,5 +46,10 @@ public class UIController : MonoBehaviour
     {
         levelSelectUI.SetActive(false);
         playerUI.SetActive(true);
+    }
+
+    public void OpenToolShopUI()
+    {
+        throw new NotImplementedException();
     }
 }
