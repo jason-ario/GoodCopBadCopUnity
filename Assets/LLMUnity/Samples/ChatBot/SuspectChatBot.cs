@@ -159,7 +159,7 @@ namespace LLMUnitySamples
         void onValueChanged(string newText)
         {
             // Get rid of newline character added when we press enter
-            if (Input.GetKey(KeyCode.Return))
+            if (Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter))
             {
                 if (inputFieldTMP.text.Trim() == "")
                 {
