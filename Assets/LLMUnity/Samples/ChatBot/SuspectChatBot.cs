@@ -35,6 +35,8 @@ namespace LLMUnitySamples
         [Header("UI (set in Inspector)")]
         [SerializeField] private TMP_InputField inputFieldTMP;
         [SerializeField] float timeToClearChat = 1f;
+        [TextArea(5,10)]
+        [SerializeField] private string starterMessage;
 
         void Start()
         {
@@ -102,9 +104,9 @@ namespace LLMUnitySamples
 
             // replace vertical_tab
             string message = inputFieldTMP.text.Replace("\v", "\n");
-            
-            if (!message.StartsWith("Detective: "))
-                message = "Detective: " + message;
+
+            string suffix = " (You are Mark. I am the detective)";
+            message = message + suffix;
             
             Task chatTask = llmCharacter.Chat(message, subtitles.SetText, AllowInput);
             audioSource.PlayOneShot(voiceSounds[Random.Range(0, voiceSounds.Length)]);
@@ -114,6 +116,7 @@ namespace LLMUnitySamples
         public void WarmUpCallback()
         {
             warmUpDone = true;
+            Task chatTask = llmCharacter.Chat(starterMessage, null, AllowInput);
             SetInputPlaceholder("Type a message and press Enter to send");
             AllowInput();
         }

@@ -23,6 +23,11 @@ public class UIController : MonoBehaviour
 
     private void Update()
     {
+        if (playerUI.activeSelf == false)
+        {
+            return;
+        }
+        
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleChatUI();
@@ -50,6 +55,17 @@ public class UIController : MonoBehaviour
 
     public void OpenToolShopUI()
     {
-        throw new NotImplementedException();
+        toolShopUI.SetActive(true);
+        playerUI.SetActive(false);
+        
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+    }
+    
+    public void CloseToolShopUI()
+    {
+        toolShopUI.SetActive(false);
+        playerUI.SetActive(true);
+        
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 }

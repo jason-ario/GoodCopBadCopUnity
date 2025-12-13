@@ -137,6 +137,7 @@ namespace LLMUnity
         protected SemaphoreSlim chatLock = new SemaphoreSlim(1, 1);
         protected string chatTemplate;
         protected ChatTemplate template = null;
+
         /// \endcond
 
         /// <summary>
@@ -233,6 +234,7 @@ namespace LLMUnity
         public virtual void ClearChat()
         {
             chat.Clear();
+
             ChatMessage promptMessage = new ChatMessage { role = "system", content = prompt };
             chat.Add(promptMessage);
         }
@@ -247,7 +249,10 @@ namespace LLMUnity
             prompt = newPrompt;
             nKeep = -1;
             if (clearChat) ClearChat();
-            else chat[0] = new ChatMessage { role = "system", content = prompt };
+            else
+            {
+                chat[0] = new ChatMessage { role = "system", content = prompt };
+            }
         }
 
         protected virtual bool CheckTemplate()
