@@ -12,15 +12,19 @@ public class CaseFileController : MonoBehaviour, IInteractable
     private PlayerMovementController _playerMovementController;
     [SerializeField] Animator animator;
     [SerializeField] private Transform lookPos;
+    [SerializeField] private GameObject caseFileUI;
+    [SerializeField] SuspectData suspect;
     
     public void Interact(PlayerInteractionController player)
     {
         PlayerMovementController playerMovementController = player.GetComponent<PlayerMovementController>();
         _playerMovementController = playerMovementController;
         playerMovementController.SetCanControl(false);
-        player.transform.DOMove(standingPosition.position, lerpDuration).OnComplete(() => animator.SetBool("Open", true));
+        animator.SetBool("Open", true);
+        player.transform.DOMove(standingPosition.position, lerpDuration);
         player.transform.DORotateQuaternion(standingPosition.rotation, lerpDuration);
         lookingAtCaseFile = true;
+        caseFileUI.SetActive(true);
     }
     
     private void Update()
@@ -39,5 +43,23 @@ public class CaseFileController : MonoBehaviour, IInteractable
 
             camTransform.rotation = Quaternion.Slerp(camTransform.rotation, targetRot, t);
         }
+    }
+
+    public void StartInterrogation()
+    {
+        CloseCaseFile();
+        SceneContextController.Instance.OnLevelSelected(); 
+        SuspectController.Instance.LoadSuspect(suspect);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+        UIController.Instance.CloseLevelSelectUI();
+    }
+
+    public void CloseCaseFile()
+    {
+        _playerMovementController.transform.DOKill();
+        animator.SetBool("Open", false);
+        lookingAtCaseFile = false;
+        _playerMovementController.SetCanControl(true);
+        caseFileUI.SetActive(false);
     }
 }

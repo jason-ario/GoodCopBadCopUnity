@@ -9,6 +9,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject _textChat;
     [SerializeField] private GameObject toolShopUI;
+    [SerializeField] private GameObject caseFileUI;
 
     private void Awake()
     {
@@ -42,7 +43,7 @@ public class UIController : MonoBehaviour
 
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(!_textChat.activeSelf);
     }
-
+    
     public void OpenLevelSelectUI()
     {
         levelSelectUI.SetActive(true);

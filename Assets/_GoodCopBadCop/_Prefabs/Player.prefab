@@ -171,6 +171,135 @@ Transform:
   m_Children: []
   m_Father: {fileID: 379908663391551372}
   m_LocalEulerAnglesHint: {x: -51.365, y: -248.369, z: 53.869}
+--- !u!1 &1151747675086832188
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2654693638623932747}
+  - component: {fileID: 7482045326139760384}
+  m_Layer: 0
+  m_Name: Footsteps Audio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2654693638623932747
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1151747675086832188}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.000002801418, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8000816560836992802}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &7482045326139760384
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1151747675086832188}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 2.3329864
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1326449759293481940
 GameObject:
   m_ObjectHideFlags: 0
@@ -269,6 +398,7 @@ GameObject:
   - component: {fileID: 1368121587261875706}
   - component: {fileID: 6845953909524944592}
   - component: {fileID: 371220573109159834}
+  - component: {fileID: 7541639783584628704}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -292,6 +422,7 @@ Transform:
   - {fileID: 3000760193102558246}
   - {fileID: 379908663391551372}
   - {fileID: 7634414149529840893}
+  - {fileID: 2654693638623932747}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -180, z: 0}
 --- !u!143 &5788063810737065446
@@ -404,10 +535,10 @@ MonoBehaviour:
   interactDistance: 6
   interactLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 251
   pickupController: {fileID: 6845953909524944592}
   reticle: {fileID: 0}
-  playerAnimationController: {fileID: 0}
+  playerAnimationController: {fileID: 6460359851244041616}
 --- !u!114 &6845953909524944592
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -437,6 +568,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97396c99c298a314db1fba96172650c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!114 &7541639783584628704
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4cde03d37cad364586a7f761cf6a0d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootstepsAudio
+  audioSource: {fileID: 7482045326139760384}
+  footstepClips:
+  - {fileID: 8300000, guid: a42fc632b28f4f24ca796f3bdcdb24c8, type: 3}
+  - {fileID: 8300000, guid: 732bb2f088072634ebf8ac37d0188980, type: 3}
+  - {fileID: 8300000, guid: 8d482751fe186e54fb4cb8e183c3e1e8, type: 3}
+  - {fileID: 8300000, guid: 7438a7e4556e87648be2feaa579b742b, type: 3}
+  - {fileID: 8300000, guid: 848b7e71509dc844fb6d76bb74abef47, type: 3}
+  - {fileID: 8300000, guid: 6bb2841b50aec23418234cb0618ad288, type: 3}
+  - {fileID: 8300000, guid: bd7a80d0edf7b564587af3bcab30cb21, type: 3}
+  - {fileID: 8300000, guid: ebe591a58c0a61445aaf94738c0c3152, type: 3}
+  - {fileID: 8300000, guid: 4a42c9dde9cbb5a489395f79a7426762, type: 3}
+  - {fileID: 8300000, guid: 531613071b1ef9b4793e07bab8acce9c, type: 3}
+  - {fileID: 8300000, guid: 625053f3e04f5274e93163b6e1c27b55, type: 3}
+  pitchRandomness: 0.1
+  disable: 0
 --- !u!1 &3295434167070617424
 GameObject:
   m_ObjectHideFlags: 0
@@ -868,6 +1026,7 @@ SkinnedMeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   serializedVersion: 2
   m_Quality: 0
   m_UpdateWhenOffscreen: 0
@@ -1021,6 +1180,7 @@ SkinnedMeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   serializedVersion: 2
   m_Quality: 0
   m_UpdateWhenOffscreen: 0
