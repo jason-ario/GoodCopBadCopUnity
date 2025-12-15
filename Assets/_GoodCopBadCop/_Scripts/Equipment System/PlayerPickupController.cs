@@ -29,7 +29,7 @@ public class PlayerPickupController : MonoBehaviour
         }
     }
 
-    public void PickupObject(PickableObject obj)
+    public void PickUpObject(PickableObject obj)
     {
         // Drop existing object if holding something already
         if (heldObject != null)
@@ -47,7 +47,26 @@ public class PlayerPickupController : MonoBehaviour
         
         foreach (var objectContainer in objectContainers)
         {
-            objectContainer.EquipItem(obj);
+            objectContainer.EquipItem(obj.ItemData);
+        }
+    }
+
+    public void PickUpObject(PickableItemData itemData, bool pocketHeldObject = false)
+    {
+        // Drop existing object if holding something already
+        if (heldObject != null)
+        {
+            DropObject();
+        }
+        
+        heldObject = itemData;
+        
+        //Despawn
+        _playerAnimationController.EnableHoldObjectMask();
+        
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.EquipItem(itemData);
         }
     }
 

@@ -13,6 +13,6 @@ public class PickableObject : MonoBehaviour, IInteractable
 
     public void Interact(PlayerInteractionController player)
     {
-        player.pickupController.PickupObject(this);
+        player.pickupController.PickUpObject(this);
     }
 }

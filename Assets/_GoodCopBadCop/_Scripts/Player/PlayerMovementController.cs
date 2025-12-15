@@ -19,6 +19,8 @@ public class PlayerMovementController : MonoBehaviour
     public float MoveZRaw { get; private set; }
     
     bool canControl = true;
+    
+    public Transform CameraTransform => cameraTransform;
     public bool CanControl
     {
         get { return canControl; }

@@ -7,7 +7,7 @@ public class ObjectContainer : MonoBehaviour
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
     
-    [SerializeField] public enum ParentContainerType
+    public enum ParentContainerType
     {
         BODY,
         ARMS
@@ -38,11 +38,11 @@ public class ObjectContainer : MonoBehaviour
         }
     }
     
-    public void EquipItem(PickableObject item)
+    public void EquipItem(PickableItemData itemData)
     {
         foreach (var itemHeld in itemsHeld)
         {
-            if (item.ItemData == itemHeld.ItemData)
+            if (itemData == itemHeld.ItemData)
             {
                 // Found matching item, equip it
                 if (currentlyEquippedItem != null)

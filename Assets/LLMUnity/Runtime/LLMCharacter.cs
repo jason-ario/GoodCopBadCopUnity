@@ -119,7 +119,7 @@ namespace LLMUnity
         [Chat] public string AIName = "assistant";
         /// <summary> a description of the AI role (system prompt) </summary>
         [Tooltip("a description of the AI role (system prompt)")]
-        [TextArea(5, 10), Chat] public string prompt = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.";
+        [TextArea(20, 30), Chat] public string prompt = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.";
         /// <summary> set the number of tokens to always retain from the prompt (nKeep) based on the LLMCharacter system prompt </summary>
         [Tooltip("set the number of tokens to always retain from the prompt (nKeep) based on the LLMCharacter system prompt")]
         public bool setNKeepToPrompt = true;
