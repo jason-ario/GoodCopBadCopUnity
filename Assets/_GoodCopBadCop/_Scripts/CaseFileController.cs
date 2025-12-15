@@ -49,7 +49,6 @@ public class CaseFileController : MonoBehaviour, IInteractable
     {
         CloseCaseFile();
         SceneContextController.Instance.OnLevelSelected(); 
-        SuspectController.Instance.LoadSuspect(suspect);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
         UIController.Instance.CloseLevelSelectUI();
     }

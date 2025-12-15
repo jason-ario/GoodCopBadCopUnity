@@ -20,115 +20,179 @@ namespace LLMUnity
         /// <summary> file to save the chat history.
         /// The file will be saved within the persistentDataPath directory. </summary>
         [Tooltip("file to save the chat history. The file will be saved within the persistentDataPath directory.")]
-        [LLM] public string save = "";
+        [LLM]
+        public string save = "";
+
         /// <summary> save the LLM cache. Speeds up the prompt calculation when reloading from history but also requires ~100MB of space per character. </summary>
         [Tooltip("save the LLM cache. Speeds up the prompt calculation when reloading from history but also requires ~100MB of space per character.")]
-        [LLM] public bool saveCache = false;
+        [LLM]
+        public bool saveCache = false;
+
         /// <summary> log the constructed prompt the Unity Editor. </summary>
         [Tooltip("log the constructed prompt the Unity Editor.")]
-        [LLM] public bool debugPrompt = false;
+        [LLM]
+        public bool debugPrompt = false;
+
         /// <summary> maximum number of tokens that the LLM will predict (-1 = infinity). </summary>
         [Tooltip("maximum number of tokens that the LLM will predict (-1 = infinity).")]
-        [Model] public int numPredict = -1;
+        [Model]
+        public int numPredict = -1;
+
         /// <summary> slot of the server to use for computation (affects caching) </summary>
         [Tooltip("slot of the server to use for computation (affects caching)")]
-        [ModelAdvanced] public int slot = -1;
+        [ModelAdvanced]
+        public int slot = -1;
+
         /// <summary> grammar file used for the LLMCharacter (.gbnf format) </summary>
         [Tooltip("grammar file used for the LLMCharacter (.gbnf format)")]
-        [ModelAdvanced] public string grammar = null;
+        [ModelAdvanced]
+        public string grammar = null;
+
         /// <summary> grammar file used for the LLMCharacter (.json format) </summary>
         [Tooltip("grammar file used for the LLMCharacter (.json format)")]
-        [ModelAdvanced] public string grammarJSON = null;
+        [ModelAdvanced]
+        public string grammarJSON = null;
+
         /// <summary> cache the processed prompt to avoid reprocessing the entire prompt every time (default: true, recommended!) </summary>
         [Tooltip("cache the processed prompt to avoid reprocessing the entire prompt every time (default: true, recommended!)")]
-        [ModelAdvanced] public bool cachePrompt = true;
+        [ModelAdvanced]
+        public bool cachePrompt = true;
+
         /// <summary> seed for reproducibility (-1 = no reproducibility). </summary>
         [Tooltip("seed for reproducibility (-1 = no reproducibility).")]
-        [ModelAdvanced] public int seed = 0;
+        [ModelAdvanced]
+        public int seed = 0;
+
         /// <summary> LLM temperature, lower values give more deterministic answers. </summary>
         [Tooltip("LLM temperature, lower values give more deterministic answers.")]
-        [ModelAdvanced, Float(0f, 2f)] public float temperature = 0.2f;
+        [ModelAdvanced, Float(0f, 2f)]
+        public float temperature = 0.2f;
+
         /// <summary> Top-k sampling selects the next token only from the top k most likely predicted tokens (0 = disabled).
         /// Higher values lead to more diverse text, while lower value will generate more focused and conservative text.
         /// </summary>
         [Tooltip("Top-k sampling selects the next token only from the top k most likely predicted tokens (0 = disabled). Higher values lead to more diverse text, while lower value will generate more focused and conservative text. ")]
-        [ModelAdvanced, Int(-1, 100)] public int topK = 40;
+        [ModelAdvanced, Int(-1, 100)]
+        public int topK = 40;
+
         /// <summary> Top-p sampling selects the next token from a subset of tokens that together have a cumulative probability of at least p (1.0 = disabled).
         /// Higher values lead to more diverse text, while lower value will generate more focused and conservative text.
         /// </summary>
         [Tooltip("Top-p sampling selects the next token from a subset of tokens that together have a cumulative probability of at least p (1.0 = disabled). Higher values lead to more diverse text, while lower value will generate more focused and conservative text. ")]
-        [ModelAdvanced, Float(0f, 1f)] public float topP = 0.9f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float topP = 0.9f;
+
         /// <summary> minimum probability for a token to be used. </summary>
         [Tooltip("minimum probability for a token to be used.")]
-        [ModelAdvanced, Float(0f, 1f)] public float minP = 0.05f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float minP = 0.05f;
+
         /// <summary> Penalty based on repeated tokens to control the repetition of token sequences in the generated text. </summary>
         [Tooltip("Penalty based on repeated tokens to control the repetition of token sequences in the generated text.")]
-        [ModelAdvanced, Float(0f, 2f)] public float repeatPenalty = 1.1f;
+        [ModelAdvanced, Float(0f, 2f)]
+        public float repeatPenalty = 1.1f;
+
         /// <summary> Penalty based on token presence in previous responses to control the repetition of token sequences in the generated text. (0.0 = disabled). </summary>
         [Tooltip("Penalty based on token presence in previous responses to control the repetition of token sequences in the generated text. (0.0 = disabled).")]
-        [ModelAdvanced, Float(0f, 1f)] public float presencePenalty = 0f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float presencePenalty = 0f;
+
         /// <summary> Penalty based on token frequency in previous responses to control the repetition of token sequences in the generated text. (0.0 = disabled). </summary>
         [Tooltip("Penalty based on token frequency in previous responses to control the repetition of token sequences in the generated text. (0.0 = disabled).")]
-        [ModelAdvanced, Float(0f, 1f)] public float frequencyPenalty = 0f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float frequencyPenalty = 0f;
+
         /// <summary> enable locally typical sampling (1.0 = disabled). Higher values will promote more contextually coherent tokens, while  lower values will promote more diverse tokens. </summary>
         [Tooltip("enable locally typical sampling (1.0 = disabled). Higher values will promote more contextually coherent tokens, while  lower values will promote more diverse tokens.")]
-        [ModelAdvanced, Float(0f, 1f)] public float typicalP = 1f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float typicalP = 1f;
+
         /// <summary> last n tokens to consider for penalizing repetition (0 = disabled, -1 = ctx-size). </summary>
         [Tooltip("last n tokens to consider for penalizing repetition (0 = disabled, -1 = ctx-size).")]
-        [ModelAdvanced, Int(0, 2048)] public int repeatLastN = 64;
+        [ModelAdvanced, Int(0, 2048)]
+        public int repeatLastN = 64;
+
         /// <summary> penalize newline tokens when applying the repeat penalty. </summary>
         [Tooltip("penalize newline tokens when applying the repeat penalty.")]
-        [ModelAdvanced] public bool penalizeNl = true;
+        [ModelAdvanced]
+        public bool penalizeNl = true;
+
         /// <summary> prompt for the purpose of the penalty evaluation. Can be either null, a string or an array of numbers representing tokens (null/'' = use original prompt) </summary>
         [Tooltip("prompt for the purpose of the penalty evaluation. Can be either null, a string or an array of numbers representing tokens (null/'' = use original prompt)")]
-        [ModelAdvanced] public string penaltyPrompt;
+        [ModelAdvanced]
+        public string penaltyPrompt;
+
         /// <summary> enable Mirostat sampling, controlling perplexity during text generation (0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0). </summary>
         [Tooltip("enable Mirostat sampling, controlling perplexity during text generation (0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0).")]
-        [ModelAdvanced, Int(0, 2)] public int mirostat = 0;
+        [ModelAdvanced, Int(0, 2)]
+        public int mirostat = 0;
+
         /// <summary> The Mirostat target entropy (tau) controls the balance between coherence and diversity in the generated text. </summary>
         [Tooltip("The Mirostat target entropy (tau) controls the balance between coherence and diversity in the generated text.")]
-        [ModelAdvanced, Float(0f, 10f)] public float mirostatTau = 5f;
+        [ModelAdvanced, Float(0f, 10f)]
+        public float mirostatTau = 5f;
+
         /// <summary> The Mirostat learning rate (eta) controls how quickly the algorithm responds to feedback from the generated text. </summary>
         [Tooltip("The Mirostat learning rate (eta) controls how quickly the algorithm responds to feedback from the generated text.")]
-        [ModelAdvanced, Float(0f, 1f)] public float mirostatEta = 0.1f;
+        [ModelAdvanced, Float(0f, 1f)]
+        public float mirostatEta = 0.1f;
+
         /// <summary> if greater than 0, the response also contains the probabilities of top N tokens for each generated token. </summary>
         [Tooltip("if greater than 0, the response also contains the probabilities of top N tokens for each generated token.")]
-        [ModelAdvanced, Int(0, 10)] public int nProbs = 0;
+        [ModelAdvanced, Int(0, 10)]
+        public int nProbs = 0;
+
         /// <summary> ignore end of stream token and continue generating. </summary>
         [Tooltip("ignore end of stream token and continue generating.")]
-        [ModelAdvanced] public bool ignoreEos = false;
+        [ModelAdvanced]
+        public bool ignoreEos = false;
+
         /// <summary> number of tokens to retain from the prompt when the model runs out of context (-1 = LLMCharacter prompt tokens if setNKeepToPrompt is set to true). </summary>
         [Tooltip("number of tokens to retain from the prompt when the model runs out of context (-1 = LLMCharacter prompt tokens if setNKeepToPrompt is set to true).")]
         public int nKeep = -1;
+
         /// <summary> stopwords to stop the LLM in addition to the default stopwords from the chat template. </summary>
         [Tooltip("stopwords to stop the LLM in addition to the default stopwords from the chat template.")]
         public List<string> stop = new List<string>();
+
         /// <summary> the logit bias option allows to manually adjust the likelihood of specific tokens appearing in the generated text.
         /// By providing a token ID and a positive or negative bias value, you can increase or decrease the probability of that token being generated. </summary>
         [Tooltip("the logit bias option allows to manually adjust the likelihood of specific tokens appearing in the generated text. By providing a token ID and a positive or negative bias value, you can increase or decrease the probability of that token being generated.")]
         public Dictionary<int, string> logitBias = null;
+
         /// <summary> Receive the reply from the model as it is produced (recommended!).
         /// If not selected, the full reply from the model is received in one go </summary>
         [Tooltip("Receive the reply from the model as it is produced (recommended!). If not selected, the full reply from the model is received in one go")]
-        [Chat] public bool stream = true;
+        [Chat]
+        public bool stream = true;
+
         /// <summary> the name of the player </summary>
         [Tooltip("the name of the player")]
-        [Chat] public string playerName = "user";
+        [Chat]
+        public string playerName = "user";
+
         /// <summary> the name of the AI </summary>
         [Tooltip("the name of the AI")]
-        [Chat] public string AIName = "assistant";
+        [Chat]
+        public string AIName = "assistant";
+
         /// <summary> a description of the AI role (system prompt) </summary>
         [Tooltip("a description of the AI role (system prompt)")]
-        [TextArea(20, 30), Chat] public string prompt = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.";
+        [TextArea(20, 30), Chat]
+        public string prompt = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.";
+
         /// <summary> set the number of tokens to always retain from the prompt (nKeep) based on the LLMCharacter system prompt </summary>
         [Tooltip("set the number of tokens to always retain from the prompt (nKeep) based on the LLMCharacter system prompt")]
         public bool setNKeepToPrompt = true;
+
         /// <summary> the chat history as list of chat messages </summary>
         [Tooltip("the chat history as list of chat messages")]
         public List<ChatMessage> chat = new List<ChatMessage>();
+
         /// <summary> the grammar to use </summary>
         [Tooltip("the grammar to use")]
         public string grammarString;
+
         /// <summary> the grammar to use </summary>
         [Tooltip("the grammar to use")]
         public string grammarJSONString;

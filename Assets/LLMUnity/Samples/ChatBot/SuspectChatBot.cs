@@ -105,7 +105,7 @@ namespace LLMUnitySamples
             // replace vertical_tab
             string message = inputFieldTMP.text.Replace("\v", "\n");
 
-            string suffix = " (You are Mark. I am the detective)";
+            string suffix = " (You are the suspect being interrogated.)";
             message = message + suffix;
             
             Task chatTask = llmCharacter.Chat(message, subtitles.SetText, AllowInput);
