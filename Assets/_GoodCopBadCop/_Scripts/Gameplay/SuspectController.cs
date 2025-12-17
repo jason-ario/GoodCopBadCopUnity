@@ -11,9 +11,13 @@ public class SuspectController : MonoBehaviour
     [TextArea(5,10)]
     [SerializeField] string prompt;
 
+    [SerializeField] private GameObject llmChatController;
+    [SerializeField] private SuspectData suspectData;
+    
     private void Start()
     {
         DisableLook();
+        LoadSuspect(suspectData);
     }
 
     public void LoadSuspect(SuspectData suspectData)
@@ -27,6 +31,7 @@ public class SuspectController : MonoBehaviour
         suspectPrompt += "Your conversation style is " + suspectData.conversationStyle + ". ";
         suspectPrompt += "You are " + (suspectData.isGuilty ? "guilty" : "innocent") + ". ";
         _llmCharacter.prompt = prompt + suspectPrompt;
+        llmChatController.SetActive(true);
     }
 
     public void EnableLook()

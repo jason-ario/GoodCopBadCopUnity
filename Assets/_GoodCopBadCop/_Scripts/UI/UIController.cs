@@ -9,7 +9,6 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject _textChat;
     [SerializeField] private GameObject toolShopUI;
-    [SerializeField] private GameObject caseFileUI;
 
     private void Awake()
     {
