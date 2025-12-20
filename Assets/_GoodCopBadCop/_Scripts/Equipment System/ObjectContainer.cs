@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class ObjectContainer : MonoBehaviour
 {
-    private PickableObject[] itemsHeld;
+    [SerializeField] private PickableObject[] itemsHeld;
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
     
@@ -40,6 +40,7 @@ public class ObjectContainer : MonoBehaviour
     
     public void EquipItem(PickableItemData itemData)
     {
+        Debug.Log(itemsHeld.Length);
         foreach (var itemHeld in itemsHeld)
         {
             if (itemData == itemHeld.ItemData)
