@@ -25,7 +25,6 @@ public class LevelSelectController : MonoBehaviour
     public void StartInterrogation(SuspectData suspect)
     {
         SceneContextController.Instance.OnLevelSelected(); 
-        SuspectController.Instance.LoadSuspect(suspect);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
         UIController.Instance.CloseLevelSelectUI();
     }
