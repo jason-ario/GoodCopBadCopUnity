@@ -18,7 +18,7 @@ public class RoomController : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            suspect.DisableLook();
+            //suspect.DisableLook();
         }
     }
 }

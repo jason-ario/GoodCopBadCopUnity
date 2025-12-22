@@ -19,6 +19,9 @@ public class PlayerMovementController : MonoBehaviour
     public float MoveZRaw { get; private set; }
     
     bool canControl = true;
+
+    public bool CanMove;
+    public bool CanLook;
     
     public Transform CameraTransform => cameraTransform;
     public bool CanControl
@@ -30,9 +33,13 @@ public class PlayerMovementController : MonoBehaviour
 
             if (canControl)
             {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-                GetComponent<PlayerInteractionController>().SetReticleActive(true);
+                if (CanLook)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                    GetComponent<PlayerInteractionController>().SetReticleActive(true);
+                }
+               
             }
             else
             {
@@ -72,6 +79,8 @@ public class PlayerMovementController : MonoBehaviour
         Vector3 moveDir = new Vector3(MoveX, 0, MoveZ);
         moveDir = transform.TransformDirection(moveDir);
         moveDir *= characterSpeed;
+
+        return;
         _characterController.Move(moveDir * Time.deltaTime);
     }
 

@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using FIMSpace.FLook;
 using UnityEngine;
 
@@ -11,20 +12,33 @@ public class SuspectController : MonoBehaviour
 
     [SerializeField] private GameObject llmChatController;
     [SerializeField] private SuspectData suspectData;
-    
-    private void Start()
-    {
-        DisableLook();
-    }
+    [SerializeField] private Transform spawnPos;
+    [SerializeField] private Transform standPos;
+    [SerializeField] Animator animator;
+    [SerializeField] private Transform suspectTransform;
 
     public void EnableLook()
     {
         _lookAnimator.ObjectToFollow = Camera.main.transform;
     }
-    
-    public void DisableLook()
+
+    private void Start()
     {
-        _lookAnimator.ObjectToFollow = null;
+        GameManager.Instance.OnRoundStart += StartRound;
+        suspectTransform.rotation = spawnPos.rotation;
+        suspectTransform.position = spawnPos.position;
+    }
+
+    void StartRound()
+    {
+        animator.SetBool("Walking", true);
+        suspectTransform.DOMove(standPos.position, 3f).OnComplete(ArrivedAtPosition);
+    }
+
+    void ArrivedAtPosition()
+    {
+        suspectTransform.DORotateQuaternion(standPos.rotation, 1f);
+        animator.SetBool("Walking", false);
     }
 }
 
