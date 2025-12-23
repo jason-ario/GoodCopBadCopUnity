@@ -28,6 +28,11 @@ public class UIController : MonoBehaviour
             return;
         }
         
+        if(PlayerInstance.Instance == null)
+        {
+            return;
+        }
+        
         if(PlayerInstance.Instance.CanControl == false) return;
         
         if (Input.GetKeyDown(KeyCode.Tab))

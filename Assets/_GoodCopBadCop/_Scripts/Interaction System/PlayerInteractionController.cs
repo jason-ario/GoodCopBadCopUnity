@@ -14,6 +14,7 @@ public class PlayerInteractionController : MonoBehaviour
     private void Awake()
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
+        reticle = GameObject.FindFirstObjectByType<ReticleController>();
     }
 
     void Update()
