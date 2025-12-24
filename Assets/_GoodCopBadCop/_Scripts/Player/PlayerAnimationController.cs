@@ -14,6 +14,19 @@ public class PlayerAnimationController : NetworkBehaviour
     private float currentMoveX = 0f;
     private float currentMoveZ = 0f;
     
+    [SerializeField] Transform headLookAtTransform;
+    [SerializeField] Transform chestLookAtTransform;
+    
+    private NetworkVariable<Vector3> headLookAtPos =
+        new NetworkVariable<Vector3>(
+            writePerm: NetworkVariableWritePermission.Owner
+        );
+
+    private NetworkVariable<Vector3> chestLookAtPos =
+        new NetworkVariable<Vector3>(
+            writePerm: NetworkVariableWritePermission.Owner
+        );
+    
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
@@ -41,6 +54,16 @@ public class PlayerAnimationController : NetworkBehaviour
 
     private void UpdateAnimations()
     {
+        if(IsLocalPlayer == false)
+        {
+            headLookAtTransform.position = headLookAtPos.Value;
+            chestLookAtTransform.position = chestLookAtPos.Value;
+            return;
+        }
+
+        headLookAtPos.Value = headLookAtTransform.position;
+        chestLookAtPos.Value = chestLookAtTransform.position;
+
         // Smoothly lerp between current and target values
         currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * animLerpSpeed);
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
