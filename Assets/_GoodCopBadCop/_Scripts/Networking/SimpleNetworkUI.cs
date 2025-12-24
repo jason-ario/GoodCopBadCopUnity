@@ -1,26 +1,24 @@
+using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using Netcode.Transports.Facepunch;
+using Steamworks;
+using Steamworks.Data;
 using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 public class SimpleNetworkUI : MonoBehaviour
 {
     public GameObject uiRoot;
-    public string hostIP = "178.134.251.97"; // <-- HOST LAN IP
-    [SerializeField] UnityTransport transport;
     [SerializeField] string ipAddress;
 
     
     void Start()
     {
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-        ipAddress = "0.0.0.0";
-        SetIpAddress(); // Set the Ip to the above address
     }
-
-
-
+    
     
     void OnDestroy()
     {
@@ -28,52 +26,49 @@ public class SimpleNetworkUI : MonoBehaviour
         NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
     }
 
-    public void Host()
+    public async void Host()
     {
+        Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+        lobby.SetPublic();
+
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        lobby.SetData("created_at", timestamp.ToString());
+
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport
+            as FacepunchTransport;
+
+        transport.targetSteamId = lobby.Owner.Id;
+
         NetworkManager.Singleton.StartHost();
-        GetLocalIPAddress();
         uiRoot.SetActive(false);
     }
-    
-    // To Join a game
-    public void StartClient() {
-        NetworkManager.Singleton.StartClient();
-    }
 
-    public void Join()
+    public async void Join()
     {
-        var transport = (UnityTransport)
-            NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+        Lobby[] lobbies = await SteamMatchmaking.LobbyList
+            .WithSlotsAvailable(1)
+            .RequestAsync();
 
-        SetIpAddress();
-        transport.ConnectionData.Address = hostIP;
+        if (lobbies == null || lobbies.Length == 0)
+        {
+            Debug.Log("No lobbies found");
+            return;
+        }
+
+        Lobby newestLobby = lobbies
+            .Where(l => l.GetData("created_at") != null)
+            .OrderByDescending(l => long.Parse(l.GetData("created_at")))
+            .First();
+
+        await newestLobby.Join();
+
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport
+            as FacepunchTransport;
+
+        transport.targetSteamId = newestLobby.Owner.Id;
 
         NetworkManager.Singleton.StartClient();
         uiRoot.SetActive(false);
-    }
-    
-    /* Gets the Ip Address of your connected network and
-    shows on the screen in order to let other players join
-    by inputing that Ip in the input field */
-    // ONLY FOR HOST SIDE 
-    public string GetLocalIPAddress() {
-        var host = Dns.GetHostEntry(Dns.GetHostName());
-        foreach (var ip in host.AddressList) {
-            if (ip.AddressFamily == AddressFamily.InterNetwork) {
-                ipAddress = ip.ToString();
-                Debug.Log(ipAddress);
-                return ip.ToString();
-            }
-        }
-        throw new System.Exception("No network adapters with an IPv4 address in the system!");
-    }
-
-    /* Sets the Ip Address of the Connection Data in Unity Transport
-    to the Ip Address which was input in the Input Field */
-    // ONLY FOR CLIENT SIDE
-    public void SetIpAddress() {
-        transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        transport.ConnectionData.Address = ipAddress;
     }
 
     void OnClientConnected(ulong clientId)
