@@ -19,6 +19,11 @@ public class GameManager : MonoBehaviour
         StartCoroutine(StartLevel());
     }
 
+    public void OnStartLevel()
+    {
+        
+    }
+
     IEnumerator StartLevel()
     {
         yield return new WaitForSeconds(3);
