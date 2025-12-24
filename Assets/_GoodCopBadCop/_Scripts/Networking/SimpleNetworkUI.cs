@@ -1,9 +1,11 @@
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 public class SimpleNetworkUI : MonoBehaviour
 {
     public GameObject uiRoot;
+    public string hostIP = "178.134.251.97"; // <-- HOST LAN IP
 
     void Start()
     {
@@ -24,6 +26,11 @@ public class SimpleNetworkUI : MonoBehaviour
 
     public void Join()
     {
+        var transport = (UnityTransport)
+            NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+
+        transport.ConnectionData.Address = hostIP;
+
         NetworkManager.Singleton.StartClient();
         uiRoot.SetActive(false);
     }
