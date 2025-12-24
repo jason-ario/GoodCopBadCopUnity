@@ -1,7 +1,8 @@
 using System;
+using Unity.Netcode;
 using UnityEngine;
 
-public class PlayerInstance : MonoBehaviour
+public class PlayerInstance : NetworkBehaviour
 {
     public static PlayerInstance Instance;
 
@@ -11,8 +12,19 @@ public class PlayerInstance : MonoBehaviour
     
     private void Awake()
     {
-        Instance = this;
         _playerMovementController = GetComponent<PlayerMovementController>();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        
+        if (IsLocalPlayer == false)
+        {
+            return;
+        }
+        
+        Instance = this;
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

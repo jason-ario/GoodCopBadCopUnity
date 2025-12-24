@@ -1,11 +1,13 @@
+using Unity.Netcode;
 using UnityEngine;
 
 [RequireComponent(typeof(Animator))]
-public class PlayerAnimationController : MonoBehaviour
+public class PlayerAnimationController : NetworkBehaviour
 {
     [SerializeField] private Animator bodyAnimator;
     [SerializeField] private Animator armsAnimator;
     private PlayerMovementController _playerMovementController;
+    [SerializeField] private GameObject armsOnBody;
     
     [SerializeField] private float animLerpSpeed = 5f;
     
@@ -21,7 +23,22 @@ public class PlayerAnimationController : MonoBehaviour
     {
         UpdateAnimations();
     }
-    
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        
+        if (IsLocalPlayer == false)
+        {
+            armsOnBody.layer = LayerMask.NameToLayer("Default");
+
+            foreach (Transform child in armsOnBody.transform)
+            {
+                armsOnBody.layer = LayerMask.NameToLayer("Default");
+            }
+        }
+    }
+
     private void UpdateAnimations()
     {
         // Smoothly lerp between current and target values

@@ -741,6 +741,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8000816560836992802}
   - component: {fileID: 5788063810737065446}
+  - component: {fileID: 5699448016634563419}
   - component: {fileID: 3041942974558453909}
   - component: {fileID: 6460359851244041616}
   - component: {fileID: 5651200760162566270}
@@ -749,7 +750,6 @@ GameObject:
   - component: {fileID: 6845953909524944592}
   - component: {fileID: 371220573109159834}
   - component: {fileID: 7541639783584628704}
-  - component: {fileID: 5699448016634563419}
   - component: {fileID: 7132022092377744834}
   m_Layer: 0
   m_Name: Player
@@ -805,6 +805,31 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 1.32, z: 0}
+--- !u!114 &5699448016634563419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1936807553
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &3041942974558453909
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -817,6 +842,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 659ace02b2ea3004786e7de9df09d80d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   characterSpeed: 2
   cameraTransform: {fileID: 379908663391551372}
   mouseSensitivity: 2
@@ -835,8 +861,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c38b537818995a489d1648d20d5430e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   bodyAnimator: {fileID: 5651200760162566270}
   armsAnimator: {fileID: 3679315214518465595}
+  armsOnBody: {fileID: 6028187549922927467}
   animLerpSpeed: 10
 --- !u!95 &5651200760162566270
 Animator:
@@ -888,6 +916,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5100d788b4a743d49a4a92ac396681f9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   cam: {fileID: 2394760599302704364}
   interactDistance: 6
   interactLayer:
@@ -908,6 +937,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 985dba30433abef458987c55279f167b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   holdPoint: {fileID: 6989590167347024618}
   holdSmoothness: 10
   objectContainers:
@@ -925,6 +955,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97396c99c298a314db1fba96172650c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!114 &7541639783584628704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -952,31 +983,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 625053f3e04f5274e93163b6e1c27b55, type: 3}
   pitchRandomness: 0.1
   disable: 0
---- !u!114 &5699448016634563419
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2953290070593623070}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!114 &7132022092377744834
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2897,6 +2903,11 @@ Transform:
 --- !u!4 &5781438277871687768 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7208261743932278219, guid: 09305a8c421cc1b449c41c360907392b, type: 3}
+  m_PrefabInstance: {fileID: 3761394807423655315}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &6028187549922927467 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -1757736439733616904, guid: 09305a8c421cc1b449c41c360907392b, type: 3}
   m_PrefabInstance: {fileID: 3761394807423655315}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &6384723108777783127 stripped

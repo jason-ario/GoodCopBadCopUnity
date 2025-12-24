@@ -1,7 +1,8 @@
 using System;
+using Unity.Netcode;
 using UnityEngine;
 
-public class PlayerInteractionController : MonoBehaviour
+public class PlayerInteractionController : NetworkBehaviour
 {
     public Camera cam;
     public float interactDistance = 3f;
@@ -19,6 +20,11 @@ public class PlayerInteractionController : MonoBehaviour
 
     void Update()
     {
+        if (IsLocalPlayer == false)
+        {
+            return;
+        }
+        
         HandleReticle();
 
         if (Input.GetKeyDown(KeyCode.E))

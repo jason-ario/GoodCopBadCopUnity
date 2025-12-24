@@ -1,10 +1,11 @@
 using System;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.Cursor;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerMovementController : MonoBehaviour
+public class PlayerMovementController : NetworkBehaviour
 {
     private CharacterController _characterController;
     [SerializeField] private float characterSpeed;
@@ -57,8 +58,19 @@ public class PlayerMovementController : MonoBehaviour
         Cursor.visible = false;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        if (IsLocalPlayer == false)
+        {
+            cameraTransform.gameObject.SetActive(false);
+        }
+    }
+    
+
     private void Update()
     {
+        if(IsLocalPlayer == false) return;
         if (canControl == false)
         {
             return;

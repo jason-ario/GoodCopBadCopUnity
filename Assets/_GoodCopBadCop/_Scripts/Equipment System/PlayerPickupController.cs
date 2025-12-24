@@ -1,7 +1,8 @@
 using System;
+using Unity.Netcode;
 using UnityEngine;
 
-public class PlayerPickupController : MonoBehaviour
+public class PlayerPickupController : NetworkBehaviour
 {
     public Transform holdPoint;
     public float holdSmoothness = 10f;
@@ -19,6 +20,11 @@ public class PlayerPickupController : MonoBehaviour
 
     void Update()
     {
+        if (IsLocalPlayer == false)
+        {
+            return;
+        }
+
         if (heldObject != null)
         {
             // Drop with E or right-click
