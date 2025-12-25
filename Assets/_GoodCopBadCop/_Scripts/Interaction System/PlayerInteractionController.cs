@@ -27,7 +27,7 @@ public class PlayerInteractionController : NetworkBehaviour
         
         HandleReticle();
 
-        if (Input.GetKeyDown(KeyCode.E))
+        if (Input.GetMouseButtonDown(0))
         {
             TryInteract();
         }

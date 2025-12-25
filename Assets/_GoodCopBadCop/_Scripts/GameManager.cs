@@ -12,6 +12,7 @@ public class GameManager : NetworkBehaviour
     public UnityAction OnRoundStart;
 
     NetworkVariable<bool> levelStarted = new NetworkVariable<bool>();
+    [SerializeField] WindowLampController windowLampController;
 
     private void Awake()
     {
@@ -21,7 +22,10 @@ public class GameManager : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         if (levelStarted.Value)
+        {
             rollingShutter.SetBool("Open", true);
+            windowLampController.TurnGreen();
+        }
     }
 
     // 🔘 CALL THIS FROM UI (client or host)
@@ -51,5 +55,6 @@ public class GameManager : NetworkBehaviour
     {
         OnRoundStart?.Invoke();
         rollingShutter.SetBool("Open", true);
+        windowLampController.TurnGreen();
     }
 }
