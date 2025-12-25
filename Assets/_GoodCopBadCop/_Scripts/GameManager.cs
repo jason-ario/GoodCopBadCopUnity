@@ -1,32 +1,54 @@
 using System;
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class GameManager : MonoBehaviour
+public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
-    [SerializeField] private Animator rollingShutter;
 
+    [SerializeField] private Animator rollingShutter;
     public UnityAction OnRoundStart;
+
+    NetworkVariable<bool> levelStarted = new NetworkVariable<bool>();
+
     private void Awake()
     {
         Instance = this;
     }
 
-    private void Start()
+    public override void OnNetworkSpawn()
     {
-        StartCoroutine(StartLevel());
+        if (levelStarted.Value)
+            rollingShutter.SetBool("Open", true);
     }
 
-    public void OnStartLevel()
+    // 🔘 CALL THIS FROM UI (client or host)
+    public void TryStartLevel()
     {
-        
+        if (IsServer)
+            StartLevel();
+        else
+            RequestStartLevelServerRpc();
     }
 
-    IEnumerator StartLevel()
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestStartLevelServerRpc()
     {
-        yield return new WaitForSeconds(3);
+        StartLevel();
+    }
+
+    private void StartLevel()
+    {
+        if (!IsServer) return;
+        levelStarted.Value = true;
+        StartLevelClientRpc();
+    }
+
+    [ClientRpc]
+    private void StartLevelClientRpc()
+    {
         OnRoundStart?.Invoke();
         rollingShutter.SetBool("Open", true);
     }
