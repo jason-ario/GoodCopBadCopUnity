@@ -13,6 +13,7 @@ public class GameManager : NetworkBehaviour
 
     NetworkVariable<bool> levelStarted = new NetworkVariable<bool>();
     [SerializeField] WindowLampController windowLampController;
+    [SerializeField] private AudioSource _buzzerSound;
 
     private void Awake()
     {
@@ -46,6 +47,8 @@ public class GameManager : NetworkBehaviour
     private void StartLevel()
     {
         if (!IsServer) return;
+        if (levelStarted.Value) { return; }
+        
         levelStarted.Value = true;
         StartLevelClientRpc();
     }
@@ -53,8 +56,27 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void StartLevelClientRpc()
     {
-        OnRoundStart?.Invoke();
-        rollingShutter.SetBool("Open", true);
+        StartCoroutine(OpenWindowSequence(true));
+    }
+
+    public void OpenWindow()
+    {
+        StartCoroutine(OpenWindowSequence(false));
+    }
+
+    IEnumerator OpenWindowSequence(bool startGame)
+    {
+        _buzzerSound.Play(); 
+        yield return new WaitForSeconds(.5f);
         windowLampController.TurnGreen();
+
+        yield return new WaitForSeconds(3);
+        
+        if (startGame)
+        {
+            OnRoundStart?.Invoke();
+        }
+        
+        rollingShutter.SetBool("Open", true);
     }
 }

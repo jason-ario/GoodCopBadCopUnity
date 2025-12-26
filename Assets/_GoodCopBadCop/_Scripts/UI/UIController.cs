@@ -18,7 +18,6 @@ public class UIController : MonoBehaviour
     private void Start()
     {
         _textChat.SetActive(false);
-        playerUI.SetActive(true);
     }
 
     private void Update()
@@ -74,5 +73,10 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
         
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+    }
+
+    public void ClosePlayerUI()
+    {
+        playerUI.SetActive(false);
     }
 }
