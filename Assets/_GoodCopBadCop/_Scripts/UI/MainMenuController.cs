@@ -13,7 +13,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Transform _camEndPos;
     [SerializeField] WindowLampController windowLampController;
     [SerializeField] private float _timeTillOpenWindow = 8;
-
+    
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
