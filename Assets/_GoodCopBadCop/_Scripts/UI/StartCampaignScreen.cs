@@ -11,12 +11,15 @@ public class StartCampaignScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
+        LobbyManager.Instance.OnClientJoined += RefreshUI;
         RefreshUI();
     }
 
     private void OnDisable()
     {
         LobbyManager.Instance.OnLobbyUpdated -= RefreshUI;
+        LobbyManager.Instance.OnClientJoined -= RefreshUI;
+
     }
 
     public void StartCampaignAsHost()

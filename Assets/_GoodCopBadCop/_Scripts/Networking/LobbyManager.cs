@@ -97,8 +97,6 @@ public class LobbyManager : MonoBehaviour
 
         OnClientJoined?.Invoke();
         OnLobbyUpdated?.Invoke();
-        
-
     }
 
     private void OnLobbyMemberLeave(Lobby lobby, Friend friend)
