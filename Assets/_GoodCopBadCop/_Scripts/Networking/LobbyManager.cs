@@ -133,6 +133,7 @@ public class LobbyManager : MonoBehaviour
         if (IsHost == false)
         {
             OnKicked?.Invoke();
+            CurrentLobby.Leave();
         }
         else
         {
@@ -169,16 +170,12 @@ public class LobbyManager : MonoBehaviour
 
     public void ExitLobby()
     {
-        CurrentLobby.Leave();
-
         if (IsHost)
         {
             NetworkManager.Singleton.Shutdown();
         }
-        else
-        {
-            OnKicked?.Invoke();
-        }
+        
+        CurrentLobby.Leave();
     }
 
 }
