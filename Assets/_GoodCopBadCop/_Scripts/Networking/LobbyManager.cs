@@ -89,16 +89,18 @@ public class LobbyManager : MonoBehaviour
     }
     
     
-
-    private void OnClientConnected(ulong clientId)
+    private async void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
             return;
 
-        OnClientJoined?.Invoke();
+        // Steam membership updates slightly after netcode connect
+        await Task.Delay(50);
+
+        Debug.Log($"[Host] Client connected. Steam members: {CurrentLobby.Members.Count()}");
+
         OnLobbyUpdated?.Invoke();
     }
-
     private void OnLobbyMemberLeave(Lobby lobby, Friend friend)
     {
         if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
