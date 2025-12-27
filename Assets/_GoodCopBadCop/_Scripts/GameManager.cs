@@ -63,6 +63,12 @@ public class GameManager : NetworkBehaviour
     {
         StartCoroutine(OpenWindowSequence(false));
     }
+    
+    public void ResetWindow()
+    {
+        windowLampController.TurnRed();
+        rollingShutter.SetBool("Open", false);
+    }
 
     IEnumerator OpenWindowSequence(bool startGame)
     {

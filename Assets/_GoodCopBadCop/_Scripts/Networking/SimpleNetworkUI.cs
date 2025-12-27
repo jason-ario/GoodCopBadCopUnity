@@ -135,7 +135,7 @@ public class SimpleNetworkUI : MonoBehaviour
         if (!NetworkManager.Singleton.IsServer)
             return;
 
-        PlayerSpawner.Instance.SpawnPlayer(clientId);
-        Debug.Log("Spawn Player");
+        //PlayerSpawner.Instance.SpawnPlayer(clientId);
+        Debug.Log("Player Joined");
     }
 }

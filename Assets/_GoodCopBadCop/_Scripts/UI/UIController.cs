@@ -79,4 +79,9 @@ public class UIController : MonoBehaviour
     {
         playerUI.SetActive(false);
     }
+    
+    public void ShowPlayerUI()
+    {
+        playerUI.SetActive(true);
+    }
 }

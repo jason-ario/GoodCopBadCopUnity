@@ -11,11 +11,17 @@ public class PanelButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     {
         audioSource.Play();
 
-        _animator.SetBool("Selected", true);
+        if (_animator != null)
+        {
+            _animator.SetBool("Selected", true);
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        _animator.SetBool("Selected", false);
+        if (_animator != null)
+        {
+            _animator.SetBool("Selected", false);
+        }    
     }
 }

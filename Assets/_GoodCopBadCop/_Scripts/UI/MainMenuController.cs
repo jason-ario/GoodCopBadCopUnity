@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
+using Unity.Netcode;
 using UnityEngine;
 
 public class MainMenuController : MonoBehaviour
@@ -81,6 +82,28 @@ public class MainMenuController : MonoBehaviour
         {
             chair.SetActive(false);
         }
+        
+        StopAllCoroutines();
+        
+        GameManager.Instance.ResetWindow();
+        UIController.Instance.ShowPlayerUI();
+
+        
+        Debug.Log(NetworkManager.Singleton.ConnectedClients.Count);
+        Debug.Log(NetworkManager.Singleton.LocalClientId);
+
+        if (NetworkManager.Singleton.ConnectedClients.Count > 1)
+        {
+            PlayerSpawner.Instance.SpawnPlayer(0, false);
+            PlayerSpawner.Instance.SpawnPlayer(1, false);
+        }
+        else
+        {
+            PlayerSpawner.Instance.SpawnPlayer(0, true);
+
+        }
+        
         mainMenu.SetActive(false);
+        
     }
 }
