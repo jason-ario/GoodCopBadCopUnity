@@ -46,7 +46,7 @@ public class LobbyBrowserView : MonoBehaviour
                 continue;
             }
             LobbyRow row = Instantiate(lobbyRowPrefab, lobbyListParent);
-            row.Setup(lobby, facepunch);
+            row.Setup(lobby);
         }
     }
 }

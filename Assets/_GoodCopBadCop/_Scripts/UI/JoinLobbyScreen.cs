@@ -1,22 +1,19 @@
 using System;
 using UnityEngine;
-using Unity.Netcode;
-using Steamworks;
-using Steamworks.Data;
 using TMPro;
 
 public class JoinLobbyScreen : MonoBehaviour
 {
-    [SerializeField] TMP_InputField inviteCodeInput;
-    [SerializeField] MainMenuController mainMenuController;
-    [SerializeField] StartCampaignScreen startCampaignScreen;
-    
+    [SerializeField] private TMP_InputField inviteCodeInput;
+    [SerializeField] private MainMenuController mainMenuController;
+
     private void Awake()
     {
+        // Press Enter to join
         inviteCodeInput.onSubmit.AddListener(_ => JoinWithCode());
     }
-    
-    public async void JoinWithCode()
+
+    public void JoinWithCode()
     {
         string code = inviteCodeInput.text
             .Trim()
@@ -24,8 +21,13 @@ public class JoinLobbyScreen : MonoBehaviour
             .Replace(" ", "")
             .ToUpper();
 
-        ulong lobbyId;
+        if (string.IsNullOrEmpty(code))
+        {
+            Debug.LogWarning("Invite code is empty");
+            return;
+        }
 
+        ulong lobbyId;
         try
         {
             lobbyId = InviteCodeUtility.DecodeLobbyId(code);
@@ -36,17 +38,12 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
         }
 
-        Debug.Log($"Decoded lobby ID: {lobbyId}");
+        Debug.Log($"Joining lobby {lobbyId}");
 
-        Lobby lobby = new Lobby(lobbyId);
+        // 🔑 ALL networking handled by LobbyManager
+        LobbyManager.Instance.JoinLobby(lobbyId);
 
-        Debug.Log("Joining lobby...");
-        await lobby.Join();
-
-        Debug.Log("Starting client...");
-        NetworkManager.Singleton.StartClient();
-        startCampaignScreen.SetCurrentLobby(lobby);
-        mainMenuController.OpenStartCampaignScreen(true);
+        // ✅ UI only — client waiting screen
+        mainMenuController.OpenStartCampaignAsClient();
     }
-    
 }

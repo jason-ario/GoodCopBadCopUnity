@@ -118,7 +118,7 @@ public class SimpleNetworkUI : MonoBehaviour
                  .OrderByDescending(l => long.Parse(l.GetData("created_at"))))
         {
             LobbyRow row = Instantiate(lobbyRowPrefab, lobbyListParent);
-            row.Setup(lobby, facepunch);
+            row.Setup(lobby);
         }
     }
 

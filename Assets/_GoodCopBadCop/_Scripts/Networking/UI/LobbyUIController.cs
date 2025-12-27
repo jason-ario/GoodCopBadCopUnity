@@ -64,7 +64,7 @@ public class LobbyBrowser : MonoBehaviour
                  .OrderByDescending(l => long.Parse(l.GetData("created_at"))))
         {
             LobbyRow row = Instantiate(lobbyRowPrefab, contentRoot);
-            row.Setup(lobby, transport);
+            row.Setup(lobby);
         }
     }
 

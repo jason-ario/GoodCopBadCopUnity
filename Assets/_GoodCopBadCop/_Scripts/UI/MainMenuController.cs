@@ -1,120 +1,151 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
-using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class MainMenuController : MonoBehaviour
 {
     public static MainMenuController Instance;
-    
+
     [Header("Screens")]
     [SerializeField] private GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
+    [SerializeField] private StartCampaignScreen startCampaignScreenScript;
     [SerializeField] private GameObject joinGameScreen;
-    public StartCampaignScreen startCampaignScreenScript;
 
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private GameObject[] chairs;
-    [SerializeField] private GameObject _camera;
-    [SerializeField] private Transform _camEndPos;
-    [SerializeField] WindowLampController windowLampController;
-    [SerializeField] private float _timeTillOpenWindow = 8;
+    [SerializeField] private GameObject sceneCamera;
+    [SerializeField] private Transform camEndPos;
+    [SerializeField] private WindowLampController windowLampController;
+    [SerializeField] private float timeTillOpenWindow = 8f;
 
-    private GameObject _currentScreen;
-    private List<GameObject> _allScreens;
+    private GameObject currentScreen;
+    private List<GameObject> allScreens;
+
+    #region Unity Lifecycle
 
     private void Awake()
     {
+        if (Instance != null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
-        
-        // Initialize the list of screens for easier management
-        _allScreens = new List<GameObject> 
-        { 
-            homeScreen, startShiftScreen, newLoadCampaignScreen, 
-            startCampaignScreen, joinGameScreen 
+
+        allScreens = new List<GameObject>
+        {
+            homeScreen,
+            startShiftScreen,
+            newLoadCampaignScreen,
+            startCampaignScreen,
+            joinGameScreen
         };
     }
 
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
-        
-        // Initial state: ensure only home screen is active
+
         SwitchToScreen(homeScreen);
         
-        _camera.transform.DOMove(_camEndPos.position, 30);
+        sceneCamera.transform.DOMove(camEndPos.position, 30f);
+
         StartCoroutine(WaitAndOpenWindow());
     }
 
-    private void SwitchToScreen(GameObject targetScreen)
-    {
-        if (targetScreen == null) return;
+    #endregion
 
-        foreach (var screen in _allScreens)
-        {
-            screen.SetActive(screen == targetScreen);
-        }
-        _currentScreen = targetScreen;
+    #region Screen Switching
+
+    private void SwitchToScreen(GameObject target)
+    {
+        if (target == null)
+            return;
+
+        foreach (var screen in allScreens)
+            screen.SetActive(screen == target);
+
+        currentScreen = target;
     }
 
-    IEnumerator WaitAndOpenWindow()
-    {
-        yield return new WaitForSeconds(_timeTillOpenWindow);
-        GameManager.Instance.OpenWindow();
-    }
+    public void OpenStartShiftScreen() =>
+        SwitchToScreen(startShiftScreen);
 
-    public void OpenStartShiftScreen() => SwitchToScreen(startShiftScreen);
-    
-    public void OpenNewLoadCampaignScreen() => SwitchToScreen(newLoadCampaignScreen);
-    
-    public void OpenStartCampaignScreen(bool isClient)
+    public void OpenNewLoadCampaignScreen() =>
+        SwitchToScreen(newLoadCampaignScreen);
+
+    public void OpenJoinLobbyScreen() =>
+        SwitchToScreen(joinGameScreen);
+
+    public void BackToHomeScreen() =>
+        SwitchToScreen(homeScreen);
+
+    public void BackToStartShiftScreen() =>
+        SwitchToScreen(startShiftScreen);
+
+    #endregion
+
+    #region Multiplayer Entry Points (UI → LobbyManager)
+
+    /// <summary>
+    /// Host flow: start server + create lobby
+    /// </summary>
+    public void OpenStartCampaignAsHost()
     {
         SwitchToScreen(startCampaignScreen);
-
-        if (isClient == false)
-        {
-            startCampaignScreenScript.StartCampaignAsHost();
-        }
-        else
-        {
-            startCampaignScreenScript.OpenAsClient();
-        }
+        startCampaignScreenScript.StartCampaignAsHost();
     }
 
-    public void OpenJoinLobbyScreen() => SwitchToScreen(joinGameScreen);
+    /// <summary>
+    /// Client flow: waiting screen (actual join triggered elsewhere)
+    /// </summary>
+    public void OpenStartCampaignAsClient()
+    {
+        SwitchToScreen(startCampaignScreen);
+    }
 
-    public void BackToHomeScreen() => SwitchToScreen(homeScreen);
-    
-    public void BackToStartShiftScreen() => SwitchToScreen(startShiftScreen);
+    #endregion
+
+    #region Game Start
 
     public void StartGame()
     {
         foreach (var chair in chairs)
-        {
             chair.SetActive(false);
-        }
-        
+
         StopAllCoroutines();
-        
+
         GameManager.Instance.ResetWindow();
         UIController.Instance.ShowPlayerUI();
-        
+
         mainMenu.SetActive(false);
-        
+
         GameManager.Instance.TryStartGame();
     }
 
     public void HideAllMenus()
     {
-        foreach (var screen in _allScreens)
-        {
+        foreach (var screen in allScreens)
             screen.SetActive(false);
-        }
     }
+
+    #endregion
+
+    #region Scene Effects
+
+    private IEnumerator WaitAndOpenWindow()
+    {
+        yield return new WaitForSeconds(timeTillOpenWindow);
+        GameManager.Instance.OpenWindow();
+    }
+
+    #endregion
 }
