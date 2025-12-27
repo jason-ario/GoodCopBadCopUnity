@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using TMPro;
 
@@ -11,9 +12,20 @@ public class StartCampaignScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
+        
         RefreshUI();
+        //StartCoroutine(RefreshUIRepeating());
     }
 
+    IEnumerator RefreshUIRepeating()
+    {
+        while (true)
+        {
+            RefreshUI();
+            yield return new WaitForSeconds(1f);
+        }
+    }
+    
     private void OnDisable()
     {
         LobbyManager.Instance.OnLobbyUpdated -= RefreshUI;

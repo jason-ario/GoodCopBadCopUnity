@@ -1,9 +1,11 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Netcode.Transports.Facepunch;
 using UnityEngine;
 using Unity.Netcode;
 using Steamworks;
 using Steamworks.Data;
+using Unity.Netcode.Transports.UTP;
 
 public class LobbyManager : MonoBehaviour
 {
@@ -56,8 +58,23 @@ public class LobbyManager : MonoBehaviour
     {
         var lobby = new Lobby(lobbyId);
         await lobby.Join();
+        
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+
+        if (transport is FacepunchTransport)
+        {
+        }
+        else if (transport is UnityTransport unityTransport)
+        {
+            // Simple LAN fallback
+            unityTransport.SetConnectionData("127.0.0.1", 7777);
+        }
+        
+        NetworkManager.Singleton.StartClient();
         // OnLobbyEntered will fire locally
     }
+    
+
 
     // =========================
     // STEAM CALLBACKS
