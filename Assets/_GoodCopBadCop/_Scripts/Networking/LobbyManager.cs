@@ -48,6 +48,13 @@ public class LobbyManager : MonoBehaviour
         lobby.SetPublic();
         lobby.SetJoinable(true);
         lobby.SetData("host", SteamClient.Name);
+        
+        OnLobbyUpdated?.Invoke();
+        var members = LobbyManager.Instance.GetMembersSnapshot();
+        foreach (var friend in members)
+        {
+            Debug.Log(friend.Name);
+        }
     }
 
     // =========================
@@ -68,12 +75,20 @@ public class LobbyManager : MonoBehaviour
         CurrentLobby = lobby;
 
         Debug.Log($"Lobby entered. Members: {CurrentLobby.Members.Count()}");
-
+        
+        var members = LobbyManager.Instance.GetMembersSnapshot();
+        foreach (var friend in members)
+        {
+            Debug.Log(friend.Name);
+        }
+        
         OnLobbyUpdated?.Invoke();
 
         if (!NetworkManager.Singleton.IsHost)
             NetworkManager.Singleton.StartClient();
     }
+    
+    
 
     private void OnClientConnected(ulong clientId)
     {
@@ -82,6 +97,8 @@ public class LobbyManager : MonoBehaviour
 
         OnClientJoined?.Invoke();
         OnLobbyUpdated?.Invoke();
+        
+
     }
 
     private void OnLobbyMemberLeave(Lobby lobby, Friend friend)

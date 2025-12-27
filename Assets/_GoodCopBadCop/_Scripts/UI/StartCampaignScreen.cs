@@ -11,6 +11,7 @@ public class StartCampaignScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
+        RefreshUI();
     }
 
     private void OnDisable()
@@ -26,12 +27,17 @@ public class StartCampaignScreen : MonoBehaviour
 
     private void RefreshUI()
     {
+        Debug.Log("Refreshing UI");
+        
         var members = LobbyManager.Instance.GetMembersSnapshot();
+        inviteCodeText.text = InviteCodeUtility.EncodeLobbyId(LobbyManager.Instance.CurrentLobby.Id);
 
         for (int i = 0; i < playerPanels.Length; i++)
+        {
             playerPanels[i].gameObject.SetActive(false);
+        }
 
-        for (int i = 0; i < members.Length && i < playerPanels.Length; i++)
+        for (int i = 0; i < members.Length; i++)
         {
             playerPanels[i].PopulateInfo(members[i].Name);
             playerPanels[i].gameObject.SetActive(true);
