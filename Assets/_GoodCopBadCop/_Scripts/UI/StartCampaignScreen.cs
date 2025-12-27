@@ -24,6 +24,8 @@ public class StartCampaignScreen : MonoBehaviour
         // 2️⃣ Create Steam Lobby
         Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
 
+    
+        
         // 3️⃣ Make it joinable
         lobby.SetFriendsOnly(); // or SetPublic()
         lobby.SetJoinable(true);
@@ -33,7 +35,8 @@ public class StartCampaignScreen : MonoBehaviour
         lobby.SetData("host", SteamClient.Name);
 
         // 5️⃣ Display invite code (Lobby ID)
-        string inviteCode = lobby.Id.ToString();
+        string shortCode = InviteCodeUtility.EncodeLobbyId(lobby.Id);
+        string inviteCode = shortCode;
         Debug.Log($"Invite Code: {inviteCode}");
         inviteCodeText.text = "Invite Code: " + inviteCode;
 
