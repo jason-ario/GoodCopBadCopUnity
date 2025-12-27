@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Unity.Netcode;
 using Steamworks;
@@ -17,11 +18,25 @@ public class JoinLobbyScreen : MonoBehaviour
     
     public async void JoinWithCode()
     {
-        if (!ulong.TryParse(inviteCodeInput.text, out ulong lobbyId))
+        string code = inviteCodeInput.text
+            .Trim()
+            .Replace("-", "")
+            .Replace(" ", "")
+            .ToUpper();
+
+        ulong lobbyId;
+
+        try
         {
-            Debug.LogError("Invalid invite code");
+            lobbyId = InviteCodeUtility.DecodeLobbyId(code);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Invalid invite code: {e.Message}");
             return;
         }
+
+        Debug.Log($"Decoded lobby ID: {lobbyId}");
 
         Lobby lobby = new Lobby(lobbyId);
 
@@ -30,6 +45,7 @@ public class JoinLobbyScreen : MonoBehaviour
 
         Debug.Log("Starting client...");
         NetworkManager.Singleton.StartClient();
+
         mainMenuController.OpenStartCampaignScreen(true);
     }
 }
