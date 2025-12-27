@@ -164,7 +164,6 @@ public class StartCampaignScreen : MonoBehaviour
         // Host-only: enable Start when both players present
         if (NetworkManager.Singleton.IsHost)
         {
-            startButton.SetActive(count >= 2);
             waitForHostText.SetActive(false);
         }
         else

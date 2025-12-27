@@ -45,7 +45,7 @@ public class JoinLobbyScreen : MonoBehaviour
 
         Debug.Log("Starting client...");
         NetworkManager.Singleton.StartClient();
-
+        startCampaignScreen.SetCurrentLobby(lobby);
         mainMenuController.OpenStartCampaignScreen(true);
     }
 }

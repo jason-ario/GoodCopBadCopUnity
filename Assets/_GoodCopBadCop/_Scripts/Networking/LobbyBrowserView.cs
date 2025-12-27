@@ -38,10 +38,13 @@ public class LobbyBrowserView : MonoBehaviour
             return;
         }
 
-        foreach (Lobby lobby in lobbies
-                     .Where(l => !string.IsNullOrEmpty(l.GetData("created_at")))
-                     .OrderByDescending(l => long.Parse(l.GetData("created_at"))))
+        foreach (Lobby lobby in lobbies)
         {
+            if (lobby.GetData("Host") == SteamClient.Name)
+            {
+                Debug.Log("Skipping host lobby");
+                continue;
+            }
             LobbyRow row = Instantiate(lobbyRowPrefab, lobbyListParent);
             row.Setup(lobby, facepunch);
         }
