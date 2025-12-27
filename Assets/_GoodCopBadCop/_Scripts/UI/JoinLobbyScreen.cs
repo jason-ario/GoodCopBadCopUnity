@@ -4,9 +4,11 @@ using Steamworks;
 using Steamworks.Data;
 using TMPro;
 
-public class JoinCampaignScreen : MonoBehaviour
+public class JoinLobbyScreen : MonoBehaviour
 {
     [SerializeField] TMP_InputField inviteCodeInput;
+    [SerializeField] MainMenuController mainMenuController;
+    [SerializeField] StartCampaignScreen startCampaignScreen;
     
     private void Awake()
     {
@@ -28,5 +30,6 @@ public class JoinCampaignScreen : MonoBehaviour
 
         Debug.Log("Starting client...");
         NetworkManager.Singleton.StartClient();
+        mainMenuController.OpenStartCampaignScreen(true);
     }
 }

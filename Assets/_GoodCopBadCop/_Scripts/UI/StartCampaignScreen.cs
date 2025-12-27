@@ -9,11 +9,9 @@ public class StartCampaignScreen : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI inviteCodeText;
     [SerializeField] PlayerInfoPanel playerOneInfoPanel;
-    private void Start()
-    {
-        StartCampaignAsHost();
-    }
-
+    [SerializeField] private GameObject startButton;
+    [SerializeField] private GameObject waitForHostText;
+    
     public async void StartCampaignAsHost()
     {
         Debug.Log("Starting server...");
@@ -23,8 +21,6 @@ public class StartCampaignScreen : MonoBehaviour
 
         // 2️⃣ Create Steam Lobby
         Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
-
-    
         
         // 3️⃣ Make it joinable
         lobby.SetFriendsOnly(); // or SetPublic()
@@ -42,5 +38,15 @@ public class StartCampaignScreen : MonoBehaviour
 
         // TODO: show this in your UI text field
         playerOneInfoPanel.PopulateInfo(SteamClient.Name);
+    }
+
+    public void ClientJoined(string steamClientName)
+    {
+    }
+
+    public void OpenAsClient()
+    {
+        startButton.SetActive(false);
+        waitForHostText.SetActive(true);
     }
 }

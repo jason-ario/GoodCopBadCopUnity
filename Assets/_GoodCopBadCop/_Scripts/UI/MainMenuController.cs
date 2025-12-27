@@ -14,6 +14,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
     [SerializeField] private GameObject joinGameScreen;
+    [SerializeField] StartCampaignScreen startCampaignScreenScript;
 
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
@@ -68,8 +69,20 @@ public class MainMenuController : MonoBehaviour
     
     public void OpenNewLoadCampaignScreen() => SwitchToScreen(newLoadCampaignScreen);
     
-    public void OpenStartCampaignScreen() => SwitchToScreen(startCampaignScreen);
-    
+    public void OpenStartCampaignScreen(bool isClient)
+    {
+        SwitchToScreen(startCampaignScreen);
+
+        if (isClient == false)
+        {
+            startCampaignScreenScript.StartCampaignAsHost();
+        }
+        else
+        {
+            startCampaignScreenScript.OpenAsClient();
+        }
+    }
+
     public void OpenJoinLobbyScreen() => SwitchToScreen(joinGameScreen);
 
     public void BackToHomeScreen() => SwitchToScreen(homeScreen);
