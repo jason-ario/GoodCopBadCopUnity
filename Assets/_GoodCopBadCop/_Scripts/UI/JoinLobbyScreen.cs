@@ -2,12 +2,20 @@ using UnityEngine;
 using Unity.Netcode;
 using Steamworks;
 using Steamworks.Data;
+using TMPro;
 
 public class JoinCampaignScreen : MonoBehaviour
 {
-    public async void JoinWithCode(string code)
+    [SerializeField] TMP_InputField inviteCodeInput;
+    
+    private void Awake()
     {
-        if (!ulong.TryParse(code, out ulong lobbyId))
+        inviteCodeInput.onSubmit.AddListener(_ => JoinWithCode());
+    }
+    
+    public async void JoinWithCode()
+    {
+        if (!ulong.TryParse(inviteCodeInput.text, out ulong lobbyId))
         {
             Debug.LogError("Invalid invite code");
             return;

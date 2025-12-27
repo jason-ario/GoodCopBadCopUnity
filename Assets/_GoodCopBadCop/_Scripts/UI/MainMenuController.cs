@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using DG.Tweening;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class MainMenuController : MonoBehaviour
@@ -21,13 +21,40 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Transform _camEndPos;
     [SerializeField] WindowLampController windowLampController;
     [SerializeField] private float _timeTillOpenWindow = 8;
-    
+
+    private GameObject _currentScreen;
+    private List<GameObject> _allScreens;
+
+    private void Awake()
+    {
+        // Initialize the list of screens for easier management
+        _allScreens = new List<GameObject> 
+        { 
+            homeScreen, startShiftScreen, newLoadCampaignScreen, 
+            startCampaignScreen, joinGameScreen 
+        };
+    }
+
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
         
+        // Initial state: ensure only home screen is active
+        SwitchToScreen(homeScreen);
+        
         _camera.transform.DOMove(_camEndPos.position, 30);
         StartCoroutine(WaitAndOpenWindow());
+    }
+
+    private void SwitchToScreen(GameObject targetScreen)
+    {
+        if (targetScreen == null) return;
+
+        foreach (var screen in _allScreens)
+        {
+            screen.SetActive(screen == targetScreen);
+        }
+        _currentScreen = targetScreen;
     }
 
     IEnumerator WaitAndOpenWindow()
@@ -36,29 +63,17 @@ public class MainMenuController : MonoBehaviour
         GameManager.Instance.OpenWindow();
     }
 
-    public void OpenStartShiftScreen()
-    {
-        homeScreen.SetActive(false);
-        startShiftScreen.SetActive(true);
-    }
+    public void OpenStartShiftScreen() => SwitchToScreen(startShiftScreen);
     
-    public void OpenNewLoadCampaignScreen()
-    {
-        newLoadCampaignScreen.SetActive(true);
-        startShiftScreen.SetActive(false);
-    }
+    public void OpenNewLoadCampaignScreen() => SwitchToScreen(newLoadCampaignScreen);
     
-    public void OpenStartCampaignScreen()
-    {
-        startCampaignScreen.SetActive(true);
-        newLoadCampaignScreen.SetActive(false);
-    }
+    public void OpenStartCampaignScreen() => SwitchToScreen(startCampaignScreen);
     
-    public void OpenJoinLobbyScreen()
-    {
-        joinGameScreen.SetActive(true);
-        startShiftScreen.SetActive(false);
-    }
+    public void OpenJoinLobbyScreen() => SwitchToScreen(joinGameScreen);
+
+    public void BackToHomeScreen() => SwitchToScreen(homeScreen);
+    
+    public void BackToStartShiftScreen() => SwitchToScreen(startShiftScreen);
 
     public void StartGame()
     {
@@ -67,17 +82,5 @@ public class MainMenuController : MonoBehaviour
             chair.SetActive(false);
         }
         mainMenu.SetActive(false);
-    }
-    
-    public void BackToHomeScreen()
-    {
-        homeScreen.SetActive(true);
-        startShiftScreen.SetActive(false);    
-    }
-    
-    public void BackToStartShiftScreen()
-    {
-        startShiftScreen.SetActive(true);    
-        startCampaignScreen.SetActive(false);
     }
 }
