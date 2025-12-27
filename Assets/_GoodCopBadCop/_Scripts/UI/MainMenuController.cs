@@ -68,4 +68,9 @@ public class MainMenuController : MonoBehaviour
         startShiftScreen.SetActive(false);    
     }
     
+    public void BackToStartShiftScreen()
+    {
+        startShiftScreen.SetActive(true);    
+        startCampaignScreen.SetActive(false);
+    }
 }
