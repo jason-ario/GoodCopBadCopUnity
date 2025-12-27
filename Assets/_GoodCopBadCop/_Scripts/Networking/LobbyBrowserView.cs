@@ -40,11 +40,11 @@ public class LobbyBrowserView : MonoBehaviour
 
         foreach (Lobby lobby in lobbies)
         {
-            if (lobby.GetData("Host") == SteamClient.Name)
+            /*if (lobby.GetData("Host") == SteamClient.Name)
             {
                 Debug.Log("Skipping host lobby");
                 continue;
-            }
+            }*/
             LobbyRow row = Instantiate(lobbyRowPrefab, lobbyListParent);
             row.Setup(lobby);
         }

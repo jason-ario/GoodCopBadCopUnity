@@ -2449,7 +2449,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   inviteCodeInput: {fileID: 1564670841387632156}
   mainMenuController: {fileID: 4466439013260128064}
-  startCampaignScreen: {fileID: 3247986590019521712}
 --- !u!1 &7433628056176050959
 GameObject:
   m_ObjectHideFlags: 0
@@ -2850,15 +2849,15 @@ MonoBehaviour:
   startShiftScreen: {fileID: 5571535399832997511}
   newLoadCampaignScreen: {fileID: 4531475738882684147}
   startCampaignScreen: {fileID: 617250931820082484}
-  joinGameScreen: {fileID: 7205018434095389299}
   startCampaignScreenScript: {fileID: 3247986590019521712}
+  joinGameScreen: {fileID: 7205018434095389299}
   rollingShutter: {fileID: 0}
   chairs:
   - {fileID: 0}
-  _camera: {fileID: 4537090120096746056}
-  _camEndPos: {fileID: 5003264712806277454}
+  sceneCamera: {fileID: 0}
+  camEndPos: {fileID: 0}
   windowLampController: {fileID: 0}
-  _timeTillOpenWindow: 8
+  timeTillOpenWindow: 8
 --- !u!1 &9094132493896261273
 GameObject:
   m_ObjectHideFlags: 0
@@ -4260,6 +4259,10 @@ PrefabInstance:
     - target: {fileID: 1047239761005737694, guid: 1ecc1df3c8e91934f8f814ddc753bdaf, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3365121526011594026, guid: 1ecc1df3c8e91934f8f814ddc753bdaf, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3966518075178368250, guid: 1ecc1df3c8e91934f8f814ddc753bdaf, type: 3}
       propertyPath: m_IsActive
