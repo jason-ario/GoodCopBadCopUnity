@@ -6,7 +6,14 @@ using UnityEngine;
 
 public class MainMenuController : MonoBehaviour
 {
+    [Header("Screens")]
     [SerializeField] private GameObject mainMenu;
+    [SerializeField] private GameObject homeScreen;
+    [SerializeField] private GameObject startShiftScreen;
+    [SerializeField] private GameObject startCampaignScreen;
+    [SerializeField] private GameObject joinGameScreen;
+
+    [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private GameObject[] chairs;
     [SerializeField] private GameObject _camera;
@@ -27,7 +34,24 @@ public class MainMenuController : MonoBehaviour
         yield return new WaitForSeconds(_timeTillOpenWindow);
         GameManager.Instance.OpenWindow();
     }
+
+    public void OpenStartShiftScreen()
+    {
+        homeScreen.SetActive(false);
+        startShiftScreen.SetActive(true);
+    }
     
+    public void OpenStartCampaignScreen()
+    {
+        startCampaignScreen.SetActive(true);
+        startShiftScreen.SetActive(false);
+    }
+    
+    public void OpenJoinLobbyScreen()
+    {
+        joinGameScreen.SetActive(true);
+        startShiftScreen.SetActive(false);
+    }
 
     public void StartGame()
     {
@@ -38,5 +62,10 @@ public class MainMenuController : MonoBehaviour
         mainMenu.SetActive(false);
     }
     
+    public void BackToHomeScreen()
+    {
+        homeScreen.SetActive(true);
+        startShiftScreen.SetActive(false);    
+    }
     
 }
