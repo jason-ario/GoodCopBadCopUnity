@@ -15,6 +15,7 @@ public class LobbyManager : MonoBehaviour
     public Lobby CurrentLobby { get; private set; }
 
     public event System.Action OnLobbyUpdated;
+    public event System.Action OnKicked;
 
     private void Awake()
     {
@@ -129,6 +130,15 @@ public class LobbyManager : MonoBehaviour
 
         await Task.Delay(50);
 
+        if (IsHost == false)
+        {
+            OnKicked?.Invoke();
+        }
+        else
+        {
+            ExitLobby();
+        }
+        
         Debug.Log($"[OnLobbyMemberLeave] {friend.Name}");
         OnLobbyUpdated?.Invoke();
     }
@@ -156,4 +166,19 @@ public class LobbyManager : MonoBehaviour
     }
 
     public bool IsHost => NetworkManager.Singleton.IsHost;
+
+    public void ExitLobby()
+    {
+        CurrentLobby.Leave();
+
+        if (IsHost)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+        else
+        {
+            OnKicked?.Invoke();
+        }
+    }
+
 }

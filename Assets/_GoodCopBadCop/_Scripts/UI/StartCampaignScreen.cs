@@ -12,9 +12,15 @@ public class StartCampaignScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
+        LobbyManager.Instance.OnKicked += OnKicked;
         
         RefreshUI();
         //StartCoroutine(RefreshUIRepeating());
+    }
+
+    public void ExitLobby()
+    {
+        LobbyManager.Instance.ExitLobby();
     }
 
     IEnumerator RefreshUIRepeating()
@@ -36,6 +42,11 @@ public class StartCampaignScreen : MonoBehaviour
     {
         LobbyManager.Instance.CreateLobby();
         RefreshUI();
+    }
+
+    void OnKicked()
+    {
+        
     }
 
     private void RefreshUI()

@@ -37,7 +37,6 @@ public class GameManager : NetworkBehaviour
     private void StartGameServer()
     {
         if (!IsServer) return;
-        levelStarted.Value = true;
 
         // 🔒 SERVER decides spawning
         SpawnPlayersServer();
@@ -82,6 +81,8 @@ public class GameManager : NetworkBehaviour
     // 🔘 CALL THIS FROM UI (client or host)
     public void TryStartLevel()
     {
+        Debug.Log("Try Start Level");
+        
         if (IsServer)
             StartLevel();
         else
