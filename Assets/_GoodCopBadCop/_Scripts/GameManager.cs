@@ -19,6 +19,57 @@ public class GameManager : NetworkBehaviour
     {
         Instance = this;
     }
+    
+    public void TryStartGame()
+    {
+        if (IsServer)
+            StartGameServer();
+        else
+            RequestStartGameServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestStartGameServerRpc()
+    {
+        StartGameServer();
+    }   
+    
+    private void StartGameServer()
+    {
+        if (!IsServer) return;
+        if (levelStarted.Value) return;
+
+        levelStarted.Value = true;
+
+        // 🔒 SERVER decides spawning
+        SpawnPlayersServer();
+
+        // 🔊 Tell all clients to transition
+        StartGameClientRpc();
+    }
+    
+    [ClientRpc]
+    private void StartGameClientRpc()
+    {
+        UIController.Instance.ShowPlayerUI();
+
+        MainMenuController.Instance.HideAllMenus();
+
+        ResetWindow();
+    }
+    private void SpawnPlayersServer()
+    {
+        bool isSinglePlayer =
+            NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            PlayerSpawner.Instance.SpawnPlayer(
+                client.ClientId,
+                isSinglePlayer
+            );
+        }
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -85,4 +136,6 @@ public class GameManager : NetworkBehaviour
         
         rollingShutter.SetBool("Open", true);
     }
+    
+    
 }

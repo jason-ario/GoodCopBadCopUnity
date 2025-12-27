@@ -101,13 +101,22 @@ public class StartCampaignScreen : MonoBehaviour
             return;
 
         int i = 0;
+        
+        playerOneInfoPanel.gameObject.SetActive(false);
+        playerTwoInfoPanel.gameObject.SetActive(false);
+
         foreach (var member in currentLobby.Members)
         {
             if (i == 0)
+            {
                 playerOneInfoPanel.PopulateInfo(member.Name);
+                playerOneInfoPanel.gameObject.SetActive(true);
+            }
             else if (i == 1)
+            {
                 playerTwoInfoPanel.PopulateInfo(member.Name);
-
+                playerTwoInfoPanel.gameObject.SetActive(true);
+            }
             i++;
         }
     }

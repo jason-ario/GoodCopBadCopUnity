@@ -7,6 +7,8 @@ using UnityEngine;
 
 public class MainMenuController : MonoBehaviour
 {
+    public static MainMenuController Instance;
+    
     [Header("Screens")]
     [SerializeField] private GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
@@ -29,6 +31,8 @@ public class MainMenuController : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
+        
         // Initialize the list of screens for easier management
         _allScreens = new List<GameObject> 
         { 
@@ -100,23 +104,17 @@ public class MainMenuController : MonoBehaviour
         
         GameManager.Instance.ResetWindow();
         UIController.Instance.ShowPlayerUI();
-
-        
-        Debug.Log(NetworkManager.Singleton.ConnectedClients.Count);
-        Debug.Log(NetworkManager.Singleton.LocalClientId);
-
-        if (NetworkManager.Singleton.ConnectedClients.Count > 1)
-        {
-            PlayerSpawner.Instance.SpawnPlayer(0, false);
-            PlayerSpawner.Instance.SpawnPlayer(1, false);
-        }
-        else
-        {
-            PlayerSpawner.Instance.SpawnPlayer(0, true);
-
-        }
         
         mainMenu.SetActive(false);
         
+        GameManager.Instance.TryStartGame();
+    }
+
+    public void HideAllMenus()
+    {
+        foreach (var screen in _allScreens)
+        {
+            screen.SetActive(false);
+        }
     }
 }

@@ -30,7 +30,6 @@ public class LobbyBrowserView : MonoBehaviour
             Destroy(child.gameObject);
 
         Lobby[] lobbies = await SteamMatchmaking.LobbyList
-            .WithSlotsAvailable(1)
             .RequestAsync();
 
         if (lobbies == null || lobbies.Length == 0)
