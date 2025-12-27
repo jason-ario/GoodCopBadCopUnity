@@ -50,8 +50,7 @@ public class GameManager : NetworkBehaviour
     private void StartGameClientRpc()
     {
         UIController.Instance.ShowPlayerUI();
-
-        MainMenuController.Instance.HideAllMenus();
+        MainMenuController.Instance.Reset();
 
         ResetWindow();
     }

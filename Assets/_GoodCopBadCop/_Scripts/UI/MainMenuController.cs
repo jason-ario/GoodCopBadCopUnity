@@ -9,7 +9,7 @@ public class MainMenuController : MonoBehaviour
     public static MainMenuController Instance;
 
     [Header("Screens")]
-    [SerializeField] private GameObject mainMenu;
+    [SerializeField] public GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject newLoadCampaignScreen;
@@ -118,16 +118,8 @@ public class MainMenuController : MonoBehaviour
 
     public void StartGame()
     {
-        foreach (var chair in chairs)
-            chair.SetActive(false);
-
         StopAllCoroutines();
-
-        GameManager.Instance.ResetWindow();
-        UIController.Instance.ShowPlayerUI();
-
-        mainMenu.SetActive(false);
-
+        
         GameManager.Instance.TryStartGame();
     }
 
@@ -148,4 +140,16 @@ public class MainMenuController : MonoBehaviour
     }
 
     #endregion
+
+    public void Reset()
+    {
+        foreach (var chair in chairs)
+        {
+            chair.SetActive(false);
+        }
+        
+        mainMenu.SetActive(false);
+        
+        HideAllMenus();
+    }
 }
