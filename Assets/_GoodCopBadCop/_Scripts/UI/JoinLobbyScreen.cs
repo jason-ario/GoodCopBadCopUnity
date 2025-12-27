@@ -48,4 +48,5 @@ public class JoinLobbyScreen : MonoBehaviour
         startCampaignScreen.SetCurrentLobby(lobby);
         mainMenuController.OpenStartCampaignScreen(true);
     }
+    
 }

@@ -13,13 +13,14 @@ public class LobbyRow : MonoBehaviour
 
     private Lobby lobby;
     private FacepunchTransport transport;
+    private StartCampaignScreen _startCampaignScreen;
 
     public void Setup(Lobby lobby, FacepunchTransport transport)
     {
         this.lobby = lobby;
         this.transport = transport;
 
-        lobbyName.text = lobby.GetData("name");
+        lobbyName.text = lobby.GetData("Host");
         players.text = $"{lobby.MemberCount}/{lobby.MaxMembers}";
 
         joinButton.onClick.AddListener(JoinLobby);
@@ -29,6 +30,9 @@ public class LobbyRow : MonoBehaviour
     {
         await lobby.Join();
         transport.targetSteamId = lobby.Owner.Id;
+        
         NetworkManager.Singleton.StartClient();
+        MainMenuController.Instance.startCampaignScreenScript.SetCurrentLobby(lobby);
+        MainMenuController.Instance.OpenStartCampaignScreen(true);
     }
 }

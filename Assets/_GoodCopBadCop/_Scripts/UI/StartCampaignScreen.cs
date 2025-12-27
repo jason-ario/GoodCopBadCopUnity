@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -62,6 +61,9 @@ public class StartCampaignScreen : MonoBehaviour
 
         currentLobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
 
+        // 🔑 REQUIRED — host must enter its own lobby
+        SteamMatchmaking.JoinLobbyAsync(currentLobby.Id);
+
         currentLobby.SetPublic();
         currentLobby.SetJoinable(true);
         currentLobby.SetData("host", SteamClient.Name);
@@ -82,14 +84,13 @@ public class StartCampaignScreen : MonoBehaviour
         waitForHostText.SetActive(true);
     }
 
-    // Called by join-with-code logic AFTER lobby.Join()
+    // Called AFTER lobby.Join()
     public void SetCurrentLobby(Lobby lobby)
     {
         currentLobby = lobby;
         Debug.Log("Client entered lobby");
 
-        RefreshLobbyUI();
-
+        // Netcode must start before host detects client
         NetworkManager.Singleton.StartClient();
     }
 
@@ -97,7 +98,7 @@ public class StartCampaignScreen : MonoBehaviour
     // CALLBACKS
     // =========================
 
-    // Client-side signal that Steam lobby entry completed
+    // Client-only: Steam confirms lobby entry
     private void OnLobbyEntered(Lobby lobby)
     {
         if (NetworkManager.Singleton.IsHost)
@@ -109,13 +110,15 @@ public class StartCampaignScreen : MonoBehaviour
         RefreshLobbyUI();
     }
 
-    // Host-side signal that Netcode client connected
+    // Host-only: Netcode client connected
     private void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
             return;
 
         Debug.Log($"Netcode client connected: {clientId}");
+
+        // This is the authoritative signal for host UI
         RefreshLobbyUI();
     }
 
@@ -136,34 +139,28 @@ public class StartCampaignScreen : MonoBehaviour
         if (currentLobby.Id == 0)
             return;
 
-        // Allow Steam to settle membership
-        await Task.Delay(50);
+        await Task.Delay(50); // allow Steam to update
 
-        var members = currentLobby.Members;
-        int count = members.Count();
+        var members = currentLobby.Members.ToList();
 
         playerOneInfoPanel.gameObject.SetActive(false);
         playerTwoInfoPanel.gameObject.SetActive(false);
 
-        int i = 0;
-        foreach (var member in currentLobby.Members)
+        if (members.Count > 0)
         {
-            if (i == 0)
-            {
-                playerOneInfoPanel.PopulateInfo(member.Name);
-                playerOneInfoPanel.gameObject.SetActive(true);
-            }
-            else if (i == 1)
-            {
-                playerTwoInfoPanel.PopulateInfo(member.Name);
-                playerTwoInfoPanel.gameObject.SetActive(true);
-            }
-            i++;
+            playerOneInfoPanel.PopulateInfo(members[0].Name);
+            playerOneInfoPanel.gameObject.SetActive(true);
         }
 
-        // Host-only: enable Start when both players present
+        if (members.Count > 1)
+        {
+            playerTwoInfoPanel.PopulateInfo(members[1].Name);
+            playerTwoInfoPanel.gameObject.SetActive(true);
+        }
+
         if (NetworkManager.Singleton.IsHost)
         {
+            startButton.SetActive(true);
             waitForHostText.SetActive(false);
         }
         else
@@ -171,5 +168,7 @@ public class StartCampaignScreen : MonoBehaviour
             startButton.SetActive(false);
             waitForHostText.SetActive(true);
         }
+
+        Debug.Log($"Lobby members count: {members.Count}");
     }
 }

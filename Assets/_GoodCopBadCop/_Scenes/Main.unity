@@ -119,6 +119,43 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!84 &1681839
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 256
+  m_Height: 256
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 0
+  m_ColorFormat: 8
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!4 &14812771 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
@@ -2964,43 +3001,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!84 &1221819670
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 256
-  m_Height: 256
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 0
-  m_ColorFormat: 8
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!114 &1252248858 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8931692263157711138, guid: e6cbc30a1200a214cb4963daea9ea31b, type: 3}
@@ -4073,7 +4073,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NoiseTex:
-        m_Texture: {fileID: 1221819670}
+        m_Texture: {fileID: 1681839}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -4097,7 +4097,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DetailColor: {r: 0, g: 0.11066035, b: 0.023712922, a: 0}
     - _DetailData: {r: 0.464, g: -0.5, b: 0.04, a: 1}
-    - _DetailWindDirection: {r: -0.025465444, g: 0, b: 0, a: 0}
+    - _DetailWindDirection: {r: 0, g: 0, b: 0, a: 0}
     - _DistanceData: {r: 0, g: -1, b: 0.000004, a: 0}
     - _FogOfWarCenter: {r: 0, g: 0, b: 0, a: 1}
     - _FogOfWarCenterAdjusted: {r: 0, g: 0, b: 0, a: 1}
@@ -4109,7 +4109,7 @@ Material:
     - _ShadowData: {r: 0.5, g: 0, b: 250, a: 0}
     - _SpecularColor: {r: 0.5, g: 0.5, b: 0.5, a: 0}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _WindDirection: {r: -0.025465444, g: 0, b: 0, a: 0}
+    - _WindDirection: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1001 &1729546235
@@ -4503,9 +4503,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   playerPrefab: {fileID: 2953290070593623070, guid: 5667ca756af7b9b4cac55b2ee1a95241, type: 3}
   singlePlayerSpawnPoint: {fileID: 1736092715}
-  spawnPoints:
-  - {fileID: 326921068}
-  - {fileID: 2101421300}
+  multiplayerSpawnPoints: []
 --- !u!28 &1758154774
 Texture2D:
   m_ObjectHideFlags: 0
@@ -5779,6 +5777,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.x
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 617250931820082484, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 685767067883214577, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -5898,6 +5900,18 @@ PrefabInstance:
     - target: {fileID: 4850989059326825046, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530434323429186956, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530434323429186956, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530434323429186956, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 453.0128
       objectReference: {fileID: 0}
     - target: {fileID: 5571535399832997511, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_IsActive

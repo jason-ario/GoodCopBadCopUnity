@@ -16,7 +16,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
     [SerializeField] private GameObject joinGameScreen;
-    [SerializeField] StartCampaignScreen startCampaignScreenScript;
+    public StartCampaignScreen startCampaignScreenScript;
 
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
