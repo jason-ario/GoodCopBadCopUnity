@@ -12,7 +12,6 @@ public class LobbyManager : MonoBehaviour
     public Lobby CurrentLobby { get; private set; }
 
     public event System.Action OnLobbyUpdated;
-    public event System.Action OnClientJoined;
 
     private void Awake()
     {
@@ -29,12 +28,12 @@ public class LobbyManager : MonoBehaviour
     private void Start()
     {
         SteamMatchmaking.OnLobbyEntered += OnLobbyEntered;
+        SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberJoined;
         SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeave;
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
     }
     
-
     // =========================
     // HOST
     // =========================
@@ -43,18 +42,11 @@ public class LobbyManager : MonoBehaviour
         if (!NetworkManager.Singleton.StartHost())
             return;
 
-        var lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+        var lobby = (Lobby) await SteamMatchmaking.CreateLobbyAsync(2);
 
         lobby.SetPublic();
         lobby.SetJoinable(true);
         lobby.SetData("host", SteamClient.Name);
-        
-        OnLobbyUpdated?.Invoke();
-        var members = LobbyManager.Instance.GetMembersSnapshot();
-        foreach (var friend in members)
-        {
-            Debug.Log(friend.Name);
-        }
     }
 
     // =========================
@@ -64,47 +56,67 @@ public class LobbyManager : MonoBehaviour
     {
         var lobby = new Lobby(lobbyId);
         await lobby.Join();
-        // Netcode will start after OnLobbyEntered
+        // OnLobbyEntered will fire locally
     }
 
     // =========================
-    // CALLBACKS
+    // STEAM CALLBACKS
     // =========================
-    private void OnLobbyEntered(Lobby lobby)
+
+    /// <summary>
+    /// Fires ONLY for the local player (host or client)
+    /// </summary>
+    private async void OnLobbyEntered(Lobby lobby)
     {
         CurrentLobby = lobby;
 
-        Debug.Log($"Lobby entered. Members: {CurrentLobby.Members.Count()}");
-        
-        var members = LobbyManager.Instance.GetMembersSnapshot();
-        foreach (var friend in members)
-        {
-            Debug.Log(friend.Name);
-        }
-        
+        await Task.Delay(50); // Steam membership settle
+
+        Debug.Log($"[OnLobbyEntered] Local members: {CurrentLobby.Members.Count()}");
+
         OnLobbyUpdated?.Invoke();
 
         if (!NetworkManager.Singleton.IsHost)
             NetworkManager.Singleton.StartClient();
     }
-    
-    
+
+    /// <summary>
+    /// 🔑 THIS is what fires on the HOST when a client joins
+    /// </summary>
+    private async void OnLobbyMemberJoined(Lobby lobby, Friend friend)
+    {
+        if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
+            return;
+
+        await Task.Delay(50); // Steam updates members slightly later
+
+        Debug.Log($"[OnLobbyMemberJoined] {friend.Name}");
+        Debug.Log($"Members now: {CurrentLobby.Members.Count()}");
+
+        OnLobbyUpdated?.Invoke();
+    }
+
+    private async void OnLobbyMemberLeave(Lobby lobby, Friend friend)
+    {
+        if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
+            return;
+
+        await Task.Delay(50);
+
+        Debug.Log($"[OnLobbyMemberLeave] {friend.Name}");
+        OnLobbyUpdated?.Invoke();
+    }
+
+    // =========================
+    // NETCODE (SUPPLEMENTAL)
+    // =========================
     private async void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
             return;
 
-        // Steam membership updates slightly after netcode connect
         await Task.Delay(50);
-
-        Debug.Log($"[Host] Client connected. Steam members: {CurrentLobby.Members.Count()}");
-
-        OnLobbyUpdated?.Invoke();
-    }
-    private void OnLobbyMemberLeave(Lobby lobby, Friend friend)
-    {
-        if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
-            return;
+        Debug.Log($"[Host] Netcode client connected. Steam members: {CurrentLobby.Members.Count()}");
 
         OnLobbyUpdated?.Invoke();
     }
