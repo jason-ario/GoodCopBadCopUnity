@@ -45,26 +45,16 @@ public class LobbyManager : MonoBehaviour
         if (!NetworkManager.Singleton.StartHost())
             return;
 
-        var lobby = (Lobby) await SteamMatchmaking.CreateLobbyAsync(2);
+        var lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
 
         lobby.SetPublic();
         lobby.SetJoinable(true);
         lobby.SetData("host", SteamClient.Name);
-        NetworkManager.Singleton.StartHost();
-        
-        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
-        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        lobby.SetData("created_at", timestamp.ToString());
-        lobby.SetData("name", SteamClient.Name + "'s Lobby");
-        
-        if (transport is FacepunchTransport facepunch)
+        if (NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport facepunch)
         {
-            facepunch.targetSteamId = lobby.Owner.Id; 
+            facepunch.targetSteamId = lobby.Owner.Id;
         }
-
-
-        NetworkManager.Singleton.StartHost();
     }
 
     // =========================
@@ -74,22 +64,25 @@ public class LobbyManager : MonoBehaviour
     {
         var lobby = new Lobby(lobbyId);
         await lobby.Join();
-        
+
+        CurrentLobby = lobby;
+
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
-        if (transport is FacepunchTransport)
+        if (transport is FacepunchTransport facepunch)
         {
+            // 🔑 THIS is the missing piece
+            facepunch.targetSteamId = lobby.Owner.Id;
         }
         else if (transport is UnityTransport unityTransport)
         {
-            // Simple LAN fallback
+            // LAN fallback
             unityTransport.SetConnectionData("127.0.0.1", 7777);
         }
-        
+
+        // 🔥 Connect to host Netcode server
         NetworkManager.Singleton.StartClient();
-        // OnLobbyEntered will fire locally
     }
-    
 
 
     // =========================
