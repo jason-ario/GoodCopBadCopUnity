@@ -10,6 +10,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
     [SerializeField] private GameObject startShiftScreen;
+    [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
     [SerializeField] private GameObject joinGameScreen;
 
@@ -41,10 +42,16 @@ public class MainMenuController : MonoBehaviour
         startShiftScreen.SetActive(true);
     }
     
+    public void OpenNewLoadCampaignScreen()
+    {
+        newLoadCampaignScreen.SetActive(true);
+        startShiftScreen.SetActive(false);
+    }
+    
     public void OpenStartCampaignScreen()
     {
         startCampaignScreen.SetActive(true);
-        startShiftScreen.SetActive(false);
+        newLoadCampaignScreen.SetActive(false);
     }
     
     public void OpenJoinLobbyScreen()
