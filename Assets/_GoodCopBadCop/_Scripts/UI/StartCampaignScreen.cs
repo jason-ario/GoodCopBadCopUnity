@@ -19,8 +19,6 @@ public class StartCampaignScreen : MonoBehaviour
 
     private Lobby currentLobby;
 
-    #region Unity lifecycle
-
     private void Awake()
     {
         Instance = this;
@@ -44,8 +42,6 @@ public class StartCampaignScreen : MonoBehaviour
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
     }
 
-    #endregion
-
     // =========================
     // HOST FLOW
     // =========================
@@ -59,20 +55,15 @@ public class StartCampaignScreen : MonoBehaviour
             return;
         }
 
-        currentLobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+        // This ALSO joins the lobby
+        var lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
 
-        // 🔑 REQUIRED — host must enter its own lobby
-        SteamMatchmaking.JoinLobbyAsync(currentLobby.Id);
+        lobby.SetPublic();
+        lobby.SetJoinable(true);
+        lobby.SetData("host", SteamClient.Name);
 
-        currentLobby.SetPublic();
-        currentLobby.SetJoinable(true);
-        currentLobby.SetData("host", SteamClient.Name);
-
-        string inviteCode = InviteCodeUtility.EncodeLobbyId(currentLobby.Id);
+        string inviteCode = InviteCodeUtility.EncodeLobbyId(lobby.Id);
         inviteCodeText.text = $"Invite Code: {inviteCode}";
-        Debug.Log($"Invite Code: {inviteCode}");
-
-        RefreshLobbyUI();
     }
 
     // =========================
@@ -84,41 +75,40 @@ public class StartCampaignScreen : MonoBehaviour
         waitForHostText.SetActive(true);
     }
 
-    // Called AFTER lobby.Join()
+    // Called after lobby.Join()
     public void SetCurrentLobby(Lobby lobby)
     {
         currentLobby = lobby;
-        Debug.Log("Client entered lobby");
-
-        // Netcode must start before host detects client
-        NetworkManager.Singleton.StartClient();
+        Debug.Log("Client joined lobby via code");
+        // Netcode will be started in OnLobbyEntered
     }
 
     // =========================
     // CALLBACKS
     // =========================
 
-    // Client-only: Steam confirms lobby entry
+    // 🔑 AUTHORITATIVE lobby snapshot (HOST + CLIENT)
     private void OnLobbyEntered(Lobby lobby)
     {
-        if (NetworkManager.Singleton.IsHost)
-            return;
-
         currentLobby = lobby;
-        Debug.Log("Steam lobby entered (client)");
+
+        Debug.Log($"Lobby entered. Members: {currentLobby.Members.Count()}");
 
         RefreshLobbyUI();
+
+        // Client only: start networking AFTER joining lobby
+        if (!NetworkManager.Singleton.IsHost)
+        {
+            NetworkManager.Singleton.StartClient();
+        }
     }
 
-    // Host-only: Netcode client connected
     private void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
             return;
 
         Debug.Log($"Netcode client connected: {clientId}");
-
-        // This is the authoritative signal for host UI
         RefreshLobbyUI();
     }
 
@@ -127,7 +117,6 @@ public class StartCampaignScreen : MonoBehaviour
         if (currentLobby.Id == 0 || lobby.Id != currentLobby.Id)
             return;
 
-        Debug.Log("Steam lobby member left");
         RefreshLobbyUI();
     }
 
@@ -139,20 +128,20 @@ public class StartCampaignScreen : MonoBehaviour
         if (currentLobby.Id == 0)
             return;
 
-        await Task.Delay(50); // allow Steam to update
+        await Task.Delay(50); // Steam settle
 
-        var members = currentLobby.Members.ToList();
+        var members = currentLobby.Members.ToArray();
 
         playerOneInfoPanel.gameObject.SetActive(false);
         playerTwoInfoPanel.gameObject.SetActive(false);
 
-        if (members.Count > 0)
+        if (members.Length > 0)
         {
             playerOneInfoPanel.PopulateInfo(members[0].Name);
             playerOneInfoPanel.gameObject.SetActive(true);
         }
 
-        if (members.Count > 1)
+        if (members.Length > 1)
         {
             playerTwoInfoPanel.PopulateInfo(members[1].Name);
             playerTwoInfoPanel.gameObject.SetActive(true);
@@ -169,6 +158,6 @@ public class StartCampaignScreen : MonoBehaviour
             waitForHostText.SetActive(true);
         }
 
-        Debug.Log($"Lobby members count: {members.Count}");
+        Debug.Log($"[UI] Members count = {members.Length}");
     }
 }

@@ -9,7 +9,6 @@ public class LobbyRow : MonoBehaviour
 {
     public TextMeshProUGUI lobbyName;
     public TextMeshProUGUI players;
-    public Button joinButton;
 
     private Lobby lobby;
     private FacepunchTransport transport;
@@ -22,8 +21,11 @@ public class LobbyRow : MonoBehaviour
 
         lobbyName.text = lobby.GetData("Host");
         players.text = $"{lobby.MemberCount}/{lobby.MaxMembers}";
+    }
 
-        joinButton.onClick.AddListener(JoinLobby);
+    public void JoinLobbyButtonPressed()
+    {
+        JoinLobby();
     }
 
     async void JoinLobby()
