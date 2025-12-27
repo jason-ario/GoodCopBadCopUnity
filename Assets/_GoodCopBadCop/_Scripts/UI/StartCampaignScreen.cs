@@ -46,7 +46,7 @@ public class StartCampaignScreen : MonoBehaviour
 
     void OnKicked()
     {
-        
+        ExitLobby();
     }
 
     private void RefreshUI()
