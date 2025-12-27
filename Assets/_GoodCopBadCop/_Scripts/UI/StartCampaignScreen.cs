@@ -9,9 +9,37 @@ public class StartCampaignScreen : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI inviteCodeText;
     [SerializeField] PlayerInfoPanel playerOneInfoPanel;
-    [SerializeField] private GameObject startButton;
-    [SerializeField] private GameObject waitForHostText;
-    
+    [SerializeField] PlayerInfoPanel playerTwoInfoPanel;
+    [SerializeField] GameObject startButton;
+    [SerializeField] GameObject waitForHostText;
+
+    private Lobby currentLobby;
+
+    #region Unity lifecycle
+
+    private void OnEnable()
+    {
+        SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberChanged;
+        SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberChanged;
+
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+    }
+
+    private void OnDisable()
+    {
+        SteamMatchmaking.OnLobbyMemberJoined -= OnLobbyMemberChanged;
+        SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberChanged;
+
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+    }
+
+    #endregion
+
+    // =========================
+    // HOST FLOW
+    // =========================
     public async void StartCampaignAsHost()
     {
         Debug.Log("Starting server...");
@@ -20,33 +48,67 @@ public class StartCampaignScreen : MonoBehaviour
         NetworkManager.Singleton.StartHost();
 
         // 2️⃣ Create Steam Lobby
-        Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
-        
+        currentLobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+
         // 3️⃣ Make it joinable
-        lobby.SetFriendsOnly(); // or SetPublic()
-        lobby.SetJoinable(true);
+        currentLobby.SetFriendsOnly(); // or SetPublic()
+        currentLobby.SetJoinable(true);
 
-        // 4️⃣ Store useful metadata
-        lobby.SetData("name", SteamClient.Name);
-        lobby.SetData("host", SteamClient.Name);
+        // 4️⃣ Store metadata
+        currentLobby.SetData("host", SteamClient.Name);
 
-        // 5️⃣ Display invite code (Lobby ID)
-        string shortCode = InviteCodeUtility.EncodeLobbyId(lobby.Id);
-        string inviteCode = shortCode;
+        // 5️⃣ Invite code
+        string inviteCode = InviteCodeUtility.EncodeLobbyId(currentLobby.Id);
+        inviteCodeText.text = $"Invite Code: {inviteCode}";
         Debug.Log($"Invite Code: {inviteCode}");
-        inviteCodeText.text = "Invite Code: " + inviteCode;
 
-        // TODO: show this in your UI text field
-        playerOneInfoPanel.PopulateInfo(SteamClient.Name);
+        RefreshLobbyUI();
     }
 
-    public void ClientJoined(string steamClientName)
-    {
-    }
-
+    // =========================
+    // CLIENT FLOW
+    // =========================
     public void OpenAsClient()
     {
         startButton.SetActive(false);
         waitForHostText.SetActive(true);
+    }
+
+    // =========================
+    // CALLBACKS
+    // =========================
+    private void OnLobbyMemberChanged(Lobby lobby, Friend friend)
+    {
+        if (currentLobby.Id == 0 || lobby.Id != currentLobby.Id)
+            return;
+
+        Debug.Log("Steam lobby updated");
+        RefreshLobbyUI();
+    }
+
+    private void OnClientConnected(ulong clientId)
+    {
+        Debug.Log($"Netcode client connected: {clientId}");
+        RefreshLobbyUI();
+    }
+
+    // =========================
+    // UI
+    // =========================
+    private void RefreshLobbyUI()
+    {
+        if (currentLobby.Id == 0)
+            return;
+
+        int i = 0;
+        foreach (var member in currentLobby.Members)
+        {
+            if (i == 0)
+                playerOneInfoPanel.PopulateInfo(member.Name);
+            else if (i == 1)
+                playerTwoInfoPanel.PopulateInfo(member.Name);
+
+            i++;
+        }
     }
 }
