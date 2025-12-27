@@ -80,7 +80,7 @@ public class SimpleNetworkUI : MonoBehaviour
         {
             // Simple LAN fallback
             unityTransport.SetConnectionData("127.0.0.1", 7777);
-            NetworkManager.Singleton.StartClient();
+
             uiRoot.SetActive(false);
         }
         

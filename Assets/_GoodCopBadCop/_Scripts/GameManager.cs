@@ -37,8 +37,6 @@ public class GameManager : NetworkBehaviour
     private void StartGameServer()
     {
         if (!IsServer) return;
-        if (levelStarted.Value) return;
-
         levelStarted.Value = true;
 
         // 🔒 SERVER decides spawning
@@ -62,6 +60,7 @@ public class GameManager : NetworkBehaviour
         bool isSinglePlayer =
             NetworkManager.Singleton.ConnectedClientsList.Count == 1;
 
+        Debug.Log("Connected Clients " + NetworkManager.Singleton.ConnectedClientsList.Count);
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
             PlayerSpawner.Instance.SpawnPlayer(
