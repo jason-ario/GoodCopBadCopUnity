@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Netcode.Transports.Facepunch;
@@ -49,6 +50,21 @@ public class LobbyManager : MonoBehaviour
         lobby.SetPublic();
         lobby.SetJoinable(true);
         lobby.SetData("host", SteamClient.Name);
+        NetworkManager.Singleton.StartHost();
+        
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        lobby.SetData("created_at", timestamp.ToString());
+        lobby.SetData("name", SteamClient.Name + "'s Lobby");
+        
+        if (transport is FacepunchTransport facepunch)
+        {
+            facepunch.targetSteamId = lobby.Owner.Id; 
+        }
+
+
+        NetworkManager.Singleton.StartHost();
     }
 
     // =========================

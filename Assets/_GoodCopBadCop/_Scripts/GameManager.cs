@@ -57,8 +57,9 @@ public class GameManager : NetworkBehaviour
     }
     private void SpawnPlayersServer()
     {
-        bool isSinglePlayer =
-            NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        
+        Debug.Log("Is Single Player " + isSinglePlayer);
 
         Debug.Log("Connected Clients " + NetworkManager.Singleton.ConnectedClientsList.Count);
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
