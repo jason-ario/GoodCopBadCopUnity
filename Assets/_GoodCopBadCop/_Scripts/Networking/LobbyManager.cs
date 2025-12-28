@@ -31,6 +31,13 @@ public class LobbyManager : MonoBehaviour
 
     private void Start()
     {
+        NetworkTransport networkTransport = NetworkManager.Singleton.GetComponent<NetworkTransport>();
+
+        if (networkTransport is not FacepunchTransport)
+        {
+            return;
+        }
+        
         SteamMatchmaking.OnLobbyEntered += OnLobbyEntered;
         SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberJoined;
         SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeave;

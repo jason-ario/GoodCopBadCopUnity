@@ -10,6 +10,7 @@ public class GameManager : NetworkBehaviour
 
     [SerializeField] private Animator rollingShutter;
     public UnityAction OnRoundStart;
+    public UnityAction OnGameStart;
 
     NetworkVariable<bool> levelStarted = new NetworkVariable<bool>();
     [SerializeField] WindowLampController windowLampController;
@@ -84,6 +85,7 @@ public class GameManager : NetworkBehaviour
         
         //Game officially starts
         UIController.Instance.FadeOut();
+        OnGameStart?.Invoke();
     }
 
     public override void OnNetworkSpawn()
