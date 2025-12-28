@@ -130,15 +130,7 @@ public class LobbyManager : MonoBehaviour
 
         await Task.Delay(50);
 
-        if (IsHost == false)
-        {
-            OnKicked?.Invoke();
-            CurrentLobby.Leave();
-        }
-        else
-        {
-            ExitLobby();
-        }
+        ExitLobby();
         
         Debug.Log($"[OnLobbyMemberLeave] {friend.Name}");
         OnLobbyUpdated?.Invoke();

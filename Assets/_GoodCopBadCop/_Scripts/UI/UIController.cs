@@ -9,6 +9,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject _textChat;
     [SerializeField] private GameObject toolShopUI;
+    [SerializeField] private Animator screenFade;
 
     private void Awake()
     {
@@ -83,5 +84,31 @@ public class UIController : MonoBehaviour
     public void ShowPlayerUI()
     {
         playerUI.SetActive(true);
+    }
+
+    public void FadeIn()
+    { 
+        CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
+
+        foreach (var canvasGroup in canvasGroups)
+        {
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+
+        }
+        
+        screenFade.SetBool("Black", true);
+    }
+    
+    public void FadeOut()
+    {
+        screenFade.SetBool("Black", false);
+        
+        CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
+
+        foreach (var canvasGroup in canvasGroups)
+        {
+            canvasGroup.interactable = true;
+        }
     }
 }

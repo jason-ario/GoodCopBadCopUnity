@@ -16,7 +16,8 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject startCampaignScreen;
     [SerializeField] private StartCampaignScreen startCampaignScreenScript;
     [SerializeField] private GameObject joinGameScreen;
-
+    [SerializeField] private Animator screenFade;
+ 
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private GameObject[] chairs;
@@ -27,6 +28,7 @@ public class MainMenuController : MonoBehaviour
 
     private GameObject currentScreen;
     private List<GameObject> allScreens;
+    [SerializeField] public CanvasGroup canvasGroup;
 
     #region Unity Lifecycle
 
@@ -49,7 +51,7 @@ public class MainMenuController : MonoBehaviour
             joinGameScreen
         };
     }
-
+    
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
@@ -141,7 +143,7 @@ public class MainMenuController : MonoBehaviour
 
     #endregion
 
-    public void Reset()
+    public void TransitionToGameplay()
     {
         foreach (var chair in chairs)
         {

@@ -751,6 +751,7 @@ GameObject:
   - component: {fileID: 371220573109159834}
   - component: {fileID: 7541639783584628704}
   - component: {fileID: 7132022092377744834}
+  - component: {fileID: 4843346619952356873}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -1031,6 +1032,28 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &4843346619952356873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  TransitionStateInfoList:
+  - IsCrossFadeExit: 0
+    Layer: 2
+    OriginatingState: 753088835
+    DestinationState: 1783648139
+    TransitionDuration: 0.25
+    TriggerNameHash: 207596745
+    TransitionIndex: 0
+  m_Animator: {fileID: 5651200760162566270}
 --- !u!1 &3295434167070617424
 GameObject:
   m_ObjectHideFlags: 0

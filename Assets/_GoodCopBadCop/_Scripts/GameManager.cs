@@ -14,6 +14,7 @@ public class GameManager : NetworkBehaviour
     NetworkVariable<bool> levelStarted = new NetworkVariable<bool>();
     [SerializeField] WindowLampController windowLampController;
     [SerializeField] private AudioSource _buzzerSound;
+    [SerializeField] private AudioClip transitionToGameplayStinger;
 
     private void Awake()
     {
@@ -38,9 +39,6 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        // 🔒 SERVER decides spawning
-        SpawnPlayersServer();
-
         // 🔊 Tell all clients to transition
         StartGameClientRpc();
     }
@@ -49,7 +47,7 @@ public class GameManager : NetworkBehaviour
     private void StartGameClientRpc()
     {
         UIController.Instance.ShowPlayerUI();
-        MainMenuController.Instance.Reset();
+        StartCoroutine(TransitionToGameplay());
 
         ResetWindow();
     }
@@ -67,6 +65,25 @@ public class GameManager : NetworkBehaviour
                 isSinglePlayer
             );
         }
+    }
+
+    IEnumerator TransitionToGameplay()
+    {
+        UIController.Instance.FadeIn();
+        AudioManager.Instance.FadeOutAmbientAudio();
+        SFXController.Instance.Play(transitionToGameplayStinger);
+        // Loading
+        yield return new WaitForSeconds(4);
+        MainMenuController.Instance.TransitionToGameplay(); 
+        AudioManager.Instance.StartAmbientAudio();
+
+        if (IsServer)
+        {
+            SpawnPlayersServer();
+        }
+        
+        //Game officially starts
+        UIController.Instance.FadeOut();
     }
 
     public override void OnNetworkSpawn()
@@ -129,12 +146,13 @@ public class GameManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3);
         
+        rollingShutter.SetBool("Open", true);
+        
+        yield return new WaitForSeconds(3);
         if (startGame)
         {
             OnRoundStart?.Invoke();
         }
-        
-        rollingShutter.SetBool("Open", true);
     }
     
     
