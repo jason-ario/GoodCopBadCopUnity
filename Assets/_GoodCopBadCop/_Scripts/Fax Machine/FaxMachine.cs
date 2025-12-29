@@ -9,9 +9,11 @@ public class FaxMachine : MonoBehaviour
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private MachineShake machineShake;
     [SerializeField] private Animator faxMachineAnimator;
+    [SerializeField] PaperPickup paperPickup;
     
     private void Start()
     {
+        paper.SetActive(false);
         GameManager.Instance.OnGameStart += OnGameStart;
     }
 
@@ -25,10 +27,12 @@ public class FaxMachine : MonoBehaviour
     {
         _audioSource.Play();
         machineShake.enabled = true;
+        paperPickup.enabled = false;
         yield return new WaitForSeconds(10.5f);
         paper.gameObject.SetActive(true);
         faxMachineAnimator.SetBool("On", true);
         yield return new WaitForSeconds(3);
+        paperPickup.enabled = true;
         machineShake.enabled = false;
     }
 }

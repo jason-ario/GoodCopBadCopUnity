@@ -10,7 +10,8 @@ public class PlayerInteractionController : NetworkBehaviour
 
     public PlayerPickupController pickupController;
     public ReticleController reticle;
-    public PlayerAnimationController playerAnimationController;
+    public PlayerAnimationController playerAnimationController; 
+    Interactable lastInteractable;
 
     private void Awake()
     {
@@ -40,16 +41,24 @@ public class PlayerInteractionController : NetworkBehaviour
             reticle = GameObject.FindFirstObjectByType<ReticleController>();
         }
         
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward); 
+        
+        if(lastInteractable != null) lastInteractable.Highlight(false);
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
-            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
+            Interactable interactable = hit.collider.GetComponent<Interactable>();
 
-            if (interactable != null)
+            if (interactable != null && interactable.enabled)
             {
                 reticle.SetInteractState(true);
+                interactable.Highlight(true);
+                lastInteractable = interactable;
                 return;
+            }
+            else
+            {
+                lastInteractable = null;
             }
         }
 
@@ -62,7 +71,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
-            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
+            Interactable interactable = hit.collider.GetComponent<Interactable>();
 
             if (interactable != null)
             {

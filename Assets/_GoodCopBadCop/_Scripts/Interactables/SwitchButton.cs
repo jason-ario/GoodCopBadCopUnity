@@ -1,8 +1,8 @@
 using UnityEngine;
 
-public class SwitchButton : MonoBehaviour, IInteractable
+public class SwitchButton : Interactable
 {
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         GameManager.Instance.TryStartLevel();
     }

@@ -1,10 +1,10 @@
 using UnityEngine;
 
-public class FilingCabinet : MonoBehaviour, IInteractable
+public class FilingCabinet : Interactable
 {
     [SerializeField] private GameObject levelSelectUI;
     
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         player.GetComponent<PlayerMovementController>().SetCanControl(false);
         

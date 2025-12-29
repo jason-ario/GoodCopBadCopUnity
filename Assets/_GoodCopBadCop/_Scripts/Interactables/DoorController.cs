@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-public class DoorController : MonoBehaviour, IInteractable
+public class DoorController : Interactable
 {
     bool doorOpen = false;
     [SerializeField] private Animator _animator;
@@ -11,7 +11,7 @@ public class DoorController : MonoBehaviour, IInteractable
     [SerializeField] AudioClip doorOpenClip;
     [SerializeField] AudioClip doorCloseClip;
 
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         if (beingInteractedWith == false)
         {

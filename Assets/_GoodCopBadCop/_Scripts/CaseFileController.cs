@@ -3,7 +3,7 @@ using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 
-public class CaseFileController : MonoBehaviour, IInteractable
+public class CaseFileController : Interactable
 {
     [SerializeField] Transform standingPosition;
     [SerializeField] private float lerpDuration = 1;
@@ -15,7 +15,7 @@ public class CaseFileController : MonoBehaviour, IInteractable
     [SerializeField] private GameObject caseFileUI;
     [SerializeField] SuspectData suspect;
     
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         PlayerMovementController playerMovementController = player.GetComponent<PlayerMovementController>();
         _playerMovementController = playerMovementController;

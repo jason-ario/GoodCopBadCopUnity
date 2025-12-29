@@ -1,8 +1,8 @@
 using UnityEngine;
 
-public class ToolsLocker : MonoBehaviour, IInteractable
+public class ToolsLocker : Interactable
 {
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         UIController.Instance.OpenToolShopUI();
     }

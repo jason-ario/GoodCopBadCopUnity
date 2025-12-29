@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class PickableObject : MonoBehaviour, IInteractable
+public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
 
@@ -11,7 +11,7 @@ public class PickableObject : MonoBehaviour, IInteractable
     [SerializeField] PickableItemData itemData;
     public PickableItemData ItemData => itemData;
 
-    public void Interact(PlayerInteractionController player)
+    public override void Interact(PlayerInteractionController player)
     {
         player.pickupController.PickUpObject(this);
     }
