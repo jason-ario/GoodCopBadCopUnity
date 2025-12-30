@@ -29,7 +29,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.49305424, y: 0.50684196, z: -0.5000043, w: 0.50000453}
   m_LocalPosition: {x: -0.00377, y: 0.00005, z: -0.00229}
-  m_LocalScale: {x: 0.005305313, y: 0.005305316, z: 0.0053053154}
+  m_LocalScale: {x: 0.83437717, y: 0.8343781, z: 0.8343779}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 699330901732754610}
@@ -69,6 +69,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   itemData: {fileID: 11400000, guid: 752ac0d560d563642a50042358017121, type: 2}
+  pickupSound: {fileID: 8300000, guid: 8bb45c78f7c81334fa62d05150f681e4, type: 3}
 --- !u!114 &776382627458472369
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -317,6 +318,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: dc5f3c803efa8194eb7e3587c6c274f9, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: cbcb4625951230142a0467f40530c7d5, type: 2}
     - target: {fileID: -5439097546272933965, guid: dc5f3c803efa8194eb7e3587c6c274f9, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 

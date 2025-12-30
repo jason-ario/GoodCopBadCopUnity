@@ -57,7 +57,7 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
-    public void PickUpObject(PickableItemData itemData, bool pocketHeldObject = false)
+    public void PickUpObject(PickableObject pickableObject, PickableItemData itemData)
     {
         // Drop existing object if holding something already
         if (heldObject != null)
@@ -66,14 +66,22 @@ public class PlayerPickupController : NetworkBehaviour
         }
         
         heldObject = itemData;
-        
-        //Despawn
-        _playerAnimationController.EnableHoldObjectMask();
+
+        if (itemData.usesTwoArms)
+        {
+            _playerAnimationController.EnableHoldObjectTwoArmsMask();
+        }
+        else
+        {
+            _playerAnimationController.EnableHoldObjectMask();
+        }
         
         foreach (var objectContainer in objectContainers)
         {
             objectContainer.EquipItem(itemData);
         }
+        
+        pickableObject.OnPickedUp();
     }
 
     public void DropObject()

@@ -79,17 +79,29 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         bodyAnimator.SetLayerWeight(1, 1);
         armsAnimator.SetLayerWeight(1,1);
+        bodyAnimator.SetLayerWeight(2,0);
+        armsAnimator.SetLayerWeight(2,0);
     }
     
     public void DisableHoldObjectMask()
     {
         bodyAnimator.SetLayerWeight(1, 0);
         armsAnimator.SetLayerWeight(1,0);
+        bodyAnimator.SetLayerWeight(2,0);
+        armsAnimator.SetLayerWeight(2,0);
     }
 
     public void OpenDoor()
     {
         bodyAnimator.SetTrigger("OpenDoor");
         armsAnimator.SetTrigger("OpenDoor");
+    }
+
+    public void EnableHoldObjectTwoArmsMask()
+    {
+        bodyAnimator.SetLayerWeight(1, 0);
+        armsAnimator.SetLayerWeight(1,0);
+        bodyAnimator.SetLayerWeight(2,1);
+        armsAnimator.SetLayerWeight(2,1);
     }
 }

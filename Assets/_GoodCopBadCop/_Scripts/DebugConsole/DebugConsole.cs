@@ -4,17 +4,14 @@ using UnityEngine;
 
 public class DebugConsole : MonoBehaviour
 {
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.F5))
-        {
-            SkipMainMenu();
-        }
-    }
+    public bool skipMainMenu;
 
-    public void SkipMainMenu()
+    private void Start()
     {
-        NetworkManager.Singleton.StartHost();
-        GameManager.Instance.TryStartGame();
+        if (skipMainMenu)
+        {
+            NetworkManager.Singleton.StartHost();
+            GameManager.Instance.TryStartGame(true);
+        }
     }
 }

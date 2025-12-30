@@ -5,4 +5,8 @@ public class PickableItemData : ScriptableObject
 {
     [SerializeField] private GameObject pickUpPrefab;
     public GameObject PickUpPrefab => pickUpPrefab;
+    
+    [Header("Animation Data")]
+    public bool usesTwoArms;
+    public string pickupAnimBool;
 }

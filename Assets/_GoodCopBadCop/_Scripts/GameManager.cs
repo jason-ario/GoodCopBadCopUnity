@@ -22,13 +22,14 @@ public class GameManager : NetworkBehaviour
         Instance = this;
     }
     
-    public void TryStartGame()
+    public void TryStartGame(bool skipTransition = false)
     {
         if (IsServer)
-            StartGameServer();
+            StartGameServer(skipTransition);
         else
             RequestStartGameServerRpc();
     }
+    
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestStartGameServerRpc()
@@ -36,19 +37,19 @@ public class GameManager : NetworkBehaviour
         StartGameServer();
     }   
     
-    private void StartGameServer()
+    private void StartGameServer(bool skipTransition = false)
     {
         if (!IsServer) return;
 
         // 🔊 Tell all clients to transition
-        StartGameClientRpc();
+        StartGameClientRpc(skipTransition);
     }
     
     [ClientRpc]
-    private void StartGameClientRpc()
+    private void StartGameClientRpc(bool skipTransition = false)
     {
         UIController.Instance.ShowPlayerUI();
-        StartCoroutine(TransitionToGameplay());
+        StartCoroutine(TransitionToGameplay(skipTransition));
 
         ResetWindow();
     }
@@ -68,8 +69,20 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    IEnumerator TransitionToGameplay()
+    IEnumerator TransitionToGameplay(bool skipTransition = false)
     {
+        if (skipTransition)
+        {
+            MainMenuController.Instance.TransitionToGameplay(); 
+            
+            if (IsServer)
+            {
+                SpawnPlayersServer();
+            }
+            OnGameStart?.Invoke(); 
+            yield break;
+        }
+        
         UIController.Instance.FadeIn();
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);
