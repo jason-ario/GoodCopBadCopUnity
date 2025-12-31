@@ -1,4 +1,5 @@
 using System;
+using Unity.Netcode;
 using UnityEngine;
 
 public class ObjectContainer : MonoBehaviour
@@ -7,7 +8,7 @@ public class ObjectContainer : MonoBehaviour
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
     public PickableObject CurrentlyEquippedItem => currentlyEquippedItem;
-    
+
     public enum ParentContainerType
     {
         BODY,
@@ -28,6 +29,16 @@ public class ObjectContainer : MonoBehaviour
             SetLayerRecursively(itemHeld.gameObject, layer);
         }
     }
+
+    public void SetClientLayers()
+    {
+        string layerName = "Default";
+        int layer = LayerMask.NameToLayer(layerName);
+        foreach (var itemHeld in itemsHeld)
+        {
+            SetLayerRecursively(itemHeld.gameObject, layer);
+        }
+    }
     
     private void SetLayerRecursively(GameObject obj, int layer)
     {
@@ -41,9 +52,9 @@ public class ObjectContainer : MonoBehaviour
     
     public void EquipItem(PickableItemData itemData, PlayerPickupController playerPickupController)
     {
-        Debug.Log(itemsHeld.Length);
-        foreach (var itemHeld in itemsHeld)
+        for (var i = 0; i < itemsHeld.Length; i++)
         {
+            var itemHeld = itemsHeld[i];
             if (itemData == itemHeld.ItemData)
             {
                 // Found matching item, equip it
@@ -51,16 +62,19 @@ public class ObjectContainer : MonoBehaviour
                 {
                     currentlyEquippedItem.gameObject.SetActive(false);
                 }
-            
+
                 currentlyEquippedItem = itemHeld;
                 itemHeld.gameObject.SetActive(true);
-                itemHeld.OnEquipped(playerPickupController);
+                if (playerPickupController != null)
+                {
+                    itemHeld.OnEquipped(playerPickupController);
+                }
                 return;
             }
         }
     }
     
-    public void UnequipItem(PickableItemData item)
+    public void UnequipItem()
     {
         // Found matching item, equip it
         if (currentlyEquippedItem != null)
@@ -69,5 +83,23 @@ public class ObjectContainer : MonoBehaviour
         }
             
         currentlyEquippedItem = null;
+    }
+
+    public int ItemIndex(PickableItemData itemData)
+    {
+        for (int i = 0; i < itemsHeld.Length; i++)
+        {
+            if (itemsHeld[i].ItemData == itemData)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public PickableItemData GetItemData(int newValue)
+    {
+        return itemsHeld[newValue].ItemData;
     }
 }

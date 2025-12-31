@@ -15,12 +15,55 @@ public class PlayerPickupController : NetworkBehaviour
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     
     [SerializeField] ObjectContainer[] objectContainers;
-    [SerializeField] private ObjectContainer objectContainerToUse;
+    [SerializeField] private ObjectContainer objectContainerToUse; 
+    private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     private void Awake()
     {
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         objectContainers = GetComponentsInChildren<ObjectContainer>(true);
+        itemEquippedIndex.OnValueChanged += OnItemValueChanged;
+    }
+
+    private void Start()
+    {
+        if (!IsOwner)
+        {
+            foreach (var objectContainer in objectContainers)
+            {
+                objectContainer.SetClientLayers();
+            }  
+        }    
+    }
+
+    private void OnItemValueChanged(int previousValue, int newValue)
+    {
+        Debug.Log("Player Pickup Controller: OnItemValueChanged");
+        if (newValue == -1)
+        {
+            foreach (var objectContainer in objectContainers)
+            {
+                objectContainer.UnequipItem();
+            }
+
+            return;
+        }
+        
+        PickableItemData itemData = objectContainerToUse.GetItemData(newValue);
+        
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.EquipItem(itemData, this);
+        }
+        
+        if (itemData.usesTwoArms)
+        {
+            _playerAnimationController.EnableHoldObjectTwoArmsMask();
+        }
+        else
+        {
+            _playerAnimationController.EnableHoldObjectMask();
+        }
     }
 
     void Update()
@@ -77,19 +120,8 @@ public class PlayerPickupController : NetworkBehaviour
         heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
 
-        if (itemData.usesTwoArms)
-        {
-            _playerAnimationController.EnableHoldObjectTwoArmsMask();
-        }
-        else
-        {
-            _playerAnimationController.EnableHoldObjectMask();
-        }
-        
-        foreach (var objectContainer in objectContainers)
-        {
-            objectContainer.EquipItem(itemData, this);
-        }
+        int itemIndex = objectContainerToUse.ItemIndex(itemData);
+        itemEquippedIndex.Value = itemIndex;
         
         pickableObject.OnPickedUp();
     }
@@ -105,10 +137,11 @@ public class PlayerPickupController : NetworkBehaviour
 
         foreach (var objectContainer in objectContainers)
         {
-            objectContainer.UnequipItem(heldObject);
+            objectContainer.UnequipItem();
         }
 
         heldObject = null;
+        itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();
     }
