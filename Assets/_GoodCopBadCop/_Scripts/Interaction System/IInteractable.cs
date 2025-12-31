@@ -14,7 +14,7 @@ public abstract class Interactable : MonoBehaviour, IInteractable
     HighlightEffect highlightEffect;
     public abstract void Interact(PlayerInteractionController player);
 
-    private void Awake()
+    protected virtual void Awake()
     {
         highlightEffect = GetComponent<HighlightEffect>();
         highlightEffect.enabled = false;

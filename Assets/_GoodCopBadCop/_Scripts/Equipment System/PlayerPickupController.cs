@@ -8,7 +8,10 @@ public class PlayerPickupController : NetworkBehaviour
     public float holdSmoothness = 10f;
 
     private PickableItemData heldObject;
+    
+    public bool IsHoldingObject => heldObject != null;
     private PlayerAnimationController _playerAnimationController;
+    public PickableItemData HeldObject => heldObject;
     
     [SerializeField] ObjectContainer[] objectContainers;
 
@@ -47,6 +50,8 @@ public class PlayerPickupController : NetworkBehaviour
 
         // Notify item-specific logic
         obj.OnPickedUp();
+        ObjectPlacer.Instance.SetItem(obj.ItemData);
+        
         Destroy(obj.gameObject);
         //Despawn
         _playerAnimationController.EnableHoldObjectMask();
@@ -66,6 +71,7 @@ public class PlayerPickupController : NetworkBehaviour
         }
         
         heldObject = itemData;
+        ObjectPlacer.Instance.SetItem(itemData);
 
         if (itemData.usesTwoArms)
         {
@@ -89,22 +95,9 @@ public class PlayerPickupController : NetworkBehaviour
         if (heldObject == null) return;
 
         GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, holdPoint.position, Quaternion.identity);
-        // Re-enable physics & collider
-        if (spawnedPickup.TryGetComponent<Rigidbody>(out var rb))
-        {
-            rb.isKinematic = false;
 
-            // Small forward toss for feel
-            rb.AddForce(holdPoint.forward * 2f, ForceMode.Impulse);
-        }
-
-        if (spawnedPickup.TryGetComponent<Collider>(out var col))
-        {
-            col.enabled = true;
-        }
-
-        // Notify item-specific logic
-        spawnedPickup.GetComponent<PickableObject>().OnDropped();
+        spawnedPickup.transform.position = ObjectPlacer.Instance.transform.position;
+        spawnedPickup.transform.rotation = ObjectPlacer.Instance.transform.rotation;
 
         foreach (var objectContainer in objectContainers)
         {
@@ -113,5 +106,6 @@ public class PlayerPickupController : NetworkBehaviour
         _playerAnimationController.DisableHoldObjectMask();
 
         heldObject = null;
+        ObjectPlacer.Instance.DeactivatePlacer();
     }
 }

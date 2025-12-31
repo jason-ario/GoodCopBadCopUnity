@@ -12,11 +12,13 @@ public class PlayerInteractionController : NetworkBehaviour
     public ReticleController reticle;
     public PlayerAnimationController playerAnimationController; 
     Interactable lastInteractable;
+    private PlayerPickupController _playerPickupController;
 
     private void Awake()
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
         reticle = GameObject.FindFirstObjectByType<ReticleController>();
+        _playerPickupController = GetComponent<PlayerPickupController>();
     }
 
     void Update()
@@ -47,7 +49,8 @@ public class PlayerInteractionController : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
-            Interactable interactable = hit.collider.GetComponent<Interactable>();
+            Interactable interactable = hit.collider.GetComponent<Interactable>(); 
+            PlacementBoard placementBoard = hit.collider.GetComponent<PlacementBoard>();
 
             if (interactable != null && interactable.enabled)
             {
@@ -58,6 +61,40 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             else
             {
+                lastInteractable = null;
+            }
+
+            if (_playerPickupController.IsHoldingObject && placementBoard != null)
+            {
+                if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false)
+                {
+                    reticle.SetInteractState(false);
+                    if (ObjectPlacer.Instance.IsActive)
+                    {
+                        ObjectPlacer.Instance.DeactivatePlacer();
+                    }
+                
+                    lastInteractable = null;
+                    return;
+                }
+                
+                reticle.SetInteractState(true);
+                
+                if (ObjectPlacer.Instance.IsActive == false)
+                {
+                    ObjectPlacer.Instance.ActivatePlacer(placementBoard);
+                }
+                
+                ObjectPlacer.Instance.transform.position = hit.point;
+                return;
+            }
+            else
+            {
+                if (ObjectPlacer.Instance.IsActive)
+                {
+                    ObjectPlacer.Instance.DeactivatePlacer();
+                }
+                
                 lastInteractable = null;
             }
         }

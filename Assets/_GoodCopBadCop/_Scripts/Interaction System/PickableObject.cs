@@ -3,7 +3,15 @@ using UnityEngine;
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
+    [SerializeField] MeshRenderer[] meshRenderers;
+    bool setSeeThrough = false;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
+    }
+    
     public virtual void OnPickedUp()
     {
         if (pickupSound != null)
@@ -13,6 +21,7 @@ public class PickableObject : Interactable
         
         Destroy(gameObject);
     }
+    
     public virtual void OnDropped() { }
     public virtual void OnEquipped() { }
 
