@@ -99,30 +99,34 @@ public class PlayerPickupController : NetworkBehaviour
         if (heldObject == null) return;
         if (ObjectPlacer.Instance.IsActive == false) return;
 
-        // Call the server to handle the actual spawning
-        RequestDropServerRpc(ObjectPlacer.Instance.transform.position, ObjectPlacer.Instance.transform.rotation);
+        // Pass the index/ID of the held item so the server knows which prefab to spawn
+        int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
+        RequestDropServerRpc(itemIndex, ObjectPlacer.Instance.transform.position, ObjectPlacer.Instance.transform.rotation);
 
         foreach (var objectContainer in objectContainers)
         {
             objectContainer.UnequipItem(heldObject);
         }
-        _playerAnimationController.DisableHoldObjectMask();
 
         heldObject = null;
+        _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();
     }
 
     [ServerRpc]
-    private void RequestDropServerRpc(Vector3 position, Quaternion rotation)
+    private void RequestDropServerRpc(int itemIndex, Vector3 position, Quaternion rotation)
     {
-        // 1. Instantiate the prefab (must have a NetworkObject component)
-        GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, position, rotation);
+        // Get the actual data/prefab on the server side using the index
+        PickableItemData data = ItemDatabase.Instance.GetItemByIndex(itemIndex);
+        if (data == null || data.PickUpPrefab == null) return;
 
-        // 2. Spawn it on the network
+        GameObject spawnedPickup = Instantiate(data.PickUpPrefab, position, rotation);
+
         NetworkObject netObj = spawnedPickup.GetComponent<NetworkObject>();
         if (netObj != null)
         {
             netObj.Spawn();
         }
+        
     }
 }

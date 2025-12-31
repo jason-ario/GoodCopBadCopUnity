@@ -53,15 +53,20 @@ public class LobbyManager : MonoBehaviour
         if (!NetworkManager.Singleton.StartHost())
             return;
 
-        var lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
-        lobby.SetPublic();
-        lobby.SetJoinable(true);
-        lobby.SetData("host", SteamClient.Name);
-
-        if (NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport facepunch)
+        if (transport is FacepunchTransport facepunch)
         {
+            var lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+            lobby.SetPublic();
+            lobby.SetJoinable(true);
+            lobby.SetData("host", SteamClient.Name);
             facepunch.targetSteamId = lobby.Owner.Id;
+        }
+        else if (transport is UnityTransport unityTransport)
+        {
+            // LAN Setup - Usually defaults are 127.0.0.1:7777 unless configured otherwise in inspector
+            Debug.Log("Starting LAN Host via UnityTransport");
         }
     }
 
@@ -70,21 +75,18 @@ public class LobbyManager : MonoBehaviour
     // =========================
     public async void JoinLobby(ulong lobbyId)
     {
-        var lobby = new Lobby(lobbyId);
-        await lobby.Join();
-
-        CurrentLobby = lobby;
-
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
         if (transport is FacepunchTransport facepunch)
         {
-            // 🔑 THIS is the missing piece
+            var lobby = new Lobby(lobbyId);
+            await lobby.Join();
+            CurrentLobby = lobby;
             facepunch.targetSteamId = lobby.Owner.Id;
         }
         else if (transport is UnityTransport unityTransport)
         {
-            // LAN fallback
+            // LAN fallback: join the local IP
             unityTransport.SetConnectionData("127.0.0.1", 7777);
         }
 
@@ -169,12 +171,15 @@ public class LobbyManager : MonoBehaviour
 
     public void ExitLobby()
     {
-        if (IsHost)
+        if (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient)
         {
             NetworkManager.Singleton.Shutdown();
         }
         
-        CurrentLobby.Leave();
+        if (CurrentLobby.Id != 0)
+        {
+            CurrentLobby.Leave();
+        }
     }
 
 }
