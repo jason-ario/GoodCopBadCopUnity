@@ -107,6 +107,20 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void SetAnimBool(string animString, bool value)
     {
+        if (!IsOwner) return;
+        
+        SetAnimBoolServerRpc(animString, value);
+    }
+
+    [ServerRpc]
+    private void SetAnimBoolServerRpc(string animString, bool value)
+    {
+        SetAnimBoolClientRpc(animString, value);
+    }
+
+    [ClientRpc]
+    private void SetAnimBoolClientRpc(string animString, bool value)
+    {
         bodyAnimator.SetBool(animString, value);
         armsAnimator.SetBool(animString, value);
     }
