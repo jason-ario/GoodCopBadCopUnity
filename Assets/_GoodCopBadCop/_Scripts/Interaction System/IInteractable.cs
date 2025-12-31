@@ -1,5 +1,6 @@
 using System;
 using HighlightPlus;
+using Unity.Netcode;
 using UnityEngine;
 
 public interface IInteractable
@@ -9,7 +10,7 @@ public interface IInteractable
 }
 
 [RequireComponent(typeof(HighlightEffect))]
-public abstract class Interactable : MonoBehaviour, IInteractable
+public abstract class Interactable : NetworkBehaviour, IInteractable
 {
     HighlightEffect highlightEffect;
     public abstract void Interact(PlayerInteractionController player);

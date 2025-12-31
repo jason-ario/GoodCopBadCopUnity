@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8573273491766061766}
   - component: {fileID: 7974828276406352585}
+  - component: {fileID: 7678791981046714543}
   - component: {fileID: 1532312543768439055}
   - component: {fileID: 776382627458472369}
   m_Layer: 0
@@ -56,6 +57,31 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.6522007, y: 0.080867246, z: 1.0014024}
   m_Center: {x: 0, y: 0.00000011920929, z: -0.00000029802322}
+--- !u!114 &7678791981046714543
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7776097630994183444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &1532312543768439055
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -68,6 +94,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf78f6c01b631fa438ea09655a3c15f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   meshRenderers: []
   itemData: {fileID: 11400000, guid: 752ac0d560d563642a50042358017121, type: 2}
   pickupSound: {fileID: 8300000, guid: 8bb45c78f7c81334fa62d05150f681e4, type: 3}

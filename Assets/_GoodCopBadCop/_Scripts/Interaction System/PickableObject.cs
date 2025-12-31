@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class PickableObject : Interactable
@@ -20,7 +21,17 @@ public class PickableObject : Interactable
             SFXController.Instance.Play(pickupSound);
         }
         
-        Destroy(gameObject);
+        RequestDespawnServerRpc();
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDespawnServerRpc()
+    {
+        var networkObject = GetComponent<NetworkObject>();
+        if (networkObject != null && networkObject.IsSpawned)
+        {
+            networkObject.Despawn();
+        }
     }
     
     public virtual void OnDropped() { }

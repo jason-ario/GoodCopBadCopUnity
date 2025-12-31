@@ -99,10 +99,8 @@ public class PlayerPickupController : NetworkBehaviour
         if (heldObject == null) return;
         if (ObjectPlacer.Instance.IsActive == false) return;
 
-        GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, holdPoint.position, Quaternion.identity);
-
-        spawnedPickup.transform.position = ObjectPlacer.Instance.transform.position;
-        spawnedPickup.transform.rotation = ObjectPlacer.Instance.transform.rotation;
+        // Call the server to handle the actual spawning
+        RequestDropServerRpc(ObjectPlacer.Instance.transform.position, ObjectPlacer.Instance.transform.rotation);
 
         foreach (var objectContainer in objectContainers)
         {
@@ -112,5 +110,19 @@ public class PlayerPickupController : NetworkBehaviour
 
         heldObject = null;
         ObjectPlacer.Instance.DeactivatePlacer();
+    }
+
+    [ServerRpc]
+    private void RequestDropServerRpc(Vector3 position, Quaternion rotation)
+    {
+        // 1. Instantiate the prefab (must have a NetworkObject component)
+        GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, position, rotation);
+
+        // 2. Spawn it on the network
+        NetworkObject netObj = spawnedPickup.GetComponent<NetworkObject>();
+        if (netObj != null)
+        {
+            netObj.Spawn();
+        }
     }
 }
