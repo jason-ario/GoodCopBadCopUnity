@@ -8,12 +8,14 @@ public class PlayerPickupController : NetworkBehaviour
     public float holdSmoothness = 10f;
 
     private PickableItemData heldObject;
-    
+    public PickableItemData HeldObject => heldObject; 
+
     public bool IsHoldingObject => heldObject != null;
     private PlayerAnimationController _playerAnimationController;
-    public PickableItemData HeldObject => heldObject;
+    public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     
     [SerializeField] ObjectContainer[] objectContainers;
+    [SerializeField] private ObjectContainer objectContainerToUse;
 
     private void Awake()
     {
@@ -35,30 +37,32 @@ public class PlayerPickupController : NetworkBehaviour
             {
                 DropObject();
             }
+            
+            if (Input.GetMouseButtonDown(0))
+            {
+                UseObject();
+            }
+            
+            if (Input.GetMouseButtonUp(0))
+            {
+                StopUsingObject();
+            }
         }
     }
 
-    public void PickUpObject(PickableObject obj)
+    void UseObject()
     {
-        // Drop existing object if holding something already
-        if (heldObject != null)
+        if (objectContainerToUse.CurrentlyEquippedItem != null)
         {
-            DropObject();
+            objectContainerToUse.CurrentlyEquippedItem.OnStartUse();
         }
-        
-        heldObject = obj.ItemData;
+    }
 
-        // Notify item-specific logic
-        obj.OnPickedUp();
-        ObjectPlacer.Instance.SetItem(obj.ItemData);
-        
-        Destroy(obj.gameObject);
-        //Despawn
-        _playerAnimationController.EnableHoldObjectMask();
-        
-        foreach (var objectContainer in objectContainers)
+    void StopUsingObject()
+    {
+        if (objectContainerToUse.CurrentlyEquippedItem != null)
         {
-            objectContainer.EquipItem(obj.ItemData);
+            objectContainerToUse.CurrentlyEquippedItem.OnStopUse();
         }
     }
 
@@ -67,7 +71,7 @@ public class PlayerPickupController : NetworkBehaviour
         // Drop existing object if holding something already
         if (heldObject != null)
         {
-            DropObject();
+            return;
         }
         
         heldObject = itemData;
@@ -84,7 +88,7 @@ public class PlayerPickupController : NetworkBehaviour
         
         foreach (var objectContainer in objectContainers)
         {
-            objectContainer.EquipItem(itemData);
+            objectContainer.EquipItem(itemData, this);
         }
         
         pickableObject.OnPickedUp();
@@ -93,6 +97,7 @@ public class PlayerPickupController : NetworkBehaviour
     public void DropObject()
     {
         if (heldObject == null) return;
+        if (ObjectPlacer.Instance.IsActive == false) return;
 
         GameObject spawnedPickup = Instantiate(heldObject.PickUpPrefab, holdPoint.position, Quaternion.identity);
 

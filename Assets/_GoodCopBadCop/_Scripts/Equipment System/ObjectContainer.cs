@@ -6,6 +6,7 @@ public class ObjectContainer : MonoBehaviour
     [SerializeField] private PickableObject[] itemsHeld;
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
+    public PickableObject CurrentlyEquippedItem => currentlyEquippedItem;
     
     public enum ParentContainerType
     {
@@ -38,7 +39,7 @@ public class ObjectContainer : MonoBehaviour
         }
     }
     
-    public void EquipItem(PickableItemData itemData)
+    public void EquipItem(PickableItemData itemData, PlayerPickupController playerPickupController)
     {
         Debug.Log(itemsHeld.Length);
         foreach (var itemHeld in itemsHeld)
@@ -53,12 +54,12 @@ public class ObjectContainer : MonoBehaviour
             
                 currentlyEquippedItem = itemHeld;
                 itemHeld.gameObject.SetActive(true);
-                itemHeld.OnEquipped();
+                itemHeld.OnEquipped(playerPickupController);
                 return;
             }
         }
     }
-
+    
     public void UnequipItem(PickableItemData item)
     {
         // Found matching item, equip it

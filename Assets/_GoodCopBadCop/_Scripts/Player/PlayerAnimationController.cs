@@ -104,4 +104,10 @@ public class PlayerAnimationController : NetworkBehaviour
         bodyAnimator.SetLayerWeight(2,1);
         armsAnimator.SetLayerWeight(2,1);
     }
+
+    public void SetAnimBool(string animString, bool value)
+    {
+        bodyAnimator.SetBool(animString, value);
+        armsAnimator.SetBool(animString, value);
+    }
 }

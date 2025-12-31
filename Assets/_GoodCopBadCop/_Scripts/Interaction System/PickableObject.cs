@@ -5,6 +5,7 @@ public class PickableObject : Interactable
     // Virtual methods allow overriding
     [SerializeField] MeshRenderer[] meshRenderers;
     bool setSeeThrough = false;
+    protected PlayerPickupController playerPickupController;
 
     protected override void Awake()
     {
@@ -23,7 +24,11 @@ public class PickableObject : Interactable
     }
     
     public virtual void OnDropped() { }
-    public virtual void OnEquipped() { }
+
+    public virtual void OnEquipped(PlayerPickupController player)
+    {
+        playerPickupController = player;
+    }
 
     [SerializeField] PickableItemData itemData;
     public PickableItemData ItemData => itemData;
@@ -33,5 +38,15 @@ public class PickableObject : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         player.pickupController.PickUpObject(this, ItemData);
+    }
+
+    public virtual void OnStartUse()
+    {
+        
+    }
+    
+    public virtual void OnStopUse()
+    {
+        
     }
 }
