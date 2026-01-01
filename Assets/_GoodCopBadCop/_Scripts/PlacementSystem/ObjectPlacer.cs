@@ -44,4 +44,17 @@ public class ObjectPlacer : MonoBehaviour
         container.gameObject.SetActive(false);
         IsActive = false;
     }
+
+    public GameObject GetPickableObject(PickableItemData heldObject)
+    {
+        foreach (var pickableObject in pickableObjects)
+        {
+            if (pickableObject.ItemData == heldObject)
+            {
+                return pickableObject.gameObject;
+            }
+        }
+
+        return null;
+    }
 }

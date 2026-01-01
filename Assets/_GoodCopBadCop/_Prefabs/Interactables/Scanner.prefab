@@ -189,6 +189,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 8889526540930178221}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 2761549045362973022}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
       insertIndex: -1
@@ -202,6 +205,31 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
   m_PrefabInstance: {fileID: 6630243241288233727}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8889526540930178221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5819269505631014830}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &2761549045362973022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -214,7 +242,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fadfec2f2d549e45b66e91de6636b31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
+  meshRenderers: []
   itemData: {fileID: 11400000, guid: 5fe8564a7140fb34eb4f9164b78b0c42, type: 2}
+  pickupSound: {fileID: 0}
 --- !u!65 &6988650317516088836
 BoxCollider:
   m_ObjectHideFlags: 0

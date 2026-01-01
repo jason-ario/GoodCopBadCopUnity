@@ -133,7 +133,8 @@ public class PlayerPickupController : NetworkBehaviour
 
         // Pass the index/ID of the held item so the server knows which prefab to spawn
         int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
-        RequestDropServerRpc(itemIndex, ObjectPlacer.Instance.transform.position, ObjectPlacer.Instance.transform.rotation);
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;
+        RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
 
         foreach (var objectContainer in objectContainers)
         {
