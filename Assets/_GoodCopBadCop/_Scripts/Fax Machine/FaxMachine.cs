@@ -1,25 +1,33 @@
 using System;
 using System.Collections;
 using DG.Tweening;
+using Unity.Netcode;
 using UnityEngine;
 
-public class FaxMachine : MonoBehaviour
+public class FaxMachine : NetworkBehaviour
 {
     [SerializeField] private GameObject paper;
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private MachineShake machineShake;
     [SerializeField] private Animator faxMachineAnimator;
-    [SerializeField] PaperPickup paperPickup;
-    
+    [SerializeField] NetworkObject paperPickupNetworkObject;
     private void Start()
     {
         paper.SetActive(false);
         GameManager.Instance.OnGameStart += OnGameStart;
     }
-
+    
     private void OnGameStart()
     {
-
+        if (IsHost)
+        {
+            RunFaxMachineClientRpc();
+        }
+    }
+    
+    [ClientRpc]
+    private void RunFaxMachineClientRpc()
+    {
         StartCoroutine(RunFaxMachine());
     }
 
@@ -27,12 +35,23 @@ public class FaxMachine : MonoBehaviour
     {
         _audioSource.Play();
         machineShake.enabled = true;
-        paperPickup.enabled = false;
         yield return new WaitForSeconds(10.5f);
         paper.gameObject.SetActive(true);
         faxMachineAnimator.SetBool("On", true);
         yield return new WaitForSeconds(3);
-        paperPickup.enabled = true;
         machineShake.enabled = false;
+        paper.gameObject.SetActive(false);
+
+        if (IsServer)
+        {
+            // 1. Instantiate the object on the server
+            NetworkObject spawnedPaper = Instantiate(paperPickupNetworkObject, paper.transform.position, paper.transform.rotation);
+            
+            // 2. Set the scale to match the paper's lossy scale
+            spawnedPaper.transform.localScale = paper.transform.lossyScale;
+
+            // 3. Spawn it into the network
+            spawnedPaper.Spawn();
+        }
     }
 }
