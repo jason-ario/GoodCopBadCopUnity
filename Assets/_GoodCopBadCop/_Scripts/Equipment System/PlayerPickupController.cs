@@ -135,16 +135,19 @@ public class PlayerPickupController : NetworkBehaviour
         int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
         GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;
         RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
+        objectContainerToUse.CurrentlyEquippedItem.OnDropped();
 
         foreach (var objectContainer in objectContainers)
         {
             objectContainer.UnequipItem();
         }
+        
 
         heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();
+
     }
 
     [ServerRpc]

@@ -8,6 +8,11 @@ public class PickableObject : Interactable
     bool setSeeThrough = false;
     protected PlayerPickupController playerPickupController;
 
+    [SerializeField] PickableItemData itemData;
+    public PickableItemData ItemData => itemData;
+    [SerializeField] AudioClip pickupSound;
+    [SerializeField] AudioClip putDownSound;
+
     protected override void Awake()
     {
         base.Awake();
@@ -33,17 +38,23 @@ public class PickableObject : Interactable
             networkObject.Despawn();
         }
     }
-    
-    public virtual void OnDropped() { }
+
+    public virtual void OnDropped()
+    {
+        if (putDownSound != null)
+        {
+            SFXController.Instance.Play(putDownSound);
+        } else if (pickupSound != null)
+        {
+            SFXController.Instance.Play(pickupSound);
+        }
+    }
 
     public virtual void OnEquipped(PlayerPickupController player)
     {
         playerPickupController = player;
     }
 
-    [SerializeField] PickableItemData itemData;
-    public PickableItemData ItemData => itemData;
-    [SerializeField] AudioClip pickupSound;
 
 
     public override void Interact(PlayerInteractionController player)
