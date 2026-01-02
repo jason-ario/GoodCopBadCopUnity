@@ -2,7 +2,7 @@ using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 
-public class SuspectCharacter : NetworkBehaviour
+public class SuspectCharacter : Interactable
 {
     public FLookAnimator lookAnimator;
     public Animator animator;
@@ -10,4 +10,8 @@ public class SuspectCharacter : NetworkBehaviour
     [TextArea(3, 10)]
     public string entryDialogue;
     public AudioClip[] voiceAudioClips;
+    public override void Interact(PlayerInteractionController player)
+    {
+        DialogueManager.Instance.InitiateChoices();
+    }
 }

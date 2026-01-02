@@ -11,6 +11,7 @@ public class DialogueManager : MonoBehaviour
     Coroutine audioDialogueCoroutine;
     [SerializeField] private float minDelayBetweenClips = 0.03f;
     [SerializeField] private float maxDelayBetweenClips = 0.1f;
+    [SerializeField] DialogueChoiceSystem dialogueChoiceSystem;
     
     private void Awake()
     {
@@ -78,5 +79,10 @@ public class DialogueManager : MonoBehaviour
             StopCoroutine(audioDialogueCoroutine);
             audioDialogueCoroutine = null;
         }
+    }
+
+    public void InitiateChoices()
+    {
+        dialogueChoiceSystem.StartDialogueChoices();
     }
 }
