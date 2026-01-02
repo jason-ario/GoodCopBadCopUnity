@@ -11,7 +11,7 @@ public class SuspectController : MonoBehaviour
     public SuspectData suspectData;
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
-    [SerializeField] private SuspectData[] suspectDatas;
+    [SerializeField] private SuspectCharacter[] suspectCharacters;
     private SuspectCharacter _suspectCharacter;
 
     public void EnableLook()
@@ -38,15 +38,14 @@ public class SuspectController : MonoBehaviour
     private void RequestSpawnSuspectServerRpc(int suspectIndex, Vector3 position, Quaternion rotation)
     {
         // Lookup the data on the server using the index
-        SuspectData data = suspectDatas[suspectIndex];
+        SuspectCharacter suspect = suspectCharacters[suspectIndex];
         
-        GameObject spawnedSuspect = Instantiate(data.suspectPrefab.gameObject, position, rotation);
+        GameObject spawnedSuspect = Instantiate(suspect.gameObject, position, rotation);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
         netObj.Spawn();
         
         // Pass the index to clients so they know which references to set up
         AssignReferencesClientRpc(netObj.NetworkObjectId);
-        InitiateSuspect();
     }
 
     [ClientRpc]
@@ -66,7 +65,11 @@ public class SuspectController : MonoBehaviour
         SuspectCharacter suspectCharacter = netObj.GetComponent<SuspectCharacter>();
         _suspectCharacter = suspectCharacter;
         yield return new WaitForSeconds(.2f);
-        InitiateSuspect();
+
+        if (NetworkManager.Singleton.IsHost)
+        {
+            InitiateSuspect();
+        }
     }
     
     void InitiateSuspect()
@@ -83,7 +86,8 @@ public class SuspectController : MonoBehaviour
 
     void SayEntryDialogue()
     {
-        DialogueManager.Instance.SayDialogue(suspectData.entryDialogue, _suspectCharacter.audioSource, _suspectCharacter.suspectData.voiceAudioClips);
+        Debug.Log("Saying entry dialogue");
+        DialogueManager.Instance.SayDialogue(_suspectCharacter.entryDialogue, _suspectCharacter.audioSource, _suspectCharacter.voiceAudioClips);
     }
 }
 

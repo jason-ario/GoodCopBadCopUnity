@@ -35,7 +35,7 @@ public class FaxMachine : NetworkBehaviour
     {
         _audioSource.Play();
         machineShake.enabled = true;
-        yield return new WaitForSeconds(10.5f);
+        yield return new WaitForSeconds(4f);
         paper.gameObject.SetActive(true);
         faxMachineAnimator.SetBool("On", true);
         yield return new WaitForSeconds(3);

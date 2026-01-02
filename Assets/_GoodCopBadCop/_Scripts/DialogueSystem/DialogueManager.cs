@@ -9,6 +9,8 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI suspectDialogueText;
     [SerializeField] private float secondsPerCharacter = 0.06f;
     Coroutine audioDialogueCoroutine;
+    [SerializeField] private float minDelayBetweenClips = 0.03f;
+    [SerializeField] private float maxDelayBetweenClips = 0.1f;
     
     private void Awake()
     {
@@ -31,21 +33,40 @@ public class DialogueManager : MonoBehaviour
     {
         float duration = dialogue.Length * secondsPerCharacter;
         float timer = 0;
+        int lastClipIndex = -1;
 
         while (timer < duration)
         {
-            // Pick a random clip
-            AudioClip clip = audioClips[UnityEngine.Random.Range(0, audioClips.Length)];
+            int randomIndex;
+            
+            if (audioClips.Length > 1)
+            {
+                do
+                {
+                    randomIndex = UnityEngine.Random.Range(0, audioClips.Length);
+                } while (randomIndex == lastClipIndex);
+            }
+            else
+            {
+                randomIndex = 0;
+            }
+
+            lastClipIndex = randomIndex;
+            AudioClip clip = audioClips[randomIndex];
             audioSource.PlayOneShot(clip);
 
-            // Wait for the clip to finish or the duration to end
-            float waitTime = clip.length;
-            yield return new WaitForSeconds(waitTime);
+            // Wait for the clip to finish
+            float clipDuration = clip.length;
+            yield return new WaitForSeconds(clipDuration);
             
-            timer += waitTime;
+            // Add a random delay between clips for a more natural rhythm
+            float extraDelay = UnityEngine.Random.Range(minDelayBetweenClips, maxDelayBetweenClips);
+            yield return new WaitForSeconds(extraDelay);
+            
+            timer += clipDuration + extraDelay;
         }
 
-        yield return new WaitForSeconds(1f); // Brief pause before clearing
+        yield return new WaitForSeconds(1f);
         suspectDialogueText.text = "";
         audioDialogueCoroutine = null;
     }
