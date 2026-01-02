@@ -161,6 +161,5 @@ public class PlayerPickupController : NetworkBehaviour
         {
             netObj.Spawn();
         }
-        
     }
 }

@@ -7,7 +7,6 @@ public class UIController : MonoBehaviour
 
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
-    [SerializeField] private GameObject _textChat;
     [SerializeField] private GameObject toolShopUI;
     [SerializeField] private Animator screenFade;
 
@@ -15,11 +14,7 @@ public class UIController : MonoBehaviour
     {
         Instance = this;
     }
-
-    private void Start()
-    {
-        _textChat.SetActive(false);
-    }
+    
 
     private void Update()
     {
@@ -34,18 +29,6 @@ public class UIController : MonoBehaviour
         }
         
         if(PlayerInstance.Instance.CanControl == false) return;
-        
-        if (Input.GetKeyDown(KeyCode.Tab))
-        {
-            ToggleChatUI();
-        }
-    }
-    
-    public void ToggleChatUI()
-    {
-        _textChat.SetActive(!_textChat.activeSelf);
-
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(!_textChat.activeSelf);
     }
     
     public void OpenLevelSelectUI()
