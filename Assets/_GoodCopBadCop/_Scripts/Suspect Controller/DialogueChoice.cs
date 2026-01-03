@@ -6,6 +6,8 @@ public class DialogueChoice : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 {
     public string choiceText;
     [SerializeField] private TextMeshProUGUI choiceTextUI;
+    [SerializeField] DialogueChoiceSystem dialogueChoiceSystem;
+    [SerializeField] int choiceIndex;
     
     public void SetChoiceText(string text)
     {
@@ -21,5 +23,10 @@ public class DialogueChoice : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     public void OnPointerExit(PointerEventData eventData)
     {
         choiceTextUI.text = choiceText;
+    }
+
+    public void OnChooseChoice()
+    {
+        dialogueChoiceSystem.ChooseDialogueChoice(choiceIndex);
     }
 }

@@ -10,6 +10,8 @@ public class SuspectCharacter : Interactable
     [TextArea(3, 10)]
     public string entryDialogue;
     public AudioClip[] voiceAudioClips;
+    public Transform lookPos;
+    
     public override void Interact(PlayerInteractionController player)
     {
         DialogueManager.Instance.InitiateChoices();

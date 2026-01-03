@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -118,5 +119,29 @@ public class PlayerMovementController : NetworkBehaviour
         CanControl = value;
         MoveXRaw = 0;
         MoveZRaw = 0;
+    }
+
+    public void LookAtTarget(Transform target)
+    {
+        // Rotate player (Y axis) based on horizontal mouse movement
+        Vector3 direction = target.position - transform.position;
+        direction.y = 0; // Keep the rotation only on the Y axis
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            transform.DORotateQuaternion(targetRotation, 0.5f);
+        }
+        
+        // Rotate camera (X axis) based on vertical mouse movement
+        if (cameraTransform != null)
+        {
+            cameraTransform.DOLookAt(target.position, 0.5f);
+            
+            // Optional: Update _cameraPitch to match the new rotation to prevent snapping when mouse moves
+            cameraTransform.DOLookAt(target.position, 0.5f).OnUpdate(() => {
+                _cameraPitch = cameraTransform.localEulerAngles.x;
+                if (_cameraPitch > 180) _cameraPitch -= 360;
+            });
+        }
     }
 }

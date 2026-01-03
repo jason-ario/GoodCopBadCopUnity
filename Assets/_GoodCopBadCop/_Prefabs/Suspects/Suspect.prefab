@@ -129,6 +129,37 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!1 &2879629145379069694
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5330771091470271895}
+  m_Layer: 0
+  m_Name: Look Pos
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5330771091470271895
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2879629145379069694}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9165884929875893673}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4331289234258202243
 GameObject:
   m_ObjectHideFlags: 0
@@ -167,6 +198,7 @@ Transform:
   m_Children:
   - {fileID: 4358938340305545481}
   - {fileID: 2354999757147834004}
+  - {fileID: 5330771091470271895}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!114 &253971976340002767
@@ -395,7 +427,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 3615840691
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -433,6 +465,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: ecc499fb021982b44a03201cf6194eb1, type: 3}
   - {fileID: 8300000, guid: 02019eb0a67278c44b178287d8d3758c, type: 3}
   - {fileID: 8300000, guid: ea2da5791667b5549af6ea56bf46b340, type: 3}
+  lookPos: {fileID: 5330771091470271895}
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0

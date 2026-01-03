@@ -12,11 +12,16 @@ public class SuspectController : MonoBehaviour
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
     [SerializeField] private SuspectCharacter[] suspectCharacters;
-    private SuspectCharacter _suspectCharacter;
+    public SuspectCharacter suspectCharacter;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     public void EnableLook()
     {
-        _suspectCharacter.lookAnimator.ObjectToFollow = Camera.main.transform;
+        suspectCharacter.lookAnimator.ObjectToFollow = Camera.main.transform;
     }
 
     private void Start()
@@ -62,8 +67,8 @@ public class SuspectController : MonoBehaviour
         }
 
         var netObj = NetworkManager.Singleton.SpawnManager.SpawnedObjects[networkObjectId];
-        SuspectCharacter suspectCharacter = netObj.GetComponent<SuspectCharacter>();
-        _suspectCharacter = suspectCharacter;
+        SuspectCharacter newSuspectCharacter = netObj.GetComponent<SuspectCharacter>();
+        suspectCharacter = newSuspectCharacter;
         yield return new WaitForSeconds(.2f);
 
         if (NetworkManager.Singleton.IsHost)
@@ -74,20 +79,20 @@ public class SuspectController : MonoBehaviour
     
     void InitiateSuspect()
     {
-        _suspectCharacter.animator.SetBool("Walking", true);
-        _suspectCharacter.transform.DOMove(standPos.position, 3f).OnComplete(ArrivedAtPosition);
+        suspectCharacter.animator.SetBool("Walking", true);
+        suspectCharacter.transform.DOMove(standPos.position, 3f).OnComplete(ArrivedAtPosition);
     }
 
     void ArrivedAtPosition()
     {
-        _suspectCharacter.transform.DORotateQuaternion(standPos.rotation, .5f).OnComplete(SayEntryDialogue);
-        _suspectCharacter.animator.SetBool("Walking", false);
+        suspectCharacter.transform.DORotateQuaternion(standPos.rotation, .5f).OnComplete(SayEntryDialogue);
+        suspectCharacter.animator.SetBool("Walking", false);
     }
 
     void SayEntryDialogue()
     {
         Debug.Log("Saying entry dialogue");
-        DialogueManager.Instance.SayDialogue(_suspectCharacter.entryDialogue, _suspectCharacter.audioSource, _suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
     }
 }
 
