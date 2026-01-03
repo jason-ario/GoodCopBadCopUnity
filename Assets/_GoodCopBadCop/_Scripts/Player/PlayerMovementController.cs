@@ -93,8 +93,9 @@ public class PlayerMovementController : NetworkBehaviour
         moveDir = transform.TransformDirection(moveDir);
         moveDir *= characterSpeed;
 
-        return;
         _characterController.Move(moveDir * Time.deltaTime);
+
+        return;
     }
 
     void Rotate()
