@@ -13,8 +13,11 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private float mouseSensitivity = 2f;
     [SerializeField] private float maxLookAngle = 80f;
-    
+    [SerializeField] private float acceleration = 20f;
+    [SerializeField] private float drag = 5f;
+
     private float _cameraPitch = 0f;
+    private Vector3 _currentVelocity;
     
     // Public properties for animation controller to access
     public float MoveXRaw { get; private set; }
@@ -89,11 +92,27 @@ public class PlayerMovementController : NetworkBehaviour
         float MoveX = Input.GetAxis("Horizontal");
         float MoveZ = Input.GetAxis("Vertical");
         
-        Vector3 moveDir = new Vector3(MoveX, 0, MoveZ);
-        moveDir = transform.TransformDirection(moveDir);
-        moveDir *= characterSpeed;
+        // Calculate desired direction based on input
+        Vector3 inputDir = new Vector3(MoveX, 0, MoveZ);
+        inputDir = transform.TransformDirection(inputDir);
 
-        _characterController.Move(moveDir * Time.deltaTime);
+        if (inputDir.magnitude > 0.1f)
+        {
+            // Apply acceleration (pushing the chair)
+            _currentVelocity += inputDir * acceleration * Time.deltaTime;
+        }
+
+        // Apply drag/friction (wheels slowing down)
+        _currentVelocity -= _currentVelocity * drag * Time.deltaTime;
+
+        // Clamp speed to characterSpeed
+        if (_currentVelocity.magnitude > characterSpeed)
+        {
+            _currentVelocity = _currentVelocity.normalized * characterSpeed;
+        }
+
+        // Apply movement
+        _characterController.Move(_currentVelocity * Time.deltaTime);
 
         return;
     }
