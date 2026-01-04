@@ -86,6 +86,8 @@ public class PlayerMovementController : NetworkBehaviour
 
     void Move()
     {
+        return;
+
         // Store input values for animation
         MoveXRaw = Input.GetAxisRaw("Horizontal");
         MoveZRaw = Input.GetAxisRaw("Vertical");
@@ -111,10 +113,10 @@ public class PlayerMovementController : NetworkBehaviour
             _currentVelocity = _currentVelocity.normalized * characterSpeed;
         }
 
+        
         // Apply movement
         _characterController.Move(_currentVelocity * Time.deltaTime);
 
-        return;
     }
 
     void Rotate()

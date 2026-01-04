@@ -94,5 +94,10 @@ public class SuspectController : MonoBehaviour
         Debug.Log("Saying entry dialogue");
         DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
     }
+
+    public void RespondToDialogueChoice(int choiceIndex)
+    {
+        DialogueManager.Instance.SayDialogue(suspectCharacter.dialogueResponses[choiceIndex].text, suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+    }
 }
 
