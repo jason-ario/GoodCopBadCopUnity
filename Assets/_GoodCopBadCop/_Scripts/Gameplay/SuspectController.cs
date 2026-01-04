@@ -5,7 +5,7 @@ using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 
-public class SuspectController : MonoBehaviour
+public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
     public SuspectData suspectData;
@@ -31,12 +31,10 @@ public class SuspectController : MonoBehaviour
 
     void StartRound()
     {
-        RequestSpawnSuspectServerRpc(0, spawnPos.position, spawnPos.rotation);
-    }
-    
-    public void RequestSpawn(int suspectIndex, Vector3 position, Quaternion rotation)
-    {
-        RequestSpawnSuspectServerRpc(suspectIndex, position, rotation);
+        if (IsHost)
+        {
+            RequestSpawnSuspectServerRpc(0, spawnPos.position, spawnPos.rotation);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -44,11 +42,11 @@ public class SuspectController : MonoBehaviour
     {
         // Lookup the data on the server using the index
         SuspectCharacter suspect = suspectCharacters[suspectIndex];
-        
+    
         GameObject spawnedSuspect = Instantiate(suspect.gameObject, position, rotation);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
         netObj.Spawn();
-        
+    
         // Pass the index to clients so they know which references to set up
         AssignReferencesClientRpc(netObj.NetworkObjectId);
     }
@@ -56,6 +54,7 @@ public class SuspectController : MonoBehaviour
     [ClientRpc]
     private void AssignReferencesClientRpc(ulong networkObjectId)
     {
+        Debug.Log("Assigning references");
         StartCoroutine(WaitForSpawnAndAssign(networkObjectId));
     }
 
