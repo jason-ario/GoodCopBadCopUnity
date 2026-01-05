@@ -26,5 +26,23 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public void Highlight(bool highlight)
     {
         highlightEffect.enabled = highlight;
+
+        if (highlight)
+        {
+            OnHighlight();
+        }
+        else
+        {
+            OnStopHighlight();
+        }
+    }
+
+    protected virtual void OnHighlight()
+    {
+        
+    }
+
+    protected virtual void OnStopHighlight()
+    {
     }
 }

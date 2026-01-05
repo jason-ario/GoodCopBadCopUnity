@@ -50,6 +50,13 @@ public class PlayerInteractionController : NetworkBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
+            InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
+
+            if (interactableCollider != null)
+            {
+                interactable = interactableCollider.Interactable;
+            }
+            
             PlacementBoard placementBoard = hit.collider.GetComponent<PlacementBoard>();
 
             if (interactable != null && interactable.enabled)
@@ -109,7 +116,13 @@ public class PlayerInteractionController : NetworkBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>();
+            InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
 
+            if (interactableCollider != null)
+            {
+                interactable = interactableCollider.Interactable;
+            }
+            
             if (interactable != null)
             {
                 interactable.Interact(this);
