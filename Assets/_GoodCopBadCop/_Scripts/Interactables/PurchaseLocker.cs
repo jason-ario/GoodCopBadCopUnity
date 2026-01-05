@@ -7,6 +7,9 @@ public class PurchaseLocker : Interactable
     [SerializeField] private Animator anim;
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isPurchased = new NetworkVariable<bool>(false);
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip lockerOpenSound;
+    [SerializeField] private AudioClip lockerCloseSound;
 
     protected override void Awake()
     {
@@ -19,6 +22,14 @@ public class PurchaseLocker : Interactable
         isOpen.OnValueChanged += (oldValue, newValue) =>
         {
             anim.SetBool("Open", newValue);
+            if (newValue == false)
+            {
+                audioSource.PlayOneShot(lockerCloseSound);
+            }
+            else
+            {
+                audioSource.PlayOneShot(lockerOpenSound);
+            }
         };
         
         isPurchased.OnValueChanged += (oldValue, newValue) =>

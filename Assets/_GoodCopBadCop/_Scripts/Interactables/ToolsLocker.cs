@@ -6,6 +6,9 @@ public class ToolsLocker : Interactable
     [SerializeField] private Animator anim;
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     [SerializeField] private PurchaseLocker[] miniLockers;
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip lockerOpenSound;
+    [SerializeField] private AudioClip lockerCloseSound;
     
     public override void OnNetworkSpawn()
     {
@@ -27,10 +30,15 @@ public class ToolsLocker : Interactable
 
         if (isOpen.Value == false)
         {
+            audioSource.PlayOneShot(lockerCloseSound);
             foreach (var miniLocker in miniLockers)
             {
                 miniLocker.CloseServerRpc();
             }
+        }
+        else
+        {
+            audioSource.PlayOneShot(lockerOpenSound);
         }
     }
 }
