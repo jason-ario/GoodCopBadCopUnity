@@ -53,6 +53,19 @@ public class PickableObject : Interactable
     public virtual void OnEquipped(PlayerPickupController player)
     {
         playerPickupController = player;
+
+        if (itemData.pickupAnimBool != null)
+        {
+            playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, true);
+        }
+    }
+    
+    public virtual void OnUnequip(PlayerPickupController player)
+    {
+        if (itemData.pickupAnimBool != null)
+        {
+            playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, false);
+        }
     }
 
 

@@ -13,6 +13,6 @@ public class MoneyText : MonoBehaviour
 
     void UpdateText()
     {
-        moneyText.text = GlobalHostVariables.Instance.money.Value.ToString();
+        moneyText.text = "$" + GlobalHostVariables.Instance.money.Value.ToString();
     }
 }
