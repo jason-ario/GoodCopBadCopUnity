@@ -42,14 +42,6 @@ public class UIController : MonoBehaviour
         levelSelectUI.SetActive(false);
         playerUI.SetActive(true);
     }
-
-    public void OpenToolShopUI()
-    {
-        toolShopUI.SetActive(true);
-        playerUI.SetActive(false);
-        
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
-    }
     
     public void CloseToolShopUI()
     {

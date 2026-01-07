@@ -43,7 +43,7 @@ public class PlayerPickupController : NetworkBehaviour
         {
             foreach (var objectContainer in objectContainers)
             {
-                objectContainer.UnequipItem();
+                objectContainer.UnequipItem(this);
             }
 
             return;
@@ -139,7 +139,7 @@ public class PlayerPickupController : NetworkBehaviour
 
         foreach (var objectContainer in objectContainers)
         {
-            objectContainer.UnequipItem();
+            objectContainer.UnequipItem(this);
         }
         
 

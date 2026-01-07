@@ -74,11 +74,12 @@ public class ObjectContainer : MonoBehaviour
         }
     }
     
-    public void UnequipItem()
+    public void UnequipItem(PlayerPickupController playerPickupController)
     {
         // Found matching item, equip it
         if (currentlyEquippedItem != null)
         {
+            currentlyEquippedItem.OnUnequip(playerPickupController);
             currentlyEquippedItem.gameObject.SetActive(false);
         }
             
