@@ -91,6 +91,8 @@ public class PlayerInteractionController : NetworkBehaviour
                 {
                     ObjectPlacer.Instance.ActivatePlacer(placementBoard);
                 }
+                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
+
                 
                 ObjectPlacer.Instance.transform.position = hit.point;
                 return;

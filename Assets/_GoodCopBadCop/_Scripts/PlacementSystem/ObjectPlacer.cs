@@ -35,7 +35,6 @@ public class ObjectPlacer : MonoBehaviour
     public void ActivatePlacer(PlacementBoard placementBoard)
     {
         container.gameObject.SetActive(true);
-        transform.rotation = placementBoard.transform.rotation;
         IsActive = true;
     }
 
