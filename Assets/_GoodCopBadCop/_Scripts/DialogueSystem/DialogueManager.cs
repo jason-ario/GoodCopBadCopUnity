@@ -140,4 +140,6 @@ public class DialogueManager : NetworkBehaviour
         yield return new WaitForSeconds(5);
         Destroy(subtitle);
     }
+
+    
 }

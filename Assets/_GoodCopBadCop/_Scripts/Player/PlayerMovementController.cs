@@ -139,8 +139,8 @@ public class PlayerMovementController : NetworkBehaviour
     public void SetCanControl(bool value)
     {
         CanControl = value;
-        MoveXRaw = 0;
-        MoveZRaw = 0;
+        cameraTransform.DOKill();
+        transform.DOKill();
     }
 
     public void LookAtTarget(Transform target)

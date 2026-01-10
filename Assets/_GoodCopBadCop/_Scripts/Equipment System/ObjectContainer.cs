@@ -8,6 +8,7 @@ public class ObjectContainer : MonoBehaviour
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
     public PickableObject CurrentlyEquippedItem => currentlyEquippedItem;
+    public bool overrideLayer = true;
 
     public enum ParentContainerType
     {
@@ -21,12 +22,15 @@ public class ObjectContainer : MonoBehaviour
     {
         itemsHeld = GetComponentsInChildren<PickableObject>(true);
 
-        string layerName = parentContainerType == ParentContainerType.ARMS ? "Arms" : "Body";
-        int layer = LayerMask.NameToLayer(layerName);
-
-        foreach (var itemHeld in itemsHeld)
+        if (overrideLayer)
         {
-            SetLayerRecursively(itemHeld.gameObject, layer);
+            string layerName = parentContainerType == ParentContainerType.ARMS ? "Arms" : "Body";
+            int layer = LayerMask.NameToLayer(layerName);
+
+            foreach (var itemHeld in itemsHeld)
+            {
+                SetLayerRecursively(itemHeld.gameObject, layer);
+            }
         }
     }
 

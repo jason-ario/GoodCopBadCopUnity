@@ -6,7 +6,7 @@ public class ObjectPlacer : MonoBehaviour
 {
     public static ObjectPlacer Instance;
     [SerializeField] private Transform container;
-    [SerializeField] private PickableObject[] pickableObjects;
+    [SerializeField] private ObjectContainer objectContainer;
     private PickableItemData _pickableItemData;
     public bool IsActive;
 
@@ -24,7 +24,7 @@ public class ObjectPlacer : MonoBehaviour
     {
         _pickableItemData = itemData;
         
-        foreach (var pickableObject in pickableObjects)
+        foreach (var pickableObject in objectContainer.ItemsHeld)
         {
             if (pickableObject.ItemData == itemData)
             {
@@ -51,7 +51,7 @@ public class ObjectPlacer : MonoBehaviour
 
     public GameObject GetPickableObject(PickableItemData heldObject)
     {
-        foreach (var pickableObject in pickableObjects)
+        foreach (var pickableObject in objectContainer.ItemsHeld)
         {
             if (pickableObject.ItemData == heldObject)
             {

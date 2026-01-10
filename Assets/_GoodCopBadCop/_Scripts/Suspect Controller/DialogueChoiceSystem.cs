@@ -26,8 +26,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     public void ChooseDialogueChoice(int choiceIndex)
     {
-        dialogueChoiceContainer.SetActive(false);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+       CloseDialogueChoices();
         string playerName = GetPlayerName();
         
         // Request server to broadcast this choice
@@ -67,5 +66,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         yield return new WaitForSeconds(1);
         SuspectController.Instance.RespondToDialogueChoice(choiceIndex);
+    }
+    
+    public void CloseDialogueChoices()
+    {
+        dialogueChoiceContainer.SetActive(false);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 }
