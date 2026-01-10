@@ -78,6 +78,9 @@ public class PlayerPickupController : NetworkBehaviour
             // Drop with E or right-click
             if (Input.GetMouseButtonDown(1))
             {
+                if (heldObject == null) return;
+                if (ObjectPlacer.Instance.IsActive == false) return;
+                if (heldObject.canUsePlacementBoard == false) return;
                 DropObject();
             }
             
@@ -126,15 +129,20 @@ public class PlayerPickupController : NetworkBehaviour
         pickableObject.OnPickedUp();
     }
 
-    public void DropObject()
+    public void DropObject(Transform dropPoint = null)
     {
-        if (heldObject == null) return;
-        if (ObjectPlacer.Instance.IsActive == false) return;
-
         // Pass the index/ID of the held item so the server knows which prefab to spawn
         int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
         GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;
-        RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
+        
+        if (dropPoint != null)
+        {
+            RequestDropServerRpc(itemIndex, dropPoint.transform.position, dropPoint.transform.rotation);
+        }
+        else
+        {
+            RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
+        }
         objectContainerToUse.CurrentlyEquippedItem.OnDropped();
 
         foreach (var objectContainer in objectContainers)
@@ -142,12 +150,10 @@ public class PlayerPickupController : NetworkBehaviour
             objectContainer.UnequipItem(this);
         }
         
-
         heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();
-
     }
 
     [ServerRpc]

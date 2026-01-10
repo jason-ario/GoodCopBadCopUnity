@@ -16,6 +16,11 @@ public class PlayerAnimationController : NetworkBehaviour
     
     [SerializeField] Transform headLookAtTransform;
     [SerializeField] Transform chestLookAtTransform;
+
+    private float targetLayer1Weight = 0f;
+    private float targetLayer2Weight = 0f;
+    private float currentLayer1Weight = 0f;
+    private float currentLayer2Weight = 0f;
     
     private NetworkVariable<Vector3> headLookAtPos =
         new NetworkVariable<Vector3>(
@@ -73,38 +78,42 @@ public class PlayerAnimationController : NetworkBehaviour
         bodyAnimator.SetFloat("MoveZ", currentMoveZ);
         armsAnimator.SetFloat("MoveX", currentMoveX);
         armsAnimator.SetFloat("MoveZ", currentMoveZ);
+        
+        // Smoothly lerp layer weights
+        currentLayer1Weight = Mathf.Lerp(currentLayer1Weight, targetLayer1Weight, Time.deltaTime * animLerpSpeed);
+        currentLayer2Weight = Mathf.Lerp(currentLayer2Weight, targetLayer2Weight, Time.deltaTime * animLerpSpeed);
+
+        bodyAnimator.SetLayerWeight(1, currentLayer1Weight);
+        armsAnimator.SetLayerWeight(1, currentLayer1Weight);
+        bodyAnimator.SetLayerWeight(2, currentLayer2Weight);
+        armsAnimator.SetLayerWeight(2, currentLayer2Weight);
     }
 
     public void EnableHoldObjectMask()
     {
-        bodyAnimator.SetLayerWeight(1, 1);
-        armsAnimator.SetLayerWeight(1,1);
-        bodyAnimator.SetLayerWeight(2,0);
-        armsAnimator.SetLayerWeight(2,0);
+        targetLayer1Weight = 1f;
+        targetLayer2Weight = 0f;
     }
     
     public void DisableHoldObjectMask()
     {
-        bodyAnimator.SetLayerWeight(1, 0);
-        armsAnimator.SetLayerWeight(1,0);
-        bodyAnimator.SetLayerWeight(2,0);
-        armsAnimator.SetLayerWeight(2,0);
+        targetLayer1Weight = 0f;
+        targetLayer2Weight = 0f;
     }
 
+    public void EnableHoldObjectTwoArmsMask()
+    {
+        targetLayer1Weight = 0f;
+        targetLayer2Weight = 1f;
+    }
+
+    
     public void OpenDoor()
     {
         bodyAnimator.SetTrigger("OpenDoor");
         armsAnimator.SetTrigger("OpenDoor");
     }
-
-    public void EnableHoldObjectTwoArmsMask()
-    {
-        bodyAnimator.SetLayerWeight(1, 0);
-        armsAnimator.SetLayerWeight(1,0);
-        bodyAnimator.SetLayerWeight(2,1);
-        armsAnimator.SetLayerWeight(2,1);
-    }
-
+    
     public void SetAnimBool(string animString, bool value)
     {
         if (!IsOwner) return;

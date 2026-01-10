@@ -43,9 +43,13 @@ public class PlayerInteractionController : NetworkBehaviour
             reticle = GameObject.FindFirstObjectByType<ReticleController>();
         }
         
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward); 
-        
-        if(lastInteractable != null) lastInteractable.Highlight(false);
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+
+        if (lastInteractable != null)
+        {
+            lastInteractable.Highlight(false);
+            if(lastInteractable.GetComponent<PlaceObjectSlot>() != null) lastInteractable.GetComponent<PlaceObjectSlot>().HidePlacedVisual();
+        }
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
         {
@@ -64,6 +68,19 @@ public class PlayerInteractionController : NetworkBehaviour
                 reticle.SetInteractState(true);
                 interactable.Highlight(true);
                 lastInteractable = interactable;
+                PlaceObjectSlot placeObjectSlot = hit.collider.GetComponent<PlaceObjectSlot>();
+
+                //Placement Slot?
+                if (_playerPickupController.IsHoldingObject && placeObjectSlot != null && placeObjectSlot.itemThatCanBePlaced == _playerPickupController.HeldObject)
+                {
+                    reticle.SetInteractState(true);
+                    placeObjectSlot.ShowPlacedVisual();
+                }
+                else
+                {
+                    if (placeObjectSlot != null) placeObjectSlot.HidePlacedVisual();
+                }
+                
                 return;
             }
             else
@@ -71,9 +88,11 @@ public class PlayerInteractionController : NetworkBehaviour
                 lastInteractable = null;
             }
 
+
+            //Placement Board?
             if (_playerPickupController.IsHoldingObject && placementBoard != null)
             {
-                if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false)
+                if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false || _playerPickupController.HeldObject.canUsePlacementBoard == false)
                 {
                     reticle.SetInteractState(false);
                     if (ObjectPlacer.Instance.IsActive)
@@ -86,14 +105,12 @@ public class PlayerInteractionController : NetworkBehaviour
                 }
                 
                 reticle.SetInteractState(true);
-                
                 if (ObjectPlacer.Instance.IsActive == false)
                 {
                     ObjectPlacer.Instance.ActivatePlacer(placementBoard);
                 }
-                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
-
                 
+                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
                 ObjectPlacer.Instance.transform.position = hit.point;
                 return;
             }

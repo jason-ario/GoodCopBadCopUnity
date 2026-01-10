@@ -86,6 +86,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ef2d8c5ee75ba414b87a44c2b04681a6, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 5306550021341743300}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ef2d8c5ee75ba414b87a44c2b04681a6, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 6114922466755143734}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ef2d8c5ee75ba414b87a44c2b04681a6, type: 3}
       insertIndex: -1
@@ -99,6 +102,31 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: ef2d8c5ee75ba414b87a44c2b04681a6, type: 3}
   m_PrefabInstance: {fileID: 9036854217952750911}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &5306550021341743300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8189851833319903342}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &6114922466755143734
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -111,6 +139,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49e2a403fd793154ab715fd5bf0aa6af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!114 &1743245268829514652
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -123,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HighlightPlus.HighlightEffect
-  profile: {fileID: 11400000, guid: e6e74f38237364260b68bef0cd1b8795, type: 2}
+  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
   camerasLayerMask:
     serializedVersion: 2
@@ -132,12 +161,12 @@ MonoBehaviour:
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
   combineMeshes: 0
-  alphaCutOff: 0
-  cullBackFaces: 1
+  alphaCutOff: 0.5
+  cullBackFaces: 0
   padding: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
@@ -170,7 +199,7 @@ MonoBehaviour:
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
   outline: 1
-  outlineColor: {r: 0.49245283, g: 0.2139757, b: 0.121719465, a: 1}
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 1}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -203,14 +232,14 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.2
-  outlineBlurPasses: 2
-  outlineQuality: 1
+  outlineWidth: 0.64
+  outlineBlurPasses: 1
+  outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
   outlineSharpness: 1
-  outlineDownsampling: 2
-  outlineVisibility: 0
+  outlineDownsampling: 1
+  outlineVisibility: 1
   glowBlendMode: 0
   outlineBlitDebug: 0
   outlineIndependent: 0
@@ -218,7 +247,7 @@ MonoBehaviour:
   outlineMaskMode: 0
   glow: 0
   glowWidth: 0.5
-  glowQuality: 1
+  glowQuality: 2
   glowBlurMethod: 0
   glowDownsampling: 2
   glowHQColor: {r: 0.64, g: 1, b: 0, a: 1}
@@ -227,7 +256,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 0
+  glowVisibility: 1
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:

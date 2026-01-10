@@ -21,7 +21,7 @@ MonoBehaviour:
     m_Value: {x: 0.5, y: 0.5}
   intensity:
     m_OverrideState: 1
-    m_Value: 0.431
+    m_Value: 0.334
   smoothness:
     m_OverrideState: 1
     m_Value: 0.346
@@ -138,6 +138,28 @@ MonoBehaviour:
   m_OffsetY:
     m_OverrideState: 0
     m_Value: 0
+--- !u!114 &-6183130183920739414
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5485954d14dfb9a4c8ead8edb0ded5b1, type: 3}
+  m_Name: LiftGammaGain
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.LiftGammaGain
+  active: 1
+  lift:
+    m_OverrideState: 0
+    m_Value: {x: 1, y: 1, z: 1, w: 0}
+  gamma:
+    m_OverrideState: 0
+    m_Value: {x: 1, y: 1, z: 1, w: 0.025236692}
+  gain:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1, z: 1, w: 1}
 --- !u!114 &-1849037693974293413
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -150,13 +172,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66f335fb1ffd8684294ad653bf1c7564, type: 3}
   m_Name: ColorAdjustments
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ColorAdjustments
-  active: 0
+  active: 1
   postExposure:
-    m_OverrideState: 0
-    m_Value: 0.25
+    m_OverrideState: 1
+    m_Value: 0.69
   contrast:
     m_OverrideState: 1
-    m_Value: -3
+    m_Value: 27.4
   colorFilter:
     m_OverrideState: 0
     m_Value: {r: 1, g: 1, b: 1, a: 1}
@@ -165,7 +187,7 @@ MonoBehaviour:
     m_Value: 0
   saturation:
     m_OverrideState: 1
-    m_Value: 4.5
+    m_Value: 34.5
 --- !u!114 &-675193509401890554
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -288,6 +310,7 @@ MonoBehaviour:
   - {fileID: 8454363667032986970}
   - {fileID: -8982763933432261747}
   - {fileID: 6164926614321786720}
+  - {fileID: -6183130183920739414}
 --- !u!114 &3175878613428323006
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -473,16 +496,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 558a8e2b6826cf840aae193990ba9f2e, type: 3}
   m_Name: ShadowsMidtonesHighlights
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights
-  active: 0
+  active: 1
   shadows:
     m_OverrideState: 1
-    m_Value: {x: 1, y: 0.85389733, z: 0.8051146, w: -0.030250989}
+    m_Value: {x: 1, y: 0.9005022, z: 0.85129786, w: -0.030250989}
   midtones:
     m_OverrideState: 1
-    m_Value: {x: 1, y: 0.77972573, z: 0.8800731, w: 0.20373031}
+    m_Value: {x: 1, y: 0.9434694, z: 0.8852135, w: 0.20373031}
   highlights:
-    m_OverrideState: 1
-    m_Value: {x: 0.32405308, y: 1, z: 0.29898995, w: 0.292249}
+    m_OverrideState: 0
+    m_Value: {x: 0.32405308, y: 1, z: 0.29898995, w: 0.23051968}
   shadowsStart:
     m_OverrideState: 0
     m_Value: 0
@@ -548,10 +571,10 @@ MonoBehaviour:
     m_Value: 1
   threshold:
     m_OverrideState: 1
-    m_Value: 0.7
+    m_Value: 0.8
   intensity:
     m_OverrideState: 1
-    m_Value: 2
+    m_Value: 1
   scatter:
     m_OverrideState: 0
     m_Value: 0.7

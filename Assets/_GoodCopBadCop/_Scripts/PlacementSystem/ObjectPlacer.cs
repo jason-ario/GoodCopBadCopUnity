@@ -15,6 +15,11 @@ public class ObjectPlacer : MonoBehaviour
         Instance = this;
     }
 
+    private void Start()
+    {
+        container.gameObject.SetActive(false);
+    }
+
     public void SetItem(PickableItemData itemData)
     {
         _pickableItemData = itemData;
