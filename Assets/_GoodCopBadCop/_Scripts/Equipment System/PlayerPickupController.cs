@@ -129,20 +129,39 @@ public class PlayerPickupController : NetworkBehaviour
         pickableObject.OnPickedUp();
     }
 
-    public void DropObject(Transform dropPoint = null)
+    public void PickUpObject(PickableItemData itemData)
+    {
+        // Drop existing object if holding something already
+        if (heldObject != null)
+        {
+            return;
+        }
+        
+        heldObject = itemData;
+        ObjectPlacer.Instance.SetItem(itemData);
+
+        int itemIndex = objectContainerToUse.ItemIndex(itemData);
+        itemEquippedIndex.Value = itemIndex;
+    }
+
+    public void DropObject(Transform dropPoint = null, bool doSpawn = true)
     {
         // Pass the index/ID of the held item so the server knows which prefab to spawn
         int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
         GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;
-        
-        if (dropPoint != null)
+
+        if (doSpawn)
         {
-            RequestDropServerRpc(itemIndex, dropPoint.transform.position, dropPoint.transform.rotation);
+            if (dropPoint != null)
+            {
+                RequestDropServerRpc(itemIndex, dropPoint.transform.position, dropPoint.transform.rotation);
+            }
+            else
+            {
+                RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
+            }
         }
-        else
-        {
-            RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
-        }
+   
         objectContainerToUse.CurrentlyEquippedItem.OnDropped();
 
         foreach (var objectContainer in objectContainers)

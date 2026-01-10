@@ -4,10 +4,51 @@ public class PlaceObjectSlot : MonoBehaviour
 {
     public PickableItemData itemThatCanBePlaced;
     [SerializeField] private GameObject placeObjectVisual;
+    [SerializeField] private GameObject objectPlacedVisual;
     [SerializeField] private Transform placementPos;
-    public Transform PlaceObjectPos => placementPos;
-    public void ShowPlacedVisual()
+    public bool startPlaced;
+    private bool _isPlaced;
+
+    public bool IsPlaced
     {
+        get => _isPlaced;
+        set
+        {
+            if (value)
+            {
+                ShowObjectPlacedVisual();
+            }
+            else
+            {
+                HideObjectPlacedVisual();
+            }
+
+            _isPlaced = value;
+        }
+    }
+    
+    void Start()
+    {
+        objectPlacedVisual.SetActive(startPlaced);
+        _isPlaced = startPlaced;
+    }
+    
+    public Transform PlaceObjectPos => placementPos;
+    
+    public void ShowObjectPlacedVisual()
+    {
+        objectPlacedVisual.SetActive(true);
+    }
+    
+    public void HideObjectPlacedVisual()
+    {
+        objectPlacedVisual.SetActive(false);
+    }
+    
+    public void ShowPlaceObjectVisual()
+    {
+        if (IsPlaced) return;
+        
         placeObjectVisual.SetActive(true);
     }
     
