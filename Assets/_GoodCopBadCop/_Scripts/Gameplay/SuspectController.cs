@@ -69,7 +69,6 @@ public class SuspectController : NetworkBehaviour
         SuspectCharacter newSuspectCharacter = netObj.GetComponent<SuspectCharacter>();
         suspectCharacter = newSuspectCharacter;
         yield return new WaitForSeconds(.2f);
-
         if (NetworkManager.Singleton.IsHost)
         {
             InitiateSuspect();
@@ -86,6 +85,7 @@ public class SuspectController : NetworkBehaviour
     {
         suspectCharacter.transform.DORotateQuaternion(standPos.rotation, .5f).OnComplete(SayEntryDialogue);
         suspectCharacter.animator.SetBool("Walking", false);
+        EnableLook();
     }
 
     void SayEntryDialogue()
