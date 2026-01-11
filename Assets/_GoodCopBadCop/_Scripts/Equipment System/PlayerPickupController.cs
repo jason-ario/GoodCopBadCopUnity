@@ -76,7 +76,7 @@ public class PlayerPickupController : NetworkBehaviour
         if (heldObject != null)
         {
             // Drop with E or right-click
-            if (Input.GetMouseButtonDown(1))
+            if (Input.GetMouseButtonDown(1) && !Input.GetMouseButton(0))
             {
                 if (heldObject == null) return;
                 if (ObjectPlacer.Instance.IsActive == false) return;
