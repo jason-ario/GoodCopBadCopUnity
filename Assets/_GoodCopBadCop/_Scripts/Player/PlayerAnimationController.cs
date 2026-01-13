@@ -110,8 +110,7 @@ public class PlayerAnimationController : NetworkBehaviour
     
     public void OpenDoor()
     {
-        bodyAnimator.SetTrigger("OpenDoor");
-        armsAnimator.SetTrigger("OpenDoor");
+        SetAnimTrigger("OpenDoor");
     }
     
     public void SetAnimBool(string animString, bool value)
@@ -132,5 +131,25 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         bodyAnimator.SetBool(animString, value);
         armsAnimator.SetBool(animString, value);
+    }
+
+    public void SetAnimTrigger(string animString)
+    {
+        if (!IsOwner) return;
+        
+        SetAnimTriggerServerRpc(animString);
+    }
+
+    [ServerRpc]
+    private void SetAnimTriggerServerRpc(string animString)
+    {
+        SetAnimTriggerClientRpc(animString);
+    }
+
+    [ClientRpc]
+    private void SetAnimTriggerClientRpc(string animString)
+    {
+        bodyAnimator.SetTrigger(animString);
+        armsAnimator.SetTrigger(animString);
     }
 }

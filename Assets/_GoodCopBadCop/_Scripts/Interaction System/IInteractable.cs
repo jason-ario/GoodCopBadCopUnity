@@ -13,6 +13,8 @@ public interface IInteractable
 public abstract class Interactable : NetworkBehaviour, IInteractable
 {
     HighlightEffect highlightEffect;
+    public PickableItemData[] itemsThatCanInteractWith;
+    
     public abstract void Interact(PlayerInteractionController player);
 
     protected virtual void Awake()
@@ -44,5 +46,10 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     protected virtual void OnStopHighlight()
     {
+    }
+
+    public virtual void InteractWithItem(PlayerInteractionController playerInteractionController)
+    {
+        
     }
 }

@@ -20,6 +20,7 @@ public class ToolsLocker : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        Debug.Log("Toggle Tool Locker");
         ToggleToolLockerServerRpc();
     }
 

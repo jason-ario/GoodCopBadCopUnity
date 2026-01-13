@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -16,8 +17,11 @@ public class PlayerPickupController : NetworkBehaviour
     
     [SerializeField] ObjectContainer[] objectContainers;
     [SerializeField] private ObjectContainer objectContainerToUse; 
+    public ObjectContainer ObjectContainer => objectContainerToUse;
     private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
+    private float pickUpUseCooldownTimer = .2f;
+    private bool pickUpCooldownComplete = false;
+    
     private void Awake()
     {
         _playerAnimationController = GetComponent<PlayerAnimationController>();
@@ -76,28 +80,27 @@ public class PlayerPickupController : NetworkBehaviour
         if (heldObject != null)
         {
             // Drop with E or right-click
-            if (Input.GetMouseButtonDown(1) && !Input.GetMouseButton(0))
+            if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
             {
                 if (heldObject == null) return;
-                if (ObjectPlacer.Instance.IsActive == false) return;
+                if (ObjectPlacer.Instance.deactivatedThisFrame == false) return;
                 if (heldObject.canUsePlacementBoard == false) return;
                 DropObject();
             }
             
-            if (Input.GetMouseButtonDown(0))
-            {
-                UseObject();
-            }
-            
-            if (Input.GetMouseButtonUp(0))
+            if (Input.GetMouseButtonUp(0) && pickUpCooldownComplete)
             {
                 StopUsingObject();
             }
         }
     }
 
-    void UseObject()
+    public void TryUseObject()
     {
+        if (Input.GetMouseButtonDown(1)) return;
+        if (heldObject == null) return;
+        if(pickUpCooldownComplete == false) return;
+        
         if (objectContainerToUse.CurrentlyEquippedItem != null)
         {
             objectContainerToUse.CurrentlyEquippedItem.OnStartUse();
@@ -127,6 +130,13 @@ public class PlayerPickupController : NetworkBehaviour
         itemEquippedIndex.Value = itemIndex;
         
         pickableObject.OnPickedUp();
+        StartCoroutine(PickUpCoolDown());
+    }
+    
+    IEnumerator PickUpCoolDown()
+    {
+        yield return new WaitForSeconds(pickUpUseCooldownTimer);
+        pickUpCooldownComplete = true;
     }
 
     public void PickUpObject(PickableItemData itemData)
@@ -137,6 +147,7 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
         
+
         heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
 
@@ -146,6 +157,8 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void DropObject(Transform dropPoint = null, bool doSpawn = true)
     {
+        pickUpCooldownComplete = false;
+
         // Pass the index/ID of the held item so the server knows which prefab to spawn
         int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
         GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;

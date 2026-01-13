@@ -18,7 +18,12 @@ public class PickableObject : Interactable
         base.Awake();
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
     }
-    
+
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController)
+    {
+        throw new System.NotImplementedException();
+    }
+
     public virtual void OnPickedUp()
     {
         if (pickupSound != null)
