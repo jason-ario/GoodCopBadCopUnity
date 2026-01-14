@@ -8,10 +8,12 @@ public class PlayerPickupController : NetworkBehaviour
     public Transform holdPoint;
     public float holdSmoothness = 10f;
 
-    private PickableItemData heldObject;
-    public PickableItemData HeldObject => heldObject; 
+    private PickableItemData _heldObject;
+    public PickableItemData HeldObject => _heldObject; 
+    private PickableObject _currentlyEquippedItem;
+    public PickableObject CurrentlyEquippedItem => _currentlyEquippedItem;
 
-    public bool IsHoldingObject => heldObject != null;
+    public bool IsHoldingObject => _heldObject != null;
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     
@@ -77,14 +79,14 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        if (heldObject != null)
+        if (_heldObject != null)
         {
             // Drop with E or right-click
             if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
             {
-                if (heldObject == null) return;
+                if (_heldObject == null) return;
                 if (ObjectPlacer.Instance.deactivatedThisFrame == false) return;
-                if (heldObject.canUsePlacementBoard == false) return;
+                if (_heldObject.canUsePlacementBoard == false) return;
                 DropObject();
             }
             
@@ -98,7 +100,7 @@ public class PlayerPickupController : NetworkBehaviour
     public void TryUseObject()
     {
         if (Input.GetMouseButtonDown(1)) return;
-        if (heldObject == null) return;
+        if (_heldObject == null) return;
         if(pickUpCooldownComplete == false) return;
         
         if (objectContainerToUse.CurrentlyEquippedItem != null)
@@ -118,17 +120,17 @@ public class PlayerPickupController : NetworkBehaviour
     public void PickUpObject(PickableObject pickableObject, PickableItemData itemData)
     {
         // Drop existing object if holding something already
-        if (heldObject != null)
+        if (_heldObject != null)
         {
             return;
         }
         
-        heldObject = itemData;
+        _heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
-
+        
         int itemIndex = objectContainerToUse.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
-        
+        _currentlyEquippedItem = objectContainerToUse.CurrentlyEquippedItem;
         pickableObject.OnPickedUp();
         StartCoroutine(PickUpCoolDown());
     }
@@ -142,17 +144,18 @@ public class PlayerPickupController : NetworkBehaviour
     public void PickUpObject(PickableItemData itemData)
     {
         // Drop existing object if holding something already
-        if (heldObject != null)
+        if (_heldObject != null)
         {
             return;
         }
         
 
-        heldObject = itemData;
+        _heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
 
         int itemIndex = objectContainerToUse.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
+        _currentlyEquippedItem = objectContainerToUse.CurrentlyEquippedItem;
     }
 
     public void DropObject(Transform dropPoint = null, bool doSpawn = true)
@@ -160,8 +163,8 @@ public class PlayerPickupController : NetworkBehaviour
         pickUpCooldownComplete = false;
 
         // Pass the index/ID of the held item so the server knows which prefab to spawn
-        int itemIndex = ItemDatabase.Instance.GetItemIndex(heldObject);
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(heldObject).gameObject;
+        int itemIndex = ItemDatabase.Instance.GetItemIndex(_heldObject);
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject;
 
         if (doSpawn)
         {
@@ -181,8 +184,9 @@ public class PlayerPickupController : NetworkBehaviour
         {
             objectContainer.UnequipItem(this);
         }
-        
-        heldObject = null;
+
+        _currentlyEquippedItem = null;
+        _heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();

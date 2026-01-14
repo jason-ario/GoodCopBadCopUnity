@@ -190,7 +190,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 //Check if held object is compatible with this object
                 if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject))
                 {
-                    interactable.InteractWithItem(this);
+                    interactable.InteractWithItem(this, pickupController.HeldObject);
                     return true;
                 }
 

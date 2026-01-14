@@ -48,7 +48,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
     }
 
-    public virtual void InteractWithItem(PlayerInteractionController playerInteractionController)
+    public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
     {
         
     }

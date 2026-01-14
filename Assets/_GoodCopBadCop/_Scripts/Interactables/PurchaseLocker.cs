@@ -84,10 +84,7 @@ public class PurchaseLocker : Interactable
         price.gameObject.SetActive(false);
     }
 
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController)
-    {
-        
-    }
+
 
     [ServerRpc(RequireOwnership = false)]
     public void CloseServerRpc()

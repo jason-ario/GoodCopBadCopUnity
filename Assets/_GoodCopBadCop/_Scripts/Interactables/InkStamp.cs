@@ -15,9 +15,9 @@ public class InkStamp : Interactable
         }
     }
 
-    public override void InteractWithItem(PlayerInteractionController player)
+    public override void InteractWithItem(PlayerInteractionController player, PickableItemData itemData)
     {
-        if (player.pickupController.HeldObject == stampPlaceObjectSlot.itemThatCanBePlaced && !stampPlaceObjectSlot.IsPlaced)
+        if (itemData == stampPlaceObjectSlot.itemThatCanBePlaced && !stampPlaceObjectSlot.IsPlaced)
         {
             player.pickupController.DropObject(stampPlaceObjectSlot.PlaceObjectPos, false);
             stampPlaceObjectSlot.IsPlaced = true;
