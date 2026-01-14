@@ -3,6 +3,7 @@ using UnityEngine;
 public class InkStamp : Interactable
 {
     [SerializeField] private PlaceObjectSlot stampPlaceObjectSlot;
+    public StampContainer.StampType StampType;
     
     public override void Interact(PlayerInteractionController player)
     {

@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 
 [RequireComponent(typeof(Animator))]
 public class PlayerAnimationController : NetworkBehaviour
@@ -21,6 +22,11 @@ public class PlayerAnimationController : NetworkBehaviour
     private float targetLayer2Weight = 0f;
     private float currentLayer1Weight = 0f;
     private float currentLayer2Weight = 0f;
+
+    [SerializeField] private Rig armRig;
+    public Rig ArmRig => armRig;
+    [SerializeField] private Transform armIKTarget; 
+    public Transform ArmIKTarget => armIKTarget;
     
     private NetworkVariable<Vector3> headLookAtPos =
         new NetworkVariable<Vector3>(

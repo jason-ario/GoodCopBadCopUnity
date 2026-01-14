@@ -28,15 +28,15 @@ Material:
   - TCP2_REFLECTIONS_FRESNEL
   - TCP2_RIM_LIGHTING_LIGHTMASK
   - TCP2_SHADOW_LIGHT_COLOR
-  - _ALPHAPREMULTIPLY_ON
   m_InvalidKeywords:
   - TCP2_UV_NORMALS_FULL
   - _SURFACE_TYPE_TRANSPARENT
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
   disabledShaderPasses:
   - MOTIONVECTORS
   - DepthOnly
@@ -46,7 +46,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: b214b956eaa2feb44b270b9a757f5461, type: 3}
+        m_Texture: {fileID: 2800000, guid: ef85426ddb097104e8a8f17c235f8bc1, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -169,13 +169,13 @@ Material:
     - _RampOffset: 0
     - _RampScale: 1
     - _RampSmoothing: 0.1
-    - _RampThreshold: 0.75
+    - _RampThreshold: 0.802
     - _RampType: 0
     - _ReceiveShadows: 1
     - _ReceiveShadowsOff: 1
     - _ReflectionMapType: 0
     - _ReflectionSmoothness: 0.5
-    - _RenderingMode: 0
+    - _RenderingMode: 1
     - _RimMax: 1
     - _RimMin: 0.5
     - _ShadowColorLightAtten: 1
@@ -188,7 +188,7 @@ Material:
     - _SpecularToonSize: 0.25
     - _SpecularToonSmoothness: 0.05
     - _SpecularType: 0
-    - _SrcBlend: 1
+    - _SrcBlend: 5
     - _SrcBlendAlpha: 1
     - _Surface: 1
     - _UseAlphaTest: 0
@@ -209,7 +209,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 0
     m_Colors:
-    - _BaseColor: {r: 0, g: 0.6754716, b: 0.20423563, a: 1}
+    - _BaseColor: {r: 0, g: 0.5169811, b: 0.06284871, a: 1}
     - _Color: {r: 0, g: 0.6754716, b: 0.20423558, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _HColor: {r: 1, g: 1, b: 1, a: 1}
