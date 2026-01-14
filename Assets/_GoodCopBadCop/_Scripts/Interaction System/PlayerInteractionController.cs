@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -13,6 +14,8 @@ public class PlayerInteractionController : NetworkBehaviour
     public PlayerAnimationController playerAnimationController; 
     Interactable lastInteractable;
     private PlayerPickupController _playerPickupController;
+    [SerializeField] float objectPlacerLerpSpeed = 10f;
+    private bool _placerBlocked;
 
     private void Awake()
     {
@@ -27,15 +30,25 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             return;
         }
+
+        if (Input.GetMouseButtonUp(1))
+        {
+            _placerBlocked = false;
+        }
         
         HandleReticle();
 
         if (Input.GetMouseButtonDown(0))
         {
-            TryInteract();
+            if (!TryInteract())
+            {
+                Debug.Log("Can Not Interact");
+                // This is where you would call UseObject if interaction failed
+                _playerPickupController.TryUseObject(); 
+            }
         }
     }
-
+    
     void HandleReticle()
     {
         if (reticle == null)
@@ -89,47 +102,71 @@ public class PlayerInteractionController : NetworkBehaviour
                 lastInteractable = null;
             }
 
-
-            //Placement Board?
-            if (_playerPickupController.IsHoldingObject && placementBoard != null)
+            if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
             {
-                if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false || _playerPickupController.HeldObject.canUsePlacementBoard == false)
-                {
-                    reticle.SetInteractState(false);
-                    if (ObjectPlacer.Instance.IsActive)
-                    {
-                        ObjectPlacer.Instance.DeactivatePlacer();
-                    }
-                
-                    lastInteractable = null;
-                    return;
-                }
-                
-                reticle.SetInteractState(true);
-                if (ObjectPlacer.Instance.IsActive == false)
-                {
-                    ObjectPlacer.Instance.ActivatePlacer(placementBoard);
-                }
-                
-                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
-                ObjectPlacer.Instance.transform.position = hit.point;
-                return;
+                _placerBlocked = true;
+            }
+
+            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked)
+            {
+                CheckActivatePlacer(placementBoard, hit);
             }
             else
             {
+                if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+            }
+            
+            lastInteractable = null;
+        }
+
+        reticle.SetInteractState(false);
+    }
+
+    void CheckActivatePlacer(PlacementBoard placementBoard, RaycastHit hit)
+    {
+        //Placement Board?
+        if (_playerPickupController.IsHoldingObject && placementBoard != null)
+        {
+            if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false || _playerPickupController.HeldObject.canUsePlacementBoard == false)
+            {
+                reticle.SetInteractState(false);
                 if (ObjectPlacer.Instance.IsActive)
                 {
                     ObjectPlacer.Instance.DeactivatePlacer();
                 }
                 
                 lastInteractable = null;
+                return;
             }
+                
+            reticle.SetInteractState(true);
+            
+            if (!ObjectPlacer.Instance.IsActive)
+            {
+                ObjectPlacer.Instance.ActivatePlacer(placementBoard);
+                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
+                ObjectPlacer.Instance.transform.position = hit.point;
+            }
+                
+            ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, placementBoard.transform.rotation, Time.deltaTime * objectPlacerLerpSpeed);
+            ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, hit.point, Time.deltaTime * objectPlacerLerpSpeed);
+            return;
         }
 
-        reticle.SetInteractState(false);
+        if (ObjectPlacer.Instance.IsActive)
+        {
+            ObjectPlacer.Instance.DeactivatePlacer();
+        }
+
+    }
+    
+
+    public void SetReticleActive(bool value)
+    {
+        reticle.gameObject.SetActive(value);
     }
 
-    void TryInteract()
+    bool TryInteract()
     {
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
@@ -143,15 +180,31 @@ public class PlayerInteractionController : NetworkBehaviour
                 interactable = interactableCollider.Interactable;
             }
             
-            if (interactable != null)
+            if (interactable == null)
+            {
+                return false;
+            }
+
+            if (pickupController.HeldObject != null)
+            {
+                //Check if held object is compatible with this object
+                if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject))
+                {
+                    interactable.InteractWithItem(this, pickupController.HeldObject);
+                    return true;
+                }
+
+                Debug.Log("Held Object is not compatible with this object");
+                return false;
+            }
+            
+            if (interactable != null && interactable.enabled)
             {
                 interactable.Interact(this);
+                return true;
             }
         }
-    }
 
-    public void SetReticleActive(bool value)
-    {
-        reticle.gameObject.SetActive(value);
+        return false;
     }
 }

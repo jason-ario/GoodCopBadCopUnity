@@ -18,7 +18,7 @@ public class PickableObject : Interactable
         base.Awake();
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
     }
-    
+
     public virtual void OnPickedUp()
     {
         if (pickupSound != null)

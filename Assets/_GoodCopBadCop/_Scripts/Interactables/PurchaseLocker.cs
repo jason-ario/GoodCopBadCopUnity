@@ -84,6 +84,8 @@ public class PurchaseLocker : Interactable
         price.gameObject.SetActive(false);
     }
 
+
+
     [ServerRpc(RequireOwnership = false)]
     public void CloseServerRpc()
     {

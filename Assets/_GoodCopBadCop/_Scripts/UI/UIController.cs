@@ -9,6 +9,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject toolShopUI;
     [SerializeField] private Animator screenFade;
+    [SerializeField] private Animator newspaper;
 
     private void Awake()
     {
@@ -85,5 +86,15 @@ public class UIController : MonoBehaviour
         {
             canvasGroup.interactable = true;
         }
+    }
+    
+    public void OpenNewspaper()
+    {
+        newspaper.SetBool("Open", true);
+    }
+    
+    public void CloseNewspaper()
+    {
+        newspaper.SetBool("Open", false);
     }
 }

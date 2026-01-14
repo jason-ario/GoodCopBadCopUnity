@@ -13,6 +13,8 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private Transform standPos;
     [SerializeField] private SuspectCharacter[] suspectCharacters;
     public SuspectCharacter suspectCharacter;
+    [SerializeField] private NetworkObject applicationPrefab;
+    [SerializeField] Transform applicationSpawnPos;
 
     private void Awake()
     {
@@ -69,7 +71,6 @@ public class SuspectController : NetworkBehaviour
         SuspectCharacter newSuspectCharacter = netObj.GetComponent<SuspectCharacter>();
         suspectCharacter = newSuspectCharacter;
         yield return new WaitForSeconds(.2f);
-
         if (NetworkManager.Singleton.IsHost)
         {
             InitiateSuspect();
@@ -86,12 +87,29 @@ public class SuspectController : NetworkBehaviour
     {
         suspectCharacter.transform.DORotateQuaternion(standPos.rotation, .5f).OnComplete(SayEntryDialogue);
         suspectCharacter.animator.SetBool("Walking", false);
+        EnableLook();
     }
 
     void SayEntryDialogue()
     {
         Debug.Log("Saying entry dialogue");
         DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        StartCoroutine(GivePaperworkCoroutine());
+    }
+
+    IEnumerator GivePaperworkCoroutine()
+    {
+        suspectCharacter.animator.SetTrigger("Give"); 
+        yield return new WaitForSeconds(1f);
+        SpawnPaperwork();
+    }
+
+    public void SpawnPaperwork()
+    {
+        if (!IsServer) return;
+
+        NetworkObject spawnedApp = Instantiate(applicationPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
+        spawnedApp.Spawn();
     }
 
     public void RespondToDialogueChoice(int choiceIndex)

@@ -6,7 +6,11 @@ public class PlayerInstance : NetworkBehaviour
 {
     public static PlayerInstance Instance;
 
-    public bool CanControl => _playerMovementController.CanControl;
+    public bool CanControl
+    {
+        get => _playerMovementController.CanControl;
+        set => _playerMovementController.CanControl = value;
+    } 
 
     private PlayerMovementController _playerMovementController;
     
