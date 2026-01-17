@@ -19,6 +19,10 @@ public class GameManager : NetworkBehaviour
     [SerializeField] private Transform folderPos;
     public Transform FolderPos => folderPos;
 
+    public StampContainer.StampType verdictDelivered;
+
+    public GateController GateController;
+
     private void Awake()
     {
         Instance = this;
@@ -153,6 +157,7 @@ public class GameManager : NetworkBehaviour
     {
         windowLampController.TurnRed();
         rollingShutter.SetBool("Open", false);
+        rollingShutter.SetTrigger("Reset");
     }
 
     IEnumerator OpenWindowSequence(bool startGame)
@@ -170,5 +175,40 @@ public class GameManager : NetworkBehaviour
         {
             OnRoundStart?.Invoke();
         }
+    }
+
+    public void DeliveredVertict(StampContainer.StampType stampType)
+    {
+        verdictDelivered = stampType;
+        
+        switch (stampType)
+        {
+            case StampContainer.StampType.Pass:
+                SuspectController.Instance.Pass();
+                break;
+            case StampContainer.StampType.Quarantine:
+                SuspectController.Instance.Quarantine();
+                break;
+            case StampContainer.StampType.Kill:
+                SuspectController.Instance.Kill();
+                break;
+            default:
+                break;
+        }
+    }
+
+    public void NextRound()
+    {
+        if (IsServer)
+        {
+            OnRoundStart?.Invoke();
+        }
+    }
+
+    public void LevelComplete()
+    {
+        Debug.Log("Level Complete");
+        windowLampController.TurnRed();
+        rollingShutter.SetBool("Open", false);
     }
 }

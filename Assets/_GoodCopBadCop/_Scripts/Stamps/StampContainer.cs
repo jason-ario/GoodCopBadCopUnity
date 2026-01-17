@@ -5,7 +5,9 @@ public class StampContainer : MonoBehaviour
     [SerializeField] private GameObject quarantineStamp;
     [SerializeField] private GameObject passStamp;
     [SerializeField] private GameObject killStamp;
-
+    private StampType _stampType;
+    public StampType Stamp => _stampType;
+    
     public enum StampType
     {
         Quarantine, Pass, Kill
@@ -13,6 +15,8 @@ public class StampContainer : MonoBehaviour
     
     public void PlaceStamp(StampType stampType)
     {
+        _stampType = stampType;
+        
         switch (stampType)
         {
             case StampType.Pass:

@@ -25,7 +25,6 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Transform camEndPos;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private float timeTillOpenWindow = 8f;
-
     private GameObject currentScreen;
     private List<GameObject> allScreens;
     [SerializeField] public CanvasGroup canvasGroup;

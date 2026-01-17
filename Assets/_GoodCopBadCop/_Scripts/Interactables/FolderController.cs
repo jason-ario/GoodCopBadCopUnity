@@ -7,6 +7,7 @@ public class FolderController : Interactable
 {
     private NetworkVariable<bool> inFolderPos = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
+    private NetworkVariable<bool> isStamped = new NetworkVariable<bool>(false);
 
     [SerializeField] private AudioClip folderPlaceClip;
     [SerializeField] Animator anim;
@@ -16,6 +17,7 @@ public class FolderController : Interactable
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
     PlayerPickupController playerPickupController;
+    private StampContainer.StampType _stampType;
 
     public override void OnNetworkSpawn()
     {
@@ -39,7 +41,7 @@ public class FolderController : Interactable
         }
         else
         {
-            transform.DOJump(SuspectController.Instance.ApplicationSpawnPos.position, .3f, 1, .5f);
+            transform.DOJump(SuspectController.Instance.ApplicationSpawnPos.position, .3f, 1, .5f).OnComplete(() => GameManager.Instance.DeliveredVertict(stampContainer.Stamp));
         }
 
         SFXController.Instance.Play(folderPlaceClip);
@@ -47,6 +49,8 @@ public class FolderController : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        if (isStamped.Value) return;
+
         InteractServerRpc();
     }
 
@@ -66,6 +70,8 @@ public class FolderController : Interactable
     public override void InteractWithItem(PlayerInteractionController playerInteractionController,
         PickableItemData heldItem)
     {
+        if (isStamped.Value) return;
+        
         // Stamping sequence involves local player control locking and IK, 
         // so we trigger the visual sequence on all clients via RPC.
         ulong clientId = playerInteractionController.NetworkObjectId;
@@ -100,7 +106,8 @@ public class FolderController : Interactable
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
         isStamping = true;
-
+        isStamped.Value = true;
+        
         // Only lock controls for the local player who is actually interacting
         bool isLocal = playerPickupController.IsLocalPlayer;
         if (isLocal) PlayerInstance.Instance.CanControl = false;
