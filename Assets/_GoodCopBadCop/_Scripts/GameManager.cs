@@ -16,6 +16,8 @@ public class GameManager : NetworkBehaviour
     [SerializeField] WindowLampController windowLampController;
     [SerializeField] private AudioSource _buzzerSound;
     [SerializeField] private AudioClip transitionToGameplayStinger;
+    [SerializeField] private Transform folderPos;
+    public Transform FolderPos => folderPos;
 
     private void Awake()
     {
@@ -169,6 +171,4 @@ public class GameManager : NetworkBehaviour
             OnRoundStart?.Invoke();
         }
     }
-    
-    
 }

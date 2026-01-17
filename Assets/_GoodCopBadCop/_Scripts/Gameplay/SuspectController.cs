@@ -14,7 +14,8 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private SuspectCharacter[] suspectCharacters;
     public SuspectCharacter suspectCharacter;
     [SerializeField] private NetworkObject applicationPrefab;
-    [SerializeField] Transform applicationSpawnPos;
+    [SerializeField] Transform applicationSpawnPos; 
+    public Transform ApplicationSpawnPos => applicationSpawnPos;
 
     private void Awake()
     {
