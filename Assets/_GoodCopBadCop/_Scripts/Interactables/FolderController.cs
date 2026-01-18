@@ -19,8 +19,23 @@ public class FolderController : Interactable
     PlayerPickupController playerPickupController;
     private StampContainer.StampType _stampType;
 
+    [Header("Documents")] 
+    [SerializeField] private NetworkObject IdCard;
+    [SerializeField] private NetworkObject InvitationLetter;
+    [SerializeField] private NetworkObject ApplicationLetter;
+    [SerializeField] private Transform idCardSpawnPos;
+    [SerializeField] private Transform invitationLetterSpawnPos;
+    [SerializeField] private Transform applicationLetterSpawnPos;
+    
     public override void OnNetworkSpawn()
     {
+        if (IsServer)
+        {
+            SpawnDocument(IdCard, idCardSpawnPos);
+            SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
+            SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
+        }
+
         // Sync visual state on spawn and when variables change
         inFolderPos.OnValueChanged += (oldVal, newVal) => HandlePositionChange(newVal);
         isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
@@ -31,6 +46,17 @@ public class FolderController : Interactable
         {
             transform.position = GameManager.Instance.FolderPos.position;
         }
+        
+        
+    }
+
+    private void SpawnDocument(NetworkObject prefab, Transform spawnPos)
+    {
+        if (prefab == null || spawnPos == null) return;
+
+        NetworkObject doc = Instantiate(prefab, spawnPos.position, spawnPos.rotation);
+        doc.Spawn();
+        doc.transform.SetParent(transform);
     }
 
     private void HandlePositionChange(bool isInFolderPos)

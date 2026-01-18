@@ -87,6 +87,7 @@ public class PlayerPickupController : NetworkBehaviour
                 if (_heldObject == null) return;
                 if (ObjectPlacer.Instance.deactivatedThisFrame == false) return;
                 if (_heldObject.canUsePlacementBoard == false) return;
+                Debug.Log("Drop Object");
                 DropObject();
             }
             
@@ -195,9 +196,14 @@ public class PlayerPickupController : NetworkBehaviour
     [ServerRpc]
     private void RequestDropServerRpc(int itemIndex, Vector3 position, Quaternion rotation)
     {
+        Debug.Log("RequestDropServerRpc");
         // Get the actual data/prefab on the server side using the index
         PickableItemData data = ItemDatabase.Instance.GetItemByIndex(itemIndex);
-        if (data == null || data.PickUpPrefab == null) return;
+        if (data == null || data.PickUpPrefab == null)
+        {
+            Debug.LogError("Failed to find prefab for item index: " + itemIndex);
+            return;
+        }
 
         GameObject spawnedPickup = Instantiate(data.PickUpPrefab, position, rotation);
 
