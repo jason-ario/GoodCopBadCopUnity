@@ -16,7 +16,8 @@ public class SuspectCharacter : Interactable
     public Transform lookPos;
 
     [Header("Dialogue")]
-    public Response[] dialogueResponses;
+    public Response[] dialogueResponses; 
+    [SerializeField] Collider interactionCollider;
 
     [System.Serializable]
     public struct Response
@@ -28,5 +29,10 @@ public class SuspectCharacter : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         DialogueManager.Instance.InitiateChoices();
+    }
+
+    public void SetCanInteract(bool b)
+    {
+        interactionCollider.enabled = false;
     }
 }

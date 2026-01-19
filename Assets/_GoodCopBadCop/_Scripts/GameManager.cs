@@ -59,6 +59,7 @@ public class GameManager : NetworkBehaviour
 
         ResetWindow();
     }
+    
     private void SpawnPlayersServer()
     {
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
@@ -180,6 +181,7 @@ public class GameManager : NetworkBehaviour
     public void DeliveredVertict(StampContainer.StampType stampType)
     {
         verdictDelivered = stampType;
+        SuspectController.Instance.SetCanInteract(false);
         
         switch (stampType)
         {

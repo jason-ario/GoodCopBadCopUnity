@@ -427,7 +427,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3615840691
+  GlobalObjectIdHash: 2739019034
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -453,9 +453,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
+  itemsThatCanInteractWith: []
   lookAnimator: {fileID: 253971976340002767}
   animator: {fileID: 3144101779491009765}
   audioSource: {fileID: 1751970679333441786}
+  suspectName: 
+  suspectNameColor: {r: 0, g: 0, b: 0, a: 0}
   entryDialogue: Hello. I'm looking to pass through please...
   voiceAudioClips:
   - {fileID: 8300000, guid: b5302926c0ee68a4fbdf3c2e970e1a3b, type: 3}
@@ -466,6 +469,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 02019eb0a67278c44b178287d8d3758c, type: 3}
   - {fileID: 8300000, guid: ea2da5791667b5549af6ea56bf46b340, type: 3}
   lookPos: {fileID: 5330771091470271895}
+  dialogueResponses: []
+  interactionCollider: {fileID: 7460938723757500394}
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -525,7 +530,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
   ShowTopMostFoldoutHeaderGroup: 1
-  TransitionStateInfoList: []
+  TransitionStateInfoList:
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: 607913104
+    TransitionDuration: 0.25
+    TriggerNameHash: 607913104
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 607913104
+    DestinationState: 1339033456
+    TransitionDuration: 0.25
+    TriggerNameHash: 904796290
+    TransitionIndex: 1
   m_Animator: {fileID: 3144101779491009765}
 --- !u!114 &1701216653970133219
 MonoBehaviour:

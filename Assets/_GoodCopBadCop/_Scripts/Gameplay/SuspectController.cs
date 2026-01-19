@@ -165,7 +165,9 @@ public class SuspectController : NetworkBehaviour
         if (IsServer)
         {
             if (spawnedFolder != null && spawnedFolder.IsSpawned)
-                spawnedFolder.Despawn();
+            {
+                DespawnWithChildren(spawnedFolder);
+            }
 
             // Trigger visuals for other clients
             PassVisualsClientRpc();
@@ -234,7 +236,61 @@ public class SuspectController : NetworkBehaviour
 
     public void Kill()
     {
+        if (IsServer)
+        {
+           StartCoroutine(KillSequence());
+        }
+    }
+    
+    private void DespawnWithChildren(NetworkObject netObj)
+    {
+        if (netObj == null || !netObj.IsSpawned) return;
 
+        // Get all nested NetworkObjects in children
+        var childNetworkObjects = netObj.GetComponentsInChildren<NetworkObject>();
+        
+        // Despawn children first (excluding the parent itself to avoid early destruction)
+        for (int i = childNetworkObjects.Length - 1; i >= 0; i--)
+        {
+            if (childNetworkObjects[i] != netObj && childNetworkObjects[i].IsSpawned)
+            {
+                childNetworkObjects[i].Despawn();
+            }
+        }
+
+        // Finally despawn the parent
+        netObj.Despawn();
+    }
+
+    IEnumerator KillSequence()
+    {
+        yield return new WaitForSeconds(1f);
+        SuspectCharacter thisCharacter = suspectCharacter;
+
+        // Visual: Animation
+        thisCharacter.animator.SetTrigger("Give");
+        yield return new WaitForSeconds(1f);
+
+        if (IsServer)
+        {
+            if (spawnedFolder != null && spawnedFolder.IsSpawned)
+            { 
+                DespawnWithChildren(spawnedFolder);
+            }
+        }
+        //"Wait... NO!!!"
+        yield return new WaitForSeconds(1f);
+
+        DialogueManager.Instance.SayDialogue("Wait... NO!!!", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        suspectCharacter.animator.SetTrigger("ShotUp");
+        yield return new WaitForSeconds(1f);
+        KillMachineController.Instance.Kill();
+        yield return new WaitForSeconds(2);
+    }
+
+    public void SetCanInteract(bool b)
+    {
+        suspectCharacter.SetCanInteract(b);
     }
 }
 
