@@ -294,43 +294,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
   m_PrefabInstance: {fileID: 276610247}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &49186742
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 256
-  m_Height: 256
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 0
-  m_ColorFormat: 8
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!4 &66200036 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 685503384657172108, guid: a2ba5c4f583411e43b1e8e0226755b47, type: 3}
@@ -5558,6 +5521,43 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6636927709217994083, guid: fea57657714efe34abb6896d86912861, type: 3}
   m_PrefabInstance: {fileID: 561986353903007375}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &869033617
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 256
+  m_Height: 256
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 0
+  m_ColorFormat: 8
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!4 &902505277 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1750669482020988703, guid: 038037c186d11fe49a9f364500f5809b, type: 3}
@@ -7291,6 +7291,72 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 437919abcc6eae5459c09eded561cba4, type: 3}
   m_PrefabInstance: {fileID: 1357920583}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1365987400 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 9094627901928745921, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
+  m_PrefabInstance: {fileID: 2390800013779358315}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1365987401 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 1547905258505384948, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
+  m_PrefabInstance: {fileID: 2390800013779358315}
+  m_PrefabAsset: {fileID: 0}
+--- !u!33 &1365987403
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1365987400}
+  m_Mesh: {fileID: -1550514412580984892, guid: 72c1ddc912f25744485e40d9352d0385, type: 3}
+--- !u!23 &1365987404
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1365987400}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 8f18335a2b3fb104e93007d3695fc253, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &1375970569 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5531356140726497565, guid: 79d5b7778367bc549b966d0dc791db69, type: 3}
@@ -8228,7 +8294,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1235631918
+  GlobalObjectIdHash: 647087098
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -8916,7 +8982,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NoiseTex:
-        m_Texture: {fileID: 49186742}
+        m_Texture: {fileID: 869033617}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -8940,7 +9006,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DetailColor: {r: 0, g: 0.11066035, b: 0.023712922, a: 0}
     - _DetailData: {r: 0.464, g: -0.5, b: 0.04, a: 1}
-    - _DetailWindDirection: {r: -0.15926944, g: 0, b: 0, a: 0}
+    - _DetailWindDirection: {r: -0.31850663, g: 0, b: 0, a: 0}
     - _DistanceData: {r: 0, g: -1, b: 0.000004, a: 0}
     - _FogOfWarCenter: {r: 0, g: 0, b: 0, a: 1}
     - _FogOfWarCenterAdjusted: {r: 0, g: 0, b: 0, a: 1}
@@ -8952,7 +9018,7 @@ Material:
     - _ShadowData: {r: 0.5, g: 0, b: 250, a: 0}
     - _SpecularColor: {r: 0.5, g: 0.5, b: 0.5, a: 0}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _WindDirection: {r: -0.15926944, g: 0, b: 0, a: 0}
+    - _WindDirection: {r: -0.31850663, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!4 &1725785521 stripped
@@ -12492,7 +12558,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3177035091
+  GlobalObjectIdHash: 2687017496
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -13933,7 +13999,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2088563075955625729, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2462358043393814367, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
       propertyPath: m_Enabled
@@ -13962,7 +14028,7 @@ PrefabInstance:
     - target: {fileID: 5649640046455802056, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
       propertyPath: boxCollider
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1365987401}
     - target: {fileID: 7595143581981913453, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
       propertyPath: m_Name
       value: Kill Machine
@@ -13977,7 +14043,13 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1369493344539394616, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
       insertIndex: -1
       addedObject: {fileID: 153181222}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 9094627901928745921, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1365987404}
+    - targetCorrespondingSourceObject: {fileID: 9094627901928745921, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1365987403}
   m_SourcePrefab: {fileID: 100100000, guid: b1285117adf9f9842a20ad7d96f23222, type: 3}
 --- !u!33 &2409951303420482722
 MeshFilter:
@@ -21554,7 +21626,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3447360957
+  GlobalObjectIdHash: 4227416245
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -22071,10 +22143,6 @@ PrefabInstance:
     - target: {fileID: 7254549401451038287, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7433628056176050959, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8050093120355019273, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode

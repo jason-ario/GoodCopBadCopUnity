@@ -14,6 +14,7 @@ public class KillMachineController : MonoBehaviour
     [SerializeField] AudioClip windowOpenSound;
     [SerializeField] AudioClip windowCloseSound;
     [SerializeField] BoxCollider boxCollider;
+    [SerializeField] private GameObject[] bloodSplatters;
 
     private void Awake()
     {
@@ -57,13 +58,7 @@ public class KillMachineController : MonoBehaviour
         
         for (int i = 0; i < 4; i++)
         {
-            Vector3 randomPos = new Vector3(
-                UnityEngine.Random.Range(boxCollider.bounds.min.x, boxCollider.bounds.max.x),
-                UnityEngine.Random.Range(boxCollider.bounds.min.y, boxCollider.bounds.max.y),
-                UnityEngine.Random.Range(boxCollider.bounds.min.z, boxCollider.bounds.max.z)
-            );
-
-            //_bloodDecalManager.AddDecal(bloodDecalAsset, Color.red, randomPos, boxCollider.gameObject.transform.forward, Vector3.one);
+            bloodSplatters[i].SetActive(true);
             yield return new WaitForSeconds(UnityEngine.Random.Range(0.2f, 0.5f));
         }
     }
