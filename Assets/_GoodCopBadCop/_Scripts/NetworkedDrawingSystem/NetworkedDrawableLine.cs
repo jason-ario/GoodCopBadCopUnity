@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -16,6 +17,7 @@ public class NetworkDrawableLine : NetworkBehaviour
     public float sendInterval = 0.06f;
     public float lineWidth = 0.02f;
     public Color32 lineColor = new Color32(0, 0, 0, 255);
+    private PlayerPickupController _playerPickupController;
 
     [Header("Line Renderer")]
     public Material lineMaterial;
@@ -26,6 +28,7 @@ public class NetworkDrawableLine : NetworkBehaviour
     public int maxEventsKept = 20000;
 
     private enum StrokeEventType : byte { Start, Point, End }
+    
 
     private struct StrokeEvent :
         INetworkSerializable,
@@ -86,6 +89,7 @@ public class NetworkDrawableLine : NetworkBehaviour
 
     private uint _currentStrokeId;
     private bool _isDrawing;
+    private bool _hasClickedToStart;
     private float _sendTimer;
 
     private readonly List<Vector3> _pendingPoints = new();
@@ -93,6 +97,8 @@ public class NetworkDrawableLine : NetworkBehaviour
     private bool _hasLastQueuedPoint;
 
     [SerializeField] private GameObject virtualCamera;
+    [SerializeField] private Transform ikTarget;
+    [SerializeField] private Vector3 ikOffset;
 
     private void Awake()
     {
@@ -100,6 +106,8 @@ public class NetworkDrawableLine : NetworkBehaviour
             readPerm: NetworkVariableReadPermission.Everyone,
             writePerm: NetworkVariableWritePermission.Server
         );
+        
+        drawCamera = Camera.main;
     }
 
     public override void OnNetworkSpawn()
@@ -121,25 +129,46 @@ public class NetworkDrawableLine : NetworkBehaviour
         Cleanup();
     }
 
-    public void EnterDrawMode()
+
+    
+    public void EnterDrawMode(PlayerPickupController playerPickupController)
     {
         enabled = true;
-        if (virtualCamera != null)
-            virtualCamera.SetActive(true);
+        _hasClickedToStart = false;
+        drawingSurface.enabled = true;
+        
+        _playerPickupController = playerPickupController;
+        PlayerMovementController playerMovementController = _playerPickupController.PlayerMovementController;
+        playerMovementController.LookAtTarget(transform);
+        playerMovementController.CameraTransform.DOMove(virtualCamera.transform.position, .5f); 
+        playerMovementController.CameraTransform.DORotate(virtualCamera.transform.rotation.eulerAngles, .5f);
+
+        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(1,1);
+        _playerPickupController.PlayerAnimationController.ArmIKTarget.DOMove(ikTarget.position, .25f);
+        _playerPickupController.PlayerAnimationController.ArmIKTarget.DORotate(ikTarget.rotation.eulerAngles, .25f);
+    }
+
+    void SetIKTargetPos(Vector3 pos)
+    {
+        ikTarget.localPosition = pos + ikOffset;
+        _playerPickupController.PlayerAnimationController.ArmIKTarget.transform.position = ikTarget.position;
+        _playerPickupController.PlayerAnimationController.ArmIKTarget.transform.rotation = ikTarget.rotation;
     }
 
     public void ExitDrawMode()
     {
+        drawingSurface.enabled = false;
+        _playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
+        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(0,1);
+        
         enabled = false;
-        if (virtualCamera != null)
-            virtualCamera.SetActive(false);
     }
 
     private void Update()
     {
         if (!IsOwner) return;
         if (drawCamera == null) drawCamera = Camera.main;
-
+        
         if (Input.GetMouseButtonDown(0) && TryGetLocalPoint(out var p))
             BeginStroke(p);
 
@@ -216,6 +245,7 @@ public class NetworkDrawableLine : NetworkBehaviour
             return;
 
         AddPointLocal(_currentStrokeId, localPoint);
+        SetIKTargetPos(localPoint);    
         QueuePoint(localPoint);
     }
 

@@ -1,3 +1,4 @@
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
@@ -157,5 +158,11 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         bodyAnimator.SetTrigger(animString);
         armsAnimator.SetTrigger(animString);
+    }
+
+    public void SetArmRigWeightSmooth(float smoothWeight, float smoothTime)
+    {
+        DOTween.Kill(armRig.weight);
+        DOTween.To(() => armRig.weight, x => armRig.weight = x, smoothWeight, smoothTime);
     }
 }

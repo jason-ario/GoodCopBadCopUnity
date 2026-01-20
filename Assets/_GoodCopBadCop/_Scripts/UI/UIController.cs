@@ -1,5 +1,7 @@
 using System;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
 
 public class UIController : MonoBehaviour
 {
@@ -10,12 +12,12 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject toolShopUI;
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
+    [SerializeField] private Button backButton;
 
     private void Awake()
     {
         Instance = this;
     }
-    
 
     private void Update()
     {
@@ -96,5 +98,17 @@ public class UIController : MonoBehaviour
     public void CloseNewspaper()
     {
         newspaper.SetBool("Open", false);
+    }
+
+    public void ShowBackButton(UnityAction onClickCallback)
+    {
+        backButton.onClick.AddListener(onClickCallback);
+        backButton.gameObject.SetActive(true);
+    }
+
+    public void HideBackButton()
+    {
+        backButton.onClick.RemoveAllListeners();
+        backButton.gameObject.SetActive(false);
     }
 }
