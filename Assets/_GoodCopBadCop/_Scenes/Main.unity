@@ -3387,43 +3387,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 389b62f8cd3d9f9428be59d2fab1fcca, type: 3}
---- !u!84 &500143453
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 256
-  m_Height: 256
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 0
-  m_ColorFormat: 8
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &510282962
 GameObject:
   m_ObjectHideFlags: 0
@@ -5861,6 +5824,43 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 83d59c511b45f044f9c5b60383bc56ce, type: 3}
   m_PrefabInstance: {fileID: 3538495700826087014}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &785335612
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 256
+  m_Height: 256
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 0
+  m_ColorFormat: 8
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1001 &787721403
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10388,7 +10388,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NoiseTex:
-        m_Texture: {fileID: 500143453}
+        m_Texture: {fileID: 785335612}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -10412,7 +10412,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DetailColor: {r: 0, g: 0.11066035, b: 0.023712922, a: 0}
     - _DetailData: {r: 0.464, g: -0.5, b: 0.04, a: 1}
-    - _DetailWindDirection: {r: -0.48531705, g: 0, b: 0, a: 0}
+    - _DetailWindDirection: {r: -0.14879028, g: 0, b: 0, a: 0}
     - _DistanceData: {r: 0, g: -1, b: 0.000004, a: 0}
     - _FogOfWarCenter: {r: 0, g: 0, b: 0, a: 1}
     - _FogOfWarCenterAdjusted: {r: 0, g: 0, b: 0, a: 1}
@@ -10424,7 +10424,7 @@ Material:
     - _ShadowData: {r: 0.5, g: 0, b: 250, a: 0}
     - _SpecularColor: {r: 0.5, g: 0.5, b: 0.5, a: 0}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _WindDirection: {r: -0.48531705, g: 0, b: 0, a: 0}
+    - _WindDirection: {r: -0.14879028, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!4 &1725785521 stripped
@@ -12697,7 +12697,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3412297675668504302, guid: 57b600371949c39469c5d4bf875500b6, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3985550604471709835, guid: 57b600371949c39469c5d4bf875500b6, type: 3}
       propertyPath: m_AnchorMax.y
@@ -24016,7 +24016,7 @@ PrefabInstance:
     - target: {fileID: 1995365291537246392, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_TargetTexture
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 8400000, guid: 6ea50738b9a16024e80b6d3a4926ce4c, type: 2}
     - target: {fileID: 2214162898189883443, guid: e79d0f7f301b016418470d86c15b3bc8, type: 3}
       propertyPath: m_LocalPosition.x
       value: 1.947
