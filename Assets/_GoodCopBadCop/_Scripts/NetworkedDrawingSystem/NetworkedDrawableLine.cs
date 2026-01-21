@@ -168,15 +168,23 @@ public class NetworkDrawableLine : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (drawCamera == null) drawCamera = Camera.main;
-        
-        if (Input.GetMouseButtonDown(0) && TryGetLocalPoint(out var p))
+
+        Vector3 p = Vector3.zero;
+        bool hasPoint = TryGetLocalPoint(out p);
+
+        if (hasPoint && Input.GetMouseButtonDown(0))
             BeginStroke(p);
 
-        if (_isDrawing && Input.GetMouseButton(0) && TryGetLocalPoint(out p))
+        if (_isDrawing && Input.GetMouseButton(0) && hasPoint)
             AddPoint(p);
 
         if (_isDrawing && Input.GetMouseButtonUp(0))
             EndStroke();
+
+        if (hasPoint)
+        {
+            SetIKTargetPos(p);
+        }
 
         if (_isDrawing)
         {
@@ -198,7 +206,17 @@ public class NetworkDrawableLine : NetworkBehaviour
     {
         localPoint = default;
 
-        Ray ray = drawCamera.ScreenPointToRay(Input.mousePosition);
+        // Get the mouse position
+        Vector3 mousePos = Input.mousePosition;
+
+        // If drawCamera is rendering to a RenderTexture, we must remap screen coordinates
+        if (drawCamera.targetTexture != null)
+        {
+            mousePos.x *= (float)drawCamera.targetTexture.width / Screen.width;
+            mousePos.y *= (float)drawCamera.targetTexture.height / Screen.height;
+        }
+
+        Ray ray = drawCamera.ScreenPointToRay(mousePos);
 
         if (!drawingSurface.Raycast(ray, out RaycastHit hit, 500f))
             return false;
