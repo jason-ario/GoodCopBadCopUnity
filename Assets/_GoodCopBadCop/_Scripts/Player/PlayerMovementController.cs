@@ -28,6 +28,9 @@ public class PlayerMovementController : NetworkBehaviour
     public bool CanMove;
     public bool CanLook;
     
+    private Vector3 camStartPos;
+    private Quaternion camStartRot;
+
     public Transform CameraTransform => cameraTransform;
     public bool CanControl
     {
@@ -60,6 +63,12 @@ public class PlayerMovementController : NetworkBehaviour
         _characterController = GetComponent<CharacterController>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    private void Start()
+    {
+        camStartPos = cameraTransform.localPosition;
+        camStartRot = cameraTransform.localRotation;
     }
 
     public override void OnNetworkSpawn()
@@ -164,6 +173,20 @@ public class PlayerMovementController : NetworkBehaviour
                 _cameraPitch = cameraTransform.localEulerAngles.x;
                 if (_cameraPitch > 180) _cameraPitch -= 360;
             });
+        }
+    }
+    
+    public void ResetCameraPos(bool instant = true, float duration = 0.5f)
+    {
+        cameraTransform.DOKill();
+
+        if (instant)
+        {
+            cameraTransform.localPosition = camStartPos;
+        }
+        else
+        {
+            cameraTransform.DOLocalMove(camStartPos, duration);
         }
     }
 }

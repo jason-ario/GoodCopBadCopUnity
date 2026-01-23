@@ -1,3 +1,5 @@
+using System.Collections;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
@@ -46,6 +48,26 @@ public class PlayerAnimationController : NetworkBehaviour
     private void Update()
     {
         UpdateAnimations();
+
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            ShrugEmote();
+        }
+    }
+
+    void ShrugEmote()
+    {
+        StartCoroutine(ShrugEmoteCoroutine());
+    }
+
+    IEnumerator ShrugEmoteCoroutine()
+    {
+        bodyAnimator.SetBool("Shrug", true);
+        armsAnimator.SetBool("Shrug", true);
+        yield return new WaitForSeconds(1);
+        bodyAnimator.SetBool("Shrug", false);
+        armsAnimator.SetBool("Shrug", false);
+        
     }
 
     public override void OnNetworkSpawn()
@@ -157,5 +179,11 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         bodyAnimator.SetTrigger(animString);
         armsAnimator.SetTrigger(animString);
+    }
+
+    public void SetArmRigWeightSmooth(float smoothWeight, float smoothTime)
+    {
+        DOTween.Kill(armRig.weight);
+        DOTween.To(() => armRig.weight, x => armRig.weight = x, smoothWeight, smoothTime);
     }
 }

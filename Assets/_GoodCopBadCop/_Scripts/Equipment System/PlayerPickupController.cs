@@ -20,6 +20,9 @@ public class PlayerPickupController : NetworkBehaviour
     [SerializeField] ObjectContainer[] objectContainers;
     [SerializeField] private ObjectContainer objectContainerToUse; 
     public ObjectContainer ObjectContainer => objectContainerToUse;
+    private PlayerMovementController _playerMovementController;
+    public PlayerMovementController PlayerMovementController => _playerMovementController;
+
     private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private float pickUpUseCooldownTimer = .2f;
     private bool pickUpCooldownComplete = false;
@@ -29,6 +32,7 @@ public class PlayerPickupController : NetworkBehaviour
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         objectContainers = GetComponentsInChildren<ObjectContainer>(true);
         itemEquippedIndex.OnValueChanged += OnItemValueChanged;
+        _playerMovementController = GetComponent<PlayerMovementController>();
     }
 
     private void Start()
@@ -84,9 +88,25 @@ public class PlayerPickupController : NetworkBehaviour
             // Drop with E or right-click
             if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
             {
-                if (_heldObject == null) return;
-                if (ObjectPlacer.Instance.deactivatedThisFrame == false) return;
-                if (_heldObject.canUsePlacementBoard == false) return;
+                if (_heldObject == null)
+                {
+                    Debug.Log("HeldObject is null");
+                    return;
+                }
+                
+                /*
+                if (ObjectPlacer.Instance.deactivatedThisFrame == false)
+                {
+                    Debug.Log("ObjectPlacer is not deactivated");
+                    return;
+                }*/
+
+                if (_heldObject.canUsePlacementBoard == false)
+                {
+                    Debug.Log("Can't use placement board");
+                    return;
+                }
+                
                 Debug.Log("Drop Object");
                 DropObject();
             }

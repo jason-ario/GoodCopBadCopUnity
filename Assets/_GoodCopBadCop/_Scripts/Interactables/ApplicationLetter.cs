@@ -1,17 +1,7 @@
+using HighlightPlus;
 using UnityEngine;
 
-public class ApplicationLetter : PickableObject
+public class ApplicationLetter : Paper
 {
-    public override void OnStartUse()
-    {
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
-        UIController.Instance.OpenNewspaper();
-    }
-    
-    public override void OnStopUse()
-    {
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
-        UIController.Instance.CloseNewspaper();
-    }
 
 }

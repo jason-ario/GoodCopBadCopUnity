@@ -25,7 +25,7 @@ public class ObjectPlacer : MonoBehaviour
     {
         container.gameObject.SetActive(false);
     }
-
+    
     private void Update()
     {
         if (deactivatedThisFrame)
