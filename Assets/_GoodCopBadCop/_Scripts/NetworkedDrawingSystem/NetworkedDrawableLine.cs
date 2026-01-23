@@ -82,7 +82,7 @@ public class NetworkDrawableLine : NetworkBehaviour
         }
     }
 
-    private NetworkList<StrokeEvent> _events;
+    private NetworkList<StrokeEvent> _events = new NetworkList<StrokeEvent>();
 
     private readonly Dictionary<uint, LineRenderer> _lines = new();
     private readonly Dictionary<uint, List<Vector3>> _points = new();

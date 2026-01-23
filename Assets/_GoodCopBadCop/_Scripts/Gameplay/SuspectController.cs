@@ -239,10 +239,28 @@ public class SuspectController : NetworkBehaviour
 
     IEnumerator QuarantineSequence()
     {
+        suspectCharacter.animator.SetTrigger("Give");
+        yield return new WaitForSeconds(1f);
+
+        // Logic: Despawn folder (Server only)
+        if (IsServer)
+        {
+            if (spawnedFolder != null && spawnedFolder.IsSpawned)
+            {
+                DespawnWithChildren(spawnedFolder);
+            }
+
+            // Trigger visuals for other clients
+            PassVisualsClientRpc();
+        }
+
+        yield return new WaitForSeconds(2f);
+        suspectCharacter.animator.SetTrigger("Shocked");
+
         quarantineTimeline.gameObject.SetActive(true);
         quarantineTimeline.Play();
+        DialogueManager.Instance.SayDialogue("Wait... No... I'm healthy.. No!", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
 
-     
         yield return new WaitForSeconds(2);
         suspectCharacter.lookAnimator.SetLookTarget(null);
         suspectCharacter.animator.SetBool("BeingRestrained", true);
