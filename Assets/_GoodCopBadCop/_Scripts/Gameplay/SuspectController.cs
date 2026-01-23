@@ -4,6 +4,7 @@ using DG.Tweening;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Playables;
 
 public class SuspectController : NetworkBehaviour
 {
@@ -23,6 +24,8 @@ public class SuspectController : NetworkBehaviour
 
     private NetworkObject spawnedFolder;
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1);
+    [SerializeField] private PlayableDirector quarantineTimeline;
+    [SerializeField] private Transform suspectQuarantineFollowPos;
 
     private void Awake()
     {
@@ -230,8 +233,34 @@ public class SuspectController : NetworkBehaviour
     {
         if (IsServer)
         {
-            StartCoroutine(PassSequence());
+            StartCoroutine(QuarantineSequence());
         }
+    }
+
+    IEnumerator QuarantineSequence()
+    {
+        quarantineTimeline.gameObject.SetActive(true);
+        quarantineTimeline.Play();
+
+     
+        yield return new WaitForSeconds(2);
+        suspectCharacter.lookAnimator.SetLookTarget(null);
+        suspectCharacter.animator.SetBool("BeingRestrained", true);
+        
+        float quarantiningTime = 9;
+        float timeElapsed = 0;
+        while (timeElapsed < quarantiningTime)
+        {
+            yield return new WaitForEndOfFrame();
+            suspectCharacter.transform.position = suspectQuarantineFollowPos.position;
+            suspectCharacter.transform.rotation = suspectQuarantineFollowPos.rotation;
+
+            timeElapsed += Time.deltaTime;
+        }
+        
+        DespawnSuspect(suspectCharacter);
+        GameManager.Instance.NextRound();
+        quarantineTimeline.gameObject.SetActive(false);
     }
 
     public void Kill()
@@ -291,6 +320,11 @@ public class SuspectController : NetworkBehaviour
     public void SetCanInteract(bool b)
     {
         suspectCharacter.SetCanInteract(b);
+    }
+
+    public void GrabSuspect()
+    {
+        suspectCharacter.animator.SetBool("Restrained", true);
     }
 }
 
