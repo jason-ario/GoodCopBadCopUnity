@@ -15,6 +15,7 @@ public class KillMachineController : MonoBehaviour
     [SerializeField] AudioClip windowCloseSound;
     [SerializeField] BoxCollider boxCollider;
     [SerializeField] private GameObject[] bloodSplatters;
+    [SerializeField] private GameObject[] bloodParticles;
 
     private void Awake()
     {
@@ -50,6 +51,18 @@ public class KillMachineController : MonoBehaviour
     public void SpawnBloodDecals()
     {
         StartCoroutine(SpawnRandomBloodDecals());
+        StartCoroutine(SpawnBloodParticles());
+    }
+
+    IEnumerator SpawnBloodParticles()
+    {
+        yield return new WaitForSeconds(.5f);
+        int bloodParticles = UnityEngine.Random.Range(5, 10);
+        for (int i = 0; i < bloodParticles; i++)
+        {
+            Instantiate(this.bloodParticles[UnityEngine.Random.Range(0, this.bloodParticles.Length)], boxCollider.bounds.center, UnityEngine.Random.rotation);
+            yield return new WaitForSeconds(UnityEngine.Random.Range(0.2f, 0.3f));
+        }
     }
     IEnumerator SpawnRandomBloodDecals()
     {
@@ -59,7 +72,7 @@ public class KillMachineController : MonoBehaviour
         for (int i = 0; i < bloodSplatters.Length - 1; i++)
         {
             bloodSplatters[i].SetActive(true);
-            yield return new WaitForSeconds(UnityEngine.Random.Range(0.2f, 0.5f));
+            yield return new WaitForSeconds(UnityEngine.Random.Range(0.1f, 0.2f));
         }
     }
 }
