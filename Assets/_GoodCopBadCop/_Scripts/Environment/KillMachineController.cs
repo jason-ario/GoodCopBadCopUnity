@@ -56,7 +56,7 @@ public class KillMachineController : MonoBehaviour
         yield return new WaitForSeconds(.5f); 
         //Spawn Decals within box collider
         
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < bloodSplatters.Length - 1; i++)
         {
             bloodSplatters[i].SetActive(true);
             yield return new WaitForSeconds(UnityEngine.Random.Range(0.2f, 0.5f));
