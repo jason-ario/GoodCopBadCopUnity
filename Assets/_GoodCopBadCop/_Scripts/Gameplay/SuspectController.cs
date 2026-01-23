@@ -151,9 +151,23 @@ public class SuspectController : NetworkBehaviour
     [ClientRpc]
     private void PassVisualsClientRpc()
     {
-        if (IsServer) return; // Host already runs this via Coroutine logic if desired, or we separate logic.
+        if (IsServer) return; // Host already runs this via Coroutine logic
         // To keep it simple and synchronized, we'll trigger the sequence on all clients.
         StartCoroutine(PassSequence());
+    }
+
+    [ClientRpc]
+    private void QuarantineVisualsClientRpc()
+    {
+        if (IsServer) return;
+        StartCoroutine(QuarantineSequence());
+    }
+
+    [ClientRpc]
+    private void KillVisualsClientRpc()
+    {
+        if (IsServer) return;
+        StartCoroutine(KillSequence());
     }
 
     IEnumerator PassSequence()
@@ -251,7 +265,7 @@ public class SuspectController : NetworkBehaviour
             }
 
             // Trigger visuals for other clients
-            PassVisualsClientRpc();
+            QuarantineVisualsClientRpc();
         }
 
         yield return new WaitForSeconds(2f);
@@ -276,8 +290,11 @@ public class SuspectController : NetworkBehaviour
             timeElapsed += Time.deltaTime;
         }
         
-        DespawnSuspect(suspectCharacter);
-        GameManager.Instance.NextRound();
+        if (IsServer)
+        {
+            DespawnSuspect(suspectCharacter);
+            GameManager.Instance.NextRound();
+        }
         quarantineTimeline.gameObject.SetActive(false);
     }
 
@@ -324,6 +341,8 @@ public class SuspectController : NetworkBehaviour
             { 
                 DespawnWithChildren(spawnedFolder);
             }
+
+            KillVisualsClientRpc();
         }
         //"Wait... NO!!!"
         yield return new WaitForSeconds(1f);
@@ -331,7 +350,11 @@ public class SuspectController : NetworkBehaviour
         DialogueManager.Instance.SayDialogue("Wait... NO!!!", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
         suspectCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
-        KillMachineController.Instance.Kill();
+        
+        if (IsServer)
+        {
+            KillMachineController.Instance.Kill();
+        }
         yield return new WaitForSeconds(2);
     }
 
@@ -345,4 +368,3 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.animator.SetBool("Restrained", true);
     }
 }
-
