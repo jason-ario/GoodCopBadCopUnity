@@ -1,5 +1,6 @@
 using System.Collections;
 using DG.Tweening;
+using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -26,7 +27,12 @@ public class FolderController : Interactable
     [SerializeField] private Transform idCardSpawnPos;
     [SerializeField] private Transform invitationLetterSpawnPos;
     [SerializeField] private Transform applicationLetterSpawnPos;
-    
+
+
+    [Header("Camera")] 
+    [SerializeField] private GameObject cinemachineVirtualCamera;
+
+    [SerializeField] private CinemachineImpulseSource _impulseSource;
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -138,6 +144,12 @@ public class FolderController : Interactable
         bool isLocal = playerPickupController.IsLocalPlayer;
         if (isLocal) PlayerInstance.Instance.CanControl = false;
 
+        if (IsOwner)
+        {
+            cinemachineVirtualCamera.SetActive(true);
+        }
+        yield return new WaitForSeconds(.25f);
+
         playerPickupController.PlayerAnimationController.SetAnimTrigger("UseStamp");
         playerPickupController.PlayerAnimationController.ArmRig.weight = 1;
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
@@ -153,6 +165,7 @@ public class FolderController : Interactable
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DORotate(
             stampDownTarget.rotation.eulerAngles, .25f);
         SFXController.Instance.Play(stampSound);
+     
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DOMove(stampDownTarget.position, .25f)
             .OnComplete(() =>
             {
@@ -160,6 +173,8 @@ public class FolderController : Interactable
                 if (IsServer) stampContainer.PlaceStamp(stampType);
             });
 
+        yield return new WaitForSeconds(.2f);
+        _impulseSource.GenerateImpulse();
         yield return new WaitForSeconds(.25f);
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
@@ -172,6 +187,11 @@ public class FolderController : Interactable
         playerPickupController.PlayerAnimationController.ArmRig.weight = 0;
         isStamping = false;
 
+        if (IsOwner)
+        {
+            cinemachineVirtualCamera.SetActive(false);
+        }
+        
         if (IsServer) inFolderPos.Value = false;
     }
 
