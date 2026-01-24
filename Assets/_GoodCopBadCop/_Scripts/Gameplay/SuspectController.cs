@@ -159,14 +159,14 @@ public class SuspectController : NetworkBehaviour
     [ClientRpc]
     private void QuarantineVisualsClientRpc()
     {
-        if (IsServer) return;
+        if (IsServer) return; // Host already runs this via Coroutine logic started in Quarantine()
         StartCoroutine(QuarantineSequence());
     }
 
     [ClientRpc]
     private void KillVisualsClientRpc()
     {
-        if (IsServer) return;
+        if (IsServer) return; // Host already runs this via Coroutine logic started in Kill()
         StartCoroutine(KillSequence());
     }
 
@@ -351,10 +351,8 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
         
-        if (IsServer)
-        {
-            KillMachineController.Instance.Kill();
-        }
+        KillMachineController.Instance.Kill();
+
         yield return new WaitForSeconds(2);
     }
 
