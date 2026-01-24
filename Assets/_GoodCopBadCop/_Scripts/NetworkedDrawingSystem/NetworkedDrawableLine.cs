@@ -143,7 +143,7 @@ public class NetworkDrawableLine : NetworkBehaviour
         playerMovementController.CameraTransform.DOMove(virtualCamera.transform.position, .5f); 
         playerMovementController.CameraTransform.DORotate(virtualCamera.transform.rotation.eulerAngles, .5f);
 
-        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(1,1);
+        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(1,.5f);
         _playerPickupController.PlayerAnimationController.ArmIKTarget.DOMove(ikTarget.position, .25f);
         _playerPickupController.PlayerAnimationController.ArmIKTarget.DORotate(ikTarget.rotation.eulerAngles, .25f);
     }
