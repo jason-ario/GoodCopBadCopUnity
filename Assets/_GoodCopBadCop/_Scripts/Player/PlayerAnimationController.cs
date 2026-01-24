@@ -49,6 +49,10 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         UpdateAnimations();
 
+        if (IsOwner == false)
+        {
+            return;
+        }
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             ShrugEmote();
@@ -62,12 +66,9 @@ public class PlayerAnimationController : NetworkBehaviour
 
     IEnumerator ShrugEmoteCoroutine()
     {
-        bodyAnimator.SetBool("Shrug", true);
-        armsAnimator.SetBool("Shrug", true);
+        SetAnimBool("Shrug", true);
         yield return new WaitForSeconds(1);
-        bodyAnimator.SetBool("Shrug", false);
-        armsAnimator.SetBool("Shrug", false);
-        
+        SetAnimBool("Shrug", false);
     }
 
     public override void OnNetworkSpawn()
