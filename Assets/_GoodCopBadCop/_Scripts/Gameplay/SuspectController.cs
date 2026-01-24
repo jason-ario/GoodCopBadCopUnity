@@ -163,13 +163,6 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(QuarantineSequence());
     }
 
-    [ClientRpc]
-    private void KillVisualsClientRpc()
-    {
-        if (IsServer) return; // Host already runs this via Coroutine logic started in Kill()
-        StartCoroutine(KillSequence());
-    }
-
     IEnumerator PassSequence()
     {
         SuspectCharacter thisCharacter = suspectCharacter;
@@ -300,10 +293,7 @@ public class SuspectController : NetworkBehaviour
 
     public void Kill()
     {
-        if (IsServer)
-        {
-           StartCoroutine(KillSequence());
-        }
+        StartCoroutine(KillSequence());
     }
     
     private void DespawnWithChildren(NetworkObject netObj)
@@ -341,8 +331,6 @@ public class SuspectController : NetworkBehaviour
             { 
                 DespawnWithChildren(spawnedFolder);
             }
-
-            KillVisualsClientRpc();
         }
         //"Wait... NO!!!"
         yield return new WaitForSeconds(1f);
