@@ -778,7 +778,7 @@ MonoBehaviour:
     m_Root: {fileID: 3711661967754532839}
     m_Mid: {fileID: 3131692624468751717}
     m_Tip: {fileID: 3273074458883132888}
-    m_Target: {fileID: 151579872214920813}
+    m_Target: {fileID: 8657725739345380849}
     m_Hint: {fileID: 0}
     m_TargetPositionWeight: 1
     m_TargetRotationWeight: 1
@@ -1055,7 +1055,7 @@ MonoBehaviour:
   animLerpSpeed: 10
   headLookAtTransform: {fileID: 7634414149529840893}
   chestLookAtTransform: {fileID: 8156789284174780857}
-  armRig: {fileID: 2707976807583367742}
+  armRig: {fileID: 7268924440814586463}
   armIKTarget: {fileID: 8657725739345380849}
 --- !u!95 &5651200760162566270
 Animator:
@@ -2959,6 +2959,10 @@ PrefabInstance:
       value: 7
       objectReference: {fileID: 0}
     - target: {fileID: -4202798675411607032, guid: d8c32e657777a5f48b45cf60e150d0e7, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -4202798675411607032, guid: d8c32e657777a5f48b45cf60e150d0e7, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 681e4ccfbb9fcef41969bb7ba786f7ff, type: 2}
@@ -3156,7 +3160,12 @@ PrefabInstance:
       objectReference: {fileID: 22100000, guid: d1fffa979b9f5ec48a45e90231fe1bca, type: 2}
     - target: {fileID: 5866666021909216657, guid: d8c32e657777a5f48b45cf60e150d0e7, type: 3}
       propertyPath: m_WarningMessage
-      value: 
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform
+        'mixamorig:RightArm'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform
+        'mixamorig:RightArm'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform
+        'mixamorig:RightArm'"
       objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: d8c32e657777a5f48b45cf60e150d0e7, type: 3}
       propertyPath: m_ApplyRootMotion
@@ -5691,15 +5700,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8833723053514349481, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.0401
+      value: 0.017
       objectReference: {fileID: 0}
     - target: {fileID: 8833723053514349481, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.0739
+      value: -0.101
       objectReference: {fileID: 0}
     - target: {fileID: 8833723053514349481, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.0267
+      value: 0.094
       objectReference: {fileID: 0}
     - target: {fileID: 8980736300809977239, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: GlobalObjectIdHash
