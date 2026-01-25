@@ -7,6 +7,7 @@ public class PlayerSpawner : MonoBehaviour
 
     [Header("Prefabs")]
     [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject player2Prefab;
 
     [Header("Spawn Points")]
     [SerializeField] private Transform singlePlayerSpawnPoint;
@@ -45,8 +46,14 @@ public class PlayerSpawner : MonoBehaviour
 
         Transform spawnPoint = GetSpawnPoint(clientId, isSinglePlayer);
 
+        GameObject prefabToSpawn = playerPrefab;
+        if (!isSinglePlayer && clientId > 0)
+        {
+            prefabToSpawn = player2Prefab != null ? player2Prefab : playerPrefab;
+        }
+
         GameObject player = Instantiate(
-            playerPrefab,
+            prefabToSpawn,
             spawnPoint.position,
             spawnPoint.rotation
         );
