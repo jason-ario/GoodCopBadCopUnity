@@ -187,4 +187,11 @@ public class PlayerAnimationController : NetworkBehaviour
         DOTween.Kill(armRig.weight);
         DOTween.To(() => armRig.weight, x => armRig.weight = x, smoothWeight, smoothTime);
     }
+
+    public void SetAnimFloat(string animString, float value)
+    {
+        bodyAnimator.SetFloat(animString, value);
+        armsAnimator.SetFloat(animString, value);
+    }
+    
 }

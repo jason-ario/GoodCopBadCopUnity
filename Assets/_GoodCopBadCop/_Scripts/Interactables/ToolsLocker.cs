@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -9,37 +10,66 @@ public class ToolsLocker : Interactable
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip lockerOpenSound;
     [SerializeField] private AudioClip lockerCloseSound;
+    [SerializeField] private Transform lookTarget;
+    [SerializeField] private GameObject[] decor;
+    Coroutine closeCoroutine;
     
     public override void OnNetworkSpawn()
     {
         isOpen.OnValueChanged += (oldValue, newValue) =>
         {
             anim.SetBool("Open", newValue);
+
+            if (newValue == true)
+            {
+                foreach (var decoration in decor)
+                {
+                    decoration.SetActive(newValue);
+                }
+            }
         };
     }
 
     public override void Interact(PlayerInteractionController player)
     {
         Debug.Log("Toggle Tool Locker");
-        ToggleToolLockerServerRpc();
+        UIController.Instance.OpenToolShop(lookTarget);
+        
+        OpenLockerServerRpc();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void ToggleToolLockerServerRpc()
+    [ServerRpc]
+    public void CloseLockerServerRpc()
     {
-        isOpen.Value = !isOpen.Value;
+        isOpen.Value = false;
 
-        if (isOpen.Value == false)
+        audioSource.PlayOneShot(lockerCloseSound);
+        foreach (var miniLocker in miniLockers)
         {
-            audioSource.PlayOneShot(lockerCloseSound);
-            foreach (var miniLocker in miniLockers)
+            miniLocker.CloseServerRpc();
+        }
+
+        closeCoroutine = StartCoroutine(CloseLocker());
+    }
+
+    IEnumerator CloseLocker()
+    {
+        yield return new WaitForSeconds(3f);
+        if (!isOpen.Value)
+        {
+            foreach (var decoration in decor)
             {
-                miniLocker.CloseServerRpc();
+                decoration.SetActive(false);
             }
         }
-        else
-        {
-            audioSource.PlayOneShot(lockerOpenSound);
-        }
+    }
+    
+    
+    [ServerRpc]
+    public void OpenLockerServerRpc()
+    {
+        isOpen.Value = true;
+        StopCoroutine(closeCoroutine);
+        audioSource.PlayOneShot(lockerOpenSound);
     }
 }

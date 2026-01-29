@@ -19,6 +19,8 @@ public class SuspectCharacter : Interactable
     public Response[] dialogueResponses; 
     [SerializeField] Collider interactionCollider;
 
+    public bool givesFolder = true;
+    
     [System.Serializable]
     public struct Response
     {
@@ -34,5 +36,10 @@ public class SuspectCharacter : Interactable
     public void SetCanInteract(bool b)
     {
         interactionCollider.enabled = false;
+    }
+    
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
+    {
+        DialogueManager.Instance.InitiateChoices();
     }
 }

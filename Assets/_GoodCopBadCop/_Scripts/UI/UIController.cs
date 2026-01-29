@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -46,11 +47,26 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
     }
     
+    public void OpenToolShop(Transform toolShopLookTarget)
+    {
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(toolShopLookTarget);
+        StartCoroutine(WaitAndOpenShopUI());
+    }
+
+    IEnumerator WaitAndOpenShopUI()
+    {
+        yield return new WaitForSeconds(.5f);
+        playerUI.SetActive(false);
+        toolShopUI.SetActive(true);
+    }
+    
     public void CloseToolShopUI()
     {
         toolShopUI.SetActive(false);
         playerUI.SetActive(true);
-        
+        PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 
@@ -111,4 +127,6 @@ public class UIController : MonoBehaviour
         backButton.onClick.RemoveAllListeners();
         backButton.gameObject.SetActive(false);
     }
+
+
 }

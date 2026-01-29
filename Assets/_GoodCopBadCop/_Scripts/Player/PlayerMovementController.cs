@@ -58,9 +58,14 @@ public class PlayerMovementController : NetworkBehaviour
         }
     }
 
+    private PlayerAnimationController _playerAnimationController;
+    public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
+
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
+        _playerAnimationController = GetComponent<PlayerAnimationController>();
+        
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }

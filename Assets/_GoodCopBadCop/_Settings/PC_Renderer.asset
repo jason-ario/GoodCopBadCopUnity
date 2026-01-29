@@ -1,18 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-8118708204510024473
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 790bcd5ee75b9fb4c997ed0938750856, type: 3}
-  m_Name: CRT
-  m_EditorClassIdentifier: Assembly-CSharp::RetroShadersPro.URP.CRTEffect
-  m_Active: 1
 --- !u!114 &-4038359656389517380
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,8 +68,8 @@ MonoBehaviour:
   - {fileID: 8798211543770503462}
   - {fileID: -4038359656389517380}
   - {fileID: -2075444741547056404}
-  - {fileID: 0}
-  m_RendererFeatureMap: ad6b866f10d7b46c9b53cc1ede0af62226992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e30000000000000000
+  - {fileID: 6104699316840559988}
+  m_RendererFeatureMap: ad6b866f10d7b46c9b53cc1ede0af62226992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb854
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -131,7 +118,7 @@ MonoBehaviour:
   passIndex: 0
   bindDepthStencilAttachment: 0
   m_Version: 1
---- !u!114 &4385938670871111769
+--- !u!114 &6104699316840559988
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -140,37 +127,59 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7b6d13ff6a488d047b04c58af90683e2, type: 3}
-  m_Name: VolumetricLightingRendererFeature
-  m_EditorClassIdentifier: Pinwheel.Beam.Runtime::Pinwheel.Beam.VolumetricLightingRendererFeature
+  m_Script: {fileID: 11500000, guid: cc1203593d2d2c9439448f31c60fe0a0, type: 3}
+  m_Name: Noir
+  m_EditorClassIdentifier: FronkonGames.Retro.Noir::FronkonGames.Retro.Noir.Noir
   m_Active: 1
-  m_ShaderData: {fileID: 11400000, guid: 7c839a9e6cc5e824191c7e6d422e3230, type: 2}
-  m_Quality: 1
-  m_UseAdditionalLights: 0
-  m_UseCookies: 0
-  m_UseLocalFogs: 0
-  m_UseFogsHeightAttenuation: 1
-  m_UseFogsNoiseAttenuation: 1
---- !u!114 &5807763682912678023
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7b6d13ff6a488d047b04c58af90683e2, type: 3}
-  m_Name: VolumetricLightingRendererFeature
-  m_EditorClassIdentifier: Pinwheel.Beam.Runtime::Pinwheel.Beam.VolumetricLightingRendererFeature
-  m_Active: 1
-  m_ShaderData: {fileID: 11400000, guid: 7c839a9e6cc5e824191c7e6d422e3230, type: 2}
-  m_Quality: 1
-  m_UseAdditionalLights: 0
-  m_UseCookies: 0
-  m_UseLocalFogs: 1
-  m_UseFogsHeightAttenuation: 1
-  m_UseFogsNoiseAttenuation: 1
+  settings:
+    intensity: 0.312
+    method: 2
+    noirIntensity: 1
+    ditherSpread: 1
+    ditherDensity: 1
+    ditherColorBlend: 16
+    dotScreenGridSize: 92
+    dotScreenLuminanceGain: 0.3
+    dotScreenColorBlend: 13
+    halftoneSize: 3.36
+    halftoneAngle: 84.9
+    halftoneThreshold: 0.027
+    linesCount: 4
+    linesGranularity: 0.25
+    linesThreshold: 0.5
+    linesColorBlend: 16
+    halftoneColorBlend: 3
+    duoToneIntensity: 1
+    duoToneBrightnessColor: {r: 1, g: 1, b: 1, a: 1}
+    duoToneDarknessColor: {r: 0.05, g: 0.05, b: 0.05, a: 1}
+    duoToneThreshold: 0.5
+    duoToneLuminanceMinRange: 0
+    duoToneLuminanceMaxRange: 1
+    duoToneSoftness: 0.5
+    duoToneExposure: 1
+    duoToneEmbossDark: 0.05
+    duoToneColorBlend: 16
+    sepiaIntensity: 0
+    chromaticAberrationIntensity: 0
+    blotchesIntensity: 0
+    blotchesSpeed: 10
+    vignetteIntensity: 1
+    vignetteSize: 1
+    filmGrainIntensity: 0
+    filmGrainSpeed: 0.5
+    vignetteColor: {r: 0, g: 0, b: 0, a: 1}
+    vignetteSmoothness: 0.5
+    vignetteTimeVariation: 0
+    scratchesIntensity: 0
+    scratchesSpeed: 0.5
+    brightness: -0.005
+    contrast: 1.1
+    gamma: 1
+    hue: 0
+    saturation: 1
+    affectSceneView: 0
+    whenToInsert: 550
+    useScaledTime: 1
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0

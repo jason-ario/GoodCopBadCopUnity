@@ -114,7 +114,11 @@ public class SuspectController : NetworkBehaviour
         Debug.Log("Saying entry dialogue");
         DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource,
             suspectCharacter.voiceAudioClips);
-        StartCoroutine(GivePaperworkCoroutine());
+
+        if (suspectCharacter.givesFolder)
+        {
+            StartCoroutine(GivePaperworkCoroutine());
+        }
     }
 
     IEnumerator GivePaperworkCoroutine()
@@ -182,6 +186,8 @@ public class SuspectController : NetworkBehaviour
             // Trigger visuals for other clients
             PassVisualsClientRpc();
         }
+        
+        DialogueManager.Instance.SayDialogue("Thanks, comrade. I owe ya one.", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
 
         yield return new WaitForSeconds(2f);
 
@@ -353,4 +359,6 @@ public class SuspectController : NetworkBehaviour
     {
         suspectCharacter.animator.SetBool("Restrained", true);
     }
+
+
 }
