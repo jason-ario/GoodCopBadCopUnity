@@ -57,7 +57,7 @@ public class MainMenuController : MonoBehaviour
 
         SwitchToScreen(homeScreen);
         
-        sceneCamera.transform.DOMove(camEndPos.position, 30f);
+        sceneCamera.transform.DOMove(camEndPos.position, 10f);
 
         StartCoroutine(WaitAndOpenWindow());
     }

@@ -23,6 +23,19 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		[TCP2Vector4Floats(Contrast X,Contrast Y,Contrast Z,Smoothing,1,16,1,16,1,16,0.01,1)] _TriplanarBlendStrength ("Triplanar Parameters", Vector) = (2,8,2,0.5)
 		[TCP2Separator]
 		
+		_StylizedThreshold ("Stylized Threshold", 2D) = "gray" {}
+		[TCP2Separator]
+		
+		[TCP2HeaderHelp(Outline)]
+		_OutlineWidth ("Width", Range(0.1,4)) = 1
+		_OutlineColorVertex ("Color", Color) = (0,0,0,1)
+		// Outline Normals
+		[TCP2MaterialKeywordEnumNoPrefix(Regular, _, Vertex Colors, TCP2_COLORS_AS_NORMALS, Tangents, TCP2_TANGENT_AS_NORMALS, UV1, TCP2_UV1_AS_NORMALS, UV2, TCP2_UV2_AS_NORMALS, UV3, TCP2_UV3_AS_NORMALS, UV4, TCP2_UV4_AS_NORMALS)]
+		_NormalsSource ("Outline Normals Source", Float) = 0
+		[TCP2MaterialKeywordEnumNoPrefix(Full XYZ, TCP2_UV_NORMALS_FULL, Compressed XY, _, Compressed ZW, TCP2_UV_NORMALS_ZW)]
+		_NormalsUVType ("UV Data Type", Float) = 0
+		[TCP2Separator]
+
 		[ToggleOff(_RECEIVE_SHADOWS_OFF)] _ReceiveShadowsOff ("Receive Shadows", Float) = 1
 
 		// Avoid compile error if the properties are ending with a drawer
@@ -67,14 +80,18 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		// Shader Properties
 		TCP2_TEX2D_WITH_SAMPLER(_TriGround);
 		TCP2_TEX2D_WITH_SAMPLER(_TriSide);
+		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
 
 		CBUFFER_START(UnityPerMaterial)
 			
 			// Shader Properties
+			float _OutlineWidth;
+			fixed4 _OutlineColorVertex;
 			float4 _TriGround_ST;
 			float4 _TriSide_ST;
 			float4 _TriplanarBlendStrength;
 			fixed4 _BaseColor;
+			float4 _StylizedThreshold_ST;
 			float _RampThreshold;
 			float _RampSmoothing;
 			fixed4 _SColor;
@@ -87,6 +104,140 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		
 		ENDHLSL
 
+		// Outline Include
+		HLSLINCLUDE
+
+		#pragma multi_compile_fog
+
+		struct appdata_outline
+		{
+			float4 vertex : POSITION;
+			float3 normal : NORMAL;
+			#if TCP2_UV1_AS_NORMALS
+			float4 texcoord0 : TEXCOORD0;
+		#elif TCP2_UV2_AS_NORMALS
+			float4 texcoord1 : TEXCOORD1;
+		#elif TCP2_UV3_AS_NORMALS
+			float4 texcoord2 : TEXCOORD2;
+		#elif TCP2_UV4_AS_NORMALS
+			float4 texcoord3 : TEXCOORD3;
+		#endif
+		#if TCP2_COLORS_AS_NORMALS
+			float4 vertexColor : COLOR;
+		#endif
+		#if TCP2_TANGENT_AS_NORMALS
+			float4 tangent : TANGENT;
+		#endif
+			UNITY_VERTEX_INPUT_INSTANCE_ID
+		};
+
+		struct v2f_outline
+		{
+			float4 vertex : SV_POSITION;
+			float4 vcolor : TEXCOORD0;
+			float4 pack1 : TEXCOORD1; /* pack1.xyz = worldPos  pack1.w = fogFactor */
+			UNITY_VERTEX_INPUT_INSTANCE_ID
+			UNITY_VERTEX_OUTPUT_STEREO
+		};
+
+		v2f_outline vertex_outline (appdata_outline v)
+		{
+			v2f_outline output = (v2f_outline)0;
+
+			UNITY_SETUP_INSTANCE_ID(v);
+			UNITY_TRANSFER_INSTANCE_ID(v, output);
+			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+			// Shader Properties Sampling
+			float __outlineWidth = ( _OutlineWidth );
+			float4 __outlineColorVertex = ( _OutlineColorVertex.rgba );
+
+			float3 worldPos = mul(UNITY_MATRIX_M, v.vertex).xyz;
+			output.pack1.xyz = worldPos;
+		
+		#ifdef TCP2_COLORS_AS_NORMALS
+			//Vertex Color for Normals
+			float3 normal = (v.vertexColor.xyz*2) - 1;
+		#elif TCP2_TANGENT_AS_NORMALS
+			//Tangent for Normals
+			float3 normal = v.tangent.xyz;
+		#elif TCP2_UV1_AS_NORMALS || TCP2_UV2_AS_NORMALS || TCP2_UV3_AS_NORMALS || TCP2_UV4_AS_NORMALS
+			#if TCP2_UV1_AS_NORMALS
+				#define uvChannel texcoord0
+			#elif TCP2_UV2_AS_NORMALS
+				#define uvChannel texcoord1
+			#elif TCP2_UV3_AS_NORMALS
+				#define uvChannel texcoord2
+			#elif TCP2_UV4_AS_NORMALS
+				#define uvChannel texcoord3
+			#endif
+		
+			#if TCP2_UV_NORMALS_FULL
+			//UV for Normals, full
+			float3 normal = v.uvChannel.xyz;
+			#else
+			//UV for Normals, compressed
+			#if TCP2_UV_NORMALS_ZW
+				#define ch1 z
+				#define ch2 w
+			#else
+				#define ch1 x
+				#define ch2 y
+			#endif
+			float3 n;
+			//unpack uvs
+			v.uvChannel.ch1 = v.uvChannel.ch1 * 255.0/16.0;
+			n.x = floor(v.uvChannel.ch1) / 15.0;
+			n.y = frac(v.uvChannel.ch1) * 16.0 / 15.0;
+			//- get z
+			n.z = v.uvChannel.ch2;
+			//- transform
+			n = n*2 - 1;
+			float3 normal = n;
+			#endif
+		#else
+			float3 normal = v.normal;
+		#endif
+		
+		#if TCP2_ZSMOOTH_ON
+			//Correct Z artefacts
+			normal = UnityObjectToViewPos(normal);
+			normal.z = -_ZSmooth;
+		#endif
+			float size = 1;
+		
+		#if !defined(SHADOWCASTER_PASS)
+			output.vertex = UnityObjectToClipPos(v.vertex.xyz + normal * __outlineWidth * size * 0.01);
+		#else
+			v.vertex = v.vertex + float4(normal,0) * __outlineWidth * size * 0.01;
+		#endif
+		
+			output.vcolor.xyzw = __outlineColorVertex;
+			output.pack1.w = ComputeFogFactor(output.vertex.z);
+
+			return output;
+		}
+
+		float4 fragment_outline (v2f_outline input) : SV_Target
+		{
+
+			UNITY_SETUP_INSTANCE_ID(input);
+			UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+			float3 positionWS = input.pack1.xyz;
+			float3 normalWS = input.pack1.xyz;
+
+			// Shader Properties Sampling
+			float4 __outlineColor = ( float4(1,1,1,1) );
+
+			half4 outlineColor = __outlineColor * input.vcolor.xyzw;
+			outlineColor.rgb = MixFog(outlineColor.rgb, input.pack1.w);
+
+			return outlineColor;
+		}
+
+		ENDHLSL
+		// Outline Include End
 		Pass
 		{
 			Name "Main"
@@ -119,6 +270,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
 
 			// -------------------------------------
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
 
 			//--------------------------------------
 			// GPU Instancing
@@ -149,6 +301,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 				half3 vertexLights : TEXCOORD2;
 			#endif
 				float2 pack0 : TEXCOORD3; /* pack0.xy = texcoord0 */
+				float pack1 : TEXCOORD4; /* pack1.x = fogFactor */
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -188,6 +341,9 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 				// world position
 				output.worldPosAndFog = float4(vertexInput.positionWS.xyz, 0);
 
+				// Computes fog factor per-vertex
+				output.worldPosAndFog.w = ComputeFogFactor(vertexInput.positionCS.z);
+
 				// normal
 				output.normal = normalize(vertexNormalInput.normalWS);
 
@@ -211,6 +367,8 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 				float4 __triplanarParameters = ( _TriplanarBlendStrength.xyzw );
 				float4 __mainColor = ( _BaseColor.rgba );
 				float __ambientIntensity = ( 1.0 );
+				float __stylizedThreshold = ( TCP2_TEX2D_SAMPLE(_StylizedThreshold, _StylizedThreshold, input.pack0.xy * _StylizedThreshold_ST.xy + _StylizedThreshold_ST.zw).a );
+				float __stylizedThresholdScale = ( 1.0 );
 				float __rampThreshold = ( _RampThreshold );
 				float __rampSmoothing = ( _RampSmoothing );
 				float3 __shadowColor = ( _SColor.rgb );
@@ -289,6 +447,10 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 				half atten = mainLight.shadowAttenuation * mainLight.distanceAttenuation;
 
 				half ndl = dot(normalWS, lightDir);
+				float stylizedThreshold = __stylizedThreshold;
+				stylizedThreshold -= 0.5;
+				stylizedThreshold *= __stylizedThresholdScale;
+				ndl += stylizedThreshold;
 				half3 ramp;
 				
 				half rampThreshold = __rampThreshold;
@@ -335,6 +497,10 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 							#endif
 
 							half ndl = dot(normalWS, lightDir);
+							float stylizedThreshold = __stylizedThreshold;
+							stylizedThreshold -= 0.5;
+							stylizedThreshold *= __stylizedThresholdScale;
+							ndl += stylizedThreshold;
 							half3 ramp;
 							
 							ndl = saturate(ndl);
@@ -378,6 +544,10 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 					#endif
 
 					half ndl = dot(normalWS, lightDir);
+					float stylizedThreshold = __stylizedThreshold;
+					stylizedThreshold -= 0.5;
+					stylizedThreshold *= __stylizedThresholdScale;
+					ndl += stylizedThreshold;
 					half3 ramp;
 					
 					ndl = saturate(ndl);
@@ -406,11 +576,38 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 				color += emission;
 
+				// Mix the pixel color with fogColor. You can optionally use MixFogColor to override the fogColor with a custom one.
+				float fogFactor = input.worldPosAndFog.w;
+				color = MixFog(color, fogFactor);
+
 				return half4(color, alpha);
 			}
 			ENDHLSL
 		}
 
+		// Outline
+		Pass
+		{
+			Name "Outline"
+			Tags { "LightMode" = "Outline" }
+			Tags
+			{
+			}
+			Cull Front
+
+			HLSLPROGRAM
+
+			#pragma vertex vertex_outline
+			#pragma fragment fragment_outline
+
+			#pragma target 3.0
+
+			#pragma multi_compile _ TCP2_COLORS_AS_NORMALS TCP2_TANGENT_AS_NORMALS TCP2_UV1_AS_NORMALS TCP2_UV2_AS_NORMALS TCP2_UV3_AS_NORMALS TCP2_UV4_AS_NORMALS
+			#pragma multi_compile _ TCP2_UV_NORMALS_FULL TCP2_UV_NORMALS_ZW
+			#pragma multi_compile_instancing
+
+			ENDHLSL
+		}
 		// Depth & Shadow Caster Passes
 		HLSLINCLUDE
 
@@ -632,5 +829,5 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","TRIPLANAR","TEMPLATE_LWRP"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,sp(name:"Ground Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriGround";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"bace4302-c397-4f26-8627-728d400fde62";op:Multiply;lbl:"Ground";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False),sp(name:"Walls Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriSide";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"e5f5c0f8-eb1c-4209-aef8-36282e1757cc";op:Multiply;lbl:"Walls";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH 9c92ca366510f2a0866a4659904e1dfa */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","TRIPLANAR","TEXTURED_THRESHOLD","TEMPLATE_LWRP","FOG","OUTLINE","OUTLINE_URP_FEATURE"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,sp(name:"Ground Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriGround";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"bace4302-c397-4f26-8627-728d400fde62";op:Multiply;lbl:"Ground";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False),sp(name:"Walls Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriSide";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"e5f5c0f8-eb1c-4209-aef8-36282e1757cc";op:Multiply;lbl:"Walls";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
+/* TCP_HASH 950a6be7d8ef697cbdf8503f3a4dabb7 */

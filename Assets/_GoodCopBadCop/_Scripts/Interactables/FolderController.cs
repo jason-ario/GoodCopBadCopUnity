@@ -31,8 +31,9 @@ public class FolderController : Interactable
 
     [Header("Camera")] 
     [SerializeField] private GameObject cinemachineVirtualCamera;
-
     [SerializeField] private CinemachineImpulseSource _impulseSource;
+
+    [SerializeField] private Transform cameraRigPos;
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -137,6 +138,7 @@ public class FolderController : Interactable
 
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
+        GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
         isStamping = true;
         isStamped.Value = true;
         
@@ -151,14 +153,15 @@ public class FolderController : Interactable
         yield return new WaitForSeconds(.25f);
 
         playerPickupController.PlayerAnimationController.SetAnimTrigger("UseStamp");
-        playerPickupController.PlayerAnimationController.ArmRig.weight = 1;
+       // playerPickupController.PlayerAnimationController.ArmRig.weight = 1;
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.position = stampDownTarget.position;
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
-
+        playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f); 
+        playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
         StartCoroutine(LerpRigOnAndOff());
         yield return new WaitForSeconds(.5f);
 
@@ -176,23 +179,27 @@ public class FolderController : Interactable
         yield return new WaitForSeconds(.2f);
         _impulseSource.GenerateImpulse();
         yield return new WaitForSeconds(.25f);
+
+
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.ArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
-        yield return new WaitForSeconds(.5f);
-
-        if (isLocal) PlayerInstance.Instance.CanControl = true;
 
         yield return new WaitForSeconds(.5f);
+
+
         playerPickupController.PlayerAnimationController.ArmRig.weight = 0;
         isStamping = false;
-
+        
+        yield return new WaitForSeconds(.5f);
         if (IsOwner)
         {
             cinemachineVirtualCamera.SetActive(false);
         }
-        
+        if (isLocal) PlayerInstance.Instance.CanControl = true;
+        playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
         if (IsServer) inFolderPos.Value = false;
+
     }
 
     IEnumerator LerpRigOnAndOff()

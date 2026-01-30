@@ -64,7 +64,8 @@ public class PlayerInteractionController : NetworkBehaviour
             if(lastInteractable.GetComponent<PlaceObjectSlot>() != null) lastInteractable.GetComponent<PlaceObjectSlot>().HidePlacedVisual();
         }
 
-        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
+        // Increase distance significantly to detect "Too Far" objects
+        if (Physics.Raycast(ray, out RaycastHit hit, 50f, interactLayer))
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
             InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
@@ -74,17 +75,28 @@ public class PlayerInteractionController : NetworkBehaviour
                 interactable = interactableCollider.Interactable;
             }
             
+            bool inRange = hit.distance <= interactDistance;
             PlacementBoard placementBoard = hit.collider.GetComponent<PlacementBoard>();
 
             if (interactable != null && interactable.enabled)
             {
-                reticle.SetInteractState(true);
-                interactable.Highlight(true);
-                lastInteractable = interactable;
+                if (inRange)
+                {
+                    reticle.SetInteractState(true);
+                    interactable.Highlight(true);
+                    lastInteractable = interactable;
+                }
+                else
+                {
+                    Debug.Log("Out of range");
+                    reticle.SetTooFarState(true);
+                    lastInteractable = null;
+                }
+
                 PlaceObjectSlot placeObjectSlot = hit.collider.GetComponent<PlaceObjectSlot>();
 
                 //Placement Slot?
-                if (_playerPickupController.IsHoldingObject && placeObjectSlot != null && !placeObjectSlot.IsPlaced && placeObjectSlot.itemThatCanBePlaced == _playerPickupController.HeldObject)
+                if (inRange && _playerPickupController.IsHoldingObject && placeObjectSlot != null && !placeObjectSlot.IsPlaced && placeObjectSlot.itemThatCanBePlaced == _playerPickupController.HeldObject)
                 {
                     reticle.SetInteractState(true);
                     placeObjectSlot.ShowPlaceObjectVisual();
@@ -95,31 +107,38 @@ public class PlayerInteractionController : NetworkBehaviour
                     if (placeObjectSlot != null) placeObjectSlot.HidePlacedVisual();
                 }
                 
+                // Return so the reset logic at the bottom doesn't run
                 return;
             }
-            else
+            
+            // Handle non-interactable placement surfaces (like PlacementBoard)
+            if (inRange)
             {
-                lastInteractable = null;
-            }
+                if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
+                {
+                    _placerBlocked = true;
+                }
 
-            if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
-            {
-                _placerBlocked = true;
-            }
-
-            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked)
-            {
-                CheckActivatePlacer(placementBoard, hit);
-            }
-            else
-            {
-                if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked)
+                {
+                    CheckActivatePlacer(placementBoard, hit);
+                }
+                else
+                {
+                    if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+                }
+                
+                // If we are over a placement board but it's not an "interactable" per se,
+                // we might still want to return if CheckActivatePlacer sets a reticle state.
+                if (placementBoard != null && _playerPickupController.IsHoldingObject) return;
             }
             
             lastInteractable = null;
         }
 
+        // Reset both states if no valid target was found or returned early
         reticle.SetInteractState(false);
+        reticle.SetTooFarState(false);
     }
 
     void CheckActivatePlacer(PlacementBoard placementBoard, RaycastHit hit)
