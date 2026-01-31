@@ -28,15 +28,15 @@ public class Subtitles : MonoBehaviour
         if (subtitlesText == null || string.IsNullOrEmpty(originalText)) return;
 
         string wrappedText = WrapText(originalText, maxCharactersPerLine);
+        string colorHex = ColorUtility.ToHtmlStringRGB(lastDisplayColor);
 
         if (string.IsNullOrEmpty(lastDisplayName))
         {
-            subtitlesText.text = wrappedText;
+            subtitlesText.text = $"<color=#{colorHex}>{wrappedText}</color>";
         }
         else
         {
-            string colorTag = $"<color=#{ColorUtility.ToHtmlStringRGB(lastDisplayColor)}>";
-            subtitlesText.text = $"{colorTag}{lastDisplayName}:</color> {wrappedText}";
+            subtitlesText.text = $"<color=#{colorHex}>{lastDisplayName}: {wrappedText}</color>";
         }
 
         subtitlesText.enableWordWrapping = true;
@@ -78,14 +78,24 @@ public class Subtitles : MonoBehaviour
         // If we are just editing in the inspector, we grab what's currently in the text box.
         if (!Application.isPlaying && subtitlesText != null)
         {
-            // Try to extract the text part if there are tags
             string currentText = subtitlesText.text;
-            
-            // Basic check to see if we have a colon (meaning a name tag is likely present)
-            if (currentText.Contains(":</color> "))
+
+            // Simple cleanup to strip the outer color tags if they exist for editing
+            if (currentText.StartsWith("<color=#") && currentText.EndsWith("</color>"))
             {
-                int index = currentText.IndexOf(":</color> ") + 10;
-                originalText = currentText.Substring(index);
+                int start = currentText.IndexOf('>') + 1;
+                int end = currentText.LastIndexOf("</color>");
+                string content = currentText.Substring(start, end - start);
+                
+                if (content.Contains(": "))
+                {
+                    int colonIndex = content.IndexOf(": ") + 2;
+                    originalText = content.Substring(colonIndex);
+                }
+                else
+                {
+                    originalText = content;
+                }
             }
             else
             {
