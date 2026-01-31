@@ -117,6 +117,7 @@ public class PlayerPickupController : NetworkBehaviour
             }
         }
     }
+    
 
     public void TryUseObject()
     {
@@ -152,6 +153,18 @@ public class PlayerPickupController : NetworkBehaviour
         int itemIndex = objectContainerToUse.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
         _currentlyEquippedItem = objectContainerToUse.CurrentlyEquippedItem;
+        
+        if (itemData.useRightIK)
+        {
+            _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
+            _playerAnimationController.RightArmRigIKTarget = _currentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+        }
+        if (itemData.useLeftIK)
+        {
+            _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
+            _playerAnimationController.LeftArmRigIKTarget = _currentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+        }
+        
         pickableObject.OnPickedUp();
         StartCoroutine(PickUpCoolDown());
     }
@@ -185,7 +198,8 @@ public class PlayerPickupController : NetworkBehaviour
 
         // Pass the index/ID of the held item so the server knows which prefab to spawn
         int itemIndex = ItemDatabase.Instance.GetItemIndex(_heldObject);
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject;
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject; 
+        DisableArmIKs();
 
         if (doSpawn)
         {
@@ -211,6 +225,21 @@ public class PlayerPickupController : NetworkBehaviour
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();
+    }
+
+    void DisableArmIKs()
+    {
+        if (_heldObject.useLeftIK)
+        {
+            _playerAnimationController.SetLeftArmRigWeightSmooth(0,.25f);
+            _playerAnimationController.LeftArmRigIKTarget = null;
+        }
+        
+        if (_heldObject.useRightIK)
+        {
+            _playerAnimationController.SetRightArmRigWeightSmooth(0,.25f);
+            _playerAnimationController.RightArmRigIKTarget = null;
+        }
     }
 
     [ServerRpc]

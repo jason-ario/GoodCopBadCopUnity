@@ -143,23 +143,23 @@ public class NetworkDrawableLine : NetworkBehaviour
         playerMovementController.CameraTransform.DOMove(virtualCamera.transform.position, .5f); 
         playerMovementController.CameraTransform.DORotate(virtualCamera.transform.rotation.eulerAngles, .5f);
 
-        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(1,.5f);
-        _playerPickupController.PlayerAnimationController.ArmIKTarget.DOMove(ikTarget.position, .25f);
-        _playerPickupController.PlayerAnimationController.ArmIKTarget.DORotate(ikTarget.rotation.eulerAngles, .25f);
+        _playerPickupController.PlayerAnimationController.SetRightArmRigWeightSmooth(1,.5f);
+        _playerPickupController.PlayerAnimationController.RightArmIKTarget.DOMove(ikTarget.position, .25f);
+        _playerPickupController.PlayerAnimationController.RightArmIKTarget.DORotate(ikTarget.rotation.eulerAngles, .25f);
     }
 
     void SetIKTargetPos(Vector3 pos)
     {
         ikTarget.localPosition = pos + ikOffset;
-        _playerPickupController.PlayerAnimationController.ArmIKTarget.transform.position = ikTarget.position;
-        _playerPickupController.PlayerAnimationController.ArmIKTarget.transform.rotation = ikTarget.rotation;
+        _playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = ikTarget.position;
+        _playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.rotation = ikTarget.rotation;
     }
 
     public void ExitDrawMode()
     {
         drawingSurface.enabled = false;
         _playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
-        _playerPickupController.PlayerAnimationController.SetArmRigWeightSmooth(0,1);
+        _playerPickupController.PlayerAnimationController.SetRightArmRigWeightSmooth(0,1);
         
         enabled = false;
     }

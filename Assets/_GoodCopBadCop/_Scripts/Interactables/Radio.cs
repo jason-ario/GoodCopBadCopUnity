@@ -73,8 +73,8 @@ public class Radio : Interactable
     
     void SetIKTargetPos()
     {
-        _playerMovementController.PlayerAnimationController.ArmIKTarget.transform.position = ikTarget.position;
-        _playerMovementController.PlayerAnimationController.ArmIKTarget.transform.rotation = ikTarget.rotation;
+        _playerMovementController.PlayerAnimationController.RightArmIKTarget.transform.position = ikTarget.position;
+        _playerMovementController.PlayerAnimationController.RightArmIKTarget.transform.rotation = ikTarget.rotation;
     }
 
 
