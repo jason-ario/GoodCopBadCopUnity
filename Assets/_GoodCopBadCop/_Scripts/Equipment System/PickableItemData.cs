@@ -11,4 +11,6 @@ public class PickableItemData : ScriptableObject
     public bool usesTwoArms;
     public string pickupAnimBool;
     public bool canUsePlacementBoard = true;
+    public bool useLeftIK;
+    public bool useRightIK;
 }

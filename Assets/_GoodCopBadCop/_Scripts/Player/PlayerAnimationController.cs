@@ -3,6 +3,7 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using UnityEngine.Serialization;
 
 [RequireComponent(typeof(Animator))]
 public class PlayerAnimationController : NetworkBehaviour
@@ -25,11 +26,19 @@ public class PlayerAnimationController : NetworkBehaviour
     private float currentLayer1Weight = 0f;
     private float currentLayer2Weight = 0f;
 
-    [SerializeField] private Rig armRig;
-    public Rig ArmRig => armRig;
-    [SerializeField] private Transform armIKTarget; 
-    public Transform ArmIKTarget => armIKTarget;
-    
+    [FormerlySerializedAs("armRig")] [SerializeField] private Rig rightArmRig;
+    [SerializeField] private Rig leftArmRig;
+    public Rig RightArmRig => rightArmRig;
+    public Rig LeftArmRig => leftArmRig;
+
+    [FormerlySerializedAs("armIKTarget")] [SerializeField] private Transform rightArmIKTarget; 
+    [SerializeField] private Transform leftArmIKTarget; 
+    public Transform RightArmIKTarget => rightArmIKTarget;
+    public Transform LeftArmIKTarget => leftArmIKTarget;
+    public Transform RightArmRigIKTarget { get; set; }
+    public Transform LeftArmRigIKTarget { get; set; }
+
+
     private NetworkVariable<Vector3> headLookAtPos =
         new NetworkVariable<Vector3>(
             writePerm: NetworkVariableWritePermission.Owner
@@ -56,6 +65,18 @@ public class PlayerAnimationController : NetworkBehaviour
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             ShrugEmote();
+        }
+
+        if (RightArmRigIKTarget != null)
+        {
+            rightArmIKTarget.position = RightArmRigIKTarget.position;
+            rightArmIKTarget.rotation = RightArmRigIKTarget.rotation;
+        }
+        
+        if (LeftArmRigIKTarget != null)
+        {
+            leftArmIKTarget.position = LeftArmRigIKTarget.position;
+            leftArmIKTarget.rotation = LeftArmRigIKTarget.rotation;
         }
     }
 
@@ -182,11 +203,18 @@ public class PlayerAnimationController : NetworkBehaviour
         armsAnimator.SetTrigger(animString);
     }
 
-    public void SetArmRigWeightSmooth(float smoothWeight, float smoothTime)
+    public void SetRightArmRigWeightSmooth(float smoothWeight, float smoothTime)
     {
-        DOTween.Kill(armRig.weight);
-        DOTween.To(() => armRig.weight, x => armRig.weight = x, smoothWeight, smoothTime);
+        DOTween.Kill(rightArmRig.weight);
+        DOTween.To(() => rightArmRig.weight, x => rightArmRig.weight = x, smoothWeight, smoothTime);
     }
+    
+    public void SetLeftArmRigWeightSmooth(float smoothWeight, float smoothTime)
+    {
+        DOTween.Kill(leftArmRig.weight);
+        DOTween.To(() => leftArmRig.weight, x => leftArmRig.weight = x, smoothWeight, smoothTime);
+    }
+    
 
     public void SetAnimFloat(string animString, float value)
     {
