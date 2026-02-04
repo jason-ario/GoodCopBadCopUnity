@@ -210,6 +210,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject))
                 {
                     interactable.InteractWithItem(this, pickupController.HeldObject);
+                    _playerPickupController.TryUseObject(); 
                     return true;
                 }
 

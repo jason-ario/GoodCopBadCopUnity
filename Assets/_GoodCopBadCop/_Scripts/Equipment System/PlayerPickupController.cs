@@ -121,6 +121,8 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void TryUseObject()
     {
+        Debug.Log("Try use object");
+
         if (Input.GetMouseButtonDown(1)) return;
         if (_heldObject == null) return;
         if(pickUpCooldownComplete == false) return;

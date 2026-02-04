@@ -111,6 +111,12 @@ public class SuspectController : NetworkBehaviour
 
     void SayEntryDialogue()
     {
+        if (suspectCharacter.attackImmediately)
+        {
+            suspectCharacter.AimAtPlayer();
+            return;
+        }
+        
         Debug.Log("Saying entry dialogue");
         DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource,
             suspectCharacter.voiceAudioClips);

@@ -1,16 +1,22 @@
+using System;
 using UnityEngine;
+using VolumetricFogAndMist2;
 
 public class BackgroundManager : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    [SerializeField] private Environment[] _environments;
+    [SerializeField] private VolumetricFog _volumetricFog;
+
+    private void Start()
     {
-        
+        SetEnvironment(_environments[0]);
     }
 
-    // Update is called once per frame
-    void Update()
+    public void SetEnvironment(Environment environment)
     {
-        
+        RenderSettings.fogColor = environment.fogColor;
+        _volumetricFog.profile = environment.volumetricFogProfile;
+        RenderSettings.skybox = environment.Skybox;
+        RenderSettings.fogDensity = environment.fogDensity;
     }
 }

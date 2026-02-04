@@ -6,6 +6,8 @@ public class PlayerInstance : NetworkBehaviour
 {
     public static PlayerInstance Instance;
 
+    [SerializeField] private ScreenDamage screenDamage;
+    
     public bool CanControl
     {
         get => _playerMovementController.CanControl;
@@ -47,5 +49,10 @@ public class PlayerInstance : NetworkBehaviour
     public void SetCanInteract(bool value)
     {
         _playerInteractionController.enabled = value;
+    }
+
+    public void HurtPlayer()
+    {
+        screenDamage.CurrentHealth -= 1;
     }
 }

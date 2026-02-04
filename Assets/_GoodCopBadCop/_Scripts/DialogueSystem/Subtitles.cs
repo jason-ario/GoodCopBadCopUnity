@@ -30,14 +30,8 @@ public class Subtitles : MonoBehaviour
         string wrappedText = WrapText(originalText, maxCharactersPerLine);
         string colorHex = ColorUtility.ToHtmlStringRGB(lastDisplayColor);
 
-        if (string.IsNullOrEmpty(lastDisplayName))
-        {
-            subtitlesText.text = $"<color=#{colorHex}>{wrappedText}</color>";
-        }
-        else
-        {
-            subtitlesText.text = $"<color=#{colorHex}>{lastDisplayName}: {wrappedText}</color>";
-        }
+        // Apply color to the entire wrapped text body and remove the name prefix
+        subtitlesText.text = $"<color=#{colorHex}>{wrappedText}</color>";
 
         subtitlesText.enableWordWrapping = true;
     }
@@ -79,23 +73,13 @@ public class Subtitles : MonoBehaviour
         if (!Application.isPlaying && subtitlesText != null)
         {
             string currentText = subtitlesText.text;
-
-            // Simple cleanup to strip the outer color tags if they exist for editing
+            
+            // Extract content between color tags if present
             if (currentText.StartsWith("<color=#") && currentText.EndsWith("</color>"))
             {
                 int start = currentText.IndexOf('>') + 1;
                 int end = currentText.LastIndexOf("</color>");
-                string content = currentText.Substring(start, end - start);
-                
-                if (content.Contains(": "))
-                {
-                    int colonIndex = content.IndexOf(": ") + 2;
-                    originalText = content.Substring(colonIndex);
-                }
-                else
-                {
-                    originalText = content;
-                }
+                originalText = currentText.Substring(start, end - start);
             }
             else
             {

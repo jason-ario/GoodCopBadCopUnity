@@ -14,6 +14,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
+    [SerializeField] private ScreenDamageCanvas _screenDamageCanvas; 
+    public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
 
     private void Awake()
     {

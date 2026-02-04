@@ -13,6 +13,8 @@ GameObject:
   - component: {fileID: 1423170003410679800}
   - component: {fileID: 1314381610903866587}
   - component: {fileID: 6295940694324711478}
+  - component: {fileID: 6856902921673393363}
+  - component: {fileID: 2125054057713852315}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -28,8 +30,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.00000039736432, y: 2.437, z: 0.40800017}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.437, z: 0.4079999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -171,6 +173,48 @@ MonoBehaviour:
       m_PostInfinity: 2
       m_RotationOrder: 4
   CustomBlends: {fileID: 0}
+--- !u!114 &6856902921673393363
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 58595389007674765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfca03ef0fbc4da4bb85b25d38fa49b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenDamage
+  maxHealth: 100
+  bloodyFrame: {fileID: 0}
+  criticalHealth: 10
+  useBlurEffect: 1
+  blurImage: {fileID: 0}
+  blurDuration: 0.1
+  blurFadeSpeed: 5
+  pulseSound: {fileID: 0}
+  fadeAudios: 1
+  audiosToFade: []
+  audiosFadeVolume: 0.3
+  autoHeal: 1
+  healingSpeed: 20
+  autoHealTime: 2
+  deathEvent:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &2125054057713852315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 58595389007674765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2d183b05ae87164ea5c789541127538, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  _screenDamage: {fileID: 6856902921673393363}
 --- !u!1 &134417301731173818
 GameObject:
   m_ObjectHideFlags: 0
@@ -872,6 +916,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
+  screenDamage: {fileID: 6856902921673393363}
 --- !u!114 &7541639783584628704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -966,6 +1011,13 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: -1343213179
     TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 2
+    OriginatingState: 776543318
+    DestinationState: -1628668092
+    TransitionDuration: 0.25
+    TriggerNameHash: -1316629574
+    TransitionIndex: 1
   - IsCrossFadeExit: 0
     Layer: 3
     OriginatingState: 753088835

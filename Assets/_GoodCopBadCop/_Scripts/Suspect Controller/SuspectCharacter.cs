@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
@@ -20,6 +22,10 @@ public class SuspectCharacter : Interactable
     [SerializeField] Collider interactionCollider;
 
     public bool givesFolder = true;
+
+    [SerializeField] private GameObject bloodExplosion;
+    public bool attackImmediately;
+    private bool facingPlayer;
     
     [System.Serializable]
     public struct Response
@@ -40,6 +46,53 @@ public class SuspectCharacter : Interactable
     
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
     {
-        DialogueManager.Instance.InitiateChoices();
+        if (itemData == null)
+        {
+            DialogueManager.Instance.InitiateChoices();
+        }
+
+        if (itemData.name == "Shotgun")
+        {
+            GetShot();
+        }
+    }
+
+    public void GetShot()
+    {
+        bloodExplosion.SetActive(true);
+        animator.SetTrigger("Die");
+    }
+
+    public void AimAtPlayer()
+    {
+        StartCoroutine(StartFiring());
+    }
+
+    IEnumerator StartFiring()
+    {
+        facingPlayer = true;
+        yield return new WaitForSeconds(1);
+        animator.SetBool("Aiming Rifle", true);
+        DialogueManager.Instance.SayDialogue("You.. You're a traitor!!");
+        yield return new WaitForSeconds(2);
+        animator.SetBool("FiringRifle", true);
+
+        while (true)
+        {
+            PlayerInstance.Instance.HurtPlayer();
+            yield return new WaitForSeconds(.5f);
+        }
+
+        yield break;
+    }
+
+    private void Update()
+    {
+        if (facingPlayer)
+        {
+            Vector3 targetPosition = PlayerInstance.Instance.transform.position;
+            targetPosition.y = transform.position.y; // Keep the target at the same height
+            transform.LookAt(targetPosition);
+        }
     }
 }

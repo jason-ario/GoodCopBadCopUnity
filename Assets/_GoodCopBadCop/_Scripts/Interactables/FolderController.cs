@@ -24,9 +24,11 @@ public class FolderController : Interactable
     [SerializeField] private NetworkObject IdCard;
     [SerializeField] private NetworkObject InvitationLetter;
     [SerializeField] private NetworkObject ApplicationLetter;
+    [SerializeField] private NetworkObject Envelope;
     [SerializeField] private Transform idCardSpawnPos;
     [SerializeField] private Transform invitationLetterSpawnPos;
     [SerializeField] private Transform applicationLetterSpawnPos;
+    [SerializeField] private Transform envelopeSpawnPos;
 
 
     [Header("Camera")] 
@@ -41,6 +43,8 @@ public class FolderController : Interactable
             SpawnDocument(IdCard, idCardSpawnPos);
             SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
             SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
+            SpawnDocument(Envelope, envelopeSpawnPos);
+
         }
 
         // Sync visual state on spawn and when variables change
@@ -53,8 +57,6 @@ public class FolderController : Interactable
         {
             transform.position = GameManager.Instance.FolderPos.position;
         }
-        
-        
     }
 
     private void SpawnDocument(NetworkObject prefab, Transform spawnPos)
