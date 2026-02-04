@@ -59,10 +59,24 @@ public class SuspectCharacter : Interactable
 
     public void GetShot()
     {
+        if (NetworkManager.Singleton.IsClient)
+        {
+            GetShotServerRpc();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void GetShotServerRpc()
+    {
+        GetShotClientRpc();
+    }
+
+    [ClientRpc]
+    private void GetShotClientRpc()
+    {
         bloodExplosion.SetActive(true);
         animator.SetTrigger("Die");
     }
-
     public void AimAtPlayer()
     {
         StartCoroutine(StartFiring());
