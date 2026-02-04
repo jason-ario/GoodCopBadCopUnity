@@ -26,6 +26,7 @@ public class SuspectCharacter : Interactable
     [SerializeField] private GameObject bloodExplosion;
     public bool attackImmediately;
     private bool facingPlayer;
+    public Vector3 standPosOffset;
     
     [System.Serializable]
     public struct Response

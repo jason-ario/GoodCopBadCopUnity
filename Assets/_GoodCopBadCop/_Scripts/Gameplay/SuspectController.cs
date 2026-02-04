@@ -99,7 +99,7 @@ public class SuspectController : NetworkBehaviour
     void InitiateSuspect()
     {
         suspectCharacter.animator.SetBool("Walking", true);
-        suspectCharacter.transform.DOMove(standPos.position, 3f).OnComplete(ArrivedAtPosition);
+        suspectCharacter.transform.DOMove(standPos.position + suspectCharacter.standPosOffset, 3f).OnComplete(ArrivedAtPosition);
     }
 
     void ArrivedAtPosition()

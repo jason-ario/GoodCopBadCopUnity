@@ -36,6 +36,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		[TCP2MaterialKeywordEnumNoPrefix(Full XYZ, TCP2_UV_NORMALS_FULL, Compressed XY, _, Compressed ZW, TCP2_UV_NORMALS_ZW)]
 		_NormalsUVType ("UV Data Type", Float) = 0
 		[TCP2Separator]
+		
+		[Enum(ToonyColorsPro.ShaderGenerator.Culling)] _faceCulling ("Face Culling", Float) = 2
 
 		[ToggleOff(_RECEIVE_SHADOWS_OFF)] _ReceiveShadowsOff ("Receive Shadows", Float) = 1
 
@@ -255,6 +257,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			{
 				"LightMode"="UniversalForward"
 			}
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard SRP library
@@ -755,6 +758,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			ZWrite On
 			ZTest LEqual
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard srp library
@@ -789,6 +793,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			ZWrite On
 			ColorMask 0
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 
@@ -819,6 +824,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			}
 
 			ZWrite On
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 			#pragma exclude_renderers gles gles3 glcore
@@ -842,5 +848,5 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","TEMPLATE_LWRP","FOG"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH 5740c39da845e7241482224bcd2ec5a1 */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","TEMPLATE_LWRP","CULLING"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
+/* TCP_HASH 8a20434c1c76dd3f2443d27985c6b176 */
