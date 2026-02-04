@@ -69,7 +69,7 @@ public class PlayerAnimationController : NetworkBehaviour
         _playerMovementController = GetComponent<PlayerMovementController>();
     }
     
-    private void Update()
+    private void LateUpdate()
     {
         UpdateAnimations();
 

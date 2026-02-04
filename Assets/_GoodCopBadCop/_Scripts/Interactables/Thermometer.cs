@@ -11,7 +11,7 @@ public class Thermometer : PickableObject
     
     private Coroutine readingCoroutine;
     private float currentReading;
-    private const float TargetBaseTemp = 36.5f;
+    private const float TargetBaseTemp = 45.5f;
     
     [SerializeField] private MeshRenderer screenRenderer;
     [SerializeField] private Color highColor;
