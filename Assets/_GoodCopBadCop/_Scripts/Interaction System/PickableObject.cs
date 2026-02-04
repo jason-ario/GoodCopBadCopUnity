@@ -77,8 +77,17 @@ public class PickableObject : Interactable
 
     public virtual void OnStartUse()
     {
+    }
+    
+    public virtual void OnBodyStartUse()
+    {
         
     }
+
+    public virtual void OnBodyStopUse()
+    {
+    }
+    
     
     public virtual void OnStopUse()
     {
@@ -89,4 +98,6 @@ public class PickableObject : Interactable
     {
       
     }
+
+
 }

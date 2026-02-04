@@ -10,6 +10,11 @@ public class Shotgun : PickableObject
         shootVFX.Play();
         playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
     }
+
+    public override void OnBodyStartUse()
+    {
+        shootVFX.Play();
+    }
     
     
 }

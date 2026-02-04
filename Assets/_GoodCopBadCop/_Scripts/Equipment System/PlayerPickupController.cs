@@ -97,6 +97,15 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.LeftArmRigIKTarget = null;
         }
         
+        if (itemData.useAimIK)
+        {
+            _playerAnimationController.SetAimRigWeightSmooth(1, .2f);
+        }
+        else
+        {
+            _playerAnimationController.SetAimRigWeightSmooth(0, .2f);
+        }
+        
         if (itemData.usesTwoArms)
         {
             _playerAnimationController.EnableHoldObjectTwoArmsMask();
@@ -162,6 +171,23 @@ public class PlayerPickupController : NetworkBehaviour
         {
             camObjectContainer.CurrentlyEquippedItem.OnStartUse();
         }
+        
+        RequestBodyUseServerRpc();
+    }
+
+    [ServerRpc]
+    private void RequestBodyUseServerRpc()
+    {
+        RequestBodyUseClientRpc();
+    }
+
+    [ClientRpc]
+    private void RequestBodyUseClientRpc()
+    {
+        if (bodyObjectContainer.CurrentlyEquippedItem != null)
+        {
+            bodyObjectContainer.CurrentlyEquippedItem.OnBodyStartUse();
+        }
     }
 
     void StopUsingObject()
@@ -169,6 +195,23 @@ public class PlayerPickupController : NetworkBehaviour
         if (camObjectContainer.CurrentlyEquippedItem != null)
         {
             camObjectContainer.CurrentlyEquippedItem.OnStopUse();
+        }
+        
+        RequestBodyStopUseServerRpc();
+    }
+
+    [ServerRpc]
+    private void RequestBodyStopUseServerRpc()
+    {
+        RequestBodyStopUseClientRpc();
+    }
+
+    [ClientRpc]
+    private void RequestBodyStopUseClientRpc()
+    {
+        if (bodyObjectContainer.CurrentlyEquippedItem != null)
+        {
+            bodyObjectContainer.CurrentlyEquippedItem.OnBodyStopUse();
         }
     }
 
@@ -201,6 +244,11 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
             _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
             _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+        }
+
+        if (itemData.useAimIK)
+        {
+            _playerAnimationController.SetAimRigWeightSmooth(1, .2f);
         }
         
         pickableObject.OnPickedUp();

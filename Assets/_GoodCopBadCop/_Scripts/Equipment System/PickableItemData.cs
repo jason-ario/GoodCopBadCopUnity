@@ -13,4 +13,5 @@ public class PickableItemData : ScriptableObject
     public bool canUsePlacementBoard = true;
     public bool useLeftIK;
     public bool useRightIK;
+    public bool useAimIK;
 }

@@ -29,8 +29,10 @@ public class PlayerAnimationController : NetworkBehaviour
     [Header("Body Arm Rigs")]
     [SerializeField] private Rig rightArmRig;
     [SerializeField] private Rig leftArmRig;
+    [SerializeField] private Rig shoulderRig;
+
     [SerializeField] private Transform rightArmIKTarget; 
-    [SerializeField] private Transform leftArmIKTarget; 
+    [SerializeField] private Transform leftArmIKTarget;
 
     [Header("Camera Arm Rigs")]
     [SerializeField] private Rig camRightArmRig;
@@ -257,5 +259,16 @@ public class PlayerAnimationController : NetworkBehaviour
         bodyAnimator.SetFloat(animString, value);
         armsAnimator.SetFloat(animString, value);
     }
-    
+
+    public void SetAimRigWeightSmooth(float smoothWeight, float smoothTime)
+    {
+        DOTween.Kill(shoulderRig.weight);
+        DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime);
+
+        if (camLeftArmRig != null)
+        {
+            DOTween.Kill(shoulderRig.weight);
+            DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime);
+        }
+    }
 }
