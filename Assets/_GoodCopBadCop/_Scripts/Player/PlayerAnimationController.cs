@@ -71,15 +71,6 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         UpdateAnimations();
 
-        if (IsOwner == false)
-        {
-            return;
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            ShrugEmote();
-        }
-
         if (RightArmRigIKTarget != null)
         {
             rightArmIKTarget.position = RightArmRigIKTarget.position;
@@ -102,6 +93,15 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             camLeftArmIKTarget.position = CamLeftArmRigIKTarget.position;
             camLeftArmIKTarget.rotation = CamLeftArmRigIKTarget.rotation;
+        }
+        
+        if (IsOwner == false)
+        {
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            ShrugEmote();
         }
     }
 

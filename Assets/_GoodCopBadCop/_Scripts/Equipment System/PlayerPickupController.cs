@@ -69,6 +69,33 @@ public class PlayerPickupController : NetworkBehaviour
         {
             objectContainer.EquipItem(itemData, this);
         }
+
+        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
+        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
+
+        if (itemData.useRightIK)
+        {
+            _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
+            _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+        }
+        else
+        {
+            _playerAnimationController.SetRightArmRigWeightSmooth(0, .2f);
+            _playerAnimationController.RightArmRigIKTarget = null;
+        }
+
+        if (itemData.useLeftIK)
+        {
+            _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
+            _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+        }
+        else
+        {
+            _playerAnimationController.SetLeftArmRigWeightSmooth(0, .2f);
+            _playerAnimationController.LeftArmRigIKTarget = null;
+        }
         
         if (itemData.usesTwoArms)
         {
@@ -174,7 +201,6 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
             _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
             _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
-            
         }
         
         pickableObject.OnPickedUp();
@@ -195,16 +221,14 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
         
-
         _heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
-
+        
         int itemIndex = camObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
-        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
-        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
+        
+        StartCoroutine(PickUpCoolDown());
     }
-
     public void DropObject(Transform dropPoint = null, bool doSpawn = true)
     {
         pickUpCooldownComplete = false;
