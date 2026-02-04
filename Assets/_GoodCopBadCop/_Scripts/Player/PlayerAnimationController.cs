@@ -71,8 +71,6 @@ public class PlayerAnimationController : NetworkBehaviour
     
     private void LateUpdate()
     {
-        UpdateAnimations();
-
         if (RightArmRigIKTarget != null)
         {
             rightArmIKTarget.position = RightArmRigIKTarget.position;
@@ -101,6 +99,11 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             return;
         }
+        else
+        {
+            UpdateAnimations();
+        }
+        
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             ShrugEmote();
