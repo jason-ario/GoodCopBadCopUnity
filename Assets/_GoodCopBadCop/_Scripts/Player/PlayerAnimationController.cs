@@ -26,17 +26,30 @@ public class PlayerAnimationController : NetworkBehaviour
     private float currentLayer1Weight = 0f;
     private float currentLayer2Weight = 0f;
 
-    [FormerlySerializedAs("armRig")] [SerializeField] private Rig rightArmRig;
+    [Header("Body Arm Rigs")]
+    [SerializeField] private Rig rightArmRig;
     [SerializeField] private Rig leftArmRig;
+    [SerializeField] private Transform rightArmIKTarget; 
+    [SerializeField] private Transform leftArmIKTarget; 
+
+    [Header("Camera Arm Rigs")]
+    [SerializeField] private Rig camRightArmRig;
+    [SerializeField] private Rig camLeftArmRig;
+    [SerializeField] private Transform camRightArmIKTarget; 
+    [SerializeField] private Transform camLeftArmIKTarget;
+
     public Rig RightArmRig => rightArmRig;
     public Rig LeftArmRig => leftArmRig;
 
-    [FormerlySerializedAs("armIKTarget")] [SerializeField] private Transform rightArmIKTarget; 
-    [SerializeField] private Transform leftArmIKTarget; 
     public Transform RightArmIKTarget => rightArmIKTarget;
     public Transform LeftArmIKTarget => leftArmIKTarget;
     public Transform RightArmRigIKTarget { get; set; }
     public Transform LeftArmRigIKTarget { get; set; }
+    
+    public Transform CamRightArmIKTarget => camRightArmIKTarget;
+    public Transform CamLeftArmIKTarget => camLeftArmIKTarget;
+    public Transform CamRightArmRigIKTarget { get; set; }
+    public Transform CamLeftArmRigIKTarget { get; set; }
 
 
     private NetworkVariable<Vector3> headLookAtPos =
@@ -77,6 +90,18 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             leftArmIKTarget.position = LeftArmRigIKTarget.position;
             leftArmIKTarget.rotation = LeftArmRigIKTarget.rotation;
+        }
+        
+        if (CamRightArmRigIKTarget != null)
+        {
+            camRightArmIKTarget.position = CamRightArmRigIKTarget.position;
+            camRightArmIKTarget.rotation = CamRightArmRigIKTarget.rotation;
+        }
+        
+        if (CamLeftArmRigIKTarget != null)
+        {
+            camLeftArmIKTarget.position = CamLeftArmRigIKTarget.position;
+            camLeftArmIKTarget.rotation = CamLeftArmRigIKTarget.rotation;
         }
     }
 
@@ -207,14 +232,25 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         DOTween.Kill(rightArmRig.weight);
         DOTween.To(() => rightArmRig.weight, x => rightArmRig.weight = x, smoothWeight, smoothTime);
+        
+        if (camRightArmRig != null)
+        {
+            DOTween.Kill(camRightArmRig.weight);
+            DOTween.To(() => camRightArmRig.weight, x => camRightArmRig.weight = x, smoothWeight, smoothTime);
+        }
     }
     
     public void SetLeftArmRigWeightSmooth(float smoothWeight, float smoothTime)
     {
         DOTween.Kill(leftArmRig.weight);
         DOTween.To(() => leftArmRig.weight, x => leftArmRig.weight = x, smoothWeight, smoothTime);
+
+        if (camLeftArmRig != null)
+        {
+            DOTween.Kill(camLeftArmRig.weight);
+            DOTween.To(() => camLeftArmRig.weight, x => camLeftArmRig.weight = x, smoothWeight, smoothTime);
+        }
     }
-    
 
     public void SetAnimFloat(string animString, float value)
     {

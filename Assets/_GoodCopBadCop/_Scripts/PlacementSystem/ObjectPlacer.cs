@@ -46,7 +46,7 @@ public class ObjectPlacer : MonoBehaviour
         PlayerPickupController playerPickup = PlayerInstance.Instance.GetComponent<PlayerPickupController>(); // Assuming you have a way to get the local player
         if (playerPickup == null) return;
 
-        Vector3 startPos = playerPickup.ObjectContainer.CurrentlyEquippedItem.transform.position; // Or a specific hand Transform
+        Vector3 startPos = playerPickup.CamObjectContainer.CurrentlyEquippedItem.transform.position; // Or a specific hand Transform
         Vector3 endPos = transform.position;
         
         // Control point for the arc (middle point + height)

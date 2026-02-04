@@ -84,4 +84,9 @@ public class PickableObject : Interactable
     {
         
     }
+
+    public void OnDroppedFromBody()
+    {
+      
+    }
 }

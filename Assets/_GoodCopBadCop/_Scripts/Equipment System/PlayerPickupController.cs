@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class PlayerPickupController : NetworkBehaviour
 {
@@ -10,16 +11,19 @@ public class PlayerPickupController : NetworkBehaviour
 
     private PickableItemData _heldObject;
     public PickableItemData HeldObject => _heldObject; 
-    private PickableObject _currentlyEquippedItem;
-    public PickableObject CurrentlyEquippedItem => _currentlyEquippedItem;
-
+    private PickableObject _camEquippedItem;
+    private PickableObject _bodyCurrentlyEquippedItem;
+    
     public bool IsHoldingObject => _heldObject != null;
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     
     [SerializeField] ObjectContainer[] objectContainers;
-    [SerializeField] private ObjectContainer objectContainerToUse; 
-    public ObjectContainer ObjectContainer => objectContainerToUse;
+    [FormerlySerializedAs("objectContainerToUse")] [SerializeField] private ObjectContainer camObjectContainer; 
+    [SerializeField] private ObjectContainer bodyObjectContainer; 
+    public ObjectContainer CamObjectContainer => camObjectContainer;
+    public ObjectContainer BodyObjectContainer => bodyObjectContainer;
+
     private PlayerMovementController _playerMovementController;
     public PlayerMovementController PlayerMovementController => _playerMovementController;
 
@@ -59,7 +63,7 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
         
-        PickableItemData itemData = objectContainerToUse.GetItemData(newValue);
+        PickableItemData itemData = camObjectContainer.GetItemData(newValue);
         
         foreach (var objectContainer in objectContainers)
         {
@@ -127,17 +131,17 @@ public class PlayerPickupController : NetworkBehaviour
         if (_heldObject == null) return;
         if(pickUpCooldownComplete == false) return;
         
-        if (objectContainerToUse.CurrentlyEquippedItem != null)
+        if (camObjectContainer.CurrentlyEquippedItem != null)
         {
-            objectContainerToUse.CurrentlyEquippedItem.OnStartUse();
+            camObjectContainer.CurrentlyEquippedItem.OnStartUse();
         }
     }
 
     void StopUsingObject()
     {
-        if (objectContainerToUse.CurrentlyEquippedItem != null)
+        if (camObjectContainer.CurrentlyEquippedItem != null)
         {
-            objectContainerToUse.CurrentlyEquippedItem.OnStopUse();
+            camObjectContainer.CurrentlyEquippedItem.OnStopUse();
         }
     }
 
@@ -152,19 +156,25 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
         
-        int itemIndex = objectContainerToUse.ItemIndex(itemData);
+        int itemIndex = camObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
-        _currentlyEquippedItem = objectContainerToUse.CurrentlyEquippedItem;
+        
+        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
+        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
         
         if (itemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.RightArmRigIKTarget = _currentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
         }
         if (itemData.useLeftIK)
         {
+            Debug.Log("Picking up left arm");
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.LeftArmRigIKTarget = _currentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            
         }
         
         pickableObject.OnPickedUp();
@@ -189,9 +199,10 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = itemData;
         ObjectPlacer.Instance.SetItem(itemData);
 
-        int itemIndex = objectContainerToUse.ItemIndex(itemData);
+        int itemIndex = camObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
-        _currentlyEquippedItem = objectContainerToUse.CurrentlyEquippedItem;
+        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
+        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
     }
 
     public void DropObject(Transform dropPoint = null, bool doSpawn = true)
@@ -215,14 +226,16 @@ public class PlayerPickupController : NetworkBehaviour
             }
         }
    
-        objectContainerToUse.CurrentlyEquippedItem.OnDropped();
+        camObjectContainer.CurrentlyEquippedItem.OnDropped();
+        bodyObjectContainer.CurrentlyEquippedItem.OnDroppedFromBody();
 
         foreach (var objectContainer in objectContainers)
         {
             objectContainer.UnequipItem(this);
         }
 
-        _currentlyEquippedItem = null;
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
