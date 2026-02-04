@@ -58,6 +58,9 @@ public class PlayerPickupController : NetworkBehaviour
             foreach (var objectContainer in objectContainers)
             {
                 objectContainer.UnequipItem(this);
+                _playerAnimationController.SetLeftArmRigWeightSmooth(0, .2f);
+                _playerAnimationController.SetRightArmRigWeightSmooth(0, .2f);
+                _playerAnimationController.SetAimRigWeightSmooth(0, .2f);
             }
 
             return;
