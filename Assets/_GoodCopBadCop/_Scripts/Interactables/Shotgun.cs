@@ -13,6 +13,8 @@ public class Shotgun : PickableObject
 
     public override void OnBodyStartUse()
     {
+        playerPickupController.GetComponent<RagdollController>().ActivateRagdollWithForce(-playerPickupController.transform.forward * 100);
+
         shootVFX.Play();
     }
     
