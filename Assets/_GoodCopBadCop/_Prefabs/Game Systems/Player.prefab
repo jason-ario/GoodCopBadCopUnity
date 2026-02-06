@@ -710,6 +710,7 @@ GameObject:
   - component: {fileID: 7342743542733398178}
   - component: {fileID: 5356956456531027514}
   - component: {fileID: 6731608615017123389}
+  - component: {fileID: 322217302369239222}
   m_Layer: 0
   m_Name: CinemachineCamera
   m_TagString: Untagged
@@ -796,6 +797,30 @@ MonoBehaviour:
   AmplitudeGain: 0.6
   FrequencyGain: 0.6
   m_NoiseOffsets: {x: 0, y: 0, z: 0}
+--- !u!114 &322217302369239222
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2736576804362404258}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00b2d199b96b516448144ab30fb26aed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseListener
+  ApplyAfter: 2
+  ChannelMask: 1
+  Gain: 1
+  Use2DDistance: 0
+  UseCameraSpace: 1
+  SignalCombinationMode: 0
+  ReactionSettings:
+    m_SecondaryNoise: {fileID: 11400000, guid: 69ce8388f6785dd4c8c39915efece2f4, type: 2}
+    AmplitudeGain: 1
+    FrequencyGain: 5
+    Duration: 1
+    m_NoiseOffsets: {x: 0, y: 0, z: 0}
 --- !u!1 &2953290070593623070
 GameObject:
   m_ObjectHideFlags: 0
@@ -885,7 +910,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1936807553
+  GlobalObjectIdHash: 4229621594
   InScenePlacedSourceGlobalObjectIdHash: 4229621594
   DeferredDespawnTick: 0
   Ownership: 1
@@ -917,6 +942,10 @@ MonoBehaviour:
   maxLookAngle: 80
   acceleration: 20
   drag: 5
+  recoilVerticalAmount: 10
+  recoilHorizontalAmount: 5
+  recoilKickDuration: 0.2
+  recoilRecoverDuration: 0.3
   CanMove: 1
   CanLook: 1
 --- !u!114 &6460359851244041616
@@ -1145,7 +1174,7 @@ MonoBehaviour:
     Layer: 2
     OriginatingState: 776543318
     DestinationState: -1628668092
-    TransitionDuration: 0.25
+    TransitionDuration: 0.046509624
     TriggerNameHash: -1316629574
     TransitionIndex: 1
   - IsCrossFadeExit: 0
@@ -2273,19 +2302,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 874337331516959081, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.0039364696
+      value: 0.002059639
       objectReference: {fileID: 0}
     - target: {fileID: 874337331516959081, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalRotation.x
-      value: -0.04208955
+      value: -0.0117530525
       objectReference: {fileID: 0}
     - target: {fileID: 874337331516959081, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.005766779
+      value: -0.006474093
       objectReference: {fileID: 0}
     - target: {fileID: 874337331516959081, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0.9990895
+      value: 0.99990785
       objectReference: {fileID: 0}
     - target: {fileID: 891983733397771196, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5657,7 +5686,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2057829180894635182, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3064973622844393188, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: GlobalObjectIdHash

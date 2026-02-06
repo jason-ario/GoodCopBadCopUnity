@@ -16,6 +16,13 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private float acceleration = 20f;
     [SerializeField] private float drag = 5f;
 
+    [Header("Recoil Settings")]
+    [SerializeField] private float recoilVerticalAmount = 3f;
+    [SerializeField] private float recoilHorizontalAmount = 1.5f;
+    [SerializeField] private float recoilKickDuration = 0.07f;
+    [SerializeField] private float recoilRecoverDuration = 0.2f;
+
+    private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
     private Vector3 _currentVelocity;
     
@@ -130,8 +137,34 @@ public class PlayerMovementController : NetworkBehaviour
         {
             _cameraPitch -= mouseY;
             _cameraPitch = Mathf.Clamp(_cameraPitch, -maxLookAngle, maxLookAngle);
-            cameraTransform.localEulerAngles = new Vector3(_cameraPitch, 0f, 0f);
+            
+            // Combine base aim pitch with procedural recoil rotation
+            cameraTransform.localEulerAngles = new Vector3(_cameraPitch + _recoilRotation.x, _recoilRotation.y, 0f);
         }
+    }
+
+    public void ApplyRecoil()
+    {
+        if (!IsLocalPlayer) return;
+
+        // Reset any existing recoil tween to prevent stacking issues
+        DOTween.Kill("recoilRotate");
+
+        Vector3 targetRecoil = new Vector3(-recoilVerticalAmount, UnityEngine.Random.Range(-recoilHorizontalAmount, recoilHorizontalAmount), 0);
+
+        // Sequence: Kick up/side then recover to zero
+        DOTween.To(() => _recoilRotation, x => _recoilRotation = x, targetRecoil, recoilKickDuration)
+            .SetId("recoilRotate")
+            .SetEase(Ease.OutQuad)
+            .OnComplete(() => {
+                DOTween.To(() => _recoilRotation, x => _recoilRotation = x, Vector3.zero, recoilRecoverDuration)
+                    .SetId("recoilRotate")
+                    .SetEase(Ease.InOutSine);
+            });
+
+        // Positional kickback for feel
+        cameraTransform.DOComplete();
+        cameraTransform.DOPunchPosition(new Vector3(0, 0, -0.05f), recoilKickDuration + recoilRecoverDuration, 2, 0.5f);
     }
 
     public void SetCanControl(bool value)
