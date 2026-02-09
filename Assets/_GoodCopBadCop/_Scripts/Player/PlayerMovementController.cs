@@ -13,6 +13,7 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private float mouseSensitivity = 2f;
     [SerializeField] private float maxLookAngle = 80f;
+    [SerializeField] private float mouseSmoothing = 10f;
     [SerializeField] private float acceleration = 20f;
     [SerializeField] private float drag = 5f;
 
@@ -25,6 +26,8 @@ public class PlayerMovementController : NetworkBehaviour
     private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
     private Vector3 _currentVelocity;
+    private float _smoothedMouseX;
+    private float _smoothedMouseY;
     
     // Public properties for animation controller to access
     public float MoveXRaw { get; private set; }
@@ -128,14 +131,18 @@ public class PlayerMovementController : NetworkBehaviour
     {
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
-        
+
+        // Smooth the raw mouse input
+        _smoothedMouseX = Mathf.Lerp(_smoothedMouseX, mouseX, mouseSmoothing * Time.deltaTime);
+        _smoothedMouseY = Mathf.Lerp(_smoothedMouseY, mouseY, mouseSmoothing * Time.deltaTime);
+
         // Rotate player (Y axis) based on horizontal mouse movement
-        transform.Rotate(Vector3.up * mouseX);
+        transform.Rotate(Vector3.up * _smoothedMouseX);
         
         // Rotate camera (X axis) based on vertical mouse movement
         if (cameraTransform != null)
         {
-            _cameraPitch -= mouseY;
+            _cameraPitch -= _smoothedMouseY;
             _cameraPitch = Mathf.Clamp(_cameraPitch, -maxLookAngle, maxLookAngle);
             
             // Combine base aim pitch with procedural recoil rotation
