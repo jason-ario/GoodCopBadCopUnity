@@ -25,7 +25,38 @@ public class Thermometer : PickableObject
         if (readingCoroutine != null) StopCoroutine(readingCoroutine);
         readingCoroutine = StartCoroutine(PerformReading());
     }
-    
+
+    public void FakeNormalReading()
+    {
+        if (readingCoroutine != null) StopCoroutine(readingCoroutine);
+        readingCoroutine = StartCoroutine(FakeNormalReadingRoutine());
+    }
+
+    private IEnumerator FakeNormalReadingRoutine()
+    {
+        float elapsed = 0f;
+        float duration = 1f;
+        float startTemp = 0f;
+        float targetTemp = 36.5f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float jitter = UnityEngine.Random.Range(-0.5f, 0.5f) * (1f - t);
+            currentReading = Mathf.Lerp(startTemp, targetTemp, t) + jitter;
+            thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
+            SetColorFromTemp(currentReading);
+            yield return null;
+        }
+
+        // Settle on final value
+        currentReading = targetTemp;
+        thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
+        SetColorFromTemp(currentReading);
+        readingCoroutine = null;
+    }
+
     public override void OnStopUse()
     {
         isUsing = false;

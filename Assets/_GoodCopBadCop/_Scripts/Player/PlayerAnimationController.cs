@@ -41,7 +41,11 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private Transform camLeftArmIKTarget;
 
     public Rig RightArmRig => rightArmRig;
+    public Rig CamRightArmRig => camRightArmRig;
+
     public Rig LeftArmRig => leftArmRig;
+    public Rig CamLeftArmRig => camLeftArmRig;
+
 
     public Transform RightArmIKTarget => rightArmIKTarget;
     public Transform LeftArmIKTarget => leftArmIKTarget;

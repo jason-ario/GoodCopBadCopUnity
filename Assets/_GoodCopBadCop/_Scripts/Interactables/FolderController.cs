@@ -159,9 +159,17 @@ public class FolderController : Interactable
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = stampDownTarget.position;
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.position = stampDownTarget.position;
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
+
+        
+        
+        
         playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f); 
         playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
         StartCoroutine(LerpRigOnAndOff());
@@ -169,9 +177,12 @@ public class FolderController : Interactable
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampDownTarget.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            stampDownTarget.rotation.eulerAngles, .25f);
         SFXController.Instance.Play(stampSound);
      
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f)
+        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f);
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f)
             .OnComplete(() =>
             {
                 // Only server handles logic state changes
@@ -186,11 +197,15 @@ public class FolderController : Interactable
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
-
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            stampUpTarget.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
         yield return new WaitForSeconds(.5f);
 
 
         playerPickupController.PlayerAnimationController.RightArmRig.weight = 0;
+        playerPickupController.PlayerAnimationController.CamRightArmRig.weight = 0;
+
         isStamping = false;
         
         yield return new WaitForSeconds(.5f);
@@ -215,6 +230,7 @@ public class FolderController : Interactable
         {
             elapsed += Time.deltaTime;
             playerPickupController.PlayerAnimationController.RightArmRig.weight = Mathf.Lerp(0, 1, elapsed / upDuration);
+            playerPickupController.PlayerAnimationController.CamRightArmRig.weight = Mathf.Lerp(0, 1, elapsed / upDuration);
             yield return null;
         }
 
@@ -226,6 +242,8 @@ public class FolderController : Interactable
         {
             elapsed += Time.deltaTime;
             playerPickupController.PlayerAnimationController.RightArmRig.weight = Mathf.Lerp(1, 0, elapsed / downDuration);
+            playerPickupController.PlayerAnimationController.CamRightArmRig.weight = Mathf.Lerp(1, 0, elapsed / downDuration);
+
             yield return null;
         }
 

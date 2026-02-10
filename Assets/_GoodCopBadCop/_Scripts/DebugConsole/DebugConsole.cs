@@ -22,8 +22,19 @@ public class DebugConsole : MonoBehaviour
     {
         if (skipMainMenu)
         {
+            if (cutsceneMode)
+            {
+                UIController.Instance.ClosePlayerUI();
+                return;
+            }
             NetworkManager.Singleton.StartHost();
             GameManager.Instance.TryStartGame(true);
         }
+        
+        if (cutsceneMode)
+        {
+            UIController.Instance.ClosePlayerUI();
+        }
+
     }
 }
