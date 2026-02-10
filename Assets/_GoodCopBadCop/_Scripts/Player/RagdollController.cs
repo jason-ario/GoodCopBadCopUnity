@@ -5,6 +5,7 @@ public class RagdollController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private Rigidbody[] ragdollRigidbodies;
     [SerializeField] private Collider[] ragdollColliders;
+    [SerializeField] Vector3 forceToApplyOnActivate;
 
     void Awake()
     {
@@ -38,6 +39,11 @@ public class RagdollController : MonoBehaviour
                 col.enabled = active;
             }
         }
+    }
+
+    public void ActivateRagdollWithForce()
+    {
+        ActivateRagdollWithForce(forceToApplyOnActivate);
     }
 
     public void ActivateRagdollWithForce(Vector3 force, ForceMode mode = ForceMode.Impulse)
