@@ -11,7 +11,6 @@ public class Shotgun : PickableObject
     public override void OnStartUse()
     {
         base.OnStartUse();
-        Debug.Log("Player shotgun!");
         shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         shootVFX.Play();
         playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
@@ -22,6 +21,14 @@ public class Shotgun : PickableObject
         {
             movement.ApplyRecoil();
         }
+    }
+
+    public void ShootFX()
+    {
+        shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        shootVFX.Play();
+        _cinemachineImpulseSource.GenerateImpulse();
+        StartCoroutine(LightOnOff());
     }
 
     IEnumerator LightOnOff()

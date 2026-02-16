@@ -34,6 +34,8 @@ public class SuspectCharacter : Interactable
         [TextArea(3, 10)]
         public string text;
     }
+
+    [SerializeField] private ParticleSystem[] vomitParticles;
     
     public override void Interact(PlayerInteractionController player)
     {
@@ -81,6 +83,22 @@ public class SuspectCharacter : Interactable
     public void AimAtPlayer()
     {
         StartCoroutine(StartFiring());
+    }
+
+    public void StartVomiting()
+    {
+        foreach (var vomitParticle in vomitParticles)
+        {
+            vomitParticle.Play();
+        }
+    }
+
+    public void StopVomiting()
+    {
+        foreach (var vomitParticle in vomitParticles)
+        {
+            vomitParticle.Stop();
+        }
     }
 
     IEnumerator StartFiring()
