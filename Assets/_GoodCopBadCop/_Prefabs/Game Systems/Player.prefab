@@ -107,7 +107,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 159
+    m_Bits: 2207
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 8400000, guid: 6ea50738b9a16024e80b6d3a4926ce4c, type: 2}
   m_TargetDisplay: 0
@@ -996,10 +996,7 @@ Animator:
   m_AnimatePhysics: 0
   m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
     are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:Spine2'\n\tTransform
-    'mixamorig:RightForeArm'\n\tTransform 'mixamorig:Head'\n\tTransform 'mixamorig:LeftArm'\n\tTransform
-    'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform 'mixamorig:LeftForeArm'\n\tTransform
-    'mixamorig:RightShoulder'\n\tTransform 'mixamorig:Neck'\n\tand more ..."
+    by Humanoid clips.\n\tTransform 'mixamorig:Spine1'\n\tFrom animation clip 'Cheers'"
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -1043,7 +1040,7 @@ MonoBehaviour:
   interactDistance: 2.5
   interactLayer:
     serializedVersion: 2
-    m_Bits: 251
+    m_Bits: 2299
   pickupController: {fileID: 6845953909524944592}
   reticle: {fileID: 0}
   playerAnimationController: {fileID: 6460359851244041616}
@@ -1247,6 +1244,8 @@ MonoBehaviour:
   - {fileID: 1320763547669879257}
   - {fileID: 4296567037630098863}
   - {fileID: 1077796196054434978}
+  forceToApplyOnActivate: {x: 0, y: 0, z: 0}
+  activateOnAwake: 0
 --- !u!1 &3213811794621837411
 GameObject:
   m_ObjectHideFlags: 0
@@ -1574,9 +1573,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 2
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.03
-  m_Range: 2
+  m_Color: {r: 0.6528301, g: 0.5442381, b: 0.21063009, a: 1}
+  m_Intensity: 0.43
+  m_Range: 4.72
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -1854,7 +1853,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70b342d8ce5c2fd48b8fa3147d48d1d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Animation.Rigging::UnityEngine.Animations.Rigging.Rig
-  m_Weight: 1
+  m_Weight: 0
   m_Effectors: []
 --- !u!1 &6668900976840895106
 GameObject:
@@ -5796,7 +5795,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4788746498924198927, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: m_WarningMessage
-      value: 
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'mixamorig:Spine1'\n\tFrom animation clip
+        'Cheers'"
       objectReference: {fileID: 0}
     - target: {fileID: 5356626190369929533, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: GlobalObjectIdHash

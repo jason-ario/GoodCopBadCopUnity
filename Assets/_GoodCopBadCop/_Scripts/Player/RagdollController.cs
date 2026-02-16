@@ -6,6 +6,7 @@ public class RagdollController : MonoBehaviour
     [SerializeField] private Rigidbody[] ragdollRigidbodies;
     [SerializeField] private Collider[] ragdollColliders;
     [SerializeField] Vector3 forceToApplyOnActivate;
+    [SerializeField] bool activateOnAwake = false;
 
     void Awake()
     {
@@ -16,7 +17,7 @@ public class RagdollController : MonoBehaviour
         if (ragdollColliders == null || ragdollColliders.Length == 0)
             ragdollColliders = GetComponentsInChildren<Collider>();
 
-        SetRagdollActive(false);
+        SetRagdollActive(activateOnAwake);
     }
 
     public void SetRagdollActive(bool active)
