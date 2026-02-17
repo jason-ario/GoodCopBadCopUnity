@@ -77,6 +77,9 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+		#if defined(URP_12_OR_NEWER)
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
+		#endif
 
 		// Uniforms
 
@@ -114,6 +117,23 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		#define UnityObjectToClipPos TransformObjectToHClip
 		#define _WorldSpaceLightPos0 _MainLightPosition
 		
+		#if defined(_DBUFFER)
+			// Derived from 'ApplyDecal' in URP's DBuffer.hlsl, directly fetch the decal data so that we can blend it accordingly
+			DecalSurfaceData GetDecals(float4 positionCS)
+			{
+				FETCH_DBUFFER(DBuffer, _DBufferTexture, int2(positionCS.xy));
+
+				DecalSurfaceData decalSurfaceData = (DecalSurfaceData)0;
+				DECODE_FROM_DBUFFER(DBuffer, decalSurfaceData);
+
+				#if !defined(_DBUFFER_MRT3)
+					decalSurfaceData.MAOSAlpha = 0;
+				#endif
+
+				return decalSurfaceData;
+			}
+		#endif
+
 		ENDHLSL
 
 		// Outline Include
@@ -279,6 +299,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
 			#pragma multi_compile _ SHADOWS_SHADOWMASK
+			#pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
 			#pragma multi_compile _ _CLUSTER_LIGHT_LOOP
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
 
@@ -404,6 +425,26 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// main texture
 				half3 albedo = __albedo.rgb;
 				half alpha = __alpha;
+
+				// URP Decals
+				#if defined(_DBUFFER)
+					#if defined(_DBUFFER_MRT2) || defined(_DBUFFER_MRT3)
+						#define HAS_DECAL_NORMALS
+					#endif
+					#if defined(_DBUFFER_MRT3)
+						#define HAS_DECAL_MAOS
+					#endif
+
+					DecalSurfaceData decals = GetDecals(input.positionCS);
+					albedo.rgb = albedo.rgb * decals.baseColor.a + decals.baseColor.rgb;
+					#if defined(HAS_DECAL_NORMALS)
+						// Always test the normal as we can have decompression artifact
+						if (decals.normalWS.w < 1.0)
+						{
+							normalWS.xyz = normalize(normalWS.xyz * decals.normalWS.w + decals.normalWS.xyz);
+						}
+					#endif
+				#endif
 
 				half3 emission = half3(0,0,0);
 				
@@ -848,5 +889,5 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","TEMPLATE_LWRP","CULLING"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH 8a20434c1c76dd3f2443d27985c6b176 */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","CULLING","TEMPLATE_LWRP","ENABLE_DECALS"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
+/* TCP_HASH a45485728bb638572439cfb6cf53e832 */

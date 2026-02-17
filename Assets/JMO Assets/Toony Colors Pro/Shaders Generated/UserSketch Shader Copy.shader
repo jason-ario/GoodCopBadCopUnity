@@ -1,7 +1,7 @@
 ﻿// Toony Colors Pro+Mobile 2
 // (c) 2014-2025 Jean Moreno
 
-Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
+Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 {
 	Properties
 	{
@@ -9,6 +9,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		_BaseColor ("Color", Color) = (1,1,1,1)
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
 		[TCP2ColorNoAlpha] _SColor ("Shadow Color", Color) = (0.2,0.2,0.2,1)
+		[MainTexture] _BaseMap ("Albedo", 2D) = "white" {}
 		[TCP2Separator]
 
 		[TCP2Header(Ramp Shading)]
@@ -17,13 +18,13 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		_RampSmoothing ("Smoothing", Range(0.001,1)) = 0.5
 		[TCP2Separator]
 		
-		[TCP2HeaderHelp(Triplanar Mapping)]
-		_TriGround ("Ground", 2D) = "white" {}
-		_TriSide ("Walls", 2D) = "white" {}
-		[TCP2Vector4Floats(Contrast X,Contrast Y,Contrast Z,Smoothing,1,16,1,16,1,16,0.01,1)] _TriplanarBlendStrength ("Triplanar Parameters", Vector) = (2,8,2,0.5)
+		_StylizedThreshold ("Stylized Threshold", 2D) = "gray" {}
 		[TCP2Separator]
 		
-		_StylizedThreshold ("Stylized Threshold", 2D) = "gray" {}
+		[TCP2HeaderHelp(Sketch)]
+		[Toggle(TCP2_SKETCH)] _UseSketch ("Enable Sketch Effect", Float) = 0
+		_SketchTexture ("Sketch Texture", 2D) = "black" {}
+		_SketchTexture_OffsetSpeed ("Sketch Texture UV Offset Speed", Float) = 120
 		[TCP2Separator]
 		
 		[TCP2HeaderHelp(Outline)]
@@ -35,6 +36,8 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		[TCP2MaterialKeywordEnumNoPrefix(Full XYZ, TCP2_UV_NORMALS_FULL, Compressed XY, _, Compressed ZW, TCP2_UV_NORMALS_ZW)]
 		_NormalsUVType ("UV Data Type", Float) = 0
 		[TCP2Separator]
+		
+		[Enum(ToonyColorsPro.ShaderGenerator.Culling)] _faceCulling ("Face Culling", Float) = 2
 
 		[ToggleOff(_RECEIVE_SHADOWS_OFF)] _ReceiveShadowsOff ("Receive Shadows", Float) = 1
 
@@ -74,54 +77,43 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-		#if defined(URP_12_OR_NEWER)
-			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
-		#endif
 
 		// Uniforms
 
 		// Shader Properties
-		TCP2_TEX2D_WITH_SAMPLER(_TriGround);
-		TCP2_TEX2D_WITH_SAMPLER(_TriSide);
+		TCP2_TEX2D_WITH_SAMPLER(_BaseMap);
 		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
+		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
 
 		CBUFFER_START(UnityPerMaterial)
 			
 			// Shader Properties
 			float _OutlineWidth;
 			fixed4 _OutlineColorVertex;
-			float4 _TriGround_ST;
-			float4 _TriSide_ST;
-			float4 _TriplanarBlendStrength;
+			float4 _BaseMap_ST;
 			fixed4 _BaseColor;
 			float4 _StylizedThreshold_ST;
 			float _RampThreshold;
 			float _RampSmoothing;
+			float4 _SketchTexture_ST;
+			half _SketchTexture_OffsetSpeed;
 			fixed4 _SColor;
 			fixed4 _HColor;
 		CBUFFER_END
 
+		// Hash without sin and uniform across platforms
+		// Adapted from: https://www.shadertoy.com/view/4djSRW (c) 2014 - Dave Hoskins - CC BY-SA 4.0 License
+		float2 hash22(float2 p)
+		{
+			float3 p3 = frac(p.xyx * float3(443.897, 441.423, 437.195));
+			p3 += dot(p3, p3.yzx + 19.19);
+			return frac((p3.xx+p3.yz)*p3.zy);
+		}
+		
 		// Built-in renderer (CG) to SRP (HLSL) bindings
 		#define UnityObjectToClipPos TransformObjectToHClip
 		#define _WorldSpaceLightPos0 _MainLightPosition
 		
-		#if defined(_DBUFFER)
-			// Derived from 'ApplyDecal' in URP's DBuffer.hlsl, directly fetch the decal data so that we can blend it accordingly
-			DecalSurfaceData GetDecals(float4 positionCS)
-			{
-				FETCH_DBUFFER(DBuffer, _DBufferTexture, int2(positionCS.xy));
-
-				DecalSurfaceData decalSurfaceData = (DecalSurfaceData)0;
-				DECODE_FROM_DBUFFER(DBuffer, decalSurfaceData);
-
-				#if !defined(_DBUFFER_MRT3)
-					decalSurfaceData.MAOSAlpha = 0;
-				#endif
-
-				return decalSurfaceData;
-			}
-		#endif
-
 		ENDHLSL
 
 		// Outline Include
@@ -155,7 +147,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 		{
 			float4 vertex : SV_POSITION;
 			float4 vcolor : TEXCOORD0;
-			float4 pack1 : TEXCOORD1; /* pack1.xyz = worldPos  pack1.w = fogFactor */
+			float pack1 : TEXCOORD1; /* pack1.x = fogFactor */
 			UNITY_VERTEX_INPUT_INSTANCE_ID
 			UNITY_VERTEX_OUTPUT_STEREO
 		};
@@ -172,9 +164,6 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			float __outlineWidth = ( _OutlineWidth );
 			float4 __outlineColorVertex = ( _OutlineColorVertex.rgba );
 
-			float3 worldPos = mul(UNITY_MATRIX_M, v.vertex).xyz;
-			output.pack1.xyz = worldPos;
-		
 		#ifdef TCP2_COLORS_AS_NORMALS
 			//Vertex Color for Normals
 			float3 normal = (v.vertexColor.xyz*2) - 1;
@@ -227,13 +216,19 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			float size = 1;
 		
 		#if !defined(SHADOWCASTER_PASS)
-			output.vertex = UnityObjectToClipPos(v.vertex.xyz + normal * __outlineWidth * size * 0.01);
+			output.vertex = UnityObjectToClipPos(v.vertex.xyz);
+			normal = mul(UNITY_MATRIX_M, float4(normal, 0)).xyz;
+			float2 clipNormals = normalize(mul(UNITY_MATRIX_VP, float4(normal,0)).xy);
+			half2 screenRatio = half2(1.0, _ScreenParams.x / _ScreenParams.y);
+			half2 outlineWidth = (__outlineWidth / 100) * screenRatio;
+			output.vertex.xy += clipNormals.xy * outlineWidth;
+			
 		#else
 			v.vertex = v.vertex + float4(normal,0) * __outlineWidth * size * 0.01;
 		#endif
 		
 			output.vcolor.xyzw = __outlineColorVertex;
-			output.pack1.w = ComputeFogFactor(output.vertex.z);
+			output.pack1.x = ComputeFogFactor(output.vertex.z);
 
 			return output;
 		}
@@ -244,14 +239,11 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			UNITY_SETUP_INSTANCE_ID(input);
 			UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-			float3 positionWS = input.pack1.xyz;
-			float3 normalWS = input.pack1.xyz;
-
 			// Shader Properties Sampling
 			float4 __outlineColor = ( float4(1,1,1,1) );
 
 			half4 outlineColor = __outlineColor * input.vcolor.xyzw;
-			outlineColor.rgb = MixFog(outlineColor.rgb, input.pack1.w);
+			outlineColor.rgb = MixFog(outlineColor.rgb, input.pack1.x);
 
 			return outlineColor;
 		}
@@ -265,6 +257,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			{
 				"LightMode"="UniversalForward"
 			}
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard SRP library
@@ -286,7 +279,6 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 			#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
 			#pragma multi_compile _ SHADOWS_SHADOWMASK
-			#pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
 			#pragma multi_compile _ _CLUSTER_LIGHT_LOOP
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
 
@@ -299,6 +291,10 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 			#pragma vertex Vertex
 			#pragma fragment Fragment
+
+			//--------------------------------------
+			// Toony Colors Pro 2 keywords
+			#pragma shader_feature_local_fragment TCP2_SKETCH
 
 			// vertex input
 			struct Attributes
@@ -321,8 +317,9 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			#ifdef _ADDITIONAL_LIGHTS_VERTEX
 				half3 vertexLights : TEXCOORD2;
 			#endif
-				float2 pack0 : TEXCOORD3; /* pack0.xy = texcoord0 */
-				float pack1 : TEXCOORD4; /* pack1.x = fogFactor */
+				float4 screenPosition : TEXCOORD3;
+				float2 pack1 : TEXCOORD4; /* pack1.xy = texcoord0 */
+				float pack2 : TEXCOORD5; /* pack2.x = fogFactor */
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -345,13 +342,16 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
 				// Texture Coordinates
-				output.pack0.xy = input.texcoord0.xy;
+				output.pack1.xy.xy = input.texcoord0.xy * _BaseMap_ST.xy + _BaseMap_ST.zw;
 
-				float3 worldPos = mul(UNITY_MATRIX_M, input.vertex).xyz;
 				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.vertex.xyz);
 			#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
 				output.shadowCoord = GetShadowCoord(vertexInput);
 			#endif
+				float4 clipPos = vertexInput.positionCS;
+
+				float4 screenPos = ComputeScreenPos(clipPos);
+				output.screenPosition.xyzw = screenPos;
 
 				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal);
 			#ifdef _ADDITIONAL_LIGHTS_VERTEX
@@ -382,67 +382,30 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
-				float3 normalWS_Vertex = normalWS;
 
+				//Screen Space UV
+				float2 screenUV = input.screenPosition.xyzw.xy / input.screenPosition.xyzw.w;
+				
 				// Shader Properties Sampling
-				float4 __triplanarParameters = ( _TriplanarBlendStrength.xyzw );
+				float4 __albedo = ( TCP2_TEX2D_SAMPLE(_BaseMap, _BaseMap, input.pack1.xy).rgba );
 				float4 __mainColor = ( _BaseColor.rgba );
+				float __alpha = ( __albedo.a * __mainColor.a );
 				float __ambientIntensity = ( 1.0 );
-				float __stylizedThreshold = ( TCP2_TEX2D_SAMPLE(_StylizedThreshold, _StylizedThreshold, input.pack0.xy * _StylizedThreshold_ST.xy + _StylizedThreshold_ST.zw).a );
+				float __stylizedThreshold = ( TCP2_TEX2D_SAMPLE(_StylizedThreshold, _StylizedThreshold, input.pack1.xy * _StylizedThreshold_ST.xy + _StylizedThreshold_ST.zw).a );
 				float __stylizedThresholdScale = ( 1.0 );
 				float __rampThreshold = ( _RampThreshold );
 				float __rampSmoothing = ( _RampSmoothing );
+				float3 __sketchColor = ( float3(0,0,0) );
+				float3 __sketchTexture = ( TCP2_TEX2D_SAMPLE(_SketchTexture, _SketchTexture, screenUV * _ScreenParams.zw * _SketchTexture_ST.xy + _SketchTexture_ST.zw + hash22(floor(_Time.xx * _SketchTexture_OffsetSpeed.xx) / _SketchTexture_OffsetSpeed.xx)).aaa );
+				float __sketchThresholdScale = ( 1.0 );
 				float3 __shadowColor = ( _SColor.rgb );
 				float3 __highlightColor = ( _HColor.rgb );
 
 				// main texture
-				half3 albedo = half3(1,1,1);
-				half alpha = 1;
-
-				// URP Decals
-				#if defined(_DBUFFER)
-					#if defined(_DBUFFER_MRT2) || defined(_DBUFFER_MRT3)
-						#define HAS_DECAL_NORMALS
-					#endif
-					#if defined(_DBUFFER_MRT3)
-						#define HAS_DECAL_MAOS
-					#endif
-
-					DecalSurfaceData decals = GetDecals(input.positionCS);
-					albedo.rgb = albedo.rgb * decals.baseColor.a + decals.baseColor.rgb;
-					#if defined(HAS_DECAL_NORMALS)
-						// Always test the normal as we can have decompression artifact
-						if (decals.normalWS.w < 1.0)
-						{
-							normalWS.xyz = normalize(normalWS.xyz * decals.normalWS.w + decals.normalWS.xyz);
-						}
-					#endif
-				#endif
+				half3 albedo = __albedo.rgb;
+				half alpha = __alpha;
 
 				half3 emission = half3(0,0,0);
-				half4 albedoAlpha = half4(albedo, alpha);
-				
-				// Triplanar Texture Blending
-				half2 uv_ground = positionWS.xz;
-				half2 uv_sideX = positionWS.zy;
-				half2 uv_sideZ = positionWS.xy;
-				float3 triplanarNormal = normalWS_Vertex;
-				
-				//ground
-				half4 triplanar = ( TCP2_TEX2D_SAMPLE(_TriGround, _TriGround, uv_ground * _TriGround_ST.xy + _TriGround_ST.zw).rgba );
-				
-				//walls
-				fixed4 tex_sideX = ( TCP2_TEX2D_SAMPLE(_TriSide, _TriSide, uv_sideX * _TriSide_ST.xy + _TriSide_ST.zw).rgba );
-				fixed4 tex_sideZ = ( TCP2_TEX2D_SAMPLE(_TriSide, _TriSide, uv_sideZ * _TriSide_ST.xy + _TriSide_ST.zw).rgba );
-				
-				//blending
-				half3 blendWeights = pow(abs(triplanarNormal), __triplanarParameters.xyz / __triplanarParameters.w);
-				blendWeights = blendWeights / (blendWeights.x + abs(blendWeights.y) + blendWeights.z);
-				
-				triplanar = tex_sideX * blendWeights.x + triplanar * blendWeights.y + tex_sideZ * blendWeights.z;
-				albedoAlpha *= triplanar;
-				albedo = albedoAlpha.rgb;
-				alpha = albedoAlpha.a;
 				
 				albedo *= __mainColor.rgb;
 
@@ -608,9 +571,18 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			#endif
 
 				accumulatedRamp = saturate(accumulatedRamp);
+				
+				// Sketch
+				#if defined(TCP2_SKETCH)
+				half3 sketchColor = lerp(__sketchColor, half3(1,1,1), __sketchTexture);
+				half3 sketch = lerp(sketchColor, half3(1,1,1), saturate(accumulatedRamp * __sketchThresholdScale));
+				#endif
 				half3 shadowColor = (1 - accumulatedRamp.rgb) * __shadowColor;
 				accumulatedRamp = accumulatedColors.rgb * __highlightColor + shadowColor;
 				color += albedo * accumulatedRamp;
+				#if defined(TCP2_SKETCH)
+				color.rgb *= sketch.rgb;
+				#endif
 
 				// apply ambient
 				color += indirectDiffuse;
@@ -666,16 +638,14 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			{
 				float4 vertex   : POSITION;
 				float3 normal   : NORMAL;
+				float4 texcoord0 : TEXCOORD0;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
 			struct Varyings
 			{
 				float4 positionCS     : SV_POSITION;
-			#if defined(DEPTH_NORMALS_PASS)
-				float3 normalWS : TEXCOORD0;
-			#endif
-				float3 pack0 : TEXCOORD1; /* pack0.xyz = positionWS */
+				float2 pack0 : TEXCOORD1; /* pack0.xy = texcoord0 */
 			#if defined(DEPTH_ONLY_PASS)
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
@@ -711,16 +681,11 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 					UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 				#endif
 
-				float3 worldPos = mul(UNITY_MATRIX_M, input.vertex).xyz;
-				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.vertex.xyz);
-				output.pack0.xyz = vertexInput.positionWS;
+				// Texture Coordinates
+				output.pack0.xy.xy = input.texcoord0.xy * _BaseMap_ST.xy + _BaseMap_ST.zw;
 
 				#if defined(DEPTH_ONLY_PASS)
 					output.positionCS = TransformObjectToHClip(input.vertex.xyz);
-					#if defined(DEPTH_NORMALS_PASS)
-						float3 normalWS = TransformObjectToWorldNormal(input.normal);
-						output.normalWS = normalWS; // already normalized in TransformObjectToWorldNormal
-					#endif
 				#elif defined(SHADOW_CASTER_PASS)
 					output.positionCS = GetShadowPositionHClip(input);
 				#else
@@ -732,40 +697,20 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 			half4 ShadowDepthPassFragment(
 				Varyings input
-	#if defined(DEPTH_NORMALS_PASS) && defined(_WRITE_RENDERING_LAYERS)
-		#if UNITY_VERSION >= 60020000
-				, out uint outRenderingLayers : SV_Target1
-		#else
-				, out float4 outRenderingLayers : SV_Target1
-		#endif
-	#endif
 			) : SV_TARGET
 			{
 				#if defined(DEPTH_ONLY_PASS)
 					UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 				#endif
 
-				float3 positionWS = input.pack0.xyz;
+				// Shader Properties Sampling
+				float4 __albedo = ( TCP2_TEX2D_SAMPLE(_BaseMap, _BaseMap, input.pack0.xy).rgba );
+				float4 __mainColor = ( _BaseColor.rgba );
+				float __alpha = ( __albedo.a * __mainColor.a );
 
 				half3 albedo = half3(1,1,1);
-				half alpha = 1;
+				half alpha = __alpha;
 				half3 emission = half3(0,0,0);
-
-				#if defined(DEPTH_NORMALS_PASS)
-					#if defined(_WRITE_RENDERING_LAYERS)
-						#if UNITY_VERSION >= 60020000
-							outRenderingLayers = EncodeMeshRenderingLayer();
-						#else
-							outRenderingLayers = float4(EncodeMeshRenderingLayer(GetMeshRenderingLayer()), 0, 0, 0);
-						#endif
-					#endif
-
-					#if defined(URP_12_OR_NEWER)
-						return float4(input.normalWS.xyz, 0.0);
-					#else
-						return float4(PackNormalOctRectEncode(TransformWorldToViewDir(input.normalWS, true)), 0.0, 0.0);
-					#endif
-				#endif
 
 				return 0;
 			}
@@ -783,6 +728,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 			ZWrite On
 			ZTest LEqual
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard srp library
@@ -817,6 +763,7 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 
 			ZWrite On
 			ColorMask 0
+			Cull [_faceCulling]
 
 			HLSLPROGRAM
 
@@ -838,37 +785,11 @@ Shader "Toony Colors Pro 2/User/World Space Hybrid Shader"
 			ENDHLSL
 		}
 
-		Pass
-		{
-			Name "DepthNormals"
-			Tags
-			{
-				"LightMode" = "DepthNormals"
-			}
-
-			ZWrite On
-
-			HLSLPROGRAM
-			#pragma exclude_renderers gles gles3 glcore
-			#pragma target 2.0
-
-			#pragma multi_compile_instancing
-
-			// using simple #define doesn't work, we have to use this instead
-			#pragma multi_compile DEPTH_ONLY_PASS
-			#pragma multi_compile DEPTH_NORMALS_PASS
-
-			#pragma vertex ShadowDepthPassVertex
-			#pragma fragment ShadowDepthPassFragment
-
-			ENDHLSL
-		}
-
 	}
 
 	FallBack "Hidden/InternalErrorShader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","TRIPLANAR","TEXTURED_THRESHOLD","FOG","OUTLINE","OUTLINE_URP_FEATURE","TEMPLATE_LWRP","ENABLE_DECALS"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,sp(name:"Ground Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriGround";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"bace4302-c397-4f26-8627-728d400fde62";op:Multiply;lbl:"Ground";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False),sp(name:"Walls Texture";imps:list[imp_mp_texture(uto:True;tov:"";tov_lbl:"";gto:False;sbt:False;scr:False;scv:"";scv_lbl:"";gsc:False;roff:False;goff:False;sin_anm:False;sin_anmv:"";sin_anmv_lbl:"";gsin:False;notile:False;triplanar_local:False;def:"white";locked_uv:True;uv:0;cc:4;chan:"RGBA";mip:-1;mipprop:False;ssuv_vert:False;ssuv_obj:False;uv_type:Texcoord;uv_chan:"XZ";tpln_scale:1;uv_shaderproperty:__NULL__;uv_cmp:__NULL__;sep_sampler:__NULL__;prop:"_TriSide";md:"";gbv:False;custom:False;refs:"";pnlock:False;guid:"e5f5c0f8-eb1c-4209-aef8-36282e1757cc";op:Multiply;lbl:"Walls";gpu_inst:False;dots_inst:False;locked:True;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH 55cb632b39b1a134885c493dff679dcf */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","CULLING","TEMPLATE_LWRP"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
+/* TCP_HASH 9fb2e2a9f03390f30e94ad40596da9c2 */
