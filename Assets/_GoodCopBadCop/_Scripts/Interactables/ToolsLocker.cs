@@ -30,6 +30,12 @@ public class ToolsLocker : Interactable
         };
     }
 
+    [ContextMenu("Open")]
+    public void ForceOpen()
+    {
+        OpenLockerServerRpc();
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         Debug.Log("Toggle Tool Locker");

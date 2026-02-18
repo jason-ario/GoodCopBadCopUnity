@@ -7,7 +7,6 @@ public class HumanoidFingerController : MonoBehaviour
 
     [Header("Left Hand")]
     [Range(0, 1)] public float leftFist;
-    [Range(0, 1)] public float leftThumb;
     [Range(0, 1)] public float leftIndex;
     [Range(0, 1)] public float leftMiddle;
     [Range(0, 1)] public float leftRing;
@@ -15,57 +14,62 @@ public class HumanoidFingerController : MonoBehaviour
 
     [Header("Right Hand")]
     [Range(0, 1)] public float rightFist;
-    [Range(0, 1)] public float rightThumb;
     [Range(0, 1)] public float rightIndex;
     [Range(0, 1)] public float rightMiddle;
     [Range(0, 1)] public float rightRing;
     [Range(0, 1)] public float rightLittle;
 
-    private FingerSet leftHand;
-    private FingerSet rightHand;
+    FingerSet leftHand;
+    FingerSet rightHand;
 
     void OnEnable()
     {
-        if (!animator) animator = GetComponent<Animator>();
-        Setup();
+        Initialize();
     }
 
-    void Update()
+    void Initialize()
     {
-        ApplyHand(leftHand, leftFist, leftThumb, leftIndex, leftMiddle, leftRing, leftLittle);
-        ApplyHand(rightHand, rightFist, rightThumb, rightIndex, rightMiddle, rightRing, rightLittle);
+        if (!animator)
+            animator = GetComponentInChildren<Animator>();
+
+        if (animator && animator.isHuman)
+        {
+            leftHand = new FingerSet(animator, true);
+            rightHand = new FingerSet(animator, false);
+        }
     }
 
-    void Setup()
+    void LateUpdate()
     {
         if (!animator || !animator.isHuman) return;
 
-        leftHand = CreateFingerSet(true);
-        rightHand = CreateFingerSet(false);
+        ApplyHand(leftHand, leftFist, leftIndex, leftMiddle, leftRing, leftLittle);
+        ApplyHand(rightHand, rightFist, rightIndex, rightMiddle, rightRing, rightLittle);
     }
 
-    FingerSet CreateFingerSet(bool left)
-    {
-        HumanBodyBones prefix = left ? HumanBodyBones.LeftThumbProximal : HumanBodyBones.RightThumbProximal;
-
-        return new FingerSet(animator, left);
-    }
-
-    void ApplyHand(FingerSet hand, float fist, float thumb, float index, float middle, float ring, float little)
+    void ApplyHand(FingerSet hand, float fist, float index, float middle, float ring, float little)
     {
         if (hand == null) return;
 
-        hand.ApplyFinger(hand.thumb, thumb + fist);
-        hand.ApplyFinger(hand.index, index + fist);
-        hand.ApplyFinger(hand.middle, middle + fist);
-        hand.ApplyFinger(hand.ring, ring + fist);
-        hand.ApplyFinger(hand.little, little + fist);
+        hand.index.Apply(Mathf.Clamp01(index + fist));
+        hand.middle.Apply(Mathf.Clamp01(middle + fist));
+        hand.ring.Apply(Mathf.Clamp01(ring + fist));
+        hand.little.Apply(Mathf.Clamp01(little + fist));
     }
+
+#if UNITY_EDITOR
+    [ContextMenu("Recalibrate Base Pose")]
+    void Recalibrate()
+    {
+        leftHand?.Recalibrate();
+        rightHand?.Recalibrate();
+    }
+#endif
 }
+
 
 class FingerSet
 {
-    public Finger thumb;
     public Finger index;
     public Finger middle;
     public Finger ring;
@@ -73,17 +77,7 @@ class FingerSet
 
     public FingerSet(Animator animator, bool left)
     {
-        if (!animator.isHuman) return;
-
-        thumb = new Finger(
-            animator,
-            left ? HumanBodyBones.LeftThumbProximal : HumanBodyBones.RightThumbProximal,
-            left ? HumanBodyBones.LeftThumbIntermediate : HumanBodyBones.RightThumbIntermediate,
-            left ? HumanBodyBones.LeftThumbDistal : HumanBodyBones.RightThumbDistal,
-            true    // invert for thumb
-        );
-
-        index  = new Finger(animator,
+        index = new Finger(animator,
             left ? HumanBodyBones.LeftIndexProximal : HumanBodyBones.RightIndexProximal,
             left ? HumanBodyBones.LeftIndexIntermediate : HumanBodyBones.RightIndexIntermediate,
             left ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal);
@@ -93,7 +87,7 @@ class FingerSet
             left ? HumanBodyBones.LeftMiddleIntermediate : HumanBodyBones.RightMiddleIntermediate,
             left ? HumanBodyBones.LeftMiddleDistal : HumanBodyBones.RightMiddleDistal);
 
-        ring   = new Finger(animator,
+        ring = new Finger(animator,
             left ? HumanBodyBones.LeftRingProximal : HumanBodyBones.RightRingProximal,
             left ? HumanBodyBones.LeftRingIntermediate : HumanBodyBones.RightRingIntermediate,
             left ? HumanBodyBones.LeftRingDistal : HumanBodyBones.RightRingDistal);
@@ -104,63 +98,55 @@ class FingerSet
             left ? HumanBodyBones.LeftLittleDistal : HumanBodyBones.RightLittleDistal);
     }
 
-    public void ApplyFinger(Finger finger, float amount)
+    public void Recalibrate()
     {
-        finger?.Apply(amount);
+        index?.CaptureBasePose();
+        middle?.CaptureBasePose();
+        ring?.CaptureBasePose();
+        little?.CaptureBasePose();
     }
 }
 
+
 class Finger
 {
-    Transform p;
-    Transform i;
-    Transform d;
+    Transform p, i, d;
 
-    Quaternion pOpen;
-    Quaternion iOpen;
-    Quaternion dOpen;
+    Quaternion pBase, iBase, dBase;
 
-    Quaternion pClosed;
-    Quaternion iClosed;
-    Quaternion dClosed;
+    Vector3 bendAxis = Vector3.right;
+    float maxAngle = 90f;
 
-    bool initialized = false;
-
-    public Finger(
-        Animator animator,
-        HumanBodyBones pBone,
-        HumanBodyBones iBone,
-        HumanBodyBones dBone,
-        bool invertCurl = false)
+    public Finger(Animator animator,
+                  HumanBodyBones pBone,
+                  HumanBodyBones iBone,
+                  HumanBodyBones dBone)
     {
         p = animator.GetBoneTransform(pBone);
         i = animator.GetBoneTransform(iBone);
         d = animator.GetBoneTransform(dBone);
 
-        if (!p || !i || !d) return;
+        CaptureBasePose();
+    }
 
-        // Store open pose
-        pOpen = p.localRotation;
-        iOpen = i.localRotation;
-        dOpen = d.localRotation;
+    public void CaptureBasePose()
+    {
+        if (!p) return;
 
-        // Create closed pose (deterministic)
-        float curl = invertCurl ? -90f : 90f;
-
-        pClosed = pOpen * Quaternion.Euler(curl, 0, 0);
-        iClosed = iOpen * Quaternion.Euler(curl * 1.2f, 0, 0);
-        dClosed = dOpen * Quaternion.Euler(curl * 1.3f, 0, 0);
-
-        initialized = true;
+        pBase = p.localRotation;
+        iBase = i.localRotation;
+        dBase = d.localRotation;
     }
 
     public void Apply(float t)
     {
-        if (!initialized) return;
+        if (!p) return;
 
-        p.localRotation = Quaternion.Slerp(pOpen, pClosed, t);
-        i.localRotation = Quaternion.Slerp(iOpen, iClosed, t);
-        d.localRotation = Quaternion.Slerp(dOpen, dClosed, t);
+        float angle = Mathf.Lerp(0f, maxAngle, t);
+        Quaternion offset = Quaternion.AngleAxis(angle, bendAxis);
+
+        p.localRotation = pBase * offset;
+        i.localRotation = iBase * offset;
+        d.localRotation = dBase * offset;
     }
 }
-
