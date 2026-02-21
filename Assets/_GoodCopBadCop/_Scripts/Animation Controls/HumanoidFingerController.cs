@@ -24,11 +24,6 @@ public class HumanoidFingerController : MonoBehaviour
 
     void OnEnable()
     {
-        Initialize();
-    }
-
-    void Initialize()
-    {
         if (!animator)
             animator = GetComponentInChildren<Animator>();
 
@@ -41,7 +36,8 @@ public class HumanoidFingerController : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!animator || !animator.isHuman) return;
+        if (!animator || !animator.isHuman)
+            return;
 
         ApplyHand(leftHand, leftFist, leftIndex, leftMiddle, leftRing, leftLittle);
         ApplyHand(rightHand, rightFist, rightIndex, rightMiddle, rightRing, rightLittle);
@@ -59,10 +55,17 @@ public class HumanoidFingerController : MonoBehaviour
 
 #if UNITY_EDITOR
     [ContextMenu("Recalibrate Base Pose")]
-    void Recalibrate()
+    void RecalibrateBase()
     {
         leftHand?.Recalibrate();
         rightHand?.Recalibrate();
+    }
+
+    [ContextMenu("Reset To Original Base Pose")]
+    void ResetToOriginalBase()
+    {
+        leftHand?.ResetToOriginal();
+        rightHand?.ResetToOriginal();
     }
 #endif
 }
@@ -105,6 +108,14 @@ class FingerSet
         ring?.CaptureBasePose();
         little?.CaptureBasePose();
     }
+
+    public void ResetToOriginal()
+    {
+        index?.ResetToOriginal();
+        middle?.ResetToOriginal();
+        ring?.ResetToOriginal();
+        little?.ResetToOriginal();
+    }
 }
 
 
@@ -113,8 +124,9 @@ class Finger
     Transform p, i, d;
 
     Quaternion pBase, iBase, dBase;
+    Quaternion pOriginal, iOriginal, dOriginal;
 
-    Vector3 bendAxis = Vector3.right;
+    Vector3 bendAxis = Vector3.right; // humanoid fingers usually bend on local X
     float maxAngle = 90f;
 
     public Finger(Animator animator,
@@ -126,6 +138,14 @@ class Finger
         i = animator.GetBoneTransform(iBone);
         d = animator.GetBoneTransform(dBone);
 
+        if (!p) return;
+
+        // Original pose (first time component initialized)
+        pOriginal = p.localRotation;
+        iOriginal = i.localRotation;
+        dOriginal = d.localRotation;
+
+        // Working base (used for curl math)
         CaptureBasePose();
     }
 
@@ -137,6 +157,42 @@ class Finger
         iBase = i.localRotation;
         dBase = d.localRotation;
     }
+
+    public void ResetToOriginal()
+    {
+        if (!p) return;
+    
+        // Restore original calibration pose
+        p.localRotation = pOriginal;
+        i.localRotation = iOriginal;
+        d.localRotation = dOriginal;
+    
+    #if UNITY_EDITOR
+        // Clear prefab overrides so Unity doesn't re-apply them
+        RevertPrefabOverride(p);
+        RevertPrefabOverride(i);
+        RevertPrefabOverride(d);
+    #endif
+    
+        // Reset working base
+        CaptureBasePose();
+    }
+    
+#if UNITY_EDITOR
+    void RevertPrefabOverride(Transform t)
+    {
+        if (t == null) return;
+
+        var prefabInstance = UnityEditor.PrefabUtility.GetOutermostPrefabInstanceRoot(t);
+        if (prefabInstance != null)
+        {
+            UnityEditor.PrefabUtility.RevertObjectOverride(
+                t,
+                UnityEditor.InteractionMode.AutomatedAction
+            );
+        }
+    }
+#endif
 
     public void Apply(float t)
     {
