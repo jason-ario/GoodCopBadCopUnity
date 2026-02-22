@@ -54,10 +54,14 @@ public static class FingerSceneUI
         GUILayout.Space(10);
 
         GUILayout.BeginHorizontal();
+        
+        GUILayout.BeginHorizontal();
+        GUILayout.EndHorizontal();
+
+        GUILayout.Space(8);
 
         DrawHand(
             "Left",
-            ref controller.leftThumb,
             ref controller.leftIndex,
             ref controller.leftMiddle,
             ref controller.leftRing,
@@ -70,7 +74,6 @@ public static class FingerSceneUI
 
         DrawHand(
             "Right",
-            ref controller.rightThumb,
             ref controller.rightIndex,
             ref controller.rightMiddle,
             ref controller.rightRing,
@@ -91,7 +94,6 @@ public static class FingerSceneUI
 
     static void DrawHand(
         string label,
-        ref float thumb,
         ref float index,
         ref float middle,
         ref float ring,
@@ -119,8 +121,6 @@ public static class FingerSceneUI
 
         if (isRightHand)
         {
-            DrawBottomAlignedSlider(ref thumb,  x, baseY, thumbHeight,  sliderWidth);
-            x += sliderWidth + spacing;
 
             DrawBottomAlignedSlider(ref index,  x, baseY, indexHeight,  sliderWidth);
             x += sliderWidth + spacing;
@@ -146,8 +146,6 @@ public static class FingerSceneUI
 
             DrawBottomAlignedSlider(ref index,  x, baseY, indexHeight, sliderWidth);
             x += sliderWidth + spacing;
-
-            DrawBottomAlignedSlider(ref thumb,  x, baseY, thumbHeight, sliderWidth);
         }
 
         // Fist slider beside hand
