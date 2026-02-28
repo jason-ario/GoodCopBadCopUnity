@@ -22,6 +22,19 @@ public class KillMachineController : MonoBehaviour
         Instance = this;
     }
 
+    void OnDisable()
+    { 
+        ResetBloodSplatter();
+    }
+
+    public void ResetBloodSplatter()
+    {
+        for (int i = 0; i < bloodSplatters.Length - 1; i++)
+        {
+            bloodSplatters[i].SetActive(false);
+        }
+    }
+
     public void Kill()
     {
         StartCoroutine(KillSequence());
@@ -31,17 +44,24 @@ public class KillMachineController : MonoBehaviour
     {
         killShield.SetActive(true);
         windowSound.PlayOneShot(windowCloseSound);
-        yield return new WaitForSeconds(2f);
-        SpawnBloodDecals();
+
+        yield return new WaitForSeconds(1f);
         guns.SetActive(true);
+
+        SpawnBloodDecals();
         yield return new WaitForSeconds(.5f);
-        PlayerInstance.Instance.GetComponent<PlayerCameraController>().TurnOnRumble();
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.GetComponent<PlayerCameraController>().TurnOnRumble();
+        }
         shootSFX.Play();
-        yield return new WaitForSeconds(2.2f);
-        PlayerInstance.Instance.GetComponent<PlayerCameraController>().TurnOffRumble();
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(1.5f);
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.GetComponent<PlayerCameraController>().TurnOffRumble();
+        }
+        yield return new WaitForSeconds(1.5f);
         shootSFX.Stop();
-        guns.SetActive(false);
         windowSound.PlayOneShot(windowOpenSound);
         yield return new WaitForSeconds(2f);
         killShield.SetActive(false);
