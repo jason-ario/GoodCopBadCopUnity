@@ -4,6 +4,8 @@ using UnityEditor;
 [InitializeOnLoad]
 public static class FingerSceneUI
 {
+    const float SCALE = 0.65f;
+
     static FingerSceneUI()
     {
         SceneView.duringSceneGui += OnSceneGUI;
@@ -21,146 +23,158 @@ public static class FingerSceneUI
 
         Handles.BeginGUI();
 
-        float sliderWidth = 22f;
-        float spacing = 6f;
-        float fistSpacing = 12f;
-        float sideMargin = 20f;
+        float sliderWidth = 18f * SCALE;
+        float spacing = 6f * SCALE;
+        float fistSpacing = 12f * SCALE;
 
         float singleHandWidth =
-            (sliderWidth * 6) +      // 5 fingers + fist
+            (sliderWidth * 6) +
             (spacing * 4) +
             fistSpacing;
 
-        float panelWidth = (singleHandWidth * 2) + 60f;
-        float panelHeight = 260f;
+        float panelWidth = (singleHandWidth * 2) + 30f;
+        float panelHeight = 135f; // tighter panel
 
-        // Clamp panel so it never exits Scene view bounds
-        float xPos = Mathf.Clamp(
-            sceneView.position.width - panelWidth - sideMargin,
-            10f,
-            sceneView.position.width - panelWidth - 10f
-        );
+        Rect sceneRect = sceneView.position;
+
+        float rightPadding = 15f;
+        float bottomPadding = 60f;
 
         Rect area = new Rect(
-            xPos,
-            40,
+            sceneRect.width - panelWidth - rightPadding,
+            sceneRect.height - panelHeight - bottomPadding,
             panelWidth,
             panelHeight
         );
 
-        GUILayout.BeginArea(area, GUI.skin.box);
+        // Dark translucent background
+        EditorGUI.DrawRect(area, new Color(0f, 0f, 0f, 0.45f));
 
-        GUILayout.Label("HAND CONTROLS", EditorStyles.boldLabel);
-        GUILayout.Space(10);
+        float startX = area.x + 12f;
+        float startY = area.y + 6f;
 
-        GUILayout.BeginHorizontal();
-        
-        GUILayout.BeginHorizontal();
-        GUILayout.EndHorizontal();
-
-        GUILayout.Space(8);
-
-        DrawHand(
+        // Labels
+        GUI.Label(
+            new Rect(startX, startY, 80f, 16f),
             "Left",
+            EditorStyles.miniBoldLabel
+        );
+
+        GUI.Label(
+            new Rect(startX + singleHandWidth + 20f, startY, 80f, 16f),
+            "Right",
+            EditorStyles.miniBoldLabel
+        );
+
+        startY += 18f;
+
+        // LEFT HAND
+        DrawHand(controller,
             ref controller.leftIndex,
             ref controller.leftMiddle,
             ref controller.leftRing,
             ref controller.leftLittle,
             ref controller.leftFist,
-            false
+            false,
+            startX,
+            startY,
+            sliderWidth,
+            spacing
         );
 
-        GUILayout.Space(30);
-
-        DrawHand(
-            "Right",
+        // RIGHT HAND
+        DrawHand(controller,
             ref controller.rightIndex,
             ref controller.rightMiddle,
             ref controller.rightRing,
             ref controller.rightLittle,
             ref controller.rightFist,
-            true
+            true,
+            startX + singleHandWidth + 20f,
+            startY,
+            sliderWidth,
+            spacing
         );
 
-        GUILayout.EndHorizontal();
-
-        GUILayout.EndArea();
-
         Handles.EndGUI();
-
-        if (GUI.changed)
-            EditorUtility.SetDirty(controller);
     }
 
     static void DrawHand(
-        string label,
+        HumanoidFingerController controller,
         ref float index,
         ref float middle,
         ref float ring,
         ref float little,
         ref float fist,
-        bool isRightHand)
+        bool isRight,
+        float startX,
+        float startY,
+        float sliderWidth,
+        float spacing)
     {
-        GUILayout.BeginVertical();
-        GUILayout.Label(label + " Hand", EditorStyles.boldLabel);
-        GUILayout.Space(5);
+        float littleHeight = 60f * SCALE;
+        float ringHeight = 75f * SCALE;
+        float indexHeight = 90f * SCALE;
+        float middleHeight = 105f * SCALE;
+        float fistHeight = 85f * SCALE;
 
-        Rect handRect = GUILayoutUtility.GetRect(200, 180);
+        float baseY = startY + 105f * SCALE;
+        float x = startX;
 
-        float baseY = handRect.yMax;
-        float sliderWidth = 22f;
-        float spacing = 6f;
+        // White for fingers
+        GUI.color = Color.white;
 
-        float thumbHeight = 60f;
-        float littleHeight = 90f;
-        float ringHeight = 110f;
-        float indexHeight = 130f;
-        float middleHeight = 150f;
-
-        float x = handRect.x;
-
-        if (isRightHand)
+        if (isRight)
         {
-
-            DrawBottomAlignedSlider(ref index,  x, baseY, indexHeight,  sliderWidth);
+            HandleSlider(controller, ref index, x, baseY, indexHeight, sliderWidth, "rightIndex");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref middle, x, baseY, middleHeight, sliderWidth);
+            HandleSlider(controller, ref middle, x, baseY, middleHeight, sliderWidth, "rightMiddle");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref ring,   x, baseY, ringHeight,   sliderWidth);
+            HandleSlider(controller, ref ring, x, baseY, ringHeight, sliderWidth, "rightRing");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref little, x, baseY, littleHeight, sliderWidth);
+            HandleSlider(controller, ref little, x, baseY, littleHeight, sliderWidth, "rightLittle");
         }
         else
         {
-            DrawBottomAlignedSlider(ref little, x, baseY, littleHeight, sliderWidth);
+            HandleSlider(controller, ref little, x, baseY, littleHeight, sliderWidth, "leftLittle");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref ring,   x, baseY, ringHeight, sliderWidth);
+            HandleSlider(controller, ref ring, x, baseY, ringHeight, sliderWidth, "leftRing");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref middle, x, baseY, middleHeight, sliderWidth);
+            HandleSlider(controller, ref middle, x, baseY, middleHeight, sliderWidth, "leftMiddle");
             x += sliderWidth + spacing;
 
-            DrawBottomAlignedSlider(ref index,  x, baseY, indexHeight, sliderWidth);
-            x += sliderWidth + spacing;
+            HandleSlider(controller, ref index, x, baseY, indexHeight, sliderWidth, "leftIndex");
         }
 
-        // Fist slider beside hand
-        x += sliderWidth + 12f;
-        DrawBottomAlignedSlider(ref fist, x, baseY, 120f, sliderWidth);
+        // Fist slider = blue
+        x += sliderWidth + 10f;
+        GUI.color = new Color(0.2f, 0.6f, 1f, 1f);
 
-        GUILayout.EndVertical();
+        HandleSlider(controller,
+            ref fist,
+            x,
+            baseY,
+            fistHeight,
+            sliderWidth,
+            isRight ? "rightFist" : "leftFist"
+        );
+
+        GUI.color = Color.white;
     }
 
-    static void DrawBottomAlignedSlider(
+    static void HandleSlider(
+        HumanoidFingerController controller,
         ref float value,
         float x,
         float baseY,
         float height,
-        float width)
+        float width,
+        string propertyName)
     {
         Rect r = new Rect(
             x,
@@ -169,11 +183,23 @@ public static class FingerSceneUI
             height
         );
 
-        value = GUI.VerticalSlider(
+        EditorGUI.BeginChangeCheck();
+
+        float newVal = GUI.VerticalSlider(
             r,
             value,
-            1f,  // top = closed
-            0f   // bottom = open
+            1f,
+            0f
         );
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(controller, "Finger Change");
+
+            value = newVal;
+
+            EditorUtility.SetDirty(controller);
+            SceneView.RepaintAll();
+        }
     }
 }
