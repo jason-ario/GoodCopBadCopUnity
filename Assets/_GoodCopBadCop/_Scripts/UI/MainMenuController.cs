@@ -14,6 +14,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
+    [SerializeField] private GameObject singleplayerOrMultiplayer;
     [SerializeField] private StartCampaignScreen startCampaignScreenScript;
     [SerializeField] private GameObject joinGameScreen;
     [SerializeField] private Animator screenFade;
@@ -47,7 +48,8 @@ public class MainMenuController : MonoBehaviour
             startShiftScreen,
             newLoadCampaignScreen,
             startCampaignScreen,
-            joinGameScreen
+            joinGameScreen,
+            singleplayerOrMultiplayer
         };
     }
     
@@ -57,7 +59,7 @@ public class MainMenuController : MonoBehaviour
 
         SwitchToScreen(homeScreen);
         
-        sceneCamera.transform.DOMove(camEndPos.position, 10f);
+        sceneCamera.transform.DOMove(camEndPos.position, 30f);
 
         StartCoroutine(WaitAndOpenWindow());
     }
@@ -76,6 +78,9 @@ public class MainMenuController : MonoBehaviour
 
         currentScreen = target;
     }
+    
+    public void OpenStartGameScreen() =>
+        SwitchToScreen(singleplayerOrMultiplayer);
 
     public void OpenStartShiftScreen() =>
         SwitchToScreen(startShiftScreen);
@@ -89,6 +94,9 @@ public class MainMenuController : MonoBehaviour
     public void BackToHomeScreen() =>
         SwitchToScreen(homeScreen);
 
+    public void BackToStartGameScreen() =>
+        SwitchToScreen(singleplayerOrMultiplayer);
+    
     public void BackToStartShiftScreen() =>
         SwitchToScreen(startShiftScreen);
 

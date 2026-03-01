@@ -94,7 +94,7 @@ public class GameManager : NetworkBehaviour
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);
         // Loading
-        yield return new WaitForSeconds(4);
+        yield return new WaitForSeconds(1);
         MainMenuController.Instance.TransitionToGameplay(); 
         AudioManager.Instance.StartAmbientAudio();
 
