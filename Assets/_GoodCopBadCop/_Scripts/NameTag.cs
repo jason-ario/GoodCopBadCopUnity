@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class NameTag : MonoBehaviour
@@ -8,7 +9,12 @@ public class NameTag : MonoBehaviour
     [Tooltip("Optional offset from the target position (e.g. to float above the head)")]
     public Vector3 offset = new Vector3(0f, 0.2f, 0f);
 
-    [SerializeField] Camera _camera;
+    Camera _camera;
+
+    private void OnEnable()
+    {
+        _camera = Camera.main;
+    }
 
     void LateUpdate()
     {
