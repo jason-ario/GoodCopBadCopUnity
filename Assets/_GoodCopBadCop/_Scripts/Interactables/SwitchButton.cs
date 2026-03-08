@@ -12,7 +12,6 @@ public class SwitchButton : Interactable
         GameManager.Instance.TryStartLevel();
         player.playerAnimationController.SetAnimTrigger("PressButton");
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
-        player.playerAnimationController.CamRightArmRigIKTarget = ikTarget;
         player.playerAnimationController.RightArmRigIKTarget = ikTarget;
         PlayButtonSoundClientRpc();
     }

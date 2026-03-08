@@ -50,7 +50,6 @@ public class Radio : Interactable
     {
         if (isUsingRadio)
         {
-           SetIKTargetPos();
            ControlRadioFrequency();
         }
     }
@@ -71,12 +70,6 @@ public class Radio : Interactable
         arrow.position = pos;
     }
     
-    void SetIKTargetPos()
-    {
-        _playerMovementController.PlayerAnimationController.RightArmIKTarget.transform.position = ikTarget.position;
-        _playerMovementController.PlayerAnimationController.RightArmIKTarget.transform.rotation = ikTarget.rotation;
-    }
-
 
     void ExitRadio(PlayerInteractionController playerInteractionController)
     {
