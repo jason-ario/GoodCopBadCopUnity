@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -10,10 +11,20 @@ public class SwitchButton : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         GameManager.Instance.TryStartLevel();
+        StartCoroutine(EnableAndDisableMask(player));
         player.playerAnimationController.SetAnimTrigger("PressButton");
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
         player.playerAnimationController.RightArmRigIKTarget = ikTarget;
         PlayButtonSoundClientRpc();
+    }
+
+    IEnumerator EnableAndDisableMask(PlayerInteractionController player)
+    {
+        player.PlayerMovementController.SetCanControl(false);
+        player.playerAnimationController.EnableHoldObjectMask();
+        yield return new WaitForSeconds(1);
+        player.playerAnimationController.DisableHoldObjectMask();
+        player.PlayerMovementController.SetCanControl(true);
     }
 
     [ClientRpc]

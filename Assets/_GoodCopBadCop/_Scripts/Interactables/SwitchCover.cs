@@ -25,13 +25,16 @@ public class SwitchCover : Interactable
             switchCoverOpen.Value = true;
         }
         
-        StartCoroutine(WaitAndOpenSwitch());
+        StartCoroutine(WaitAndOpenSwitch(player));
     }
 
-    IEnumerator WaitAndOpenSwitch()
+    IEnumerator WaitAndOpenSwitch(PlayerInteractionController player)
     {
+        player.playerAnimationController.EnableHoldObjectMask();
         yield return new WaitForSeconds(0.3f);
         anim.SetBool("SwitchOpen", switchCoverOpen.Value);
         audioSource.Play();
+        yield return new WaitForSeconds(0.5f);
+        player.playerAnimationController.DisableHoldObjectMask();
     }
 }

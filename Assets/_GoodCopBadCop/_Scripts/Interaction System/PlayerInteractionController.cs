@@ -12,6 +12,8 @@ public class PlayerInteractionController : NetworkBehaviour
     public PlayerPickupController pickupController;
     public ReticleController reticle;
     public PlayerAnimationController playerAnimationController; 
+    public PlayerMovementController PlayerMovementController; 
+
     Interactable lastInteractable;
     private PlayerPickupController _playerPickupController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
@@ -20,6 +22,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private void Awake()
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
+        PlayerMovementController = GetComponent<PlayerMovementController>();
         reticle = GameObject.FindFirstObjectByType<ReticleController>();
         _playerPickupController = GetComponent<PlayerPickupController>();
     }
