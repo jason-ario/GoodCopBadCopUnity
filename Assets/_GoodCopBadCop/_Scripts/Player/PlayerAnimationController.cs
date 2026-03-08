@@ -49,10 +49,19 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public Transform RightArmIKTarget => rightArmIKTarget;
     public Transform LeftArmIKTarget => leftArmIKTarget;
-    public Transform RightArmRigIKTarget { get; set; }
-    public Transform LeftArmRigIKTarget { get; set; }
-    
-    public Transform CamRightArmIKTarget => camRightArmIKTarget;
+
+    public Transform RightArmRigIKTarget { get; set; } //USE THIS ONE
+
+    public Transform LeftArmRigIKTarget { get; set; } // USE THIS ONE
+
+    public Transform CamRightArmIKTarget
+    {
+        get => camRightArmIKTarget;
+        set
+        {
+            camRightArmIKTarget = value;
+        }
+    } 
     public Transform CamLeftArmIKTarget => camLeftArmIKTarget;
     public Transform CamRightArmRigIKTarget { get; set; }
     public Transform CamLeftArmRigIKTarget { get; set; }
@@ -277,5 +286,39 @@ public class PlayerAnimationController : NetworkBehaviour
             DOTween.Kill(shoulderRig.weight);
             DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime);
         }
+    }
+
+    public void TurnRightArmRigOnAndOff(float smoothOnDuration, float onDuration)
+    {
+        StartCoroutine(TurnRightArmRigOnAndOffCR(smoothOnDuration, onDuration));
+    }
+
+    IEnumerator TurnRightArmRigOnAndOffCR(float smoothOnDuration, float onDuration)
+    {
+        float elapsed = 0;
+        // Phase 1: Lerp Up to 1
+        while (elapsed < smoothOnDuration)
+        {
+            elapsed += Time.deltaTime;
+            RightArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            CamRightArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            yield return null;
+        }
+
+        RightArmRig.weight = 1;
+        yield return new WaitForSeconds(onDuration);
+
+        // Phase 2: Lerp Down to 0 (Faster)
+        elapsed = 0f;
+        while (elapsed < smoothOnDuration)
+        {
+            elapsed += Time.deltaTime;
+            RightArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
+            CamRightArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
+
+            yield return null;
+        }
+        
+        RightArmRig.weight = 0;
     }
 }

@@ -28,18 +28,22 @@ public class PlayerMovementController : NetworkBehaviour
     private Vector3 _currentVelocity;
     private float _smoothedMouseX;
     private float _smoothedMouseY;
+    private float _verticalVelocity;
+
+    [Header("Gravity Settings")]
+    [SerializeField] private float gravity = -20f;
+
+    public bool CanMove;
+    public bool CanLook;
     
     // Public properties for animation controller to access
     public float MoveXRaw { get; private set; }
     public float MoveZRaw { get; private set; }
     
-    bool canControl = true;
-
-    public bool CanMove;
-    public bool CanLook;
-    
     private Vector3 camStartPos;
     private Quaternion camStartRot;
+        
+    bool canControl = true;
 
     public Transform CameraTransform => cameraTransform;
     public bool CanControl
@@ -121,10 +125,20 @@ public class PlayerMovementController : NetworkBehaviour
         Vector3 inputDir = new Vector3(MoveX, 0, MoveZ);
         inputDir = transform.TransformDirection(inputDir);
 
-        
-        // Apply movement
-        _characterController.Move(inputDir * characterSpeed * Time.deltaTime);
+        // Apply gravity
+        if (_characterController.isGrounded)
+        {
+            _verticalVelocity = -2f; // Small constant to keep grounded
+        }
+        else
+        {
+            _verticalVelocity += gravity * Time.deltaTime;
+        }
 
+        Vector3 moveVector = inputDir * characterSpeed + Vector3.up * _verticalVelocity;
+
+        // Apply movement
+        _characterController.Move(moveVector * Time.deltaTime);
     }
 
     void Rotate()
