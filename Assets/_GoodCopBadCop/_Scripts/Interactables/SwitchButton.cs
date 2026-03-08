@@ -6,6 +6,7 @@ public class SwitchButton : Interactable
     [SerializeField] private AudioSource buttonPressSound;
     [SerializeField] private Animator anim;
     [SerializeField] Transform ikTarget;
+    
     public override void Interact(PlayerInteractionController player)
     {
         GameManager.Instance.TryStartLevel();
