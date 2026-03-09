@@ -22,6 +22,8 @@ public class GameManager : NetworkBehaviour
     public StampContainer.StampType verdictDelivered;
 
     public GateController GateController;
+    private bool _isSinglePlayer;
+    public bool IsSinglePlayer => _isSinglePlayer;
 
     private void Awake()
     {
@@ -63,6 +65,7 @@ public class GameManager : NetworkBehaviour
     private void SpawnPlayersServer()
     {
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        _isSinglePlayer = isSinglePlayer;
         
         Debug.Log("Is Single Player " + isSinglePlayer);
 
