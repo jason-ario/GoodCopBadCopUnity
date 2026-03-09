@@ -275,6 +275,7 @@ public class PlayerMovementController : NetworkBehaviour
     public void Sit(Chair chair)
     {
         if (_isSitting || camSitPos == null) return;
+        SetMovementLocked(true);
         _isSitting = true;
         chairSeatedAt = chair;
         cameraTransform.DOKill();

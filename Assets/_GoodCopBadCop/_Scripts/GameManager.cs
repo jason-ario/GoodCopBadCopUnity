@@ -86,6 +86,9 @@ public class GameManager : NetworkBehaviour
             {
                 SpawnPlayersServer();
             }
+            
+            StoryProgressionManager.Instance.StartGame();
+
             OnGameStart?.Invoke(); 
             yield break;
         }
@@ -93,8 +96,9 @@ public class GameManager : NetworkBehaviour
         UIController.Instance.FadeIn();
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);
-        // Loading
+
         yield return new WaitForSeconds(1);
+        
         MainMenuController.Instance.TransitionToGameplay(); 
         AudioManager.Instance.StartAmbientAudio();
 
@@ -102,6 +106,8 @@ public class GameManager : NetworkBehaviour
         {
             SpawnPlayersServer();
         }
+        
+        StoryProgressionManager.Instance.StartGame();
         
         //Game officially starts
         UIController.Instance.FadeOut();

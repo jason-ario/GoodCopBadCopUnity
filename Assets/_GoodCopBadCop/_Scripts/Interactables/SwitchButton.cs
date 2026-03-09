@@ -20,11 +20,11 @@ public class SwitchButton : Interactable
 
     IEnumerator EnableAndDisableMask(PlayerInteractionController player)
     {
-        player.PlayerMovementController.SetCanControl(false);
+        player.playerMovementController.SetCanControl(false);
         player.playerAnimationController.EnableHoldObjectMask();
         yield return new WaitForSeconds(1);
         player.playerAnimationController.DisableHoldObjectMask();
-        player.PlayerMovementController.SetCanControl(true);
+        player.playerMovementController.SetCanControl(true);
     }
 
     [ClientRpc]
