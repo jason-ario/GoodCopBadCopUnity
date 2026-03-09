@@ -49,7 +49,18 @@ public class IntroTutorialManager : MonoBehaviour
         vlad.animator.SetTrigger("TalkSlightSurprise");
         yield return new WaitForSeconds(4f); 
         DialogueManager.Instance.SayDialogue(vlad, "You're even skinnier and more pathetic than the last guy", true);
+        vlad.animator.SetTrigger("TalkDismissing");
+        yield return new WaitForSeconds(5f); 
+        DialogueManager.Instance.SayDialogue(vlad, "And he didn’t last very long.", true);
+        vlad.animator.SetTrigger("TalkShrug");
+        yield return new WaitForSeconds(3f); 
+        DialogueManager.Instance.SayDialogue(vlad, "I give you a week. Maybe two if you’re lucky.", true);
+        vlad.animator.SetTrigger("TalkLookAway");
+        yield return new WaitForSeconds(4f); 
+        DialogueManager.Instance.SayDialogue(vlad, "Anyway. We’ve got work to do.", true);
         vlad.animator.SetTrigger("TalkCocky");
+        yield return new WaitForSeconds(3f); 
+        DialogueManager.Instance.SayDialogue(vlad, "Town still needs supplies and someone has to keep the infected out", true);
 
     }
 }
