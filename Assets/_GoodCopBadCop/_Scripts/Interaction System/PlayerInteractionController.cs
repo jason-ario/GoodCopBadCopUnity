@@ -16,13 +16,20 @@ public class PlayerInteractionController : NetworkBehaviour
     private PlayerPickupController _playerPickupController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
     private bool _placerBlocked;
-
+    private bool _canInteract;
+    public bool CanInteract => _canInteract;
+    
     private void Awake()
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
         playerMovementController = GetComponent<PlayerMovementController>();
         reticle = GameObject.FindFirstObjectByType<ReticleController>();
         _playerPickupController = GetComponent<PlayerPickupController>();
+    }
+    
+    public void SetCanInteract(bool value)
+    {
+        _canInteract = value;
     }
 
     void Update()
@@ -32,11 +39,13 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        if (_canInteract == false) return;
+        
         if (Input.GetMouseButtonUp(1))
         {
             _placerBlocked = false;
         }
-        
+
         HandleReticle();
 
         if (Input.GetMouseButtonDown(0))
@@ -177,7 +186,6 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             ObjectPlacer.Instance.DeactivatePlacer();
         }
-
     }
     
 

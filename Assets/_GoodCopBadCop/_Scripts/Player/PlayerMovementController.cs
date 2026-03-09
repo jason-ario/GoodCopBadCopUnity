@@ -55,6 +55,12 @@ public class PlayerMovementController : NetworkBehaviour
     private Chair chairSeatedAt;
 
     public Transform CameraTransform => cameraTransform;
+    bool _canSitOrStand = true;
+
+    public void SetCantSitOrStand(bool value)
+    {
+        _canSitOrStand = value;
+    }
     public bool CanControl
     {
         get { return canControl; }
@@ -123,7 +129,7 @@ public class PlayerMovementController : NetworkBehaviour
         if (CanMove) Move();
         if (CanLook) Rotate();
 
-        if (_isSitting)
+        if (_isSitting && _canSitOrStand)
         {
             if (Input.GetKeyDown(KeyCode.Space))
             {

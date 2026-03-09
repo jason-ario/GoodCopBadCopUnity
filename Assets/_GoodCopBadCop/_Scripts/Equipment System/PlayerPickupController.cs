@@ -17,6 +17,7 @@ public class PlayerPickupController : NetworkBehaviour
     public bool IsHoldingObject => _heldObject != null;
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
+    private PlayerInteractionController _playerInteractionController;
     
     [SerializeField] ObjectContainer[] objectContainers;
     [FormerlySerializedAs("objectContainerToUse")] [SerializeField] private ObjectContainer camObjectContainer; 
@@ -37,6 +38,7 @@ public class PlayerPickupController : NetworkBehaviour
         objectContainers = GetComponentsInChildren<ObjectContainer>(true);
         itemEquippedIndex.OnValueChanged += OnItemValueChanged;
         _playerMovementController = GetComponent<PlayerMovementController>();
+        _playerInteractionController = gameObject.GetComponent<PlayerInteractionController>();
     }
 
     private void Start()
@@ -126,6 +128,8 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        if(_playerInteractionController.CanInteract == false) return;
+        
         if (_heldObject != null)
         {
             // Drop with E or right-click
@@ -136,13 +140,6 @@ public class PlayerPickupController : NetworkBehaviour
                     Debug.Log("HeldObject is null");
                     return;
                 }
-                
-                /*
-                if (ObjectPlacer.Instance.deactivatedThisFrame == false)
-                {
-                    Debug.Log("ObjectPlacer is not deactivated");
-                    return;
-                }*/
 
                 if (_heldObject.canUsePlacementBoard == false)
                 {
