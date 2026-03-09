@@ -1,5 +1,3 @@
-
-using System;
 using System.Collections;
 using TMPro;
 using Unity.Netcode;
@@ -16,47 +14,66 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private Subtitles NPCSubtitlesPrefab;
     [SerializeField] private Subtitles playerSubtitlesPrefab;
     [SerializeField] RectTransform subtitlesContainer;
-    
+    private SuspectCharacter characterTalking;
+
     private void Awake()
     {
         Instance = this;
     }
 
-    public void SayDialogue(string dialogue, AudioSource characterAudio = null, AudioClip[] audioClips = null)
+    public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false)
     {
+        // Resolve the NetworkObjectId of the character whose AudioSource was passed in
+        ulong networkObjectId = ulong.MaxValue;
+        if (character != null)
+        {
+            var netObj = character.GetComponent<NetworkObject>();
+            if (netObj != null) networkObjectId = netObj.NetworkObjectId;
+        }
+
         if (IsServer)
         {
-            // Server broadcasts to all clients
-            SayDialogueClientRpc(dialogue);
+            SayDialogueClientRpc(dialogue, networkObjectId, clearHistory);
         }
         else
         {
-            // Client requests server to broadcast
-            SayDialogueServerRpc(dialogue);
+            SayDialogueServerRpc(dialogue, networkObjectId, clearHistory);
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SayDialogueServerRpc(string dialogue)
+    private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false)
     {
-        SayDialogueClientRpc(dialogue);
+        SayDialogueClientRpc(dialogue, networkObjectId, clearHistory);
     }
 
     [ClientRpc]
-    private void SayDialogueClientRpc(string dialogue)
+    private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false)
     {
         StopDialogueAudio();
-        GameObject subtitle = SpawnSubtitles(dialogue, SuspectController.Instance.suspectCharacter.suspectName, SuspectController.Instance.suspectCharacter.suspectNameColor, false);
-        
-        // Play audio locally on each client
-        if (SuspectController.Instance.suspectCharacter.audioSource != null && 
-            SuspectController.Instance.suspectCharacter.voiceAudioClips != null && 
-            SuspectController.Instance.suspectCharacter.voiceAudioClips.Length > 0)
+
+        // Resolve the character from its NetworkObjectId, falling back to the current suspect
+        SuspectCharacter character = null;
+        if (networkObjectId != ulong.MaxValue &&
+            NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(networkObjectId, out var netObj))
+        {
+            character = netObj.GetComponent<SuspectCharacter>();
+        }
+
+        // Fallback to the current suspect if the character couldn't be resolved
+        if (character == null)
+            character = SuspectController.Instance.suspectCharacter;
+
+        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, character.suspectNameColor, false, clearHistory);
+
+        if (character.audioSource != null &&
+            character.voiceAudioClips != null &&
+            character.voiceAudioClips.Length > 0)
         {
             audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(
-                dialogue, 
-                SuspectController.Instance.suspectCharacter.audioSource, 
-                SuspectController.Instance.suspectCharacter.voiceAudioClips, 
+                dialogue,
+                character.audioSource,
+                character.voiceAudioClips,
                 subtitle));
         }
     }
@@ -70,7 +87,7 @@ public class DialogueManager : NetworkBehaviour
         while (timer < duration)
         {
             int randomIndex;
-            
+
             if (audioClips.Length > 1)
             {
                 do
@@ -87,14 +104,12 @@ public class DialogueManager : NetworkBehaviour
             AudioClip clip = audioClips[randomIndex];
             audioSource.PlayOneShot(clip);
 
-            // Wait for the clip to finish
             float clipDuration = clip.length;
             yield return new WaitForSeconds(clipDuration);
-            
-            // Add a random delay between clips for a more natural rhythm
+
             float extraDelay = UnityEngine.Random.Range(minDelayBetweenClips, maxDelayBetweenClips);
             yield return new WaitForSeconds(extraDelay);
-            
+
             timer += clipDuration + extraDelay;
         }
 
@@ -115,9 +130,14 @@ public class DialogueManager : NetworkBehaviour
         dialogueChoiceSystem.StartDialogueChoices();
     }
 
-    public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default, bool isPlayer = false)
+    public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default, bool isPlayer = false, bool clearHistory = false)
     {
         Subtitles subtitles;
+
+        if (clearHistory)
+        {
+            DestroyPreviousSubtitles();
+        }
         
         if (isPlayer)
         {
@@ -127,12 +147,24 @@ public class DialogueManager : NetworkBehaviour
         {
             subtitles = Instantiate(NPCSubtitlesPrefab, subtitlesContainer);
         }
+
+ 
         
         subtitles.SetText(text, characterName, nameColor);
         subtitles.transform.SetAsLastSibling();
         StartCoroutine(DestroySubtitles(subtitles.gameObject));
 
+
+
         return subtitles.gameObject;
+    }
+
+    void DestroyPreviousSubtitles()
+    {
+        foreach (Transform child in subtitlesContainer)
+        {
+            Destroy(child.gameObject);
+        }
     }
 
     IEnumerator DestroySubtitles(GameObject subtitle)
@@ -140,6 +172,4 @@ public class DialogueManager : NetworkBehaviour
         yield return new WaitForSeconds(5);
         Destroy(subtitle);
     }
-
-    
 }

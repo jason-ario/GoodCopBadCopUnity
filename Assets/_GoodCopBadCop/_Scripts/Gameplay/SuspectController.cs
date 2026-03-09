@@ -118,8 +118,7 @@ public class SuspectController : NetworkBehaviour
         }
         
         Debug.Log("Saying entry dialogue");
-        DialogueManager.Instance.SayDialogue(suspectCharacter.entryDialogue, suspectCharacter.audioSource,
-            suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.entryDialogue);
 
         if (suspectCharacter.givesFolder)
         {
@@ -146,8 +145,7 @@ public class SuspectController : NetworkBehaviour
 
     public void RespondToDialogueChoice(int choiceIndex)
     {
-        DialogueManager.Instance.SayDialogue(suspectCharacter.dialogueResponses[choiceIndex].text,
-            suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.dialogueResponses[choiceIndex].text);
     }
 
     public void Pass()
@@ -193,7 +191,7 @@ public class SuspectController : NetworkBehaviour
             PassVisualsClientRpc();
         }
         
-        DialogueManager.Instance.SayDialogue("Thanks, comrade. I owe ya one.", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter,"Thanks, comrade. I owe ya one.");
 
         yield return new WaitForSeconds(2f);
 
@@ -278,7 +276,7 @@ public class SuspectController : NetworkBehaviour
 
         quarantineTimeline.gameObject.SetActive(true);
         quarantineTimeline.Play();
-        DialogueManager.Instance.SayDialogue("Wait... No... I'm healthy.. No!", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter,"Wait... No... I'm healthy.. No!");
 
         yield return new WaitForSeconds(2);
         suspectCharacter.lookAnimator.SetLookTarget(null);
@@ -347,7 +345,7 @@ public class SuspectController : NetworkBehaviour
         //"Wait... NO!!!"
         yield return new WaitForSeconds(1f);
 
-        DialogueManager.Instance.SayDialogue("Wait... NO!!!", suspectCharacter.audioSource, suspectCharacter.voiceAudioClips);
+        DialogueManager.Instance.SayDialogue(suspectCharacter,"Wait... NO!!!");
         suspectCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
         

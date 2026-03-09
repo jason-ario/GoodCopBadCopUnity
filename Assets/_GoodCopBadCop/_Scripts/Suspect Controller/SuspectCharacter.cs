@@ -106,7 +106,7 @@ public class SuspectCharacter : Interactable
         facingPlayer = true;
         yield return new WaitForSeconds(1);
         animator.SetBool("Aiming Rifle", true);
-        DialogueManager.Instance.SayDialogue("You.. You're a traitor!!");
+        DialogueManager.Instance.SayDialogue(this,"You.. You're a traitor!!");
         yield return new WaitForSeconds(2);
         animator.SetBool("FiringRifle", true);
 
