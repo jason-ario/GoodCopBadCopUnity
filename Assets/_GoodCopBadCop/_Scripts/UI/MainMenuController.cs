@@ -21,7 +21,6 @@ public class MainMenuController : MonoBehaviour
  
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
-    [SerializeField] private GameObject[] chairs;
     [SerializeField] private GameObject sceneCamera;
     [SerializeField] private Transform camEndPos;
     [SerializeField] private WindowLampController windowLampController;
@@ -152,11 +151,6 @@ public class MainMenuController : MonoBehaviour
 
     public void TransitionToGameplay()
     {
-        foreach (var chair in chairs)
-        {
-            chair.SetActive(false);
-        }
-        
         mainMenu.SetActive(false);
         
         HideAllMenus();

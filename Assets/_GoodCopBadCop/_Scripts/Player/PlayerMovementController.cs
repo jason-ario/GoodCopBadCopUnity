@@ -45,6 +45,15 @@ public class PlayerMovementController : NetworkBehaviour
         
     bool canControl = true;
 
+    [Header("Sitting and Standing")]
+    [SerializeField] private Transform camSitPos;
+    [SerializeField] private Transform camStandPos;
+    [SerializeField] private float sitStandDuration = 0.4f;
+
+    private bool _isSitting = false;
+    public bool IsSitting => _isSitting;
+    private Chair chairSeatedAt;
+
     public Transform CameraTransform => cameraTransform;
     public bool CanControl
     {
@@ -80,6 +89,9 @@ public class PlayerMovementController : NetworkBehaviour
         _characterController = GetComponent<CharacterController>();
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         
+        CanMove = true;
+        CanLook = true;
+        
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -108,8 +120,16 @@ public class PlayerMovementController : NetworkBehaviour
             return;
         }
         
-        Move();
-        Rotate();
+        if (CanMove) Move();
+        if (CanLook) Rotate();
+
+        if (_isSitting)
+        {
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                StandUp();
+            }
+        }
     }
 
     void Move()
@@ -195,6 +215,25 @@ public class PlayerMovementController : NetworkBehaviour
         transform.DOKill();
     }
 
+    public void SetCanMove(bool value)
+    {
+        CanMove = value;
+    }
+
+    public void SetCanLook(bool value)
+    {
+        CanLook = value;
+    }
+
+    /// <summary>
+    /// Locks player movement while still allowing camera look/rotation.
+    /// </summary>
+    public void SetMovementLocked(bool locked)
+    {
+        CanMove = !locked;
+        CanLook = true;
+    }
+
     public void LookAtTarget(Transform target)
     {
         // Rotate player (Y axis) based on horizontal mouse movement
@@ -231,5 +270,28 @@ public class PlayerMovementController : NetworkBehaviour
         {
             cameraTransform.DOLocalMove(camStartPos, duration);
         }
+    }
+
+    public void Sit(Chair chair)
+    {
+        if (_isSitting || camSitPos == null) return;
+        _isSitting = true;
+        chairSeatedAt = chair;
+        cameraTransform.DOKill();
+        cameraTransform.DOLocalMove(camSitPos.localPosition, sitStandDuration).SetEase(Ease.InOutSine);
+        _playerAnimationController.SetAnimBool("Sitting", true);
+    }
+
+    public void StandUp()
+    {
+        if (!_isSitting || camStandPos == null) return;
+        _isSitting = false;
+        transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
+        chairSeatedAt.transform.parent = null;
+        chairSeatedAt = null;
+        
+        cameraTransform.DOKill();
+        cameraTransform.DOLocalMove(camStandPos.localPosition, sitStandDuration).SetEase(Ease.InOutSine).OnComplete(() => SetMovementLocked(false));
+        _playerAnimationController.SetAnimBool("Sitting", false);
     }
 }
