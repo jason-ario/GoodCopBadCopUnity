@@ -270,11 +270,12 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (instant)
         {
-            cameraTransform.localPosition = camStartPos;
+            cameraTransform.localPosition = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
         }
         else
         {
-            cameraTransform.DOLocalMove(camStartPos, duration);
+            Vector3 targetPos = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
+            cameraTransform.DOLocalMove(targetPos, duration);
         }
     }
 

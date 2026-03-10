@@ -150,7 +150,33 @@ public class IntroTutorialManager : MonoBehaviour
         greenStamp.OnInteract -= OnGrabbedGreenStamp;
         FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
+        folderController.onStampedComplete += OnStampedFolderGreen;
         TutorialUIManager.Instance.HideTutorialText();
         TutorialUIManager.Instance.SetTutorialText("Stamp the folder with <sprite=0>");
+    }
+
+    public void OnStampedFolderGreen()
+    {
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
+        TutorialUIManager.Instance.HideTutorialText();
+        StartCoroutine(StampedGreen());
+    }
+
+    IEnumerator StampedGreen()
+    {
+        yield return new WaitForSeconds(1f);
+        yield return new DialogueSequence()
+            .Say(vlad, "Look at that,", clearHistory: true, waitForInput: true, 
+                onShow: () => vlad.animator.SetTrigger("TalkSarcasticNod"))
+            .Say(vlad, "You can perform basic motor functions", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("Give"))
+            .Play();
+
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        NetworkHelper.DespawnWithChildren(folderController.GetComponent<NetworkObject>());
+        yield return new WaitForSeconds(.5f);
+        
+        yield return new WaitForSeconds(.5f);
     }
 }

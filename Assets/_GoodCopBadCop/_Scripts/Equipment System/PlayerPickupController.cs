@@ -159,7 +159,10 @@ public class PlayerPickupController : NetworkBehaviour
                 }
                 
                 Debug.Log("Drop Object");
-                DropObject();
+                if (ObjectPlacer.Instance.IsActive || ObjectPlacer.Instance.deactivatedThisFrame)
+                {
+                    DropObject();
+                }
             }
             
             if (Input.GetMouseButtonUp(0) && pickUpCooldownComplete)

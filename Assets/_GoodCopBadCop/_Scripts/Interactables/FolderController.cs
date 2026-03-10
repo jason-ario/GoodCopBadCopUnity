@@ -37,6 +37,7 @@ public class FolderController : Interactable
     [SerializeField] private CinemachineImpulseSource _impulseSource;
 
     [SerializeField] private Transform cameraRigPos;
+    public UnityAction onStampedComplete;
 
     public override void OnNetworkSpawn()
     {
@@ -218,7 +219,8 @@ public class FolderController : Interactable
         if (isLocal) PlayerInstance.Instance.CanControl = true;
         playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
         if (IsServer) inFolderPos.Value = false;
-
+        
+        onStampedComplete?.Invoke();
     }
 
     IEnumerator LerpRigOnAndOff()

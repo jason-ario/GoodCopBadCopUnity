@@ -177,7 +177,7 @@ public class SuspectController : NetworkBehaviour
         {
             if (spawnedFolder != null && spawnedFolder.IsSpawned)
             {
-                DespawnWithChildren(spawnedFolder);
+                NetworkHelper.DespawnWithChildren(spawnedFolder);
             }
 
             // Trigger visuals for other clients
@@ -257,7 +257,7 @@ public class SuspectController : NetworkBehaviour
         {
             if (spawnedFolder != null && spawnedFolder.IsSpawned)
             {
-                DespawnWithChildren(spawnedFolder);
+                NetworkHelper.DespawnWithChildren(spawnedFolder);
             }
 
             // Trigger visuals for other clients
@@ -299,25 +299,7 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(KillSequence());
     }
     
-    private void DespawnWithChildren(NetworkObject netObj)
-    {
-        if (netObj == null || !netObj.IsSpawned) return;
 
-        // Get all nested NetworkObjects in children
-        var childNetworkObjects = netObj.GetComponentsInChildren<NetworkObject>();
-        
-        // Despawn children first (excluding the parent itself to avoid early destruction)
-        for (int i = childNetworkObjects.Length - 1; i >= 0; i--)
-        {
-            if (childNetworkObjects[i] != netObj && childNetworkObjects[i].IsSpawned)
-            {
-                childNetworkObjects[i].Despawn();
-            }
-        }
-
-        // Finally despawn the parent
-        netObj.Despawn();
-    }
 
     IEnumerator KillSequence()
     {
@@ -332,7 +314,7 @@ public class SuspectController : NetworkBehaviour
         {
             if (spawnedFolder != null && spawnedFolder.IsSpawned)
             { 
-                DespawnWithChildren(spawnedFolder);
+                NetworkHelper.DespawnWithChildren(spawnedFolder);
             }
         }
         //"Wait... NO!!!"
