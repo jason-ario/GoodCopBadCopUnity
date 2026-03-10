@@ -40,42 +40,42 @@ public class IntroTutorialManager : MonoBehaviour
         StartCoroutine(StartIntro());
     }
 
+    //TUTORIAL PART 1
     IEnumerator StartIntro()
     {
         vlad.gameObject.SetActive(true);
         vlad.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
         yield return new WaitForSeconds(4f);
+
         rollingShutter.SetBool("Open", true);
-        yield return new WaitForSeconds(3f); 
-        DialogueManager.Instance.SayDialogue(vlad, "So you’re the replacement, huh?", true);
-        vlad.animator.SetTrigger("TalkSlightSurprise");
-        yield return new WaitForSeconds(4f); 
-        DialogueManager.Instance.SayDialogue(vlad, "You're even skinnier and more pathetic than the last guy", true);
-        vlad.animator.SetTrigger("TalkDismissing");
-        yield return new WaitForSeconds(5f); 
-        DialogueManager.Instance.SayDialogue(vlad, "And he didn’t last very long.", true);
-        vlad.animator.SetTrigger("TalkShrug");
-        yield return new WaitForSeconds(3f); 
-        DialogueManager.Instance.SayDialogue(vlad, "I give you a week. Maybe two if you’re lucky.", true);
-        vlad.animator.SetTrigger("TalkLookAway");
-        yield return new WaitForSeconds(4f); 
-        DialogueManager.Instance.SayDialogue(vlad, "Anyway. We’ve got work to do.", true);
-        vlad.animator.SetTrigger("TalkCocky");
-        yield return new WaitForSeconds(3f); 
-        DialogueManager.Instance.SayDialogue(vlad, "Town still needs supplies and someone has to keep the infected out", true);
-        yield return new WaitForSeconds(3f); 
-        vlad.GivePaperwork();
-        DialogueManager.Instance.SayDialogue(vlad, "The system is simple. Follow protocol.", true);
-        yield return new WaitForSeconds(3f); 
-        vlad.animator.SetTrigger("TalkCocky");
-        DialogueManager.Instance.SayDialogue(vlad, "First, coffee breaks over. Put down that coffee and grab this folder, will ya?", true);
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(3f);
+
+        yield return new DialogueSequence()
+            .Say(vlad, "So you're the replacement, huh?", clearHistory: true, waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkSlightSurprise"))
+            .Say(vlad, "You're even skinnier and more pathetic than the last guy", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkDismissing"))
+            .Say(vlad, "And he didn't last very long.", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkShrug"))
+            .Say(vlad, "I give you a week. Maybe two if you're lucky.", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkLookAway"))
+            .Say(vlad, "Anyway. We've got work to do.", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkCocky"))
+            .Say(vlad, "Town still needs supplies and someone has to keep the infected out", waitForInput: true)
+            .Say(vlad, "The system is simple. Follow protocol.", waitForInput: true,
+                onShow: () => vlad.GivePaperwork())
+            .Say(vlad, "First, coffee breaks over. Put down that coffee and grab this folder, will ya?",
+                waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkCocky"))
+            .Play();
+
         TutorialUIManager.Instance.SetTutorialText("Hold <sprite=1> to put down the coffee.");
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += PutDownCoffee;
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
         PlayerInstance.Instance.SetCanInteract(true);
     }
 
+    //TUTORIAL PART 2
     void PutDownCoffee()
     {
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject -= PutDownCoffee;
@@ -83,6 +83,7 @@ public class IntroTutorialManager : MonoBehaviour
         StartCoroutine(GrabFolderTutorial());
     }
 
+    //TUTORIAL PART 3
     IEnumerator GrabFolderTutorial()
     {
         yield return new WaitForSeconds(.5f);
@@ -92,8 +93,39 @@ public class IntroTutorialManager : MonoBehaviour
         folderController.OnInteract += OnGrabbedFolder;
     }
     
+    //TUTORIAL PART 4
     void OnGrabbedFolder()
     {
         TutorialUIManager.Instance.HideTutorialText();
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        folderController.OnInteract -= OnGrabbedFolder;
+        StartCoroutine(PassTutorial());
+    }
+
+    //TUTORIAL PART 5
+    IEnumerator PassTutorial()
+    {
+        yield return new DialogueSequence()
+            .Say(vlad, "Three options", clearHistory: true, waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkPoint"))
+            .Say(vlad, "Pass. Quarantine. Or Kill", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkPoint"))
+            .Say(vlad, "You decide who gets through based on whether they're infected...", waitForInput: true)
+            .Say(vlad, "Or about to be.", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkDismissing"))
+            .Say(vlad, "We don't want them spreading that sickness inside town. Obviously.", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkShrug"))
+            .Say(vlad, "If someone is healthy, and their mind is still in one piece…", waitForInput: true)
+            .Say(vlad, "You let them through", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkPoint"))
+            .Say(vlad, "Simple as that", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkShrug"))
+            .Say(vlad, "Go ahead. Stamp me green", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkShrug"))
+            .Say(vlad, "Feeling healthier than an ox today", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkBigCocky"))
+            .Say(vlad, "ha ha ha ha", waitForInput: true,
+                onShow: () => vlad.animator.SetTrigger("TalkBigLaugh"))
+            .Play();
     }
 }

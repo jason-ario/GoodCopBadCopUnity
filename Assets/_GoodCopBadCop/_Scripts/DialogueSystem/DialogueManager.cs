@@ -3,6 +3,13 @@ using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+using Unity.Netcode;
+using UnityEngine;
+
 public class DialogueManager : NetworkBehaviour
 {
     public static DialogueManager Instance;
@@ -16,14 +23,16 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] RectTransform subtitlesContainer;
     private SuspectCharacter characterTalking;
 
+    private Subtitles _waitingSubtitle;
+
     private void Awake()
     {
         Instance = this;
     }
 
-    public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false)
+    public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false,
+        bool waitForInput = false, Action onComplete = null)
     {
-        // Resolve the NetworkObjectId of the character whose AudioSource was passed in
         ulong networkObjectId = ulong.MaxValue;
         if (character != null)
         {
@@ -33,26 +42,30 @@ public class DialogueManager : NetworkBehaviour
 
         if (IsServer)
         {
-            SayDialogueClientRpc(dialogue, networkObjectId, clearHistory);
+            SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput);
         }
         else
         {
-            SayDialogueServerRpc(dialogue, networkObjectId, clearHistory);
+            SayDialogueServerRpc(dialogue, networkObjectId, clearHistory, waitForInput);
+        }
+
+        if (waitForInput)
+        {
+            StartCoroutine(WaitForInputRoutine(onComplete));
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false)
+    private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false, bool waitForInput = false)
     {
-        SayDialogueClientRpc(dialogue, networkObjectId, clearHistory);
+        SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput);
     }
 
     [ClientRpc]
-    private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false)
+    private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false, bool waitForInput = false)
     {
         StopDialogueAudio();
 
-        // Resolve the character from its NetworkObjectId, falling back to the current suspect
         SuspectCharacter character = null;
         if (networkObjectId != ulong.MaxValue &&
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(networkObjectId, out var netObj))
@@ -60,11 +73,10 @@ public class DialogueManager : NetworkBehaviour
             character = netObj.GetComponent<SuspectCharacter>();
         }
 
-        // Fallback to the current suspect if the character couldn't be resolved
         if (character == null)
             character = SuspectController.Instance.suspectCharacter;
 
-        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, character.suspectNameColor, false, clearHistory);
+        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, character.suspectNameColor, false, clearHistory, waitForInput);
 
         if (character.audioSource != null &&
             character.voiceAudioClips != null &&
@@ -130,33 +142,70 @@ public class DialogueManager : NetworkBehaviour
         dialogueChoiceSystem.StartDialogueChoices();
     }
 
-    public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default, bool isPlayer = false, bool clearHistory = false)
+    public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,
+        bool isPlayer = false, bool clearHistory = false, bool waitForInput = false)
     {
-        Subtitles subtitles;
-
         if (clearHistory)
-        {
             DestroyPreviousSubtitles();
-        }
-        
-        if (isPlayer)
+
+        Subtitles subtitles = Instantiate(isPlayer ? playerSubtitlesPrefab : NPCSubtitlesPrefab, subtitlesContainer);
+
+        subtitles.SetText(text, characterName, nameColor);
+        subtitles.transform.SetAsLastSibling();
+
+        if (waitForInput)
         {
-            subtitles = Instantiate(playerSubtitlesPrefab, subtitlesContainer);
+            _waitingSubtitle = subtitles;
+            subtitles.ShowContinuePrompt(true);
         }
         else
         {
-            subtitles = Instantiate(NPCSubtitlesPrefab, subtitlesContainer);
+            _waitingSubtitle = null;
+            StartCoroutine(DestroySubtitles(subtitles.gameObject));
         }
 
- 
-        
-        subtitles.SetText(text, characterName, nameColor);
-        subtitles.transform.SetAsLastSibling();
-        StartCoroutine(DestroySubtitles(subtitles.gameObject));
-
-
-
         return subtitles.gameObject;
+    }
+
+    private bool _dialogueInputReceived = false;
+
+    /// <summary>
+    /// Called by any client pressing Space — notifies the server to advance for everyone.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void AdvanceDialogueServerRpc()
+    {
+        AdvanceDialogueClientRpc();
+    }
+
+    [ClientRpc]
+    private void AdvanceDialogueClientRpc()
+    {
+        _dialogueInputReceived = true;
+    }
+
+    public IEnumerator WaitForInputRoutine(Action onComplete = null)
+    {
+        _dialogueInputReceived = false;
+        yield return null;
+
+        while (!_dialogueInputReceived)
+        {
+            if (Input.GetKeyDown(KeyCode.E) && _waitingSubtitle != null && _waitingSubtitle.IsPromptActive)
+            {
+                AdvanceDialogueServerRpc();
+            }
+            yield return null;
+        }
+
+        ClearHistory();
+        _waitingSubtitle = null;
+        onComplete?.Invoke();
+    }
+
+    public void ClearHistory()
+    {
+        DestroyPreviousSubtitles();
     }
 
     void DestroyPreviousSubtitles()
@@ -171,5 +220,60 @@ public class DialogueManager : NetworkBehaviour
     {
         yield return new WaitForSeconds(5);
         Destroy(subtitle);
+    }
+}
+
+
+public class DialogueSequence
+{
+    private struct Entry
+    {
+        public SuspectCharacter character;
+        public string text;
+        public bool clearHistory;
+        public bool waitForInput;
+        public Action onShow;       // fires immediately when this line is shown
+    }
+
+    private readonly List<Entry> _entries = new();
+    private Action _onComplete;
+
+    public DialogueSequence Say(SuspectCharacter character, string text,
+        bool clearHistory = false, bool waitForInput = false, Action onShow = null)
+    {
+        _entries.Add(new Entry
+        {
+            character = character,
+            text = text,
+            clearHistory = clearHistory,
+            waitForInput = waitForInput,
+            onShow = onShow
+        });
+        return this; // fluent chaining
+    }
+
+    public DialogueSequence OnComplete(Action onComplete)
+    {
+        _onComplete = onComplete;
+        return this;
+    }
+
+    public IEnumerator Play()
+    {
+        foreach (var entry in _entries)
+        {
+            entry.onShow?.Invoke();
+
+            DialogueManager.Instance.SayDialogue(entry.character, entry.text,
+                clearHistory: entry.clearHistory,
+                waitForInput: entry.waitForInput);
+
+            if (entry.waitForInput)
+            {
+                yield return DialogueManager.Instance.WaitForInputRoutine();
+            }
+        }
+
+        _onComplete?.Invoke();
     }
 }

@@ -2,16 +2,48 @@ using Febucci.TextAnimatorCore;
 using Febucci.TextAnimatorForUnity;
 using TMPro;
 using UnityEngine;
+using System.Collections;
 using System.Text;
 
 public class Subtitles : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI subtitlesText;
     [SerializeField] private int maxCharactersPerLine = 50;
+    [SerializeField] private CanvasGroup continuePrompt;
 
     private string originalText; // Stores the raw text without manual breaks
     private string lastDisplayName;
     private Color lastDisplayColor;
+
+    public bool IsPromptActive { get; private set; }
+
+    public void ShowContinuePrompt(bool show)
+    {
+        if (continuePrompt == null) return;
+
+        if (show)
+            StartCoroutine(ShowPromptAfterTypewriter());
+        else
+        {
+            IsPromptActive = false;
+            continuePrompt.alpha = 0;
+        }
+    }
+
+    private IEnumerator ShowPromptAfterTypewriter()
+    {
+        IsPromptActive = false;
+        continuePrompt.alpha = 0;
+
+        var typewriter = subtitlesText.GetComponent<TextAnimatorComponentBase>();
+        if (typewriter != null)
+        {
+            yield return new WaitUntil(() => typewriter.allLettersShown);
+        }
+
+        IsPromptActive = true;
+        continuePrompt.alpha = 1;
+    }
 
     public void SetText(string text, string name = null, Color nameColor = default)
     {
