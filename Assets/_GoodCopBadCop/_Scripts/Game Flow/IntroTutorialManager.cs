@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using FIMSpace.FLook;
 using Unity.Netcode;
@@ -11,7 +12,7 @@ public class IntroTutorialManager : MonoBehaviour
 
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private SuspectCharacter vlad;
-    
+
     public void StartIntroTutorial()
     {
         //Force player into seat
@@ -29,6 +30,7 @@ public class IntroTutorialManager : MonoBehaviour
         }
         
         PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = false;
         PlayerInstance.Instance.transform.position = chair.SitPos.position;
         PlayerInstance.Instance.transform.rotation = chair.SitPos.rotation;
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().PickUpObject(coffee);
@@ -61,6 +63,37 @@ public class IntroTutorialManager : MonoBehaviour
         vlad.animator.SetTrigger("TalkCocky");
         yield return new WaitForSeconds(3f); 
         DialogueManager.Instance.SayDialogue(vlad, "Town still needs supplies and someone has to keep the infected out", true);
+        yield return new WaitForSeconds(3f); 
+        vlad.GivePaperwork();
+        DialogueManager.Instance.SayDialogue(vlad, "The system is simple. Follow protocol.", true);
+        yield return new WaitForSeconds(3f); 
+        vlad.animator.SetTrigger("TalkCocky");
+        DialogueManager.Instance.SayDialogue(vlad, "First, coffee breaks over. Put down that coffee and grab this folder, will ya?", true);
+        yield return new WaitForSeconds(5f);
+        TutorialUIManager.Instance.SetTutorialText("Hold <sprite=1> to put down the coffee.");
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += PutDownCoffee;
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
+        PlayerInstance.Instance.SetCanInteract(true);
+    }
 
+    void PutDownCoffee()
+    {
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject -= PutDownCoffee;
+        TutorialUIManager.Instance.HideTutorialText();
+        StartCoroutine(GrabFolderTutorial());
+    }
+
+    IEnumerator GrabFolderTutorial()
+    {
+        yield return new WaitForSeconds(.5f);
+        TutorialUIManager.Instance.SetTutorialText("Grab the folder with <sprite=0>");
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
+        folderController.OnInteract += OnGrabbedFolder;
+    }
+    
+    void OnGrabbedFolder()
+    {
+        TutorialUIManager.Instance.HideTutorialText();
     }
 }

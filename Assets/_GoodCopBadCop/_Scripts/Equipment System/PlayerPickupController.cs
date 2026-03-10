@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Serialization;
 
 public class PlayerPickupController : NetworkBehaviour
@@ -31,7 +32,17 @@ public class PlayerPickupController : NetworkBehaviour
     private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private float pickUpUseCooldownTimer = .2f;
     private bool pickUpCooldownComplete = false;
+
+    public UnityAction OnPlaceObject;
+
     
+    private bool _canPickUpAndPlace;
+    public bool CanPickUpAndPlace
+    {
+        get => _canPickUpAndPlace;
+        set => _canPickUpAndPlace = value;
+    }
+
     private void Awake()
     {
         _playerAnimationController = GetComponent<PlayerAnimationController>();
@@ -128,8 +139,8 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        if(_playerInteractionController.CanInteract == false) return;
-        
+        if(CanPickUpAndPlace == false) return;
+
         if (_heldObject != null)
         {
             // Drop with E or right-click
@@ -279,6 +290,7 @@ public class PlayerPickupController : NetworkBehaviour
     }
     public void DropObject(Transform dropPoint = null, bool doSpawn = true)
     {
+        OnPlaceObject?.Invoke();
         pickUpCooldownComplete = false;
 
         // Pass the index/ID of the held item so the server knows which prefab to spawn
@@ -349,4 +361,5 @@ public class PlayerPickupController : NetworkBehaviour
             netObj.Spawn();
         }
     }
+
 }

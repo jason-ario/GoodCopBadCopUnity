@@ -3,6 +3,7 @@ using DG.Tweening;
 using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class FolderController : Interactable
 {
@@ -36,6 +37,8 @@ public class FolderController : Interactable
     [SerializeField] private CinemachineImpulseSource _impulseSource;
 
     [SerializeField] private Transform cameraRigPos;
+    public UnityAction OnInteract;
+
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -44,7 +47,6 @@ public class FolderController : Interactable
             SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
             SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
             SpawnDocument(Envelope, envelopeSpawnPos);
-
         }
 
         // Sync visual state on spawn and when variables change
@@ -86,6 +88,7 @@ public class FolderController : Interactable
     {
         if (isStamped.Value) return;
 
+        OnInteract?.Invoke();
         InteractServerRpc();
     }
 

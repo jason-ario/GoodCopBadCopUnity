@@ -128,4 +128,16 @@ public class SuspectCharacter : Interactable
             transform.LookAt(targetPosition);
         }
     }
+    
+    public void GivePaperwork()
+    {
+        StartCoroutine(GivePaperworkCoroutine());
+    }
+    
+    IEnumerator GivePaperworkCoroutine()
+    {
+        animator.SetTrigger("Give");
+        yield return new WaitForSeconds(1f);
+        SuspectController.Instance.SpawnPaperwork();
+    }
 }

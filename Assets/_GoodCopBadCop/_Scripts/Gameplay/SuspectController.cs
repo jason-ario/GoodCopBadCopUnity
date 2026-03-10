@@ -122,17 +122,10 @@ public class SuspectController : NetworkBehaviour
 
         if (suspectCharacter.givesFolder)
         {
-            StartCoroutine(GivePaperworkCoroutine());
+            suspectCharacter.GivePaperwork();
         }
     }
-
-    IEnumerator GivePaperworkCoroutine()
-    {
-        suspectCharacter.animator.SetTrigger("Give");
-        yield return new WaitForSeconds(1f);
-        SpawnPaperwork();
-    }
-
+    
     public void SpawnPaperwork()
     {
         if (!IsServer) return;

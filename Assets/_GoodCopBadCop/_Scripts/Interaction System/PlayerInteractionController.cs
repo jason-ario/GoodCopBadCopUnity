@@ -18,6 +18,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _placerBlocked;
     private bool _canInteract;
     public bool CanInteract => _canInteract;
+    public Interactable onlyAllowedInteractable;
     
     private void Awake()
     {
@@ -39,6 +40,7 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        HandleReticle();
         if (_canInteract == false) return;
         
         if (Input.GetMouseButtonUp(1))
@@ -46,7 +48,6 @@ public class PlayerInteractionController : NetworkBehaviour
             _placerBlocked = false;
         }
 
-        HandleReticle();
 
         if (Input.GetMouseButtonDown(0))
         {
@@ -61,6 +62,11 @@ public class PlayerInteractionController : NetworkBehaviour
     
     void HandleReticle()
     {
+        if (_playerPickupController.CanPickUpAndPlace == false && CanInteract == false)
+        {
+            return;
+        }
+        
         if (reticle == null)
         {
             reticle = GameObject.FindFirstObjectByType<ReticleController>();
@@ -79,10 +85,15 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
             InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
-
+            
             if (interactableCollider != null)
             {
                 interactable = interactableCollider.Interactable;
+            }
+            
+            if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
+            {
+                return;
             }
             
             bool inRange = hit.distance <= interactDistance;
@@ -129,7 +140,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     _placerBlocked = true;
                 }
 
-                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked)
+                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace)
                 {
                     CheckActivatePlacer(placementBoard, hit);
                 }
@@ -206,6 +217,14 @@ public class PlayerInteractionController : NetworkBehaviour
             if (interactableCollider != null)
             {
                 interactable = interactableCollider.Interactable;
+            }
+
+            if (onlyAllowedInteractable != null)
+            {
+                if (interactable != onlyAllowedInteractable)
+                {
+                    return false;
+                }
             }
             
             if (interactable == null)
