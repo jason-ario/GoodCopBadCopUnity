@@ -2,6 +2,7 @@ using System;
 using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 
 public interface IInteractable
 {
@@ -14,8 +15,12 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 {
     HighlightEffect highlightEffect;
     public PickableItemData[] itemsThatCanInteractWith;
-    
-    public abstract void Interact(PlayerInteractionController player);
+    public UnityAction OnInteract;
+
+    public virtual void Interact(PlayerInteractionController player)
+    {
+        OnInteract?.Invoke();
+    }
 
     protected virtual void Awake()
     {

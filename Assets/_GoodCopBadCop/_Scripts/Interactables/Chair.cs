@@ -18,6 +18,7 @@ public class Chair : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         Sit(player);
     }
 

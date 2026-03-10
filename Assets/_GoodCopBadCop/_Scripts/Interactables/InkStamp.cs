@@ -1,12 +1,14 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 public class InkStamp : Interactable
 {
     [SerializeField] private PlaceObjectSlot stampPlaceObjectSlot;
     public StampContainer.StampType StampType;
-    
+
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         if (player.pickupController.HeldObject == null && stampPlaceObjectSlot.IsPlaced)
         {
             stampPlaceObjectSlot.IsPlaced = false;

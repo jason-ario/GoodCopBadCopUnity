@@ -12,6 +12,7 @@ public class SwitchCover : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         if (switchCoverOpen.Value)
         {
             player.playerAnimationController.SetAnimTrigger("CloseSwitch");

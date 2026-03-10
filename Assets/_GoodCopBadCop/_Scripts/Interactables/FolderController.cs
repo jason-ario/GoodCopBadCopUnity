@@ -37,7 +37,6 @@ public class FolderController : Interactable
     [SerializeField] private CinemachineImpulseSource _impulseSource;
 
     [SerializeField] private Transform cameraRigPos;
-    public UnityAction OnInteract;
 
     public override void OnNetworkSpawn()
     {
@@ -88,7 +87,7 @@ public class FolderController : Interactable
     {
         if (isStamped.Value) return;
 
-        OnInteract?.Invoke();
+        base.Interact(player);
         InteractServerRpc();
     }
 

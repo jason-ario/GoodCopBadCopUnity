@@ -23,6 +23,7 @@ public class Radio : Interactable
     
     public override void Interact(PlayerInteractionController playerInteractionController)
     {
+        base.Interact(playerInteractionController);
         StartRadioInteraction(playerInteractionController);
     }
 

@@ -10,6 +10,7 @@ public class SwitchButton : Interactable
     
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         GameManager.Instance.TryStartLevel();
         StartCoroutine(EnableAndDisableMask(player));
         player.playerAnimationController.SetAnimTrigger("PressButton");

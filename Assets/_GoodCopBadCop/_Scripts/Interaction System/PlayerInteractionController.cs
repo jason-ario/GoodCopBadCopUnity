@@ -31,6 +31,16 @@ public class PlayerInteractionController : NetworkBehaviour
     public void SetCanInteract(bool value)
     {
         _canInteract = value;
+
+        if (value == false)
+        {
+            if (lastInteractable != null)
+            {
+                Debug.Log("No longer interactable");
+                lastInteractable.Highlight(false);
+                reticle.SetInteractState(false);
+            }
+        }
     }
 
     void Update()

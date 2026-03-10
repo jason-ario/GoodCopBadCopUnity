@@ -9,6 +9,7 @@ public class SupplyBox : PickableObject
     
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         if (canPickUp)
         {
             player.pickupController.PickUpObject(this, ItemData);

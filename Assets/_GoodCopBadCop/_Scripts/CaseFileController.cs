@@ -17,6 +17,7 @@ public class CaseFileController : Interactable
     
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         PlayerMovementController playerMovementController = player.GetComponent<PlayerMovementController>();
         _playerMovementController = playerMovementController;
         playerMovementController.SetCanControl(false);

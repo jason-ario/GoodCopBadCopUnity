@@ -13,6 +13,11 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private SuspectCharacter vlad;
 
+    [Header("Stamps")] 
+    [SerializeField] private InkStamp greenStamp;
+    [SerializeField] private InkStamp yellowStamp;
+    [SerializeField] private InkStamp redStamp;
+
     public void StartIntroTutorial()
     {
         //Force player into seat
@@ -72,13 +77,14 @@ public class IntroTutorialManager : MonoBehaviour
         TutorialUIManager.Instance.SetTutorialText("Hold <sprite=1> to put down the coffee.");
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += PutDownCoffee;
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
-        PlayerInstance.Instance.SetCanInteract(true);
     }
 
     //TUTORIAL PART 2
     void PutDownCoffee()
     {
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = false;
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject -= PutDownCoffee;
+        PlayerInstance.Instance.SetCanInteract(false);
         TutorialUIManager.Instance.HideTutorialText();
         StartCoroutine(GrabFolderTutorial());
     }
@@ -89,6 +95,7 @@ public class IntroTutorialManager : MonoBehaviour
         yield return new WaitForSeconds(.5f);
         TutorialUIManager.Instance.SetTutorialText("Grab the folder with <sprite=0>");
         FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
         folderController.OnInteract += OnGrabbedFolder;
     }
@@ -96,6 +103,8 @@ public class IntroTutorialManager : MonoBehaviour
     //TUTORIAL PART 4
     void OnGrabbedFolder()
     {
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
         TutorialUIManager.Instance.HideTutorialText();
         FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         folderController.OnInteract -= OnGrabbedFolder;
@@ -127,5 +136,21 @@ public class IntroTutorialManager : MonoBehaviour
             .Say(vlad, "ha ha ha ha", waitForInput: true,
                 onShow: () => vlad.animator.SetTrigger("TalkBigLaugh"))
             .Play();
+        
+        yield return new WaitForSeconds(.5f);
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
+        PlayerInstance.Instance.SetCanInteract(true);
+        TutorialUIManager.Instance.SetTutorialText("Grab the green stamp with <sprite=0>");
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = greenStamp;
+        greenStamp.OnInteract += OnGrabbedGreenStamp;
+    }
+
+    public void OnGrabbedGreenStamp()
+    {
+        greenStamp.OnInteract -= OnGrabbedGreenStamp;
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
+        TutorialUIManager.Instance.HideTutorialText();
+        TutorialUIManager.Instance.SetTutorialText("Stamp the folder with <sprite=0>");
     }
 }

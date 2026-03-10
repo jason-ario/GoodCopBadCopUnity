@@ -72,6 +72,7 @@ public class PickableObject : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         player.pickupController.PickUpObject(this, ItemData);
     }
 
