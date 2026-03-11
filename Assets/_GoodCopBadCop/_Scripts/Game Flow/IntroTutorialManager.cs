@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using DG.Tweening;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
@@ -10,7 +11,6 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private Chair singlePlayerChair;
     [SerializeField] private PickableItemData coffee;
 
-    [SerializeField] private Animator rollingShutter;
     [SerializeField] private SuspectCharacter vlad;
 
     [Header("Stamps")] 
@@ -18,12 +18,19 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private InkStamp yellowStamp;
     [SerializeField] private InkStamp redStamp;
 
+    [Header("Environment")] 
+    [SerializeField] private Animator rollingShutter;
+    [SerializeField] private Animator gate1;
+    [SerializeField] private Animator gate2;
+    [SerializeField] private Animator door;
+    
+    [System.Serializable]
     public struct MovementSequence
     {
         public Transform[] positions;
     }
 
-    public MovementSequence vladMovementSequence;
+    [SerializeField] private MovementSequence vladMovementSequence;
 
     public void StartIntroTutorial()
     {
@@ -186,5 +193,46 @@ public class IntroTutorialManager : MonoBehaviour
         rollingShutter.SetBool("Open", false);
         yield return new WaitForSeconds(.5f);
         
+        Sequence vladMovement = DOTween.Sequence();
+        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[0].rotation.eulerAngles, .5f));
+        vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", true));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[0].position, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false));
+        vladMovement.AppendCallback(() => gate1.SetBool("Open", true));
+        vladMovement.AppendInterval(.25f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[1].position, 1));
+        vladMovement.AppendInterval(.5f);
+        vladMovement.AppendCallback(() => gate1.SetBool("Open", false));
+        vladMovement.AppendInterval(.25f);
+        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[2].rotation.eulerAngles, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.AppendCallback(() => gate2.SetBool("Open", true));
+        vladMovement.AppendInterval(.25f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[2].position, 1));
+        vladMovement.AppendCallback(() => gate2.SetBool("Open", false));
+        vladMovement.AppendInterval(.5f);
+        vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", true));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[3].position, 2)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[3].rotation.eulerAngles, 2));
+        vladMovement.AppendCallback(() => door.SetBool("OpenedIn", true));
+        vladMovement.AppendInterval(.5f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[4].position, 1));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[5].position, 1));
+        vladMovement.AppendCallback(() => door.SetBool("OpenedIn", false));
+        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[5].rotation.eulerAngles, 1));
+        vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false)).OnComplete(VladEntersBooth);
+    }
+
+    void VladEntersBooth()
+    {
+        StartCoroutine(VladEntersBoothSequence());
+    }
+    IEnumerator VladEntersBoothSequence()
+    {
+        yield return new DialogueSequence()
+            .Say(vlad, "“Now let’s talk about people who are… less than healthy.", clearHistory: true, waitForInput: true, 
+                onShow: () => vlad.animator.SetTrigger("TalkLookAway"))
+            .Play();
+        
+        rollingShutter.SetBool("Open", true);
     }
 }
