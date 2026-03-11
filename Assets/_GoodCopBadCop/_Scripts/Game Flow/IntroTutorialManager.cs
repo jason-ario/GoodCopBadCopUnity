@@ -18,6 +18,13 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private InkStamp yellowStamp;
     [SerializeField] private InkStamp redStamp;
 
+    public struct MovementSequence
+    {
+        public Transform[] positions;
+    }
+
+    public MovementSequence vladMovementSequence;
+
     public void StartIntroTutorial()
     {
         //Force player into seat
@@ -176,7 +183,8 @@ public class IntroTutorialManager : MonoBehaviour
         FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         NetworkHelper.DespawnWithChildren(folderController.GetComponent<NetworkObject>());
         yield return new WaitForSeconds(.5f);
-        
+        rollingShutter.SetBool("Open", false);
         yield return new WaitForSeconds(.5f);
+        
     }
 }
