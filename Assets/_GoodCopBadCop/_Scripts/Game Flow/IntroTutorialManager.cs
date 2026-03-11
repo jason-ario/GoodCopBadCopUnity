@@ -11,7 +11,9 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private Chair singlePlayerChair;
     [SerializeField] private PickableItemData coffee;
 
+    [Header("Characters")] 
     [SerializeField] private SuspectCharacter vlad;
+    [SerializeField] private SuspectCharacter guard;
 
     [Header("Stamps")] 
     [SerializeField] private InkStamp greenStamp;
@@ -31,6 +33,7 @@ public class IntroTutorialManager : MonoBehaviour
     }
 
     [SerializeField] private MovementSequence vladMovementSequence;
+    [SerializeField] private MovementSequence guardMovementSequence;
 
     public void StartIntroTutorial()
     {
@@ -216,10 +219,11 @@ public class IntroTutorialManager : MonoBehaviour
         vladMovement.AppendCallback(() => door.SetBool("OpenedIn", true));
         vladMovement.AppendInterval(.5f);
         vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[4].position, 1));
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[5].position, 1));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[5].position, 1)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
         vladMovement.AppendCallback(() => door.SetBool("OpenedIn", false));
         vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[5].rotation.eulerAngles, 1));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false)).OnComplete(VladEntersBooth);
+        
     }
 
     void VladEntersBooth()
@@ -234,5 +238,33 @@ public class IntroTutorialManager : MonoBehaviour
             .Play();
         
         rollingShutter.SetBool("Open", true);
+        
+        yield return new WaitForSeconds(1f);
+        Sequence guardMovement = DOTween.Sequence();
+        guard.animator.SetBool("Walking", true);
+        guardMovement.Append(guard.transform.DOMove(guardMovementSequence.positions[0].position, 1.5f));
+        guardMovement.AppendCallback(() => guard.animator.SetBool("Walking", false));
+        guardMovement.Append(guard.transform.DORotate(guardMovementSequence.positions[0].rotation.eulerAngles, .5f)).OnComplete(GuardCoughs);
+        guardMovement.Play();
+    }
+
+    void GuardCoughs()
+    {
+        StartCoroutine(GuardCoughsSequence());
+    }
+
+    IEnumerator GuardCoughsSequence()
+    {
+        yield return new WaitForSeconds(1f);
+        guard.GivePaperwork();
+        yield return new WaitForSeconds(2f);
+        yield return new DialogueSequence()
+            .Say(guard, "COUGH COUGH", clearHistory: true, waitForInput: true,
+                onShow: () => guard.animator.SetTrigger("FakeCough"))
+            .Say(guard, "Ohhh nooo…", clearHistory: true, waitForInput: true)
+            .Say(guard, "I don't feel so good...", clearHistory: true, waitForInput: true)
+            .Play();
+        
+        yield return new WaitForSeconds(1);
     }
 }
