@@ -17,7 +17,7 @@ public class PlayerInteractionController : NetworkBehaviour
     [SerializeField] float objectPlacerLerpSpeed = 10f;
     private bool _placerBlocked;
     private bool _canInteract;
-    public bool CanInteract => _canInteract;
+    public bool CanInteract => _canInteract = true;
     public Interactable onlyAllowedInteractable;
     
     private void Awake()
@@ -51,7 +51,9 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         HandleReticle();
-        if (_canInteract == false) return;
+        
+        Debug.Log("Can Interact");
+        if (CanInteract == false) return;
         
         if (Input.GetMouseButtonUp(1))
         {
@@ -236,7 +238,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     return false;
                 }
             }
-            
+
             if (interactable == null)
             {
                 return false;
@@ -244,18 +246,17 @@ public class PlayerInteractionController : NetworkBehaviour
 
             if (pickupController.HeldObject != null)
             {
-                //Check if held object is compatible with this object
                 if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject))
                 {
                     interactable.InteractWithItem(this, pickupController.HeldObject);
-                    _playerPickupController.TryUseObject(); 
+                    _playerPickupController.TryUseObject();
                     return true;
                 }
 
                 Debug.Log("Held Object is not compatible with this object");
                 return false;
             }
-            
+
             if (interactable != null && interactable.enabled)
             {
                 interactable.Interact(this);

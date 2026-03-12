@@ -36,7 +36,7 @@ public class PlayerPickupController : NetworkBehaviour
     public UnityAction OnPlaceObject;
 
     
-    private bool _canPickUpAndPlace;
+    private bool _canPickUpAndPlace = true;
     public bool CanPickUpAndPlace
     {
         get => _canPickUpAndPlace;

@@ -16,6 +16,8 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     HighlightEffect highlightEffect;
     public PickableItemData[] itemsThatCanInteractWith;
     public UnityAction OnInteract;
+    public UnityAction OnInteractWithItem;
+
 
     public virtual void Interact(PlayerInteractionController player)
     {
@@ -55,6 +57,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
     {
-        
+        OnInteractWithItem?.Invoke();
     }
 }

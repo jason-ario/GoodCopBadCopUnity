@@ -56,6 +56,7 @@ public class SuspectCharacter : Interactable
 
         if (itemData.name == "Shotgun")
         {
+            base.InteractWithItem(playerInteractionController, itemData);
             GetShot();
         }
     }

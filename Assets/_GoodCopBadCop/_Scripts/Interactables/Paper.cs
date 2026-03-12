@@ -20,6 +20,7 @@ public class Paper : PickableObject
     {
         if (itemData.name == "RedPencil")
         {
+            base.InteractWithItem(playerInteractionController, itemData);
             EnterDrawMode(playerInteractionController);
         }
     }

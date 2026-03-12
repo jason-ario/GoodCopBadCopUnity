@@ -25,6 +25,8 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private Animator gate1;
     [SerializeField] private Animator gate2;
     [SerializeField] private Animator door;
+
+    [SerializeField] private AudioClip introScream;
     
     [System.Serializable]
     public struct MovementSequence
@@ -65,6 +67,8 @@ public class IntroTutorialManager : MonoBehaviour
     //TUTORIAL PART 1
     IEnumerator StartIntro()
     {
+        //SFXController.Instance.Play(introScream,.5f);
+        //yield return new WaitForSeconds(18);
         vlad.gameObject.SetActive(true);
         vlad.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
         yield return new WaitForSeconds(4f);
@@ -86,7 +90,7 @@ public class IntroTutorialManager : MonoBehaviour
             .Say(vlad, "Town still needs supplies and someone has to keep the infected out", waitForInput: true)
             .Say(vlad, "The system is simple. Follow protocol.", waitForInput: true,
                 onShow: () => vlad.GivePaperwork())
-            .Say(vlad, "First, coffee breaks over. Put down that coffee and grab this folder, will ya?",
+            .Say(vlad, "First, coffee breaks over. Put that down and grab this folder, will ya?",
                 waitForInput: true,
                 onShow: () => vlad.animator.SetTrigger("TalkCocky"))
             .Play();
@@ -116,9 +120,16 @@ public class IntroTutorialManager : MonoBehaviour
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
         folderController.OnInteract += OnGrabbedFolder;
     }
+
+    void OnGrabbedFolder()
+    {
+        TutorialUIManager.Instance.SetTutorialText("Hold <sprite=1> to put down the folder.");
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += OnPutDownFolder;
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
+    }
     
     //TUTORIAL PART 4
-    void OnGrabbedFolder()
+    void OnPutDownFolder()
     {
         PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
@@ -189,41 +200,58 @@ public class IntroTutorialManager : MonoBehaviour
             .Say(vlad, "You can perform basic motor functions", waitForInput: true,
                 onShow: () => vlad.animator.SetTrigger("Give"))
             .Play();
-
+        
         FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         NetworkHelper.DespawnWithChildren(folderController.GetComponent<NetworkObject>());
+
+        PlayerInstance.Instance.SetCanInteract(true);
+        TutorialUIManager.Instance.SetTutorialText("Place the stamp back on the ink pad with <sprite=0>");
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = greenStamp;
+        greenStamp.OnInteractWithItem += PlacedStampBack;
+    }
+
+    public void PlacedStampBack()
+    {
+        TutorialUIManager.Instance.HideTutorialText();
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
+        greenStamp.OnInteract -= PlacedStampBack;
+        StartCoroutine(VladMoveToBoothSequence());
+        PlayerInstance.Instance.SetCanInteract(false);
+    }
+
+    IEnumerator VladMoveToBoothSequence()
+    {
         yield return new WaitForSeconds(.5f);
         rollingShutter.SetBool("Open", false);
         yield return new WaitForSeconds(.5f);
         
         Sequence vladMovement = DOTween.Sequence();
-        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[0].rotation.eulerAngles, .5f));
+        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[0].rotation.eulerAngles, .25f));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", true));
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[0].position, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[0].position, .25f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false));
         vladMovement.AppendCallback(() => gate1.SetBool("Open", true));
+        vladMovement.AppendInterval(.125f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[1].position, .5f));
         vladMovement.AppendInterval(.25f);
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[1].position, 1));
-        vladMovement.AppendInterval(.5f);
         vladMovement.AppendCallback(() => gate1.SetBool("Open", false));
-        vladMovement.AppendInterval(.25f);
-        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[2].rotation.eulerAngles, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.AppendInterval(.125f);
+        vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[2].rotation.eulerAngles, .25f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
         vladMovement.AppendCallback(() => gate2.SetBool("Open", true));
-        vladMovement.AppendInterval(.25f);
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[2].position, 1));
+        vladMovement.AppendInterval(.125f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[2].position, .5f));
         vladMovement.AppendCallback(() => gate2.SetBool("Open", false));
-        vladMovement.AppendInterval(.5f);
+        vladMovement.AppendInterval(.25f);
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", true));
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[3].position, 2)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
-        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[3].rotation.eulerAngles, 2));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[3].position, 1)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[3].rotation.eulerAngles, 1));
         vladMovement.AppendCallback(() => door.SetBool("OpenedIn", true));
-        vladMovement.AppendInterval(.5f);
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[4].position, 1));
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[5].position, 1)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.AppendInterval(.25f);
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[4].position, .5f));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[5].position, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
         vladMovement.AppendCallback(() => door.SetBool("OpenedIn", false));
-        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[5].rotation.eulerAngles, 1));
+        vladMovement.Join(vlad.transform.DORotate(vladMovementSequence.positions[5].rotation.eulerAngles, .5f));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false)).OnComplete(VladEntersBooth);
-        
     }
 
     void VladEntersBooth()

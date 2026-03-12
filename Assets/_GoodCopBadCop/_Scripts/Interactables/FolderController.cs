@@ -5,7 +5,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class FolderController : Interactable
+public class FolderController : PickableObject
 {
     private NetworkVariable<bool> inFolderPos = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
@@ -22,10 +22,10 @@ public class FolderController : Interactable
     private StampContainer.StampType _stampType;
 
     [Header("Documents")] 
-    [SerializeField] private NetworkObject IdCard;
-    [SerializeField] private NetworkObject InvitationLetter;
-    [SerializeField] private NetworkObject ApplicationLetter;
-    [SerializeField] private NetworkObject Envelope;
+    //[SerializeField] private NetworkObject IdCard;
+    //[SerializeField] private NetworkObject InvitationLetter;
+    //[SerializeField] private NetworkObject ApplicationLetter;
+    //[SerializeField] private NetworkObject Envelope;
     [SerializeField] private Transform idCardSpawnPos;
     [SerializeField] private Transform invitationLetterSpawnPos;
     [SerializeField] private Transform applicationLetterSpawnPos;
@@ -43,10 +43,10 @@ public class FolderController : Interactable
     {
         if (IsServer)
         {
-            SpawnDocument(IdCard, idCardSpawnPos);
-            SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
-            SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
-            SpawnDocument(Envelope, envelopeSpawnPos);
+            //SpawnDocument(IdCard, idCardSpawnPos);
+            //SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
+            //SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
+            //SpawnDocument(Envelope, envelopeSpawnPos);
         }
 
         // Sync visual state on spawn and when variables change
@@ -109,6 +109,7 @@ public class FolderController : Interactable
         PickableItemData heldItem)
     {
         if (isStamped.Value) return;
+     base.InteractWithItem(playerInteractionController, heldItem);
         
         // Stamping sequence involves local player control locking and IK, 
         // so we trigger the visual sequence on all clients via RPC.

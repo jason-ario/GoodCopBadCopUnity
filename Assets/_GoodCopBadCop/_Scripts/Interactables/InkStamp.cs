@@ -22,6 +22,7 @@ public class InkStamp : Interactable
     {
         if (itemData == stampPlaceObjectSlot.itemThatCanBePlaced && !stampPlaceObjectSlot.IsPlaced)
         {
+            base.InteractWithItem(player, itemData);
             player.pickupController.DropObject(stampPlaceObjectSlot.PlaceObjectPos, false);
             stampPlaceObjectSlot.IsPlaced = true;
             Debug.Log("Place stamp");
