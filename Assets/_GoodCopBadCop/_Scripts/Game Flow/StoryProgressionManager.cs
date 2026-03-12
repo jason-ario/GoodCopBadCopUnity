@@ -23,7 +23,7 @@ public class StoryProgressionManager : MonoBehaviour
 
     private void StartIntroTutorial()
     {
-        //_introTutorialManager.StartIntroTutorial();
+        _introTutorialManager.StartIntroTutorial();
         SaveDataManager.Instance.HasSeenIntroTutorial = true;
     }
 }

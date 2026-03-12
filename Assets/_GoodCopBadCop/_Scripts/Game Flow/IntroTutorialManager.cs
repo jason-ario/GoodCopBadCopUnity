@@ -115,27 +115,29 @@ public class IntroTutorialManager : MonoBehaviour
     {
         yield return new WaitForSeconds(.5f);
         TutorialUIManager.Instance.SetTutorialText("Grab the folder with <sprite=0>");
-        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         PlayerInstance.Instance.SetCanInteract(true);
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
         folderController.OnInteract += OnGrabbedFolder;
     }
 
     void OnGrabbedFolder()
     {
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        folderController.OnInteract -= OnGrabbedFolder;
+        PlayerInstance.Instance.SetCanInteract(false);
         TutorialUIManager.Instance.SetTutorialText("Hold <sprite=1> to put down the folder.");
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += OnPutDownFolder;
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
     }
     
-    //TUTORIAL PART 4
     void OnPutDownFolder()
     {
         PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = false;
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject -= OnPutDownFolder;
         PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
         TutorialUIManager.Instance.HideTutorialText();
-        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
-        folderController.OnInteract -= OnGrabbedFolder;
         StartCoroutine(PassTutorial());
     }
 

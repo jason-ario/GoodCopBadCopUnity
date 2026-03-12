@@ -50,7 +50,6 @@ public class FolderController : PickableObject
         }
 
         // Sync visual state on spawn and when variables change
-        inFolderPos.OnValueChanged += (oldVal, newVal) => HandlePositionChange(newVal);
         isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
 
         // Set initial state
@@ -68,20 +67,6 @@ public class FolderController : PickableObject
         NetworkObject doc = Instantiate(prefab, spawnPos.position, spawnPos.rotation);
         doc.Spawn();
         doc.transform.SetParent(transform);
-    }
-
-    private void HandlePositionChange(bool isInFolderPos)
-    {
-        if (isInFolderPos)
-        {
-            transform.DOJump(GameManager.Instance.FolderPos.position, .3f, 1, .5f);
-        }
-        else
-        {
-            transform.DOJump(SuspectController.Instance.ApplicationSpawnPos.position, .3f, 1, .5f).OnComplete(() => GameManager.Instance.DeliveredVertict(stampContainer.Stamp));
-        }
-
-        SFXController.Instance.Play(folderPlaceClip);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -220,6 +205,11 @@ public class FolderController : PickableObject
         if (isLocal) PlayerInstance.Instance.CanControl = true;
         playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
         if (IsServer) inFolderPos.Value = false;
+        
+        transform.DOJump(SuspectController.Instance.ApplicationSpawnPos.position, .3f, 1, .5f)
+            .OnComplete(() => GameManager.Instance.DeliveredVertict(stampContainer.Stamp));
+        
+        SFXController.Instance.Play(folderPlaceClip);
         
         onStampedComplete?.Invoke();
     }

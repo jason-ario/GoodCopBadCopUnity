@@ -16,8 +16,8 @@ public class PlayerInteractionController : NetworkBehaviour
     private PlayerPickupController _playerPickupController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
     private bool _placerBlocked;
-    private bool _canInteract;
-    public bool CanInteract => _canInteract = true;
+    private bool _canInteract = false;
+    public bool CanInteract => _canInteract;
     public Interactable onlyAllowedInteractable;
     
     private void Awake()
@@ -36,7 +36,6 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             if (lastInteractable != null)
             {
-                Debug.Log("No longer interactable");
                 lastInteractable.Highlight(false);
                 reticle.SetInteractState(false);
             }
@@ -52,7 +51,6 @@ public class PlayerInteractionController : NetworkBehaviour
 
         HandleReticle();
         
-        Debug.Log("Can Interact");
         if (CanInteract == false) return;
         
         if (Input.GetMouseButtonUp(1))
