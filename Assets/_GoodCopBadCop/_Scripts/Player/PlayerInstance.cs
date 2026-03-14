@@ -34,9 +34,9 @@ public class PlayerInstance : NetworkBehaviour
         Instance = this;
     }
     
-    public void SetCanInteract(bool value)
+    public void SetCanInteract(bool value, string interactText = "")
     {
-        _playerInteractionController.SetCanInteract(value);
+        _playerInteractionController.SetCanInteract(value, interactText);
     }
 
     public void HurtPlayer()

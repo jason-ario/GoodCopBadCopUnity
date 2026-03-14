@@ -28,7 +28,7 @@ public class PlayerInteractionController : NetworkBehaviour
         _playerPickupController = GetComponent<PlayerPickupController>();
     }
     
-    public void SetCanInteract(bool value)
+    public void SetCanInteract(bool value, string interactText)
     {
         _canInteract = value;
 
@@ -37,8 +37,12 @@ public class PlayerInteractionController : NetworkBehaviour
             if (lastInteractable != null)
             {
                 lastInteractable.Highlight(false);
-                reticle.SetInteractState(false);
+                reticle.SetInteractState(false, interactText);
             }
+        }
+        else
+        {
+            reticle.SetInteractState(true, interactText);
         }
     }
 
@@ -113,7 +117,7 @@ public class PlayerInteractionController : NetworkBehaviour
             {
                 if (inRange)
                 {
-                    reticle.SetInteractState(true);
+                    reticle.SetInteractState(true, interactable.interactText);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -129,7 +133,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 //Placement Slot?
                 if (inRange && _playerPickupController.IsHoldingObject && placeObjectSlot != null && !placeObjectSlot.IsPlaced && placeObjectSlot.itemThatCanBePlaced == _playerPickupController.HeldObject)
                 {
-                    reticle.SetInteractState(true);
+                    reticle.SetInteractState(true, interactable.interactText);
                     placeObjectSlot.ShowPlaceObjectVisual();
                     ObjectPlacer.Instance.DeactivatePlacer();
                 }
@@ -189,7 +193,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 return;
             }
                 
-            reticle.SetInteractState(true);
+            reticle.SetInteractState(false);
             
             if (!ObjectPlacer.Instance.IsActive)
             {

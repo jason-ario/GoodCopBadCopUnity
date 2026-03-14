@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,6 +16,9 @@ public class ReticleController : MonoBehaviour
     private bool canInteract = false;
     private bool isTooFar = false;
 
+    [SerializeField] private TextMeshProUGUI doText; 
+    [SerializeField] private Image line;
+
     void Update()
     {
         Color targetColor = normalColor;
@@ -30,11 +34,18 @@ public class ReticleController : MonoBehaviour
             Debug.Log("Too far");
             targetColor = tooFarColor;
             targetScale = interactScale; // Keep it slightly larger when hovering too far
+            doText.gameObject.SetActive(false);
+        }
+        else
+        {
+            doText.gameObject.SetActive(false);
         }
 
         // Smoothly change color
-        reticle.color = Color.Lerp(reticle.color, targetColor, Time.deltaTime * lerpSpeed);
-
+        reticle.color = Color.Lerp(reticle.color, targetColor, Time.deltaTime * lerpSpeed); 
+        doText.color = Color.Lerp(doText.color, targetColor, Time.deltaTime * lerpSpeed);
+        line.color = Color.Lerp(line.color, targetColor, Time.deltaTime * lerpSpeed);
+        
         // Smoothly change size
         reticle.rectTransform.localScale = Vector3.Lerp(
             reticle.rectTransform.localScale,
@@ -43,10 +54,20 @@ public class ReticleController : MonoBehaviour
         );
     }
 
-    public void SetInteractState(bool state)
+    public void SetInteractState(bool state, string text = "")
     {
         canInteract = state;
         if (state) isTooFar = false;
+        
+        if (state == true && text != "")
+        {
+            doText.gameObject.SetActive(true);
+            doText.text = text;
+        }
+        else
+        {
+            doText.gameObject.SetActive(false);
+        }
     }
 
     public void SetTooFarState(bool state)
