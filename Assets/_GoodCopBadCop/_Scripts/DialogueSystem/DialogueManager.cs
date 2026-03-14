@@ -73,9 +73,16 @@ public class DialogueManager : NetworkBehaviour
             character = netObj.GetComponent<SuspectCharacter>();
         }
 
-        if (character == null)
+        if (character == null && SuspectController.Instance != null)
             character = SuspectController.Instance.suspectCharacter;
 
+        if (character == null)
+        {
+            Debug.LogWarning("DialogueManager: No character resolved for dialogue: " + dialogue);
+            return;
+        }
+
+        Debug.Log(character);
         GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, character.suspectNameColor, false, clearHistory, waitForInput);
 
         if (character.audioSource != null &&

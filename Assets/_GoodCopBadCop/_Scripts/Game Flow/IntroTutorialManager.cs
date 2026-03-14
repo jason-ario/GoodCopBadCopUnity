@@ -14,6 +14,7 @@ public class IntroTutorialManager : MonoBehaviour
     [Header("Characters")] 
     [SerializeField] private SuspectCharacter vlad;
     [SerializeField] private SuspectCharacter guard;
+    [SerializeField] private GameObject guardsContainer;
 
     [Header("Stamps")] 
     [SerializeField] private InkStamp greenStamp;
@@ -27,6 +28,14 @@ public class IntroTutorialManager : MonoBehaviour
     [SerializeField] private Animator door;
 
     [SerializeField] private AudioClip introScream;
+
+    public enum StartingSection
+    {
+        Beginning,
+        GuardQuarantine
+    }
+    
+    [SerializeField] private StartingSection startingSection;
     
     [System.Serializable]
     public struct MovementSequence
@@ -60,8 +69,15 @@ public class IntroTutorialManager : MonoBehaviour
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().PickUpObject(coffee);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCantSitOrStand(false);
         chair.SitImmediate(PlayerInstance.Instance.GetComponent<PlayerInteractionController>());
-        
-        StartCoroutine(StartIntro());
+
+        if (startingSection == StartingSection.GuardQuarantine)
+        {
+            SkipToQuarantineTutorial();
+        }
+        else
+        {
+            StartCoroutine(StartIntro());
+        }
     }
 
     //TUTORIAL PART 1
@@ -230,7 +246,7 @@ public class IntroTutorialManager : MonoBehaviour
         Sequence vladMovement = DOTween.Sequence();
         vladMovement.Append(vlad.transform.DORotate(vladMovementSequence.positions[0].rotation.eulerAngles, .25f));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", true));
-        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[0].position, .25f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
+        vladMovement.Append(vlad.transform.DOMove(vladMovementSequence.positions[0].position, .5f)).OnComplete(() => vlad.animator.SetTrigger("OpenDoorInwards"));
         vladMovement.AppendCallback(() => vlad.animator.SetBool("Walking", false));
         vladMovement.AppendCallback(() => gate1.SetBool("Open", true));
         vladMovement.AppendInterval(.125f);
@@ -260,25 +276,35 @@ public class IntroTutorialManager : MonoBehaviour
     {
         StartCoroutine(VladEntersBoothSequence());
     }
+    
+    public void SkipToQuarantineTutorial()
+    {
+        StartCoroutine(VladEntersBoothSequence());   
+    }
     IEnumerator VladEntersBoothSequence()
     {
+        vlad.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
+        guard.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
+        vlad.gameObject.SetActive(true);
+        vlad.transform.position = vladMovementSequence.positions[5].position;
+        vlad.transform.rotation = vladMovementSequence.positions[5].rotation;
         yield return new DialogueSequence()
             .Say(vlad, "“Now let’s talk about people who are… less than healthy.", clearHistory: true, waitForInput: true, 
                 onShow: () => vlad.animator.SetTrigger("TalkLookAway"))
             .Play();
         
         rollingShutter.SetBool("Open", true);
-        
-        yield return new WaitForSeconds(1f);
-        Sequence guardMovement = DOTween.Sequence();
-        guard.animator.SetBool("Walking", true);
-        guardMovement.Append(guard.transform.DOMove(guardMovementSequence.positions[0].position, 1.5f));
-        guardMovement.AppendCallback(() => guard.animator.SetBool("Walking", false));
-        guardMovement.Append(guard.transform.DORotate(guardMovementSequence.positions[0].rotation.eulerAngles, .5f)).OnComplete(GuardCoughs);
-        guardMovement.Play();
+        guardsContainer.SetActive(true);
+        foreach (var character in guardsContainer.GetComponentsInChildren<SuspectCharacter>())
+        {
+            character.GetComponent<NetworkObject>().Spawn();
+        }
+
+        yield return new WaitForSeconds(2f);
+        StartQuarantineTutorial();
     }
 
-    void GuardCoughs()
+    void StartQuarantineTutorial()
     {
         StartCoroutine(GuardCoughsSequence());
     }
