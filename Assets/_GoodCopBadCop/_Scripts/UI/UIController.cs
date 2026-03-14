@@ -14,7 +14,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
-    [SerializeField] private ScreenDamageCanvas _screenDamageCanvas; 
+    [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
+    [SerializeField] private GameObject leaveChairUI;
     
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
 
@@ -81,6 +82,11 @@ public class UIController : MonoBehaviour
     public void ShowPlayerUI()
     {
         playerUI.SetActive(true);
+    }
+    
+    public void ShowLeaveChairUI(bool value)
+    {
+        leaveChairUI.SetActive(value);
     }
 
     public void FadeIn()

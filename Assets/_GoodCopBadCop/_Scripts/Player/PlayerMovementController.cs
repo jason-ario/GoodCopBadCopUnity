@@ -49,6 +49,8 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Transform camSitPos;
     [SerializeField] private Transform camStandPos;
     [SerializeField] private float sitStandDuration = 0.4f;
+    [SerializeField] AudioClip sitSound;
+    [SerializeField] AudioClip standSound;
 
     private bool _isSitting = false;
     public bool IsSitting => _isSitting;
@@ -131,7 +133,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (_isSitting && _canSitOrStand)
         {
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKeyDown(KeyCode.Q))
             {
                 StandUp();
             }
@@ -288,16 +290,20 @@ public class PlayerMovementController : NetworkBehaviour
         cameraTransform.DOKill();
         cameraTransform.DOLocalMove(camSitPos.localPosition, sitStandDuration).SetEase(Ease.InOutSine);
         _playerAnimationController.SetAnimBool("Sitting", true);
+        SFXController.Instance.Play(sitSound);
     }
 
     public void StandUp()
     {
         if (!_isSitting || camStandPos == null) return;
         _isSitting = false;
+        UIController.Instance.ShowLeaveChairUI(false);
+
         transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
         chairSeatedAt.transform.parent = null;
         chairSeatedAt = null;
         
+        SFXController.Instance.Play(standSound);
         cameraTransform.DOKill();
         cameraTransform.DOLocalMove(camStandPos.localPosition, sitStandDuration).SetEase(Ease.InOutSine).OnComplete(() => SetMovementLocked(false));
         _playerAnimationController.SetAnimBool("Sitting", false);

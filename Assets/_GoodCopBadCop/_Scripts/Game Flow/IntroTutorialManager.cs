@@ -13,7 +13,7 @@ public class IntroTutorialManager : MonoBehaviour
 
     [Header("Characters")] 
     [SerializeField] private SuspectCharacter vlad;
-    [SerializeField] private SuspectCharacter guard;
+    [SerializeField] private SuspectCharacter[] guards;
     [SerializeField] private GameObject guardsContainer;
 
     [Header("Stamps")] 
@@ -66,7 +66,6 @@ public class IntroTutorialManager : MonoBehaviour
         PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = false;
         PlayerInstance.Instance.transform.position = chair.SitPos.position;
         PlayerInstance.Instance.transform.rotation = chair.SitPos.rotation;
-        PlayerInstance.Instance.GetComponent<PlayerPickupController>().PickUpObject(coffee);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCantSitOrStand(false);
         chair.SitImmediate(PlayerInstance.Instance.GetComponent<PlayerInteractionController>());
 
@@ -76,6 +75,7 @@ public class IntroTutorialManager : MonoBehaviour
         }
         else
         {
+            PlayerInstance.Instance.GetComponent<PlayerPickupController>().PickUpObject(coffee);
             StartCoroutine(StartIntro());
         }
     }
@@ -284,7 +284,7 @@ public class IntroTutorialManager : MonoBehaviour
     IEnumerator VladEntersBoothSequence()
     {
         vlad.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
-        guard.GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
+        guards[0].GetComponent<FLookAnimator>().SetLookTarget(Camera.main.transform);
         vlad.gameObject.SetActive(true);
         vlad.transform.position = vladMovementSequence.positions[5].position;
         vlad.transform.rotation = vladMovementSequence.positions[5].rotation;
@@ -312,15 +312,83 @@ public class IntroTutorialManager : MonoBehaviour
     IEnumerator GuardCoughsSequence()
     {
         yield return new WaitForSeconds(1f);
-        guard.GivePaperwork();
+        guards[0].GivePaperwork();
         yield return new WaitForSeconds(2f);
         yield return new DialogueSequence()
-            .Say(guard, "COUGH COUGH", clearHistory: true, waitForInput: true,
-                onShow: () => guard.animator.SetTrigger("FakeCough"))
-            .Say(guard, "Ohhh nooo…", clearHistory: true, waitForInput: true)
-            .Say(guard, "I don't feel so good...", clearHistory: true, waitForInput: true)
+            .Say(guards[0], "COUGH COUGH", clearHistory: true, waitForInput: true,
+                onShow: () => guards[0].animator.SetTrigger("FakeCough"))
+            .Say(guards[0], "Ohhh nooo…", clearHistory: true, waitForInput: true)
+            .Say(guards[0], "I don't feel so good...", clearHistory: true, waitForInput: true)
+            .Play();
+
+        for (int i = 1; i < 3; i++)
+        {
+            guards[i].animator.SetTrigger("ShortLaugh");
+        }
+        
+        vlad.animator.SetTrigger("TalkPoint");
+        
+        yield return new DialogueSequence()
+            .Say(vlad, "When someone shows symptoms of radiation sickness…", clearHistory: true, waitForInput: true,
+                onShow: () => guards[0].animator.SetTrigger("FakeCough"))
+            .Say(vlad, "They go to quarantine", clearHistory: true, waitForInput: true)
+            .Say(vlad, "No exceptions", clearHistory: true, waitForInput: true)
+            .Say(vlad, "Use the yellow stamp.", clearHistory: true, waitForInput: true)
             .Play();
         
-        yield return new WaitForSeconds(1);
+        PlayerInstance.Instance.SetCanInteract(true);
+
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = folderController;
+        folderController.OnInteract += OnPickedUpQuarantineFolder;
+        TutorialUIManager.Instance.SetTutorialText("Stamp the folder with the YELLOW stamp");
+
     }
+
+    void OnPickedUpQuarantineFolder()
+    {
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        folderController.OnInteract -= OnPickedUpQuarantineFolder;
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject += OnPutQuarantineFolderDown;
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = true;
+    }
+    
+    void OnPutQuarantineFolderDown(){
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().OnPlaceObject -= OnPutQuarantineFolderDown;
+        PlayerInstance.Instance.GetComponent<PlayerPickupController>().CanPickUpAndPlace = false;
+
+        TutorialUIManager.Instance.SetTutorialText("Grab the yellow stamp with <sprite=0>");
+
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        folderController.onStampedComplete += OnStampedFolderYellow;
+        
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = yellowStamp;
+
+    }
+    
+    public void OnStampedFolderYellow()
+    {
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = null;
+        StartCoroutine(StampedYellow());
+    }
+    
+    IEnumerator StampedYellow()
+    {
+        yield break;
+        
+        FolderController folderController = GameObject.FindAnyObjectByType<FolderController>();
+        folderController.onStampedComplete -= OnStampedFolderYellow;
+        PlayerInstance.Instance.SetCanInteract(false);
+
+        NetworkHelper.DespawnWithChildren(folderController.GetComponent<NetworkObject>());
+
+        TutorialUIManager.Instance.SetTutorialText("Place the stamp back on the ink pad with <sprite=0>");
+        PlayerInstance.Instance.GetComponent<PlayerInteractionController>().onlyAllowedInteractable = yellowStamp;
+        yellowStamp.OnInteractWithItem += PlacedStampBack;
+        TutorialUIManager.Instance.HideTutorialText();
+    }
+
 }

@@ -16,7 +16,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private PlayerPickupController _playerPickupController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
     private bool _placerBlocked;
-    private bool _canInteract = false;
+    private bool _canInteract = true;
     public bool CanInteract => _canInteract;
     public Interactable onlyAllowedInteractable;
     
