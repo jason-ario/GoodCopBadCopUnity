@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class PlaceObjectSlot : MonoBehaviour
 {
-    public PickableItemData itemThatCanBePlaced;
+    public PickableObject itemThatCanBePlaced;
     [SerializeField] private GameObject placeObjectVisual;
     [SerializeField] private GameObject objectPlacedVisual;
     [SerializeField] private Transform placementPos;

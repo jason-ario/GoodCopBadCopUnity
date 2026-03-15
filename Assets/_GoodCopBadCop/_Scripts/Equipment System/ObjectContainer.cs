@@ -54,8 +54,16 @@ public class ObjectContainer : MonoBehaviour
         }
     }
     
-    public void EquipItem(PickableItemData itemData, PlayerPickupController playerPickupController)
+    public void EquipItem(PickableItemData itemData, PlayerPickupController playerPickupController, PickableObject equipThis = null)
     {
+        if (equipThis != null)
+        {
+            currentlyEquippedItem = equipThis;
+            equipThis.OnEquipped(playerPickupController);
+            ObjectPlacer.Instance.SetItem(itemData);
+            return;
+        }
+        
         for (var i = 0; i < itemsHeld.Length; i++)
         {
             var itemHeld = itemsHeld[i];
@@ -78,13 +86,13 @@ public class ObjectContainer : MonoBehaviour
         }
     }
     
-    public void UnequipItem(PlayerPickupController playerPickupController)
+    public void UnequipItem(PlayerPickupController playerPickupController, bool deactivate = false)
     {
         // Found matching item, equip it
         if (currentlyEquippedItem != null)
         {
             currentlyEquippedItem.OnUnequip(playerPickupController);
-            currentlyEquippedItem.gameObject.SetActive(false);
+            if(deactivate) currentlyEquippedItem.gameObject.SetActive(false);
         }
             
         currentlyEquippedItem = null;

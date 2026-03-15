@@ -12,7 +12,7 @@ public class SupplyBox : PickableObject
         base.Interact(player);
         if (canPickUp)
         {
-            player.pickupController.PickUpObject(this, ItemData);
+            player.pickupController.PickUpObject(this);
         }
         else
         {

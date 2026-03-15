@@ -230,6 +230,7 @@ GameObject:
   - component: {fileID: 5426360536631860487}
   - component: {fileID: 2740063734379323081}
   - component: {fileID: 7018508940169711468}
+  - component: {fileID: 716927550540705936}
   m_Layer: 0
   m_Name: Folder
   m_TagString: Untagged
@@ -273,7 +274,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1661984415
+  GlobalObjectIdHash: 849978758
   InScenePlacedSourceGlobalObjectIdHash: 849978758
   DeferredDespawnTick: 0
   Ownership: 1
@@ -303,10 +304,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5f53032baf14e004a8e6dceb1ec1e53e, type: 2}
   - {fileID: 11400000, guid: faf369d580a787a45b2aec83112fd943, type: 2}
   - {fileID: 11400000, guid: e19983b2a1e6cb64f9bfb953477a7400, type: 2}
+  interactText: 
   meshRenderers: []
   itemData: {fileID: 11400000, guid: 9fd4d0762b506834bb5e1ee1a8cfa5b9, type: 2}
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
+  interactableColliders:
+  - {fileID: 1557523901879592777}
   folderPlaceClip: {fileID: 8300000, guid: 31592f4dc70b1a6469d96fc2bec5705b, type: 3}
   anim: {fileID: 2308801506894084094}
   stampUpTarget: {fileID: 5412411234339117797}
@@ -520,6 +524,29 @@ MonoBehaviour:
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
+--- !u!1773428102 &716927550540705936
+ParentConstraint:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2878295405558994315}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Weight: 1
+  m_TranslationAtRest: {x: 0, y: 0, z: 0}
+  m_RotationAtRest: {x: 0, y: 0, z: 0}
+  m_TranslationOffsets: []
+  m_RotationOffsets: []
+  m_AffectTranslationX: 1
+  m_AffectTranslationY: 1
+  m_AffectTranslationZ: 1
+  m_AffectRotationX: 1
+  m_AffectRotationY: 1
+  m_AffectRotationZ: 1
+  m_Active: 0
+  m_IsLocked: 0
+  m_Sources: []
 --- !u!1 &2976564984535136087
 GameObject:
   m_ObjectHideFlags: 0
@@ -771,7 +798,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4439714717531541461, guid: 811fce5e362f6724b9d260045d605dfa, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 959397533
+      value: 2692128288
       objectReference: {fileID: 0}
     - target: {fileID: 4439714717531541461, guid: 811fce5e362f6724b9d260045d605dfa, type: 3}
       propertyPath: SceneMigrationSynchronization
@@ -873,7 +900,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4436568374014581353, guid: ea4c05f16d623b349be212cd550dfcc7, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2868576150
+      value: 418422413
       objectReference: {fileID: 0}
     - target: {fileID: 4436568374014581353, guid: ea4c05f16d623b349be212cd550dfcc7, type: 3}
       propertyPath: SceneMigrationSynchronization
@@ -1262,7 +1289,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4252581406688791252, guid: 1bf6bc2364a2e7243a09a1e00976d72d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2845964499
+      value: 2755616124
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1397,7 +1424,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1706998783752543239, guid: 76944089a6378f74ca103aee325a2acc, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2101047009
+      value: 1697641053
       objectReference: {fileID: 0}
     - target: {fileID: 2846438477581394607, guid: 76944089a6378f74ca103aee325a2acc, type: 3}
       propertyPath: m_Name

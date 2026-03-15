@@ -9,7 +9,7 @@ public class IntroTutorialManager : MonoBehaviour
 {
     [SerializeField] private Chair[] chairs;
     [SerializeField] private Chair singlePlayerChair;
-    [SerializeField] private PickableItemData coffee;
+    [SerializeField] private PickableObject coffee;
 
     [Header("Characters")] 
     [SerializeField] private SuspectCharacter vlad;

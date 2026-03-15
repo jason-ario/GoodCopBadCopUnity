@@ -74,37 +74,17 @@ public class FolderController : PickableObject
         if (isStamped.Value) return;
 
         base.Interact(player);
-        InteractServerRpc();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void InteractServerRpc()
-    {
-        if (inFolderPos.Value == false)
-        {
-            inFolderPos.Value = true;
-        }
-        else
-        {
-            isOpen.Value = !isOpen.Value;
-        }
-    }
-
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController,
-        PickableItemData heldItem)
-    {
-        if (isStamped.Value) return;
-     base.InteractWithItem(playerInteractionController, heldItem);
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData heldItem)
+    { 
+        if (isStamped.Value) return; 
+        base.InteractWithItem(playerInteractionController, heldItem);
         
         // Stamping sequence involves local player control locking and IK, 
         // so we trigger the visual sequence on all clients via RPC.
         ulong clientId = playerInteractionController.NetworkObjectId;
         var inkStamp = heldItem.PickUpPrefab.GetComponent<InkStampPickup>();
-        if (isOpen.Value)
-        {
-            InteractServerRpc();
-            return;
-        }
 
         StartUseStampServerRpc(clientId, inkStamp.StampType);
     }

@@ -73,30 +73,46 @@ public class ObjectPlacer : MonoBehaviour
     public void SetItem(PickableItemData itemData)
     {
         _pickableItemData = itemData;
-        
-        foreach (var pickableObject in objectContainer.ItemsHeld)
-        {
-            if (pickableObject.ItemData == itemData)
-            {
-                pickableObject.gameObject.SetActive(true);
-            }
-            else
-            {
-                pickableObject.gameObject.SetActive(false);
-            }
-        }
+        objectContainer.EquipItem(itemData, null);
     }
 
     public void ActivatePlacer(PlacementBoard placementBoard)
     {
         container.gameObject.SetActive(true);
         IsActive = true;
+        objectContainer.CurrentlyEquippedItem.gameObject.SetActive(true);
+
+        // Sync animator state from the cam-held item to the placer item
+        PlayerPickupController playerPickup = PlayerInstance.Instance.GetComponent<PlayerPickupController>();
+        if (playerPickup != null)
+        {
+            PickableObject sourceItem = playerPickup.CamObjectContainer.CurrentlyEquippedItem;
+            PickableObject targetItem = objectContainer.CurrentlyEquippedItem;
+
+            if (sourceItem != null && targetItem != null)
+            {
+                Animator sourceAnimator = sourceItem.GetComponent<Animator>();
+                Animator targetAnimator = targetItem.GetComponent<Animator>();
+
+                if (sourceAnimator != null && targetAnimator != null)
+                {
+                    for (int i = 0; i < sourceAnimator.layerCount; i++)
+                    {
+                        AnimatorStateInfo stateInfo = sourceAnimator.GetCurrentAnimatorStateInfo(i);
+                        targetAnimator.Play(stateInfo.fullPathHash, i, stateInfo.normalizedTime);
+                    }
+                    targetAnimator.Update(0f); // Force immediate evaluation
+                }
+            }
+        }
+
         if (arcLine != null) arcLine.enabled = true;
     }
 
     public void DeactivatePlacer()
     {
         container.gameObject.SetActive(false);
+        objectContainer.CurrentlyEquippedItem.gameObject.SetActive(false);
         IsActive = false;
         if (arcLine != null)
         {
