@@ -18,7 +18,6 @@ public class FolderController : PickableObject
     public Transform stampDownTarget;
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
-    PlayerPickupController playerPickupController;
     private StampContainer.StampType _stampType;
 
     [Header("Documents")] 
@@ -38,6 +37,7 @@ public class FolderController : PickableObject
 
     [SerializeField] private Transform cameraRigPos;
     public UnityAction onStampedComplete;
+    private bool isOpening;
 
     public override void OnNetworkSpawn()
     {
@@ -244,4 +244,27 @@ public class FolderController : PickableObject
 
         playerPickupController.PlayerAnimationController.RightArmRig.weight = 0;
     }
+
+    public override void OnStartUse()
+    {
+        if (isOpening == false && isOpen.Value == false)
+        {
+            playerPickupController.PlayerAnimationController.SetAnimTrigger("OpenFolder");
+            StartCoroutine(WaitAndOpen());
+        }
+        else
+        {
+            playerPickupController.PlayerAnimationController.SetAnimTrigger("CloseFolder");
+            anim.SetBool("Open", false);
+        }
+    }
+    
+    IEnumerator WaitAndOpen()
+    {
+        isOpening = true;
+        yield return new WaitForSeconds(.4f);
+        anim.SetBool("Open", true);
+        isOpening = false;
+    }
+
 }
