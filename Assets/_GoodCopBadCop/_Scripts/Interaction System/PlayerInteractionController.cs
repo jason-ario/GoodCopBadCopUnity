@@ -197,6 +197,7 @@ public class PlayerInteractionController : NetworkBehaviour
             
             if (!ObjectPlacer.Instance.IsActive)
             {
+                ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject); // Set the item BEFORE activating
                 ObjectPlacer.Instance.ActivatePlacer(placementBoard);
                 ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
                 ObjectPlacer.Instance.transform.position = hit.point;
