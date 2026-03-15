@@ -12,6 +12,8 @@ public class AnomalyController : MonoBehaviour
     [SerializeField] private List<EnvironmentalAnomaly> _environmentalAnomalies;
 
     private Anomaly[] _anomalies;
+    private readonly List<Anomaly> _availableAnomalies = new List<Anomaly>();
+    public int AvailableAnomalyCount => _availableAnomalies.Count;
 
     private void Awake()
     {
@@ -23,9 +25,24 @@ public class AnomalyController : MonoBehaviour
             .Concat(_environmentalAnomalies)
             .ToArray();
     }
+
+    public void ResetAvailableAnomalies()
+    {
+        _availableAnomalies.Clear();
+        _availableAnomalies.AddRange(_anomalies);
+    }
+
     public void TriggerAnomaly()
     {
-        var randomAnomaly = _anomalies[Random.Range(0, _anomalies.Length)];
-        randomAnomaly.ActivateAnomaly();
+        if (_availableAnomalies.Count == 0)
+        {
+            Debug.LogWarning("No available anomalies left to trigger this round.");
+            return;
+        }
+
+        int index = Random.Range(0, _availableAnomalies.Count);
+        Anomaly chosen = _availableAnomalies[index];
+        _availableAnomalies.RemoveAt(index);
+        chosen.ActivateAnomaly();
     }
 }

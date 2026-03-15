@@ -4,7 +4,7 @@ public class Anomaly : MonoBehaviour
 {
     public virtual void ActivateAnomaly()
     {
-        
+        Debug.Log("Activated Anomaly: " + gameObject.name);
     }
 }
 

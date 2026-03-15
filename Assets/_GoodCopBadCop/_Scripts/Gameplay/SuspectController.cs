@@ -101,7 +101,11 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.animator.SetBool("Walking", true);
         suspectCharacter.transform.DOMove(standPos.position + suspectCharacter.standPosOffset, 3f).OnComplete(ArrivedAtPosition);
 
-        if (AnomalyManager.Instance.ShouldHaveAnomalyThisRound)
+        int anomalyCount = AnomalyManager.Instance.AnomalyCountThisRound();
+        suspectCharacter.PrepareAnomalies();
+        anomalyCount = Mathf.Min(anomalyCount, suspectCharacter.AnomalyController.AvailableAnomalyCount);
+        
+        for (int i = 0; i < anomalyCount; i++)
         {
             suspectCharacter.TriggerAnomaly();
         }

@@ -30,7 +30,8 @@ public class SuspectCharacter : Interactable
     
     [Header("Anomalies")]
     [SerializeField] AnomalyController anomalyController;
-    
+    public AnomalyController AnomalyController => anomalyController;
+
     [System.Serializable]
     public struct Response
     {
@@ -143,6 +144,11 @@ public class SuspectCharacter : Interactable
         animator.SetTrigger("Give");
         yield return new WaitForSeconds(1f);
         SuspectController.Instance.SpawnPaperwork();
+    }
+    
+    public void PrepareAnomalies()
+    {
+        anomalyController.ResetAvailableAnomalies();
     }
 
     public void TriggerAnomaly()
