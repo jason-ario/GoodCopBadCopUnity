@@ -28,6 +28,9 @@ public class SuspectCharacter : Interactable
     private bool facingPlayer;
     public Vector3 standPosOffset;
     
+    [Header("Anomalies")]
+    [SerializeField] AnomalyController anomalyController;
+    
     [System.Serializable]
     public struct Response
     {
@@ -140,5 +143,10 @@ public class SuspectCharacter : Interactable
         animator.SetTrigger("Give");
         yield return new WaitForSeconds(1f);
         SuspectController.Instance.SpawnPaperwork();
+    }
+
+    public void TriggerAnomaly()
+    {
+        anomalyController.TriggerAnomaly();
     }
 }

@@ -100,6 +100,11 @@ public class SuspectController : NetworkBehaviour
     {
         suspectCharacter.animator.SetBool("Walking", true);
         suspectCharacter.transform.DOMove(standPos.position + suspectCharacter.standPosOffset, 3f).OnComplete(ArrivedAtPosition);
+
+        if (AnomalyManager.Instance.ShouldHaveAnomalyThisRound)
+        {
+            suspectCharacter.TriggerAnomaly();
+        }
     }
 
     void ArrivedAtPosition()
