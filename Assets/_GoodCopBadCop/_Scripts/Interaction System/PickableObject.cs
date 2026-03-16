@@ -1,7 +1,10 @@
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.Animations;
 
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(NetworkRigidbody))]
 [RequireComponent(typeof(ParentConstraint))]
 public class PickableObject : Interactable
 {
@@ -16,12 +19,15 @@ public class PickableObject : Interactable
     [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
     [SerializeField] Collider[] interactableColliders;
+    private Rigidbody _rigidbody;
 
     protected override void Awake()
     {
         base.Awake();
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
+        _rigidbody = GetComponent<Rigidbody>();
+        _rigidbody.isKinematic = true;
     }
 
     public virtual void OnPickedUp()

@@ -129,6 +129,51 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!1 &2664013478176405355
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4171448047194625492}
+  - component: {fileID: 3154278045306970327}
+  m_Layer: 11
+  m_Name: Throw Folder Anomaly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4171448047194625492
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2664013478176405355}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7199573274550266412}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3154278045306970327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2664013478176405355}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eba99db11ef8de84ebc24484b66dbf8b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  suspect: {fileID: 6270557809546838554}
 --- !u!1 &2879629145379069694
 GameObject:
   m_ObjectHideFlags: 0
@@ -160,6 +205,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 9165884929875893673}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &3736317329971349890
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6423852802992605336}
+  - component: {fileID: 4105699154554456356}
+  m_Layer: 11
+  m_Name: Confused
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6423852802992605336
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3736317329971349890}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7199573274550266412}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4105699154554456356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3736317329971349890}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b26d41fb00c5af7468dcc0c739422880, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  suspectCharacter: {fileID: 6270557809546838554}
+  confusedAnimatorController: {fileID: 22100000, guid: 9213558925e0a8745a7a925bb1fc4fde, type: 2}
 --- !u!1 &3868534579613957341
 GameObject:
   m_ObjectHideFlags: 0
@@ -242,7 +333,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnomalyController
   _mutationAnomalies: []
-  _behaviorAnomalies: []
+  _behaviorAnomalies:
+  - {fileID: 4105699154554456356}
+  - {fileID: 3154278045306970327}
   _biologicalAnomalies: []
   _documentationAnomalies: []
   _realityDistortionAnomalies: []
@@ -516,7 +609,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4002776400
+  GlobalObjectIdHash: 2680247759
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -569,6 +662,12 @@ MonoBehaviour:
   standPosOffset: {x: 0, y: 0, z: 0}
   anomalyController: {fileID: 827143177211400971}
   vomitParticles: []
+  folderGivingAnimationDatas:
+  - animation: 0
+    animationTriggerName: Give
+  - animation: 1
+    animationTriggerName: ThrowFolder
+  _folderGivingAnimation: 0
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -970,7 +1069,9 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 6423852802992605336}
+  - {fileID: 4171448047194625492}
   m_Father: {fileID: 2926345404913525736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6711763605911860997

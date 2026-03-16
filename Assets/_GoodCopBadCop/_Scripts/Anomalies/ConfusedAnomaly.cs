@@ -2,12 +2,12 @@ using UnityEngine;
 
 public class ConfusedAnomaly : BehaviorAnomaly
 {
-    [SerializeField] private AnimatorOverrideController confusedAnimatorController; 
-    [SerializeField] Animator animator;
+    [SerializeField] private SuspectCharacter suspectCharacter; 
+    [SerializeField] AnimatorOverrideController confusedAnimatorController;
 
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
-        animator.runtimeAnimatorController = confusedAnimatorController;
+        suspectCharacter.animator.runtimeAnimatorController = confusedAnimatorController;
     }
 }

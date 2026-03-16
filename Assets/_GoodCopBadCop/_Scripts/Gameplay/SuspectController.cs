@@ -348,5 +348,29 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.animator.SetBool("Restrained", true);
     }
 
+    public void SpawnAndThrowPaperwork(Transform handSpawnPos)
+    {
+        if (!IsServer) return;
 
+        NetworkObject spawnedApp =
+            Instantiate(applicationPrefab, handSpawnPos.position, handSpawnPos.rotation);
+        spawnedApp.Spawn();
+        
+
+        // Apply throw force using the hand's forward direction
+        if (spawnedApp.TryGetComponent<Rigidbody>(out Rigidbody rb))
+        {
+            rb.isKinematic = false;
+            Vector3 throwDirection = handSpawnPos.forward + Vector3.up * 0.5f;
+            rb.linearVelocity = throwDirection.normalized * 10f;
+            rb.angularVelocity = new Vector3(
+                UnityEngine.Random.Range(-3f, 3f),
+                UnityEngine.Random.Range(-3f, 3f),
+                UnityEngine.Random.Range(-3f, 3f)
+            );
+        }
+
+        spawnedFolder = spawnedApp;
+    }
+    
 }
