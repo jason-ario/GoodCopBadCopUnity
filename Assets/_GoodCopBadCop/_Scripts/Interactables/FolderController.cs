@@ -18,7 +18,6 @@ public class FolderController : PickableObject
     public Transform stampDownTarget;
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
-    PlayerPickupController playerPickupController;
     private StampContainer.StampType _stampType;
 
     [Header("Documents")] 
@@ -38,6 +37,7 @@ public class FolderController : PickableObject
 
     [SerializeField] private Transform cameraRigPos;
     public UnityAction onStampedComplete;
+    private bool isOpening;
 
     public override void OnNetworkSpawn()
     {
@@ -74,37 +74,17 @@ public class FolderController : PickableObject
         if (isStamped.Value) return;
 
         base.Interact(player);
-        InteractServerRpc();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void InteractServerRpc()
-    {
-        if (inFolderPos.Value == false)
-        {
-            inFolderPos.Value = true;
-        }
-        else
-        {
-            isOpen.Value = !isOpen.Value;
-        }
-    }
-
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController,
-        PickableItemData heldItem)
-    {
-        if (isStamped.Value) return;
-     base.InteractWithItem(playerInteractionController, heldItem);
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData heldItem)
+    { 
+        if (isStamped.Value) return; 
+        base.InteractWithItem(playerInteractionController, heldItem);
         
         // Stamping sequence involves local player control locking and IK, 
         // so we trigger the visual sequence on all clients via RPC.
         ulong clientId = playerInteractionController.NetworkObjectId;
         var inkStamp = heldItem.PickUpPrefab.GetComponent<InkStampPickup>();
-        if (isOpen.Value)
-        {
-            InteractServerRpc();
-            return;
-        }
 
         StartUseStampServerRpc(clientId, inkStamp.StampType);
     }
@@ -244,4 +224,27 @@ public class FolderController : PickableObject
 
         playerPickupController.PlayerAnimationController.RightArmRig.weight = 0;
     }
+
+    public override void OnStartUse()
+    {
+        if (isOpening == false && isOpen.Value == false)
+        {
+            playerPickupController.PlayerAnimationController.SetAnimTrigger("OpenFolder");
+            StartCoroutine(WaitAndOpen());
+        }
+        else
+        {
+            playerPickupController.PlayerAnimationController.SetAnimTrigger("CloseFolder");
+            anim.SetBool("Open", false);
+        }
+    }
+    
+    IEnumerator WaitAndOpen()
+    {
+        isOpening = true;
+        yield return new WaitForSeconds(.4f);
+        anim.SetBool("Open", true);
+        isOpening = false;
+    }
+
 }

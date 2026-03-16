@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.Events;
 using UnityEngine.Serialization;
 
@@ -11,7 +13,8 @@ public class PlayerPickupController : NetworkBehaviour
     public float holdSmoothness = 10f;
 
     private PickableItemData _heldObject;
-    public PickableItemData HeldObject => _heldObject; 
+    public PickableItemData HeldObject => _heldObject;
+    private PickableObject _heldPickableObject; // the actual world instance being carried
     private PickableObject _camEquippedItem;
     private PickableObject _bodyCurrentlyEquippedItem;
     
@@ -81,12 +84,8 @@ public class PlayerPickupController : NetworkBehaviour
         
         PickableItemData itemData = camObjectContainer.GetItemData(newValue);
         
-        foreach (var objectContainer in objectContainers)
-        {
-            objectContainer.EquipItem(itemData, this);
-        }
+        bodyObjectContainer.EquipItem(itemData, this);
 
-        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
         _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
 
         if (itemData.useRightIK)
@@ -158,7 +157,6 @@ public class PlayerPickupController : NetworkBehaviour
                     return;
                 }
                 
-                Debug.Log("Drop Object");
                 if (ObjectPlacer.Instance.IsActive || ObjectPlacer.Instance.deactivatedThisFrame)
                 {
                     DropObject();
@@ -229,34 +227,60 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
-    public void PickUpObject(PickableObject pickableObject, PickableItemData itemData)
+    public void PickUpObject(PickableObject pickableObject)
     {
-        // Drop existing object if holding something already
         if (_heldObject != null)
         {
             return;
         }
         
+        PickableItemData itemData = pickableObject.ItemData;
+
         _heldObject = itemData;
+        _heldPickableObject = pickableObject;
         ObjectPlacer.Instance.SetItem(itemData);
-        
+
         int itemIndex = camObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
-        
-        _camEquippedItem = camObjectContainer.CurrentlyEquippedItem;
+
+        _camEquippedItem = pickableObject;
         _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
-        
+        camObjectContainer.EquipItem(itemData, this, pickableObject);
+
+        // Reparent the real world object into the cam container slot
+        if (_camEquippedItem != null)
+        {
+            // Disable any physics so it follows the hand cleanly
+            Rigidbody rb = pickableObject.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = true;
+
+            // Match the slot's local transform, then hide the slot placeholder
+            
+            PickableObject itemInContainer = null;
+            foreach (var item in camObjectContainer.ItemsHeld)
+            {
+                if (item.ItemData == itemData)
+                {
+                    itemInContainer = item;
+                }
+            }
+            
+            pickableObject.SetParent(itemInContainer.transform);
+            pickableObject.transform.position = itemInContainer.transform.position;
+            pickableObject.transform.rotation = itemInContainer.transform.rotation;
+        }
+
         if (itemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.CamRightArmRigIKTarget = pickableObject.GetComponent<IkTargets>()?.rightIKTarget ?? _camEquippedItem?.GetComponent<IkTargets>().rightIKTarget;
             _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
         }
         if (itemData.useLeftIK)
         {
             Debug.Log("Picking up left arm");
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.CamLeftArmRigIKTarget = pickableObject.GetComponent<IkTargets>()?.leftIKTarget ?? _camEquippedItem?.GetComponent<IkTargets>().leftIKTarget;
             _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
         }
 
@@ -264,7 +288,7 @@ public class PlayerPickupController : NetworkBehaviour
         {
             _playerAnimationController.SetAimRigWeightSmooth(1, .2f);
         }
-        
+
         pickableObject.OnPickedUp();
         StartCoroutine(PickUpCoolDown());
     }
@@ -274,47 +298,33 @@ public class PlayerPickupController : NetworkBehaviour
         yield return new WaitForSeconds(pickUpUseCooldownTimer);
         pickUpCooldownComplete = true;
     }
-
-    public void PickUpObject(PickableItemData itemData)
-    {
-        // Drop existing object if holding something already
-        if (_heldObject != null)
-        {
-            return;
-        }
-        
-        _heldObject = itemData;
-        ObjectPlacer.Instance.SetItem(itemData);
-        
-        int itemIndex = camObjectContainer.ItemIndex(itemData);
-        itemEquippedIndex.Value = itemIndex;
-        
-        StartCoroutine(PickUpCoolDown());
-    }
-    public void DropObject(Transform dropPoint = null, bool doSpawn = true)
+    
+    public void DropObject(Transform dropPoint = null)
     {
         OnPlaceObject?.Invoke();
         pickUpCooldownComplete = false;
 
-        // Pass the index/ID of the held item so the server knows which prefab to spawn
-        int itemIndex = ItemDatabase.Instance.GetItemIndex(_heldObject);
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject; 
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject;
         DisableArmIKs();
 
-        if (doSpawn)
+        if (_heldPickableObject != null)
         {
-            if (dropPoint != null)
-            {
-                RequestDropServerRpc(itemIndex, dropPoint.transform.position, dropPoint.transform.rotation);
-            }
-            else
-            {
-                RequestDropServerRpc(itemIndex, placementItem.transform.position, placementItem.transform.rotation);
-            }
+            Vector3 dropPos = dropPoint != null ? dropPoint.position : placementItem.transform.position;
+            Quaternion dropRot = dropPoint != null ? dropPoint.rotation : placementItem.transform.rotation;
+
+            // Return to the world
+            _heldPickableObject.RemoveParent();
+            _heldPickableObject.transform.position = dropPos;
+            _heldPickableObject.transform.rotation = dropRot;
+
+            // Re-enable physics
+            Rigidbody rb = _heldPickableObject.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+
+            _heldPickableObject.OnDropped();
         }
-   
-        camObjectContainer.CurrentlyEquippedItem.OnDropped();
-        bodyObjectContainer.CurrentlyEquippedItem.OnDroppedFromBody();
+
+        bodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
 
         foreach (var objectContainer in objectContainers)
         {
@@ -324,6 +334,7 @@ public class PlayerPickupController : NetworkBehaviour
         _camEquippedItem = null;
         _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
+        _heldPickableObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableHoldObjectMask();
         ObjectPlacer.Instance.DeactivatePlacer();

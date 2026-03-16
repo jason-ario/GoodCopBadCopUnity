@@ -17,7 +17,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public PickableItemData[] itemsThatCanInteractWith;
     public UnityAction OnInteract;
     public UnityAction OnInteractWithItem;
-
+    public string interactText;
 
     public virtual void Interact(PlayerInteractionController player)
     {

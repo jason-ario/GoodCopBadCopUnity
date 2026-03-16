@@ -28,6 +28,10 @@ public class SuspectCharacter : Interactable
     private bool facingPlayer;
     public Vector3 standPosOffset;
     
+    [Header("Anomalies")]
+    [SerializeField] AnomalyController anomalyController;
+    public AnomalyController AnomalyController => anomalyController;
+
     [System.Serializable]
     public struct Response
     {
@@ -37,6 +41,31 @@ public class SuspectCharacter : Interactable
 
     [SerializeField] private ParticleSystem[] vomitParticles;
     
+    // Folder giving animation
+    public enum FolderGivingAnimation
+    {
+        HandOver,
+        Throw
+    }
+
+    [System.Serializable]
+    public struct FolderGivingAnimationData
+    {
+        public FolderGivingAnimation animation;
+        public string animationTriggerName;
+    }
+
+    [SerializeField] private FolderGivingAnimationData[] folderGivingAnimationDatas;
+    [SerializeField] private FolderGivingAnimation _folderGivingAnimation = FolderGivingAnimation.HandOver;
+    private FolderGivingAnimationData _folderGivingAnimationData;
+    [SerializeField] private Transform handSpawnPos;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         DialogueManager.Instance.InitiateChoices();
@@ -137,8 +166,39 @@ public class SuspectCharacter : Interactable
     
     IEnumerator GivePaperworkCoroutine()
     {
-        animator.SetTrigger("Give");
-        yield return new WaitForSeconds(1f);
-        SuspectController.Instance.SpawnPaperwork();
+        animator.SetTrigger(_folderGivingAnimationData.animationTriggerName);
+        
+        if (_folderGivingAnimation == FolderGivingAnimation.Throw)
+        {
+            yield return new WaitForSeconds(.8f);
+            SuspectController.Instance.SpawnAndThrowPaperwork(handSpawnPos); 
+        }
+        else
+        {
+            yield return new WaitForSeconds(1f);
+            SuspectController.Instance.SpawnPaperwork();
+        }
+    }
+    
+    public void PrepareAnomalies()
+    {
+        anomalyController.ResetAvailableAnomalies();
+    }
+
+    public void TriggerAnomaly()
+    {
+        anomalyController.TriggerAnomaly();
+    }
+    
+    public void SetFolderGivingAnimation(FolderGivingAnimation folderGivingAnimation)
+    {
+        foreach (var folderGivingAnimationData in folderGivingAnimationDatas)
+        {
+            if (folderGivingAnimationData.animation == folderGivingAnimation)
+            {
+                _folderGivingAnimationData = folderGivingAnimationData;
+                _folderGivingAnimation = folderGivingAnimation;
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using HighlightPlus;
 using UnityEngine;
+using UnityEngine.Animations;
 
 public class ObjectPlacer : MonoBehaviour
 {
@@ -13,6 +14,7 @@ public class ObjectPlacer : MonoBehaviour
     [SerializeField] private float arcHeight = 1f;
 
     private PickableItemData _pickableItemData;
+    private PickableObject _clonedItem;
     public bool IsActive;
     public bool deactivatedThisFrame = false;
     
@@ -73,31 +75,116 @@ public class ObjectPlacer : MonoBehaviour
     public void SetItem(PickableItemData itemData)
     {
         _pickableItemData = itemData;
-        
-        foreach (var pickableObject in objectContainer.ItemsHeld)
+    }
+
+    // Returns the child slot transform from the objectContainer that matches the item,
+    // used as the reference position/rotation for the clone.
+    private Transform GetSlotTransform(PickableItemData itemData)
+    {
+        foreach (var item in objectContainer.ItemsHeld)
         {
-            if (pickableObject.ItemData == itemData)
+            if (item.ItemData == itemData)
+                return item.transform;
+        }
+        return container;
+    }
+
+    private void SpawnClone()
+    {
+        if (_clonedItem != null)
+        {
+            Destroy(_clonedItem.gameObject);
+            _clonedItem = null;
+        }
+
+        PlayerPickupController playerPickup = PlayerInstance.Instance.GetComponent<PlayerPickupController>();
+        if (playerPickup == null) return;
+
+        PickableObject sourceItem = playerPickup.CamObjectContainer.CurrentlyEquippedItem;
+        if (sourceItem == null) return;
+
+        // Find the matching slot child in objectContainer by ItemData
+        Transform slotTransform = null;
+        foreach (var item in objectContainer.ItemsHeld)
+        {
+            if (item.ItemData == _pickableItemData)
             {
-                pickableObject.gameObject.SetActive(true);
-            }
-            else
-            {
-                pickableObject.gameObject.SetActive(false);
+                slotTransform = item.transform;
+                break;
             }
         }
+        if (slotTransform == null) return;
+
+        // Spawn clone parented to the container, using the slot's local position/rotation
+        _clonedItem = Instantiate(sourceItem, container);
+        _clonedItem.transform.localPosition = slotTransform.localPosition;
+        _clonedItem.transform.localRotation = slotTransform.localRotation;
+
+        // Jump clone's animator to the exact state of the source
+        Animator sourceAnimator = sourceItem.GetComponentInChildren<Animator>();
+        Animator cloneAnimator = _clonedItem.GetComponentInChildren<Animator>();
+        if (sourceAnimator != null && cloneAnimator != null)
+        {
+            // Copy all parameter values first
+            foreach (AnimatorControllerParameter param in sourceAnimator.parameters)
+            {
+                switch (param.type)
+                {
+                    case AnimatorControllerParameterType.Float:
+                        cloneAnimator.SetFloat(param.nameHash, sourceAnimator.GetFloat(param.nameHash));
+                        break;
+                    case AnimatorControllerParameterType.Int:
+                        cloneAnimator.SetInteger(param.nameHash, sourceAnimator.GetInteger(param.nameHash));
+                        break;
+                    case AnimatorControllerParameterType.Bool:
+                        cloneAnimator.SetBool(param.nameHash, sourceAnimator.GetBool(param.nameHash));
+                        break;
+                }
+            }
+
+            // Then jump to the exact state on each layer
+            for (int i = 0; i < sourceAnimator.layerCount; i++)
+            {
+                AnimatorStateInfo stateInfo = sourceAnimator.GetCurrentAnimatorStateInfo(i);
+                cloneAnimator.Play(stateInfo.fullPathHash, i, stateInfo.normalizedTime);
+            }
+
+            // Force immediate pose evaluation
+            cloneAnimator.enabled = false;
+            cloneAnimator.enabled = true;
+        }
+        
+        // Disable the ParentConstraint so it doesn't override the position we just set
+        ParentConstraint parentConstraint = _clonedItem.GetComponent<ParentConstraint>();
+        if (parentConstraint != null)
+            parentConstraint.constraintActive = false;
+        
     }
 
     public void ActivatePlacer(PlacementBoard placementBoard)
     {
         container.gameObject.SetActive(true);
         IsActive = true;
+
+        SpawnClone();
+
+        if (_clonedItem != null)
+            _clonedItem.gameObject.SetActive(true);
+
         if (arcLine != null) arcLine.enabled = true;
     }
 
     public void DeactivatePlacer()
     {
+        if (_clonedItem != null)
+        {
+            Destroy(_clonedItem.gameObject);
+            _clonedItem = null;
+        }
+
         container.gameObject.SetActive(false);
         IsActive = false;
+
         if (arcLine != null)
         {
             arcLine.positionCount = 0;
@@ -108,14 +195,15 @@ public class ObjectPlacer : MonoBehaviour
 
     public GameObject GetPickableObject(PickableItemData heldObject)
     {
-        foreach (var pickableObject in objectContainer.ItemsHeld)
+        foreach (var item in objectContainer.ItemsHeld)
         {
-            if (pickableObject.ItemData == heldObject)
+            if (item.ItemData == heldObject) // _pickableItemData is null if SetItem() wasn't called!
             {
-                return pickableObject.gameObject;
+                return item.gameObject;
+                break;
             }
         }
-
+        
         return null;
     }
 }

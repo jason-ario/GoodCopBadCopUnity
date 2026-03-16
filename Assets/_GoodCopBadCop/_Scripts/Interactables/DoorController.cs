@@ -26,12 +26,13 @@ public class DoorController : Interactable
             doorOpen = false;
             _animator.SetBool("OpenedIn", false);
             _animator.SetBool("OpenedOut", false);
-          
+            interactText = "Open";
             audioSource.PlayOneShot(doorCloseClip);
         }
         else
         {
             doorOpen = true;
+            interactText = "Close";
 
             // Calculate if player is in front or behind the door
             Vector3 doorForward = transform.forward;
