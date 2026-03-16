@@ -29,7 +29,7 @@ public class FolderController : PickableObject
 
     [SerializeField] private Transform cameraRigPos;
     public UnityAction onStampedComplete;
-    private bool isOpening;
+    private bool isOpeningOrClosing;
 
     public override void OnNetworkSpawn()
     {
@@ -219,24 +219,31 @@ public class FolderController : PickableObject
 
     public override void OnStartUse()
     {
-        if (isOpening == false && isOpen.Value == false)
+        if (isOpeningOrClosing == false && isOpen.Value == false)
         {
+            Debug.Log("Open");
             playerPickupController.PlayerAnimationController.SetAnimTrigger("OpenFolder");
+            StopAllCoroutines();
             StartCoroutine(WaitAndOpen());
         }
         else
         {
+            Debug.Log("Close");
             playerPickupController.PlayerAnimationController.SetAnimTrigger("CloseFolder");
+            StopAllCoroutines();
+            isOpen.Value = false;
             anim.SetBool("Open", false);
+            isOpeningOrClosing = false;
         }
     }
     
     IEnumerator WaitAndOpen()
     {
-        isOpening = true;
+        isOpeningOrClosing = true;
         yield return new WaitForSeconds(.4f);
+        isOpen.Value = true;
         anim.SetBool("Open", true);
-        isOpening = false;
+        isOpeningOrClosing = false;
     }
 
 }
