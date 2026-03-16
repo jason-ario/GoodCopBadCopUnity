@@ -20,16 +20,8 @@ public class FolderController : PickableObject
     [SerializeField] private AudioClip stampSound;
     private StampContainer.StampType _stampType;
 
-    [Header("Documents")] 
-    //[SerializeField] private NetworkObject IdCard;
-    //[SerializeField] private NetworkObject InvitationLetter;
-    //[SerializeField] private NetworkObject ApplicationLetter;
-    //[SerializeField] private NetworkObject Envelope;
-    [SerializeField] private Transform idCardSpawnPos;
-    [SerializeField] private Transform invitationLetterSpawnPos;
-    [SerializeField] private Transform applicationLetterSpawnPos;
-    [SerializeField] private Transform envelopeSpawnPos;
-
+    [Header("Files")] 
+    [SerializeField] private Transform polaroidPhotoSpawnPos;
 
     [Header("Camera")] 
     [SerializeField] private GameObject cinemachineVirtualCamera;

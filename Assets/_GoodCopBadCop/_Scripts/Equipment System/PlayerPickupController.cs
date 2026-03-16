@@ -317,9 +317,9 @@ public class PlayerPickupController : NetworkBehaviour
             _heldPickableObject.transform.position = dropPos;
             _heldPickableObject.transform.rotation = dropRot;
 
-            // Re-enable physics
+            /*// Re-enable physics
             Rigidbody rb = _heldPickableObject.GetComponent<Rigidbody>();
-            if (rb != null) rb.isKinematic = false;
+            if (rb != null) rb.isKinematic = false;*/
 
             _heldPickableObject.OnDropped();
         }
