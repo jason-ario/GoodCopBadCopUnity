@@ -131,7 +131,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 PlaceObjectSlot placeObjectSlot = hit.collider.GetComponent<PlaceObjectSlot>();
 
                 //Placement Slot?
-                if (inRange && _playerPickupController.IsHoldingObject && placeObjectSlot != null && !placeObjectSlot.IsPlaced && placeObjectSlot.itemThatCanBePlaced == _playerPickupController.HeldObject)
+                if (inRange && _playerPickupController.IsHoldingObject && placeObjectSlot != null && !placeObjectSlot.IsPlaced && placeObjectSlot.itemThatCanBePlaced.ItemData == _playerPickupController.HeldObject)
                 {
                     reticle.SetInteractState(true, interactable.interactText);
                     placeObjectSlot.ShowPlaceObjectVisual();
