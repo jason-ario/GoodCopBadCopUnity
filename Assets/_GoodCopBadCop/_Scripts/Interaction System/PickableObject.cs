@@ -21,6 +21,9 @@ public class PickableObject : Interactable
     [SerializeField] Collider[] interactableColliders;
     private Rigidbody _rigidbody;
 
+    public bool CanPickUpManually { get; set; } = true;
+
+
     protected override void Awake()
     {
         base.Awake();
@@ -115,12 +118,12 @@ public class PickableObject : Interactable
             interactableCollider.enabled = true;
         }
     }
-
-
-
+    
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+        
+        if (!CanPickUpManually) return;
         player.pickupController.PickUpObject(this);
     }
 

@@ -12,38 +12,15 @@ public class PlaceObjectSlot : MonoBehaviour
     public bool IsPlaced
     {
         get => _isPlaced;
-        set
-        {
-            if (value)
-            {
-                ShowObjectPlacedVisual();
-            }
-            else
-            {
-                HideObjectPlacedVisual();
-            }
-
-            _isPlaced = value;
-        }
+        set => _isPlaced = value;
     }
     
     void Start()
     {
-        objectPlacedVisual.SetActive(startPlaced);
         _isPlaced = startPlaced;
     }
     
     public Transform PlaceObjectPos => placementPos;
-    
-    public void ShowObjectPlacedVisual()
-    {
-        objectPlacedVisual.SetActive(true);
-    }
-    
-    public void HideObjectPlacedVisual()
-    {
-        objectPlacedVisual.SetActive(false);
-    }
     
     public void ShowPlaceObjectVisual()
     {
