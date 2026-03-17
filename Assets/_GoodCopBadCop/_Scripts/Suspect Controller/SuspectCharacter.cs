@@ -28,6 +28,10 @@ public class SuspectCharacter : Interactable
     private bool facingPlayer;
     public Vector3 standPosOffset;
     
+    [Header("Photo")]
+    [SerializeField] Texture2D photoMaterial;
+    public Texture2D PhotoMaterial => photoMaterial;
+    
     [Header("Anomalies")]
     [SerializeField] AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;

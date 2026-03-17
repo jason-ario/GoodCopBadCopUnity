@@ -243,7 +243,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1490608804
+  GlobalObjectIdHash: 322762867
   InScenePlacedSourceGlobalObjectIdHash: 2136927079
   DeferredDespawnTick: 0
   Ownership: 1
@@ -276,6 +276,7 @@ MonoBehaviour:
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
   interactableColliders: []
+  physicsCollider: {fileID: 5037545842672665373}
 --- !u!65 &5037545842672665373
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -520,7 +521,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
