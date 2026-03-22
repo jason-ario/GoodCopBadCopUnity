@@ -14,10 +14,9 @@ public class FaxMachine : NetworkBehaviour
     private void Start()
     {
         paper.SetActive(false);
-        GameManager.Instance.OnGameStart += OnGameStart;
     }
     
-    private void OnGameStart()
+    public void OnShiftStart()
     {
         if (IsHost)
         {
