@@ -335,7 +335,6 @@ MonoBehaviour:
   _mutationAnomalies: []
   _behaviorAnomalies:
   - {fileID: 4105699154554456356}
-  - {fileID: 3154278045306970327}
   _biologicalAnomalies: []
   _documentationAnomalies: []
   _realityDistortionAnomalies: []
@@ -609,7 +608,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2680247759
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -660,6 +659,7 @@ MonoBehaviour:
   bloodExplosion: {fileID: 8015446583675946598}
   attackImmediately: 0
   standPosOffset: {x: 0, y: 0, z: 0}
+  photoMaterial: {fileID: 0}
   anomalyController: {fileID: 827143177211400971}
   vomitParticles: []
   folderGivingAnimationDatas:
@@ -668,6 +668,7 @@ MonoBehaviour:
   - animation: 1
     animationTriggerName: ThrowFolder
   _folderGivingAnimation: 0
+  handSpawnPos: {fileID: 0}
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -812,6 +813,13 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: -1846816292
     TransitionIndex: 12
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: -331495428
+    TransitionDuration: 0.25
+    TriggerNameHash: -984792713
+    TransitionIndex: 13
   - IsCrossFadeExit: 0
     Layer: 0
     OriginatingState: 607913104

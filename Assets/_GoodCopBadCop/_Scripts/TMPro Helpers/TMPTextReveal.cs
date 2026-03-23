@@ -81,7 +81,7 @@ public class TMPTextReveal : MonoBehaviour
         for (int i = 0; i <= fullText.Length; i++)
         {
             tmp.maxVisibleCharacters = i;
-            if (revealSounds != null)
+            if (revealSounds.Length != 0)
             {
                 SFXController.Instance.Play(revealSounds[UnityEngine.Random.Range(0, revealSounds.Length)]);
             }

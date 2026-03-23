@@ -11,6 +11,7 @@ public class StartShiftScreen : MonoBehaviour
 
     public void ShowDayNumber(int dayNumber)
     {
+        gameObject.SetActive(true);
         StartCoroutine(StartShift(dayNumber));
     }
 

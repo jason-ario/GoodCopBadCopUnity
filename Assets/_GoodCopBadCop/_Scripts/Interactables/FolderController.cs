@@ -222,14 +222,14 @@ public class FolderController : PickableObject
         if (isOpeningOrClosing == false && isOpen.Value == false)
         {
             Debug.Log("Open");
-            playerPickupController.PlayerAnimationController.SetAnimTrigger("OpenFolder");
+            playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
             StopAllCoroutines();
             StartCoroutine(WaitAndOpen());
         }
         else
         {
             Debug.Log("Close");
-            playerPickupController.PlayerAnimationController.SetAnimTrigger("CloseFolder");
+            playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
             StopAllCoroutines();
             isOpen.Value = false;
             anim.SetBool("Open", false);
