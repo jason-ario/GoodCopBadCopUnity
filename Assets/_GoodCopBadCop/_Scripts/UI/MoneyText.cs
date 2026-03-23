@@ -21,7 +21,10 @@ public class MoneyText : MonoBehaviour
     
     void OnEnable()
     {
-        GlobalHostVariables.Instance.money.OnValueChanged += UpdateText;
+        if (GlobalHostVariables.Instance != null)
+        {
+            GlobalHostVariables.Instance.money.OnValueChanged += UpdateText;
+        }
     }
     
     void OnDisable()

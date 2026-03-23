@@ -44,6 +44,7 @@ public class TMPTextReveal : MonoBehaviour
     public Coroutine RevealText(string text)
     {
         StopCurrentRoutine();
+        gameObject.SetActive(true);
         revealRoutine = StartCoroutine(RevealRoutine(text));
         return revealRoutine;
     }

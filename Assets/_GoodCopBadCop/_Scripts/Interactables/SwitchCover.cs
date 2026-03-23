@@ -42,6 +42,8 @@ public class SwitchCover : Interactable
     public void Reset()
     {
         switchCoverOpen.Value = false;
-        anim.SetBool("SwitchOpen", switchCoverOpen.Value);
+        switchBoxCollider.enabled = false;
+        switchCoverOpen.Value = false;
+        anim.SetBool("SwitchOpen", false);
     }
 }

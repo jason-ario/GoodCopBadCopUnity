@@ -19,6 +19,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private FaxMachine _faxMachine;
     [SerializeField] private float faxMachineDelay = 4f;
     [SerializeField] private AudioClip bellSound;
+    [SerializeField] private AudioClip endOfLevelSound;
     [SerializeField] private AudioClip knockOnDoorSound;
     [SerializeField] private GameObject cardboardBox;
     [SerializeField] private MachineShake doorShake;
@@ -44,54 +45,18 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private AudioSource _buzzerSound;
+    [SerializeField] Animator doorAnimator;
 
     private void Awake()
     {
         Instance = this;
-        GetComponent<NetworkManager>().spaw
     }
 
     private void Start()
     {
         StartCoroutine(StartShiftSequence());
     }
-
-    public override void OnNetworkSpawn()
-    {
-        base.OnNetworkSpawn();
-
-        ApplyShiftVisualState(shiftStarted.Value);
-
-        shiftStarted.OnValueChanged += OnShiftStartedChanged;
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        base.OnNetworkDespawn();
-
-        shiftStarted.OnValueChanged -= OnShiftStartedChanged;
-    }
-
-    private void OnShiftStartedChanged(bool previousValue, bool newValue)
-    {
-        ApplyShiftVisualState(newValue);
-    }
-
-    private void ApplyShiftVisualState(bool started)
-    {
-        if (started)
-        {
-            rollingShutter.SetBool("Open", true);
-            windowLampController.TurnGreen();
-        }
-        else
-        {
-            rollingShutter.SetBool("Open", false);
-            rollingShutter.SetTrigger("Reset");
-            windowLampController.TurnRed();
-        }
-    }
-
+    
     private IEnumerator StartShiftSequence()
     {
         SFXController.Instance.Play(bellSound);
@@ -157,12 +122,6 @@ public class ShiftManager : NetworkBehaviour
         StartCoroutine(OpenWindowSequence(false));
     }
 
-    public void ResetWindow()
-    {
-        shiftStarted.Value = false;
-        ApplyShiftVisualState(false);
-    }
-
     private IEnumerator OpenWindowSequence(bool startRoundAfterOpening)
     {
         _buzzerSound.Play();
@@ -183,7 +142,7 @@ public class ShiftManager : NetworkBehaviour
 
     public void EndShift()
     {
-        SFXController.Instance.Play(bellSound);
+        SFXController.Instance.Play(endOfLevelSound);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().StopMoving();
 
         var rows = new List<EndOfShiftReportUI.ReportRowData>
@@ -236,11 +195,21 @@ public class ShiftManager : NetworkBehaviour
     public void ResetEnvironment()
     {
         _switchButton.Reset();
-        ApplyShiftVisualState(false);
+        windowLampController.TurnRed();
+        rollingShutter.SetBool("Open", false); 
+        rollingShutter.SetTrigger("Reset");
+        doorAnimator.SetBool("OpenedIn", false);
+        doorAnimator.SetBool("OpenedOut", false);
+    }
+
+    void ResetShiftData()
+    {
+        shiftStarted.Value = false;
     }
 
     private void ResetEverything()
     {
+        ResetShiftData();
         ResetEnvironment();
         ResetSuspectsProcessed();
     }
