@@ -57,4 +57,9 @@ public class Lever : Interactable
         _animator.SetBool(IsUpParam, newValue);
         leverAudio.PlayOneShot(newValue ? leverOnSound : leverOffSound);
     }
+
+    public void Reset()
+    {
+        _isUp.Value = false;
+    }
 }

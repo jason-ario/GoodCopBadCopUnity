@@ -10,6 +10,17 @@ public class SwitchCover : Interactable
     [SerializeField] AudioSource audioSource; 
     [SerializeField] Transform ikTarget;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        switchCoverOpen.OnValueChanged += OnSwitchOpenValueChanged;
+    }
+
+    private void OnSwitchOpenValueChanged(bool previousValue, bool newValue)
+    {
+        interactText = newValue ? "Close Switch" : "Open Switch";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

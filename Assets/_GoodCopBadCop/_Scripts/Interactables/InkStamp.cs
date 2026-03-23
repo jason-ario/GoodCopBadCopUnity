@@ -51,6 +51,7 @@ public class InkStamp : Interactable
             player.pickupController.PickUpObject(spawnedInkStamp);
         }
     }
+    
 
     public override void InteractWithItem(PlayerInteractionController player, PickableItemData itemData)
     {

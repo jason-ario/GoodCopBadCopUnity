@@ -45,7 +45,8 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private AudioSource _buzzerSound;
-    [SerializeField] Animator doorAnimator;
+    [SerializeField] DoorController _doorController;
+    [SerializeField] private Lever lever;
 
     private void Awake()
     {
@@ -198,8 +199,8 @@ public class ShiftManager : NetworkBehaviour
         windowLampController.TurnRed();
         rollingShutter.SetBool("Open", false); 
         rollingShutter.SetTrigger("Reset");
-        doorAnimator.SetBool("OpenedIn", false);
-        doorAnimator.SetBool("OpenedOut", false);
+        _doorController.Reset();
+        lever.Reset();
     }
 
     void ResetShiftData()

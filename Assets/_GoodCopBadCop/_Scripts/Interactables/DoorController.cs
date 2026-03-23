@@ -70,4 +70,11 @@ public class DoorController : Interactable
         yield return new WaitForSeconds(waitDelay);
         beingInteractedWith = false;
     }
+
+    public void Reset()
+    {
+        _animator.SetBool("OpenedIn", false);
+        _animator.SetBool("OpenedOut", false);
+        doorOpen = false;
+    }
 }
