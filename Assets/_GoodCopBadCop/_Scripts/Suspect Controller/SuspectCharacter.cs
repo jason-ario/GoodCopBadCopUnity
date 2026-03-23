@@ -187,6 +187,7 @@ public class SuspectCharacter : Interactable
         }
         else
         {
+            animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);
             SuspectController.Instance.SpawnPaperwork();
         }
