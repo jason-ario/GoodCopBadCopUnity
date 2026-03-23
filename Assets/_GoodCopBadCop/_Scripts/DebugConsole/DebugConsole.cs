@@ -37,4 +37,12 @@ public class DebugConsole : MonoBehaviour
         }
 
     }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            GlobalHostVariables.Instance.AddMoney(1000);
+        }
+    }
 }

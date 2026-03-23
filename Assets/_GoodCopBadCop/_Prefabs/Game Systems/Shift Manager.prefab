@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5970154019171900513}
   - component: {fileID: 1135398619532927569}
+  - component: {fileID: 4747833312084432351}
   m_Layer: 0
   m_Name: Shift Manager
   m_TagString: Untagged
@@ -44,6 +45,56 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27681a98809fb8142baec607c6572c4c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
+  shiftStarted:
+    m_InternalValue: 0
+  suspectsPerShift: 0
+  dayNumber: 1
   _startShiftScreen: {fileID: 0}
   _faxMachine: {fileID: 0}
-  faxMachineDelay: 4
+  faxMachineDelay: 13
+  bellSound: {fileID: 8300000, guid: 045eaeab47be1e34f97be837bd997903, type: 3}
+  knockOnDoorSound: {fileID: 8300000, guid: e43290883d1d5ed4baa47b4ac740a436, type: 3}
+  cardboardBox: {fileID: 0}
+  doorShake: {fileID: 0}
+  suspectsProcessed: 0
+  suspectsPassedCorrect: 0
+  suspectsPassedWrong: 0
+  suspectsQuarantined: 0
+  suspectsKilledCorrect: 0
+  suspectsKilledWrong: 0
+  couponsPerPassed: 3
+  couponsPenaltyPerPassed: 2
+  couponsPerKilled: 3
+  couponsPenaltyPerKilled: 3
+  couponsPerQuarantined: 3
+  couponsPenaltyPerQuarantined: 2
+  rollingShutter: {fileID: 0}
+  _switchButton: {fileID: 0}
+  windowLampController: {fileID: 0}
+  _buzzerSound: {fileID: 0}
+--- !u!114 &4747833312084432351
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6423594408117941045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 2252591640
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0

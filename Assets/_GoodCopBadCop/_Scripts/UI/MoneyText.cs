@@ -1,25 +1,37 @@
 using System;
+using System.Collections;
 using TMPro;
+using Unity.Netcode;
 using UnityEngine;
 
 public class MoneyText : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI moneyText;
 
-    private void Start()
+    IEnumerator Start()
     {
-        UpdateText();
+        while (GlobalHostVariables.Instance == null)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        
+        GlobalHostVariables.Instance.money.OnValueChanged += UpdateText;
+        UpdateText(GlobalHostVariables.Instance.money.Value, GlobalHostVariables.Instance.money.Value);
     }
     
     void OnEnable()
     {
-        UpdateText();
+        GlobalHostVariables.Instance.money.OnValueChanged += UpdateText;
+    }
+    
+    void OnDisable()
+    {
+        GlobalHostVariables.Instance.money.OnValueChanged -= UpdateText;
     }
 
-    void UpdateText()
+    private void UpdateText(int previousValue, int newValue)
     {
-        if (GlobalHostVariables.Instance == null) return;
-        
-        moneyText.text = "$" + GlobalHostVariables.Instance.money.Value.ToString();
+        Debug.Log("Should Update Money");
+        moneyText.text = GlobalHostVariables.Instance.money.Value.ToString() + "  <sprite=0>";    
     }
 }

@@ -22,4 +22,5 @@ public class StartShiftScreen : MonoBehaviour
         yield return new WaitForSeconds(dayNumberDuration);
         dayNumberText.gameObject.SetActive(false);
     }
+    
 }

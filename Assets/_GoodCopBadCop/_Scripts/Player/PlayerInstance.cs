@@ -39,6 +39,11 @@ public class PlayerInstance : NetworkBehaviour
         _playerInteractionController.SetCanInteract(value, interactText);
     }
 
+    public void SetCanMove(bool value)
+    {
+        _playerMovementController.SetCanMove(value);
+    }
+
     public void HurtPlayer()
     {
         screenDamage.CurrentHealth -= 1;

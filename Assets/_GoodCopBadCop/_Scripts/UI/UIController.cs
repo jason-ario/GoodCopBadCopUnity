@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -16,6 +18,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private Button backButton;
     [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
     [SerializeField] private GameObject leaveChairUI;
+    [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
 
@@ -138,4 +141,13 @@ public class UIController : MonoBehaviour
     }
 
 
+    public void ShowEndShiftReport(List<EndOfShiftReportUI.ReportRowData> reportRowDatas)
+    {
+        endOfShiftReportUI.PlayReport(reportRowDatas);
+    }
+
+    public void HideEndOfShiftReport()
+    {
+        endOfShiftReportUI.gameObject.SetActive(false);
+    }
 }

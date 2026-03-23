@@ -36,6 +36,14 @@ public class SuspectCharacter : Interactable
     [SerializeField] AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
 
+    public bool IsInfected
+    {
+        get
+        {
+            return false;
+        }
+    }
+
     [System.Serializable]
     public struct Response
     {

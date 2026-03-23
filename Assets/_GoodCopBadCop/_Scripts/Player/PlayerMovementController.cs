@@ -308,4 +308,10 @@ public class PlayerMovementController : NetworkBehaviour
         cameraTransform.DOLocalMove(camStandPos.localPosition, sitStandDuration).SetEase(Ease.InOutSine).OnComplete(() => SetMovementLocked(false));
         _playerAnimationController.SetAnimBool("Sitting", false);
     }
+
+    public void StopMoving()
+    {
+        SetCanControl(false);
+        SetCanMove(false);
+    }
 }

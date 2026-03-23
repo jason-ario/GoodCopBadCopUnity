@@ -74,7 +74,7 @@ public class PlayerSpawner : MonoBehaviour
     /// <summary>
     /// Determines the correct spawn point.
     /// </summary>
-    private Transform GetSpawnPoint(ulong clientId, bool isSinglePlayer)
+    public Transform GetSpawnPoint(ulong clientId, bool isSinglePlayer)
     {
         if (isSinglePlayer || multiplayerSpawnPoints.Length == 0)
             return singlePlayerSpawnPoint;

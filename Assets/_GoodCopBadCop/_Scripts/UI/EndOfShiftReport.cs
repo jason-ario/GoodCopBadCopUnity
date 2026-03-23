@@ -11,12 +11,14 @@ public class EndOfShiftReportUI : MonoBehaviour
         public string label;
         public int amount;
         public bool isPenalty;
-
-        public ReportRowData(string label, int amount, bool isPenalty = false)
+        public bool isHeader;
+        
+        public ReportRowData(string label, int amount, bool isPenalty = false, bool isHeader = false)
         {
             this.label = label;
             this.amount = amount;
             this.isPenalty = isPenalty;
+            this.isHeader = isHeader;
         }
     }
 
@@ -62,6 +64,8 @@ public class EndOfShiftReportUI : MonoBehaviour
     {
         if (revealRoutine != null)
             StopCoroutine(revealRoutine);
+        
+        gameObject.SetActive(true);
 
         revealRoutine = StartCoroutine(RevealReportRoutine(reportRows));
     }
@@ -128,13 +132,21 @@ public class EndOfShiftReportUI : MonoBehaviour
             Color valueColor = data.isPenalty ? penaltyColor : rewardColor;
             TMPWobbleProfile valueProfile = data.isPenalty ? penaltyValueProfile : rewardValueProfile;
 
-            yield return row.RevealValue(valueText, valueColor, valueProfile);
+            if (!data.isHeader)
+            {
+                if (data.amount != 0)
+                {
+                    yield return row.RevealValue(valueText, valueColor, valueProfile);
+                }
+            }
 
             total += data.isPenalty ? -Mathf.Abs(data.amount) : Mathf.Abs(data.amount);
 
             yield return new WaitForSeconds(lineRevealDelay);
         }
 
+        GlobalHostVariables.Instance.AddMoney(total);
+        
         yield return RevealNetTotal(total);
 
         yield return new WaitForSeconds(finalDelayBeforeContinue);
@@ -171,6 +183,10 @@ public class EndOfShiftReportUI : MonoBehaviour
     private string FormatValue(int amount, bool isPenalty)
     {
         int absAmount = Mathf.Abs(amount);
+        if (amount == 0)
+        {
+            return "0";
+        }
         return isPenalty ? $"Penalty -{absAmount}" : $"Reward +{absAmount}";
     }
 
@@ -180,4 +196,11 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (value < 0) return value.ToString();
         return "0";
     }
+
+    public void OnContinueButtonPressed()
+    {
+        HideAll();
+        ShiftManager.Instance.StartNewShift();
+    }
+    
 }

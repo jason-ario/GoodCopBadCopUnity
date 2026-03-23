@@ -144,7 +144,7 @@ public class MainMenuController : MonoBehaviour
     private IEnumerator WaitAndOpenWindow()
     {
         yield return new WaitForSeconds(timeTillOpenWindow);
-        GameManager.Instance.OpenWindow();
+        ShiftManager.Instance.OpenWindow();
     }
 
     #endregion

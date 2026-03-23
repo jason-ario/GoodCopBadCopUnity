@@ -38,4 +38,10 @@ public class SwitchCover : Interactable
         yield return new WaitForSeconds(0.5f);
         player.playerAnimationController.DisableHoldObjectMask();
     }
+
+    public void Reset()
+    {
+        switchCoverOpen.Value = false;
+        anim.SetBool("SwitchOpen", switchCoverOpen.Value);
+    }
 }

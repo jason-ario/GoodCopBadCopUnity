@@ -1,4 +1,6 @@
 using System.Collections;
+using DG.Tweening;
+using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -7,23 +9,40 @@ public class SwitchButton : Interactable
     [SerializeField] private AudioSource buttonPressSound;
     [SerializeField] private Animator anim;
     [SerializeField] Transform ikTarget;
+    [SerializeField] private CinemachineCamera _camera;
+    [SerializeField] private SwitchCover switchCover;
     
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        GameManager.Instance.TryStartLevel();
-        StartCoroutine(EnableAndDisableMask(player));
-        player.playerAnimationController.SetAnimTrigger("PressButton");
-        player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
-        player.playerAnimationController.RightArmRigIKTarget = ikTarget;
-        PlayButtonSoundClientRpc();
+        StartCoroutine(PressButtonSequence(player));
     }
 
-    IEnumerator EnableAndDisableMask(PlayerInteractionController player)
+    IEnumerator PressButtonSequence(PlayerInteractionController player)
     {
         player.playerMovementController.SetCanControl(false);
+        player.playerMovementController.LookAtTarget(transform);
+
+        
+        player.playerAnimationController.RightArmRigIKTarget = ikTarget;
+        Vector3 cameraPos = player.playerMovementController.CameraTransform.position;
+        Vector3 cameraRot = player.playerMovementController.CameraTransform.eulerAngles;
+        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
+        player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
+        
+        yield return new WaitForSeconds(.5f);
         player.playerAnimationController.EnableHoldObjectMask();
+        player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
+        player.playerAnimationController.SetAnimTrigger("PressButton");
+        ShiftManager.Instance.TryStartShift();
+        PlayButtonSoundClientRpc();
+
         yield return new WaitForSeconds(1);
+        player.playerMovementController.CameraTransform.DOMove(cameraPos, .5f); 
+        player.playerMovementController.CameraTransform.DORotate(cameraRot, .5f);      
+        
+        yield return new WaitForSeconds(.25f);
+
         player.playerAnimationController.DisableHoldObjectMask();
         player.playerMovementController.SetCanControl(true);
     }
@@ -37,5 +56,10 @@ public class SwitchButton : Interactable
         }
         
         anim.SetTrigger("Push");
+    }
+
+    public void Reset()
+    {
+        switchCover.Reset();
     }
 }

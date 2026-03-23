@@ -44,18 +44,14 @@ public class SuspectController : NetworkBehaviour
 
     void StartRound()
     {
-        if (suspectIndex.Value >= suspectCharacters.Length - 1)
+        if (suspectIndex.Value >= ShiftManager.Instance.SuspectsPerShift)
         {
             Debug.Log("No more suspects to spawn");
-            GameManager.Instance.LevelComplete();
+            ShiftManager.Instance.EndShift();
             return;
         }
-        if (IsHost)
-        {
-            suspectIndex.Value += 1;
-           
-            RequestSpawnSuspectServerRpc(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
-        }
+      
+        NextSuspect();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -175,6 +171,7 @@ public class SuspectController : NetworkBehaviour
 
     IEnumerator PassSequence()
     {
+        ShiftManager.Instance.PassedSuspect(suspectCharacter);
         SuspectCharacter thisCharacter = suspectCharacter;
 
         // Visual: Animation
@@ -258,6 +255,8 @@ public class SuspectController : NetworkBehaviour
 
     IEnumerator QuarantineSequence()
     {
+        ShiftManager.Instance.QuarantinedSuspect();
+        
         suspectCharacter.animator.SetTrigger("Give");
         yield return new WaitForSeconds(1f);
 
@@ -302,16 +301,16 @@ public class SuspectController : NetworkBehaviour
         }
         quarantineTimeline.gameObject.SetActive(false);
     }
-
+    
     public void Kill()
     {
         StartCoroutine(KillSequence());
     }
-    
-
 
     IEnumerator KillSequence()
     {
+        ShiftManager.Instance.KillSuspect(suspectCharacter);
+        
         yield return new WaitForSeconds(1f);
         SuspectCharacter thisCharacter = suspectCharacter;
 
@@ -335,7 +334,20 @@ public class SuspectController : NetworkBehaviour
         
         KillMachineController.Instance.Kill();
 
-        yield return new WaitForSeconds(2);
+        yield return new WaitForSeconds(8);
+        DespawnSuspect(thisCharacter);
+        
+        NextSuspect();
+    }
+
+    void NextSuspect()
+    {
+        if (IsHost)
+        {
+            suspectIndex.Value += 1;
+           
+            RequestSpawnSuspectServerRpc(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
+        }
     }
 
     public void SetCanInteract(bool b)
@@ -372,5 +384,9 @@ public class SuspectController : NetworkBehaviour
 
         spawnedFolder = spawnedApp;
     }
-    
+
+    public void ResetSuspects()
+    {
+        suspectIndex.Value = 0;
+    }
 }
