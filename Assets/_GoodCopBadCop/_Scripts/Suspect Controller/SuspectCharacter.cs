@@ -76,6 +76,7 @@ public class SuspectCharacter : Interactable
     {
         base.Awake();
         handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
+        _folderGivingAnimationData = folderGivingAnimationDatas[0];
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -187,7 +188,6 @@ public class SuspectCharacter : Interactable
         }
         else
         {
-            animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);
             SuspectController.Instance.SpawnPaperwork();
         }
