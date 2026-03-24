@@ -5,6 +5,13 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 {
 	Properties
 	{
+		//================================
+		// Injected Code for 'Properties/Start'
+		_WobbleAmplitude ("Wobble Amplitude", Float) = 0.001
+		_WobbleFrequency ("Wobble Frequency", Float) = 15.0
+		_WobbleSpeed ("Wobble Speed", Float) = 15.0
+		//================================
+
 		[TCP2HeaderHelp(Base)]
 		_BaseColor ("Color", Color) = (1,1,1,1)
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
@@ -16,6 +23,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		
 		_RampThreshold ("Threshold", Range(0.01,1)) = 0.5
 		_RampSmoothing ("Smoothing", Range(0.001,1)) = 0.5
+		[TCP2Separator]
+		
+		[TCP2HeaderHelp(Vertex Displacement)]
+		_WorldDisplacementTex ("World Displacement Texture", 2D) = "black" {}
+		 _DisplacementStrength ("Displacement Strength", Range(-1,1)) = 0.01
 		[TCP2Separator]
 		
 		_StylizedThreshold ("Stylized Threshold", 2D) = "gray" {}
@@ -39,6 +51,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		
 		[Enum(ToonyColorsPro.ShaderGenerator.Culling)] _faceCulling ("Face Culling", Float) = 2
 
+		// Injection Point: 'Properties/End'
+
 		[ToggleOff(_RECEIVE_SHADOWS_OFF)] _ReceiveShadowsOff ("Receive Shadows", Float) = 1
 
 		// Avoid compile error if the properties are ending with a drawer
@@ -51,7 +65,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		{
 			"RenderPipeline" = "UniversalPipeline"
 			"RenderType"="Opaque"
+			// Injection Point: 'SubShader/Tags'
 		}
+
+		// Injection Point: 'SubShader/Shader States'
 
 		HLSLINCLUDE
 		#define fixed half
@@ -81,16 +98,22 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 		#endif
 
+		// Injection Point: 'Include Files'
+
 		// Uniforms
 
 		// Shader Properties
+		TCP2_TEX2D_WITH_SAMPLER(_WorldDisplacementTex);
 		TCP2_TEX2D_WITH_SAMPLER(_BaseMap);
 		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
 		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
+		// Injection Point: 'Variables/Outside CBuffer'
 
 		CBUFFER_START(UnityPerMaterial)
 			
 			// Shader Properties
+			float4 _WorldDisplacementTex_ST;
+			float _DisplacementStrength;
 			float _OutlineWidth;
 			fixed4 _OutlineColorVertex;
 			float4 _BaseMap_ST;
@@ -102,6 +125,13 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			half _SketchTexture_OffsetSpeed;
 			fixed4 _SColor;
 			fixed4 _HColor;
+			//================================
+			// Injected Code for 'Variables/Inside CBuffer'
+			float _WobbleAmplitude;
+			float _WobbleFrequency;
+			float _WobbleSpeed;
+			//================================
+
 		CBUFFER_END
 
 		// Hash without sin and uniform across platforms
@@ -134,6 +164,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			}
 		#endif
 
+		// Injection Point: 'Functions'
+
 		ENDHLSL
 
 		// Outline Include
@@ -141,13 +173,14 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 		#pragma multi_compile_fog
 
+		// Injection Point: 'Outline Pass/Pragma'
+
 		struct appdata_outline
 		{
 			float4 vertex : POSITION;
 			float3 normal : NORMAL;
-			#if TCP2_UV1_AS_NORMALS
 			float4 texcoord0 : TEXCOORD0;
-		#elif TCP2_UV2_AS_NORMALS
+			#if TCP2_UV2_AS_NORMALS
 			float4 texcoord1 : TEXCOORD1;
 		#elif TCP2_UV3_AS_NORMALS
 			float4 texcoord2 : TEXCOORD2;
@@ -160,6 +193,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		#if TCP2_TANGENT_AS_NORMALS
 			float4 tangent : TANGENT;
 		#endif
+			// Injection Point: 'Outline Pass/Attributes'
 			UNITY_VERTEX_INPUT_INSTANCE_ID
 		};
 
@@ -168,6 +202,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			float4 vertex : SV_POSITION;
 			float4 vcolor : TEXCOORD0;
 			float pack1 : TEXCOORD1; /* pack1.x = fogFactor */
+			// Injection Point: 'Outline Pass/Varyings'
 			UNITY_VERTEX_INPUT_INSTANCE_ID
 			UNITY_VERTEX_OUTPUT_STEREO
 		};
@@ -180,10 +215,36 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			UNITY_TRANSFER_INSTANCE_ID(v, output);
 			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
+			//================================
+			// Injected Code for 'Outline Pass/Vertex Shader/Start'
+			
+			float wobbleTime_outline = _Time.y * _WobbleSpeed;
+			float steppedTime_outline = floor(wobbleTime_outline);
+			float t_outline = steppedTime_outline / max(_WobbleSpeed, 0.0001);
+			
+			float3 worldPos_outline = mul(unity_ObjectToWorld, v.vertex).xyz;
+			float phase_outline = dot(worldPos_outline, float3(1.37, 2.11, 0.73));
+			
+			float3 objectScale_outline;
+			objectScale_outline.x = length(unity_ObjectToWorld._m00_m10_m20);
+			objectScale_outline.y = length(unity_ObjectToWorld._m01_m11_m21);
+			objectScale_outline.z = length(unity_ObjectToWorld._m02_m12_m22);
+			
+			float scaleCompensation_outline = max(max(objectScale_outline.x, objectScale_outline.y), max(objectScale_outline.z, 0.0001));
+			float wobble_outline = sin(t_outline * _WobbleFrequency + phase_outline) * (_WobbleAmplitude / scaleCompensation_outline);
+			
+			v.vertex.xyz += v.normal * wobble_outline;
+			//================================
+
 			// Shader Properties Sampling
+			float3 __vertexDisplacementWorld = ( TCP2_TEX2D_SAMPLE_LOD(_WorldDisplacementTex, _WorldDisplacementTex, v.texcoord0.xy * _WorldDisplacementTex_ST.xy + _WorldDisplacementTex_ST.zw, 0).rgb * _DisplacementStrength );
 			float __outlineWidth = ( _OutlineWidth );
 			float4 __outlineColorVertex = ( _OutlineColorVertex.rgba );
 
+			float3 worldPos = mul(UNITY_MATRIX_M, v.vertex).xyz;
+			worldPos.xyz += __vertexDisplacementWorld;
+			v.vertex.xyz = mul(UNITY_MATRIX_I_M, float4(worldPos, 1)).xyz;
+		
 		#ifdef TCP2_COLORS_AS_NORMALS
 			//Vertex Color for Normals
 			float3 normal = (v.vertexColor.xyz*2) - 1;
@@ -250,11 +311,14 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			output.vcolor.xyzw = __outlineColorVertex;
 			output.pack1.x = ComputeFogFactor(output.vertex.z);
 
+			// Injection Point: 'Outline Pass/Vertex Shader/End'
+
 			return output;
 		}
 
 		float4 fragment_outline (v2f_outline input) : SV_Target
 		{
+			// Injection Point: 'Outline Pass/Fragment Shader/Start'
 
 			UNITY_SETUP_INSTANCE_ID(input);
 			UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -265,6 +329,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			half4 outlineColor = __outlineColor * input.vcolor.xyzw;
 			outlineColor.rgb = MixFog(outlineColor.rgb, input.pack1.x);
 
+			// Injection Point: 'Outline Pass/Fragment Shader/End'
 			return outlineColor;
 		}
 
@@ -276,8 +341,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			Tags
 			{
 				"LightMode"="UniversalForward"
+				// Injection Point: 'Main Pass/Tags'
 			}
 			Cull [_faceCulling]
+			// Injection Point: 'Main Pass/Shader States'
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard SRP library
@@ -285,6 +352,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			#pragma prefer_hlslcc gles
 			#pragma exclude_renderers d3d11_9x
 			#pragma target 3.0
+			// Injection Point: 'Main Pass/Pragma'
 
 			// -------------------------------------
 			// Material keywords
@@ -323,6 +391,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float4 vertex       : POSITION;
 				float3 normal       : NORMAL;
 				float4 texcoord0 : TEXCOORD0;
+				// Injection Point: 'Main Pass/Attributes'
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
@@ -341,6 +410,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float4 screenPosition : TEXCOORD3;
 				float2 pack1 : TEXCOORD4; /* pack1.xy = texcoord0 */
 				float pack2 : TEXCOORD5; /* pack2.x = fogFactor */
+				// Injection Point: 'Main Pass/Varyings'
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -362,9 +432,35 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				UNITY_TRANSFER_INSTANCE_ID(input, output);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
+				//================================
+				// Injected Code for 'Main Pass/Vertex Shader/Start'
+				
+				float wobbleTime = _Time.y * _WobbleSpeed;
+				float steppedTime = floor(wobbleTime);
+				float t = steppedTime / max(_WobbleSpeed, 0.0001);
+				
+				float3 worldPos_main = mul(unity_ObjectToWorld, input.vertex).xyz;
+				float phase = dot(worldPos_main, float3(1.37, 2.11, 0.73));
+				
+				float3 objectScale_main;
+				objectScale_main.x = length(unity_ObjectToWorld._m00_m10_m20);
+				objectScale_main.y = length(unity_ObjectToWorld._m01_m11_m21);
+				objectScale_main.z = length(unity_ObjectToWorld._m02_m12_m22);
+				
+				float scaleCompensation_main = max(max(objectScale_main.x, objectScale_main.y), max(objectScale_main.z, 0.0001));
+				float wobble = sin(t * _WobbleFrequency + phase) * (_WobbleAmplitude / scaleCompensation_main);
+				
+				input.vertex.xyz += input.normal * wobble;
+				//================================
+
 				// Texture Coordinates
 				output.pack1.xy.xy = input.texcoord0.xy * _BaseMap_ST.xy + _BaseMap_ST.zw;
+				// Shader Properties Sampling
+				float3 __vertexDisplacementWorld = ( TCP2_TEX2D_SAMPLE_LOD(_WorldDisplacementTex, _WorldDisplacementTex, output.pack1.xy * _WorldDisplacementTex_ST.xy + _WorldDisplacementTex_ST.zw, 0).rgb * _DisplacementStrength );
 
+				float3 worldPos = mul(UNITY_MATRIX_M, input.vertex).xyz;
+				worldPos.xyz += __vertexDisplacementWorld;
+				input.vertex.xyz = mul(UNITY_MATRIX_I_M, float4(worldPos, 1)).xyz;
 				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.vertex.xyz);
 			#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
 				output.shadowCoord = GetShadowCoord(vertexInput);
@@ -392,6 +488,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// clip position
 				output.positionCS = vertexInput.positionCS;
 
+				// Injection Point: 'Main Pass/Vertex Shader/End'
+
 				return output;
 			}
 
@@ -400,6 +498,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			{
 				UNITY_SETUP_INSTANCE_ID(input);
 				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+				// Injection Point: 'Main Pass/Fragment Shader/Start'
 
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
@@ -634,6 +734,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float fogFactor = input.worldPosAndFog.w;
 				color = MixFog(color, fogFactor);
 
+				// Injection Point: 'Main Pass/Fragment Shader/End'
+
 				return half4(color, alpha);
 			}
 			ENDHLSL
@@ -646,8 +748,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			Tags { "LightMode" = "Outline" }
 			Tags
 			{
+				// Injection Point: 'Outline Pass/Tags'
 			}
 			Cull Front
+			// Injection Point: 'Outline Pass/Shader States'
 
 			HLSLPROGRAM
 
@@ -680,6 +784,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float4 vertex   : POSITION;
 				float3 normal   : NORMAL;
 				float4 texcoord0 : TEXCOORD0;
+				// Injection Point: 'Depth + Shadow Caster Pass/Attributes'
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
@@ -690,6 +795,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float3 normalWS : TEXCOORD0;
 			#endif
 				float2 pack0 : TEXCOORD1; /* pack0.xy = texcoord0 */
+				// Injection Point: 'Depth + Shadow Caster Pass/Varyings'
 			#if defined(DEPTH_ONLY_PASS)
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
@@ -725,8 +831,35 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 					UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 				#endif
 
+				//================================
+				// Injected Code for 'Depth + Shadow Caster Pass/Vertex Shader/Start'
+				
+				float wobbleTime_ds = _Time.y * _WobbleSpeed;
+				float steppedTime_ds = floor(wobbleTime_ds);
+				float t_ds = steppedTime_ds / max(_WobbleSpeed, 0.0001);
+				
+				float3 worldPos_ds = mul(unity_ObjectToWorld, input.vertex).xyz;
+				float phase_ds = dot(worldPos_ds, float3(1.37, 2.11, 0.73));
+				
+				float3 objectScale_ds;
+				objectScale_ds.x = length(unity_ObjectToWorld._m00_m10_m20);
+				objectScale_ds.y = length(unity_ObjectToWorld._m01_m11_m21);
+				objectScale_ds.z = length(unity_ObjectToWorld._m02_m12_m22);
+				
+				float scaleCompensation_ds = max(max(objectScale_ds.x, objectScale_ds.y), max(objectScale_ds.z, 0.0001));
+				float wobble_ds = sin(t_ds * _WobbleFrequency + phase_ds) * (_WobbleAmplitude / scaleCompensation_ds);
+				
+				input.vertex.xyz += input.normal * wobble_ds;
+				//================================
+
 				// Texture Coordinates
 				output.pack0.xy.xy = input.texcoord0.xy * _BaseMap_ST.xy + _BaseMap_ST.zw;
+				// Shader Properties Sampling
+				float3 __vertexDisplacementWorld = ( TCP2_TEX2D_SAMPLE_LOD(_WorldDisplacementTex, _WorldDisplacementTex, output.pack0.xy * _WorldDisplacementTex_ST.xy + _WorldDisplacementTex_ST.zw, 0).rgb * _DisplacementStrength );
+
+				float3 worldPos = mul(UNITY_MATRIX_M, input.vertex).xyz;
+				worldPos.xyz += __vertexDisplacementWorld;
+				input.vertex.xyz = mul(UNITY_MATRIX_I_M, float4(worldPos, 1)).xyz;
 
 				#if defined(DEPTH_ONLY_PASS)
 					output.positionCS = TransformObjectToHClip(input.vertex.xyz);
@@ -739,6 +872,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				#else
 					output.positionCS = float4(0,0,0,0);
 				#endif
+
+				// Injection Point: 'Depth + Shadow Caster Pass/Vertex Shader/End'
 
 				return output;
 			}
@@ -758,6 +893,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 					UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 				#endif
 
+				// Injection Point: 'Depth + Shadow Caster Pass/Fragment Shader/Start'
+
 				// Shader Properties Sampling
 				float4 __albedo = ( TCP2_TEX2D_SAMPLE(_BaseMap, _BaseMap, input.pack0.xy).rgba );
 				float4 __mainColor = ( _BaseColor.rgba );
@@ -766,6 +903,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				half3 albedo = half3(1,1,1);
 				half alpha = __alpha;
 				half3 emission = half3(0,0,0);
+
+				// Injection Point: 'Depth + Shadow Caster Pass/Fragment Shader/End'
 
 				#if defined(DEPTH_NORMALS_PASS)
 					#if defined(_WRITE_RENDERING_LAYERS)
@@ -795,17 +934,20 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			Tags
 			{
 				"LightMode" = "ShadowCaster"
+				// Injection Point: 'Shadow Caster Pass/Tags'
 			}
 
 			ZWrite On
 			ZTest LEqual
 			Cull [_faceCulling]
+			// Injection Point: 'Shadow Caster Pass/Shader States'
 
 			HLSLPROGRAM
 			// Required to compile gles 2.0 with standard srp library
 			#pragma prefer_hlslcc gles
 			#pragma exclude_renderers d3d11_9x
 			#pragma target 2.0
+			// Injection Point: 'Shadow Caster Pass/Pragma'
 
 			// using simple #define doesn't work, we have to use this instead
 			#pragma multi_compile SHADOW_CASTER_PASS
@@ -830,11 +972,13 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			Tags
 			{
 				"LightMode" = "DepthOnly"
+				// Injection Point: 'Depth Pass/Tags'
 			}
 
 			ZWrite On
 			ColorMask 0
 			Cull [_faceCulling]
+			// Injection Point: 'Depth Pass/Shader States'
 
 			HLSLPROGRAM
 
@@ -842,6 +986,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			#pragma prefer_hlslcc gles
 			#pragma exclude_renderers d3d11_9x
 			#pragma target 2.0
+			// Injection Point: 'Depth Pass/Pragma'
 
 			//--------------------------------------
 			// GPU Instancing
@@ -862,14 +1007,17 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			Tags
 			{
 				"LightMode" = "DepthNormals"
+				// Injection Point: 'Depth Normals Pass/Tags'
 			}
 
 			ZWrite On
 			Cull [_faceCulling]
+			// Injection Point: 'Depth Normals Pass/Shader States'
 
 			HLSLPROGRAM
 			#pragma exclude_renderers gles gles3 glcore
 			#pragma target 2.0
+			// Injection Point: 'Depth Normals Pass/Pragma'
 
 			#pragma multi_compile_instancing
 
@@ -889,5 +1037,5 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 	CustomEditor "ToonyColorsPro.ShaderGenerator.MaterialInspector_SG2"
 }
 
-/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","CULLING","TEMPLATE_LWRP","ENABLE_DECALS"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[];mark:False);matLayers:list[]) */
-/* TCP_HASH a45485728bb638572439cfb6cf53e832 */
+/* TCP_DATA u config(ver:"2.9.20";unity:"6000.2.7f2";tmplt:"SG2_Template_URP";features:list["UNITY_5_4","UNITY_5_5","UNITY_5_6","UNITY_2017_1","UNITY_2018_1","UNITY_2018_2","UNITY_2018_3","UNITY_2019_1","UNITY_2019_2","UNITY_2019_3","UNITY_2019_4","UNITY_2020_1","UNITY_2021_1","UNITY_2021_2","UNITY_2022_2","UNITY_6000_2","UNITY_6000_1","UNITY_6000_0","ENABLE_DEPTH_NORMALS_PASS","ENABLE_FORWARD_PLUS","OUTLINE","SKETCH_SHADER_FEATURE","SKETCH","TEXTURED_THRESHOLD","OUTLINE_URP_FEATURE","OUTLINE_CLIP_SPACE","FOG","CULLING","ENABLE_DECALS","VERTEX_DISPLACEMENT_WORLD","TEMPLATE_LWRP"];flags:list[];flags_extra:dict[];keywords:dict[RENDER_TYPE="Opaque",RampTextureDrawer="[TCP2Gradient]",RampTextureLabel="Ramp Texture",SHADER_TARGET="3.0"];shaderProperties:list[,,,,,,,,,,,,,,,,,sp(name:"Face Culling";imps:list[imp_enum(value_type:1;value:0;enum_type:"ToonyColorsPro.ShaderGenerator.Culling";guid:"926f85f0-e1fb-45a7-8fb2-0942b0e8f66f";op:Multiply;lbl:"Face Culling";gpu_inst:False;dots_inst:False;locked:False;impl_index:0)];layers:list[];unlocked:list[];layer_blend:dict[];custom_blend:dict[];clones:dict[];isClone:False)];customTextures:list[];codeInjection:codeInjection(injectedFiles:list[injectedFile(guid:"79974116c32e1944b87a0e19083d30aa";filename:"Wobble";injectedPoints:list[injectedPoint(name:"Properties/Start";enabled:True;replace:False;replaceMode:Replace;ignoreIndent:True;displayName:__NULL__;blockName:"Wobble Properties";program:Undefined;shaderProperties:list[]),injectedPoint(name:"Variables/Inside CBuffer";enabled:True;replace:False;replaceMode:Replace;ignoreIndent:True;displayName:__NULL__;blockName:"Wobble Variables";program:Undefined;shaderProperties:list[]),injectedPoint(name:"Main Pass/Vertex Shader/Start";enabled:True;replace:False;replaceMode:Replace;ignoreIndent:True;displayName:__NULL__;blockName:"Vertex Wobble Main";program:Vertex;shaderProperties:list[]),injectedPoint(name:"Outline Pass/Vertex Shader/Start";enabled:True;replace:False;replaceMode:Replace;ignoreIndent:True;displayName:__NULL__;blockName:"Vertex Wobble Outline";program:Vertex;shaderProperties:list[]),injectedPoint(name:"Depth + Shadow Caster Pass/Vertex Shader/Start";enabled:True;replace:False;replaceMode:Replace;ignoreIndent:True;displayName:__NULL__;blockName:"Vertex Wobble DepthShadow";program:Vertex;shaderProperties:list[])])];mark:True);matLayers:list[]) */
+/* TCP_HASH b38ca43095b65662ad748fc4ccfc4e42 */
