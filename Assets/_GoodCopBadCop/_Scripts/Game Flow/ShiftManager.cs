@@ -52,14 +52,15 @@ public class ShiftManager : NetworkBehaviour
     {
         Instance = this;
     }
-
-    private void Start()
+    
+    public void StartRound()
     {
-        StartCoroutine(StartShiftSequence());
+        SuspectController.Instance.NextSuspect();
     }
     
     private IEnumerator StartShiftSequence()
     {
+        Debug.Log("Start Shift Sequence");
         SFXController.Instance.Play(bellSound);
         _startShiftScreen.ShowDayNumber(dayNumber);
 
@@ -135,10 +136,7 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3f);
 
-        if (startRoundAfterOpening)
-        {
-            GameManager.Instance.OnRoundStart?.Invoke();
-        }
+        SuspectController.Instance.NextSuspect();
     }
 
     public void EndShift()
@@ -246,4 +244,6 @@ public class ShiftManager : NetworkBehaviour
         suspectsKilledCorrect = 0;
         suspectsKilledWrong = 0;
     }
+
+
 }

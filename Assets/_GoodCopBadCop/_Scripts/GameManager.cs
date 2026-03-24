@@ -80,7 +80,7 @@ public class GameManager : NetworkBehaviour
             }
 
             StoryProgressionManager.Instance.StartGame();
-            OnGameStart?.Invoke();
+            ShiftManager.Instance.StartNewShift();
             yield break;
         }
 
@@ -98,7 +98,7 @@ public class GameManager : NetworkBehaviour
             SpawnPlayersServer();
         }
 
-        StoryProgressionManager.Instance.StartGame();
+        ShiftManager.Instance.StartNewShift();
 
         UIController.Instance.FadeOut();
         OnGameStart?.Invoke();
