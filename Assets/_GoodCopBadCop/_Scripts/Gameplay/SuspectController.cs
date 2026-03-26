@@ -53,6 +53,8 @@ public class SuspectController : NetworkBehaviour
     public void NextSuspect()
     {
         if (!IsServer) return;
+        Debug.Log("Next suspect");
+        suspectIndex.Value += 1;
 
         if (suspectIndex.Value >= ShiftManager.Instance.SuspectsPerShift)
         {
@@ -61,7 +63,6 @@ public class SuspectController : NetworkBehaviour
             return;
         }
         
-        suspectIndex.Value += 1;
 
         if (suspectIndex.Value < 0 || suspectIndex.Value >= suspectCharacters.Length)
         {
@@ -298,6 +299,8 @@ public class SuspectController : NetworkBehaviour
         {
             GameManager.Instance.GateController.CloseGate();
         }
+        
+        NextSuspect();
     }
 
     private void DespawnSuspect(SuspectCharacter suspectToDespawn)

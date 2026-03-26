@@ -80,7 +80,6 @@ public class GameManager : NetworkBehaviour
             }
 
             StoryProgressionManager.Instance.StartGame();
-            ShiftManager.Instance.StartNewShift();
             yield break;
         }
 

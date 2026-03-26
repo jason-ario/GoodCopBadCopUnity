@@ -48,4 +48,10 @@ public class PlayerInstance : NetworkBehaviour
     {
         screenDamage.CurrentHealth -= 1;
     }
+
+    public void SetPosition(Transform position)
+    {
+        transform.position = position.position;
+        transform.rotation = position.rotation;
+    }
 }

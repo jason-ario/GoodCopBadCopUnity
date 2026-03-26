@@ -19,8 +19,9 @@ public class UIController : MonoBehaviour
     [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
     [SerializeField] private GameObject leaveChairUI;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
-    
+    [SerializeField] private GameObject startShiftScreen;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
+    [SerializeField] private AudioClip transitionToGameplayStinger;
 
     private void Awake()
     {
@@ -149,5 +150,26 @@ public class UIController : MonoBehaviour
     public void HideEndOfShiftReport()
     {
         endOfShiftReportUI.gameObject.SetActive(false);
+    }
+
+    public void OpenStartShiftScreen()
+    {
+        startShiftScreen.SetActive(true);
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+    }
+    
+    public void CloseStartShiftScreen()
+    {
+        startShiftScreen.SetActive(false);
+        PlayerInstance.Instance.SetCanInteract(true);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+    }
+
+    public void EnterFirstShift()
+    {
+        CloseStartShiftScreen();
+        SFXController.Instance.Play(transitionToGameplayStinger);
+        ShiftManager.Instance.StartNewShift();
     }
 }

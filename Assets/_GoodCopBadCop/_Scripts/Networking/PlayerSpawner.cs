@@ -82,4 +82,10 @@ public class PlayerSpawner : MonoBehaviour
         int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
         return multiplayerSpawnPoints[index];
     }
+    
+    public Transform GetBoothSpawnPoint(ulong clientId)
+    {
+        int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
+        return multiplayerSpawnPoints[index];
+    }
 }

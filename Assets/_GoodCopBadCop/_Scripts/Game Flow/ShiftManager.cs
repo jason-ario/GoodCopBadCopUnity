@@ -219,8 +219,10 @@ public class ShiftManager : NetworkBehaviour
         PlayerPrefs.SetInt("dayNumber", dayNumber);
 
         UIController.Instance.FadeIn();
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(2f);
 
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        
         UIController.Instance.HideEndOfShiftReport();
         SuspectController.Instance.ResetSuspects();
 

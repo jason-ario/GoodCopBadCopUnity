@@ -18,5 +18,9 @@ public class BackgroundManager : MonoBehaviour
         _volumetricFog.profile = environment.volumetricFogProfile;
         RenderSettings.skybox = environment.Skybox;
         RenderSettings.fogDensity = environment.fogDensity;
+        RenderSettings.ambientSkyColor = environment.ambientLighting.skyColor;
+        RenderSettings.ambientEquatorColor = environment.ambientLighting.equatorColor;
+        RenderSettings.ambientGroundColor = environment.ambientLighting.groundColor;
+
     }
 }

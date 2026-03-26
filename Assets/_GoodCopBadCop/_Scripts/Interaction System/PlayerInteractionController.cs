@@ -95,7 +95,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         // Increase distance significantly to detect "Too Far" objects
-        if (Physics.Raycast(ray, out RaycastHit hit, 50f, interactLayer))
+        if (Physics.Raycast(ray, out RaycastHit hit, 10f, interactLayer))
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
             InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();

@@ -8,7 +8,7 @@ public class StartShiftScreen : MonoBehaviour
     [SerializeField] private TMPTextReveal dayNumberText; 
     [SerializeField] float dayNumberDelay = 2f;
     [SerializeField] float dayNumberDuration = 4f;
-
+    
     public void ShowDayNumber(int dayNumber)
     {
         gameObject.SetActive(true);

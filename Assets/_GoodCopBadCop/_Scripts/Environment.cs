@@ -8,4 +8,14 @@ public class Environment : ScriptableObject
     public VolumetricFogProfile volumetricFogProfile;
     public Material Skybox;
     public float fogDensity;
+
+    [System.Serializable]
+    public struct AmbientLighting
+    {
+        public Color skyColor;
+        public Color equatorColor;
+        public Color groundColor;
+    }
+    
+    public AmbientLighting ambientLighting;
 }
