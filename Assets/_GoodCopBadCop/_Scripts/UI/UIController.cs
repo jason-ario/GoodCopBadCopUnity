@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Steamworks;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -20,6 +21,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject leaveChairUI;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
+    [SerializeField] private GameObject inviteFriendsPanel;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     [SerializeField] private AudioClip transitionToGameplayStinger;
 
@@ -155,15 +157,13 @@ public class UIController : MonoBehaviour
     public void OpenStartShiftScreen()
     {
         startShiftScreen.SetActive(true);
-        PlayerInstance.Instance.SetCanInteract(false);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+        PlayerInstance.Instance.OpenedUIPanel();
     }
     
     public void CloseStartShiftScreen()
     {
         startShiftScreen.SetActive(false);
-        PlayerInstance.Instance.SetCanInteract(true);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+        PlayerInstance.Instance.ClosedUIPanel();
     }
 
     public void EnterFirstShift()
@@ -171,5 +171,12 @@ public class UIController : MonoBehaviour
         CloseStartShiftScreen();
         SFXController.Instance.Play(transitionToGameplayStinger);
         ShiftManager.Instance.InitiateIntroCutscene();
+    }
+
+    public void OpenInvitePanel()
+    {
+        PlayerInstance.Instance.OpenedUIPanel();
+        LobbyManager.Instance.OpenInviteFriendsPopup();
+        inviteFriendsPanel.SetActive(true);
     }
 }

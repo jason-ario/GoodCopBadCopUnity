@@ -33,6 +33,18 @@ public class PlayerInstance : NetworkBehaviour
         
         Instance = this;
     }
+
+    public void OpenedUIPanel()
+    {
+        SetCanInteract(false);
+        _playerMovementController.SetCanControl(false);
+    }
+
+    public void ClosedUIPanel()
+    {
+        SetCanInteract(true);
+        _playerMovementController.SetCanControl(true);
+    }
     
     public void SetCanInteract(bool value, string interactText = "")
     {

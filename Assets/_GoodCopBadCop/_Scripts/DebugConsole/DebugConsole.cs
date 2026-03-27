@@ -28,6 +28,7 @@ public class DebugConsole : MonoBehaviour
                 return;
             }
             NetworkManager.Singleton.StartHost();
+            LobbyManager.Instance.CreateLobby();
             GameManager.Instance.TryStartGame(true);
         }
         
