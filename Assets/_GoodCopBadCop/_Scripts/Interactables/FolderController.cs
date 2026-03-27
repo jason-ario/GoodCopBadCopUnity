@@ -11,17 +11,20 @@ public class FolderController : PickableObject
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isStamped = new NetworkVariable<bool>(false);
 
+    [Header("Documents")] 
+    [SerializeField] private MeshRenderer photoID;
+    [SerializeField] EntryPermit entryPermit;
+    
+    [Header("Set Up")]
     [SerializeField] private AudioClip folderPlaceClip;
     [SerializeField] Animator anim;
-    private bool isStamping;
     public Transform stampUpTarget;
     public Transform stampDownTarget;
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
     private StampContainer.StampType _stampType;
-
-    [Header("Files")] 
-    [SerializeField] private Transform polaroidPhotoSpawnPos;
+    
+    private bool isStamping;
 
     [Header("Camera")] 
     [SerializeField] private GameObject cinemachineVirtualCamera;
@@ -31,8 +34,6 @@ public class FolderController : PickableObject
     public UnityAction onStampedComplete;
     private bool isOpeningOrClosing;
 
-    [Header("Documents")] 
-    [SerializeField] private MeshRenderer photoID;
     
     public override void OnNetworkSpawn()
     {
@@ -236,5 +237,6 @@ public class FolderController : PickableObject
     {
         Debug.Log("Setting info");
         photoID.material.mainTexture = suspectCharacter.IDPhoto;
+        entryPermit.SetEntryPermit(suspectCharacter.suspectName, suspectCharacter.ReasonForEntry, suspectCharacter.ExpirationDate, suspectCharacter.SealActive);
     }
 }

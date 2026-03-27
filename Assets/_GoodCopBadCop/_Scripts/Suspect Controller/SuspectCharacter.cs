@@ -6,8 +6,18 @@ using UnityEngine;
 
 public class SuspectCharacter : Interactable
 {
+    [Header("Suspect Data")]
     public string suspectName;
 
+    [SerializeField] string reasonForEntry;
+    [SerializeField] string expirationDate;
+    [SerializeField] bool sealActive;
+    
+    public string ReasonForEntry => reasonForEntry;
+    public string ExpirationDate=> expirationDate;
+    public bool SealActive => sealActive;
+    
+    [Header("Suspect Set Up")]
     public FLookAnimator lookAnimator;
     public Animator animator;
     public AudioSource audioSource;
@@ -43,6 +53,8 @@ public class SuspectCharacter : Interactable
             return false;
         }
     }
+
+
 
     [System.Serializable]
     public struct Response
