@@ -31,16 +31,11 @@ public class FolderController : PickableObject
     public UnityAction onStampedComplete;
     private bool isOpeningOrClosing;
 
+    [Header("Documents")] 
+    [SerializeField] private MeshRenderer photoID;
+    
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
-        {
-            //SpawnDocument(IdCard, idCardSpawnPos);
-            //SpawnDocument(InvitationLetter, invitationLetterSpawnPos);
-            //SpawnDocument(ApplicationLetter, applicationLetterSpawnPos);
-            //SpawnDocument(Envelope, envelopeSpawnPos);
-        }
-
         // Sync visual state on spawn and when variables change
         isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
 
@@ -50,15 +45,6 @@ public class FolderController : PickableObject
         {
             transform.position = GameManager.Instance.FolderPos.position;
         }
-    }
-
-    private void SpawnDocument(NetworkObject prefab, Transform spawnPos)
-    {
-        if (prefab == null || spawnPos == null) return;
-
-        NetworkObject doc = Instantiate(prefab, spawnPos.position, spawnPos.rotation);
-        doc.Spawn();
-        doc.transform.SetParent(transform);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -246,4 +232,9 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
+    public void SetInfo(SuspectCharacter suspectCharacter)
+    {
+        Debug.Log("Setting info");
+        photoID.material.mainTexture = suspectCharacter.IDPhoto;
+    }
 }

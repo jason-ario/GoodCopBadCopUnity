@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -51,6 +52,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private AudioSource _buzzerSound;
     [SerializeField] DoorController _doorController;
     [SerializeField] private Lever lever;
+    [SerializeField] private TextMeshPro calendarText;
 
     private void Awake()
     {
@@ -222,7 +224,8 @@ public class ShiftManager : NetworkBehaviour
     {
         dayNumber += 1;
         PlayerPrefs.SetInt("dayNumber", dayNumber);
-
+        calendarText.text = dayNumber.ToString("D2");
+        
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
         introCutscene.gameObject.SetActive(false);

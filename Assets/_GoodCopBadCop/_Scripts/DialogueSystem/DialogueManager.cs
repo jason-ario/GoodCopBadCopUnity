@@ -83,7 +83,7 @@ public class DialogueManager : NetworkBehaviour
         }
 
         Debug.Log(character);
-        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, character.suspectNameColor, false, clearHistory, waitForInput);
+        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, Color.white, false, clearHistory, waitForInput);
 
         if (character.audioSource != null &&
             character.voiceAudioClips != null &&

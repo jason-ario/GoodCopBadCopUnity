@@ -5,6 +5,7 @@ using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
+using UnityEngine.Serialization;
 
 public class SuspectController : NetworkBehaviour
 {
@@ -18,7 +19,7 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private SuspectCharacter[] suspectCharacters;
     public SuspectCharacter suspectCharacter;
 
-    [SerializeField] private NetworkObject applicationPrefab;
+    [FormerlySerializedAs("applicationPrefab")] [SerializeField] private NetworkObject folderPrefab;
     [SerializeField] private Transform applicationSpawnPos;
     public Transform ApplicationSpawnPos => applicationSpawnPos;
 
@@ -213,14 +214,16 @@ public class SuspectController : NetworkBehaviour
     public void SpawnPaperwork()
     {
         if (!IsServer) return;
+        
+        NetworkObject folder =
+            Instantiate(folderPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
 
-        Debug.Log("Spawning paperwork");
-        NetworkObject spawnedApp =
-            Instantiate(applicationPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
+        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
 
-        spawnedApp.Spawn();
-        spawnedFolder = spawnedApp;
+        folder.Spawn();
+        spawnedFolder = folder;
     }
+    
 
     public void RespondToDialogueChoice(int choiceIndex)
     {
@@ -440,12 +443,13 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        NetworkObject spawnedApp =
-            Instantiate(applicationPrefab, handSpawnPos.position, handSpawnPos.rotation);
+        NetworkObject folder =
+            Instantiate(folderPrefab, handSpawnPos.position, handSpawnPos.rotation);
 
-        spawnedApp.Spawn();
+        folder.Spawn();
+        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
 
-        if (spawnedApp.TryGetComponent<Rigidbody>(out Rigidbody rb))
+        if (folder.TryGetComponent<Rigidbody>(out Rigidbody rb))
         {
             rb.isKinematic = false;
             Vector3 throwDirection = handSpawnPos.forward + Vector3.up * 0.5f;
@@ -457,7 +461,7 @@ public class SuspectController : NetworkBehaviour
             );
         }
 
-        spawnedFolder = spawnedApp;
+        spawnedFolder = folder;
     }
 
     public void ResetSuspects()

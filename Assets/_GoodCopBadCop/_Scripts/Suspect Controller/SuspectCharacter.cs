@@ -6,11 +6,11 @@ using UnityEngine;
 
 public class SuspectCharacter : Interactable
 {
+    public string suspectName;
+
     public FLookAnimator lookAnimator;
     public Animator animator;
     public AudioSource audioSource;
-    public string suspectName;
-    public Color suspectNameColor;
     
     [TextArea(3, 10)]
     public string entryDialogue;
@@ -29,8 +29,8 @@ public class SuspectCharacter : Interactable
     public Vector3 standPosOffset;
     
     [Header("Photo")]
-    [SerializeField] Texture2D photoMaterial;
-    public Texture2D PhotoMaterial => photoMaterial;
+    [SerializeField] Texture2D idPhoto;
+    public Texture2D IDPhoto => idPhoto;
     
     [Header("Anomalies")]
     [SerializeField] AnomalyController anomalyController;
