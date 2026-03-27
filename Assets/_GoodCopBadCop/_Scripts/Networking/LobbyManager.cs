@@ -53,6 +53,16 @@ public class LobbyManager : MonoBehaviour
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        
+        SteamFriends.OnGameOverlayActivated += OnOverlayToggled;
+    }
+
+    private void OnOverlayToggled(bool value)
+    {
+        if (value == false)
+        {
+            CloseInviteFriendsPopUp();
+        }
     }
 
     private void OnDestroy()
@@ -167,6 +177,11 @@ public class LobbyManager : MonoBehaviour
 
         SteamFriends.OpenGameInviteOverlay(CurrentLobby.Id);
         Debug.Log($"Opened Steam invite popup for lobby {CurrentLobby.Id}");
+    }
+
+    public void CloseInviteFriendsPopUp()
+    {
+        UIController.Instance.CloseInviteFriendsScreen();
     }
 
     private void OnGameLobbyJoinRequested(Lobby lobby, SteamId friendId)

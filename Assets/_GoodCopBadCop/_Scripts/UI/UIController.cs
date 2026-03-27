@@ -179,4 +179,10 @@ public class UIController : MonoBehaviour
         LobbyManager.Instance.OpenInviteFriendsPopup();
         inviteFriendsPanel.SetActive(true);
     }
+
+    public void CloseInviteFriendsScreen()
+    {
+        PlayerInstance.Instance.ClosedUIPanel();
+        inviteFriendsPanel.SetActive(false);
+    }
 }
