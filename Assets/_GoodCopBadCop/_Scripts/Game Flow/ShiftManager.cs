@@ -254,7 +254,6 @@ public class ShiftManager : NetworkBehaviour
     public void InitiateIntroCutscene()
     {
         UIController.Instance.FadeIn();
-        PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.DisableReticle();
         StartCoroutine(PlayIntroCutscene());
     }
@@ -265,6 +264,7 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(2f);
         ResetEverything();
         yield return new WaitForSeconds(1);
+        ResetEverything(); // Did this twice because I was having a situation where player wasnt resetting properly
         introCutscene.gameObject.SetActive(true); 
         yield return new WaitForSeconds(.5f);
         UIController.Instance.FadeOut();

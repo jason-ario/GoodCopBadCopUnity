@@ -10,6 +10,7 @@ public class PlayerMovementController : NetworkBehaviour
 {
     private CharacterController _characterController;
     [SerializeField] private float characterSpeed;
+    [SerializeField] private float runSpeed = 8f;
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private float mouseSensitivity = 2f;
     [SerializeField] private float maxLookAngle = 80f;
@@ -140,15 +141,20 @@ public class PlayerMovementController : NetworkBehaviour
         }
     }
 
-    void Move()
+    void Move() 
     {
-
         // Store input values for animation
         MoveXRaw = Input.GetAxisRaw("Horizontal");
         MoveZRaw = Input.GetAxisRaw("Vertical");
         float MoveX = Input.GetAxis("Horizontal");
         float MoveZ = Input.GetAxis("Vertical");
-        
+
+        // Check run input
+        bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        // Pick speed
+        float currentSpeed = isRunning ? runSpeed : characterSpeed;
+
         // Calculate desired direction based on input
         Vector3 inputDir = new Vector3(MoveX, 0, MoveZ);
         inputDir = transform.TransformDirection(inputDir);
@@ -163,7 +169,7 @@ public class PlayerMovementController : NetworkBehaviour
             _verticalVelocity += gravity * Time.deltaTime;
         }
 
-        Vector3 moveVector = inputDir * characterSpeed + Vector3.up * _verticalVelocity;
+        Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 
         // Apply movement
         _characterController.Move(moveVector * Time.deltaTime);

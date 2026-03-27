@@ -171,6 +171,10 @@ public class PlayerAnimationController : NetworkBehaviour
         // Smoothly lerp between current and target values
         currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * animLerpSpeed);
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
+
+        bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        
+        bodyAnimator.SetBool("IsRunning", isRunning);
         
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);
