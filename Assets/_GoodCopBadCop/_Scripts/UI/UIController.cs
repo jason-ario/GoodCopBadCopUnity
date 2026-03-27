@@ -170,6 +170,6 @@ public class UIController : MonoBehaviour
     {
         CloseStartShiftScreen();
         SFXController.Instance.Play(transitionToGameplayStinger);
-        ShiftManager.Instance.StartNewShift();
+        ShiftManager.Instance.InitiateIntroCutscene();
     }
 }

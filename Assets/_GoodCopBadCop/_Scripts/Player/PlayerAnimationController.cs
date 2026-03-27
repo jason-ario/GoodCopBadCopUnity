@@ -3,6 +3,7 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using UnityEngine.Rendering;
 using UnityEngine.Serialization;
 
 [RequireComponent(typeof(Animator))]
@@ -82,6 +83,7 @@ public class PlayerAnimationController : NetworkBehaviour
         _playerMovementController = GetComponent<PlayerMovementController>();
     }
     
+
     private void LateUpdate()
     {
         if (RightArmRigIKTarget != null)
@@ -147,6 +149,10 @@ public class PlayerAnimationController : NetworkBehaviour
             {
                 armsOnBody.layer = LayerMask.NameToLayer("Default");
             }
+        }
+        else
+        {
+            armsOnBody.GetComponent<SkinnedMeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
         }
     }
 

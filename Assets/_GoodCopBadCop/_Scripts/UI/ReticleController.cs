@@ -70,6 +70,17 @@ public class ReticleController : MonoBehaviour
         }
     }
 
+    public void DisableReticle()
+    {
+        reticle.enabled = false;
+        doText.gameObject.SetActive(false);
+    }
+    
+    public void EnableReticle()
+    {
+        reticle.enabled = true;
+    }
+
     public void SetTooFarState(bool state)
     {
         isTooFar = state;

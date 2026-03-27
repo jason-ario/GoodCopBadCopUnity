@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Playables;
 
 public class ShiftManager : NetworkBehaviour
 {
@@ -23,6 +25,8 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private AudioClip knockOnDoorSound;
     [SerializeField] private GameObject cardboardBox;
     [SerializeField] private MachineShake doorShake;
+    [SerializeField] private PlayableDirector introCutscene;
+    [SerializeField] private AudioSource ambientAudio;
 
     public int SuspectsPerShift => suspectsPerShift;
 
@@ -211,6 +215,7 @@ public class ShiftManager : NetworkBehaviour
         ResetShiftData();
         ResetEnvironment();
         ResetSuspectsProcessed();
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
     }
 
     private IEnumerator NewShiftSequence()
@@ -220,8 +225,7 @@ public class ShiftManager : NetworkBehaviour
 
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
-
-        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        introCutscene.gameObject.SetActive(false);
         
         UIController.Instance.HideEndOfShiftReport();
         SuspectController.Instance.ResetSuspects();
@@ -245,6 +249,31 @@ public class ShiftManager : NetworkBehaviour
         suspectsQuarantined = 0;
         suspectsKilledCorrect = 0;
         suspectsKilledWrong = 0;
+    }
+
+    public void InitiateIntroCutscene()
+    {
+        UIController.Instance.FadeIn();
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.DisableReticle();
+        StartCoroutine(PlayIntroCutscene());
+    }
+
+    IEnumerator PlayIntroCutscene()
+    {
+        ambientAudio.DOFade(0, 2);
+        yield return new WaitForSeconds(2f);
+        ResetEverything();
+        yield return new WaitForSeconds(1);
+        introCutscene.gameObject.SetActive(true); 
+        yield return new WaitForSeconds(.5f);
+        UIController.Instance.FadeOut();
+    }
+
+    public void EndIntroCutscene()
+    {
+        StartNewShift();
+        ambientAudio.DOFade(1, 2);
     }
 
 

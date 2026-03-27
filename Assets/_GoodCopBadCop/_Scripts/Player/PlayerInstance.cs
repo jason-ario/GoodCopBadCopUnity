@@ -54,4 +54,14 @@ public class PlayerInstance : NetworkBehaviour
         transform.position = position.position;
         transform.rotation = position.rotation;
     }
+
+    public void DisableReticle()
+    {
+        _playerInteractionController.reticle.gameObject.SetActive(false);
+    }
+    
+    public void EnableReticle()
+    {
+        _playerInteractionController.reticle.gameObject.SetActive(true);
+    }
 }
