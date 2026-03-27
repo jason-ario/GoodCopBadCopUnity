@@ -19,6 +19,7 @@ public class LobbyManager : MonoBehaviour
 
     private FacepunchTransport facepunchTransport;
     private bool startingClientFromLobbyFlow;
+    private bool inviteOverlayWasOpenedByUs;
 
     private void Awake()
     {
@@ -50,19 +51,10 @@ public class LobbyManager : MonoBehaviour
             SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberJoined;
             SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeave;
             SteamFriends.OnGameLobbyJoinRequested += OnGameLobbyJoinRequested;
+            SteamFriends.OnGameOverlayActivated += OnOverlayToggled;
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-        
-        SteamFriends.OnGameOverlayActivated += OnOverlayToggled;
-    }
-
-    private void OnOverlayToggled(bool value)
-    {
-        if (value == false)
-        {
-            CloseInviteFriendsPopUp();
-        }
     }
 
     private void OnDestroy()
@@ -76,6 +68,19 @@ public class LobbyManager : MonoBehaviour
         SteamMatchmaking.OnLobbyMemberJoined -= OnLobbyMemberJoined;
         SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberLeave;
         SteamFriends.OnGameLobbyJoinRequested -= OnGameLobbyJoinRequested;
+        SteamFriends.OnGameOverlayActivated -= OnOverlayToggled;
+    }
+
+    private void OnOverlayToggled(bool isActive)
+    {
+        Debug.Log($"Steam overlay active: {isActive}");
+
+        // Only react if we previously opened the invite overlay ourselves.
+        if (!isActive && inviteOverlayWasOpenedByUs)
+        {
+            inviteOverlayWasOpenedByUs = false;
+            CloseInviteFriendsPopUp();
+        }
     }
 
     // =========================
@@ -103,7 +108,7 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby.SetJoinable(true);
             CurrentLobby.SetData("host", SteamClient.Name);
 
-            // For Facepunch transport, host targets self
+            // Host targets self for Facepunch transport.
             facepunch.targetSteamId = SteamClient.SteamId;
 
             if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
@@ -141,15 +146,25 @@ public class LobbyManager : MonoBehaviour
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
-        if (transport is FacepunchTransport facepunch)
+        if (transport is FacepunchTransport)
         {
             var lobby = new Lobby(lobbyId);
-            await lobby.Join();
+            RoomEnter joinResult = await lobby.Join();
+
+            if (joinResult != RoomEnter.Success)
+            {
+                Debug.LogError($"Failed to join lobby {lobbyId}. Result: {joinResult}");
+                return;
+            }
 
             // Do not StartClient() here.
             // Let OnLobbyEntered handle that so it only happens once.
             CurrentLobby = lobby;
-            facepunch.targetSteamId = lobby.Owner.Id;
+
+            if (facepunchTransport != null)
+            {
+                facepunchTransport.targetSteamId = lobby.Owner.Id;
+            }
 
             Debug.Log($"Requested join for lobby {lobbyId}");
         }
@@ -175,13 +190,17 @@ public class LobbyManager : MonoBehaviour
             return;
         }
 
+        inviteOverlayWasOpenedByUs = true;
         SteamFriends.OpenGameInviteOverlay(CurrentLobby.Id);
         Debug.Log($"Opened Steam invite popup for lobby {CurrentLobby.Id}");
     }
 
     public void CloseInviteFriendsPopUp()
     {
-        UIController.Instance.CloseInviteFriendsScreen();
+        if (UIController.Instance != null)
+        {
+            UIController.Instance.CloseInviteFriendsScreen();
+        }
     }
 
     private void OnGameLobbyJoinRequested(Lobby lobby, SteamId friendId)
@@ -283,6 +302,8 @@ public class LobbyManager : MonoBehaviour
 
     public void ExitLobby()
     {
+        inviteOverlayWasOpenedByUs = false;
+
         if (NetworkManager.Singleton != null &&
             (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))
         {

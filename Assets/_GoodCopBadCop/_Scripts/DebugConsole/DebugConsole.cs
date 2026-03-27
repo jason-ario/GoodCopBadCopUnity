@@ -5,6 +5,7 @@ using UnityEngine;
 public class DebugConsole : MonoBehaviour
 {
     public bool skipMainMenu; 
+    public bool skipLobby; 
     public bool cutsceneMode;
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
@@ -35,6 +36,11 @@ public class DebugConsole : MonoBehaviour
         if (cutsceneMode)
         {
             UIController.Instance.ClosePlayerUI();
+        }
+        
+        if (skipLobby)
+        {
+            ShiftManager.Instance.StartNewShift();
         }
 
     }
