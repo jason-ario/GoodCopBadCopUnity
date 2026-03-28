@@ -24,8 +24,10 @@ public class PlayerAnimationController : NetworkBehaviour
 
     private float targetLayer1Weight = 0f;
     private float targetLayer2Weight = 0f;
+    private float targetLayer4Weight = 0f;
     private float currentLayer1Weight = 0f;
     private float currentLayer2Weight = 0f;
+    private float currentLayer4Weight = 0f;
 
     [Header("Body Arm Rigs")]
     [SerializeField] private Rig rightArmRig;
@@ -185,14 +187,17 @@ public class PlayerAnimationController : NetworkBehaviour
         // Smoothly lerp layer weights
         currentLayer1Weight = Mathf.Lerp(currentLayer1Weight, targetLayer1Weight, Time.deltaTime * animLerpSpeed);
         currentLayer2Weight = Mathf.Lerp(currentLayer2Weight, targetLayer2Weight, Time.deltaTime * animLerpSpeed);
+        currentLayer4Weight = Mathf.Lerp(currentLayer4Weight, targetLayer4Weight, Time.deltaTime * animLerpSpeed);
 
         bodyAnimator.SetLayerWeight(1, currentLayer1Weight);
         armsAnimator.SetLayerWeight(1, currentLayer1Weight);
         bodyAnimator.SetLayerWeight(2, currentLayer2Weight);
         armsAnimator.SetLayerWeight(2, currentLayer2Weight);
+        bodyAnimator.SetLayerWeight(4, currentLayer4Weight);
+        armsAnimator.SetLayerWeight(4, currentLayer4Weight);
     }
 
-    public void EnableHoldObjectMask()
+    public void EnableRightArmMask()
     {
         targetLayer1Weight = 1f;
         targetLayer2Weight = 0f;
@@ -330,5 +335,49 @@ public class PlayerAnimationController : NetworkBehaviour
         }
         
         RightArmRig.weight = 0;
+    }
+
+    public void TurnLeftRigOnAndOff(float smoothOnDuration, float onDuration)
+    {
+        StartCoroutine(TurnLeftArmRigOnAndOffCR(smoothOnDuration, onDuration));
+    }
+    
+    IEnumerator TurnLeftArmRigOnAndOffCR(float smoothOnDuration, float onDuration)
+    {
+        float elapsed = 0;
+        // Phase 1: Lerp Up to 1
+        while (elapsed < smoothOnDuration)
+        {
+            elapsed += Time.deltaTime;
+            LeftArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            CamLeftArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            yield return null;
+        }
+
+        LeftArmRig.weight = 1;
+        yield return new WaitForSeconds(onDuration);
+
+        // Phase 2: Lerp Down to 0 (Faster)
+        elapsed = 0f;
+        while (elapsed < smoothOnDuration)
+        {
+            elapsed += Time.deltaTime;
+            LeftArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
+            CamLeftArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
+
+            yield return null;
+        }
+        
+        LeftArmRig.weight = 0;
+    }
+
+    public void EnableLeftArmMask()
+    {
+        targetLayer4Weight = 1;
+    }
+
+    public void DisableLeftArmMask()
+    {
+        targetLayer4Weight = 0;
     }
 }

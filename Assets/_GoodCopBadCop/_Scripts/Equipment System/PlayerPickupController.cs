@@ -38,6 +38,8 @@ public class PlayerPickupController : NetworkBehaviour
 
     public UnityAction OnPlaceObject;
 
+    [SerializeField] Transform leftHandSocket;
+    public Transform LeftHandSocket => leftHandSocket;
     
     private bool _canPickUpAndPlace = true;
     public bool CanPickUpAndPlace
@@ -127,7 +129,7 @@ public class PlayerPickupController : NetworkBehaviour
         }
         else
         {
-            _playerAnimationController.EnableHoldObjectMask();
+            _playerAnimationController.EnableRightArmMask();
         }
     }
 

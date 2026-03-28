@@ -25,21 +25,21 @@ public class SwitchButton : Interactable
 
         
         player.playerAnimationController.RightArmRigIKTarget = ikTarget;
-        Vector3 cameraPos = player.playerMovementController.CameraTransform.position;
-        Vector3 cameraRot = player.playerMovementController.CameraTransform.eulerAngles;
+        Vector3 cameraPos = player.playerMovementController.CameraTransform.localPosition;
+        Vector3 cameraRot = player.playerMovementController.CameraTransform.localEulerAngles;
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
         
         yield return new WaitForSeconds(.5f);
-        player.playerAnimationController.EnableHoldObjectMask();
+        player.playerAnimationController.EnableRightArmMask();
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
         player.playerAnimationController.SetAnimTrigger("PressButton");
         ShiftManager.Instance.TryStartShift();
         PlayButtonSoundClientRpc();
 
         yield return new WaitForSeconds(1);
-        player.playerMovementController.CameraTransform.DOMove(cameraPos, .5f); 
-        player.playerMovementController.CameraTransform.DORotate(cameraRot, .5f);      
+        player.playerMovementController.ResetCameraPos(false,.25f);
+
         
         yield return new WaitForSeconds(.25f);
 

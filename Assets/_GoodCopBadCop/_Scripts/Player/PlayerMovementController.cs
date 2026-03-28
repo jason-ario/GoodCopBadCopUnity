@@ -17,6 +17,7 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private float mouseSmoothing = 10f;
     [SerializeField] private float acceleration = 20f;
     [SerializeField] private float drag = 5f;
+    private Vector3 targetLookEuler;
 
     [Header("Recoil Settings")]
     [SerializeField] private float recoilVerticalAmount = 3f;
@@ -58,6 +59,7 @@ public class PlayerMovementController : NetworkBehaviour
     private Chair chairSeatedAt;
 
     public Transform CameraTransform => cameraTransform;
+    
     bool _canSitOrStand = true;
 
     public void SetCantSitOrStand(bool value)
@@ -194,10 +196,12 @@ public class PlayerMovementController : NetworkBehaviour
             _cameraPitch = Mathf.Clamp(_cameraPitch, -maxLookAngle, maxLookAngle);
             
             // Combine base aim pitch with procedural recoil rotation
-            cameraTransform.localEulerAngles = new Vector3(_cameraPitch + _recoilRotation.x, _recoilRotation.y, 0f);
+            targetLookEuler = new Vector3(_cameraPitch + _recoilRotation.x, _recoilRotation.y, 0f);
+            cameraTransform.localEulerAngles = targetLookEuler;
         }
     }
 
+    
     public void ApplyRecoil()
     {
         if (!IsLocalPlayer) return;
@@ -284,6 +288,7 @@ public class PlayerMovementController : NetworkBehaviour
         {
             Vector3 targetPos = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
             cameraTransform.DOLocalMove(targetPos, duration);
+            cameraTransform.DOLocalRotate(targetLookEuler, duration);
         }
     }
 

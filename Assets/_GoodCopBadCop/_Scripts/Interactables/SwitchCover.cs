@@ -42,7 +42,7 @@ public class SwitchCover : Interactable
 
     IEnumerator WaitAndOpenSwitch(PlayerInteractionController player)
     {
-        player.playerAnimationController.EnableHoldObjectMask();
+        player.playerAnimationController.EnableRightArmMask();
         yield return new WaitForSeconds(0.3f);
         anim.SetBool("SwitchOpen", switchCoverOpen.Value);
         audioSource.Play();

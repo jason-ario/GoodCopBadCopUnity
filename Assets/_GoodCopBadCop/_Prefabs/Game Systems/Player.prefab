@@ -929,6 +929,7 @@ Transform:
   - {fileID: 3967829100457087306}
   - {fileID: 3000760193102558246}
   - {fileID: 379908663391551372}
+  - {fileID: 2693880989614002730}
   - {fileID: 2654693638623932747}
   - {fileID: 8156789284174780857}
   - {fileID: 7777925332881116255}
@@ -1136,6 +1137,7 @@ MonoBehaviour:
   - {fileID: 9100922232536320652}
   camObjectContainer: {fileID: 9100922232536320652}
   bodyObjectContainer: {fileID: 8491078084034416085}
+  leftHandSocket: {fileID: 2693880989614002730}
 --- !u!114 &371220573109159834
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2539,6 +2541,65 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!1 &8249481354703023807
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2693880989614002730}
+  - component: {fileID: 8482043113195870581}
+  m_Layer: 7
+  m_Name: Left Hand Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2693880989614002730
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8249481354703023807}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.4772577, y: -0.5185068, z: 0.52520597, w: 0.4770058}
+  m_LocalPosition: {x: -1.0148354, y: 2.2309227, z: 0.5110274}
+  m_LocalScale: {x: 100, y: 99.999954, z: 100}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8000816560836992802}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1773428102 &8482043113195870581
+ParentConstraint:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8249481354703023807}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Weight: 1
+  m_TranslationAtRest: {x: -1.0148354, y: 2.2309227, z: 0.5110272}
+  m_RotationAtRest: {x: 89.456795, y: 44.59025, z: 139.71707}
+  m_TranslationOffsets:
+  - {x: 0, y: 0, z: 0}
+  m_RotationOffsets:
+  - {x: 0, y: 0, z: 0}
+  m_AffectTranslationX: 1
+  m_AffectTranslationY: 1
+  m_AffectTranslationZ: 1
+  m_AffectRotationX: 1
+  m_AffectRotationY: 1
+  m_AffectRotationZ: 1
+  m_Active: 1
+  m_IsLocked: 1
+  m_Sources:
+  - sourceTransform: {fileID: 1000040701952760015}
+    weight: 1
 --- !u!1 &9094970692894885970
 GameObject:
   m_ObjectHideFlags: 0

@@ -41,7 +41,7 @@ public class Radio : Interactable
         playerInteractionController.enabled = false;
 
         _playerMovementController.LookAtTarget(transform);
-        _playerMovementController.PlayerAnimationController.EnableHoldObjectMask();
+        _playerMovementController.PlayerAnimationController.EnableRightArmMask();
         _playerMovementController.CameraTransform.DOMove(cinemachineCamera.transform.position, .5f); 
         _playerMovementController.CameraTransform.DORotate(cinemachineCamera.transform.rotation.eulerAngles, .5f);
         _playerMovementController.PlayerAnimationController.SetAnimBool("UsingRadio", true);
