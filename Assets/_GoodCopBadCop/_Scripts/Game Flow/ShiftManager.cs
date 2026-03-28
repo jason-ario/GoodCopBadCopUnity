@@ -74,9 +74,9 @@ public class ShiftManager : NetworkBehaviour
 
         //_faxMachine.OnShiftStart();
 
-        yield return new WaitForSeconds(10);
+        //yield return new WaitForSeconds(10);
 
-        GiveBonusBox();
+        //GiveBonusBox();
     }
 
     public void GiveBonusBox()
@@ -203,7 +203,7 @@ public class ShiftManager : NetworkBehaviour
         windowLampController.TurnRed();
         rollingShutter.SetBool("Open", false); 
         rollingShutter.SetTrigger("Reset");
-        _doorController.Reset();
+        //_doorController.Reset();
         lever.Reset();
     }
 
