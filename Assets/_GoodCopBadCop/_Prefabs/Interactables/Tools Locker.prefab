@@ -765,7 +765,7 @@ Transform:
   m_GameObject: {fileID: 6343856245748400535}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.177, y: 0.024720501, z: 0.0334}
+  m_LocalPosition: {x: 0.1648, y: 0.024720501, z: 0.0406}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1251,8 +1251,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.99999994, y: 0.99999994, z: 0.99999994}
-  m_Center: {x: -0.00000035762787, y: 0, z: 0.0000009536742}
+  m_Size: {x: 0.9999993, y: 0.8789363, z: 0.9999999}
+  m_Center: {x: -0.0000003428505, y: -0.060531825, z: 0.0000009526879}
 --- !u!1001 &73710408839059924
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1373,7 +1373,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1e6992aa5bfdf1743b8b5d9fcb1fa64c, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -6.485
+      value: -8.064
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1e6992aa5bfdf1743b8b5d9fcb1fa64c, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1583,7 +1583,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 1984886206
-  InScenePlacedSourceGlobalObjectIdHash: 2420420506
+  InScenePlacedSourceGlobalObjectIdHash: 4196434297
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
@@ -1611,13 +1611,15 @@ MonoBehaviour:
   itemsThatCanInteractWith: []
   interactText: Open
   anim: {fileID: 6824243051379762325}
-  miniLockers:
-  - {fileID: 0}
+  miniLockers: []
   audioSource: {fileID: 2412519400569611988}
   lockerOpenSound: {fileID: 8300000, guid: fd5b411e3debd7644a4e89a4c37c15e2, type: 3}
   lockerCloseSound: {fileID: 8300000, guid: 06d342cc0aa3bd840b696a71f61d7f61, type: 3}
   lookTarget: {fileID: 152208814966522253}
-  decor: []
+  decor:
+  - {fileID: 7560275340927594798}
+  - {fileID: 6816624748975424488}
+  - {fileID: 7382277786687377602}
 --- !u!114 &625819678015074185
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1677,7 +1679,7 @@ MonoBehaviour:
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
   outline: 1
-  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 1}
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -1710,7 +1712,7 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.64
+  outlineWidth: 0.1
   outlineBlurPasses: 1
   outlineQuality: 2
   outlineEdgeMode: 0
@@ -5162,15 +5164,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1955640051589722812, guid: f227ef5bb3063ab4d8b2b3ac942982c3, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.416
+      value: -0.407
       objectReference: {fileID: 0}
     - target: {fileID: 1955640051589722812, guid: f227ef5bb3063ab4d8b2b3ac942982c3, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.465
+      value: 1.47
       objectReference: {fileID: 0}
     - target: {fileID: 1955640051589722812, guid: f227ef5bb3063ab4d8b2b3ac942982c3, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.011
+      value: -0.035
       objectReference: {fileID: 0}
     - target: {fileID: 1955640051589722812, guid: f227ef5bb3063ab4d8b2b3ac942982c3, type: 3}
       propertyPath: m_LocalRotation.w
