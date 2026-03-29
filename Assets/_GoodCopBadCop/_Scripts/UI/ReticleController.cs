@@ -62,7 +62,7 @@ public class ReticleController : MonoBehaviour
         if (state == true && text != "")
         {
             doText.gameObject.SetActive(true);
-            doText.text = text + "<sprite=0>";
+            doText.text = text + " <sprite=0>";
         }
         else
         {
