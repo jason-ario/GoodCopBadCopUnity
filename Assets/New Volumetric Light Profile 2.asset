@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a05f7c97fe68a4843b94f7e58995c5ac, type: 3}
-  m_Name: New Volumetric Light Profile
+  m_Name: New Volumetric Light Profile 2
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::VolumetricLights.VolumetricLightProfile
   lightMode: 0
   blendMode: 0
@@ -19,10 +19,10 @@ MonoBehaviour:
   raymarchMinStep: 0.1
   raymarchMaxSteps: 200
   jittering: 0.5
-  dithering: 0
+  dithering: 1
   useBlueNoise: 0
   animatedBlueNoise: 1
-  renderQueue: 3101
+  renderQueue: 3100
   sortingLayerID: 0
   sortingOrder: 0
   flipDepthTexture: 0
@@ -36,21 +36,21 @@ MonoBehaviour:
   distanceStartDimming: 70
   distanceDeactivation: 100
   autoToggleCheckInterval: 1
-  useNoise: 1
+  useNoise: 0
   noiseTexture: {fileID: 11700000, guid: 5b3147e9423af4f2cb0f6911a7a9b205, type: 2}
-  noiseStrength: 0.444
-  noiseScale: 5
+  noiseStrength: 1
+  noiseScale: 1
   noiseFinalMultiplier: 1
-  density: 0.15
-  mediumAlbedo: {r: 1, g: 0.40129948, b: 0, a: 1}
-  brightness: 0.0875
+  density: 0.1
+  mediumAlbedo: {r: 1, g: 1, b: 1, a: 1}
+  brightness: 0.67
   attenuationMode: 0
   attenCoefConstant: 1
   attenCoefLinear: 2
   attenCoefQuadratic: 1
   rangeFallOff: 1
-  diffusionIntensity: 4.72
-  penumbra: 0.104
+  diffusionIntensity: 0.5
+  penumbra: 1
   tipRadius: 0
   nearClipDistance: 0
   cookieTexture: {fileID: 0}
@@ -59,8 +59,8 @@ MonoBehaviour:
   cookieSpeed: {x: 0, y: 0}
   frustumAngle: 0
   windDirection: {x: 0.03, y: 0.02, z: 0}
-  enableDustParticles: 1
-  dustBrightness: 0.3
+  enableDustParticles: 0
+  dustBrightness: 1
   dustMinSize: 0.01
   dustMaxSize: 0.02
   dustWindSpeed: 1
@@ -69,7 +69,7 @@ MonoBehaviour:
   dustDistanceDeactivation: 70
   dustPrewarm: 1
   enableShadows: 0
-  shadowIntensity: 0.7
+  shadowIntensity: 0.9
   shadowColor: {r: 0, g: 0, b: 0, a: 1}
   shadowTranslucency: 0
   shadowTranslucencyIntensity: 1
@@ -77,7 +77,7 @@ MonoBehaviour:
   shadowResolution: 256
   shadowCullingMask:
     serializedVersion: 2
-    m_Bits: 4294967293
+    m_Bits: 4294967295
   shadowBakeInterval: 0
   shadowBakeIgnoreRotationChange: 0
   shadowNearDistance: 0.1

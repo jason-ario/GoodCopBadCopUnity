@@ -2,15 +2,10 @@ using UnityEngine;
 
 public class PC : Interactable
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    public override void Interact(PlayerInteractionController player)
     {
+        base.Interact(player);
         
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
         
     }
 }
