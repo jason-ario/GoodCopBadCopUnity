@@ -308,7 +308,7 @@ public class PlayerMovementController : NetworkBehaviour
     {
         if (!_isSitting || camStandPos == null) return;
         _isSitting = false;
-        UIController.Instance.ShowLeaveChairUI(false);
+        UIController.Instance.ShowBackUI(false);
 
         transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
         chairSeatedAt.transform.parent = null;

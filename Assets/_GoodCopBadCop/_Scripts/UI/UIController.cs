@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Steamworks;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class UIController : MonoBehaviour
@@ -18,7 +19,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
     [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
-    [SerializeField] private GameObject leaveChairUI;
+    [FormerlySerializedAs("leaveChairUI")] [SerializeField] private GameObject backUI;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
@@ -90,9 +91,9 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
     }
     
-    public void ShowLeaveChairUI(bool value)
+    public void ShowBackUI(bool value)
     {
-        leaveChairUI.SetActive(value);
+        backUI.SetActive(value);
     }
 
     public void FadeIn()

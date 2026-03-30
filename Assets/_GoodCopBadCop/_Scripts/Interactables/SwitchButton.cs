@@ -25,8 +25,6 @@ public class SwitchButton : Interactable
 
         
         player.playerAnimationController.RightArmRigIKTarget = ikTarget;
-        Vector3 cameraPos = player.playerMovementController.CameraTransform.localPosition;
-        Vector3 cameraRot = player.playerMovementController.CameraTransform.localEulerAngles;
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
         
