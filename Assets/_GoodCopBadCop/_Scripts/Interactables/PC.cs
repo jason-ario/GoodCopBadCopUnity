@@ -9,12 +9,20 @@ public class PC : Interactable
     [SerializeField] private Transform standPos;
     bool pcActive = false;
     private PlayerInteractionController _player;
+    [SerializeField] private SimpleCanvasCursorFromMouseDelta _virtualCanvasCursor;
+
+    [Header("Screens")] 
+    [SerializeField] private GameObject[] screens;
     
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
         
         player.playerMovementController.SetCanControl(false);
+        player.SetCanInteract(false, "");
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Confined;
         UIController.Instance.ShowBackUI(true);
         
         player.playerMovementController.LookAtTarget(lookAtTarget.transform);
@@ -22,6 +30,7 @@ public class PC : Interactable
         player.transform.DORotate(standPos.rotation.eulerAngles, .5f);
         pcActive = true;
         _player = player;
+        _virtualCanvasCursor.enabled = true;
     }
 
     private void Update()
@@ -33,7 +42,19 @@ public class PC : Interactable
                 pcActive = false;
                 UIController.Instance.ShowBackUI(false);
                 _player.playerMovementController.SetCanControl(true);
+                _player.SetCanInteract(true, "");
             }
         }
+    }
+
+    public void OpenScreen(GameObject screen)
+    {
+        for (int i = 0; i < screens.Length; i++)
+        {
+            screens[i].SetActive(false);
+            if (screens[i] == screen) screens[i].SetActive(true);
+        }
+        
+        _virtualCanvasCursor.SetScreenContent(screen.transform);
     }
 }

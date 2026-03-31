@@ -21,7 +21,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private StartShiftScreen _startShiftScreen;
     [SerializeField] private FaxMachine _faxMachine;
     [SerializeField] private float faxMachineDelay = 4f;
-    [SerializeField] private AudioClip bellSound;
+    [SerializeField] private AudioSource bellSound;
     [SerializeField] private AudioClip endOfLevelSound;
     [SerializeField] private AudioClip knockOnDoorSound;
     [SerializeField] private GameObject cardboardBox;
@@ -67,7 +67,7 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator StartShiftSequence()
     {
         Debug.Log("Start Shift Sequence");
-        SFXController.Instance.Play(bellSound);
+        bellSound.Play();
         _startShiftScreen.ShowDayNumber(dayNumber);
 
         yield return new WaitForSeconds(faxMachineDelay);
