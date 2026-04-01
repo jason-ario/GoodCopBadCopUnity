@@ -4,6 +4,7 @@ using DG.Tweening;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Playables;
 
 public class ShiftManager : NetworkBehaviour
@@ -54,6 +55,10 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private Lever lever;
     [SerializeField] private TextMeshPro calendarText;
 
+    #region Events
+    public UnityAction OnShiftStart { get; set; }
+    #endregion
+
     private void Awake()
     {
         Instance = this;
@@ -69,7 +74,7 @@ public class ShiftManager : NetworkBehaviour
         Debug.Log("Start Shift Sequence");
         bellSound.Play();
         _startShiftScreen.ShowDayNumber(dayNumber);
-
+        OnShiftStart?.Invoke();
         yield return new WaitForSeconds(faxMachineDelay);
 
         //_faxMachine.OnShiftStart();

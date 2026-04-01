@@ -13,7 +13,6 @@ public class CaseFileController : Interactable
     [SerializeField] Animator animator;
     [SerializeField] private Transform lookPos;
     [SerializeField] private GameObject caseFileUI;
-    [SerializeField] SuspectData suspect;
     
     public override void Interact(PlayerInteractionController player)
     {

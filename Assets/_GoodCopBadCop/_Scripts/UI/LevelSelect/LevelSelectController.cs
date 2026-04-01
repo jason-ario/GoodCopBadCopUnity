@@ -5,7 +5,6 @@ using UnityEngine.Events;
 public class LevelSelectController : MonoBehaviour
 {
     public static LevelSelectController Instance;
-    [SerializeField] SuspectData[] suspects;
 
     [Header("UI")] 
     [SerializeField] private RectTransform suspectContainer;
@@ -20,12 +19,5 @@ public class LevelSelectController : MonoBehaviour
     {
         UIController.Instance.CloseLevelSelectUI();
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
-    }
-
-    public void StartInterrogation(SuspectData suspect)
-    {
-        SceneContextController.Instance.OnLevelSelected(); 
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
-        UIController.Instance.CloseLevelSelectUI();
     }
 }

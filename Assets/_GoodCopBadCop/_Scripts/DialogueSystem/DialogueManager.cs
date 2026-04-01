@@ -82,17 +82,16 @@ public class DialogueManager : NetworkBehaviour
             return;
         }
 
-        Debug.Log(character);
-        GameObject subtitle = SpawnSubtitles(dialogue, character.suspectName, Color.white, false, clearHistory, waitForInput);
+        GameObject subtitle = SpawnSubtitles(dialogue, character.Data.FirstName, Color.white, false, clearHistory, waitForInput);
 
         if (character.audioSource != null &&
-            character.voiceAudioClips != null &&
-            character.voiceAudioClips.Length > 0)
+            character.Data.voiceAudioClips != null &&
+            character.Data.voiceAudioClips.Length > 0)
         {
             audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(
                 dialogue,
                 character.audioSource,
-                character.voiceAudioClips,
+                character.Data.voiceAudioClips,
                 subtitle));
         }
     }

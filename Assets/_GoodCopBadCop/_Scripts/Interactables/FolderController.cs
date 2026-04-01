@@ -237,6 +237,6 @@ public class FolderController : PickableObject
     {
         Debug.Log("Setting info");
         photoID.material.mainTexture = suspectCharacter.IDPhoto;
-        entryPermit.SetEntryPermit(suspectCharacter.suspectName, suspectCharacter.ReasonForEntry, suspectCharacter.ExpirationDate, suspectCharacter.SealActive);
+        entryPermit.SetEntryPermit(suspectCharacter.Data.FirstName + " " + suspectCharacter.Data.LastName, suspectCharacter.ReasonForEntry, suspectCharacter.ExpirationDate, suspectCharacter.SealActive);
     }
 }

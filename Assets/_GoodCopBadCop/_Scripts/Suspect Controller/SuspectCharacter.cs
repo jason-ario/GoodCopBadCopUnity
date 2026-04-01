@@ -4,11 +4,19 @@ using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 
+public enum CharacterStatus
+{
+    Resident,
+    Visitor,
+    Deceased
+}
+
 public class SuspectCharacter : Interactable
 {
     [Header("Suspect Data")]
-    public string suspectName;
-
+    [SerializeField] private SuspectData suspectData;
+    public SuspectData Data => suspectData;
+    
     [SerializeField] string reasonForEntry;
     [SerializeField] string expirationDate;
     [SerializeField] bool sealActive;
@@ -17,55 +25,24 @@ public class SuspectCharacter : Interactable
     public string ExpirationDate=> expirationDate;
     public bool SealActive => sealActive;
     
+    [Header("Character State")]
+    public CharacterStatus characterStatus;
+    
     [Header("Suspect Set Up")]
     public FLookAnimator lookAnimator;
     public Animator animator;
     public AudioSource audioSource;
-    
-    [TextArea(3, 10)]
-    public string entryDialogue;
-    public AudioClip[] voiceAudioClips;
-    public Transform lookPos;
-
-    [Header("Dialogue")]
-    public Response[] dialogueResponses; 
-    [SerializeField] Collider interactionCollider;
-
-    public bool givesFolder = true;
-
-    [SerializeField] private GameObject bloodExplosion;
-    public bool attackImmediately;
-    private bool facingPlayer;
-    public Vector3 standPosOffset;
-    
-    [Header("Photo")]
     [SerializeField] Texture2D idPhoto;
     public Texture2D IDPhoto => idPhoto;
-    
-    [Header("Anomalies")]
-    [SerializeField] AnomalyController anomalyController;
-    public AnomalyController AnomalyController => anomalyController;
-
-    public bool IsInfected
-    {
-        get
-        {
-            return false;
-        }
-    }
-
-
-
-    [System.Serializable]
-    public struct Response
-    {
-        [TextArea(3, 10)]
-        public string text;
-    }
-
+    [SerializeField] Collider interactionCollider;
+    public bool givesFolder = true;
+    [SerializeField] private GameObject bloodExplosion;
+    public Transform lookPos;
+    public Vector3 standPosOffset;
+    public bool attackImmediately;
     [SerializeField] private ParticleSystem[] vomitParticles;
-    
-    // Folder giving animation
+
+    #region Folder
     public enum FolderGivingAnimation
     {
         HandOver,
@@ -83,6 +60,15 @@ public class SuspectCharacter : Interactable
     [SerializeField] private FolderGivingAnimation _folderGivingAnimation = FolderGivingAnimation.HandOver;
     private FolderGivingAnimationData _folderGivingAnimationData;
     [SerializeField] private Transform handSpawnPos;
+    #endregion 
+    
+    private bool _facingPlayer;
+
+    [Header("Anomalies")]
+    [SerializeField] AnomalyController anomalyController;
+    public AnomalyController AnomalyController => anomalyController;
+
+    public bool IsInfected => false;
 
     protected override void Awake()
     {
@@ -158,7 +144,7 @@ public class SuspectCharacter : Interactable
 
     IEnumerator StartFiring()
     {
-        facingPlayer = true;
+        _facingPlayer = true;
         yield return new WaitForSeconds(1);
         animator.SetBool("Aiming Rifle", true);
         DialogueManager.Instance.SayDialogue(this,"You.. You're a traitor!!");
@@ -176,7 +162,7 @@ public class SuspectCharacter : Interactable
 
     private void Update()
     {
-        if (facingPlayer)
+        if (_facingPlayer)
         {
             Vector3 targetPosition = PlayerInstance.Instance.transform.position;
             targetPosition.y = transform.position.y; // Keep the target at the same height

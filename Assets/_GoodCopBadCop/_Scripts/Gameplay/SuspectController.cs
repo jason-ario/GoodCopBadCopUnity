@@ -10,12 +10,12 @@ using UnityEngine.Serialization;
 public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
-    public SuspectData suspectData;
 
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
     [SerializeField] private Transform despawnPos;
 
+    [SerializeField] private SuspectSet suspectSet;
     [SerializeField] private SuspectCharacter[] suspectCharacters;
     public SuspectCharacter suspectCharacter;
 
@@ -40,6 +40,16 @@ public class SuspectController : NetworkBehaviour
     private void Awake()
     {
         Instance = this;
+    }
+
+    private void Start()
+    {
+        ShiftManager.Instance.OnShiftStart += PopulateSuspectsForShift;
+    }
+
+    void PopulateSuspectsForShift()
+    {
+        
     }
 
     public void EnableLook()
@@ -203,7 +213,7 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
-        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.entryDialogue);
+        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.entryDialogue);
 
         if (suspectCharacter.givesFolder)
         {
@@ -228,7 +238,7 @@ public class SuspectController : NetworkBehaviour
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
-        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.dialogueResponses[choiceIndex].text);
+        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.dialogueResponses[choiceIndex].text);
     }
 
     public void Pass()
