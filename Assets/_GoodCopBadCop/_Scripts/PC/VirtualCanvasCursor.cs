@@ -1,29 +1,41 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 {
+    [Header("References")]
     [SerializeField] private RectTransform canvasRect;
     [SerializeField] private RectTransform cursorRect;
+
+    // NEW: optional precise click point
+    [SerializeField] private RectTransform cursorHotspot;
+
+    [Header("Movement")]
     [SerializeField] private float sensitivity = 1f;
     [SerializeField] private float xMargin;
     [SerializeField] private float yMargin;
-    [SerializeField] private KeyCode clickKey = KeyCode.Mouse0;
 
-    [SerializeField] private Canvas pcCanvas;
-    [SerializeField] private Transform currentScreenContentRoot;
+    [Header("Input")]
+    [SerializeField] private KeyCode clickKey = KeyCode.Mouse0;
 
     private Vector3 lastMousePosition;
     private Vector2 lastMouseDelta;
 
     private ClickablePCElement currentHoveredElement;
     private ClickablePCScrollbar currentDraggedScrollbar;
-    private ClickablePCElement[] clickablePCElements;
+
+    private ClickablePCElement[] clickableElements = Array.Empty<ClickablePCElement>();
+    private readonly Vector3[] cornersBuffer = new Vector3[4];
 
     private void Awake()
     {
+        RefreshClickableElements();
+        ResetMouseTracking();
+    }
+
+    private void OnEnable()
+    {
+        ResetState();
         RefreshClickableElements();
         ResetMouseTracking();
     }
@@ -36,6 +48,10 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         HandleDragging();
         HandleClickUp();
     }
+
+    // ========================
+    // Cursor Movement
+    // ========================
 
     private void MoveCursor()
     {
@@ -54,38 +70,52 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         cursorRect.anchoredPosition = pos;
     }
 
+    // ========================
+    // Hover Detection
+    // ========================
+
     private void UpdateHoveredElement()
     {
-        Rect cursorWorldRect = GetWorldRect(cursorRect);
-
-        ClickablePCElement newHoveredElement = null;
-
-        for (int i = 0; i < clickablePCElements.Length; i++)
+        if (canvasRect == null)
         {
-            ClickablePCElement element = clickablePCElements[i];
+            SetHoveredElement(null);
+            return;
+        }
 
-            if (element == null)
-                continue;
+        Vector2 cursorPoint = GetCursorPointInCanvasSpace();
 
-            if (!element.gameObject.activeInHierarchy)
-                continue;
+        ClickablePCElement bestElement = null;
+        int bestScore = int.MinValue;
 
-            if (currentScreenContentRoot != null && !element.transform.IsChildOf(currentScreenContentRoot))
+        for (int i = 0; i < clickableElements.Length; i++)
+        {
+            ClickablePCElement element = clickableElements[i];
+
+            if (element == null || !element.gameObject.activeInHierarchy)
                 continue;
 
             RectTransform elementRect = element.transform as RectTransform;
             if (elementRect == null)
                 continue;
 
-            Rect targetWorldRect = GetWorldRect(elementRect);
+            Rect rect = GetRectInCanvasSpace(elementRect);
 
-            if (cursorWorldRect.Overlaps(targetWorldRect))
+            if (!rect.Contains(cursorPoint))
+                continue;
+
+            int score = GetSortScore(elementRect);
+            if (score > bestScore)
             {
-                newHoveredElement = element;
-                break;
+                bestScore = score;
+                bestElement = element;
             }
         }
 
+        SetHoveredElement(bestElement);
+    }
+
+    private void SetHoveredElement(ClickablePCElement newHoveredElement)
+    {
         if (newHoveredElement == currentHoveredElement)
             return;
 
@@ -98,6 +128,10 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
             currentHoveredElement.OnHoverEnter();
     }
 
+    // ========================
+    // Click Handling
+    // ========================
+
     private void HandleClickDown()
     {
         if (!Input.GetKeyDown(clickKey))
@@ -108,8 +142,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         currentHoveredElement.OnClick();
 
-        ClickablePCScrollbar scrollbar = currentHoveredElement as ClickablePCScrollbar;
-        if (scrollbar != null)
+        if (currentHoveredElement is ClickablePCScrollbar scrollbar)
         {
             currentDraggedScrollbar = scrollbar;
             currentDraggedScrollbar.BeginDrag();
@@ -135,38 +168,38 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         EndDragging();
     }
 
-    private void RefreshClickableElements()
+    // ========================
+    // Helpers
+    // ========================
+
+    private Vector2 GetCursorPointInCanvasSpace()
     {
-        if (pcCanvas == null)
+        RectTransform source = cursorHotspot != null ? cursorHotspot : cursorRect;
+        return canvasRect.InverseTransformPoint(source.position);
+    }
+
+    private Rect GetRectInCanvasSpace(RectTransform rt)
+    {
+        rt.GetWorldCorners(cornersBuffer);
+
+        Vector2 bottomLeft = canvasRect.InverseTransformPoint(cornersBuffer[0]);
+        Vector2 topRight = canvasRect.InverseTransformPoint(cornersBuffer[2]);
+
+        return new Rect(bottomLeft, topRight - bottomLeft);
+    }
+
+    private int GetSortScore(RectTransform rt)
+    {
+        int depth = 0;
+        Transform current = rt;
+
+        while (current != null)
         {
-            clickablePCElements = Array.Empty<ClickablePCElement>();
-            return;
+            depth++;
+            current = current.parent;
         }
 
-        clickablePCElements = pcCanvas.GetComponentsInChildren<ClickablePCElement>(true);
-    }
-
-    public void SetScreenContent(Transform newScreenContentRoot)
-    {
-        currentScreenContentRoot = newScreenContentRoot;
-        RefreshAfterScreenChanged();
-    }
-
-    public void RefreshAfterScreenChanged()
-    {
-        ClearHover();
-        EndDragging();
-        RefreshClickableElements();
-        ResetMouseTracking();
-    }
-
-    private void ClearHover()
-    {
-        if (currentHoveredElement != null)
-        {
-            currentHoveredElement.OnHoverExit();
-            currentHoveredElement = null;
-        }
+        return depth * 1000 + rt.GetSiblingIndex();
     }
 
     private void EndDragging()
@@ -178,15 +211,28 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         }
     }
 
-    private Rect GetWorldRect(RectTransform rectTransform)
+    private void ResetState()
     {
-        Vector3[] corners = new Vector3[4];
-        rectTransform.GetWorldCorners(corners);
+        SetHoveredElement(null);
+        EndDragging();
+    }
 
-        Vector2 min = corners[0];
-        Vector2 max = corners[2];
+    public void RefreshClickableElements()
+    {
+        if (canvasRect == null)
+        {
+            clickableElements = Array.Empty<ClickablePCElement>();
+            return;
+        }
 
-        return new Rect(min, max - min);
+        clickableElements = canvasRect.GetComponentsInChildren<ClickablePCElement>(true);
+    }
+
+    public void SetScreenContent()
+    {
+        RefreshClickableElements();
+        ResetState();
+        ResetMouseTracking();
     }
 
     public void ResetMouseTracking()

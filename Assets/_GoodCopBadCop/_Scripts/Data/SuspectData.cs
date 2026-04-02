@@ -9,6 +9,10 @@ public class SuspectData : ScriptableObject
     public string Nickname;
     public string Occupation;
     public string CharacterDescription;
+    public string DateOfBirth;
+    
+    public string Sex;
+
     public Texture2D IDPhoto;
     public GameObject CharacterPrefab;
     public string[] reasonsForEntry;

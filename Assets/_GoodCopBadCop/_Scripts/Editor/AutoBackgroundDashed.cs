@@ -8,7 +8,7 @@ public static class HierarchyAutoSections
     private static readonly Color BorderColor = new Color(0.28f, 0.28f, 0.28f, 1f);
     private static readonly Color TextColor = new Color(0.95f, 0.95f, 0.95f, 1f);
     private static readonly Color SelectedRowColor = new Color(0.24f, 0.30f, 0.38f, 1f);
-
+    private static readonly Color InactiveRowColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
     static HierarchyAutoSections()
     {
         EditorApplication.hierarchyWindowItemOnGUI -= OnHierarchyGUI;
@@ -27,9 +27,11 @@ public static class HierarchyAutoSections
         if (!go.name.Contains("---"))
             return;
 
-        bool isSelected = Selection.instanceIDs != null && System.Array.IndexOf(Selection.instanceIDs, instanceID) >= 0;
-        Color bg = isSelected ? SelectedRowColor : RowColor;
+        bool isActive = go.activeInHierarchy;
 
+    // If inactive → use the old SelectedRowColor look
+        Color bg = isActive ? RowColor : SelectedRowColor;
+        
         string label = CleanName(go.name);
         if (string.IsNullOrWhiteSpace(label))
             label = "SECTION";
@@ -65,9 +67,14 @@ public static class HierarchyAutoSections
             clipping = TextClipping.Clip,
             richText = false
         };
-        style.normal.textColor = TextColor;
+        Color textColor = isActive 
+            ? TextColor 
+            : new Color(0.8f, 0.85f, 0.9f, 1f); // slightly softer bluish tone
 
+        style.normal.textColor = textColor;
         EditorGUI.LabelField(labelRect, label.ToUpperInvariant(), style);
+        
+        
     }
 
     private static string CleanName(string rawName)

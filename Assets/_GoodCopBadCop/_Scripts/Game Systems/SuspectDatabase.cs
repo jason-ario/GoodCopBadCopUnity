@@ -15,13 +15,16 @@ public class SuspectRecord
 
 public class SuspectDatabase : MonoBehaviour
 {
-    [SerializeField] private List<SuspectData> allSuspects;
+    public static SuspectDatabase Instance;
+
+    [SerializeField] private SuspectSet allSuspects;
 
     private Dictionary<SuspectData, SuspectRecord> records = new();
 
     private void Awake()
     {
-        foreach (var suspect in allSuspects)
+        Instance = this;
+        foreach (var suspect in allSuspects.suspects)
         {
             records[suspect] = new SuspectRecord
             {
