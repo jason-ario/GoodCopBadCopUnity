@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6687652446530153882}
   - component: {fileID: 6893472586378900336}
   - component: {fileID: 613437013226855652}
+  - component: {fileID: 1794373643734294938}
   m_Layer: 9
   m_Name: Alphabetical Folder Tab
   m_TagString: Untagged
@@ -101,6 +102,19 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1794373643734294938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 123063746082385418}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c7e4a5e6c46a39449da522d7b33dd1d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  animator: {fileID: 613437013226855652}
 --- !u!1 &6756529592018715322
 GameObject:
   m_ObjectHideFlags: 0
@@ -192,7 +206,19 @@ MonoBehaviour:
   animator: {fileID: 613437013226855652}
   onClickEvent:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1794373643734294938}
+        m_TargetAssemblyTypeName: PCFolderTab, Assembly-CSharp
+        m_MethodName: SetFolderTabSelected
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
 --- !u!1 &6764752983815732941
 GameObject:
   m_ObjectHideFlags: 0

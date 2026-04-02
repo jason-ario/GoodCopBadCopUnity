@@ -28,4 +28,12 @@ public class SuspectData : ScriptableObject
         [TextArea(3, 10)]
         public string text;
     }
+
+    public string IDNumber;
+
+    [ContextMenu("Set Random ID Number")]
+    public void SetRandomIDNumber()
+    {
+        IDNumber = Random.Range(1000000, 9999999).ToString();
+    }
 }

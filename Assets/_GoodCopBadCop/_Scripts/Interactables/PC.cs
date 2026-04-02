@@ -29,9 +29,14 @@ public class PC : Interactable
 
     private List<SuspectRecord> _currentBaseList = new();
     private List<SuspectRecord> _currentVisibleList = new();
-    [SerializeField] SimpleCanvasCursorFromMouseDelta mouseCursor;
-    [SerializeField] ClickablePCScrollbar PCScrollbar;
-    
+
+    [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
+    [SerializeField] private ClickablePCScrollbar PCScrollbar;
+
+    // Profile navigation state
+    private SuspectData _currentProfileSuspect;
+    private int _currentProfileIndex = -1;
+    [SerializeField] private PCFolderTab[] _folderTabs;
 
     private void Start()
     {
@@ -65,9 +70,10 @@ public class PC : Interactable
 
         OpenScreen(mainScreen);
 
-        // Optional: clear list state when opening the PC
+        // Clear list/profile state when opening the PC
         _currentBaseList.Clear();
         _currentVisibleList.Clear();
+        ClearCurrentProfileSelection();
     }
 
     private void Update()
@@ -93,18 +99,21 @@ public class PC : Interactable
 
         _virtualCanvasCursor.enabled = false;
         CloseAllScreens();
+        ClearCurrentProfileSelection();
     }
 
     public void OpenScreen(GameObject screen)
-    { 
+    {
         CloseAllScreens();
-        suspectListScreen.SetActive(screen == suspectListScreen);  
+
+        suspectListScreen.SetActive(screen == suspectListScreen);
         mainScreen.SetActive(screen == mainScreen);
+
         mouseCursor.SetScreenContent();
         StartCoroutine(WaitAndRefreshMouse());
     }
 
-    IEnumerator WaitAndRefreshMouse()
+    private IEnumerator WaitAndRefreshMouse()
     {
         yield return new WaitForEndOfFrame();
         yield return new WaitForEndOfFrame();
@@ -113,19 +122,147 @@ public class PC : Interactable
 
     public void CloseAllScreens()
     {
-        suspectListScreen.SetActive(false);  
+        suspectListScreen.SetActive(false);
         mainScreen.SetActive(false);
         profilePage.gameObject.SetActive(false);
     }
 
     public void OpenProfilePage(SuspectData suspectData)
     {
+        if (suspectData == null)
+            return;
+
+        _currentProfileSuspect = suspectData;
+        _currentProfileIndex = GetBaseListIndex(suspectData);
+
         CloseAllScreens();
         profilePage.gameObject.SetActive(true);
         profilePage.SetProfileData(suspectData);
+
+        UpdateProfileNavigationUI(); // 🔥 IMPORTANT
+
         StartCoroutine(WaitAndRefreshMouse());
     }
     
+    private void UpdateProfileNavigationUI()
+    {
+        if (profilePage == null)
+            return;
+
+        profilePage.SetNavigationState(
+            CanOpenPreviousProfile(),
+            CanOpenNextProfile()
+        );
+    }
+
+    public void OpenNextProfile()
+    {
+        if (_currentBaseList == null || _currentBaseList.Count == 0)
+            return;
+
+        if (_currentProfileSuspect == null)
+            return;
+
+        if (_currentProfileIndex < 0)
+            _currentProfileIndex = GetBaseListIndex(_currentProfileSuspect);
+
+        if (_currentProfileIndex < 0)
+            return;
+
+        int nextIndex = _currentProfileIndex + 1;
+
+        if (nextIndex >= _currentBaseList.Count)
+            nextIndex = _currentBaseList.Count - 1;
+
+        SuspectRecord nextRecord = _currentBaseList[nextIndex];
+        if (nextRecord == null || nextRecord.Data == null)
+            return;
+
+        OpenProfilePage(nextRecord.Data); // already updates UI
+    }
+    
+    public void OpenPreviousProfile()
+    {
+        if (_currentBaseList == null || _currentBaseList.Count == 0)
+            return;
+
+        if (_currentProfileSuspect == null)
+            return;
+
+        if (_currentProfileIndex < 0)
+            _currentProfileIndex = GetBaseListIndex(_currentProfileSuspect);
+
+        if (_currentProfileIndex < 0)
+            return;
+
+        int previousIndex = _currentProfileIndex - 1;
+
+        // Clamp to first entry
+        if (previousIndex < 0)
+            previousIndex = 0;
+
+        SuspectRecord previousRecord = _currentBaseList[previousIndex];
+        if (previousRecord == null || previousRecord.Data == null)
+            return;
+
+        OpenProfilePage(previousRecord.Data);
+    }
+
+    public bool CanOpenNextProfile()
+    {
+        return _currentBaseList != null
+               && _currentBaseList.Count > 0
+               && _currentProfileIndex >= 0
+               && _currentProfileIndex < _currentBaseList.Count - 1;
+    }
+
+    public bool CanOpenPreviousProfile()
+    {
+        return _currentBaseList != null
+               && _currentBaseList.Count > 0
+               && _currentProfileIndex > 0;
+    }
+
+    private void ClearCurrentProfileSelection()
+    {
+        _currentProfileSuspect = null;
+        _currentProfileIndex = -1;
+    }
+
+    private int GetBaseListIndex(SuspectData suspectData)
+    {
+        if (suspectData == null || _currentBaseList == null || _currentBaseList.Count == 0)
+            return -1;
+
+        for (int i = 0; i < _currentBaseList.Count; i++)
+        {
+            SuspectRecord record = _currentBaseList[i];
+
+            if (record == null || record.Data == null)
+                continue;
+
+            // Best case: same object reference
+            if (record.Data == suspectData)
+                return i;
+
+            // Fallback: identify by core fields
+            if (AreSameSuspect(record.Data, suspectData))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private bool AreSameSuspect(SuspectData a, SuspectData b)
+    {
+        if (a == null || b == null)
+            return false;
+
+        return a.FirstName == b.FirstName
+               && a.LastName == b.LastName
+               && a.DateOfBirth == b.DateOfBirth;
+    }
+
     // --------------------------------------------------
     // CATEGORY / FOLDER BUTTONS
     // --------------------------------------------------
@@ -140,9 +277,12 @@ public class PC : Interactable
             .ToList();
 
         _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
         OpenScreen(suspectListScreen);
         FilterAF();
         RenderCurrentList();
+        SelectFolderTab(0);
     }
 
     public void OpenVisitors()
@@ -155,8 +295,11 @@ public class PC : Interactable
             .ToList();
 
         _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
         RenderCurrentList();
         OpenScreen(suspectListScreen);
+        SelectFolderTab(0);
     }
 
     public void OpenDeceased()
@@ -169,8 +312,11 @@ public class PC : Interactable
             .ToList();
 
         _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
         RenderCurrentList();
         OpenScreen(suspectListScreen);
+        SelectFolderTab(0);
     }
 
     public void OpenRecentExits()
@@ -182,11 +328,13 @@ public class PC : Interactable
             .ToList();
 
         _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
         RenderCurrentList();
         OpenScreen(suspectListScreen);
+        SelectFolderTab(0);
     }
 
-    // Optional fallback if you want "all suspects"
     public void OpenAll()
     {
         _currentBaseList = suspectDatabase
@@ -196,8 +344,11 @@ public class PC : Interactable
             .ToList();
 
         _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
         RenderCurrentList();
         OpenScreen(suspectListScreen);
+        SelectFolderTab(0);
     }
 
     // --------------------------------------------------
@@ -208,24 +359,36 @@ public class PC : Interactable
     {
         FilterByLastNameRange('A', 'F');
         PCScrollbar.ResetToTop();
+        SelectFolderTab(0);
     }
 
     public void FilterGL()
     {
         FilterByLastNameRange('G', 'L');
         PCScrollbar.ResetToTop();
+        SelectFolderTab(1);
     }
 
     public void FilterMR()
     {
         FilterByLastNameRange('M', 'R');
         PCScrollbar.ResetToTop();
+        SelectFolderTab(2);
     }
 
     public void FilterSZ()
     {
         FilterByLastNameRange('S', 'Z');
         PCScrollbar.ResetToTop();
+        SelectFolderTab(3);
+    }
+
+    void SelectFolderTab(int folderTabIndex)
+    {
+        for (int i = 0; i < _folderTabs.Length; i++)
+        {
+            _folderTabs[i].SetFolderTabSelected(i == folderTabIndex);
+        }
     }
 
     public void ClearLetterFilter()
@@ -271,7 +434,6 @@ public class PC : Interactable
         StartCoroutine(WaitAndRefreshMouse());
     }
 
-    // Optional getter if another script needs the current list
     public List<SuspectRecord> GetCurrentVisibleList()
     {
         return _currentVisibleList;
