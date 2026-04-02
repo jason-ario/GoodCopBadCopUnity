@@ -24,4 +24,9 @@ public class SFXController : MonoBehaviour
         sfxSource.pitch = pitch;
         sfxSource.PlayOneShot(clip, volume);
     }
+    
+    public void PlayCustomSFX(GameObject customSFXPrefab, AudioClip clip)
+    {
+        Instantiate(customSFXPrefab, transform.position, transform.rotation).GetComponent<AudioSource>().PlayOneShot(clip);
+    }
 }

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class DialogueManager : NetworkBehaviour
 {
@@ -84,6 +85,8 @@ public class DialogueManager : NetworkBehaviour
 
         GameObject subtitle = SpawnSubtitles(dialogue, character.Data.FirstName, Color.white, false, clearHistory, waitForInput);
 
+        PlayDialogueAudio(dialogue, character.Data.voiceAudioClips, character.audioSource);
+        /*
         if (character.audioSource != null &&
             character.Data.voiceAudioClips != null &&
             character.Data.voiceAudioClips.Length > 0)
@@ -93,10 +96,16 @@ public class DialogueManager : NetworkBehaviour
                 character.audioSource,
                 character.Data.voiceAudioClips,
                 subtitle));
-        }
+        }*/
     }
 
-    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, GameObject subtitle)
+    public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null)
+    {
+        StopDialogueAudio();
+        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete));
+    }
+
+    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null)
     {
         float duration = dialogue.Length * secondsPerCharacter;
         float timer = 0;
@@ -131,6 +140,7 @@ public class DialogueManager : NetworkBehaviour
             timer += clipDuration + extraDelay;
         }
 
+        onComplete?.Invoke();
         audioDialogueCoroutine = null;
     }
 
