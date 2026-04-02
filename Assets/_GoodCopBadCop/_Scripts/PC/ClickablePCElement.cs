@@ -9,13 +9,19 @@ public class ClickablePCElement : MonoBehaviour
     public virtual void OnHoverEnter()
     {
         Debug.Log(name + " hover enter");
-        animator.SetBool("Hovering", true);
+        if (animator != null)
+        {
+            animator.SetBool("Hovering", true);
+        }
     }
 
     public virtual void OnHoverExit()
     {
         Debug.Log(name + " hover exit");
-        animator.SetBool("Hovering", false);
+        if (animator != null)
+        {
+            animator.SetBool("Hovering", false);
+        }    
     }
 
     public virtual void OnClick()

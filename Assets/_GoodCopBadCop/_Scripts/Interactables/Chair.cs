@@ -9,7 +9,8 @@ public class Chair : Interactable
     [SerializeField] private Transform standingPos;
     public Transform StandingPos => standingPos;
     [SerializeField] float sitDuration = .5f;
-
+    public bool canMoveWhileSeated = false;
+    public bool canRotateWhileSeated = false;
 
     private void Start()
     {
@@ -41,6 +42,7 @@ public class Chair : Interactable
     void OnSeated(Transform player)
     {
         transform.parent = player.transform;
-        player.GetComponent<PlayerMovementController>().SetCanLook(true);
+        player.GetComponent<PlayerMovementController>().SetCanLook(canRotateWhileSeated);
+        player.GetComponent<PlayerMovementController>().SetCanMove(canMoveWhileSeated);
     }
 }

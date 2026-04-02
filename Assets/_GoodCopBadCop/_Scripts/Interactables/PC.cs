@@ -30,6 +30,7 @@ public class PC : Interactable
     private List<SuspectRecord> _currentBaseList = new();
     private List<SuspectRecord> _currentVisibleList = new();
     [SerializeField] SimpleCanvasCursorFromMouseDelta mouseCursor;
+    [SerializeField] ClickablePCScrollbar PCScrollbar;
     
 
     private void Start()
@@ -206,21 +207,25 @@ public class PC : Interactable
     public void FilterAF()
     {
         FilterByLastNameRange('A', 'F');
+        PCScrollbar.ResetToTop();
     }
 
     public void FilterGL()
     {
         FilterByLastNameRange('G', 'L');
+        PCScrollbar.ResetToTop();
     }
 
     public void FilterMR()
     {
         FilterByLastNameRange('M', 'R');
+        PCScrollbar.ResetToTop();
     }
 
     public void FilterSZ()
     {
         FilterByLastNameRange('S', 'Z');
+        PCScrollbar.ResetToTop();
     }
 
     public void ClearLetterFilter()
@@ -263,6 +268,7 @@ public class PC : Interactable
     private void RenderCurrentList()
     {
         terminalRecordListUI.ShowRecords(_currentVisibleList);
+        StartCoroutine(WaitAndRefreshMouse());
     }
 
     // Optional getter if another script needs the current list

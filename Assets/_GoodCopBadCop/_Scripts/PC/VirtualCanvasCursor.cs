@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 {
@@ -7,7 +8,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
     [SerializeField] private RectTransform canvasRect;
     [SerializeField] private RectTransform cursorRect;
 
-    // NEW: optional precise click point
+    // optional precise click point
     [SerializeField] private RectTransform cursorHotspot;
 
     [Header("Movement")]
@@ -26,6 +27,8 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
     private ClickablePCElement[] clickableElements = Array.Empty<ClickablePCElement>();
     private readonly Vector3[] cornersBuffer = new Vector3[4];
+    
+    public Vector2 LastMouseDelta => lastMouseDelta;
 
     private void Awake()
     {
@@ -49,10 +52,6 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         HandleClickUp();
     }
 
-    // ========================
-    // Cursor Movement
-    // ========================
-
     private void MoveCursor()
     {
         Vector3 currentMousePosition = Input.mousePosition;
@@ -69,10 +68,8 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         cursorRect.anchoredPosition = pos;
     }
-
-    // ========================
-    // Hover Detection
-    // ========================
+    
+    
 
     private void UpdateHoveredElement()
     {
@@ -98,8 +95,10 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
             if (elementRect == null)
                 continue;
 
-            Rect rect = GetRectInCanvasSpace(elementRect);
+            if (!IsElementVisibleAtPoint(elementRect, cursorPoint))
+                continue;
 
+            Rect rect = GetRectInCanvasSpace(elementRect);
             if (!rect.Contains(cursorPoint))
                 continue;
 
@@ -112,6 +111,39 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         }
 
         SetHoveredElement(bestElement);
+    }
+    
+    private bool IsElementVisibleAtPoint(RectTransform elementRect, Vector2 canvasPoint)
+    {
+        Transform current = elementRect;
+
+        while (current != null && current != canvasRect)
+        {
+            RectTransform currentRect = current as RectTransform;
+
+            if (currentRect != null)
+            {
+                RectMask2D rectMask = current.GetComponent<RectMask2D>();
+                if (rectMask != null)
+                {
+                    Rect maskRect = GetRectInCanvasSpace(currentRect);
+                    if (!maskRect.Contains(canvasPoint))
+                        return false;
+                }
+
+                Mask mask = current.GetComponent<Mask>();
+                if (mask != null)
+                {
+                    Rect maskRect = GetRectInCanvasSpace(currentRect);
+                    if (!maskRect.Contains(canvasPoint))
+                        return false;
+                }
+            }
+
+            current = current.parent;
+        }
+
+        return true;
     }
 
     private void SetHoveredElement(ClickablePCElement newHoveredElement)
@@ -128,10 +160,6 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
             currentHoveredElement.OnHoverEnter();
     }
 
-    // ========================
-    // Click Handling
-    // ========================
-
     private void HandleClickDown()
     {
         if (!Input.GetKeyDown(clickKey))
@@ -140,13 +168,14 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         if (currentHoveredElement == null)
             return;
 
-        currentHoveredElement.OnClick();
-
         if (currentHoveredElement is ClickablePCScrollbar scrollbar)
         {
             currentDraggedScrollbar = scrollbar;
             currentDraggedScrollbar.BeginDrag();
+            return;
         }
+
+        currentHoveredElement.OnClick();
     }
 
     private void HandleDragging()
@@ -157,7 +186,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         if (!Input.GetKey(clickKey))
             return;
 
-        currentDraggedScrollbar.DragFromCursor();
+        currentDraggedScrollbar.DragFromCursorDelta();
     }
 
     private void HandleClickUp()
@@ -167,10 +196,6 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         EndDragging();
     }
-
-    // ========================
-    // Helpers
-    // ========================
 
     private Vector2 GetCursorPointInCanvasSpace()
     {

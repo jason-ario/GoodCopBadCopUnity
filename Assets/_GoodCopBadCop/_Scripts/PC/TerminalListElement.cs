@@ -9,7 +9,7 @@ public class TerminalListItem : MonoBehaviour
     
     public void Setup(SuspectRecord record, PC pc)
     {
-        nameText.text = $"{record.Data.FirstName} {record.Data.LastName}";
+        nameText.text = record.Data.LastName + ", " + record.Data.FirstName;
         _suspectData = record.Data;
         _pc = pc;
     }
