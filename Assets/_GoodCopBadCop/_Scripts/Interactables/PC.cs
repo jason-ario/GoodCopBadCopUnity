@@ -37,6 +37,7 @@ public class PC : Interactable
     private SuspectData _currentProfileSuspect;
     private int _currentProfileIndex = -1;
     [SerializeField] private PCFolderTab[] _folderTabs;
+    private bool isOn;
 
     private void Start()
     {
@@ -68,7 +69,11 @@ public class PC : Interactable
         _player = player;
         _virtualCanvasCursor.enabled = true;
 
-        OpenScreen(mainScreen);
+        if (!isOn)
+        {
+            isOn = true;
+            OpenScreen(mainScreen);
+        }
 
         // Clear list/profile state when opening the PC
         _currentBaseList.Clear();
@@ -98,8 +103,6 @@ public class PC : Interactable
         Cursor.lockState = CursorLockMode.Locked;
 
         _virtualCanvasCursor.enabled = false;
-        CloseAllScreens();
-        ClearCurrentProfileSelection();
     }
 
     public void OpenScreen(GameObject screen)

@@ -71,7 +71,6 @@ public class ShiftManager : NetworkBehaviour
     
     private IEnumerator StartShiftSequence()
     {
-        Debug.Log("Start Shift Sequence");
         bellSound.Play();
         _startShiftScreen.ShowDayNumber(dayNumber);
         OnShiftStart?.Invoke();

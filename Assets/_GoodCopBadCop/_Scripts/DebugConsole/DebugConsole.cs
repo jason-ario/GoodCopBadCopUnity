@@ -5,7 +5,8 @@ using UnityEngine;
 public class DebugConsole : MonoBehaviour
 {
     public bool skipMainMenu; 
-    public bool skipLobby; 
+    public bool skipLobby;
+    public bool skipInitialShiftTransition;
     public bool cutsceneMode;
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
