@@ -9,7 +9,6 @@ public class PC : Interactable
 {
     [Header("Data")]
     [SerializeField] private SuspectSet allSuspects;
-    private SuspectDatabase suspectDatabase;
 
     [Header("Set Up")]
     [SerializeField] private GameObject computerCamera;
@@ -42,12 +41,6 @@ public class PC : Interactable
     private void Start()
     {
         CloseAllScreens();
-    }
-
-    protected override void Awake()
-    {
-        base.Awake();
-        suspectDatabase = SuspectDatabase.Instance;
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -272,7 +265,7 @@ public class PC : Interactable
 
     public void OpenResidents()
     {
-        _currentBaseList = suspectDatabase
+        _currentBaseList = SuspectDatabase.Instance
             .GetAllRecords()
             .Where(r => r.Status == CharacterStatus.Resident)
             .OrderBy(r => r.Data.LastName)
@@ -290,7 +283,7 @@ public class PC : Interactable
 
     public void OpenVisitors()
     {
-        _currentBaseList = suspectDatabase
+        _currentBaseList = SuspectDatabase.Instance
             .GetAllRecords()
             .Where(r => r.Status == CharacterStatus.Visitor)
             .OrderBy(r => r.Data.LastName)
@@ -307,7 +300,7 @@ public class PC : Interactable
 
     public void OpenDeceased()
     {
-        _currentBaseList = suspectDatabase
+        _currentBaseList = SuspectDatabase.Instance
             .GetAllRecords()
             .Where(r => r.Status == CharacterStatus.Deceased)
             .OrderBy(r => r.Data.LastName)
@@ -324,7 +317,7 @@ public class PC : Interactable
 
     public void OpenRecentExits()
     {
-        _currentBaseList = suspectDatabase
+        _currentBaseList = SuspectDatabase.Instance
             .GetAllRecords()
             .Where(r => r.LastExitTime != DateTime.MinValue)
             .OrderByDescending(r => r.LastExitTime)
@@ -340,7 +333,7 @@ public class PC : Interactable
 
     public void OpenAll()
     {
-        _currentBaseList = suspectDatabase
+        _currentBaseList = SuspectDatabase.Instance
             .GetAllRecords()
             .OrderBy(r => r.Data.LastName)
             .ThenBy(r => r.Data.FirstName)

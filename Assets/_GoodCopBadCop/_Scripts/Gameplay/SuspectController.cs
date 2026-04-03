@@ -1,7 +1,5 @@
-using System;
 using System.Collections;
 using DG.Tweening;
-using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -11,31 +9,32 @@ public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
 
+    [Header("Spawn Points")]
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
     [SerializeField] private Transform despawnPos;
+    [SerializeField] private Transform gatePos;
 
-    [SerializeField] private SuspectSet suspectSet;
-    [SerializeField] private SuspectCharacter[] suspectCharacters;
-    public SuspectCharacter suspectCharacter;
+    [Header("Suspects")]
+    [SerializeField] private DailySuspectManager dailySuspectManager;
+    private SuspectCharacter suspectCharacter;
+    public SuspectCharacter CurrentSuspect => suspectCharacter;
 
-    [FormerlySerializedAs("applicationPrefab")] [SerializeField] private NetworkObject folderPrefab;
+    [Header("Paperwork")]
+    [FormerlySerializedAs("applicationPrefab")]
+    [SerializeField] private NetworkObject folderPrefab;
     [SerializeField] private Transform applicationSpawnPos;
     public Transform ApplicationSpawnPos => applicationSpawnPos;
 
-    [Header("Pass")]
-    [SerializeField] private Transform gatePos;
+    [Header("Quarantine")]
+    [SerializeField] private PlayableDirector quarantineTimeline;
+    [SerializeField] private Transform suspectQuarantineFollowPos;
 
     private NetworkObject spawnedFolder;
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1);
 
-    [SerializeField] private PlayableDirector quarantineTimeline;
-    [SerializeField] private Transform suspectQuarantineFollowPos;
-
-    // Guards against duplicate init for the same spawned suspect
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
-    private bool _subscribedToRoundStart = false;
 
     private void Awake()
     {
@@ -44,12 +43,39 @@ public class SuspectController : NetworkBehaviour
 
     private void Start()
     {
-        ShiftManager.Instance.OnShiftStart += PopulateSuspectsForShift;
+        if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart += PopulateSuspectsForShift;
+        }
     }
 
-    void PopulateSuspectsForShift()
+    private void OnDestroy()
     {
-        
+        if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart -= PopulateSuspectsForShift;
+        }
+    }
+
+    private void PopulateSuspectsForShift()
+    {
+        if (!IsServer)
+            return;
+
+        if (dailySuspectManager == null)
+        {
+            Debug.LogError("SuspectController is missing DailySuspectManager reference.");
+            return;
+        }
+
+        int currentDay = 1;
+
+        if (ShiftManager.Instance != null)
+        {
+            currentDay = ShiftManager.Instance.CurrentDay;
+        }
+
+        dailySuspectManager.GenerateDay(currentDay);
     }
 
     public void EnableLook()
@@ -64,7 +90,12 @@ public class SuspectController : NetworkBehaviour
     public void NextSuspect()
     {
         if (!IsServer) return;
-        Debug.Log("Next suspect");
+        if (dailySuspectManager == null)
+        {
+            Debug.LogError("Cannot spawn next suspect because DailySuspectManager is missing.");
+            return;
+        }
+
         suspectIndex.Value += 1;
 
         if (suspectIndex.Value >= ShiftManager.Instance.SuspectsPerShift)
@@ -73,28 +104,34 @@ public class SuspectController : NetworkBehaviour
             ShiftManager.Instance.EndShift();
             return;
         }
-        
-
-        if (suspectIndex.Value < 0 || suspectIndex.Value >= suspectCharacters.Length)
-        {
-            Debug.LogError($"Suspect index {suspectIndex.Value} is out of bounds.");
-            return;
-        }
 
         SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
     }
 
-    private void SpawnSuspectServer(int newSuspectIndex, Vector3 position, Quaternion rotation)
+    private void SpawnSuspectServer(int lineupIndex, Vector3 position, Quaternion rotation)
     {
         if (!IsServer) return;
 
-        SuspectCharacter suspectPrefab = suspectCharacters[newSuspectIndex];
+        SuspectRecord record = GetRecordForLineupIndex(lineupIndex);
+        if (record == null)
+        {
+            Debug.LogError($"No SuspectRecord found for lineup index {lineupIndex}.");
+            return;
+        }
+
+        SuspectCharacter suspectPrefab = GetPrefabFromRecord(record);
+        if (suspectPrefab == null)
+        {
+            Debug.LogError($"Could not resolve suspect prefab from SuspectRecord at lineup index {lineupIndex}.");
+            return;
+        }
+
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
 
         if (netObj == null)
         {
-            Debug.LogError("Spawned suspect is missing a NetworkObject.");
+            Debug.LogError($"Spawned suspect prefab '{spawnedSuspect.name}' is missing a NetworkObject.");
             Destroy(spawnedSuspect);
             return;
         }
@@ -104,24 +141,38 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
         if (suspectCharacter == null)
         {
-            Debug.LogError("Spawned suspect is missing SuspectCharacter.");
+            Debug.LogError($"Spawned suspect prefab '{spawnedSuspect.name}' is missing SuspectCharacter.");
             return;
         }
+
+        suspectCharacter.Initialize(record);
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;
 
-        // Server/host initializes locally exactly once
         TryInitializeCurrentSuspect();
-
-        // Remote clients just resolve references
         AssignReferencesClientRpc(netObj.NetworkObjectId);
+    }
+
+    private SuspectRecord GetRecordForLineupIndex(int lineupIndex)
+    {
+        if (dailySuspectManager == null)
+            return null;
+
+        return dailySuspectManager.GetSuspectForSlot(lineupIndex);
+    }
+
+    private SuspectCharacter GetPrefabFromRecord(SuspectRecord record)
+    {
+        if (record == null || record.Data == null || record.Data.CharacterPrefab == null)
+            return null;
+
+        return record.Data.CharacterPrefab;
     }
 
     [ClientRpc]
     private void AssignReferencesClientRpc(ulong networkObjectId)
     {
-        // Host/server already has the direct reference and already initialized locally.
         if (IsServer)
             return;
 
@@ -140,8 +191,6 @@ public class SuspectController : NetworkBehaviour
         NetworkObject netObj = NetworkManager.Singleton.SpawnManager.SpawnedObjects[networkObjectId];
         suspectCharacter = netObj.GetComponent<SuspectCharacter>();
         _currentSuspectNetworkObjectId = networkObjectId;
-
-        // Clients do NOT call InitiateSuspect.
     }
 
     private void TryInitializeCurrentSuspect()
@@ -153,10 +202,7 @@ public class SuspectController : NetworkBehaviour
         if (netObj == null) return;
 
         if (_currentSuspectInitialized && netObj.NetworkObjectId == _currentSuspectNetworkObjectId)
-        {
-            Debug.Log($"Skipping duplicate suspect init for {netObj.NetworkObjectId}");
             return;
-        }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = true;
@@ -172,21 +218,10 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
-        Debug.Log($"Initiate suspect | IsServer={IsServer} IsClient={IsClient} IsHost={IsHost} NetId={suspectCharacter.NetworkObjectId}");
-
         suspectCharacter.animator.SetBool("Walking", true);
         suspectCharacter.transform
             .DOMove(standPos.position + suspectCharacter.standPosOffset, 3f)
             .OnComplete(ArrivedAtPosition);
-
-        int anomalyCount = AnomalyManager.Instance.AnomalyCountThisRound();
-        suspectCharacter.PrepareAnomalies();
-        anomalyCount = Mathf.Min(anomalyCount, suspectCharacter.AnomalyController.AvailableAnomalyCount);
-
-        for (int i = 0; i < anomalyCount; i++)
-        {
-            suspectCharacter.TriggerAnomaly();
-        }
     }
 
     private void ArrivedAtPosition()
@@ -205,15 +240,14 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
-        Debug.Log("Saying entry dialogue");
-
         if (suspectCharacter.attackImmediately)
         {
             suspectCharacter.AimAtPlayer();
             return;
         }
 
-        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.entryDialogue);
+        string entryDialogue = suspectCharacter.GetEntryDialogue();
+        DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
 
         if (suspectCharacter.givesFolder)
         {
@@ -224,21 +258,59 @@ public class SuspectController : NetworkBehaviour
     public void SpawnPaperwork()
     {
         if (!IsServer) return;
-        
-        NetworkObject folder =
-            Instantiate(folderPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
+        if (suspectCharacter == null) return;
 
+        NetworkObject folder = Instantiate(folderPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
         folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
-
         folder.Spawn();
         spawnedFolder = folder;
     }
-    
+
+    public void SpawnAndThrowPaperwork(Transform handSpawnPos)
+    {
+        if (!IsServer) return;
+        if (suspectCharacter == null) return;
+
+        NetworkObject folder = Instantiate(folderPrefab, handSpawnPos.position, handSpawnPos.rotation);
+        folder.Spawn();
+        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
+
+        if (folder.TryGetComponent<Rigidbody>(out Rigidbody rb))
+        {
+            rb.isKinematic = false;
+            Vector3 throwDirection = handSpawnPos.forward + Vector3.up * 0.5f;
+            rb.linearVelocity = throwDirection.normalized * 10f;
+            rb.angularVelocity = new Vector3(
+                Random.Range(-3f, 3f),
+                Random.Range(-3f, 3f),
+                Random.Range(-3f, 3f)
+            );
+        }
+
+        spawnedFolder = folder;
+    }
 
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
         DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.dialogueResponses[choiceIndex].text);
+    }
+
+    private void ApplyCurrentSuspectJudgment(JudgmentResult judgmentResult)
+    {
+        if (!IsServer) return;
+        if (suspectCharacter == null) return;
+        if (suspectCharacter.Data == null) return;
+        if (SuspectDatabase.Instance == null) return;
+
+        int currentDay = 1;
+
+        if (ShiftManager.Instance != null)
+        {
+            currentDay = ShiftManager.Instance.CurrentDay;
+        }
+
+        SuspectDatabase.Instance.ApplyJudgment(suspectCharacter.Data, judgmentResult, currentDay);
     }
 
     public void Pass()
@@ -254,16 +326,14 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(PassSequence());
     }
 
-    [ClientRpc]
-    private void QuarantineVisualsClientRpc()
-    {
-        if (IsServer) return;
-        StartCoroutine(QuarantineSequence());
-    }
-
     private IEnumerator PassSequence()
     {
+        if (suspectCharacter == null)
+            yield break;
+
         ShiftManager.Instance.PassedSuspect(suspectCharacter);
+        ApplyCurrentSuspectJudgment(JudgmentResult.Passed);
+
         SuspectCharacter thisCharacter = suspectCharacter;
 
         thisCharacter.animator.SetTrigger("Give");
@@ -271,19 +341,19 @@ public class SuspectController : NetworkBehaviour
 
         if (IsServer)
         {
-            if (spawnedFolder != null && spawnedFolder.IsSpawned)
-            {
-                NetworkHelper.DespawnWithChildren(spawnedFolder);
-            }
-
+            CleanupSpawnedFolder();
             PassVisualsClientRpc();
         }
 
-        DialogueManager.Instance.SayDialogue(suspectCharacter, "Thanks, comrade. I owe ya one.");
+        DialogueManager.Instance.SayDialogue(thisCharacter, "Thanks, comrade. I owe ya one.");
 
         yield return new WaitForSeconds(2f);
 
-        thisCharacter.lookAnimator.SetLookTarget(null);
+        if (thisCharacter.lookAnimator != null)
+        {
+            thisCharacter.lookAnimator.SetLookTarget(null);
+        }
+
         thisCharacter.transform.DORotate(gatePos.rotation.eulerAngles, 0.5f);
         yield return new WaitForSeconds(0.5f);
 
@@ -312,8 +382,149 @@ public class SuspectController : NetworkBehaviour
         {
             GameManager.Instance.GateController.CloseGate();
         }
-        
+
         NextSuspect();
+    }
+
+    public void Quarantine()
+    {
+        if (!IsServer) return;
+        StartCoroutine(QuarantineSequence());
+    }
+
+    [ClientRpc]
+    private void QuarantineVisualsClientRpc()
+    {
+        if (IsServer) return;
+        StartCoroutine(QuarantineSequence());
+    }
+
+    private IEnumerator QuarantineSequence()
+    {
+        if (suspectCharacter == null)
+            yield break;
+
+        ShiftManager.Instance.QuarantinedSuspect();
+        ApplyCurrentSuspectJudgment(JudgmentResult.Quarantined);
+
+        suspectCharacter.animator.SetTrigger("Give");
+        yield return new WaitForSeconds(1f);
+
+        if (IsServer)
+        {
+            CleanupSpawnedFolder();
+            QuarantineVisualsClientRpc();
+        }
+
+        yield return new WaitForSeconds(2f);
+        suspectCharacter.animator.SetTrigger("Shocked");
+
+        if (quarantineTimeline != null)
+        {
+            quarantineTimeline.gameObject.SetActive(true);
+            quarantineTimeline.Play();
+        }
+
+        DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
+
+        yield return new WaitForSeconds(2f);
+
+        if (suspectCharacter.lookAnimator != null)
+        {
+            suspectCharacter.lookAnimator.SetLookTarget(null);
+        }
+
+        suspectCharacter.animator.SetBool("BeingRestrained", true);
+
+        float quarantiningTime = 9f;
+        float timeElapsed = 0f;
+
+        while (timeElapsed < quarantiningTime)
+        {
+            yield return new WaitForEndOfFrame();
+
+            if (suspectCharacter == null)
+                yield break;
+
+            suspectCharacter.transform.position = suspectQuarantineFollowPos.position;
+            suspectCharacter.transform.rotation = suspectQuarantineFollowPos.rotation;
+            timeElapsed += Time.deltaTime;
+        }
+
+        if (IsServer)
+        {
+            DespawnSuspect(suspectCharacter);
+            GameManager.Instance.NextRound();
+        }
+
+        if (quarantineTimeline != null)
+        {
+            quarantineTimeline.gameObject.SetActive(false);
+        }
+    }
+
+    public void Kill()
+    {
+        if (!IsServer) return;
+        StartCoroutine(KillSequence());
+    }
+
+    private IEnumerator KillSequence()
+    {
+        if (suspectCharacter == null)
+            yield break;
+
+        ShiftManager.Instance.KillSuspect(suspectCharacter);
+        ApplyCurrentSuspectJudgment(JudgmentResult.Killed);
+
+        yield return new WaitForSeconds(1f);
+        SuspectCharacter thisCharacter = suspectCharacter;
+
+        thisCharacter.animator.SetTrigger("Give");
+        yield return new WaitForSeconds(1f);
+
+        if (IsServer)
+        {
+            CleanupSpawnedFolder();
+        }
+
+        yield return new WaitForSeconds(1f);
+
+        DialogueManager.Instance.SayDialogue(thisCharacter, "Wait... NO!!!");
+        thisCharacter.animator.SetTrigger("ShotUp");
+        yield return new WaitForSeconds(1f);
+
+        KillMachineController.Instance.Kill();
+
+        yield return new WaitForSeconds(8f);
+
+        if (IsServer)
+        {
+            DespawnSuspect(thisCharacter);
+            NextSuspect();
+        }
+    }
+
+    public void SetCanInteract(bool canInteract)
+    {
+        if (suspectCharacter == null) return;
+        suspectCharacter.SetCanInteract(canInteract);
+    }
+
+    public void GrabSuspect()
+    {
+        if (suspectCharacter == null) return;
+        suspectCharacter.animator.SetBool("Restrained", true);
+    }
+
+    private void CleanupSpawnedFolder()
+    {
+        if (spawnedFolder != null && spawnedFolder.IsSpawned)
+        {
+            NetworkHelper.DespawnWithChildren(spawnedFolder);
+        }
+
+        spawnedFolder = null;
     }
 
     private void DespawnSuspect(SuspectCharacter suspectToDespawn)
@@ -342,143 +553,12 @@ public class SuspectController : NetworkBehaviour
         }
     }
 
-    public void Quarantine()
-    {
-        if (!IsServer) return;
-        StartCoroutine(QuarantineSequence());
-    }
-
-    private IEnumerator QuarantineSequence()
-    {
-        ShiftManager.Instance.QuarantinedSuspect();
-
-        suspectCharacter.animator.SetTrigger("Give");
-        yield return new WaitForSeconds(1f);
-
-        if (IsServer)
-        {
-            if (spawnedFolder != null && spawnedFolder.IsSpawned)
-            {
-                NetworkHelper.DespawnWithChildren(spawnedFolder);
-            }
-
-            QuarantineVisualsClientRpc();
-        }
-
-        yield return new WaitForSeconds(2f);
-        suspectCharacter.animator.SetTrigger("Shocked");
-
-        quarantineTimeline.gameObject.SetActive(true);
-        quarantineTimeline.Play();
-        DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
-
-        yield return new WaitForSeconds(2f);
-        suspectCharacter.lookAnimator.SetLookTarget(null);
-        suspectCharacter.animator.SetBool("BeingRestrained", true);
-
-        float quarantiningTime = 9f;
-        float timeElapsed = 0f;
-
-        while (timeElapsed < quarantiningTime)
-        {
-            yield return new WaitForEndOfFrame();
-            suspectCharacter.transform.position = suspectQuarantineFollowPos.position;
-            suspectCharacter.transform.rotation = suspectQuarantineFollowPos.rotation;
-            timeElapsed += Time.deltaTime;
-        }
-
-        if (IsServer)
-        {
-            DespawnSuspect(suspectCharacter);
-            GameManager.Instance.NextRound();
-        }
-
-        quarantineTimeline.gameObject.SetActive(false);
-    }
-
-    public void Kill()
-    {
-        if (!IsServer) return;
-        StartCoroutine(KillSequence());
-    }
-
-    private IEnumerator KillSequence()
-    {
-        ShiftManager.Instance.KillSuspect(suspectCharacter);
-
-        yield return new WaitForSeconds(1f);
-        SuspectCharacter thisCharacter = suspectCharacter;
-
-        thisCharacter.animator.SetTrigger("Give");
-        yield return new WaitForSeconds(1f);
-
-        if (IsServer)
-        {
-            if (spawnedFolder != null && spawnedFolder.IsSpawned)
-            {
-                NetworkHelper.DespawnWithChildren(spawnedFolder);
-            }
-        }
-
-        yield return new WaitForSeconds(1f);
-
-        DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... NO!!!");
-        suspectCharacter.animator.SetTrigger("ShotUp");
-        yield return new WaitForSeconds(1f);
-
-        KillMachineController.Instance.Kill();
-
-        yield return new WaitForSeconds(8f);
-
-        if (IsServer)
-        {
-            DespawnSuspect(thisCharacter);
-            NextSuspect();
-        }
-    }
-
-    public void SetCanInteract(bool canInteract)
-    {
-        if (suspectCharacter == null) return;
-        suspectCharacter.SetCanInteract(canInteract);
-    }
-
-    public void GrabSuspect()
-    {
-        if (suspectCharacter == null) return;
-        suspectCharacter.animator.SetBool("Restrained", true);
-    }
-
-    public void SpawnAndThrowPaperwork(Transform handSpawnPos)
-    {
-        if (!IsServer) return;
-
-        NetworkObject folder =
-            Instantiate(folderPrefab, handSpawnPos.position, handSpawnPos.rotation);
-
-        folder.Spawn();
-        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
-
-        if (folder.TryGetComponent<Rigidbody>(out Rigidbody rb))
-        {
-            rb.isKinematic = false;
-            Vector3 throwDirection = handSpawnPos.forward + Vector3.up * 0.5f;
-            rb.linearVelocity = throwDirection.normalized * 10f;
-            rb.angularVelocity = new Vector3(
-                UnityEngine.Random.Range(-3f, 3f),
-                UnityEngine.Random.Range(-3f, 3f),
-                UnityEngine.Random.Range(-3f, 3f)
-            );
-        }
-
-        spawnedFolder = folder;
-    }
-
     public void ResetSuspects()
     {
         suspectIndex.Value = -1;
         _currentSuspectInitialized = false;
         _currentSuspectNetworkObjectId = ulong.MaxValue;
         suspectCharacter = null;
+        spawnedFolder = null;
     }
 }

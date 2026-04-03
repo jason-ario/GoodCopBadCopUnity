@@ -12,8 +12,7 @@ public class AnomalyController : MonoBehaviour
     [SerializeField] private List<EnvironmentalAnomaly> _environmentalAnomalies;
 
     private Anomaly[] _anomalies;
-    private readonly List<Anomaly> _availableAnomalies = new List<Anomaly>();
-    public int AvailableAnomalyCount => _availableAnomalies.Count;
+    private List<Anomaly> _activeAnomalies = new List<Anomaly>();
 
     private void Awake()
     {
@@ -26,23 +25,78 @@ public class AnomalyController : MonoBehaviour
             .ToArray();
     }
 
-    public void ResetAvailableAnomalies()
+    public void GenerateAndApplyAnomalies(int targetScore, int tolerance = 5, int maxPicks = 10)
     {
-        _availableAnomalies.Clear();
-        _availableAnomalies.AddRange(_anomalies);
+        ClearAnomalies();
+
+        List<Anomaly> chosen = GenerateAnomaliesForScore(targetScore, tolerance, maxPicks);
+
+        foreach (Anomaly anomaly in chosen)
+        {
+            anomaly.ActivateAnomaly();
+            _activeAnomalies.Add(anomaly);
+        }
     }
 
-    public void TriggerAnomaly()
+    public List<Anomaly> GenerateAnomaliesForScore(int targetScore, int tolerance = 5, int maxPicks = 10)
     {
-        if (_availableAnomalies.Count == 0)
+        List<Anomaly> chosen = new List<Anomaly>();
+
+        List<Anomaly> candidates = _anomalies
+            .Where(a => a.CanAppearForScore(targetScore))
+            .ToList();
+
+        if (candidates.Count == 0)
         {
-            Debug.LogWarning("No available anomalies left to trigger this round.");
-            return;
+            Debug.LogWarning($"No anomaly candidates found for infection score {targetScore} on {gameObject.name}");
+            return chosen;
         }
 
-        int index = Random.Range(0, _availableAnomalies.Count);
-        Anomaly chosen = _availableAnomalies[index];
-        _availableAnomalies.RemoveAt(index);
-        chosen.ActivateAnomaly();
+        int currentTotal = 0;
+        int safety = 0;
+
+        while (currentTotal < targetScore - tolerance && chosen.Count < maxPicks && safety < 100)
+        {
+            safety++;
+
+            List<Anomaly> validChoices = candidates
+                .Where(a => !chosen.Contains(a) && currentTotal + a.ScoreValue <= targetScore + tolerance)
+                .ToList();
+
+            if (validChoices.Count == 0)
+                break;
+
+            Anomaly picked = GetWeightedRandom(validChoices);
+            chosen.Add(picked);
+            currentTotal += picked.ScoreValue;
+        }
+
+        return chosen;
     }
+
+    private Anomaly GetWeightedRandom(List<Anomaly> anomalies)
+    {
+        int totalWeight = anomalies.Sum(a => Mathf.Max(1, a.SelectionWeight));
+        int roll = Random.Range(0, totalWeight);
+
+        int running = 0;
+        foreach (Anomaly anomaly in anomalies)
+        {
+            running += Mathf.Max(1, anomaly.SelectionWeight);
+            if (roll < running)
+                return anomaly;
+        }
+
+        return anomalies[anomalies.Count - 1];
+    }
+
+    public void ClearAnomalies()
+    {
+        foreach (Anomaly anomaly in _anomalies)
+        {
+            anomaly.DeactivateAnomaly();
+        }
+    }
+    
+    public bool HasAnomaly(Anomaly anomaly) => _activeAnomalies.Contains(anomaly);
 }

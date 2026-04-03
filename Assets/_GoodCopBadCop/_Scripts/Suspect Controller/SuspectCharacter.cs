@@ -3,11 +3,13 @@ using System.Collections;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
+using Random = System.Random;
 
 public enum CharacterStatus
 {
     Resident,
     Visitor,
+    Quarantined,
     Deceased
 }
 
@@ -17,16 +19,19 @@ public class SuspectCharacter : Interactable
     [SerializeField] private SuspectData suspectData;
     public SuspectData Data => suspectData;
     
-    [SerializeField] string reasonForEntry;
-    [SerializeField] string expirationDate;
     [SerializeField] bool sealActive;
     
-    public string ReasonForEntry => reasonForEntry;
-    public string ExpirationDate=> expirationDate;
+    public string ReasonForEntry => suspectData.reasonsForEntry[UnityEngine.Random.Range(0, suspectData.reasonsForEntry.Length)];
+    public string ExpirationDate => suspectData.EntryPermitExpiryDate;
     public bool SealActive => sealActive;
     
     [Header("Character State")]
     public CharacterStatus characterStatus;
+
+    [Header("Runtime Record")]
+    [SerializeField] private bool autoInitializeFromDatabase = true;
+    private SuspectRecord _record;
+    public SuspectRecord Record => _record;
     
     [Header("Suspect Set Up")]
     public FLookAnimator lookAnimator;
@@ -65,16 +70,75 @@ public class SuspectCharacter : Interactable
     private bool _facingPlayer;
 
     [Header("Anomalies")]
-    [SerializeField] AnomalyController anomalyController;
+    [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
 
-    public bool IsInfected => false;
+    public bool IsInfected => _record != null && _record.InfectionScore >= 50;
+    public int InfectionScore => _record != null ? _record.InfectionScore : 0;
 
     protected override void Awake()
     {
         base.Awake();
+
         handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
-        _folderGivingAnimationData = folderGivingAnimationDatas[0];
+
+        if (folderGivingAnimationDatas != null && folderGivingAnimationDatas.Length > 0)
+        {
+            _folderGivingAnimationData = folderGivingAnimationDatas[0];
+        }
+    }
+
+    private void Start()
+    {
+        if (autoInitializeFromDatabase && suspectData != null && SuspectDatabase.Instance != null)
+        {
+            InitializeFromDatabase();
+        }
+    }
+
+    public void InitializeFromDatabase()
+    {
+        SuspectRecord record = SuspectDatabase.Instance.GetRecord(suspectData);
+        Initialize(record);
+    }
+
+    public void Initialize(SuspectRecord record)
+    {
+        _record = record;
+
+        if (_record == null)
+        {
+            Debug.LogError($"SuspectCharacter '{name}' initialized with null record.");
+            return;
+        }
+
+        suspectData = _record.Data;
+        characterStatus = _record.Status;
+
+        ApplyRecordData();
+        ApplyInfectionState();
+    }
+
+    private void ApplyRecordData()
+    {
+        if (_record == null)
+            return;
+
+        characterStatus = _record.Status;
+    }
+
+    private void ApplyInfectionState()
+    {
+        if (_record == null)
+            return;
+
+        if (anomalyController == null)
+        {
+            Debug.LogWarning($"SuspectCharacter '{name}' has no AnomalyController assigned.");
+            return;
+        }
+
+        anomalyController.GenerateAndApplyAnomalies(_record.InfectionScore);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -82,9 +146,10 @@ public class SuspectCharacter : Interactable
         DialogueManager.Instance.InitiateChoices();
     }
 
-    public void SetCanInteract(bool b)
+    public void SetCanInteract(bool canInteract)
     {
-        interactionCollider.enabled = false;
+        if (interactionCollider != null)
+            interactionCollider.enabled = canInteract;
     }
     
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
@@ -92,6 +157,7 @@ public class SuspectCharacter : Interactable
         if (itemData == null)
         {
             DialogueManager.Instance.InitiateChoices();
+            return;
         }
 
         if (itemData.name == "Shotgun")
@@ -118,9 +184,12 @@ public class SuspectCharacter : Interactable
     [ClientRpc]
     private void GetShotClientRpc()
     {
-        bloodExplosion.SetActive(true);
+        if (bloodExplosion != null)
+            bloodExplosion.SetActive(true);
+
         animator.SetTrigger("Die");
     }
+
     public void AimAtPlayer()
     {
         StartCoroutine(StartFiring());
@@ -147,7 +216,7 @@ public class SuspectCharacter : Interactable
         _facingPlayer = true;
         yield return new WaitForSeconds(1);
         animator.SetBool("Aiming Rifle", true);
-        DialogueManager.Instance.SayDialogue(this,"You.. You're a traitor!!");
+        DialogueManager.Instance.SayDialogue(this, "You.. You're a traitor!!");
         yield return new WaitForSeconds(2);
         animator.SetBool("FiringRifle", true);
 
@@ -156,8 +225,6 @@ public class SuspectCharacter : Interactable
             PlayerInstance.Instance.HurtPlayer();
             yield return new WaitForSeconds(.5f);
         }
-
-        yield break;
     }
 
     private void Update()
@@ -165,7 +232,7 @@ public class SuspectCharacter : Interactable
         if (_facingPlayer)
         {
             Vector3 targetPosition = PlayerInstance.Instance.transform.position;
-            targetPosition.y = transform.position.y; // Keep the target at the same height
+            targetPosition.y = transform.position.y;
             transform.LookAt(targetPosition);
         }
     }
@@ -190,15 +257,12 @@ public class SuspectCharacter : Interactable
             SuspectController.Instance.SpawnPaperwork();
         }
     }
-    
-    public void PrepareAnomalies()
+    public void RegenerateAnomaliesFromCurrentScore()
     {
-        anomalyController.ResetAvailableAnomalies();
-    }
+        if (_record == null || anomalyController == null)
+            return;
 
-    public void TriggerAnomaly()
-    {
-        anomalyController.TriggerAnomaly();
+        anomalyController.GenerateAndApplyAnomalies(_record.InfectionScore);
     }
     
     public void SetFolderGivingAnimation(FolderGivingAnimation folderGivingAnimation)
@@ -209,7 +273,26 @@ public class SuspectCharacter : Interactable
             {
                 _folderGivingAnimationData = folderGivingAnimationData;
                 _folderGivingAnimation = folderGivingAnimation;
+                return;
             }
         }
+    }
+    
+    public string GetEntryDialogue()
+    {
+        string entryDialogue = "";
+        if(InfectionScore >= 50)
+        {
+            entryDialogue = suspectData.anomalyEntryDialogues[
+                UnityEngine.Random.Range(0, suspectData.anomalyEntryDialogues.Length)];
+        }
+        else
+        {
+            entryDialogue =
+                suspectData.anomalyEntryDialogues[
+                    UnityEngine.Random.Range(0, suspectData.entryDialogues.Length)];
+        }
+
+        return entryDialogue;
     }
 }

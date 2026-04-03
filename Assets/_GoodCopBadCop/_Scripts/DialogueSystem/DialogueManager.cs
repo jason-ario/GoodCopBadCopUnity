@@ -75,7 +75,7 @@ public class DialogueManager : NetworkBehaviour
         }
 
         if (character == null && SuspectController.Instance != null)
-            character = SuspectController.Instance.suspectCharacter;
+            character = SuspectController.Instance.CurrentSuspect;
 
         if (character == null)
         {

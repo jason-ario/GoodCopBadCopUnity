@@ -18,7 +18,8 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private int suspectsPerShift = 6;
 
     [Header("Set Up")]
-    public int dayNumber = 1;
+    private int _currentDay = 1;
+    public int CurrentDay => _currentDay;
     [SerializeField] private StartShiftScreen _startShiftScreen;
     [SerializeField] private FaxMachine _faxMachine;
     [SerializeField] private float faxMachineDelay = 4f;
@@ -72,7 +73,7 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator StartShiftSequence()
     {
         bellSound.Play();
-        _startShiftScreen.ShowDayNumber(dayNumber);
+        _startShiftScreen.ShowDayNumber(_currentDay);
         OnShiftStart?.Invoke();
         yield return new WaitForSeconds(faxMachineDelay);
 
@@ -226,9 +227,11 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator NewShiftSequence()
     {
-        dayNumber += 1;
-        PlayerPrefs.SetInt("dayNumber", dayNumber);
-        calendarText.text = dayNumber.ToString("D2");
+        _currentDay += 1;
+        SuspectDatabase.Instance.AdvanceToDay(_currentDay);
+
+        PlayerPrefs.SetInt("dayNumber", _currentDay);
+        calendarText.text = _currentDay.ToString("D2");
         
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);

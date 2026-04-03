@@ -13,7 +13,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
         dialogueChoiceContainer.SetActive(true);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(SuspectController.Instance.suspectCharacter.lookPos);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(SuspectController.Instance.CurrentSuspect.lookPos);
         InitializeChoices();
     }
     
