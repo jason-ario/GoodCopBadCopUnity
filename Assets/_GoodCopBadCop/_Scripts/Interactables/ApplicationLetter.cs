@@ -23,4 +23,6 @@ public class ApplicationLetter : Paper
         birthDateText.font = suspectData.handwritingFont;
         sexText.font = suspectData.handwritingFont;
     }
+    
+    
 }

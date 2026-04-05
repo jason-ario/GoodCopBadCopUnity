@@ -22,4 +22,16 @@ public class IDCard : PickableObject
       residentText.text = isResident ? "* Resident of Saplavi *" : "Non-Resident";
       seal.SetActive(isResident);
    }
+   
+   public override void OnStartUse()
+   {
+      playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
+      UIController.Instance.OpenNewspaper();
+   }
+    
+   public override void OnStopUse()
+   {
+      playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+      UIController.Instance.CloseNewspaper();
+   }
 }

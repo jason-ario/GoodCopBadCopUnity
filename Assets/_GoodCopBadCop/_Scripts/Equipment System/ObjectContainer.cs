@@ -69,14 +69,8 @@ public class ObjectContainer : MonoBehaviour
             var itemHeld = itemsHeld[i];
             if (itemData == itemHeld.ItemData)
             {
-                // Found matching item, equip it
-                if (currentlyEquippedItem != null)
-                {
-                    currentlyEquippedItem.gameObject.SetActive(false);
-                }
-
                 currentlyEquippedItem = itemHeld;
-                itemHeld.gameObject.SetActive(true);
+                
                 if (playerPickupController != null)
                 {
                     itemHeld.OnEquipped(playerPickupController);
