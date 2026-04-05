@@ -67,7 +67,7 @@ public class SwitchButton : Interactable
         
         yield return new WaitForSeconds(.25f);
 
-        player.playerAnimationController.DisableHoldObjectMask();
+        player.playerAnimationController.DisableRightArmMask();
         player.playerMovementController.SetCanControl(true);
     }
 

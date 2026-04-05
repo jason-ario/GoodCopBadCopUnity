@@ -27,7 +27,7 @@ public class AnomalyController : MonoBehaviour
 
     public void GenerateAndApplyAnomalies(int targetScore, int tolerance = 5, int maxPicks = 10)
     {
-        ClearAnomalies();
+        //ClearAnomalies();
 
         List<Anomaly> chosen = GenerateAnomaliesForScore(targetScore, tolerance, maxPicks);
 

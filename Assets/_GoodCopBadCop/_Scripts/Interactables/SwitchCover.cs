@@ -47,7 +47,7 @@ public class SwitchCover : Interactable
         anim.SetBool("SwitchOpen", switchCoverOpen.Value);
         audioSource.Play();
         yield return new WaitForSeconds(0.5f);
-        player.playerAnimationController.DisableHoldObjectMask();
+        player.playerAnimationController.DisableRightArmMask();
     }
 
     public void Reset()

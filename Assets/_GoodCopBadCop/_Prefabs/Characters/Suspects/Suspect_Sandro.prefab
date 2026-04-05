@@ -44,6 +44,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9daec068aff8c9440affcc9c94c0499c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  scoreValue: 10
+  minInfectionScore: 0
+  maxInfectionScore: 100
+  selectionWeight: 1
   tumor: {fileID: 5253868379940444362}
   skinnedMeshRendererToChange: {fileID: 2252012816710678067}
   materialToChangeTo: {fileID: 2100000, guid: 9626fae6ccb414b4a8336feaaeaf4739, type: 2}
@@ -161,7 +165,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 827143177211400971, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: _behaviorAnomalies.Array.size
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 827143177211400971, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: _mutationAnomalies.Array.size

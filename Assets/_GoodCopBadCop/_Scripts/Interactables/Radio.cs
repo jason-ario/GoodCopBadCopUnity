@@ -79,7 +79,7 @@ public class Radio : Interactable
         playerInteractionController.GetComponent<PlayerMovementController>().SetCanControl(false);
         UIController.Instance.HideBackButton();
         GetComponent<HighlightEffect>().enabled = true;
-        _playerMovementController.PlayerAnimationController.DisableHoldObjectMask();
+        _playerMovementController.PlayerAnimationController.DisableRightArmMask();
 
         PlayerMovementController playerMovementController = playerInteractionController.GetComponent<PlayerMovementController>();
 

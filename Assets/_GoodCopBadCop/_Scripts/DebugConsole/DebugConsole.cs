@@ -11,8 +11,11 @@ public class DebugConsole : MonoBehaviour
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
 
+    public static DebugConsole Instance;
+    
     void Awake()
     {
+        Instance = this;
         if (cutsceneMode)
         {
             _mainMenuController.enabled = false;

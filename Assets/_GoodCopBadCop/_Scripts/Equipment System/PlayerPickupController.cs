@@ -338,7 +338,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = null;
         _heldPickableObject = null;
         itemEquippedIndex.Value = -1;
-        _playerAnimationController.DisableHoldObjectMask();
+        _playerAnimationController.DisableRightArmMask();
         ObjectPlacer.Instance.DeactivatePlacer();
     }
 

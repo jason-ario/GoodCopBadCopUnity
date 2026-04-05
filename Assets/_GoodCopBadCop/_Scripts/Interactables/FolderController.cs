@@ -165,7 +165,7 @@ public class FolderController : PickableObject
         playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
         if (IsServer) inFolderPos.Value = false;
         
-        transform.DOJump(SuspectController.Instance.ApplicationSpawnPos.position, .3f, 1, .5f)
+        transform.DOJump(SuspectController.Instance.FolderSpawnPos.position, .3f, 1, .5f)
             .OnComplete(() => GameManager.Instance.DeliveredVertict(stampContainer.Stamp));
         
         SFXController.Instance.Play(folderPlaceClip);

@@ -279,6 +279,12 @@ public class ShiftManager : NetworkBehaviour
 
     public void InitiateIntroCutscene()
     {
+        if (DebugConsole.Instance.skipInitialShiftTransition)
+        {
+            ResetEverything();
+            return;
+        }
+        
         UIController.Instance.FadeIn();
         PlayerInstance.Instance.DisableReticle();
         StartCoroutine(PlayIntroCutscene());

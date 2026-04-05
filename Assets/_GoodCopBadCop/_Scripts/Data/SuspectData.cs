@@ -12,6 +12,8 @@ public class SuspectData : ScriptableObject
     public string DateOfBirth;
     public string Sex;
     public string EntryPermitExpiryDate;
+    public bool IsResident = true;
+    public bool GivesPaperwork = true;
 
     [Header("Infection")]
     [Range(0, 100)] public int startingInfectionScore = 0;

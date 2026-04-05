@@ -1,6 +1,8 @@
 using System.Collections;
+using System.Collections.Generic;
 using DG.Tweening;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Serialization;
@@ -21,16 +23,20 @@ public class SuspectController : NetworkBehaviour
     public SuspectCharacter CurrentSuspect => suspectCharacter;
 
     [Header("Paperwork")]
-    [FormerlySerializedAs("applicationPrefab")]
-    [SerializeField] private NetworkObject folderPrefab;
-    [SerializeField] private Transform applicationSpawnPos;
-    public Transform ApplicationSpawnPos => applicationSpawnPos;
+    [SerializeField] private List<PickableObject> spawnedDocuments = new List<PickableObject>();
+
+    [SerializeField] private NetworkObject idCard;
+    [SerializeField] private NetworkObject applicationForm;
+    [SerializeField] private FolderController spawnedFolder;
+    [SerializeField] private Transform folderSpawnPos;
+    public Transform FolderSpawnPos => folderSpawnPos;
+    [SerializeField] private Transform documentSpawnStartPos;
+    [SerializeField] private Transform documentSpawnEndPos;
 
     [Header("Quarantine")]
     [SerializeField] private PlayableDirector quarantineTimeline;
     [SerializeField] private Transform suspectQuarantineFollowPos;
 
-    private NetworkObject spawnedFolder;
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
 
@@ -250,7 +256,7 @@ public class SuspectController : NetworkBehaviour
         string entryDialogue = suspectCharacter.GetEntryDialogue();
         DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
 
-        if (suspectCharacter.givesFolder)
+        if (suspectCharacter.Data.GivesPaperwork)
         {
             suspectCharacter.GivePaperwork();
         }
@@ -260,35 +266,21 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
         if (suspectCharacter == null) return;
-
-        NetworkObject folder = Instantiate(folderPrefab, applicationSpawnPos.position, applicationSpawnPos.rotation);
-        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
-        folder.Spawn();
-        spawnedFolder = folder;
-    }
-
-    public void SpawnAndThrowPaperwork(Transform handSpawnPos)
-    {
-        if (!IsServer) return;
-        if (suspectCharacter == null) return;
-
-        NetworkObject folder = Instantiate(folderPrefab, handSpawnPos.position, handSpawnPos.rotation);
-        folder.Spawn();
-        folder.GetComponent<FolderController>().SetInfo(suspectCharacter);
-
-        if (folder.TryGetComponent<Rigidbody>(out Rigidbody rb))
-        {
-            rb.isKinematic = false;
-            Vector3 throwDirection = handSpawnPos.forward + Vector3.up * 0.5f;
-            rb.linearVelocity = throwDirection.normalized * 10f;
-            rb.angularVelocity = new Vector3(
-                Random.Range(-3f, 3f),
-                Random.Range(-3f, 3f),
-                Random.Range(-3f, 3f)
-            );
-        }
-
-        spawnedFolder = folder;
+        if (!suspectCharacter.Data.GivesPaperwork) return;
+        
+        Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
+        randomPos.y = documentSpawnEndPos.position.y;
+        NetworkObject newIDCard = Instantiate(idCard, randomPos, Quaternion.identity) as NetworkObject;
+        newIDCard.GetComponent<IDCard>().SetInfo(suspectCharacter);
+        newIDCard.Spawn();
+        spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
+            
+        randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
+        randomPos.y = documentSpawnEndPos.position.y;
+        NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
+        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter.Data);
+        newApplicationForm.Spawn();
+        spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
     }
 
     public void RespondToDialogueChoice(int choiceIndex)
@@ -521,7 +513,7 @@ public class SuspectController : NetworkBehaviour
     {
         if (spawnedFolder != null && spawnedFolder.IsSpawned)
         {
-            NetworkHelper.DespawnWithChildren(spawnedFolder);
+            NetworkHelper.DespawnWithChildren(spawnedFolder.GetComponent<NetworkObject>());
         }
 
         spawnedFolder = null;

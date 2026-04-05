@@ -199,18 +199,20 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void EnableRightArmMask()
     {
+        Debug.Log("Enable Right Arm Mask");
         targetLayer1Weight = 1f;
         targetLayer2Weight = 0f;
     }
     
-    public void DisableHoldObjectMask()
+    public void DisableRightArmMask()
     {
         targetLayer1Weight = 0f;
-        targetLayer2Weight = 0f;
     }
 
     public void EnableHoldObjectTwoArmsMask()
     {
+        Debug.Log("Disable Right Arm Mask");
+
         targetLayer1Weight = 0f;
         targetLayer2Weight = 1f;
     }

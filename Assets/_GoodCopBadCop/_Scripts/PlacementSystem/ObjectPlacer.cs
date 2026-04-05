@@ -119,6 +119,8 @@ public class ObjectPlacer : MonoBehaviour
         _clonedItem = Instantiate(sourceItem, container);
         _clonedItem.transform.localPosition = slotTransform.localPosition;
         _clonedItem.transform.localRotation = slotTransform.localRotation;
+        _clonedItem.GetComponent<PickableObject>().SetPlacementClone();
+        Debug.Log(slotTransform.gameObject.name);
 
         // Jump clone's animator to the exact state of the source
         Animator sourceAnimator = sourceItem.GetComponentInChildren<Animator>();

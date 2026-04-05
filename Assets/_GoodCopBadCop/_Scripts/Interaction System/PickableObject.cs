@@ -23,6 +23,11 @@ public class PickableObject : Interactable
 
     public bool CanPickUpManually { get; set; } = true;
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _rigidbody.isKinematic = true;
+    }
 
     protected override void Awake()
     {
@@ -46,6 +51,7 @@ public class PickableObject : Interactable
 
     public virtual void OnDropped()
     {
+        _rigidbody.isKinematic = true;
         if (putDownSound != null)
         {
             SFXController.Instance.Play(putDownSound);
@@ -152,4 +158,8 @@ public class PickableObject : Interactable
     }
 
 
+    public void SetPlacementClone()
+    {
+        _parentConstraint.enabled = false;
+    }
 }

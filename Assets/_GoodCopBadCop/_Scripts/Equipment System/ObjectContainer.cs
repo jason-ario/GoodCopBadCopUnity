@@ -20,7 +20,7 @@ public class ObjectContainer : MonoBehaviour
     
     private void Awake()
     {
-        itemsHeld = GetComponentsInChildren<PickableObject>(true);
+        //itemsHeld = GetComponentsInChildren<PickableObject>(true);
 
         if (overrideLayer)
         {

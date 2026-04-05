@@ -40,12 +40,12 @@ public class SuspectCharacter : Interactable
     [SerializeField] Texture2D idPhoto;
     public Texture2D IDPhoto => idPhoto;
     [SerializeField] Collider interactionCollider;
-    public bool givesFolder = true;
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
     public Vector3 standPosOffset;
     public bool attackImmediately;
     [SerializeField] private ParticleSystem[] vomitParticles;
+
 
     #region Folder
     public enum FolderGivingAnimation
@@ -75,6 +75,7 @@ public class SuspectCharacter : Interactable
 
     public bool IsInfected => _record != null && _record.InfectionScore >= 50;
     public int InfectionScore => _record != null ? _record.InfectionScore : 0;
+
 
     protected override void Awake()
     {
@@ -245,17 +246,8 @@ public class SuspectCharacter : Interactable
     IEnumerator GivePaperworkCoroutine()
     {
         animator.SetTrigger(_folderGivingAnimationData.animationTriggerName);
-        
-        if (_folderGivingAnimation == FolderGivingAnimation.Throw)
-        {
-            yield return new WaitForSeconds(.8f);
-            SuspectController.Instance.SpawnAndThrowPaperwork(handSpawnPos); 
-        }
-        else
-        {
-            yield return new WaitForSeconds(1f);
-            SuspectController.Instance.SpawnPaperwork();
-        }
+        yield return new WaitForSeconds(1f);
+        SuspectController.Instance.SpawnPaperwork();
     }
     public void RegenerateAnomaliesFromCurrentScore()
     {
