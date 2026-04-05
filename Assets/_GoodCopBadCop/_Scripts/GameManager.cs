@@ -8,7 +8,6 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
 
-    public UnityAction OnRoundStart;
     public UnityAction OnGameStart;
 
     [SerializeField] private AudioClip transitionToGameplayStinger;
@@ -121,15 +120,6 @@ public class GameManager : NetworkBehaviour
                 break;
         }
     }
-
-    public void NextRound()
-    {
-        if (IsServer)
-        {
-            OnRoundStart?.Invoke();
-        }
-    }
-
     public void ResetPlayerPositions()
     {
         PlayerInstance.Instance.transform.position =

@@ -30,6 +30,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private MachineShake doorShake;
     [SerializeField] private PlayableDirector introCutscene;
     [SerializeField] private AudioSource ambientAudio;
+    [SerializeField] private AudioSource buzzerSound;
 
     public int SuspectsPerShift => suspectsPerShift;
 
@@ -51,23 +52,31 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
-    [SerializeField] private AudioSource _buzzerSound;
     [SerializeField] DoorController _doorController;
     [SerializeField] private Lever lever;
     [SerializeField] private TextMeshPro calendarText;
 
     #region Events
     public UnityAction OnShiftStart { get; set; }
+    public UnityAction OnShiftReady { get; set; }
+
     #endregion
 
     private void Awake()
     {
         Instance = this;
     }
-    
-    public void StartRound()
+
+
+    public void SetNextSuspectReady()
     {
-        SuspectController.Instance.NextSuspect();
+        if (SuspectController.Instance.SuspectIndex >= ShiftManager.Instance.SuspectsPerShift)
+        {
+            EndShift();
+            return;
+        }
+        
+        _switchButton.SetReady(true);
     }
     
     private IEnumerator StartShiftSequence()
@@ -75,6 +84,7 @@ public class ShiftManager : NetworkBehaviour
         bellSound.Play();
         _startShiftScreen.ShowDayNumber(_currentDay);
         OnShiftStart?.Invoke();
+        
         yield return new WaitForSeconds(faxMachineDelay);
 
         //_faxMachine.OnShiftStart();
@@ -135,10 +145,14 @@ public class ShiftManager : NetworkBehaviour
         StartCoroutine(OpenWindowSequence(false));
     }
 
+    public void PlayBuzzerSound()
+    {
+        buzzerSound.Play();
+    }
+
     private IEnumerator OpenWindowSequence(bool startRoundAfterOpening)
     {
-        _buzzerSound.Play();
-
+        PlayBuzzerSound();
         yield return new WaitForSeconds(0.5f);
         windowLampController.TurnGreen();
 
@@ -249,6 +263,8 @@ public class ShiftManager : NetworkBehaviour
         PlayerInstance.Instance.CanControl = true;
         PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.SetCanMove(true);
+        
+        OnShiftReady?.Invoke();
     }
 
     private void ResetSuspectsProcessed()

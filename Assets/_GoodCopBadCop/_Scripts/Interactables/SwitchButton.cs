@@ -11,7 +11,19 @@ public class SwitchButton : Interactable
     [SerializeField] Transform ikTarget;
     [SerializeField] private CinemachineCamera _camera;
     [SerializeField] private SwitchCover switchCover;
-    
+    public bool buttonReady = false;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        ShiftManager.Instance.OnShiftReady += OnShiftReady;
+    }
+
+    void OnShiftReady()
+    {
+        SetReady(true);
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
@@ -32,7 +44,21 @@ public class SwitchButton : Interactable
         player.playerAnimationController.EnableRightArmMask();
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
         player.playerAnimationController.SetAnimTrigger("PressButton");
-        ShiftManager.Instance.TryStartShift();
+
+        if (buttonReady)
+        {
+            SetReady(false);
+
+            if (ShiftManager.Instance.shiftStarted.Value == false)
+            {
+                ShiftManager.Instance.TryStartShift();
+            }
+            else
+            {
+                SuspectController.Instance.NextSuspect();
+            }
+        }
+        
         PlayButtonSoundClientRpc();
 
         yield return new WaitForSeconds(1);
@@ -59,5 +85,11 @@ public class SwitchButton : Interactable
     public void Reset()
     {
         switchCover.Reset();
+    }
+
+    public void SetReady(bool b)
+    {
+        anim.SetBool("Ready", b);
+        buttonReady = b;
     }
 }

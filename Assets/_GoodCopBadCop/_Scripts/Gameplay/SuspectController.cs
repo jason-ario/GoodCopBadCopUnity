@@ -31,10 +31,12 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private Transform suspectQuarantineFollowPos;
 
     private NetworkObject spawnedFolder;
-    public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1);
+    public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
+    public int SuspectIndex => suspectIndex.Value;
 
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
+
 
     private void Awake()
     {
@@ -96,15 +98,14 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        StartCoroutine(WaitAndSpawnNextSuspect());
+    }
+
+    IEnumerator WaitAndSpawnNextSuspect()
+    {
+        yield return new WaitForSeconds(3f);
         suspectIndex.Value += 1;
-
-        if (suspectIndex.Value >= ShiftManager.Instance.SuspectsPerShift)
-        {
-            Debug.Log("No more suspects to spawn");
-            ShiftManager.Instance.EndShift();
-            return;
-        }
-
+        
         SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
     }
 
@@ -365,7 +366,7 @@ public class SuspectController : NetworkBehaviour
         if (IsServer)
         {
             GameManager.Instance.GateController.OpenGate();
-            GameManager.Instance.NextRound();
+            ShiftManager.Instance.SetNextSuspectReady();
         }
 
         yield return new WaitForSeconds(2f);
@@ -376,14 +377,13 @@ public class SuspectController : NetworkBehaviour
             if (IsServer) DespawnSuspect(thisCharacter);
         });
 
+        
         yield return new WaitForSeconds(2f);
 
         if (IsServer)
         {
             GameManager.Instance.GateController.CloseGate();
         }
-
-        NextSuspect();
     }
 
     public void Quarantine()
@@ -454,7 +454,7 @@ public class SuspectController : NetworkBehaviour
         if (IsServer)
         {
             DespawnSuspect(suspectCharacter);
-            GameManager.Instance.NextRound();
+            ShiftManager.Instance.SetNextSuspectReady();
         }
 
         if (quarantineTimeline != null)
@@ -501,7 +501,7 @@ public class SuspectController : NetworkBehaviour
         if (IsServer)
         {
             DespawnSuspect(thisCharacter);
-            NextSuspect();
+            ShiftManager.Instance.SetNextSuspectReady();
         }
     }
 

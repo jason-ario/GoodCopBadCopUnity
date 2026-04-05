@@ -11,6 +11,8 @@ public class TutorialManager : MonoBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] AudioClip[] audioClips;
     [SerializeField] private Animator speakerAnimator;
+
+    public bool disabled;
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
@@ -30,6 +32,11 @@ public class TutorialManager : MonoBehaviour
 
     IEnumerator StartShiftTutorial()
     {
+        if (disabled)
+        {
+            yield break;
+        }
+        
         yield return new WaitForSeconds(7f);
         ShowTutorialText("Good morning, sunshine.");
         yield return new WaitForSeconds(5f);
