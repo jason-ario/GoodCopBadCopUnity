@@ -14,6 +14,7 @@ public class SuspectData : ScriptableObject
     public string EntryPermitExpiryDate;
     public bool IsResident = true;
     public bool GivesPaperwork = true;
+    public TMPro.TMP_FontAsset handwritingFont;
 
     [Header("Infection")]
     [Range(0, 100)] public int startingInfectionScore = 0;

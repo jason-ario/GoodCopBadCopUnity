@@ -246,6 +246,20 @@ public class ShiftManager : NetworkBehaviour
 
         PlayerPrefs.SetInt("dayNumber", _currentDay);
         calendarText.text = _currentDay.ToString("D2");
+
+        if (DebugConsole.Instance.skipInitialShiftTransition)
+        {
+            PlayerInstance.Instance.CanControl = true;
+            PlayerInstance.Instance.SetCanInteract(true);
+            PlayerInstance.Instance.SetCanMove(true);
+            introCutscene.gameObject.SetActive(false);
+            UIController.Instance.HideEndOfShiftReport();
+            SuspectController.Instance.ResetSuspects();
+            yield return new WaitForEndOfFrame();
+            OnShiftReady?.Invoke();
+            StartCoroutine(StartShiftSequence());
+            yield break;
+        }
         
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
@@ -279,12 +293,6 @@ public class ShiftManager : NetworkBehaviour
 
     public void InitiateIntroCutscene()
     {
-        if (DebugConsole.Instance.skipInitialShiftTransition)
-        {
-            ResetEverything();
-            return;
-        }
-        
         UIController.Instance.FadeIn();
         PlayerInstance.Instance.DisableReticle();
         StartCoroutine(PlayIntroCutscene());
