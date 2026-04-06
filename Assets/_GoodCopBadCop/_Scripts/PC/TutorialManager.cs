@@ -6,15 +6,24 @@ using Random = System.Random;
 
 public class TutorialManager : MonoBehaviour
 {
+    public static TutorialManager Instance;
+    
     [SerializeField] private GameObject tutorialCanvas;
     [SerializeField] private TextMeshProUGUI tutorialText;
     [SerializeField] private AudioSource audioSource;
     [SerializeField] AudioClip[] audioClips;
     [SerializeField] private Animator speakerAnimator;
-
+    private bool isSpeaking;
+    Coroutine waitAndHideCoroutine;
+    
     public bool disabled;
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     private void Start()
     {
@@ -50,7 +59,6 @@ public class TutorialManager : MonoBehaviour
         yield return new WaitForSeconds(5); 
         ShowTutorialText("But to give you the best shot, I'll be here to help out.");
         yield return new WaitForSeconds(5); 
-        HideTutorialText();
     }
 
     private void HideTutorialText()
@@ -58,13 +66,20 @@ public class TutorialManager : MonoBehaviour
         tutorialCanvas.gameObject.SetActive(false);
     }
 
-    void ShowTutorialText(string text)
+    public void ShowTutorialText(string text)
     {
+        if (isSpeaking) { return; }
+        
         StartCoroutine(ShowTextSequence(text));
     }
 
     IEnumerator ShowTextSequence(string text)
     {
+        if (waitAndHideCoroutine != null)
+        {
+            StopCoroutine(waitAndHideCoroutine);
+        }
+        isSpeaking = true;
         tutorialCanvas.gameObject.SetActive(false);
         yield return new WaitForSeconds(.4f);
         speakerAnimator.SetBool("Speaking", true);
@@ -76,5 +91,13 @@ public class TutorialManager : MonoBehaviour
     void StopSpeaking()
     {
         speakerAnimator.SetBool("Speaking", false);
+        isSpeaking = false;
+        waitAndHideCoroutine = StartCoroutine(WaitAndHideText());
+    }
+    
+    IEnumerator WaitAndHideText()
+    {
+        yield return new WaitForSeconds(3f);
+        HideTutorialText();
     }
 }

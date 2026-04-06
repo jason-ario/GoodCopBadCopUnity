@@ -228,6 +228,80 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    public void SpawnAndPickUp(PickableItemData itemData, Transform spawnPos)
+    {
+        if (!IsOwner) return;
+        if (HeldObject != null) return;
+        if (itemData == null || itemData.PickUpPrefab == null) return;
+
+        int itemIndex = ItemDatabase.Instance.GetItemIndex(itemData);
+        if (itemIndex < 0)
+        {
+            Debug.LogError($"Could not find item index for {itemData.name}");
+            return;
+        }
+
+        SpawnAndPickUpServerRpc(itemIndex, spawnPos.position, spawnPos.rotation);
+    }
+    
+    [ServerRpc]
+    private void SpawnAndPickUpServerRpc(int itemIndex, Vector3 position, Quaternion rotation, ServerRpcParams rpcParams = default)
+    {
+        PickableItemData itemData = ItemDatabase.Instance.GetItemByIndex(itemIndex);
+        if (itemData == null || itemData.PickUpPrefab == null)
+        {
+            Debug.LogError($"SpawnAndPickUpServerRpc failed: invalid item index {itemIndex}");
+            return;
+        }
+
+        GameObject spawnedObject = Instantiate(itemData.PickUpPrefab, position, rotation);
+
+        NetworkObject networkObject = spawnedObject.GetComponent<NetworkObject>();
+        if (networkObject == null)
+        {
+            Debug.LogError($"Spawned pickup prefab {itemData.name} has no NetworkObject component.");
+            Destroy(spawnedObject);
+            return;
+        }
+
+        networkObject.Spawn(true);
+
+        ulong ownerClientId = rpcParams.Receive.SenderClientId;
+
+        SpawnAndPickUpClientRpc(
+            new NetworkObjectReference(networkObject),
+            new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    TargetClientIds = new[] { ownerClientId }
+                }
+            }
+        );
+    }
+
+    [ClientRpc]
+    private void SpawnAndPickUpClientRpc(NetworkObjectReference objectRef, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner) return;
+
+        if (objectRef.TryGet(out NetworkObject networkObject))
+        {
+            PickableObject pickableObject = networkObject.GetComponent<PickableObject>();
+            if (pickableObject == null)
+            {
+                Debug.LogError("Spawned network object does not have a PickableObject component.");
+                return;
+            }
+
+            PickUpObject(pickableObject);
+        }
+        else
+        {
+            Debug.LogWarning("Failed to resolve spawned pickup NetworkObjectReference on client.");
+        }
+    }
+
     public void PickUpObject(PickableObject pickableObject)
     {
         if (HeldObject != null)

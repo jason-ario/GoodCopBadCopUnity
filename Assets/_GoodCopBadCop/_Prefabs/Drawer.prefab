@@ -413,8 +413,11 @@ GameObject:
   - component: {fileID: 3372983779603771663}
   - component: {fileID: 5975077672217129541}
   - component: {fileID: 8624353203531548445}
-  - component: {fileID: 4061665553657641688}
   - component: {fileID: 5438298170967476283}
+  - component: {fileID: 7351630181000623782}
+  - component: {fileID: 8874821697505558221}
+  - component: {fileID: 8289778105958014341}
+  - component: {fileID: 2230857315876324589}
   m_Layer: 0
   m_Name: Drawer
   m_TagString: Untagged
@@ -493,7 +496,20 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &4061665553657641688
+--- !u!114 &5438298170967476283
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2980487010090577495}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 4103237818713058702}
+--- !u!65 &7351630181000623782
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -512,18 +528,68 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.34298277, y: 0.28271654, z: 0.46472967}
-  m_Center: {x: -3.4127368e-11, y: 0.4784596, z: 0.07343327}
---- !u!114 &5438298170967476283
-MonoBehaviour:
+  m_Size: {x: 0.34298277, y: 0.2827165, z: 0.051030487}
+  m_Center: {x: 2.5947394e-10, y: 0.47846028, z: 0.28028268}
+--- !u!65 &8874821697505558221
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2980487010090577495}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
-  Interactable: {fileID: 4103237818713058702}
+  serializedVersion: 3
+  m_Size: {x: 0.02943197, y: 0.2827165, z: 0.4318167}
+  m_Center: {x: 0.14094079, y: 0.47846174, z: 0.089889124}
+--- !u!65 &8289778105958014341
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2980487010090577495}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.018990878, y: 0.2827165, z: 0.43213058}
+  m_Center: {x: -0.16199535, y: 0.4784611, z: 0.089732006}
+--- !u!65 &2230857315876324589
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2980487010090577495}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.34298277, y: 0.07973523, z: 0.44615474}
+  m_Center: {x: 7.1953325e-11, y: 0.37697047, z: 0.08272015}
