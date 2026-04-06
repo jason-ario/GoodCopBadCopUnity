@@ -153,17 +153,17 @@ public class SuspectCharacter : Interactable
             interactionCollider.enabled = canInteract;
     }
     
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
-        if (itemData == null)
+        if (item == null)
         {
             DialogueManager.Instance.InitiateChoices();
             return;
         }
 
-        if (itemData.name == "Shotgun")
+        if (item.ItemData.name == "Shotgun")
         {
-            base.InteractWithItem(playerInteractionController, itemData);
+            base.InteractWithItem(playerInteractionController, item);
             GetShot();
         }
     }

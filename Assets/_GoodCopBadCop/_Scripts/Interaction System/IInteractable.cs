@@ -55,7 +55,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
     }
 
-    public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
+    public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         OnInteractWithItem?.Invoke();
     }

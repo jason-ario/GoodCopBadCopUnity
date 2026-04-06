@@ -55,17 +55,23 @@ public class FolderController : PickableObject
         base.Interact(player);
     }
 
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData heldItem)
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
     { 
         if (isStamped.Value) return; 
         base.InteractWithItem(playerInteractionController, heldItem);
-        
-        // Stamping sequence involves local player control locking and IK, 
-        // so we trigger the visual sequence on all clients via RPC.
         ulong clientId = playerInteractionController.NetworkObjectId;
-        var inkStamp = heldItem.PickUpPrefab.GetComponent<InkStampPickup>();
 
-        StartUseStampServerRpc(clientId, inkStamp.StampType);
+        if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.name == "Stamp_Red" || heldItem.name == "Stamp_Yellow")
+        {
+            var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
+
+            StartUseStampServerRpc(clientId, inkStamp.StampType);
+        }
+
+        if (heldItem.ItemData.name == "ID card")
+        {
+            AddIDCard(heldItem);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -84,6 +90,20 @@ public class FolderController : PickableObject
 
         playerPickupController = playerObj.GetComponent<PlayerPickupController>();
         StartCoroutine(UseStampSequence(stampType));
+    }
+
+    public override void OnEquipped(PlayerPickupController player)
+    {
+        base.OnEquipped(player);
+        if (isOpen.Value)
+        {
+            player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
+        }
+    }
+    public override void OnUnequip(PlayerPickupController player)
+    {
+        base.OnUnequip(player);
+        player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
     }
 
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
@@ -233,10 +253,23 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
-    public void SetInfo(SuspectCharacter suspectCharacter)
+    public void AddIDCard(PickableObject pickableObject)
     {
-        Debug.Log("Setting info");
-        photoID.material.mainTexture = suspectCharacter.IDPhoto;
-        //entryPermit.SetEntryPermit(suspectCharacter.Data.FirstName + " " + suspectCharacter.Data.LastName, suspectCharacter.ReasonForEntry, suspectCharacter.ExpirationDate, suspectCharacter.SealActive);
+        
+    }
+
+    public void AddApplicationForm()
+    {
+        
+    }
+
+    public void AddPsychExam()
+    {
+        
+    }
+
+    public void AddPhysicalExam()
+    {
+        
     }
 }

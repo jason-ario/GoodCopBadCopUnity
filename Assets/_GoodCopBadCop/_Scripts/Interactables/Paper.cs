@@ -16,11 +16,11 @@ public class Paper : PickableObject
         UIController.Instance.CloseNewspaper();
     }
     
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableItemData itemData)
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
-        if (itemData.name == "RedPencil")
+        if (item.ItemData.name == "RedPencil")
         {
-            base.InteractWithItem(playerInteractionController, itemData);
+            base.InteractWithItem(playerInteractionController, item);
             EnterDrawMode(playerInteractionController);
         }
     }

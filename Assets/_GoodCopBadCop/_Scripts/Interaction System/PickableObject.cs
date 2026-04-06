@@ -96,22 +96,18 @@ public class PickableObject : Interactable
             playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, true);
         }
     }
-
-    void DisableColliders()
-    {
-        
-    }
-
-    void EnableColliders()
-    {
-        
-    }
     
     public virtual void OnUnequip(PlayerPickupController player)
     {
         if (itemData.pickupAnimBool != null)
         {
             playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, false);
+        }
+
+        if (itemData.usesTwoArms)
+        {
+            player.PlayerAnimationController.DisableLeftArmMask();
+            player.PlayerAnimationController.DisableRightArmMask();
         }
         
         foreach (Collider col in GetComponents<Collider>())

@@ -12,13 +12,12 @@ public class PlayerPickupController : NetworkBehaviour
     public Transform holdPoint;
     public float holdSmoothness = 10f;
 
-    private PickableItemData _heldObject;
-    public PickableItemData HeldObject => _heldObject;
-    private PickableObject _heldPickableObject; // the actual world instance being carried
+    public PickableObject HeldObject => _heldObject;
+    private PickableObject _heldObject; // the actual world instance being carried
     private PickableObject _camEquippedItem;
     private PickableObject _bodyCurrentlyEquippedItem;
-    
-    public bool IsHoldingObject => _heldObject != null;
+
+    public bool IsHoldingObject => HeldObject != null;
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     private PlayerInteractionController _playerInteractionController;
@@ -142,18 +141,18 @@ public class PlayerPickupController : NetworkBehaviour
 
         if(CanPickUpAndPlace == false) return;
 
-        if (_heldObject != null)
+        if (HeldObject != null)
         {
             // Drop with E or right-click
             if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
             {
-                if (_heldObject == null)
+                if (HeldObject == null)
                 {
                     Debug.Log("HeldObject is null");
                     return;
                 }
 
-                if (_heldObject.canUsePlacementBoard == false)
+                if (HeldObject.ItemData.canUsePlacementBoard == false)
                 {
                     Debug.Log("Can't use placement board");
                     return;
@@ -178,7 +177,7 @@ public class PlayerPickupController : NetworkBehaviour
         Debug.Log("Try use object");
 
         if (Input.GetMouseButtonDown(1)) return;
-        if (_heldObject == null) return;
+        if (HeldObject == null) return;
         if(pickUpCooldownComplete == false) return;
         
         if (camObjectContainer.CurrentlyEquippedItem != null)
@@ -231,15 +230,13 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void PickUpObject(PickableObject pickableObject)
     {
-        if (_heldObject != null)
+        if (HeldObject != null)
         {
             return;
         }
         
         PickableItemData itemData = pickableObject.ItemData;
-
-        _heldObject = itemData;
-        _heldPickableObject = pickableObject;
+        _heldObject = pickableObject;
         ObjectPlacer.Instance.SetItem(itemData);
 
         int itemIndex = camObjectContainer.ItemIndex(itemData);
@@ -306,24 +303,20 @@ public class PlayerPickupController : NetworkBehaviour
         OnPlaceObject?.Invoke();
         pickUpCooldownComplete = false;
 
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject).gameObject;
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject.ItemData).gameObject;
         DisableArmIKs();
 
-        if (_heldPickableObject != null)
+        if (_heldObject != null)
         {
             Vector3 dropPos = dropPoint != null ? dropPoint.position : placementItem.transform.position;
             Quaternion dropRot = dropPoint != null ? dropPoint.rotation : placementItem.transform.rotation;
 
             // Return to the world
-            _heldPickableObject.RemoveParent();
-            _heldPickableObject.transform.position = dropPos;
-            _heldPickableObject.transform.rotation = dropRot;
+            _heldObject.RemoveParent();
+            _heldObject.transform.position = dropPos;
+            _heldObject.transform.rotation = dropRot;
 
-            /*// Re-enable physics
-            Rigidbody rb = _heldPickableObject.GetComponent<Rigidbody>();
-            if (rb != null) rb.isKinematic = false;*/
-
-            _heldPickableObject.OnDropped();
+            _heldObject.OnDropped();
         }
 
         bodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
@@ -336,7 +329,7 @@ public class PlayerPickupController : NetworkBehaviour
         _camEquippedItem = null;
         _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
-        _heldPickableObject = null;
+        _heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
         ObjectPlacer.Instance.DeactivatePlacer();
@@ -344,13 +337,13 @@ public class PlayerPickupController : NetworkBehaviour
 
     void DisableArmIKs()
     {
-        if (_heldObject.useLeftIK)
+        if (_heldObject.ItemData.useLeftIK)
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(0,.25f);
             _playerAnimationController.LeftArmRigIKTarget = null;
         }
         
-        if (_heldObject.useRightIK)
+        if (_heldObject.ItemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(0,.25f);
             _playerAnimationController.RightArmRigIKTarget = null;

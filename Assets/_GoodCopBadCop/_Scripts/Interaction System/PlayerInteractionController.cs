@@ -181,7 +181,7 @@ public class PlayerInteractionController : NetworkBehaviour
         //Placement Board?
         if (_playerPickupController.IsHoldingObject && placementBoard != null)
         {
-            if (placementBoard.IsHanging && _playerPickupController.HeldObject.canBeHung == false || _playerPickupController.HeldObject.canUsePlacementBoard == false)
+            if (placementBoard.IsHanging && _playerPickupController.HeldObject.ItemData.canBeHung == false || _playerPickupController.HeldObject.ItemData.canUsePlacementBoard == false)
             {
                 reticle.SetInteractState(false);
                 if (ObjectPlacer.Instance.IsActive)
@@ -197,7 +197,7 @@ public class PlayerInteractionController : NetworkBehaviour
             
             if (!ObjectPlacer.Instance.IsActive)
             {
-                ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject); // Set the item BEFORE activating
+                ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject.ItemData); // Set the item BEFORE activating
                 ObjectPlacer.Instance.ActivatePlacer(placementBoard);
                 ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
                 ObjectPlacer.Instance.transform.position = hit.point;
@@ -249,7 +249,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
             if (pickupController.HeldObject != null)
             {
-                if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject))
+                if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
                 {
                     interactable.InteractWithItem(this, pickupController.HeldObject);
                     _playerPickupController.TryUseObject();
