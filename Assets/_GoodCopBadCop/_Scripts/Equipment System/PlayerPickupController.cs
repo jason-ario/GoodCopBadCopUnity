@@ -389,7 +389,12 @@ public class PlayerPickupController : NetworkBehaviour
             _heldObject.RemoveParent();
             _heldObject.transform.position = dropPos;
             _heldObject.transform.rotation = dropRot;
-
+            
+            if (dropPoint != null)
+            {
+                _heldObject.SetParent(dropPoint);
+            }
+            
             _heldObject.OnDropped();
         }
 

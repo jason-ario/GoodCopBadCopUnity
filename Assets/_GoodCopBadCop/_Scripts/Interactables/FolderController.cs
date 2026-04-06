@@ -34,6 +34,11 @@ public class FolderController : PickableObject
     public UnityAction onStampedComplete;
     private bool isOpeningOrClosing;
 
+    [Header("Document Slots")]
+    [SerializeField] private Transform idCardSlot;
+    [SerializeField] private Transform applicationSlot;
+    [SerializeField] private Transform psychExamSlot;
+    [SerializeField] private Transform physicalExamSlot;
     
     public override void OnNetworkSpawn()
     {
@@ -68,9 +73,9 @@ public class FolderController : PickableObject
             StartUseStampServerRpc(clientId, inkStamp.StampType);
         }
 
-        if (heldItem.ItemData.name == "ID card")
+        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application" || heldItem.ItemData.name == "Physical Exam Notebook" || heldItem.ItemData.name == "Psych Exam Notebook")
         {
-            AddIDCard(heldItem);
+            AddDocument(heldItem, playerInteractionController.pickupController);
         }
     }
 
@@ -253,23 +258,28 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
-    public void AddIDCard(PickableObject pickableObject)
+    public void AddDocument(PickableObject pickableObject, PlayerPickupController playerPickupController)
     {
+        string itemName = pickableObject.ItemData.name;
         
-    }
-
-    public void AddApplicationForm()
-    {
+        if (itemName == "ID card")
+        {
+            playerPickupController.DropObject(idCardSlot);
+        }
         
-    }
-
-    public void AddPsychExam()
-    {
+        if (itemName == "Application")
+        {
+            playerPickupController.DropObject(applicationSlot);
+        }
         
-    }
-
-    public void AddPhysicalExam()
-    {
+        if (itemName == "Physical Exam Notebook")
+        {
+            playerPickupController.DropObject(physicalExamSlot);
+        }
         
+        if (itemName == "Psych Exam Notebook")
+        {
+            playerPickupController.DropObject(psychExamSlot);
+        }
     }
 }
