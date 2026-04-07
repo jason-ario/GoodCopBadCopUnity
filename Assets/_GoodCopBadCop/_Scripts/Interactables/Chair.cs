@@ -25,7 +25,7 @@ public class Chair : Interactable
 
     void Sit(PlayerInteractionController player)
     {
-        UIController.Instance.ShowBackUI(true);
+        UIController.Instance.ShowBackButton(null);
         player.GetComponent<PlayerMovementController>().Sit(this);
         player.transform.DOMove(sitPos.position, sitDuration);
         player.transform.DORotate(sitPos.eulerAngles, sitDuration).OnComplete(() => OnSeated(player.transform));

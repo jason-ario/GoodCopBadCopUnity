@@ -78,15 +78,14 @@ public class PlayerMovementController : NetworkBehaviour
                 if (CanLook)
                 {
                     Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
+                    UIController.Instance.HideCursor();
                     GetComponent<PlayerInteractionController>().SetReticleActive(true);
                 }
                
             }
             else
             {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                UIController.Instance.ShowCursor();
                 GetComponent<PlayerInteractionController>().SetReticleActive(false);
             }
         }
@@ -136,7 +135,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (_isSitting && _canSitOrStand)
         {
-            if (Input.GetKeyDown(KeyCode.Q))
+            if (Input.GetButtonDown("Back"))
             {
                 StandUp();
             }
@@ -296,6 +295,7 @@ public class PlayerMovementController : NetworkBehaviour
     {
         if (_isSitting || camSitPos == null) return;
         SetMovementLocked(true);
+        UIController.Instance.ShowBackButton(StandUp);
         _isSitting = true;
         chairSeatedAt = chair;
         cameraTransform.DOKill();
@@ -308,7 +308,7 @@ public class PlayerMovementController : NetworkBehaviour
     {
         if (!_isSitting || camStandPos == null) return;
         _isSitting = false;
-        UIController.Instance.ShowBackUI(false);
+        UIController.Instance.HideBackButton();
 
         transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
         chairSeatedAt.transform.parent = null;

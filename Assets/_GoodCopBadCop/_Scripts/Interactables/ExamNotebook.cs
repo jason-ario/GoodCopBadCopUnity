@@ -42,7 +42,6 @@ public class ExamNotebook : PickableObject
     void ExitDrawMode()
     {
         playerPickupController.CanPickUpAndPlace = true;
-
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(true);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(true);
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);

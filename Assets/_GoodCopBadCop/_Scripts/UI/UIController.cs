@@ -19,12 +19,12 @@ public class UIController : MonoBehaviour
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
     [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
-    [FormerlySerializedAs("leaveChairUI")] [SerializeField] private GameObject backUI;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     [SerializeField] private AudioClip transitionToGameplayStinger;
+    [SerializeField] private Transform mouseCursor;
 
     private void Awake()
     {
@@ -99,11 +99,6 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
     }
     
-    public void ShowBackUI(bool value)
-    {
-        backUI.SetActive(value);
-    }
-
     public void FadeIn()
     { 
         CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
@@ -184,5 +179,17 @@ public class UIController : MonoBehaviour
     {
         PlayerInstance.Instance.ClosedUIPanel();
         inviteFriendsPanel.SetActive(false);
+    }
+
+    public void ShowCursor()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        mouseCursor.gameObject.SetActive(true);
+    }
+
+    public void HideCursor()
+    {
+        Cursor.lockState = CursorLockMode.Locked;
+        mouseCursor.gameObject.SetActive(false);
     }
 }

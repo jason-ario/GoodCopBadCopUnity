@@ -52,7 +52,7 @@ public class PC : Interactable
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Confined;
-        UIController.Instance.ShowBackUI(true);
+        UIController.Instance.ShowBackButton(ExitPC);
 
         player.playerMovementController.LookAtTarget(lookAtTarget.transform);
         player.transform.DOMove(standPos.position, 0.5f);
@@ -87,7 +87,7 @@ public class PC : Interactable
     private void ExitPC()
     {
         pcActive = false;
-        UIController.Instance.ShowBackUI(false);
+        UIController.Instance.HideBackButton();
 
         _player.playerMovementController.SetCanControl(true);
         _player.SetCanInteract(true, "");
