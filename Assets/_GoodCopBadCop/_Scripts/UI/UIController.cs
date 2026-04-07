@@ -42,6 +42,14 @@ public class UIController : MonoBehaviour
         {
             return;
         }
+
+        if (backButton.gameObject.activeSelf == true)
+        {
+            if(Input.GetButtonDown("Back"))
+            {
+                backButton.onClick.Invoke();
+            }
+        }
         
         if(PlayerInstance.Instance.CanControl == false) return;
     }
