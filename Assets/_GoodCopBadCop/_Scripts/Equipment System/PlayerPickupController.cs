@@ -23,10 +23,17 @@ public class PlayerPickupController : NetworkBehaviour
     private PlayerInteractionController _playerInteractionController;
     
     [SerializeField] ObjectContainer[] objectContainers;
-    [FormerlySerializedAs("objectContainerToUse")] [SerializeField] private ObjectContainer camObjectContainer; 
-    [SerializeField] private ObjectContainer bodyObjectContainer; 
-    public ObjectContainer CamObjectContainer => camObjectContainer;
-    public ObjectContainer BodyObjectContainer => bodyObjectContainer;
+    [FormerlySerializedAs("camObjectContainer")] [FormerlySerializedAs("objectContainerToUse")] 
+    [SerializeField] private ObjectContainer rightArmCamObjectContainer; 
+    [SerializeField] private ObjectContainer leftArmCamObjectContainer; 
+    [FormerlySerializedAs("bodyObjectContainer")] [SerializeField] private ObjectContainer rightArmBodyObjectContainer; 
+    [SerializeField] private ObjectContainer leftArmBodyObjectContainer; 
+
+    public ObjectContainer RightArmCamObjectContainer => rightArmCamObjectContainer;
+    public ObjectContainer RightArmBodyObjectContainer => rightArmBodyObjectContainer;
+    public ObjectContainer LeftArmBodyObjectContainer => leftArmBodyObjectContainer;
+    public ObjectContainer LeftArmCamObjectContainer => leftArmCamObjectContainer;
+
 
     private PlayerMovementController _playerMovementController;
     public PlayerMovementController PlayerMovementController => _playerMovementController;
@@ -83,11 +90,11 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
         
-        PickableItemData itemData = camObjectContainer.GetItemData(newValue);
+        PickableItemData itemData = rightArmCamObjectContainer.GetItemData(newValue);
         
-        bodyObjectContainer.EquipItem(itemData, this);
+        rightArmBodyObjectContainer.EquipItem(itemData, this);
 
-        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
+        _bodyCurrentlyEquippedItem = rightArmBodyObjectContainer.CurrentlyEquippedItem;
 
         if (itemData.useRightIK)
         {
@@ -180,9 +187,9 @@ public class PlayerPickupController : NetworkBehaviour
         if (HeldObject == null) return;
         if(pickUpCooldownComplete == false) return;
         
-        if (camObjectContainer.CurrentlyEquippedItem != null)
+        if (rightArmCamObjectContainer.CurrentlyEquippedItem != null)
         {
-            camObjectContainer.CurrentlyEquippedItem.OnStartUse();
+            rightArmCamObjectContainer.CurrentlyEquippedItem.OnStartUse();
         }
         
         RequestBodyUseServerRpc();
@@ -197,17 +204,17 @@ public class PlayerPickupController : NetworkBehaviour
     [ClientRpc]
     private void RequestBodyUseClientRpc()
     {
-        if (bodyObjectContainer.CurrentlyEquippedItem != null)
+        if (rightArmBodyObjectContainer.CurrentlyEquippedItem != null)
         {
-            bodyObjectContainer.CurrentlyEquippedItem.OnBodyStartUse();
+            rightArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStartUse();
         }
     }
 
     void StopUsingObject()
     {
-        if (camObjectContainer.CurrentlyEquippedItem != null)
+        if (rightArmCamObjectContainer.CurrentlyEquippedItem != null)
         {
-            camObjectContainer.CurrentlyEquippedItem.OnStopUse();
+            rightArmCamObjectContainer.CurrentlyEquippedItem.OnStopUse();
         }
         
         RequestBodyStopUseServerRpc();
@@ -222,9 +229,9 @@ public class PlayerPickupController : NetworkBehaviour
     [ClientRpc]
     private void RequestBodyStopUseClientRpc()
     {
-        if (bodyObjectContainer.CurrentlyEquippedItem != null)
+        if (rightArmBodyObjectContainer.CurrentlyEquippedItem != null)
         {
-            bodyObjectContainer.CurrentlyEquippedItem.OnBodyStopUse();
+            rightArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStopUse();
         }
     }
 
@@ -313,12 +320,24 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = pickableObject;
         ObjectPlacer.Instance.SetItem(itemData);
 
-        int itemIndex = camObjectContainer.ItemIndex(itemData);
+        int itemIndex = rightArmCamObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
 
         _camEquippedItem = pickableObject;
-        _bodyCurrentlyEquippedItem = bodyObjectContainer.CurrentlyEquippedItem;
-        camObjectContainer.EquipItem(itemData, this, pickableObject);
+
+
+        if (itemData.hand == PickableItemData.Hand.Right)
+        {
+            _bodyCurrentlyEquippedItem = rightArmBodyObjectContainer.CurrentlyEquippedItem;
+            rightArmCamObjectContainer.EquipItem(itemData, this, pickableObject);
+        }
+        else
+        {
+            _bodyCurrentlyEquippedItem = leftArmBodyObjectContainer.CurrentlyEquippedItem;
+            leftArmBodyObjectContainer.EquipItem(itemData, this, pickableObject);
+        }
+        
+        
 
         // Reparent the real world object into the cam container slot
         if (_camEquippedItem != null)
@@ -328,9 +347,10 @@ public class PlayerPickupController : NetworkBehaviour
             if (rb != null) rb.isKinematic = true;
 
             // Match the slot's local transform, then hide the slot placeholder
-            
+            ObjectContainer currentObjectContainer = itemData.hand == PickableItemData.Hand.Right ? rightArmCamObjectContainer : leftArmCamObjectContainer;
+
             PickableObject itemInContainer = null;
-            foreach (var item in camObjectContainer.ItemsHeld)
+            foreach (var item in currentObjectContainer.ItemsHeld)
             {
                 if (item.ItemData == itemData)
                 {
@@ -351,7 +371,6 @@ public class PlayerPickupController : NetworkBehaviour
         }
         if (itemData.useLeftIK)
         {
-            Debug.Log("Picking up left arm");
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
             _playerAnimationController.CamLeftArmRigIKTarget = pickableObject.GetComponent<IkTargets>()?.leftIKTarget ?? _camEquippedItem?.GetComponent<IkTargets>().leftIKTarget;
             _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
@@ -398,7 +417,7 @@ public class PlayerPickupController : NetworkBehaviour
             _heldObject.OnDropped();
         }
 
-        bodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
 
         foreach (var objectContainer in objectContainers)
         {

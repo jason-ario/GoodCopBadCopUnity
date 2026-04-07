@@ -6,6 +6,14 @@ public class PickableItemData : ScriptableObject
     [SerializeField] private GameObject pickUpPrefab;
     public GameObject PickUpPrefab => pickUpPrefab;
     public bool canBeHung = false;
+
+    public enum Hand
+    {
+        Left,
+        Right
+    }
+
+    public Hand hand;
     
     [Header("Animation Data")]
     public bool usesTwoArms;
