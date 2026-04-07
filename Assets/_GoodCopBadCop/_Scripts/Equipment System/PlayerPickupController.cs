@@ -181,16 +181,10 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void TryUseObject()
     {
-        Debug.Log("Try use object");
-
         if (Input.GetMouseButtonDown(1)) return;
         if (HeldObject == null) return;
         if(pickUpCooldownComplete == false) return;
-        
-        if (rightArmCamObjectContainer.CurrentlyEquippedItem != null)
-        {
-            rightArmCamObjectContainer.CurrentlyEquippedItem.OnStartUse();
-        }
+        _heldObject.OnStartUse();
         
         RequestBodyUseServerRpc();
     }
@@ -208,15 +202,20 @@ public class PlayerPickupController : NetworkBehaviour
         {
             rightArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStartUse();
         }
+        
+        if (leftArmBodyObjectContainer.CurrentlyEquippedItem != null)
+        {
+            leftArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStartUse();
+        }
     }
 
     void StopUsingObject()
     {
-        if (rightArmCamObjectContainer.CurrentlyEquippedItem != null)
+        if(_heldObject != null)
         {
-            rightArmCamObjectContainer.CurrentlyEquippedItem.OnStopUse();
+            _heldObject.OnStopUse();
         }
-        
+
         RequestBodyStopUseServerRpc();
     }
 
@@ -232,6 +231,12 @@ public class PlayerPickupController : NetworkBehaviour
         if (rightArmBodyObjectContainer.CurrentlyEquippedItem != null)
         {
             rightArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStopUse();
+        }
+        
+               
+        if (leftArmBodyObjectContainer.CurrentlyEquippedItem != null)
+        {
+            leftArmBodyObjectContainer.CurrentlyEquippedItem.OnBodyStopUse();
         }
     }
 

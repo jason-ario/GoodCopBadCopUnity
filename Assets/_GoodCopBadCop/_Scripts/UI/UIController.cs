@@ -122,15 +122,6 @@ public class UIController : MonoBehaviour
         }
     }
     
-    public void OpenNewspaper()
-    {
-        newspaper.SetBool("Open", true);
-    }
-    
-    public void CloseNewspaper()
-    {
-        newspaper.SetBool("Open", false);
-    }
 
     public void ShowBackButton(UnityAction onClickCallback)
     {
