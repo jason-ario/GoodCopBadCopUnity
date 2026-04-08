@@ -1,10 +1,14 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 public class ChecklistItem : MonoBehaviour
 {
+    [SerializeField] private ExamPage examPage;
     [SerializeField] Checkbox[] checkboxes;
     [SerializeField] private SpriteRenderer sr;
+    public bool IsChecking => examPage.IsChecking;
+
 
     private void Awake()
     {
@@ -25,5 +29,10 @@ public class ChecklistItem : MonoBehaviour
                 item.Uncheck();
             }
         }
+    }
+
+    public void AnimateCheckMark(Transform ikAnimationTarget)
+    {
+        examPage.AnimateCheckMark(ikAnimationTarget);
     }
 }

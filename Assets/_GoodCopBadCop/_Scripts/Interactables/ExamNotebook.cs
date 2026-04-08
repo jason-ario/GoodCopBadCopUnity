@@ -1,9 +1,11 @@
+using System.Collections;
 using UnityEngine;
 
 public class ExamNotebook : PickableObject
 {
     [SerializeField] private ExamPage[] pages;
-    
+    public bool IsChecking { get; set; }
+
     public override void OnEquipped(PlayerPickupController player)
     {
         base.OnEquipped(player);
@@ -46,5 +48,19 @@ public class ExamNotebook : PickableObject
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(true);
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
         UIController.Instance.HideBackButton();
+    }
+
+    public void AnimateCheckMark(Transform ikAnimationTarget)
+    {
+        IsChecking = true;
+        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = ikAnimationTarget;
+        StartCoroutine(TurnRightArmRigOff());
+    }
+
+    IEnumerator TurnRightArmRigOff()
+    {
+        playerPickupController.PlayerAnimationController.TurnRightArmRigOnAndOff(.25f, .5f);
+        yield return new WaitForSeconds(.5f);
+        IsChecking = false;
     }
 }
