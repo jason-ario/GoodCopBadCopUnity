@@ -10,6 +10,7 @@ public class Checkbox : MonoBehaviour, IClickable
     [SerializeField] private Animator ikAnimationTarget;
     [SerializeField] private Transform ikTargetTransform;
     [SerializeField] private AudioClip drawSound;
+    bool _isInteractable = false;
     private void OnEnable()
     {
         spriteRenderer.color = Color.clear;
@@ -38,6 +39,16 @@ public class Checkbox : MonoBehaviour, IClickable
 
     public void OnClick()
     {
+        if (_isInteractable == false)
+        {
+            return;
+        }
+        
         Check();
+    }
+
+    public void SetInteractable(bool value)
+    {
+        _isInteractable = value;
     }
 }

@@ -4,7 +4,23 @@ using UnityEngine;
 public class ExamNotebook : PickableObject
 {
     [SerializeField] private ExamPage[] pages;
+    
     public bool IsChecking { get; set; }
+    private bool addedToFolder;
+
+    private int currentPage = 0;
+
+
+    protected override void Awake()
+    {
+        base.Awake();
+        foreach (var page in pages)
+        {
+            page.SetInteractable(false);
+        }
+
+        pages[currentPage].SetInteractable(true);
+    }
 
     public override void OnEquipped(PlayerPickupController player)
     {
@@ -64,15 +80,31 @@ public class ExamNotebook : PickableObject
         IsChecking = false;
     }
 
-    public void AddToFolder()
+    public void AddToFolder(FolderController folder)
     {
-        for (int i = 0; i < pages.Length; i++)
+        Debug.Log("Should add to folder");
+        pages[currentPage].SetInteractable(false);
+
+        foreach (var page in pages)
         {
-            if (pages[i].IsRippedOut == false)
-            {
-                pages[i].RipOutAndAddToFolder();
-                break;
-            }
+            if (page.IsRippedOut != false) continue;
+            playerPickupController.PlayerAnimationController.SetAnimTrigger("RipOutPage");
+            StartCoroutine(WaitAndParent(page,folder));
+            Debug.Log("Rip out and add to folder");
+            break;
         }
+    }
+
+    IEnumerator WaitAndParent(ExamPage rippedPage, FolderController folder)
+    {
+        yield return new WaitForSeconds(.75f);
+        rippedPage.pageAnimator.SetTrigger("RipOut");
+        yield return new WaitForSeconds(.3f);
+        rippedPage.transform.parent = playerPickupController.RightArmCamObjectContainer.transform;
+        yield return new WaitForSeconds(.2f);
+        folder.AddNotebookDocumentToSlot(ItemData.name, rippedPage);
+        rippedPage.pageAnimator.SetTrigger("Reset");
+        currentPage += 1;
+        pages[currentPage].SetInteractable(true);
     }
 }

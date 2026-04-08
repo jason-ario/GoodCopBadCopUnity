@@ -35,4 +35,12 @@ public class ChecklistItem : MonoBehaviour
     {
         examPage.AnimateCheckMark(ikAnimationTarget);
     }
+
+    public void SetInteractable(bool value)
+    {
+        foreach (var checkbox in checkboxes)
+        {
+            checkbox.SetInteractable(value);
+        }
+    }
 }

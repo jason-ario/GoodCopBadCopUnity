@@ -39,7 +39,10 @@ public class FolderController : PickableObject
     [SerializeField] private Transform applicationSlot;
     [SerializeField] private Transform psychExamSlot;
     [SerializeField] private Transform physicalExamSlot;
-    
+
+    private ExamPage psychExamPage;
+    private ExamPage physicalExamPage;
+
     public override void OnNetworkSpawn()
     {
         // Sync visual state on spawn and when variables change
@@ -73,10 +76,32 @@ public class FolderController : PickableObject
             StartUseStampServerRpc(clientId, inkStamp.StampType);
         }
 
-        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application" || heldItem.ItemData.name == "Physical Exam Notebook" || heldItem.ItemData.name == "Psych Exam Notebook")
+        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application")
         {
             AddDocument(heldItem, playerInteractionController.pickupController);
         }
+
+        if (heldItem.ItemData.name is "Physical Exam Notebook" or "Psych Exam Notebook")
+        {
+            if (HasNotebookPage(heldItem.ItemData.name) == false)
+            {
+                AddNotebookPaper(heldItem.ItemData.name, playerInteractionController.pickupController);
+            }
+        }
+    }
+
+    bool HasNotebookPage(string itemName)
+    {
+        if (itemName == "Physical Exam Notebook")
+        {
+            return physicalExamPage != null;
+        }
+        if (itemName == "Psych Exam Notebook")
+        {
+            return psychExamPage != null;
+        }
+
+        return false;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -258,28 +283,54 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
-    public void AddDocument(PickableObject pickableObject, PlayerPickupController playerPickupController)
+    public void AddDocument(PickableObject pickableObject, PlayerPickupController player)
     {
         string itemName = pickableObject.ItemData.name;
+        Debug.Log("Try add document");
         
         if (itemName == "ID card")
         {
-            playerPickupController.DropObject(idCardSlot);
+            player.DropObject(idCardSlot);
         }
         
         if (itemName == "Application")
         {
-            playerPickupController.DropObject(applicationSlot);
+            player.DropObject(applicationSlot);
         }
-        
+    }
+
+    public void AddNotebookPaper(string itemName, PlayerPickupController player)
+    {
         if (itemName == "Physical Exam Notebook")
         {
-            playerPickupController.DropObject(physicalExamSlot);
+            Debug.Log("Add Exam");
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
         
         if (itemName == "Psych Exam Notebook")
         {
-            playerPickupController.DropObject(psychExamSlot);
+            Debug.Log("Add Exam");
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
+    }
+
+    public void AddNotebookDocumentToSlot(string itemName, ExamPage pageToParent)
+    {
+        if (itemName == "Physical Exam Notebook")
+        {
+            pageToParent.transform.parent = physicalExamSlot;
+            pageToParent.transform.localPosition = Vector3.zero;
+            pageToParent.transform.localRotation = Quaternion.identity;
+            physicalExamPage = pageToParent;
+        }
+        
+        if (itemName == "Psych Exam Notebook")
+        {
+            pageToParent.transform.parent = psychExamSlot;
+            pageToParent.transform.localPosition = Vector3.zero;
+            pageToParent.transform.localRotation = Quaternion.identity;
+            psychExamPage = pageToParent;
+        }
+        
     }
 }
