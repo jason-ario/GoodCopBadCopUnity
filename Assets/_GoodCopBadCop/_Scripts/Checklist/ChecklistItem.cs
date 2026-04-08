@@ -4,19 +4,16 @@ using UnityEngine;
 public class ChecklistItem : MonoBehaviour
 {
     [SerializeField] Checkbox[] checkboxes;
-    [SerializeField] private SpriteRenderer[] _spriteRenderers;
+    [SerializeField] private SpriteRenderer sr;
 
     private void Awake()
     {
-        foreach (var sr in _spriteRenderers)
-        {
-            sr.enabled = false;
-        }
+        sr.enabled = false;
+
         foreach (var checkbox in checkboxes)
         {
             checkbox.Uncheck();
         }
-        
     }
 
     public void UncheckOther(Checkbox checkbox)

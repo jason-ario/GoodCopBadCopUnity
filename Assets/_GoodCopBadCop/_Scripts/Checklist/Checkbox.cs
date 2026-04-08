@@ -1,11 +1,18 @@
+using System;
 using UnityEngine;
 
-public class Checkbox : MonoBehaviour
+public class Checkbox : MonoBehaviour, IClickable
 {
     [SerializeField] GameObject checkmark; 
-    [SerializeField] ChecklistItem checklistItem;
+    [SerializeField] ChecklistItem checklistItem; 
+    [SerializeField] SpriteRenderer spriteRenderer;
 
-    public void Check()
+    private void OnEnable()
+    {
+        spriteRenderer.color = Color.clear;
+    }
+
+    private void Check()
     {
         checklistItem.UncheckOther(this);
         checkmark.SetActive(true);
@@ -14,5 +21,10 @@ public class Checkbox : MonoBehaviour
     public void Uncheck()
     {
         checkmark.SetActive(false);
+    }
+
+    public void OnClick()
+    {
+        Check();
     }
 }
