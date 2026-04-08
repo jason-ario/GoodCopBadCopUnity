@@ -80,6 +80,9 @@ public class PlayerAnimationController : NetworkBehaviour
             writePerm: NetworkVariableWritePermission.Owner
         );
     
+    private Coroutine rightRigOnOffCoroutine;
+    private Coroutine leftRigOnOffCoroutine;
+
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
@@ -307,7 +310,12 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void TurnRightArmRigOnAndOff(float smoothOnDuration, float onDuration)
     {
-        StartCoroutine(TurnRightArmRigOnAndOffCR(smoothOnDuration, onDuration));
+        if (rightRigOnOffCoroutine != null)
+        {
+            StopCoroutine(rightRigOnOffCoroutine);
+        }
+        
+        rightRigOnOffCoroutine = StartCoroutine(TurnRightArmRigOnAndOffCR(smoothOnDuration, onDuration));
     }
 
     IEnumerator TurnRightArmRigOnAndOffCR(float smoothOnDuration, float onDuration)
@@ -341,7 +349,12 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void TurnLeftRigOnAndOff(float smoothOnDuration, float onDuration)
     {
-        StartCoroutine(TurnLeftArmRigOnAndOffCR(smoothOnDuration, onDuration));
+        if (leftRigOnOffCoroutine != null)
+        {
+            StopCoroutine(leftRigOnOffCoroutine);
+        }
+        
+        leftRigOnOffCoroutine = StartCoroutine(TurnLeftArmRigOnAndOffCR(smoothOnDuration, onDuration));
     }
     
     IEnumerator TurnLeftArmRigOnAndOffCR(float smoothOnDuration, float onDuration)

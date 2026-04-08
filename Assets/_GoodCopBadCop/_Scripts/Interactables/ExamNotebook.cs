@@ -63,4 +63,16 @@ public class ExamNotebook : PickableObject
         yield return new WaitForSeconds(.5f);
         IsChecking = false;
     }
+
+    public void AddToFolder()
+    {
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i].IsRippedOut == false)
+            {
+                pages[i].RipOutAndAddToFolder();
+                break;
+            }
+        }
+    }
 }

@@ -38,11 +38,6 @@ public class Checkbox : MonoBehaviour, IClickable
 
     public void OnClick()
     {
-        if (checklistItem.IsChecking)
-        {
-            return;
-        }
-        
         Check();
     }
 }
