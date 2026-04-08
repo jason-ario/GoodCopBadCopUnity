@@ -4,9 +4,8 @@ using UnityEngine;
 public class ExamNotebook : PickableObject
 {
     [SerializeField] private ExamPage[] pages;
-    
+    bool addingToFolder = false;
     public bool IsChecking { get; set; }
-    private bool addedToFolder;
 
     private int currentPage = 0;
 
@@ -50,6 +49,11 @@ public class ExamNotebook : PickableObject
 
     public override void OnStartUse()
     {
+        if (addingToFolder)
+        {
+            return;
+        }
+        
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
         playerPickupController.CanPickUpAndPlace = false;
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(false);
@@ -82,29 +86,25 @@ public class ExamNotebook : PickableObject
 
     public void AddToFolder(FolderController folder)
     {
-        Debug.Log("Should add to folder");
+        addingToFolder = true;
         pages[currentPage].SetInteractable(false);
 
-        foreach (var page in pages)
-        {
-            if (page.IsRippedOut != false) continue;
-            playerPickupController.PlayerAnimationController.SetAnimTrigger("RipOutPage");
-            StartCoroutine(WaitAndParent(page,folder));
-            Debug.Log("Rip out and add to folder");
-            break;
-        }
+        playerPickupController.PlayerAnimationController.SetAnimTrigger("RipOutPage");
+        StartCoroutine(WaitAndParent(pages[currentPage],folder));
+        Debug.Log("Rip out and add to folder");
     }
 
     IEnumerator WaitAndParent(ExamPage rippedPage, FolderController folder)
     {
-        yield return new WaitForSeconds(.75f);
+        yield return new WaitForSeconds(.5f);
         rippedPage.pageAnimator.SetTrigger("RipOut");
         yield return new WaitForSeconds(.3f);
         rippedPage.transform.parent = playerPickupController.RightArmCamObjectContainer.transform;
-        yield return new WaitForSeconds(.2f);
+        yield return new WaitForSeconds(.1f);
         folder.AddNotebookDocumentToSlot(ItemData.name, rippedPage);
         rippedPage.pageAnimator.SetTrigger("Reset");
         currentPage += 1;
         pages[currentPage].SetInteractable(true);
+        addingToFolder = false;
     }
 }
