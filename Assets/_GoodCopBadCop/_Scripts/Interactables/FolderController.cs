@@ -81,7 +81,7 @@ public class FolderController : PickableObject
             StartUseStampServerRpc(clientId, inkStamp.StampType);
         }
 
-        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application")
+        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application" || heldItem.ItemData.name == "Psych Exam Page" || heldItem.ItemData.name == "Physical Exam Page")
         {
             AddDocument(heldItem, playerInteractionController.pickupController);
         }
@@ -298,6 +298,11 @@ public class FolderController : PickableObject
         
         if (itemName == "ID card")
         {
+            if (idCard != null)
+            {
+                return;
+            }
+            
             player.DropObject(idCardSlot);
             idCard = pickableObject.GetComponent<IDCard>();
             idCard.AddToFolder(this);
@@ -305,6 +310,11 @@ public class FolderController : PickableObject
 
         if (itemName == "Application")
         {
+            if (application != null)
+            {
+                return;
+            }
+            
             player.DropObject(applicationSlot);
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
@@ -312,6 +322,12 @@ public class FolderController : PickableObject
         
         if (itemName == "Psych Exam Page")
         {
+            if (psychExamPage != null)
+            {
+                return;
+            }
+            
+            Debug.Log("Add psych exam page");
             psychExamPage = pickableObject.GetComponent<ExamPage>();
             psychExamPage.SetParent(psychExamSlot);
             psychExamPage.AddToFolder(this);
@@ -319,6 +335,11 @@ public class FolderController : PickableObject
         
         if (itemName == "Physical Exam Page")
         {
+            if (physicalExamPage != null)
+            {
+                return;
+            }
+            
             physicalExamPage = pickableObject.GetComponent<ExamPage>();
             physicalExamPage.SetParent(physicalExamSlot);
             physicalExamPage.AddToFolder(this);
@@ -338,6 +359,16 @@ public class FolderController : PickableObject
         if (itemName == "Application")
         {
             application = null;
+        }
+        
+        if (itemName == "Physical Exam Page")
+        {
+            physicalExamPage = null;
+        }
+        
+        if (itemName == "Psych Exam Page")
+        {
+            psychExamPage = null;
         }
     }
 
