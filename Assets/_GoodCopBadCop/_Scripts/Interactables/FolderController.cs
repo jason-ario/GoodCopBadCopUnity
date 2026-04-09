@@ -4,6 +4,8 @@ using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.WSA;
+using Application = UnityEngine.Application;
 
 public class FolderController : PickableObject
 {
@@ -40,8 +42,11 @@ public class FolderController : PickableObject
     [SerializeField] private Transform psychExamSlot;
     [SerializeField] private Transform physicalExamSlot;
 
+    private FolderItem idCard;
+    private FolderItem application;
     private ExamPage psychExamPage;
     private ExamPage physicalExamPage;
+    public bool IsOpen => isOpen.Value;
 
     public override void OnNetworkSpawn()
     {
@@ -125,9 +130,12 @@ public class FolderController : PickableObject
     public override void OnEquipped(PlayerPickupController player)
     {
         base.OnEquipped(player);
+        
         if (isOpen.Value)
         {
             player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
+            if(idCard != null){ idCard.SetInteractable(false); }
+            if(application != null){ application.SetInteractable(false); }
         }
     }
     public override void OnUnequip(PlayerPickupController player)
@@ -291,11 +299,31 @@ public class FolderController : PickableObject
         if (itemName == "ID card")
         {
             player.DropObject(idCardSlot);
+            idCard = pickableObject.GetComponent<IDCard>();
+            idCard.AddToFolder(this);
+        }
+
+        if (itemName == "Application")
+        {
+            player.DropObject(applicationSlot);
+            application = pickableObject.GetComponent<ApplicationLetter>();
+            application.AddToFolder(this);
+        }
+    }
+
+    public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)
+    {
+        string itemName = pickableObject.ItemData.name;
+        Debug.Log("Try remove document");
+        
+        if (itemName == "ID card")
+        {
+            idCard = null;
         }
         
         if (itemName == "Application")
         {
-            player.DropObject(applicationSlot);
+            application = null;
         }
     }
 
@@ -331,6 +359,15 @@ public class FolderController : PickableObject
             pageToParent.transform.localRotation = Quaternion.identity;
             psychExamPage = pageToParent;
         }
-        
+    }
+
+    public override void OnDropped()
+    {
+        base.OnDropped();
+        if (isOpen.Value)
+        {
+            if(idCard != null){ idCard.SetInteractable(true); }
+            if(application != null){ application.SetInteractable(true); }
+        }
     }
 }

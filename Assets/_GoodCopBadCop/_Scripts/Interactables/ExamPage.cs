@@ -8,6 +8,7 @@ public class ExamPage : MonoBehaviour
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool IsRippedOut;
+    private bool isInteractable;
 
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
@@ -16,6 +17,7 @@ public class ExamPage : MonoBehaviour
 
     public void SetInteractable(bool b)
     {
+        isInteractable = b;
         foreach (ChecklistItem item in _checklistItems)
         {
             item.SetInteractable(b);

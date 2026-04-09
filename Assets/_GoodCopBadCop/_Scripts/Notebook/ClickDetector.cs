@@ -12,6 +12,7 @@ public class ClickDetector : MonoBehaviour
 
             if (Physics.Raycast(ray, out hit, 100f, ~0, QueryTriggerInteraction.Collide))
             {
+                Debug.Log("Hit" + hit.collider.name);
                 var clickable = hit.collider.GetComponent<IClickable>();
                 if (clickable != null)
                 {

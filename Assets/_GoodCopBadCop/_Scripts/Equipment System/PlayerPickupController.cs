@@ -362,7 +362,7 @@ public class PlayerPickupController : NetworkBehaviour
                     itemInContainer = item;
                 }
             }
-            
+
             pickableObject.SetParent(itemInContainer.transform);
             pickableObject.transform.position = itemInContainer.transform.position;
             pickableObject.transform.rotation = itemInContainer.transform.rotation;

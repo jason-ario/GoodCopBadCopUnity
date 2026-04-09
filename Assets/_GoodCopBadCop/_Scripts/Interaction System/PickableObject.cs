@@ -64,6 +64,7 @@ public class PickableObject : Interactable
     public void SetParent(Transform parent)
     {
         ConstraintSource source = new ConstraintSource();
+        RemoveParent();
         source.sourceTransform = parent;
         source.weight = 1;
         _parentConstraint.AddSource(source);
@@ -72,24 +73,17 @@ public class PickableObject : Interactable
 
     public void RemoveParent()
     {
-        _parentConstraint.RemoveSource(0);
+        if (_parentConstraint.sourceCount > 0)
+        {
+            _parentConstraint.RemoveSource(0);
+        }
     }
 
     public virtual void OnEquipped(PlayerPickupController player)
     {
-        Debug.Log("Should disable colliders");
+        SetInteractable(false);
 
         playerPickupController = player;
-        foreach (Collider col in GetComponents<Collider>())
-        {
-            col.enabled = false;
-        }
-
-        foreach (Collider interactableCollider in interactableColliders)
-        {
-            Debug.Log("Should disable colliders");
-            interactableCollider.enabled = false;
-        }
 
         if (itemData.pickupAnimBool != null)
         {
@@ -99,6 +93,8 @@ public class PickableObject : Interactable
     
     public virtual void OnUnequip(PlayerPickupController player)
     {
+        SetInteractable(true);
+
         if (itemData.pickupAnimBool != null)
         {
             playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, false);
@@ -109,16 +105,6 @@ public class PickableObject : Interactable
             player.PlayerAnimationController.DisableLeftArmMask();
             player.PlayerAnimationController.DisableRightArmMask();
         }
-        
-        foreach (Collider col in GetComponents<Collider>())
-        {
-            col.enabled = true;
-        }
-        
-        foreach (Collider interactableCollider in interactableColliders)
-        {
-            interactableCollider.enabled = true;
-        }
     }
     
     public override void Interact(PlayerInteractionController player)
@@ -127,6 +113,19 @@ public class PickableObject : Interactable
         
         if (!CanPickUpManually) return;
         player.pickupController.PickUpObject(this);
+    }
+
+    public void SetInteractable(bool value)
+    {
+        foreach (Collider col in GetComponents<Collider>())
+        {
+            col.enabled = value;
+        }
+
+        foreach (var interactableCollider in interactableColliders)
+        {
+            interactableCollider.enabled = value;
+        }
     }
 
     public virtual void OnStartUse()

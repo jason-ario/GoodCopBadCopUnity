@@ -32,7 +32,6 @@ public class ExamNotebook : PickableObject
                 itemHeld.gameObject.SetActive(true);
             }
         }
-        
     }
 
     public override void OnUnequip(PlayerPickupController player)

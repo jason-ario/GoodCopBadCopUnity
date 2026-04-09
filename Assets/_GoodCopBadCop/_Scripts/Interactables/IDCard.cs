@@ -1,7 +1,8 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.WSA;
 
-public class IDCard : PickableObject
+public class IDCard : FolderItem
 {
    [SerializeField] private TextMeshPro nameText;
    [SerializeField] private TextMeshPro birthDateText;
