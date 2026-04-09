@@ -2170,7 +2170,7 @@ namespace HighlightPlus {
             SendMessage("HighlightEnd", null, SendMessageOptions.DontRequireReceiver);
         }
 
-        void SetupMaterial () {
+        public void SetupMaterial () {
 
 #if UNITY_EDITOR
             staticChildren = false;

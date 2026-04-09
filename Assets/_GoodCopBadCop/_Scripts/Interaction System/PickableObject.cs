@@ -1,3 +1,5 @@
+using System;
+using HighlightPlus;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -9,16 +11,15 @@ using UnityEngine.Animations;
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
-    [SerializeField] MeshRenderer[] meshRenderers;
+    MeshRenderer[] meshRenderers;
     bool setSeeThrough = false;
     protected PlayerPickupController playerPickupController;
-
     [SerializeField] PickableItemData itemData;
     public PickableItemData ItemData => itemData;
     [SerializeField] AudioClip pickupSound;
     [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
-    [SerializeField] Collider[] interactableColliders;
+    private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
     private Rigidbody _rigidbody;
 
     public bool CanPickUpManually { get; set; } = true;
@@ -33,6 +34,7 @@ public class PickableObject : Interactable
     {
         base.Awake();
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
+        interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
         _rigidbody = GetComponent<Rigidbody>();
         _rigidbody.linearVelocity = Vector3.zero;
@@ -73,6 +75,7 @@ public class PickableObject : Interactable
 
     public void RemoveParent()
     {
+        transform.parent = null;
         if (_parentConstraint.sourceCount > 0)
         {
             _parentConstraint.RemoveSource(0);
@@ -122,9 +125,10 @@ public class PickableObject : Interactable
             col.enabled = value;
         }
 
+        if (interactableColliders.Length <= 0) return;
         foreach (var interactableCollider in interactableColliders)
         {
-            interactableCollider.enabled = value;
+            interactableCollider.GetComponent<Collider>().enabled = value;
         }
     }
 

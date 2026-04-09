@@ -1,23 +1,21 @@
 using System;
 using UnityEngine;
 
-public class ExamPage : MonoBehaviour
+public class ExamPage : FolderItem
 {
     [SerializeField] private ChecklistItem[] _checklistItems; 
     [SerializeField] ExamNotebook notebook;
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
-    public bool IsRippedOut;
-    private bool isInteractable;
+    public bool isRippedOut;
 
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
         notebook.AnimateCheckMark(ikAnimationTarget);
     }
 
-    public void SetInteractable(bool b)
+    public void SetChecklistInteractable(bool b)
     {
-        isInteractable = b;
         foreach (ChecklistItem item in _checklistItems)
         {
             item.SetInteractable(b);

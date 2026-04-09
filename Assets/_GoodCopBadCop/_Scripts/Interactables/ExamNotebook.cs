@@ -1,4 +1,5 @@
 using System.Collections;
+using HighlightPlus;
 using UnityEngine;
 
 public class ExamNotebook : PickableObject
@@ -15,10 +16,11 @@ public class ExamNotebook : PickableObject
         base.Awake();
         foreach (var page in pages)
         {
+            page.SetChecklistInteractable(false);
             page.SetInteractable(false);
         }
 
-        pages[currentPage].SetInteractable(true);
+        pages[currentPage].SetChecklistInteractable(true);
     }
 
     public override void OnEquipped(PlayerPickupController player)
@@ -86,7 +88,7 @@ public class ExamNotebook : PickableObject
     public void AddToFolder(FolderController folder)
     {
         addingToFolder = true;
-        pages[currentPage].SetInteractable(false);
+        pages[currentPage].SetChecklistInteractable(false);
 
         playerPickupController.PlayerAnimationController.SetAnimTrigger("RipOutPage");
         StartCoroutine(WaitAndParent(pages[currentPage],folder));
@@ -98,12 +100,13 @@ public class ExamNotebook : PickableObject
         yield return new WaitForSeconds(.5f);
         rippedPage.pageAnimator.SetTrigger("RipOut");
         yield return new WaitForSeconds(.3f);
-        rippedPage.transform.parent = playerPickupController.RightArmCamObjectContainer.transform;
+        rippedPage.SetParent(playerPickupController.RightArmCamObjectContainer.transform);
         yield return new WaitForSeconds(.1f);
-        folder.AddNotebookDocumentToSlot(ItemData.name, rippedPage);
+        folder.AddDocument(rippedPage, playerPickupController);
+        GetComponent<HighlightEffect>().SetupMaterial();
         rippedPage.pageAnimator.SetTrigger("Reset");
         currentPage += 1;
-        pages[currentPage].SetInteractable(true);
+        pages[currentPage].SetChecklistInteractable(true);
         addingToFolder = false;
     }
 }

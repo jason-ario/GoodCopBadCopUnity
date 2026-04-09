@@ -309,6 +309,20 @@ public class FolderController : PickableObject
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
         }
+        
+        if (itemName == "Psych Exam Page")
+        {
+            psychExamPage = pickableObject.GetComponent<ExamPage>();
+            psychExamPage.SetParent(psychExamSlot);
+            psychExamPage.AddToFolder(this);
+        }
+        
+        if (itemName == "Physical Exam Page")
+        {
+            physicalExamPage = pickableObject.GetComponent<ExamPage>();
+            physicalExamPage.SetParent(physicalExamSlot);
+            physicalExamPage.AddToFolder(this);
+        }
     }
 
     public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)
@@ -339,25 +353,6 @@ public class FolderController : PickableObject
         {
             Debug.Log("Add Exam");
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
-        }
-    }
-
-    public void AddNotebookDocumentToSlot(string itemName, ExamPage pageToParent)
-    {
-        if (itemName == "Physical Exam Notebook")
-        {
-            pageToParent.transform.parent = physicalExamSlot;
-            pageToParent.transform.localPosition = Vector3.zero;
-            pageToParent.transform.localRotation = Quaternion.identity;
-            physicalExamPage = pageToParent;
-        }
-        
-        if (itemName == "Psych Exam Notebook")
-        {
-            pageToParent.transform.parent = psychExamSlot;
-            pageToParent.transform.localPosition = Vector3.zero;
-            pageToParent.transform.localRotation = Quaternion.identity;
-            psychExamPage = pageToParent;
         }
     }
 
