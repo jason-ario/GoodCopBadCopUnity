@@ -85,4 +85,9 @@ public class PlayerInstance : NetworkBehaviour
     {
         _playerInteractionController.reticle.gameObject.SetActive(true);
     }
+
+    public Camera GetCamera()
+    {
+        return _playerMovementController.Camera;
+    }
 }

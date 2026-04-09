@@ -12,6 +12,7 @@ public class UIController : MonoBehaviour
 {
     public static UIController Instance;
 
+    [SerializeField] RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject toolShopUI;
@@ -191,5 +192,10 @@ public class UIController : MonoBehaviour
     {
         Cursor.lockState = CursorLockMode.Locked;
         mouseCursor.gameObject.SetActive(false);
+    }
+
+    public RawImage GetCameraImage()
+    {
+        return cameraImage;
     }
 }

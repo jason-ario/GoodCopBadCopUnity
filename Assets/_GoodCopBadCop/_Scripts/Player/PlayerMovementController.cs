@@ -93,6 +93,8 @@ public class PlayerMovementController : NetworkBehaviour
 
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
+    [SerializeField] private Camera camera;
+    public Camera Camera => camera;
 
     private void Awake()
     {
