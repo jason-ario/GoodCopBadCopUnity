@@ -51,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2046019031
+  GlobalObjectIdHash: 1998829643
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -114,7 +114,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -179,8 +179,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   NetworkRigidbodyBaseExpanded: 0
   UseRigidBodyForMotion: 0
-  AutoUpdateKinematicState: 1
-  AutoSetKinematicOnDespawn: 1
+  AutoUpdateKinematicState: 0
+  AutoSetKinematicOnDespawn: 0
 --- !u!1773428102 &8758509896245454651
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -487,6 +487,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8521692344239709445, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4748860156081436253}
+    - targetCorrespondingSourceObject: {fileID: 1950005955600309289, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 184297838855124365}
+    - targetCorrespondingSourceObject: {fileID: 1950005955600309289, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1824889969090094361}
   m_SourcePrefab: {fileID: 100100000, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
 --- !u!114 &2477871920702043147 stripped
 MonoBehaviour:
@@ -542,6 +548,45 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f9ad7ce293516e4184d14f7a9e7dd7e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChecklistItem
+--- !u!1 &6256505583577056821 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1950005955600309289, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
+  m_PrefabInstance: {fileID: 5610432610097961500}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &184297838855124365
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6256505583577056821}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.017504154, y: 0.020060202, z: 0.000050000002}
+  m_Center: {x: -0.0012242192, y: -0.00000061374163, z: 0.000024069905}
+--- !u!114 &1824889969090094361
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6256505583577056821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 8221146621586711891}
 --- !u!114 &7226322546734309656 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2996385420236208900, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}

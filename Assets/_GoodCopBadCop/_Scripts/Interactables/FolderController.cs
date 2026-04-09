@@ -83,7 +83,7 @@ public class FolderController : PickableObject
 
         if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application" || heldItem.ItemData.name == "Psych Exam Page" || heldItem.ItemData.name == "Physical Exam Page")
         {
-            AddDocument(heldItem, playerInteractionController.pickupController);
+            AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
 
         if (heldItem.ItemData.name is "Physical Exam Notebook" or "Psych Exam Notebook")
@@ -291,7 +291,7 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
-    public void AddDocument(PickableObject pickableObject, PlayerPickupController player)
+    public void AddDocument(PickableObject pickableObject, PlayerPickupController player, bool dropObject)
     {
         string itemName = pickableObject.ItemData.name;
         Debug.Log("Try add document");
@@ -329,7 +329,16 @@ public class FolderController : PickableObject
             
             Debug.Log("Add psych exam page");
             psychExamPage = pickableObject.GetComponent<ExamPage>();
-            psychExamPage.SetParent(psychExamSlot);
+
+            if (dropObject)
+            {
+                player.DropObject(psychExamSlot);
+            }
+            else
+            {
+                psychExamPage.SetParent(psychExamSlot);
+            }
+            
             psychExamPage.AddToFolder(this);
         }
         
@@ -341,7 +350,16 @@ public class FolderController : PickableObject
             }
             
             physicalExamPage = pickableObject.GetComponent<ExamPage>();
-            physicalExamPage.SetParent(physicalExamSlot);
+
+            if (dropObject)
+            {
+                player.DropObject(physicalExamSlot);
+            }
+            else
+            {
+                physicalExamPage.SetParent(physicalExamSlot);
+            }
+            
             physicalExamPage.AddToFolder(this);
         }
     }
@@ -376,13 +394,11 @@ public class FolderController : PickableObject
     {
         if (itemName == "Physical Exam Notebook")
         {
-            Debug.Log("Add Exam");
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
         
         if (itemName == "Psych Exam Notebook")
         {
-            Debug.Log("Add Exam");
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
     }

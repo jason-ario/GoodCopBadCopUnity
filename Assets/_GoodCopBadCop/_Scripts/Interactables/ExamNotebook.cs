@@ -102,7 +102,7 @@ public class ExamNotebook : PickableObject
         yield return new WaitForSeconds(.3f);
         rippedPage.SetParent(playerPickupController.RightArmCamObjectContainer.transform);
         yield return new WaitForSeconds(.1f);
-        folder.AddDocument(rippedPage, playerPickupController);
+        folder.AddDocument(rippedPage, playerPickupController, false);
         GetComponent<HighlightEffect>().SetupMaterial();
         rippedPage.pageAnimator.SetTrigger("Reset");
         currentPage += 1;
