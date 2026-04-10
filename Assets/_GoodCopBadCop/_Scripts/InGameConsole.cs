@@ -23,7 +23,9 @@ public class InGameConsole : MonoBehaviour
     void Update()
     {
         if (Input.GetKeyDown(toggleKey))
+        {
             showConsole = !showConsole;
+        }
     }
 
     void HandleLog(string logString, string stackTrace, LogType type)

@@ -156,9 +156,9 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
-    public void InitiateChoices()
+    public void InitiateChoices(Transform lookTarget, string[] choices)
     {
-        dialogueChoiceSystem.StartDialogueChoices();
+        dialogueChoiceSystem.StartDialogueChoices(lookTarget,choices);
     }
 
     public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,

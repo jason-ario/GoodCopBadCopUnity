@@ -9,19 +9,20 @@ public class DialogueChoiceSystem : NetworkBehaviour
     [SerializeField] private Subtitles subtitlesPrefab;
     [SerializeField] RectTransform subtitlesContainer;
 
-    public void StartDialogueChoices()
+    public void StartDialogueChoices(Transform lookTarget, string[] choices)
     {
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
         dialogueChoiceContainer.SetActive(true);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(SuspectController.Instance.CurrentSuspect.lookPos);
-        InitializeChoices();
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
+        InitializeChoices(choices);
     }
     
-    private void InitializeChoices()
+    private void InitializeChoices(string[] choices)
     {
-        dialogueChoices[0].SetChoiceText("State your reason for crossing.");
-        dialogueChoices[1].SetChoiceText("What were you doing during the blast?");
-        dialogueChoices[2].SetChoiceText("Show me your hands.");
+        for (var i = 0; i < choices.Length; i++)
+        {
+            dialogueChoices[i].SetChoiceText(choices[i]);
+        }
     }
 
     public void ChooseDialogueChoice(int choiceIndex)

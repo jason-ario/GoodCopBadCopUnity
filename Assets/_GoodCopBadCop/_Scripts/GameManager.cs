@@ -102,7 +102,7 @@ public class GameManager : NetworkBehaviour
         OnGameStart?.Invoke();
     }
 
-    public void DeliveredVertict(StampContainer.StampType stampType)
+    public void DeliveredVerdict(StampContainer.StampType stampType)
     {
         verdictDelivered = stampType;
         SuspectController.Instance.SetCanInteract(false);

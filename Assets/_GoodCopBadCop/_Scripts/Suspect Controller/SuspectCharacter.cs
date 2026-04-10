@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
@@ -45,7 +46,7 @@ public class SuspectCharacter : Interactable
     public Vector3 standPosOffset;
     public bool attackImmediately;
     [SerializeField] private ParticleSystem[] vomitParticles;
-
+    
 
     #region Folder
     public enum FolderGivingAnimation
@@ -75,6 +76,13 @@ public class SuspectCharacter : Interactable
 
     public bool IsInfected => _record != null && _record.InfectionScore >= 50;
     public int InfectionScore => _record != null ? _record.InfectionScore : 0;
+    
+    string[] choices = new string[]
+    {
+        "State your reason for crossing.", 
+        "What were you doing during the blast?", 
+        "Show me your hands."
+    };  
 
 
     protected override void Awake()
@@ -144,7 +152,8 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        DialogueManager.Instance.InitiateChoices();
+      
+        DialogueManager.Instance.InitiateChoices(lookPos, choices);
     }
 
     public void SetCanInteract(bool canInteract)
@@ -157,7 +166,8 @@ public class SuspectCharacter : Interactable
     {
         if (item == null)
         {
-            DialogueManager.Instance.InitiateChoices();
+            
+            DialogueManager.Instance.InitiateChoices(lookPos, choices);
             return;
         }
 

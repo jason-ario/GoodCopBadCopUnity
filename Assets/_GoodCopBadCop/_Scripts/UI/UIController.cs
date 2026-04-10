@@ -26,6 +26,7 @@ public class UIController : MonoBehaviour
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     [SerializeField] private AudioClip transitionToGameplayStinger;
     [SerializeField] private Transform mouseCursor;
+    [SerializeField] private CouponUIController couponUIController;
 
     private void Awake()
     {
@@ -197,5 +198,10 @@ public class UIController : MonoBehaviour
     public RawImage GetCameraImage()
     {
         return cameraImage;
+    }
+
+    public void PlayEarnedCashUIAnimation(int cashAmount)
+    {
+        couponUIController.PlayCashAnimation(cashAmount);
     }
 }

@@ -9,7 +9,6 @@ using Application = UnityEngine.Application;
 
 public class FolderController : PickableObject
 {
-    private NetworkVariable<bool> inFolderPos = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isStamped = new NetworkVariable<bool>(false);
 
@@ -47,18 +46,12 @@ public class FolderController : PickableObject
     private ExamPage psychExamPage;
     private ExamPage physicalExamPage;
     public bool IsOpen => isOpen.Value;
+    public bool IsStamped => isStamped.Value;
 
     public override void OnNetworkSpawn()
     {
         // Sync visual state on spawn and when variables change
         isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
-
-        // Set initial state
-        anim.SetBool("Open", isOpen.Value);
-        if (inFolderPos.Value)
-        {
-            transform.position = GameManager.Instance.FolderPos.position;
-        }
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -221,12 +214,6 @@ public class FolderController : PickableObject
         }
         if (isLocal) PlayerInstance.Instance.CanControl = true;
         playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
-        if (IsServer) inFolderPos.Value = false;
-        
-        transform.DOJump(SuspectController.Instance.FolderSpawnPos.position, .3f, 1, .5f)
-            .OnComplete(() => GameManager.Instance.DeliveredVertict(stampContainer.Stamp));
-        
-        SFXController.Instance.Play(folderPlaceClip);
         
         onStampedComplete?.Invoke();
     }
