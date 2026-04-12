@@ -59,6 +59,7 @@ public class ExamNotebook : PickableObject
         playerPickupController.CanPickUpAndPlace = false;
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(false);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(false);
+        UIController.Instance.ShowCursor();
         UIController.Instance.ShowBackButton(ExitDrawMode);
     }
 
@@ -68,6 +69,7 @@ public class ExamNotebook : PickableObject
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(true);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(true);
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+        UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
     }
 

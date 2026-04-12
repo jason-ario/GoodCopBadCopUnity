@@ -3460,7 +3460,6 @@ MonoBehaviour:
   startShiftScreen: {fileID: 4701553055973981323}
   inviteFriendsPanel: {fileID: 431151925960099458}
   transitionToGameplayStinger: {fileID: 8300000, guid: 8a757c3ae73fafb4697b442805975e32, type: 3}
-  mouseCursor: {fileID: 0}
   couponUIController: {fileID: 3482766366440566691}
   pauseMenu: {fileID: 8256401164290855842}
 --- !u!223 &435570759865181822
@@ -5447,6 +5446,18 @@ PrefabInstance:
     - target: {fileID: 934473876679634879, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_text
       value: Resume
+      objectReference: {fileID: 0}
+    - target: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 6032992052753685746}
+    - target: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: ClosePauseMenu
+      objectReference: {fileID: 0}
+    - target: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: UIController, Assembly-CSharp
       objectReference: {fileID: 0}
     - target: {fileID: 7293098732328177440, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_Name

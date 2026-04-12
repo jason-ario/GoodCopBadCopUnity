@@ -68,24 +68,20 @@ public class PlayerMovementController : NetworkBehaviour
     }
     public bool CanControl
     {
-        get { return canControl; }
+        get => canControl;
         set
         {
             canControl = value;
 
             if (canControl)
             {
-                if (CanLook)
-                {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    UIController.Instance.HideCursor();
-                    GetComponent<PlayerInteractionController>().SetReticleActive(true);
-                }
-               
+                if (!CanLook) return;
+                Cursor.lockState = CursorLockMode.Locked;
+                GetComponent<PlayerInteractionController>().SetReticleActive(true);
+
             }
             else
             {
-                UIController.Instance.ShowCursor();
                 GetComponent<PlayerInteractionController>().SetReticleActive(false);
             }
         }
@@ -137,7 +133,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (_isSitting && _canSitOrStand)
         {
-            if (Input.GetButtonDown("Back"))
+            if (Input.GetButtonDown("Back") && UIController.Instance.IsPaused == false)
             {
                 StandUp();
             }
