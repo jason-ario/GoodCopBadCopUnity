@@ -55,6 +55,8 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        if (UIController.Instance.IsPaused) return;
+
         HandleReticle();
         
         if (CanInteract == false) return;

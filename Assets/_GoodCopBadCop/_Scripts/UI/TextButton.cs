@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -9,6 +10,8 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     [SerializeField] private AudioClip sfxOnSelect;
     [SerializeField] private AudioClip sfxOnClick;
     [SerializeField] AudioSource audioSource;
+    Button button;
+    public bool disableAnimation;
 
     public void OnPointerEnter(PointerEventData eventData)
     {
@@ -17,6 +20,11 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     }
 
     public void OnPointerExit(PointerEventData eventData)
+    {
+        anim.SetBool("Selected", false);
+    }
+
+    public void Reset()
     {
         anim.SetBool("Selected", false);
     }

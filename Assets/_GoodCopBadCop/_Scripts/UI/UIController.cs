@@ -252,11 +252,8 @@ public class UIController : MonoBehaviour
             HideCursor();
         }
         
-        if (showedReticleBeforePause == false)
-        {
-            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(true);
-        }
-        
+        PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
     }
