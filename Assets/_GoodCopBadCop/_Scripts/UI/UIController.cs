@@ -31,10 +31,11 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject pauseMenu;
     private bool pauseMenuOpened = false;
     
-    bool couldShowCursorBeforePaused = false;
+    bool showedCursorBeforePaused = false;
     bool couldControlBeforePaused = false;
     bool couldLookBeforePaused = false;
-    
+    bool showedReticleBeforePause = false;
+
     private void Awake()
     {
         Instance = this;
@@ -223,13 +224,16 @@ public class UIController : MonoBehaviour
     {
         couponUIController.PlayCashAnimation(cashAmount);
     }
+
     
     public void OpenPauseMenu()
     {
         pauseMenuOpened = true;
         couldControlBeforePaused = PlayerInstance.Instance.CanControl;
         couldLookBeforePaused = PlayerInstance.Instance.GetComponent<PlayerMovementController>().CanLook;
-        couldShowCursorBeforePaused = Cursor.visible;
+        showedCursorBeforePaused = Cursor.visible;
+
+        showedReticleBeforePause = PlayerInstance.Instance.PlayerInteractionController.ReticleActive;
         
         ShowCursor();
         
@@ -242,10 +246,17 @@ public class UIController : MonoBehaviour
     {
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
-        if (couldShowCursorBeforePaused == false)
+        
+        if (showedCursorBeforePaused == false)
         {
             HideCursor();
         }
+        
+        if (showedReticleBeforePause == false)
+        {
+            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(true);
+        }
+        
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
     }

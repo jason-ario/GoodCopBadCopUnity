@@ -19,6 +19,7 @@ public class PlayerInstance : NetworkBehaviour
 
     private PlayerMovementController _playerMovementController;
     private PlayerInteractionController _playerInteractionController;
+    public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();

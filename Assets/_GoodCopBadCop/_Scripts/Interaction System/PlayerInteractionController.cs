@@ -19,6 +19,8 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _canInteract = true;
     public bool CanInteract => _canInteract;
     public Interactable onlyAllowedInteractable;
+    bool reticleActive = false;
+    public bool ReticleActive => reticleActive;
     
     private void Awake()
     {
@@ -218,6 +220,7 @@ public class PlayerInteractionController : NetworkBehaviour
     public void SetReticleActive(bool value)
     {
         reticle.gameObject.SetActive(value);
+        reticleActive = value;
     }
 
     bool TryInteract()
