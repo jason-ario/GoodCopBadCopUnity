@@ -12,6 +12,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void StartDialogueChoices(Transform lookTarget, string[] choices)
     {
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+        UIController.Instance.ShowCursor();
         dialogueChoiceContainer.SetActive(true);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
         InitializeChoices(choices);
@@ -72,6 +73,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void CloseDialogueChoices()
     {
         dialogueChoiceContainer.SetActive(false);
+        UIController.Instance.HideCursor();
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
     }
 }
