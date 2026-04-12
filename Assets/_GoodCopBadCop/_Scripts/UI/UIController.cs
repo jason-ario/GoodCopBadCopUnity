@@ -24,10 +24,17 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
-    [SerializeField] private AudioClip transitionToGameplayStinger;
-    [SerializeField] private Transform mouseCursor;
-    [SerializeField] private CouponUIController couponUIController;
+    public bool IsPaused => pauseMenuOpened;
 
+    [SerializeField] private AudioClip transitionToGameplayStinger;
+    [SerializeField] private CouponUIController couponUIController;
+    [SerializeField] private GameObject pauseMenu;
+    private bool pauseMenuOpened = false;
+    
+    bool couldShowCursorBeforePaused = false;
+    bool couldControlBeforePaused = false;
+    bool couldLookBeforePaused = false;
+    
     private void Awake()
     {
         Instance = this;
@@ -50,6 +57,18 @@ public class UIController : MonoBehaviour
             if(Input.GetButtonDown("Back"))
             {
                 backButton.onClick.Invoke();
+            }
+        }
+
+        if (Input.GetButtonDown("Pause"))
+        {
+            if (pauseMenuOpened)
+            {
+                ClosePauseMenu();
+            }
+            else
+            {
+                OpenPauseMenu();
             }
         }
         
@@ -185,14 +204,14 @@ public class UIController : MonoBehaviour
 
     public void ShowCursor()
     {
-        Cursor.lockState = CursorLockMode.None;
-        mouseCursor.gameObject.SetActive(true);
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.Confined;
     }
 
     public void HideCursor()
     {
+        Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
-        mouseCursor.gameObject.SetActive(false);
     }
 
     public RawImage GetCameraImage()
@@ -203,5 +222,31 @@ public class UIController : MonoBehaviour
     public void PlayEarnedCashUIAnimation(int cashAmount)
     {
         couponUIController.PlayCashAnimation(cashAmount);
+    }
+    
+    public void OpenPauseMenu()
+    {
+        pauseMenuOpened = true;
+        couldControlBeforePaused = PlayerInstance.Instance.CanControl;
+        couldLookBeforePaused = PlayerInstance.Instance.GetComponent<PlayerMovementController>().CanLook;
+        couldShowCursorBeforePaused = Cursor.visible;
+        
+        ShowCursor();
+        
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
+        PlayerInstance.Instance.CanControl = false;
+        pauseMenu.SetActive(true);
+    }
+    
+    public void ClosePauseMenu()
+    {
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
+        if (couldShowCursorBeforePaused == false)
+        {
+            HideCursor();
+        }
+        pauseMenuOpened = false;
+        pauseMenu.SetActive(false);
     }
 }
