@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Playables;
 
 public class MainMenuController : MonoBehaviour
 {
@@ -12,13 +13,17 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] public GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
     [SerializeField] private GameObject startShiftScreen;
+    [SerializeField] private GameObject settingsScreen;
     [SerializeField] private GameObject newLoadCampaignScreen;
     [SerializeField] private GameObject startCampaignScreen;
     [SerializeField] private GameObject singleplayerOrMultiplayer;
     [SerializeField] private StartCampaignScreen startCampaignScreenScript;
     [SerializeField] private GameObject joinGameScreen;
     [SerializeField] private Animator screenFade;
- 
+
+    [Header("Cutscenes")] 
+    [SerializeField] private PlayableDirector playableDirector;
+    
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
     [SerializeField] private GameObject sceneCamera;
@@ -48,7 +53,8 @@ public class MainMenuController : MonoBehaviour
             newLoadCampaignScreen,
             startCampaignScreen,
             joinGameScreen,
-            singleplayerOrMultiplayer
+            singleplayerOrMultiplayer,
+            settingsScreen
         };
     }
     
@@ -58,9 +64,8 @@ public class MainMenuController : MonoBehaviour
 
         SwitchToScreen(homeScreen);
         
-        sceneCamera.transform.DOMove(camEndPos.position, 30f);
-
-        StartCoroutine(WaitAndOpenWindow());
+        playableDirector.gameObject.SetActive(true);
+        //StartCoroutine(WaitAndOpenWindow());
     }
 
     #endregion
@@ -89,6 +94,9 @@ public class MainMenuController : MonoBehaviour
 
     public void OpenJoinLobbyScreen() =>
         SwitchToScreen(joinGameScreen);
+    
+    public void OpenSettingsScreen() =>
+        SwitchToScreen(settingsScreen);
 
     public void BackToHomeScreen() =>
         SwitchToScreen(homeScreen);
