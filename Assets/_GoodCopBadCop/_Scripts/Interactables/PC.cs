@@ -57,6 +57,9 @@ public class PC : Interactable
         player.playerMovementController.LookAtTarget(lookAtTarget.transform);
         player.transform.DOMove(standPos.position, 0.5f);
         player.transform.DORotate(standPos.rotation.eulerAngles, 0.5f);
+        
+        //Move camera
+        player.playerMovementController.MoveCameraTo(computerCamera.transform);
 
         pcActive = true;
         _player = player;
@@ -78,7 +81,7 @@ public class PC : Interactable
     {
         if (!pcActive) return;
 
-        if (Input.GetKeyDown(KeyCode.Q))
+        if (Input.GetButtonDown("Back"))
         {
             ExitPC();
         }
@@ -88,14 +91,15 @@ public class PC : Interactable
     {
         pcActive = false;
         UIController.Instance.HideBackButton();
-
-        _player.playerMovementController.SetCanControl(true);
+        
         _player.SetCanInteract(true, "");
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
 
         _virtualCanvasCursor.enabled = false;
+        
+        _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
     }
 
     public void OpenScreen(GameObject screen)

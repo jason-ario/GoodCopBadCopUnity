@@ -2,6 +2,7 @@ using System;
 using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.Cursor;
 
@@ -273,18 +274,19 @@ public class PlayerMovementController : NetworkBehaviour
         }
     }
     
-    public void ResetCameraPos(bool instant = true, float duration = 0.5f)
+    public void ResetCameraPos(bool instant = true, float duration = 0.5f, UnityAction callback = null)
     {
         cameraTransform.DOKill();
 
         if (instant)
         {
             cameraTransform.localPosition = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
+            callback?.Invoke();
         }
         else
         {
             Vector3 targetPos = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
-            cameraTransform.DOLocalMove(targetPos, duration);
+            cameraTransform.DOLocalMove(targetPos, duration).OnComplete(() =>  callback?.Invoke());
             cameraTransform.DOLocalRotate(targetLookEuler, duration);
         }
     }
@@ -322,5 +324,11 @@ public class PlayerMovementController : NetworkBehaviour
     {
         SetCanControl(false);
         SetCanMove(false);
+    }
+
+    public void MoveCameraTo(Transform cameraTransform, float moveTime = 0.5f)
+    {
+        CameraTransform.DOMove(cameraTransform.position, moveTime);
+        CameraTransform.DORotate(cameraTransform.rotation.eulerAngles, moveTime);
     }
 }
