@@ -45,16 +45,8 @@ public class DebugConsole : MonoBehaviour
         
         if (skipLobby)
         {
-            StartCoroutine(WaitAndStartNewShift());
+            ShiftManager.Instance.StartNewShift();
         }
-    }
-
-    IEnumerator WaitAndStartNewShift()
-    {
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForSeconds(1);
-        ShiftManager.Instance.StartNewShift();
     }
 
     private void Update()

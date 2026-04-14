@@ -63,23 +63,22 @@ public class FolderController : PickableObject
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
     { 
-        if (isStamped.Value) return; 
         base.InteractWithItem(playerInteractionController, heldItem);
         ulong clientId = playerInteractionController.NetworkObjectId;
 
         if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.name == "Stamp_Red" || heldItem.name == "Stamp_Yellow")
         {
+            Debug.Log("Interact with item");
             var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
-
             StartUseStampServerRpc(clientId, inkStamp.StampType);
         }
 
-        if (heldItem.ItemData.name == "ID card" || heldItem.ItemData.name == "Application" || heldItem.ItemData.name == "Psych Exam Page" || heldItem.ItemData.name == "Physical Exam Page")
+        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" )
         {
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
 
-        if (heldItem.ItemData.name is "Physical Exam Notebook" or "Psych Exam Notebook")
+        if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Reality Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook")
         {
             if (HasNotebookPage(heldItem.ItemData.name) == false)
             {
@@ -379,12 +378,27 @@ public class FolderController : PickableObject
 
     public void AddNotebookPaper(string itemName, PlayerPickupController player)
     {
-        if (itemName == "Physical Exam Notebook")
+        if (itemName == "Mutation Exam Notebook")
         {
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
         
-        if (itemName == "Psych Exam Notebook")
+        if (itemName == "Behavior Exam Notebook")
+        {
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
+        }
+        
+        if (itemName == "Reality Exam Notebook")
+        {
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
+        }
+        
+        if (itemName == "Biological Exam Notebook")
+        {
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
+        }
+        
+        if (itemName == "Documentation Exam Notebook")
         {
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }

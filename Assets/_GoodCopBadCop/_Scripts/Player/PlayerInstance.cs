@@ -24,6 +24,9 @@ public class PlayerInstance : NetworkBehaviour
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerInteractionController = GetComponent<PlayerInteractionController>();
+        
+        Instance = this;
+
     }
 
     public void SetIsOutside(bool value)
@@ -36,7 +39,7 @@ public class PlayerInstance : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         
-        if (IsLocalPlayer == false)
+        if (!IsLocalPlayer)
         {
             return;
         }

@@ -39,7 +39,6 @@ public class PlayerPickupController : NetworkBehaviour
     public PlayerMovementController PlayerMovementController => _playerMovementController;
 
     private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-    private NetworkVariable<string> handEquipped = new NetworkVariable<string>("none", NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private float pickUpUseCooldownTimer = .2f;
     private bool pickUpCooldownComplete = false;
 
@@ -326,21 +325,19 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = pickableObject;
         ObjectPlacer.Instance.SetItem(itemData);
 
-        int itemIndex = itemData.hand == PickableItemData.Hand.Right ? rightArmCamObjectContainer.ItemIndex(itemData) : leftArmCamObjectContainer.ItemIndex(itemData);
-        
+        int itemIndex = rightArmCamObjectContainer.ItemIndex(itemData);
         itemEquippedIndex.Value = itemIndex;
 
         _camEquippedItem = pickableObject;
-        
+
+
         if (itemData.hand == PickableItemData.Hand.Right)
         {
-            handEquipped.Value = "right";
             _bodyCurrentlyEquippedItem = rightArmBodyObjectContainer.CurrentlyEquippedItem;
             rightArmCamObjectContainer.EquipItem(itemData, this, pickableObject);
         }
         else
         {
-            handEquipped.Value = "left";
             _bodyCurrentlyEquippedItem = leftArmBodyObjectContainer.CurrentlyEquippedItem;
             leftArmBodyObjectContainer.EquipItem(itemData, this, pickableObject);
         }
@@ -436,7 +433,6 @@ public class PlayerPickupController : NetworkBehaviour
         _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
         _heldObject = null;
-        handEquipped.Value = "none";
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
         ObjectPlacer.Instance.DeactivatePlacer();
