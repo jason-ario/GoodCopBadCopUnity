@@ -5,7 +5,7 @@ using UnityEngine;
 public class ChecklistItem : MonoBehaviour
 {
     [SerializeField] private ExamPage examPage;
-    [SerializeField] Checkbox[] checkboxes;
+    [SerializeField] Checkbox checkbox;
     [SerializeField] private SpriteRenderer sr;
     public bool IsChecking => examPage.IsChecking;
 
@@ -13,22 +13,7 @@ public class ChecklistItem : MonoBehaviour
     private void Awake()
     {
         sr.enabled = false;
-
-        foreach (var checkbox in checkboxes)
-        {
-            checkbox.Uncheck();
-        }
-    }
-
-    public void UncheckOther(Checkbox checkbox)
-    {
-        foreach (var item in this.checkboxes)
-        {
-            if (item != checkbox)
-            {
-                item.Uncheck();
-            }
-        }
+        checkbox.Uncheck();
     }
 
     public void AnimateCheckMark(Transform ikAnimationTarget)
@@ -38,9 +23,6 @@ public class ChecklistItem : MonoBehaviour
 
     public void SetInteractable(bool value)
     {
-        foreach (var checkbox in checkboxes)
-        {
-            checkbox.SetInteractable(value);
-        }
+        checkbox.SetInteractable(value);
     }
 }

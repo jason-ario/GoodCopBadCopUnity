@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -44,9 +45,16 @@ public class DebugConsole : MonoBehaviour
         
         if (skipLobby)
         {
-            ShiftManager.Instance.StartNewShift();
+            StartCoroutine(WaitAndStartNewShift());
         }
+    }
 
+    IEnumerator WaitAndStartNewShift()
+    {
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForSeconds(1);
+        ShiftManager.Instance.StartNewShift();
     }
 
     private void Update()
