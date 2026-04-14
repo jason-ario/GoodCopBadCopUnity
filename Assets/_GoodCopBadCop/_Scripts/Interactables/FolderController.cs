@@ -38,13 +38,20 @@ public class FolderController : PickableObject
     [Header("Document Slots")]
     [SerializeField] private Transform idCardSlot;
     [SerializeField] private Transform applicationSlot;
-    [SerializeField] private Transform psychExamSlot;
-    [SerializeField] private Transform physicalExamSlot;
+    [SerializeField] private Transform mutationExamSlot;
+    [SerializeField] private Transform biologicalExamSlot;
+    [SerializeField] private Transform behavioralExamSlot;
+    [SerializeField] private Transform documentationExamSlot;
+    [SerializeField] private Transform realityExamSlot;
 
     private FolderItem idCard;
     private FolderItem application;
-    private ExamPage psychExamPage;
-    private ExamPage physicalExamPage;
+    private ExamPage behaviorExamPage;
+    private ExamPage realityExamPage;
+    private ExamPage mutationExamPage;
+    private ExamPage biologicalExamPage;
+    private ExamPage documentationExamPage;
+
     public bool IsOpen => isOpen.Value;
     public bool IsStamped => isStamped.Value;
 
@@ -73,7 +80,7 @@ public class FolderController : PickableObject
             StartUseStampServerRpc(clientId, inkStamp.StampType);
         }
 
-        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" )
+        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" or "Biological Exam Page" )
         {
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
@@ -89,13 +96,25 @@ public class FolderController : PickableObject
 
     bool HasNotebookPage(string itemName)
     {
-        if (itemName == "Physical Exam Notebook")
+        if (itemName == "Mutation Exam Notebook")
         {
-            return physicalExamPage != null;
+            return mutationExamPage != null;
         }
-        if (itemName == "Psych Exam Notebook")
+        if (itemName == "Behavior Exam Notebook")
         {
-            return psychExamPage != null;
+            return behaviorExamPage != null;
+        }
+        if (itemName == "Reality Exam Notebook")
+        {
+            return realityExamPage != null;
+        }
+        if (itemName == "Documentation Exam Notebook")
+        {
+            return documentationExamPage != null;
+        }
+        if (itemName == "Biological Exam Notebook")
+        {
+            return biologicalExamPage != null;
         }
 
         return false;
@@ -306,47 +325,109 @@ public class FolderController : PickableObject
             application.AddToFolder(this);
         }
         
-        if (itemName == "Psych Exam Page")
+        if (itemName == "Behavior Exam Page")
         {
-            if (psychExamPage != null)
+            if (behaviorExamPage != null)
             {
                 return;
             }
             
-            Debug.Log("Add psych exam page");
-            psychExamPage = pickableObject.GetComponent<ExamPage>();
+            behaviorExamPage = pickableObject.GetComponent<ExamPage>();
 
             if (dropObject)
             {
-                player.DropObject(psychExamSlot);
+                player.DropObject(behavioralExamSlot);
             }
             else
             {
-                psychExamPage.SetParent(psychExamSlot);
+                behaviorExamPage.SetParent(behavioralExamSlot);
             }
             
-            psychExamPage.AddToFolder(this);
+            behaviorExamPage.AddToFolder(this);
         }
         
-        if (itemName == "Physical Exam Page")
+        if (itemName == "Mutation Exam Page")
         {
-            if (physicalExamPage != null)
+            if (mutationExamPage != null)
             {
                 return;
             }
             
-            physicalExamPage = pickableObject.GetComponent<ExamPage>();
+            mutationExamPage = pickableObject.GetComponent<ExamPage>();
 
             if (dropObject)
             {
-                player.DropObject(physicalExamSlot);
+                player.DropObject(mutationExamSlot);
             }
             else
             {
-                physicalExamPage.SetParent(physicalExamSlot);
+                mutationExamPage.SetParent(mutationExamSlot);
             }
             
-            physicalExamPage.AddToFolder(this);
+            mutationExamPage.AddToFolder(this);
+        }
+        
+        if (itemName == "Reality Exam Page")
+        {
+            if (realityExamPage != null)
+            {
+                return;
+            }
+            
+            realityExamPage = pickableObject.GetComponent<ExamPage>();
+
+            if (dropObject)
+            {
+                player.DropObject(realityExamSlot);
+            }
+            else
+            {
+                realityExamPage.SetParent(realityExamSlot);
+            }
+            
+            realityExamPage.AddToFolder(this);
+        }
+        
+        if (itemName == "Documentation Exam Page")
+        {
+            if (documentationExamPage != null)
+            {
+                return;
+            }
+            
+            documentationExamPage = pickableObject.GetComponent<ExamPage>();
+
+            if (dropObject)
+            {
+                player.DropObject(documentationExamSlot);
+            }
+            else
+            {
+                documentationExamPage.SetParent(documentationExamSlot);
+            }
+            
+            documentationExamPage.AddToFolder(this);
+        }
+        
+        if (itemName == "Biological Exam Page")
+        {
+            if (biologicalExamPage != null)
+            {
+                return;
+            }
+            
+            biologicalExamPage = pickableObject.GetComponent<ExamPage>();
+
+            if (dropObject)
+            {
+                player.DropObject(biologicalExamSlot);
+            }
+            else
+            {
+                biologicalExamPage.SetParent(biologicalExamSlot);
+            }
+            
+            biologicalExamPage.AddToFolder(this);
         }
     }
 
@@ -365,14 +446,29 @@ public class FolderController : PickableObject
             application = null;
         }
         
-        if (itemName == "Physical Exam Page")
+        if (itemName == "Mutation Exam Page")
         {
-            physicalExamPage = null;
+            mutationExamPage = null;
         }
         
-        if (itemName == "Psych Exam Page")
+        if (itemName == "Behavior Exam Page")
         {
-            psychExamPage = null;
+            behaviorExamPage = null;
+        }
+        
+        if (itemName == "Reality Exam Page")
+        {
+            realityExamPage = null;
+        }
+        
+        if (itemName == "Documentation Exam Page")
+        {
+            documentationExamPage = null;
+        }
+        
+        if (itemName == "Biological Exam Page")
+        {
+            biologicalExamPage = null;
         }
     }
 
