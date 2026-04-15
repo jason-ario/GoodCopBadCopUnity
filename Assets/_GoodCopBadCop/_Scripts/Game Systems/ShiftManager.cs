@@ -1,8 +1,10 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Playables;
@@ -20,8 +22,12 @@ public class ShiftManager : NetworkBehaviour
     [Header("Set Up")]
     private int _currentDay = 1;
     public int CurrentDay => _currentDay;
+    private readonly DateTime _startDate = new DateTime(1989, 10, 20);
+    public DateTime CurrentGameDate => _startDate.AddDays(_currentDay - 1);
+    
     [SerializeField] private StartShiftScreen _startShiftScreen;
     [SerializeField] private AudioSource bellSound;
+    private bool _shiftStarting = false;
     [SerializeField] private AudioClip endOfLevelSound;
     [SerializeField] private AudioClip knockOnDoorSound;
     [SerializeField] private GameObject cardboardBox;
@@ -57,12 +63,23 @@ public class ShiftManager : NetworkBehaviour
     #region Events
     public UnityAction OnShiftStart { get; set; }
     public UnityAction OnShiftReady { get; set; }
+    public string CurrentDate => _startDate.AddDays(_currentDay - 1).ToString("dd MMM yyyy");
 
     #endregion
 
     private void Awake()
     {
         Instance = this;
+        InitializeDateSystem();
+    }
+    
+    private void InitializeDateSystem()
+    {
+        // Load saved day or start at day 1
+        int savedDay = PlayerPrefs.GetInt("dayNumber", 1);
+        _currentDay = savedDay;
+        
+        Debug.Log($"Game started on {CurrentDate} (Day {_currentDay})");
     }
 
 
@@ -128,6 +145,7 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void StartShiftClientRpc()
     {
+        _shiftStarting = false;
         StartCoroutine(OpenWindowSequence(true));
     }
 
@@ -172,6 +190,7 @@ public class ShiftManager : NetworkBehaviour
             new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + suspectsKilledWrong, couponsPenaltyPerKilled * suspectsKilledWrong, true),
         };
 
+        CompletedShift();
         UIController.Instance.ShowEndShiftReport(rows);
     }
 
@@ -207,6 +226,11 @@ public class ShiftManager : NetworkBehaviour
         StartCoroutine(NewShiftSequence());
     }
 
+    public void CompletedShift()
+    {
+        _currentDay += 1; 
+    }
+
     public void ResetEnvironment()
     {
         _switchButton.Reset();
@@ -229,15 +253,14 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
     }
-
+    
     private IEnumerator NewShiftSequence()
     {
-        _currentDay += 1;
         SuspectDatabase.Instance.AdvanceToDay(_currentDay);
 
         PlayerPrefs.SetInt("dayNumber", _currentDay);
         calendarText.text = _currentDay.ToString("D2");
-
+        
         if (DebugConsole.Instance.skipInitialShiftTransition)
         {
             PlayerInstance.Instance.CanControl = true;
