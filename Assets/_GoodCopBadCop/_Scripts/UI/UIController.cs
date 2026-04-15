@@ -91,6 +91,7 @@ public class UIController : MonoBehaviour
     public void OpenToolShop(Transform toolShopLookTarget)
     {
         PlayerInstance.Instance.SetCanInteract(false);
+        ShowCursor();
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(toolShopLookTarget);
         StartCoroutine(WaitAndOpenShopUI());

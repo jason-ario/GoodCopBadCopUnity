@@ -21,8 +21,6 @@ public class ShiftManager : NetworkBehaviour
     private int _currentDay = 1;
     public int CurrentDay => _currentDay;
     [SerializeField] private StartShiftScreen _startShiftScreen;
-    [SerializeField] private FaxMachine _faxMachine;
-    [SerializeField] private float faxMachineDelay = 4f;
     [SerializeField] private AudioSource bellSound;
     [SerializeField] private AudioClip endOfLevelSound;
     [SerializeField] private AudioClip knockOnDoorSound;
@@ -84,14 +82,7 @@ public class ShiftManager : NetworkBehaviour
         bellSound.Play();
         _startShiftScreen.ShowDayNumber(_currentDay);
         OnShiftStart?.Invoke();
-        
-        yield return new WaitForSeconds(faxMachineDelay);
-
-        //_faxMachine.OnShiftStart();
-
-        //yield return new WaitForSeconds(10);
-
-        //GiveBonusBox();
+        yield break;
     }
 
     public void GiveBonusBox()
