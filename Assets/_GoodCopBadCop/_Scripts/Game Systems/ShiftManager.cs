@@ -53,7 +53,6 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private int couponsPenaltyPerQuarantined = 2;
 
     [Header("Environment Set Up")]
-    [SerializeField] private Animator rollingShutter;
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] DoorController _doorController;
@@ -165,10 +164,7 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(0.5f);
         windowLampController.TurnGreen();
 
-        yield return new WaitForSeconds(3f);
-        rollingShutter.SetBool("Open", true);
-
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(6f);
 
         SuspectController.Instance.NextSuspect();
     }
@@ -233,11 +229,7 @@ public class ShiftManager : NetworkBehaviour
 
     public void ResetEnvironment()
     {
-        _switchButton.Reset();
         windowLampController.TurnRed();
-        rollingShutter.SetBool("Open", false); 
-        rollingShutter.SetTrigger("Reset");
-        //_doorController.Reset();
         lever.Reset();
     }
 

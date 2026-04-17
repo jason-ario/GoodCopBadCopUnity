@@ -7,9 +7,9 @@ public class Lever : Interactable
     [SerializeField] private AudioSource leverAudio;
     [SerializeField] AudioClip leverOnSound;
     [SerializeField] AudioClip leverOffSound;
-
+    [SerializeField] private ShutterController shutter;
+    
     private static readonly int IsUpParam = Animator.StringToHash("IsUp");
-    [SerializeField] private GlassController _glassController;
 
     private NetworkVariable<bool> _isUp = new NetworkVariable<bool>(
         false,
@@ -44,11 +44,11 @@ public class Lever : Interactable
         _isUp.Value = !_isUp.Value;
         if (_isUp.Value)
         {
-            _glassController.SetUp();
+            shutter.OpenShutter();
         }
         else
         {
-            _glassController.SetDown();
+            shutter.CloseShutter();
         }
     }
 

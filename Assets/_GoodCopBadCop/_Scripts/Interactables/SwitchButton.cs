@@ -10,7 +10,6 @@ public class SwitchButton : Interactable
     [SerializeField] private Animator anim;
     [SerializeField] Transform ikTarget;
     [SerializeField] private CinemachineCamera _camera;
-    [SerializeField] private SwitchCover switchCover;
     public bool buttonReady = false;
 
     protected override void Awake()
@@ -80,11 +79,6 @@ public class SwitchButton : Interactable
         }
         
         anim.SetTrigger("Push");
-    }
-
-    public void Reset()
-    {
-        switchCover.Reset();
     }
 
     public void SetReady(bool b)
