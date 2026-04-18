@@ -20,7 +20,7 @@ public class Thermometer : PickableObject
     public override void OnStartUse()
     {
         isUsing = true;
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingThermometerGun", true);
+        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
         
         if (readingCoroutine != null) StopCoroutine(readingCoroutine);
         readingCoroutine = StartCoroutine(PerformReading());
@@ -60,7 +60,7 @@ public class Thermometer : PickableObject
     public override void OnStopUse()
     {
         isUsing = false;
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingThermometerGun", false);
+        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
         
         if (readingCoroutine != null)
         {

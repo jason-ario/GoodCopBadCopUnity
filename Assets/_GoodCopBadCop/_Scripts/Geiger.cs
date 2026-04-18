@@ -3,81 +3,87 @@ using System.Collections;
 
 public class GeigerNeedle : MonoBehaviour
 {
-    [Header("Rotation References")]
-    public Transform minRotation;
-    public Transform maxRotation;
+    [Header("Needle Rotation Ranges (local X only)")]
+    public float normalMinX = 40f;
+    public float normalMaxX = 60f;
+
+    public float suspiciousMinX = 60f;
+    public float suspiciousMaxX = 100f;
+
+    public float infectedMinX = 100f;
+    public float infectedMaxX = 140f;
+
+    [Header("Locked Local Rotation Axes")]
+    public float lockedY = 0f;
+    public float lockedZ = 0f;
 
     [Header("Motion")]
     public float twitchSpeed = 30f;
-    public float smoothSpeed = 10f;
+    public float smoothSpeed = 12f;
 
-    [Header("Scan Behavior")]
-    public float baseIntensity = 0.6f;
-    public float scanAggression = 1.2f;
-    public float surgeChance = 0.15f;
-    public float surgeMultiplier = 1.8f;
+    [Header("Needle Behavior")]
+    [Range(0f, 1f)] public float twitchAmount = 0.25f;
 
-    private float intensity = 1f;
-    private float currentValue = 0f; // 0 = min, 1 = max
-    private float targetValue = 0f;
+    private float displayedRadiation;
+    private float targetRadiation;
 
-    private Coroutine scanRoutine;
+    private float currentX;
+    private float targetX;
 
     void Start()
     {
-        if (!minRotation || !maxRotation)
-        {
-            Debug.LogError("Assign Min and Max rotation transforms.");
-            enabled = false;
-            return;
-        }
+        displayedRadiation = 0f;
+        targetRadiation = 0f;
+        currentX = normalMinX;
+        targetX = normalMinX;
 
-        scanRoutine = StartCoroutine(AutoScanRoutine());
+        transform.localRotation = Quaternion.Euler(currentX, lockedY, lockedZ);
     }
 
     void Update()
     {
-        AnimateNeedle();
-    }
+        displayedRadiation = Mathf.Lerp(displayedRadiation, targetRadiation, Time.deltaTime * smoothSpeed);
 
-    void AnimateNeedle()
-    {
-        // Baseline bias toward danger
-        float baseValue = baseIntensity * intensity;
+        float bandMinX;
+        float bandMaxX;
+        float bandT;
 
-        // Perlin twitch
-        float noise = Mathf.PerlinNoise(Time.time * twitchSpeed, 0f);
-        float biasedNoise = Mathf.Pow(noise, 0.35f);
-
-        // Blend base + twitch
-        targetValue = Mathf.Lerp(baseValue, biasedNoise, 0.6f);
-        targetValue = Mathf.Clamp01(targetValue);
-
-        // Smooth
-        currentValue = Mathf.Lerp(currentValue, targetValue, Time.deltaTime * smoothSpeed);
-
-        // Interpolate rotation safely
-        transform.localRotation = Quaternion.Slerp(
-            minRotation.localRotation,
-            maxRotation.localRotation,
-            currentValue
-        );
-    }
-
-    IEnumerator AutoScanRoutine()
-    {
-        while (true)
+        if (displayedRadiation < 60f)
         {
-            float randomBoost = Random.Range(0.7f, scanAggression);
-
-            if (Random.value < surgeChance)
-            {
-                randomBoost *= surgeMultiplier;
-            }
-
-            intensity = randomBoost;
-
-            yield return new WaitForSeconds(Random.Range(0.1f, 0.6f));
+            bandMinX = normalMinX;
+            bandMaxX = normalMaxX;
+            bandT = Mathf.InverseLerp(0f, 60f, displayedRadiation);
         }
+        else if (displayedRadiation < 100f)
+        {
+            bandMinX = suspiciousMinX;
+            bandMaxX = suspiciousMaxX;
+            bandT = Mathf.InverseLerp(60f, 100f, displayedRadiation);
+        }
+        else
+        {
+            bandMinX = infectedMinX;
+            bandMaxX = infectedMaxX;
+            bandT = Mathf.InverseLerp(100f, 140f, Mathf.Clamp(displayedRadiation, 100f, 140f));
+        }
+
+        // Base position from the radiation value
+        float baseX = Mathf.Lerp(bandMinX, bandMaxX, bandT);
+
+        // Small twitch layered on top
+        float noise = Mathf.PerlinNoise(Time.time * twitchSpeed, 0f);
+        float twitch = (noise - 0.5f) * 2f; // -1 to 1
+
+        float bandSize = bandMaxX - bandMinX;
+        targetX = baseX + (twitch * bandSize * twitchAmount);
+        targetX = Mathf.Clamp(targetX, bandMinX, bandMaxX);
+
+        currentX = Mathf.Lerp(currentX, targetX, Time.deltaTime * smoothSpeed);
+        transform.localRotation = Quaternion.Euler(currentX, lockedY, lockedZ);
+    }
+
+    public void SetRadiationValue(float radiation)
+    {
+        targetRadiation = Mathf.Max(0f, radiation);
     }
 }

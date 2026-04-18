@@ -76,7 +76,11 @@ public class SuspectCharacter : Interactable
 
     public bool IsInfected => _record != null && _record.InfectionScore >= 50;
     public int InfectionScore => _record != null ? _record.InfectionScore : 0;
-    
+    public int radiationAmount = 10;
+    private Vector2 radiationNormal = new Vector2(0, 30);
+    private Vector2 radiationSuspicious = new Vector2(31, 70);
+    private Vector2 radiationInfected = new Vector2(71, 100);
+
     string[] choices = new string[]
     {
         "State your reason for crossing.", 
@@ -122,8 +126,8 @@ public class SuspectCharacter : Interactable
         }
 
         suspectData = _record.Data;
-        characterStatus = _record.Status;
-
+        characterStatus = _record.Status; 
+        radiationAmount = (int)UnityEngine.Random.Range(radiationNormal.x, radiationNormal.y);
         ApplyRecordData();
         ApplyInfectionState();
     }
