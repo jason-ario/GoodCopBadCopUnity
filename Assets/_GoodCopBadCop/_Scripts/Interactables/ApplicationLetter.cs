@@ -8,7 +8,6 @@ public class ApplicationLetter : FolderItem
     [SerializeField] private TextMeshPro birthDateText;
     [SerializeField] private TextMeshPro sexText;
     [SerializeField] private TextMeshPro reasonForEntryText;
-    private FolderController insideThisFolder;
     
     public void SetInfo(SuspectData suspectData)
     {
