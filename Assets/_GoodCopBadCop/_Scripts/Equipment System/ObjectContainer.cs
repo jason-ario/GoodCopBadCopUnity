@@ -109,4 +109,24 @@ public class ObjectContainer : MonoBehaviour
     {
         return itemsHeld[newValue].ItemData;
     }
+
+    /// <summary>
+    /// Helper function that deletes all children of each item in itemsHeld.
+    /// Useful for cleanup operations in the editor.
+    /// </summary>
+    [ContextMenu("Delete All Children")]
+    public void DeleteAllChildren()
+    {
+        foreach (var item in itemsHeld)
+        {
+            if (item == null) continue;
+            
+            // Iterate backwards to safely delete children during iteration
+            for (int i = item.transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = item.transform.GetChild(i);
+                DestroyImmediate(child.gameObject);
+            }
+        }
+    }
 }
