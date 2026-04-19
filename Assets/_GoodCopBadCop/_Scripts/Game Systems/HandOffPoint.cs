@@ -7,7 +7,6 @@ public class HandOffPoint : PlacementBoard
     {
         base.OnPlaced(pickableObject);
         FolderController folderController = pickableObject.GetComponent<FolderController>();
-        Debug.Log("OnPlaced");
         
         if (folderController == null) return;
         

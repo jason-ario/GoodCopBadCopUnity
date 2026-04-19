@@ -565,6 +565,7 @@ public class SuspectController : NetworkBehaviour
     {
         SetCanInteract(false);
         spawnedFolder = folder;
+        folder.OnHandOff();
 
         switch (folder.StampType)
         {
