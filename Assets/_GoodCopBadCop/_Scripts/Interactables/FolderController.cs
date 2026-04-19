@@ -520,4 +520,82 @@ public class FolderController : PickableObject
             if(application != null){ application.SetInteractable(true); }
         }
     }
+
+    public bool ExamContainsAnomaly(Anomaly anomaly)
+    {
+        // Get all exam pages that are added to the folder
+        ExamPage[] examPages = new ExamPage[] 
+        { 
+            behaviorExamPage, 
+            realityExamPage, 
+            mutationExamPage, 
+            biologicalExamPage, 
+            documentationExamPage 
+        };
+
+        // Check each exam page for the anomaly
+        foreach (ExamPage examPage in examPages)
+        {
+            if (examPage == null) continue; 
+            Debug.Log("Checking exam page:" + examPage.name);
+
+            // Get the checklist items from the exam page
+            ChecklistItem[] checklistItems = examPage.GetComponent<ExamPage>().ChecklistItems;
+            
+            if (checklistItems == null) continue;
+
+            // Check each checklist item
+            foreach (ChecklistItem item in checklistItems)
+            {
+                Debug.Log($"Checking: {item.AnomalyTypeName} vs {anomaly.GetType().Name}, IsChecked: {item.IsChecked}");
+                
+                // Check if this checklist item references the anomaly type and is checked
+                if (item.AnomalyTypeName == anomaly.GetType().Name && item.IsChecked)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public Anomaly[] GetAnomaliesInFolder()
+    {
+        List<Anomaly> anomaliesFound = new List<Anomaly>();
+    
+        // Check all exam pages in the folder
+        ExamPage[] examPages = new ExamPage[]
+        {
+            behaviorExamPage,
+            mutationExamPage,
+            biologicalExamPage,
+            documentationExamPage,
+            realityExamPage
+        };
+    
+        // Iterate through each exam page
+        foreach (ExamPage examPage in examPages)
+        {
+            if (examPage == null) continue;
+        
+            // Get all checklist items in this exam page
+            ChecklistItem[] checklistItems = examPage.ChecklistItems;
+        
+            // Check which items have been marked as checked
+            foreach (ChecklistItem item in checklistItems)
+            {
+                if (item != null && item.IsChecked && item.AnomalyTypeReference is Anomaly anomaly)
+                {
+                    // Add the anomaly if it's not already in the list
+                    if (!anomaliesFound.Contains(anomaly))
+                    {
+                        anomaliesFound.Add(anomaly);
+                    }
+                }
+            }
+        }
+    
+        return anomaliesFound.ToArray();
+    }
 }

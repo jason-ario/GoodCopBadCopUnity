@@ -62,7 +62,15 @@ public class AnomalyController : MonoBehaviour
         for (int i = 0; i < anomalyCount; i++)
         {
             Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
-            Debug.Log("Activated" + anomaly.name);
+            
+            // Skip if this anomaly is already active
+            if (activeAnomalies.Contains(anomaly))
+            {
+                i--;
+                continue;
+            }
+            
+            Debug.Log("Activated " + anomaly.name);
             activeAnomalies.Add(anomaly);
             anomaly.ActivateAnomaly();
         }

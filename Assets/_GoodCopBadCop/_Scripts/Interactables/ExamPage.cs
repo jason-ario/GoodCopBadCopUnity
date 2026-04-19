@@ -9,6 +9,7 @@ public class ExamPage : FolderItem
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
 
+    public ChecklistItem[] ChecklistItems => _checklistItems;
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
         notebook.AnimateCheckMark(ikAnimationTarget);
@@ -21,4 +22,5 @@ public class ExamPage : FolderItem
             item.SetInteractable(b);
         }
     }
+    
 }

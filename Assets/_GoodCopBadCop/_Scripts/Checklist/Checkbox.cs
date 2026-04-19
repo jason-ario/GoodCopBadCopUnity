@@ -11,8 +11,8 @@ public class Checkbox : MonoBehaviour, IClickable
     [SerializeField] private Transform ikTargetTransform;
     [SerializeField] private AudioClip drawSound;
     bool _isInteractable = false;
-    private bool _isChecked;
-    
+    public bool IsChecked { get; private set; }
+
     private void OnEnable()
     {
         spriteRenderer.color = Color.clear;
@@ -20,7 +20,7 @@ public class Checkbox : MonoBehaviour, IClickable
 
     private void Check()
     {
-        _isChecked = true;
+        IsChecked = true;
         checklistItem.AnimateCheckMark(ikTargetTransform);
         ikAnimationTarget.SetTrigger("Check");
 
@@ -36,7 +36,7 @@ public class Checkbox : MonoBehaviour, IClickable
 
     public void Uncheck()
     {
-        _isChecked = false;
+        IsChecked = false;
         checkmark.SetActive(false);
     }
 
@@ -47,7 +47,7 @@ public class Checkbox : MonoBehaviour, IClickable
             return;
         }
 
-        if (_isChecked)
+        if (IsChecked)
         {
             Uncheck();
         }

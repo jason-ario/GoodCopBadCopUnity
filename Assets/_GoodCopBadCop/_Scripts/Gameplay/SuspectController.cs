@@ -44,6 +44,10 @@ public class SuspectController : NetworkBehaviour
     FolderController spawnedFolder;
 
     public UnityAction OnTakeFolder;
+    int accuracyOfLastSuspectFolder = 0;
+    private int correctlyMarkedAnomalies = 0;
+    private int totalAnomaliesInLastSuspect = 0;
+    private int incorrectlyMarkedAnomalies = 0;
 
     private void Awake()
     {
@@ -296,6 +300,77 @@ public class SuspectController : NetworkBehaviour
         }
     }
 
+    public int CalculatePercentAccuracy(FolderController folder, SuspectCharacter suspectCharacter)
+    {
+        // Get actual anomalies and marked anomalies
+        List<Anomaly> actualAnomalies = suspectCharacter.AnomalyController.activeAnomalies;
+        Anomaly[] markedAnomalies = folder.GetAnomaliesInFolder();
+        totalAnomaliesInLastSuspect = actualAnomalies.Count;
+        // Count correctly identified anomalies
+        correctlyMarkedAnomalies = 0;
+        foreach (var anomaly in actualAnomalies)
+        {
+            if (folder.ExamContainsAnomaly(anomaly))
+            {
+                correctlyMarkedAnomalies += 1;
+            }
+        }
+        
+        // Count incorrectly marked anomalies (false positives)
+        incorrectlyMarkedAnomalies = 0;
+        foreach (var anomaly in markedAnomalies)
+        {
+            if (!actualAnomalies.Contains(anomaly))
+            {
+                incorrectlyMarkedAnomalies += 1;
+            }
+        }
+        
+        // Calculate total possible anomalies to check
+        int totalPossibleAnomalies = actualAnomalies.Count + incorrectlyMarkedAnomalies;
+        
+        // Avoid division by zero
+        if (totalPossibleAnomalies == 0)
+        {
+            return 100; // Perfect score if no anomalies exist
+        }
+        
+        // Accuracy = (Correct - Incorrect) / Total
+        // This penalizes false positives while rewarding correct identifications
+        int accuracy = Mathf.Max(0, ((correctlyMarkedAnomalies - incorrectlyMarkedAnomalies) * 100) / totalPossibleAnomalies);
+        
+        return accuracy;
+    }
+
+    private void PayOutResults()
+    {
+        int couponPayout = Mathf.RoundToInt((accuracyOfLastSuspectFolder / 100f) * 10f);
+        
+        // Only pay out if there's a positive amount
+        if (couponPayout > 0)
+        {
+            GlobalHostVariables.Instance.AddMoney(couponPayout);
+        }
+        
+        // Log the results
+        if (totalAnomaliesInLastSuspect == 0)
+        {
+            Debug.Log($"No anomalies to identify. Paying out ${couponPayout} coupons.");
+        }
+        else if (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
+        {
+            Debug.Log($"Found all anomalies. Paying out ${couponPayout} coupons.");
+        }
+        else if (incorrectlyMarkedAnomalies > 0)
+        {
+            Debug.Log($"Found {correctlyMarkedAnomalies} correct and {incorrectlyMarkedAnomalies} incorrect anomalies. Paying out ${couponPayout} coupons.");
+        }
+        else
+        {
+            Debug.Log($"Found {correctlyMarkedAnomalies} of {totalAnomaliesInLastSuspect} anomalies. Paying out ${couponPayout} coupons.");
+        }
+    }
+
     public void Quarantine()
     {
         if (!IsServer) return;
@@ -465,6 +540,8 @@ public class SuspectController : NetworkBehaviour
         {
             suspectCharacter = null;
         }
+        
+        PayOutResults();
     }
 
     public void ResetSuspects()
@@ -481,6 +558,7 @@ public class SuspectController : NetworkBehaviour
         SetCanInteract(false);
         spawnedFolder = folder;
         folder.OnHandOff();
+        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);
 
         switch (folder.StampType)
         {

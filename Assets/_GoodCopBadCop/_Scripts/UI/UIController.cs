@@ -226,7 +226,11 @@ public class UIController : MonoBehaviour
         couponUIController.PlayCashAnimation(cashAmount);
     }
 
-    
+    public void EarnCash(int cashAmount)
+    {
+        PlayEarnedCashUIAnimation(cashAmount);
+    }
+
     public void OpenPauseMenu()
     {
         pauseMenuOpened = true;
