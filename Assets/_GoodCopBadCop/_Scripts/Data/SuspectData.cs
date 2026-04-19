@@ -23,7 +23,8 @@ public class SuspectData : ScriptableObject
     public Texture2D IDPhoto;
     public SuspectCharacter CharacterPrefab;
     public string[] reasonsForEntry;
-    
+    public string[] invalidReasonsForEntry;
+
     [Header("Dialogue")]
     public Response[] dialogueResponses; 
     public string[] entryDialogues;

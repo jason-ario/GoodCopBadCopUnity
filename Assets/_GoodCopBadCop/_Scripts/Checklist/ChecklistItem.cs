@@ -8,6 +8,7 @@ public class ChecklistItem : MonoBehaviour
     [SerializeField] Checkbox checkbox;
     [SerializeField] private SpriteRenderer sr;
     public bool IsChecking => examPage.IsChecking;
+    [SerializeField] private UnityEngine.Object anomalyTypeReference;
 
 
     private void Awake()
@@ -25,4 +26,5 @@ public class ChecklistItem : MonoBehaviour
     {
         checkbox.SetInteractable(value);
     }
+    
 }

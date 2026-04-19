@@ -567,52 +567,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
   m_PrefabInstance: {fileID: 276610247}
   m_PrefabAsset: {fileID: 0}
---- !u!28 &47899201
-Texture2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 4
-  m_Width: 32
-  m_Height: 1
-  m_CompleteImageSize: 128
-  m_MipsStripped: 0
-  m_TextureFormat: 4
-  m_MipCount: 1
-  m_IsReadable: 1
-  m_IsPreProcessed: 0
-  m_IgnoreMipmapLimit: 1
-  m_MipmapLimitGroupName: 
-  m_StreamingMipmaps: 0
-  m_StreamingMipmapsPriority: 0
-  m_VTOnly: 0
-  m_AlphaIsTransparency: 0
-  m_ImageCount: 1
-  m_TextureDimension: 2
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_LightmapFormat: 0
-  m_ColorSpace: 0
-  m_PlatformBlob: 
-  image data: 128
-  _typelessdata: 00ba24ff08bc2afa10be31f218c038e91fc23fe127c445d92fc74cd137c953c93fcb5ac147cd60b94ecf67b156d16ea85ed375a066d57b986ed8829076da89887edc908085de96788de09d7095e2a4679de4ab5fa5e6b157ade9b84fb4ebbf47bcedc63fc4efcc37ccf1d32fd4f3da26dcf5e11ee4f8e716ebfaee0ef3fcf506
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
 --- !u!1001 &56277077
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2271,7 +2225,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2051404822}
+  - {fileID: 1817563544}
   - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -7094,125 +7048,6 @@ Transform:
   - {fileID: 1219121653}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!21 &141841378
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: DustParticle(Clone)
-  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - VL_POINT
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3102
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Cookie2D:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _AlphaClip: 0
-    - _Blend: 0
-    - _BlendOp: 0
-    - _Border: 0.104
-    - _BumpScale: 1
-    - _CameraFadingEnabled: 0
-    - _CameraFarFadeDistance: 2
-    - _CameraNearFadeDistance: 1
-    - _ColorMode: 0
-    - _Cull: 2
-    - _Cutoff: 0.5
-    - _DistanceFallOff: 1
-    - _DistortionBlend: 0.5
-    - _DistortionEnabled: 0
-    - _DistortionStrength: 1
-    - _DistortionStrengthScaled: 0.1
-    - _DstBlend: 0
-    - _EnvironmentReflections: 1
-    - _FlipbookBlending: 0
-    - _FlipbookMode: 0
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _Metallic: 0
-    - _Mode: 0
-    - _NearClipDistance: 0
-    - _OcclusionStrength: 1
-    - _ParticleDistanceAtten: 100
-    - _QueueOffset: 0
-    - _ReceiveShadows: 1
-    - _Smoothness: 0.5
-    - _SmoothnessTextureChannel: 0
-    - _SoftParticlesEnabled: 0
-    - _SoftParticlesFarFadeDistance: 1
-    - _SoftParticlesNearFadeDistance: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _Surface: 0
-    - _WorkflowMode: 1
-    - _ZWrite: 1
-    m_Colors:
-    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
-    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
-    - _BoundsCenter: {r: 1.6808, g: 3.688, b: -12.9852, a: 0}
-    - _BoundsExtents: {r: 7.3049264, g: 7.304929, b: 5.990002, a: 0}
-    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _ConeAxis: {r: 1.5503256, g: 5.785896, b: -0.0000016735866, a: 35.880096}
-    - _ConeTipData: {r: 1.6808, g: 3.688, b: -12.9852, a: 0}
-    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
-    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ExtraGeoData: {r: -1, g: -0.027870605, b: 1, a: 5.99}
-    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
-    - _ParticleLightColor: {r: 0.35728303, g: 0.13376349, b: 0, a: 0.36}
-    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
-    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &145016366 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6094565531512232569, guid: 3fd148936d919e8408c9c01cc5081c31, type: 3}
@@ -8069,7 +7904,6 @@ Transform:
   - {fileID: 1322118039235566853}
   - {fileID: 304397511}
   - {fileID: 1685094408}
-  - {fileID: 2103658110}
   - {fileID: 1471028892}
   - {fileID: 478896468}
   - {fileID: 105545485}
@@ -8991,6 +8825,126 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
+--- !u!21 &246748596
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DustParticle(Clone)
+  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - VL_PHYSICAL_ATTEN
+  - VL_POINT
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3102
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Cookie2D:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Blend: 0
+    - _BlendOp: 0
+    - _Border: 0.741
+    - _BumpScale: 1
+    - _CameraFadingEnabled: 0
+    - _CameraFarFadeDistance: 2
+    - _CameraNearFadeDistance: 1
+    - _ColorMode: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DistanceFallOff: 115.33
+    - _DistortionBlend: 0.5
+    - _DistortionEnabled: 0
+    - _DistortionStrength: 1
+    - _DistortionStrengthScaled: 0.1
+    - _DstBlend: 0
+    - _EnvironmentReflections: 1
+    - _FlipbookBlending: 0
+    - _FlipbookMode: 0
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _Metallic: 0
+    - _Mode: 0
+    - _NearClipDistance: 0
+    - _OcclusionStrength: 1
+    - _ParticleDistanceAtten: 100
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _Smoothness: 0.5
+    - _SmoothnessTextureChannel: 0
+    - _SoftParticlesEnabled: 0
+    - _SoftParticlesFarFadeDistance: 1
+    - _SoftParticlesNearFadeDistance: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _Surface: 0
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
+    - _BoundsCenter: {r: -2.8234656, g: 3.9121468, b: -15.337001, a: 0}
+    - _BoundsExtents: {r: 3.385505, g: 3.3999996, b: 3.385505, a: 0}
+    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _ConeAxis: {r: 3.4, g: 0, b: 0.000009322167, a: 11.56}
+    - _ConeTipData: {r: -2.8234656, g: 3.9121468, b: -15.337001, a: 0}
+    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
+    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ExtraGeoData: {r: -1, g: -0.00075006665, b: 0.008670771, a: 3.4}
+    - _FallOff: {r: 0.1, g: 2.51, b: 0.31, a: 0}
+    - _ParticleLightColor: {r: 0.060000002, g: 0.00070588244, b: 0, a: 0.060000002}
+    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
+    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &253594148
 GameObject:
   m_ObjectHideFlags: 0
@@ -9109,7 +9063,7 @@ Camera:
     serializedVersion: 2
     m_Bits: 4294967293
   m_RenderingPath: -1
-  m_TargetTexture: {fileID: 1573184446}
+  m_TargetTexture: {fileID: 1715448822}
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 0
@@ -9176,6 +9130,43 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e668950d7a32e4f46850719a9aa6b81a, type: 3}
+--- !u!84 &256988154
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 256
+  m_Height: 256
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 0
+  m_ColorFormat: 8
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1001 &257670804
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12151,7 +12142,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -0.104648605, g: 0.9845287, b: -0.14054155, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1 &509839282
@@ -12512,7 +12503,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -0.104648605, g: 0.9845287, b: -0.14054155, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1 &526815321
@@ -13514,6 +13505,125 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3ebed73a1552cbc47838f57d2993a673, type: 3}
+--- !u!21 &569323199
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DustParticle(Clone)
+  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - VL_POINT
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3102
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Cookie2D:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Blend: 0
+    - _BlendOp: 0
+    - _Border: 0.5
+    - _BumpScale: 1
+    - _CameraFadingEnabled: 0
+    - _CameraFarFadeDistance: 2
+    - _CameraNearFadeDistance: 1
+    - _ColorMode: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DistanceFallOff: 6.77
+    - _DistortionBlend: 0.5
+    - _DistortionEnabled: 0
+    - _DistortionStrength: 1
+    - _DistortionStrengthScaled: 0.1
+    - _DstBlend: 0
+    - _EnvironmentReflections: 1
+    - _FlipbookBlending: 0
+    - _FlipbookMode: 0
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _Metallic: 0
+    - _Mode: 0
+    - _NearClipDistance: 0
+    - _OcclusionStrength: 1
+    - _ParticleDistanceAtten: 100
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _Smoothness: 0.5
+    - _SmoothnessTextureChannel: 0
+    - _SoftParticlesEnabled: 0
+    - _SoftParticlesFarFadeDistance: 1
+    - _SoftParticlesNearFadeDistance: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _Surface: 0
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
+    - _BoundsCenter: {r: -0.102999985, g: 2.6701472, b: -10.896365, a: 0}
+    - _BoundsExtents: {r: 0.65718454, g: 0.66, b: 0.65718454, a: 0}
+    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _ConeAxis: {r: 0, g: 0, b: 0.66, a: 0.43560004}
+    - _ConeTipData: {r: -0.102999985, g: 2.6701472, b: -10.896365, a: 0}
+    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
+    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ExtraGeoData: {r: -1, g: -0.33909658, b: 0.14771049, a: 0.66}
+    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
+    - _ParticleLightColor: {r: 0.120000005, g: 0.0014117648, b: 0, a: 0.120000005}
+    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
+    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!4 &569784663 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5513630259248824368, guid: 87812f70e61ffc243a48241e6a2d569b, type: 3}
@@ -13817,6 +13927,125 @@ Animator:
   m_CorrespondingSourceObject: {fileID: 2335741913713459789, guid: 79d5b7778367bc549b966d0dc791db69, type: 3}
   m_PrefabInstance: {fileID: 4878803985776590491}
   m_PrefabAsset: {fileID: 0}
+--- !u!21 &606365691
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DustParticle(Clone)
+  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - VL_POINT
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3102
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Cookie2D:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Blend: 0
+    - _BlendOp: 0
+    - _Border: 0.104
+    - _BumpScale: 1
+    - _CameraFadingEnabled: 0
+    - _CameraFarFadeDistance: 2
+    - _CameraNearFadeDistance: 1
+    - _ColorMode: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DistanceFallOff: 1
+    - _DistortionBlend: 0.5
+    - _DistortionEnabled: 0
+    - _DistortionStrength: 1
+    - _DistortionStrengthScaled: 0.1
+    - _DstBlend: 0
+    - _EnvironmentReflections: 1
+    - _FlipbookBlending: 0
+    - _FlipbookMode: 0
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _Metallic: 0
+    - _Mode: 0
+    - _NearClipDistance: 0
+    - _OcclusionStrength: 1
+    - _ParticleDistanceAtten: 100
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _Smoothness: 0.5
+    - _SmoothnessTextureChannel: 0
+    - _SoftParticlesEnabled: 0
+    - _SoftParticlesFarFadeDistance: 1
+    - _SoftParticlesNearFadeDistance: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _Surface: 0
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
+    - _BoundsCenter: {r: 1.6808, g: 3.688, b: -12.9852, a: 0}
+    - _BoundsExtents: {r: 7.3049264, g: 7.304929, b: 5.990002, a: 0}
+    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _ConeAxis: {r: 1.5503256, g: 5.785896, b: -0.0000016735866, a: 35.880096}
+    - _ConeTipData: {r: 1.6808, g: 3.688, b: -12.9852, a: 0}
+    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
+    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ExtraGeoData: {r: -1, g: -0.027870605, b: 1, a: 5.99}
+    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
+    - _ParticleLightColor: {r: 0.35728303, g: 0.13376349, b: 0, a: 0.36}
+    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
+    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!4 &606645689 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6725257036052532914, guid: e668950d7a32e4f46850719a9aa6b81a, type: 3}
@@ -14137,7 +14366,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -1, g: -0, b: -0.0000027418137, a: 1.37}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!4 &614351818 stripped
@@ -14642,7 +14871,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0.7, g: 0.3, b: 0, a: 0}
     - _ToLightDir: {r: -0, g: -0, b: -1, a: 0.61}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1001 &630483213
@@ -14826,52 +15055,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6725257036052532914, guid: e668950d7a32e4f46850719a9aa6b81a, type: 3}
   m_PrefabInstance: {fileID: 1848254479}
   m_PrefabAsset: {fileID: 0}
---- !u!28 &651038769
-Texture2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 4
-  m_Width: 32
-  m_Height: 1
-  m_CompleteImageSize: 128
-  m_MipsStripped: 0
-  m_TextureFormat: 4
-  m_MipCount: 1
-  m_IsReadable: 1
-  m_IsPreProcessed: 0
-  m_IgnoreMipmapLimit: 1
-  m_MipmapLimitGroupName: 
-  m_StreamingMipmaps: 0
-  m_StreamingMipmapsPriority: 0
-  m_VTOnly: 0
-  m_AlphaIsTransparency: 0
-  m_ImageCount: 1
-  m_TextureDimension: 2
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_LightmapFormat: 0
-  m_ColorSpace: 0
-  m_PlatformBlob: 
-  image data: 128
-  _typelessdata: 012f0d00012e0d58012d0cb0012b0cff012a0cff01290bff01280bff01260aff01250aff01240aff012209ff012109ff012009ff011f08ff011d08ff011c08ff011b07ff011a07ff011807ff001706ff001606ff001506ff001305ff001205ff001105ff000f04ff000e04ff000d03ff000a03ff000702ff000501ff000200ff
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
 --- !u!1001 &657721973
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -20810,7 +20993,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 141841378}
+  - {fileID: 606365691}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -31778,7 +31961,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: 0.104648344, g: 0.9845286, b: 0.1405427, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1 &774271932
@@ -33436,7 +33619,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 939012097}
+  - {fileID: 569323199}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -38311,43 +38494,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
---- !u!84 &922814026
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 256
-  m_Height: 256
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 0
-  m_ColorFormat: 8
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1001 &924366157
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -38516,125 +38662,6 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 3002142673963670633, guid: 7c185eb5b47a22245823e5b0b289390a, type: 3}
   m_PrefabInstance: {fileID: 4218869433469764645}
   m_PrefabAsset: {fileID: 0}
---- !u!21 &939012097
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: DustParticle(Clone)
-  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - VL_POINT
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3102
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Cookie2D:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _AlphaClip: 0
-    - _Blend: 0
-    - _BlendOp: 0
-    - _Border: 0.5
-    - _BumpScale: 1
-    - _CameraFadingEnabled: 0
-    - _CameraFarFadeDistance: 2
-    - _CameraNearFadeDistance: 1
-    - _ColorMode: 0
-    - _Cull: 2
-    - _Cutoff: 0.5
-    - _DistanceFallOff: 6.77
-    - _DistortionBlend: 0.5
-    - _DistortionEnabled: 0
-    - _DistortionStrength: 1
-    - _DistortionStrengthScaled: 0.1
-    - _DstBlend: 0
-    - _EnvironmentReflections: 1
-    - _FlipbookBlending: 0
-    - _FlipbookMode: 0
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _Metallic: 0
-    - _Mode: 0
-    - _NearClipDistance: 0
-    - _OcclusionStrength: 1
-    - _ParticleDistanceAtten: 100
-    - _QueueOffset: 0
-    - _ReceiveShadows: 1
-    - _Smoothness: 0.5
-    - _SmoothnessTextureChannel: 0
-    - _SoftParticlesEnabled: 0
-    - _SoftParticlesFarFadeDistance: 1
-    - _SoftParticlesNearFadeDistance: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _Surface: 0
-    - _WorkflowMode: 1
-    - _ZWrite: 1
-    m_Colors:
-    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
-    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
-    - _BoundsCenter: {r: -0.102999985, g: 2.6701472, b: -10.896365, a: 0}
-    - _BoundsExtents: {r: 0.65718454, g: 0.66, b: 0.65718454, a: 0}
-    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _ConeAxis: {r: 0, g: 0, b: 0.66, a: 0.43560004}
-    - _ConeTipData: {r: -0.102999985, g: 2.6701472, b: -10.896365, a: 0}
-    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
-    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ExtraGeoData: {r: -1, g: -0.33909658, b: 0.14771049, a: 0.66}
-    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
-    - _ParticleLightColor: {r: 0.120000005, g: 0.0014117648, b: 0, a: 0.120000005}
-    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
-    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!4 &942430942 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
@@ -44881,11 +44908,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3010795657667509766, guid: d5e3462e97c349e469c4e9bb4ca0b88f, type: 3}
   m_PrefabInstance: {fileID: 1030095963}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1033384483 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5085653075128491231, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
-  m_PrefabInstance: {fileID: 1318711583692110782}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1036671863
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -46464,7 +46486,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0.96, g: 0.04000002, b: 0, a: 0}
     - _ToLightDir: {r: -0, g: 0.3569197, b: -0.9341351, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!4 &1169272682 stripped
@@ -50150,7 +50172,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2081496348}
+  - {fileID: 246748596}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -58675,6 +58697,52 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1512017071}
   m_Mesh: {fileID: 8890812919789674552, guid: 2ae3144f0d7b644ddb34ee80373a475a, type: 3}
+--- !u!28 &1515899011
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 32
+  m_Height: 1
+  m_CompleteImageSize: 128
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 128
+  _typelessdata: 00ba24ff08bc2afa10be31f218c038e91fc23fe127c445d92fc74cd137c953c93fcb5ac147cd60b94ecf67b156d16ea85ed375a066d57b986ed8829076da89887edc908085de96788de09d7095e2a4679de4ab5fa5e6b157ade9b84fb4ebbf47bcedc63fc4efcc37ccf1d32fd4f3da26dcf5e11ee4f8e716ebfaee0ef3fcf506
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
 --- !u!4 &1521287664 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 276771538485411765, guid: ad0080513ac7c104c9866969da20b35b, type: 3}
@@ -60615,43 +60683,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5958687131904841445, guid: 7cc42bad9bc4c794eba79e00813b968f, type: 3}
   m_PrefabInstance: {fileID: 7533760988250809359}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &1573184446
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 256
-  m_Height: 256
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 0
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1001 &1593665755
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -62967,7 +62998,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -0.104648605, g: 0.9845287, b: -0.14054155, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!4 &1661111559 stripped
@@ -65123,6 +65154,43 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!84 &1715448822
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 256
+  m_Height: 256
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 0
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1717803139
 GameObject:
   m_ObjectHideFlags: 0
@@ -65246,7 +65314,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DepthGradientTex:
-        m_Texture: {fileID: 651038769}
+        m_Texture: {fileID: 1816616054}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailTex:
@@ -65258,7 +65326,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _HeightGradientTex:
-        m_Texture: {fileID: 47899201}
+        m_Texture: {fileID: 1515899011}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -65266,7 +65334,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NoiseTex:
-        m_Texture: {fileID: 922814026}
+        m_Texture: {fileID: 256988154}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -65290,7 +65358,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DetailColor: {r: 0.18877359, g: 0.18877359, b: 0.18877359, a: 0}
     - _DetailData: {r: 0.464, g: -0.5, b: 0.04, a: 1}
-    - _DetailWindDirection: {r: -0.02205193, g: 0, b: 0, a: 0}
+    - _DetailWindDirection: {r: -0.094156, g: 0, b: 0, a: 0}
     - _DistanceData: {r: 0, g: -1, b: 10000, a: 0}
     - _FogOfWarCenter: {r: 0, g: 0, b: 0, a: 1}
     - _FogOfWarCenterAdjusted: {r: 0, g: 0, b: 0, a: 1}
@@ -65302,7 +65370,7 @@ Material:
     - _ShadowData: {r: 0.5, g: 0, b: 250, a: 0}
     - _SpecularColor: {r: 0.5, g: 0.5, b: 0.5, a: 0}
     - _SunDir: {r: 0, g: 1, b: 0, a: 0}
-    - _WindDirection: {r: -0.02205193, g: 0, b: 0, a: 0}
+    - _WindDirection: {r: -0.094156, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1001 &1724038490
@@ -66259,7 +66327,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: 0.1046492, g: 0.9845287, b: 0.14054103, a: 0.97}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1001 &1743523891
@@ -72288,6 +72356,171 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!28 &1816616054
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 32
+  m_Height: 1
+  m_CompleteImageSize: 128
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 128
+  _typelessdata: 012f0d00012e0d58012d0cb0012b0cff012a0cff01290bff01280bff01260aff01250aff01240aff012209ff012109ff012009ff011f08ff011d08ff011c08ff011b07ff011a07ff011807ff001706ff001606ff001506ff001305ff001205ff001105ff000f04ff000e04ff000d03ff000a03ff000702ff000501ff000200ff
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
+--- !u!21 &1817563544
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DustParticle(Clone)
+  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - VL_POINT
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3102
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Cookie2D:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Blend: 0
+    - _BlendOp: 0
+    - _Border: 0.104
+    - _BumpScale: 1
+    - _CameraFadingEnabled: 0
+    - _CameraFarFadeDistance: 2
+    - _CameraNearFadeDistance: 1
+    - _ColorMode: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DistanceFallOff: 1
+    - _DistortionBlend: 0.5
+    - _DistortionEnabled: 0
+    - _DistortionStrength: 1
+    - _DistortionStrengthScaled: 0.1
+    - _DstBlend: 0
+    - _EnvironmentReflections: 1
+    - _FlipbookBlending: 0
+    - _FlipbookMode: 0
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _Metallic: 0
+    - _Mode: 0
+    - _NearClipDistance: 0
+    - _OcclusionStrength: 1
+    - _ParticleDistanceAtten: 100
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _Smoothness: 0.5
+    - _SmoothnessTextureChannel: 0
+    - _SoftParticlesEnabled: 0
+    - _SoftParticlesFarFadeDistance: 1
+    - _SoftParticlesNearFadeDistance: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _Surface: 0
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
+    - _BoundsCenter: {r: 2.9419873, g: 1.8844491, b: -10.9452915, a: 0}
+    - _BoundsExtents: {r: 12.781464, g: 9.957341, b: 12.806921, a: 0}
+    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _ConeAxis: {r: 0, g: 10.000001, b: -0.0000014342368, a: 100}
+    - _ConeTipData: {r: 2.9419873, g: 1.8844491, b: -10.9452915, a: 0}
+    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
+    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ExtraGeoData: {r: -1, g: -0.01, b: 1, a: 10}
+    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
+    - _ParticleLightColor: {r: 0.126, g: 0.034105733, b: 0, a: 0.126}
+    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
+    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1819246437
 GameObject:
   m_ObjectHideFlags: 0
@@ -72947,7 +73180,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -0, g: -1.0000001, b: 0.00000014342368, a: 4.72}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!117 &1824760699
@@ -73785,32 +74018,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
   m_PrefabInstance: {fileID: 352680968}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1880599725 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5086203889503627133, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
-  m_PrefabInstance: {fileID: 1318711583692110782}
-  m_PrefabAsset: {fileID: 0}
---- !u!65 &1880599729
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1880599725}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 6.875635, y: 3.8420424, z: 0.43852067}
-  m_Center: {x: 0.000762105, y: -0.19349204, z: -0.11366716}
 --- !u!224 &1880661377 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1026131131764516893, guid: 7c185eb5b47a22245823e5b0b289390a, type: 3}
@@ -73831,6 +74038,10 @@ PrefabInstance:
     - target: {fileID: 2097769812998611096, guid: 57b600371949c39469c5d4bf875500b6, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 2409044353
+      objectReference: {fileID: 0}
+    - target: {fileID: 2365163800595762591, guid: 57b600371949c39469c5d4bf875500b6, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2578395100531234512, guid: 57b600371949c39469c5d4bf875500b6, type: 3}
       propertyPath: m_Pivot.x
@@ -75784,125 +75995,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000010947026576, guid: 7bf1a4b26f0d5e7419b64deced1cecd3, type: 3}
   m_PrefabInstance: {fileID: 2048684025}
   m_PrefabAsset: {fileID: 0}
---- !u!21 &2051404822
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: DustParticle(Clone)
-  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - VL_POINT
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3102
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Cookie2D:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _AlphaClip: 0
-    - _Blend: 0
-    - _BlendOp: 0
-    - _Border: 0.104
-    - _BumpScale: 1
-    - _CameraFadingEnabled: 0
-    - _CameraFarFadeDistance: 2
-    - _CameraNearFadeDistance: 1
-    - _ColorMode: 0
-    - _Cull: 2
-    - _Cutoff: 0.5
-    - _DistanceFallOff: 1
-    - _DistortionBlend: 0.5
-    - _DistortionEnabled: 0
-    - _DistortionStrength: 1
-    - _DistortionStrengthScaled: 0.1
-    - _DstBlend: 0
-    - _EnvironmentReflections: 1
-    - _FlipbookBlending: 0
-    - _FlipbookMode: 0
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _Metallic: 0
-    - _Mode: 0
-    - _NearClipDistance: 0
-    - _OcclusionStrength: 1
-    - _ParticleDistanceAtten: 100
-    - _QueueOffset: 0
-    - _ReceiveShadows: 1
-    - _Smoothness: 0.5
-    - _SmoothnessTextureChannel: 0
-    - _SoftParticlesEnabled: 0
-    - _SoftParticlesFarFadeDistance: 1
-    - _SoftParticlesNearFadeDistance: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _Surface: 0
-    - _WorkflowMode: 1
-    - _ZWrite: 1
-    m_Colors:
-    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
-    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
-    - _BoundsCenter: {r: 2.9419873, g: 1.8844491, b: -10.9452915, a: 0}
-    - _BoundsExtents: {r: 12.781464, g: 9.957341, b: 12.806921, a: 0}
-    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _ConeAxis: {r: 0, g: 10.000001, b: -0.0000014342368, a: 100}
-    - _ConeTipData: {r: 2.9419873, g: 1.8844491, b: -10.9452915, a: 0}
-    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
-    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ExtraGeoData: {r: -1, g: -0.01, b: 1, a: 10}
-    - _FallOff: {r: 1, g: 2, b: 1, a: 0}
-    - _ParticleLightColor: {r: 0.126, g: 0.034105733, b: 0, a: 0.126}
-    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
-    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1001 &2054253229
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -76354,126 +76446,6 @@ MonoBehaviour:
   itemsThatCanInteractWith: []
   interactText: Open
   gateAnimator: {fileID: 1317181861}
---- !u!21 &2081496348
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: DustParticle(Clone)
-  m_Shader: {fileID: 4800000, guid: fc2655527708b470d9b23bfe28ede3e9, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - VL_PHYSICAL_ATTEN
-  - VL_POINT
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3102
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: ed6dc1204147d451d96326c7fedc6727, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Cookie2D:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _AlphaClip: 0
-    - _Blend: 0
-    - _BlendOp: 0
-    - _Border: 0.741
-    - _BumpScale: 1
-    - _CameraFadingEnabled: 0
-    - _CameraFarFadeDistance: 2
-    - _CameraNearFadeDistance: 1
-    - _ColorMode: 0
-    - _Cull: 2
-    - _Cutoff: 0.5
-    - _DistanceFallOff: 115.33
-    - _DistortionBlend: 0.5
-    - _DistortionEnabled: 0
-    - _DistortionStrength: 1
-    - _DistortionStrengthScaled: 0.1
-    - _DstBlend: 0
-    - _EnvironmentReflections: 1
-    - _FlipbookBlending: 0
-    - _FlipbookMode: 0
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _Metallic: 0
-    - _Mode: 0
-    - _NearClipDistance: 0
-    - _OcclusionStrength: 1
-    - _ParticleDistanceAtten: 100
-    - _QueueOffset: 0
-    - _ReceiveShadows: 1
-    - _Smoothness: 0.5
-    - _SmoothnessTextureChannel: 0
-    - _SoftParticlesEnabled: 0
-    - _SoftParticlesFarFadeDistance: 1
-    - _SoftParticlesNearFadeDistance: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _Surface: 0
-    - _WorkflowMode: 1
-    - _ZWrite: 1
-    m_Colors:
-    - _AreaExtents: {r: 0, g: 0, b: 0, a: 1}
-    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _BaseColorAddSubDiff: {r: 0, g: 0, b: 0, a: 0}
-    - _BoundsCenter: {r: -2.8234656, g: 3.9121468, b: -15.337001, a: 0}
-    - _BoundsExtents: {r: 3.385505, g: 3.3999996, b: 3.385505, a: 0}
-    - _CameraFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-    - _ConeAxis: {r: 3.4, g: 0, b: 0.000009322167, a: 11.56}
-    - _ConeTipData: {r: -2.8234656, g: 3.9121468, b: -15.337001, a: 0}
-    - _Cookie2D_Offset: {r: 0, g: 0, b: 0, a: 0}
-    - _Cookie2D_SS: {r: 1, g: 1, b: 0, a: 0}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ExtraGeoData: {r: -1, g: -0.00075006665, b: 0.008670771, a: 3.4}
-    - _FallOff: {r: 0.1, g: 2.51, b: 0.31, a: 0}
-    - _ParticleLightColor: {r: 0.060000002, g: 0.00070588244, b: 0, a: 0.060000002}
-    - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
-    - _SoftParticleFadeParams: {r: 0, g: 0, b: 0, a: 0}
-    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &2094104111
 GameObject:
   m_ObjectHideFlags: 0
@@ -81776,11 +81748,6 @@ ParticleSystem:
         m_PostInfinity: 2
         m_RotationOrder: 4
     vectorLabel1_3: W
---- !u!4 &2103658110 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-  m_PrefabInstance: {fileID: 8298400824247132693}
-  m_PrefabAsset: {fileID: 0}
 --- !u!21 &2107831130
 Material:
   serializedVersion: 8
@@ -81861,7 +81828,7 @@ Material:
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowIntensity: {r: 0, g: 1, b: 0, a: 0}
     - _ToLightDir: {r: -0.25881898, g: -0.9659259, b: 0.00000027939677, a: 4.72}
-    - _WindDirection: {r: 0.033077896, g: 0.02205193, b: 0, a: 3.708204}
+    - _WindDirection: {r: 0.141234, g: 0.094156, b: 0, a: 17.922987}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!1 &2110622561
@@ -84165,6 +84132,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6423594408117941045, guid: 356c346e20010ab47ad1a737f7ae9914, type: 3}
       insertIndex: -1
       addedObject: {fileID: 808559285800501788}
+    - targetCorrespondingSourceObject: {fileID: 6423594408117941045, guid: 356c346e20010ab47ad1a737f7ae9914, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 808559285800501790}
   m_SourcePrefab: {fileID: 100100000, guid: 356c346e20010ab47ad1a737f7ae9914, type: 3}
 --- !u!1 &808559285800501787 stripped
 GameObject:
@@ -84201,6 +84171,23 @@ MonoBehaviour:
             m_StringArgument: 
             m_BoolArgument: 0
           m_CallState: 2
+--- !u!114 &808559285800501790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 808559285800501787}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9db208353e19bda47ae49442c1844f18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  mutationAnomaliesLocked: 1
+  behaviorAnomaliesLocked: 1
+  biologicalAnomaliesLocked: 1
+  documentationAnomaliesLocked: 0
+  environmentAnomaliesLocked: 1
 --- !u!4 &892454710911466550
 Transform:
   m_ObjectHideFlags: 0
@@ -84373,7 +84360,8 @@ PrefabInstance:
       propertyPath: m_Name
       value: Daily Newspaper Contents
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 2668978239021135143, guid: 914681e22fa3afd4b8fee6789256b0af, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
@@ -84626,13 +84614,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 5085653075128491231, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 3265198273374271521}
-    - targetCorrespondingSourceObject: {fileID: 5086203889503627133, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1880599729}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
 --- !u!1001 &1322118039235566852
 PrefabInstance:
@@ -91012,65 +90994,12 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2888475544644796808, guid: 9cbacc8a457d3ab428e9d9822980a2b8, type: 3}
   m_PrefabInstance: {fileID: 1318711583692110782}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1033384483}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a8b087683baf6247ae9c0c860cb02ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
---- !u!114 &3265198273374271521
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1033384483}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 180ecf9b41d478f468eb3e9083753217, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseSource
-  ImpulseDefinition:
-    ImpulseChannel: 1
-    ImpulseShape: 3
-    CustomImpulseShape:
-      serializedVersion: 2
-      m_Curve: []
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
-    ImpulseDuration: 0.5
-    ImpulseType: 0
-    DissipationRate: 0.25
-    RawSignal: {fileID: 0}
-    AmplitudeGain: 1
-    FrequencyGain: 1
-    RepeatMode: 0
-    Randomize: 1
-    TimeEnvelope:
-      AttackShape:
-        serializedVersion: 2
-        m_Curve: []
-        m_PreInfinity: 2
-        m_PostInfinity: 2
-        m_RotationOrder: 4
-      DecayShape:
-        serializedVersion: 2
-        m_Curve: []
-        m_PreInfinity: 2
-        m_PostInfinity: 2
-        m_RotationOrder: 4
-      AttackTime: 0
-      SustainTime: 0.2
-      DecayTime: 0.7
-      ScaleWithImpact: 1
-      HoldForever: 0
-    ImpactRadius: 100
-    DirectionMode: 0
-    DissipationMode: 2
-    DissipationDistance: 100
-    PropagationSpeed: 343
-  DefaultVelocity: {x: 0.01, y: 0.02, z: 0}
 --- !u!4 &3285339495214449027
 Transform:
   m_ObjectHideFlags: 0
@@ -94364,6 +94293,10 @@ PrefabInstance:
       value: 0.295
       objectReference: {fileID: 0}
     - target: {fileID: 2165246397187875231, guid: 07dceda1fceba0444a6f7cbebb775093, type: 3}
+      propertyPath: suspectList
+      value: 
+      objectReference: {fileID: 11400000, guid: 99ffb1a8abc9764469e0220edc0ec058, type: 2}
+    - target: {fileID: 2165246397187875231, guid: 07dceda1fceba0444a6f7cbebb775093, type: 3}
       propertyPath: applicationForm
       value: 
       objectReference: {fileID: 6207787727289640355, guid: 9d0f54ee90d1a0541a9296be09f10a50, type: 3}
@@ -97343,67 +97276,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6cfa52b0d0e9de14e93c00912b570e88, type: 3}
---- !u!1001 &8298400824247132693
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 177339772}
-    m_Modifications:
-    - target: {fileID: 1636204427427716586, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: anomalyChance
-      value: 64.3
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2794157685633009371, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6418941365084630539, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
-      propertyPath: m_Name
-      value: AnomalyManager
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 04bc88522fc49fe418d1b69a7544d9fc, type: 3}
 --- !u!23 &8458160273049531635
 MeshRenderer:
   m_ObjectHideFlags: 0

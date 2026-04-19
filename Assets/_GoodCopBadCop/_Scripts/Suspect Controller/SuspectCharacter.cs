@@ -26,14 +26,6 @@ public class SuspectCharacter : Interactable
     public string ExpirationDate => suspectData.EntryPermitExpiryDate;
     public bool SealActive => sealActive;
     
-    [Header("Character State")]
-    public CharacterStatus characterStatus;
-
-    [Header("Runtime Record")]
-    [SerializeField] private bool autoInitializeFromDatabase = true;
-    private SuspectRecord _record;
-    public SuspectRecord Record => _record;
-    
     [Header("Suspect Set Up")]
     public FLookAnimator lookAnimator;
     public Animator animator;
@@ -73,9 +65,6 @@ public class SuspectCharacter : Interactable
     [Header("Anomalies")]
     [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
-
-    public bool IsInfected => _record != null && _record.InfectionScore >= 50;
-    public int InfectionScore => _record != null ? _record.InfectionScore : 0;
     public int radiationAmount = 10;
     private Vector2 radiationNormal = new Vector2(0, 30);
     private Vector2 radiationSuspicious = new Vector2(31, 70);
@@ -101,57 +90,10 @@ public class SuspectCharacter : Interactable
         }
     }
 
-    private void Start()
+    public void Initialize()
     {
-        if (autoInitializeFromDatabase && suspectData != null && SuspectDatabase.Instance != null)
-        {
-            InitializeFromDatabase();
-        }
-    }
-
-    public void InitializeFromDatabase()
-    {
-        SuspectRecord record = SuspectDatabase.Instance.GetRecord(suspectData);
-        Initialize(record);
-    }
-
-    public void Initialize(SuspectRecord record)
-    {
-        _record = record;
-
-        if (_record == null)
-        {
-            Debug.LogError($"SuspectCharacter '{name}' initialized with null record.");
-            return;
-        }
-
-        suspectData = _record.Data;
-        characterStatus = _record.Status; 
-        radiationAmount = (int)UnityEngine.Random.Range(radiationNormal.x, radiationNormal.y);
-        ApplyRecordData();
-        ApplyInfectionState();
-    }
-
-    private void ApplyRecordData()
-    {
-        if (_record == null)
-            return;
-
-        characterStatus = _record.Status;
-    }
-
-    private void ApplyInfectionState()
-    {
-        if (_record == null)
-            return;
-
-        if (anomalyController == null)
-        {
-            Debug.LogWarning($"SuspectCharacter '{name}' has no AnomalyController assigned.");
-            return;
-        }
-
-        anomalyController.GenerateAndApplyAnomalies(_record.InfectionScore);
+        Debug.Log("Initializing Suspect Character");
+        anomalyController.Initialize();
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -263,13 +205,6 @@ public class SuspectCharacter : Interactable
         yield return new WaitForSeconds(1f);
         SuspectController.Instance.SpawnPaperwork();
     }
-    public void RegenerateAnomaliesFromCurrentScore()
-    {
-        if (_record == null || anomalyController == null)
-            return;
-
-        anomalyController.GenerateAndApplyAnomalies(_record.InfectionScore);
-    }
     
     public void SetFolderGivingAnimation(FolderGivingAnimation folderGivingAnimation)
     {
@@ -287,17 +222,9 @@ public class SuspectCharacter : Interactable
     public string GetEntryDialogue()
     {
         string entryDialogue = "";
-        if(InfectionScore >= 50)
-        {
-            entryDialogue = suspectData.anomalyEntryDialogues[
-                UnityEngine.Random.Range(0, suspectData.anomalyEntryDialogues.Length)];
-        }
-        else
-        {
-            entryDialogue =
-                suspectData.anomalyEntryDialogues[
-                    UnityEngine.Random.Range(0, suspectData.entryDialogues.Length)];
-        }
+        
+        entryDialogue = suspectData.entryDialogues[
+            UnityEngine.Random.Range(0, suspectData.entryDialogues.Length)];
 
         return entryDialogue;
     }

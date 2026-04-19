@@ -9,15 +9,15 @@ public class TerminalRecordListUI : MonoBehaviour
 
     private readonly List<TerminalListItem> _spawnedItems = new();
 
-    public void ShowRecords(List<SuspectRecord> records)
+    public void ShowRecords(List<SuspectData> suspectDatas)
     {
         Clear(); 
         Debug.Log("Showing records");
 
-        for (int i = 0; i < records.Count; i++)
+        for (int i = 0; i < suspectDatas.Count; i++)
         {
             TerminalListItem item = Instantiate(listItemPrefab, listContainer);
-            item.Setup(records[i], pc);
+            item.Setup(suspectDatas[i], pc);
             _spawnedItems.Add(item);
         }
     }

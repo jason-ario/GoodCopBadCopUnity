@@ -194,20 +194,20 @@ public class ShiftManager : NetworkBehaviour
     {
         suspectsProcessed += 1;
 
-        if (suspectCharacter.IsInfected)
+        /*if (suspectCharacter.IsInfected)
             suspectsPassedWrong += 1;
         else
-            suspectsPassedCorrect += 1;
+            suspectsPassedCorrect += 1;*/
     }
 
     public void KillSuspect(SuspectCharacter suspectCharacter)
     {
         suspectsProcessed += 1;
 
-        if (suspectCharacter.IsInfected)
+        /*if (suspectCharacter.IsInfected)
             suspectsKilledCorrect += 1;
         else
-            suspectsKilledWrong += 1;
+            suspectsKilledWrong += 1;*/
     }
 
     public void QuarantinedSuspect()
@@ -248,8 +248,6 @@ public class ShiftManager : NetworkBehaviour
     
     private IEnumerator NewShiftSequence()
     {
-        SuspectDatabase.Instance.AdvanceToDay(_currentDay);
-
         PlayerPrefs.SetInt("dayNumber", _currentDay);
         calendarText.text = _currentDay.ToString("D2");
         

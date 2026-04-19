@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class AnomalyController : MonoBehaviour
 {
@@ -8,95 +9,64 @@ public class AnomalyController : MonoBehaviour
     [SerializeField] private List<BehaviorAnomaly> _behaviorAnomalies;
     [SerializeField] private List<BiologicalAnomaly> _biologicalAnomalies;
     [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies;
-    [SerializeField] private List<RealityDistortionAnomaly> _realityDistortionAnomalies;
     [SerializeField] private List<EnvironmentalAnomaly> _environmentalAnomalies;
 
-    private Anomaly[] _anomalies;
-    private List<Anomaly> _activeAnomalies = new List<Anomaly>();
+    private Anomaly[] _allPossibleAnomalies;
+    public List<Anomaly> activeAnomalies = new List<Anomaly>();
 
-    private void Awake()
+    private int infectionScore = 10; // make this increase over time or go down if they're quarantined
+
+    public void Initialize()
     {
-        _anomalies = _mutationAnomalies.Cast<Anomaly>()
-            .Concat(_behaviorAnomalies)
-            .Concat(_biologicalAnomalies)
-            .Concat(_documentationAnomalies)
-            .Concat(_realityDistortionAnomalies)
-            .Concat(_environmentalAnomalies)
-            .ToArray();
+        var anomalies = new List<Anomaly>();
+
+        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
+        {
+            Debug.Log("Mutations are enabled");
+            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        }
+
+        if (!AnomalyManager.Instance.behaviorAnomaliesLocked)
+        {
+            Debug.Log("Behavior is enabled");
+            anomalies.AddRange(_behaviorAnomalies.Cast<Anomaly>());
+        }
+
+        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
+        {
+            Debug.Log("Biological is enabled");
+            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+        }
+
+        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
+        {
+            Debug.Log("Documentation is enabled");
+            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        }
+
+        if (!AnomalyManager.Instance.environmentAnomaliesLocked)
+        {
+            Debug.Log("Environment is enabled");
+            anomalies.AddRange(_environmentalAnomalies.Cast<Anomaly>());
+        }
+
+        _allPossibleAnomalies = anomalies.ToArray(); 
+        Debug.Log("Activated anomalies");
+        ActivateAnomalies();
     }
 
-    public void GenerateAndApplyAnomalies(int targetScore, int tolerance = 5, int maxPicks = 10)
+    public void ActivateAnomalies()
     {
-        //ClearAnomalies();
+        int anomalyCount = Random.Range(2, 3);
 
-        List<Anomaly> chosen = GenerateAnomaliesForScore(targetScore, tolerance, maxPicks);
-
-        foreach (Anomaly anomaly in chosen)
+        for (int i = 0; i < anomalyCount; i++)
         {
+            Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
+            Debug.Log("Activated" + anomaly.name);
+            activeAnomalies.Add(anomaly);
             anomaly.ActivateAnomaly();
-            _activeAnomalies.Add(anomaly);
-        }
-    }
-
-    public List<Anomaly> GenerateAnomaliesForScore(int targetScore, int tolerance = 5, int maxPicks = 10)
-    {
-        List<Anomaly> chosen = new List<Anomaly>();
-
-        List<Anomaly> candidates = _anomalies
-            .Where(a => a.CanAppearForScore(targetScore))
-            .ToList();
-
-        if (candidates.Count == 0)
-        {
-            Debug.LogWarning($"No anomaly candidates found for infection score {targetScore} on {gameObject.name}");
-            return chosen;
-        }
-
-        int currentTotal = 0;
-        int safety = 0;
-
-        while (currentTotal < targetScore - tolerance && chosen.Count < maxPicks && safety < 100)
-        {
-            safety++;
-
-            List<Anomaly> validChoices = candidates
-                .Where(a => !chosen.Contains(a) && currentTotal + a.ScoreValue <= targetScore + tolerance)
-                .ToList();
-
-            if (validChoices.Count == 0)
-                break;
-
-            Anomaly picked = GetWeightedRandom(validChoices);
-            chosen.Add(picked);
-            currentTotal += picked.ScoreValue;
-        }
-
-        return chosen;
-    }
-
-    private Anomaly GetWeightedRandom(List<Anomaly> anomalies)
-    {
-        int totalWeight = anomalies.Sum(a => Mathf.Max(1, a.SelectionWeight));
-        int roll = Random.Range(0, totalWeight);
-
-        int running = 0;
-        foreach (Anomaly anomaly in anomalies)
-        {
-            running += Mathf.Max(1, anomaly.SelectionWeight);
-            if (roll < running)
-                return anomaly;
-        }
-
-        return anomalies[anomalies.Count - 1];
-    }
-
-    public void ClearAnomalies()
-    {
-        foreach (Anomaly anomaly in _anomalies)
-        {
-            anomaly.DeactivateAnomaly();
         }
     }
     
-    public bool HasAnomaly(Anomaly anomaly) => _activeAnomalies.Contains(anomaly);
+    public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
 }

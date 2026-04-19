@@ -7,10 +7,10 @@ public class TerminalListItem : MonoBehaviour
     private PC _pc;
     private SuspectData _suspectData;
     
-    public void Setup(SuspectRecord record, PC pc)
+    public void Setup(SuspectData suspectData, PC pc)
     {
-        nameText.text = record.Data.LastName + ", " + record.Data.FirstName;
-        _suspectData = record.Data;
+        nameText.text = suspectData.LastName + ", " + suspectData.FirstName;
+        _suspectData = suspectData;
         _pc = pc;
     }
 

@@ -19,8 +19,8 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private Transform despawnPos;
     [SerializeField] private Transform gatePos;
 
-    [Header("Suspects")]
-    [SerializeField] private DailySuspectManager dailySuspectManager;
+    [Header("Suspects")] 
+    [SerializeField] private SuspectSet suspectList;
     private SuspectCharacter suspectCharacter;
     public SuspectCharacter CurrentSuspect => suspectCharacter;
 
@@ -50,43 +50,6 @@ public class SuspectController : NetworkBehaviour
         Instance = this;
     }
 
-    private void Start()
-    {
-        if (ShiftManager.Instance != null)
-        {
-            ShiftManager.Instance.OnShiftStart += PopulateSuspectsForShift;
-        }
-    }
-
-    private void OnDestroy()
-    {
-        if (ShiftManager.Instance != null)
-        {
-            ShiftManager.Instance.OnShiftStart -= PopulateSuspectsForShift;
-        }
-    }
-
-    private void PopulateSuspectsForShift()
-    {
-        if (!IsServer)
-            return;
-
-        if (dailySuspectManager == null)
-        {
-            Debug.LogError("SuspectController is missing DailySuspectManager reference.");
-            return;
-        }
-
-        int currentDay = 1;
-
-        if (ShiftManager.Instance != null)
-        {
-            currentDay = ShiftManager.Instance.CurrentDay;
-        }
-
-        dailySuspectManager.GenerateDay(currentDay);
-    }
-
     public void EnableLook()
     {
         if (suspectCharacter == null) return;
@@ -99,11 +62,6 @@ public class SuspectController : NetworkBehaviour
     public void NextSuspect()
     {
         if (!IsServer) return;
-        if (dailySuspectManager == null)
-        {
-            Debug.LogError("Cannot spawn next suspect because DailySuspectManager is missing.");
-            return;
-        }
 
         StartCoroutine(WaitAndSpawnNextSuspect());
     }
@@ -120,14 +78,7 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        SuspectRecord record = GetRecordForLineupIndex(lineupIndex);
-        if (record == null)
-        {
-            Debug.LogError($"No SuspectRecord found for lineup index {lineupIndex}.");
-            return;
-        }
-
-        SuspectCharacter suspectPrefab = GetPrefabFromRecord(record);
+        SuspectCharacter suspectPrefab = GetRandomSuspect();
         if (suspectPrefab == null)
         {
             Debug.LogError($"Could not resolve suspect prefab from SuspectRecord at lineup index {lineupIndex}.");
@@ -147,13 +98,7 @@ public class SuspectController : NetworkBehaviour
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
-        if (suspectCharacter == null)
-        {
-            Debug.LogError($"Spawned suspect prefab '{spawnedSuspect.name}' is missing SuspectCharacter.");
-            return;
-        }
-
-        suspectCharacter.Initialize(record);
+        suspectCharacter.Initialize();
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;
@@ -162,21 +107,11 @@ public class SuspectController : NetworkBehaviour
         AssignReferencesClientRpc(netObj.NetworkObjectId);
     }
 
-    private SuspectRecord GetRecordForLineupIndex(int lineupIndex)
+    private SuspectCharacter GetRandomSuspect()
     {
-        if (dailySuspectManager == null)
-            return null;
-
-        return dailySuspectManager.GetSuspectForSlot(lineupIndex);
+        return suspectList.suspects[UnityEngine.Random.Range(0, suspectList.suspects.Count - 1)].CharacterPrefab;
     }
 
-    private SuspectCharacter GetPrefabFromRecord(SuspectRecord record)
-    {
-        if (record == null || record.Data == null || record.Data.CharacterPrefab == null)
-            return null;
-
-        return record.Data.CharacterPrefab;
-    }
 
     [ClientRpc]
     private void AssignReferencesClientRpc(ulong networkObjectId)
@@ -279,7 +214,7 @@ public class SuspectController : NetworkBehaviour
         randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
-        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter.Data);
+        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
         newApplicationForm.Spawn();
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
     }
@@ -289,24 +224,7 @@ public class SuspectController : NetworkBehaviour
         if (suspectCharacter == null) return;
         DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.dialogueResponses[choiceIndex].text);
     }
-
-    private void ApplyCurrentSuspectJudgment(JudgmentResult judgmentResult)
-    {
-        if (!IsServer) return;
-        if (suspectCharacter == null) return;
-        if (suspectCharacter.Data == null) return;
-        if (SuspectDatabase.Instance == null) return;
-
-        int currentDay = 1;
-
-        if (ShiftManager.Instance != null)
-        {
-            currentDay = ShiftManager.Instance.CurrentDay;
-        }
-
-        SuspectDatabase.Instance.ApplyJudgment(suspectCharacter.Data, judgmentResult, currentDay);
-    }
-
+    
     public void Pass()
     {
         if (!IsServer) return;
@@ -326,7 +244,6 @@ public class SuspectController : NetworkBehaviour
             yield break;
 
         ShiftManager.Instance.PassedSuspect(suspectCharacter);
-        ApplyCurrentSuspectJudgment(JudgmentResult.Passed);
 
         SuspectCharacter thisCharacter = suspectCharacter;
 
@@ -398,7 +315,6 @@ public class SuspectController : NetworkBehaviour
             yield break;
 
         ShiftManager.Instance.QuarantinedSuspect();
-        ApplyCurrentSuspectJudgment(JudgmentResult.Quarantined);
 
         suspectCharacter.animator.SetTrigger("Give");
         yield return new WaitForSeconds(1f);
@@ -468,7 +384,6 @@ public class SuspectController : NetworkBehaviour
             yield break;
 
         ShiftManager.Instance.KillSuspect(suspectCharacter);
-        ApplyCurrentSuspectJudgment(JudgmentResult.Killed);
 
         yield return new WaitForSeconds(1f);
         SuspectCharacter thisCharacter = suspectCharacter;
@@ -580,4 +495,5 @@ public class SuspectController : NetworkBehaviour
                 break;
         }
     }
+    
 }

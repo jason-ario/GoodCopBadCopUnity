@@ -8,7 +8,7 @@ using UnityEngine;
 public class PC : Interactable
 {
     [Header("Data")]
-    [SerializeField] private SuspectSet allSuspects;
+    [SerializeField] private SuspectSet _suspectSet;
 
     [Header("Set Up")]
     [SerializeField] private GameObject computerCamera;
@@ -26,9 +26,6 @@ public class PC : Interactable
     [Header("Optional UI Renderer")]
     [SerializeField] private TerminalRecordListUI terminalRecordListUI;
 
-    private List<SuspectRecord> _currentBaseList = new();
-    private List<SuspectRecord> _currentVisibleList = new();
-
     [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
     [SerializeField] private ClickablePCScrollbar PCScrollbar;
 
@@ -37,6 +34,10 @@ public class PC : Interactable
     private int _currentProfileIndex = -1;
     [SerializeField] private PCFolderTab[] _folderTabs;
     private bool isOn;
+    
+    // List management
+    private List<SuspectData> _currentBaseList;
+    private List<SuspectData> _currentVisibleList;
 
     private void Start()
     {
@@ -71,9 +72,6 @@ public class PC : Interactable
             OpenScreen(mainScreen);
         }
 
-        // Clear list/profile state when opening the PC
-        _currentBaseList.Clear();
-        _currentVisibleList.Clear();
         ClearCurrentProfileSelection();
     }
 
@@ -157,9 +155,6 @@ public class PC : Interactable
 
     public void OpenNextProfile()
     {
-        if (_currentBaseList == null || _currentBaseList.Count == 0)
-            return;
-
         if (_currentProfileSuspect == null)
             return;
 
@@ -174,11 +169,11 @@ public class PC : Interactable
         if (nextIndex >= _currentBaseList.Count)
             nextIndex = _currentBaseList.Count - 1;
 
-        SuspectRecord nextRecord = _currentBaseList[nextIndex];
-        if (nextRecord == null || nextRecord.Data == null)
+        SuspectData nextSuspect = _currentBaseList[nextIndex];
+        if (nextSuspect == null)
             return;
 
-        OpenProfilePage(nextRecord.Data); // already updates UI
+        OpenProfilePage(nextSuspect); // already updates UI
     }
     
     public void OpenPreviousProfile()
@@ -201,11 +196,11 @@ public class PC : Interactable
         if (previousIndex < 0)
             previousIndex = 0;
 
-        SuspectRecord previousRecord = _currentBaseList[previousIndex];
-        if (previousRecord == null || previousRecord.Data == null)
+        SuspectData previousSuspect = _currentBaseList[previousIndex];
+        if (previousSuspect == null)
             return;
 
-        OpenProfilePage(previousRecord.Data);
+        OpenProfilePage(previousSuspect);
     }
 
     public bool CanOpenNextProfile()
@@ -236,17 +231,17 @@ public class PC : Interactable
 
         for (int i = 0; i < _currentBaseList.Count; i++)
         {
-            SuspectRecord record = _currentBaseList[i];
+            SuspectData suspect = _currentBaseList[i];
 
-            if (record == null || record.Data == null)
+            if (suspect == null)
                 continue;
 
             // Best case: same object reference
-            if (record.Data == suspectData)
+            if (suspect == suspectData)
                 return i;
 
             // Fallback: identify by core fields
-            if (AreSameSuspect(record.Data, suspectData))
+            if (AreSameSuspect(suspect, suspectData))
                 return i;
         }
 
@@ -269,14 +264,12 @@ public class PC : Interactable
 
     public void OpenResidents()
     {
-        _currentBaseList = SuspectDatabase.Instance
-            .GetAllRecords()
-            .Where(r => r.Status == CharacterStatus.Resident)
-            .OrderBy(r => r.Data.LastName)
-            .ThenBy(r => r.Data.FirstName)
+        _currentBaseList = _suspectSet.suspects
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
             .ToList();
 
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
         OpenScreen(suspectListScreen);
@@ -287,14 +280,12 @@ public class PC : Interactable
 
     public void OpenVisitors()
     {
-        _currentBaseList = SuspectDatabase.Instance
-            .GetAllRecords()
-            .Where(r => r.Status == CharacterStatus.Visitor)
-            .OrderBy(r => r.Data.LastName)
-            .ThenBy(r => r.Data.FirstName)
+        _currentBaseList = _suspectSet.suspects
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
             .ToList();
 
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
         RenderCurrentList();
@@ -304,30 +295,12 @@ public class PC : Interactable
 
     public void OpenDeceased()
     {
-        _currentBaseList = SuspectDatabase.Instance
-            .GetAllRecords()
-            .Where(r => r.Status == CharacterStatus.Deceased)
-            .OrderBy(r => r.Data.LastName)
-            .ThenBy(r => r.Data.FirstName)
+        _currentBaseList = _suspectSet.suspects
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
             .ToList();
 
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
-        ClearCurrentProfileSelection();
-
-        RenderCurrentList();
-        OpenScreen(suspectListScreen);
-        SelectFolderTab(0);
-    }
-
-    public void OpenRecentExits()
-    {
-        _currentBaseList = SuspectDatabase.Instance
-            .GetAllRecords()
-            .Where(r => r.LastExitTime != DateTime.MinValue)
-            .OrderByDescending(r => r.LastExitTime)
-            .ToList();
-
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
         RenderCurrentList();
@@ -337,13 +310,12 @@ public class PC : Interactable
 
     public void OpenAll()
     {
-        _currentBaseList = SuspectDatabase.Instance
-            .GetAllRecords()
-            .OrderBy(r => r.Data.LastName)
-            .ThenBy(r => r.Data.FirstName)
+        _currentBaseList = _suspectSet.suspects
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
             .ToList();
 
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
         RenderCurrentList();
@@ -393,7 +365,7 @@ public class PC : Interactable
 
     public void ClearLetterFilter()
     {
-        _currentVisibleList = new List<SuspectRecord>(_currentBaseList);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
         RenderCurrentList();
     }
 
@@ -401,24 +373,24 @@ public class PC : Interactable
     {
         if (_currentBaseList == null || _currentBaseList.Count == 0)
         {
-            _currentVisibleList = new List<SuspectRecord>();
+            _currentVisibleList = new List<SuspectData>();
             RenderCurrentList();
             return;
         }
 
         _currentVisibleList = _currentBaseList
-            .Where(r =>
+            .Where(s =>
             {
-                if (r == null || r.Data == null || string.IsNullOrWhiteSpace(r.Data.LastName))
+                if (s == null || string.IsNullOrWhiteSpace(s.LastName))
                     return false;
 
-                string trimmedLastName = r.Data.LastName.Trim();
+                string trimmedLastName = s.LastName.Trim();
                 char firstChar = char.ToUpper(trimmedLastName[0]);
 
                 return firstChar >= start && firstChar <= end;
             })
-            .OrderBy(r => r.Data.LastName)
-            .ThenBy(r => r.Data.FirstName)
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
             .ToList();
 
         RenderCurrentList();
@@ -432,10 +404,5 @@ public class PC : Interactable
     {
         terminalRecordListUI.ShowRecords(_currentVisibleList);
         StartCoroutine(WaitAndRefreshMouse());
-    }
-
-    public List<SuspectRecord> GetCurrentVisibleList()
-    {
-        return _currentVisibleList;
     }
 }
