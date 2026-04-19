@@ -101,25 +101,7 @@ public class GameManager : NetworkBehaviour
         UIController.Instance.FadeOut();
         OnGameStart?.Invoke();
     }
-
-    public void DeliveredVerdict(StampContainer.StampType stampType)
-    {
-        verdictDelivered = stampType;
-        SuspectController.Instance.SetCanInteract(false);
-
-        switch (stampType)
-        {
-            case StampContainer.StampType.Pass:
-                SuspectController.Instance.Pass();
-                break;
-            case StampContainer.StampType.Quarantine:
-                SuspectController.Instance.Quarantine();
-                break;
-            case StampContainer.StampType.Kill:
-                SuspectController.Instance.Kill();
-                break;
-        }
-    }
+    
     public void ResetPlayerPositions()
     {
         PlayerInstance.Instance.transform.position =

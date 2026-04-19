@@ -30,4 +30,10 @@ public class NetworkHelper : MonoBehaviour
         // Finally despawn the parent
         netObj.Despawn();
     }
+
+    public static void Despawn(NetworkObject netObj)
+    {
+        if (netObj == null || !netObj.IsSpawned) return;
+        netObj.Despawn();
+    }
 }

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using DG.Tweening;
 using Unity.Cinemachine;
 using Unity.Netcode;
@@ -54,6 +55,9 @@ public class FolderController : PickableObject
 
     public bool IsOpen => isOpen.Value;
     public bool IsStamped => isStamped.Value;
+    public StampContainer.StampType StampType => stampContainer.Stamp;
+    private NetworkVariable<bool> isHandedOff = new NetworkVariable<bool>();
+    public List<PickableObject> documents;
 
     public override void OnNetworkSpawn()
     {
@@ -63,9 +67,15 @@ public class FolderController : PickableObject
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (isStamped.Value) return;
-
+        if (isHandedOff.Value) return;
+        
         base.Interact(player);
+    }
+
+    public void OnHandOff()
+    {
+        isHandedOff.Value = true;
+        isOpen.Value = false;
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
@@ -300,7 +310,7 @@ public class FolderController : PickableObject
     {
         string itemName = pickableObject.ItemData.name;
         Debug.Log("Try add document");
-        
+
         if (itemName == "ID card")
         {
             if (idCard != null)
@@ -310,6 +320,7 @@ public class FolderController : PickableObject
             
             player.DropObject(idCardSlot);
             idCard = pickableObject.GetComponent<IDCard>();
+            
             idCard.AddToFolder(this);
         }
 

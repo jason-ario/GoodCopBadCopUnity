@@ -403,7 +403,12 @@ public class PlayerPickupController : NetworkBehaviour
 
         GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject.ItemData).gameObject;
         DisableArmIKs();
-
+        
+        if (ObjectPlacer.Instance.PlacementBoard != null)
+        {
+            ObjectPlacer.Instance.PlacementBoard.OnPlaced(_heldObject);
+        }
+        
         if (_heldObject != null)
         {
             Vector3 dropPos = dropPoint != null ? dropPoint.position : placementItem.transform.position;
@@ -428,13 +433,14 @@ public class PlayerPickupController : NetworkBehaviour
         {
             objectContainer.UnequipItem(this);
         }
-
+        
         _camEquippedItem = null;
         _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
         _heldObject = null;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
+        
         ObjectPlacer.Instance.DeactivatePlacer();
     }
 

@@ -15,9 +15,11 @@ public class ObjectPlacer : MonoBehaviour
 
     private PickableItemData _pickableItemData;
     private PickableObject _clonedItem;
+    private PlacementBoard _currentPlacementBoard;
     public bool IsActive;
     public bool deactivatedThisFrame = false;
-    
+    public PlacementBoard PlacementBoard => _currentPlacementBoard;
+
     private void Awake()
     {
         Instance = this;
@@ -70,6 +72,7 @@ public class ObjectPlacer : MonoBehaviour
         deactivatedThisFrame = true;
         yield return new WaitForEndOfFrame();
         deactivatedThisFrame = false;
+        _currentPlacementBoard = null;
     }
 
     public void SetItem(PickableItemData itemData)
@@ -120,7 +123,6 @@ public class ObjectPlacer : MonoBehaviour
         _clonedItem.transform.localPosition = slotTransform.localPosition;
         _clonedItem.transform.localRotation = slotTransform.localRotation;
         _clonedItem.GetComponent<PickableObject>().SetPlacementClone();
-        Debug.Log(slotTransform.gameObject.name);
 
         // Jump clone's animator to the exact state of the source
         Animator sourceAnimator = sourceItem.GetComponentInChildren<Animator>();
@@ -165,6 +167,7 @@ public class ObjectPlacer : MonoBehaviour
 
     public void ActivatePlacer(PlacementBoard placementBoard)
     {
+        _currentPlacementBoard = placementBoard;
         container.gameObject.SetActive(true);
         IsActive = true;
 

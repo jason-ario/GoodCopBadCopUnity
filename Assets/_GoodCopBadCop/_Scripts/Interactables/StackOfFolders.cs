@@ -5,7 +5,13 @@ public class StackOfFolders : Interactable
     [SerializeField] private PickableItemData folder;
     private bool folderGrabbedAlready = false;
     [SerializeField] private string[] alreadyHaveFolderTutorialBarks;
-    
+
+    protected override void Awake()
+    {
+        base.Awake();
+        SuspectController.Instance.OnTakeFolder += () => folderGrabbedAlready = false;
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

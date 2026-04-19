@@ -1,21 +1,19 @@
 using UnityEngine;
+using UnityEngine.WSA;
 
-public class HandOffPoint : Interactable
+public class HandOffPoint : PlacementBoard
 {
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    public override void OnPlaced(PickableObject pickableObject)
     {
-        base.InteractWithItem(playerInteractionController, item);
-        if (item.ItemData.name == "Folder")
-        {
-            if (item.GetComponent<FolderController>().IsStamped)
-            {
-                MoveFolderToHandOffPoint();
-            }
-        }
-    }
-    
-    void MoveFolderToHandOffPoint()
-    {
+        base.OnPlaced(pickableObject);
+        FolderController folderController = pickableObject.GetComponent<FolderController>();
+        Debug.Log("OnPlaced");
         
+        if (folderController == null) return;
+        
+        if (folderController.IsStamped)
+        {
+            SuspectController.Instance.DeliverVerdict(folderController);
+        }
     }
 }

@@ -48,12 +48,13 @@ public class SwitchButton : Interactable
         {
             SetReady(false);
 
-            if (ShiftManager.Instance.shiftStarted.Value == false)
+            if (!ShiftManager.Instance.shiftStarted.Value)
             {
                 ShiftManager.Instance.TryStartShift();
             }
             else
             {
+                ShiftManager.Instance.PlayBuzzerSound();
                 SuspectController.Instance.NextSuspect();
             }
         }

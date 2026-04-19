@@ -1,9 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Playables;
 using UnityEngine.Serialization;
 
@@ -27,9 +29,6 @@ public class SuspectController : NetworkBehaviour
 
     [SerializeField] private NetworkObject idCard;
     [SerializeField] private NetworkObject applicationForm;
-    [SerializeField] private FolderController spawnedFolder;
-    [SerializeField] private Transform folderSpawnPos;
-    public Transform FolderSpawnPos => folderSpawnPos;
     [SerializeField] private Transform documentSpawnStartPos;
     [SerializeField] private Transform documentSpawnEndPos;
 
@@ -42,7 +41,9 @@ public class SuspectController : NetworkBehaviour
 
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
+    FolderController spawnedFolder;
 
+    public UnityAction OnTakeFolder;
 
     private void Awake()
     {
@@ -516,7 +517,13 @@ public class SuspectController : NetworkBehaviour
             NetworkHelper.DespawnWithChildren(spawnedFolder.GetComponent<NetworkObject>());
         }
 
+        foreach (PickableObject pickableObject in spawnedFolder.documents)
+        {
+            NetworkHelper.Despawn(pickableObject.GetComponent<NetworkObject>());
+        }
+
         spawnedFolder = null;
+        OnTakeFolder?.Invoke();
     }
 
     private void DespawnSuspect(SuspectCharacter suspectToDespawn)
@@ -552,5 +559,24 @@ public class SuspectController : NetworkBehaviour
         _currentSuspectNetworkObjectId = ulong.MaxValue;
         suspectCharacter = null;
         spawnedFolder = null;
+    }
+
+    public void DeliverVerdict(FolderController folder)
+    {
+        SetCanInteract(false);
+        spawnedFolder = folder;
+
+        switch (folder.StampType)
+        {
+            case StampContainer.StampType.Pass:
+                Pass();
+                break;
+            case StampContainer.StampType.Quarantine:
+                Quarantine();
+                break;
+            case StampContainer.StampType.Kill:
+                Kill();
+                break;
+        }
     }
 }
