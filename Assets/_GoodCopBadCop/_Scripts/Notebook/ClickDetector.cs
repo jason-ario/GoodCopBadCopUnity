@@ -4,19 +4,17 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
 public class ClickDetector : MonoBehaviour
-{
-    [SerializeField] private Camera renderCamera;
+{ 
+    private Camera renderCamera;
     [SerializeField] private RawImage cameraImage; // the UI element showing the render texture
     
     void Update()
     {
-        if (renderCamera == null || cameraImage == null)
+        if (renderCamera == null)
         {
-            Debug.LogError("Missing renderCamera or cameraImage reference.");
             renderCamera = PlayerInstance.Instance.GetCamera();
-            cameraImage = UIController.Instance.GetCameraImage();
-            return;
         }
+        
         
         if (!Input.GetMouseButtonDown(0))
             return;
