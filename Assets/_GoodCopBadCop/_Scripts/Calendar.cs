@@ -15,10 +15,7 @@ public class Calendar : MonoBehaviour
 
     void OnShiftStart()
     {
-        string month = ShiftManager.Instance.CurrentDate.Substring(0, 2);
-        string day = ShiftManager.Instance.CurrentDate.Substring(3, 2);
-        string year = ShiftManager.Instance.CurrentDate.Substring(6, 4);
-        SetDate(month, day, year);
+        SetDate(ShiftManager.Instance.currentMonth, ShiftManager.Instance.currentDay, ShiftManager.Instance.currentYear);
     }
 
     public void SetDate(string month, string day, string year)

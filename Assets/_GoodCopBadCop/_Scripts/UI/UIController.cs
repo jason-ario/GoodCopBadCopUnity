@@ -23,11 +23,11 @@ public class UIController : MonoBehaviour
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
+    [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     public bool IsPaused => pauseMenuOpened;
 
     [SerializeField] private AudioClip transitionToGameplayStinger;
-    [SerializeField] private CouponUIController couponUIController;
     [SerializeField] private GameObject pauseMenu;
     private bool pauseMenuOpened = false;
     
@@ -221,16 +221,6 @@ public class UIController : MonoBehaviour
         return cameraImage;
     }
 
-    public void PlayEarnedCashUIAnimation(int cashAmount)
-    {
-        couponUIController.PlayCashAnimation(cashAmount);
-    }
-
-    public void EarnCash(int cashAmount)
-    {
-        PlayEarnedCashUIAnimation(cashAmount);
-    }
-
     public void OpenPauseMenu()
     {
         pauseMenuOpened = true;
@@ -261,5 +251,10 @@ public class UIController : MonoBehaviour
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
+    }
+
+    public void ShowCashPopUpNotification(int amount, string message)
+    {
+        cashNotificationPopupManager.SpawnCashNotification(amount, message);
     }
 }

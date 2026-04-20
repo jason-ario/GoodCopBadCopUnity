@@ -48,7 +48,14 @@ public class SuspectController : NetworkBehaviour
     private int correctlyMarkedAnomalies = 0;
     private int totalAnomaliesInLastSuspect = 0;
     private int incorrectlyMarkedAnomalies = 0;
-
+    
+    [Header("Coupon Payouts")]
+    [SerializeField] int couponCorrectVerdictBonus = 10;
+    [SerializeField] int incorrectVerdictPenalty = 5;
+    [SerializeField] int couponPerfectAnomaliesBonus = 5;
+    [SerializeField] int couponPerCorrectAnomaly = 3;
+    [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
+    [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
     private void Awake()
     {
         Instance = this;
@@ -342,35 +349,79 @@ public class SuspectController : NetworkBehaviour
         return accuracy;
     }
 
+
     private void PayOutResults()
     {
-        int couponPayout = Mathf.RoundToInt((accuracyOfLastSuspectFolder / 100f) * 10f);
+        StartCoroutine(ShowCashPopUpSequence());
+    }
+    
+    IEnumerator ShowCashPopUpSequence()
+    {
+        // Calculate coupon payouts
+        int correctAnomalyBonus = correctlyMarkedAnomalies * couponPerCorrectAnomaly;
+        int missedAnomalyPenalty =
+            (totalAnomaliesInLastSuspect - correctlyMarkedAnomalies) * couponPenaltyPerMissedAnomaly;
+        int falsePositivePenalty = incorrectlyMarkedAnomalies * couponPenaltyPerFalsePositiveAnomaly;
+        int perfectBonusAmount =
+            (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
+                ? couponPerfectAnomaliesBonus
+                : 0;
+
+        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount +
+                           couponCorrectVerdictBonus;
+
+    // Calculate accuracy percentage
+        int accuracyPercent = 100;
+        if (totalAnomaliesInLastSuspect > 0 || incorrectlyMarkedAnomalies > 0)
+        {
+            int totalToIdentify = totalAnomaliesInLastSuspect + incorrectlyMarkedAnomalies;
+            accuracyPercent = totalToIdentify > 0 ? (correctlyMarkedAnomalies * 100) / totalToIdentify : 100;
+        }
+
+        yield return new WaitForSeconds(2f);
         
-        // Only pay out if there's a positive amount
-        if (couponPayout > 0)
+        // Add money to player account
+        GlobalHostVariables.Instance.AddMoney(totalCoupons);
+
+        // Message 1: Anomalies Identified with accuracy percentage and breakdown
+        string anomalyMessage =
+            $"Anomalies Identified: {accuracyPercent}%\n({correctlyMarkedAnomalies}/{totalAnomaliesInLastSuspect} correct)";
+        int anomalyAmount = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty;
+        UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
+
+        yield return new WaitForSeconds(2f);
+
+        // Message 2: Verdict message (you'll need to determine the verdict type)
+        string verdictMessage = GetVerdictMessage(); // Implement based on your verdict logic
+        UIController.Instance.ShowCashPopUpNotification(couponCorrectVerdictBonus, verdictMessage);
+
+        yield return new WaitForSeconds(2f);
+
+        // Message 3: Perfect bonus (if applicable)
+        if (perfectBonusAmount > 0)
         {
-            GlobalHostVariables.Instance.AddMoney(couponPayout);
+            UIController.Instance.ShowCashPopUpNotification(perfectBonusAmount, "Perfect Identification Bonus");
         }
-        
-        // Log the results
-        if (totalAnomaliesInLastSuspect == 0)
-        {
-            Debug.Log($"No anomalies to identify. Paying out ${couponPayout} coupons.");
-        }
-        else if (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
-        {
-            Debug.Log($"Found all anomalies. Paying out ${couponPayout} coupons.");
-        }
-        else if (incorrectlyMarkedAnomalies > 0)
-        {
-            Debug.Log($"Found {correctlyMarkedAnomalies} correct and {incorrectlyMarkedAnomalies} incorrect anomalies. Paying out ${couponPayout} coupons.");
-        }
-        else
-        {
-            Debug.Log($"Found {correctlyMarkedAnomalies} of {totalAnomaliesInLastSuspect} anomalies. Paying out ${couponPayout} coupons.");
-        }
+
+        yield return new WaitForSeconds(2f);
+
+        // Message 4: Final payout
+        UIController.Instance.ShowCashPopUpNotification(totalCoupons, "Payout Issued");
+
+
+
+        // Debug log for verification
+        Debug.Log(
+            $"Anomaly Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positive: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Verdict Bonus: +{couponCorrectVerdictBonus}, Total: {totalCoupons}");
     }
 
+    private string GetVerdictMessage()
+    {
+        // Implement this based on your verdict logic
+        // For now, returning a placeholder - adjust based on how you determine verdict
+        return "Verdict: CIVILIAN CORRECTLY QUARANTINED";
+    }
+    
     public void Quarantine()
     {
         if (!IsServer) return;
@@ -540,8 +591,6 @@ public class SuspectController : NetworkBehaviour
         {
             suspectCharacter = null;
         }
-        
-        PayOutResults();
     }
 
     public void ResetSuspects()
@@ -558,7 +607,8 @@ public class SuspectController : NetworkBehaviour
         SetCanInteract(false);
         spawnedFolder = folder;
         folder.OnHandOff();
-        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);
+        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter); 
+        PayOutResults();
 
         switch (folder.StampType)
         {

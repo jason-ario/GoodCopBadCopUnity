@@ -57,13 +57,15 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] DoorController _doorController;
     [SerializeField] private Lever lever;
-    [SerializeField] private TextMeshPro calendarText;
 
     #region Events
     public UnityAction OnShiftStart { get; set; }
     public UnityAction OnShiftReady { get; set; }
-    public string CurrentDate => _startDate.AddDays(_currentDay - 1).ToString("dd MMM yyyy");
-
+    private DateTime CurrentGameDateTime => _startDate.AddDays(_currentDay - 1);
+    public string currentMonth => CurrentGameDateTime.ToString("MMMM");
+    public string currentDay => CurrentGameDateTime.ToString("dd");
+    public string currentYear => CurrentGameDateTime.ToString("yyyy");
+    
     #endregion
 
     private void Awake()
@@ -78,7 +80,7 @@ public class ShiftManager : NetworkBehaviour
         int savedDay = PlayerPrefs.GetInt("dayNumber", 1);
         _currentDay = savedDay;
         
-        Debug.Log($"Game started on {CurrentDate} (Day {_currentDay})");
+        Debug.Log($"Game started on {_startDate.AddDays(_currentDay - 1):dd MMMM yyyy} (Day {_currentDay})");
     }
 
 
@@ -164,8 +166,9 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(0.5f);
         windowLampController.TurnGreen();
 
-        yield return new WaitForSeconds(6f);
+        yield return new WaitForSeconds(3f);
 
+        Debug.Log("Spawn suspect");
         SuspectController.Instance.NextSuspect();
     }
 
@@ -249,7 +252,6 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator NewShiftSequence()
     {
         PlayerPrefs.SetInt("dayNumber", _currentDay);
-        calendarText.text = _currentDay.ToString("D2");
         
         if (DebugConsole.Instance.skipInitialShiftTransition)
         {

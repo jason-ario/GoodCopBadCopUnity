@@ -24,7 +24,5 @@ public class GlobalHostVariables : NetworkBehaviour
         {
             money.Value = 0;
         }
-
-        UIController.Instance.PlayEarnedCashUIAnimation(total);
     }
 }

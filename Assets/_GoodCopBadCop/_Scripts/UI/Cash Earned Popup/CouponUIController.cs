@@ -5,12 +5,14 @@ using UnityEngine;
 public class CouponUIController : MonoBehaviour
 {
     [SerializeField] Animator cashAnimation;
-    [SerializeField] private TextMeshProUGUI cashTextUI;
+    [SerializeField] private TextMeshProUGUI earnedCashInfoText;
     [SerializeField] private AudioClip addCashSound;
     
-    public void PlayCashAnimation(int cashAmount)
+    public CouponUIController Instance;
+    
+    public void ShowEarnCashMessage(string message)
     {
-        cashTextUI.text = "+ " + cashAmount.ToString();
+        earnedCashInfoText.text = message;
         cashAnimation.gameObject.SetActive(true);
         SFXController.Instance.Play(addCashSound);
         StartCoroutine(WaitAndFinishAnimation());
