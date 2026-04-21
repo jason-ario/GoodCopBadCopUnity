@@ -233,7 +233,40 @@ public class SuspectController : NetworkBehaviour
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
-        DialogueManager.Instance.SayDialogue(suspectCharacter, suspectCharacter.Data.dialogueResponses[choiceIndex].text);
+        SuspectData.QuestionDialogueSet questionDialogueSet;
+        int responseIndex = 0;
+        
+        if (choiceIndex == 0)
+        {
+            questionDialogueSet = suspectCharacter.Data.whereAreYouComingFromAnswers;
+            responseIndex = suspectCharacter.ChosenEntryReasonIndex;
+        } else if (choiceIndex == 1)
+        {
+            questionDialogueSet = suspectCharacter.Data.haveYouBeenExperiencingAnySymptomsAnswers;
+            responseIndex = suspectCharacter.ChosenSymptomResponseIndex;
+        }
+        else
+        {
+            questionDialogueSet = suspectCharacter.Data.whoDoYouLiveWithAnswers;
+            responseIndex = suspectCharacter.ChosenWhoDoYouLiveWithIndex;
+        }
+        
+        string[] dialogueResponses;
+
+        if (ShiftManager.Instance.IsEarlyDays)
+        {
+            dialogueResponses = questionDialogueSet.earlyDaysAnswers;
+        }
+        else if (ShiftManager.Instance.IsMidDays)
+        {
+            dialogueResponses = questionDialogueSet.midDaysAnswers;
+        }
+        else
+        {
+            dialogueResponses = questionDialogueSet.finalDaysAnswers;
+        }
+        
+        DialogueManager.Instance.SayDialogue(suspectCharacter, dialogueResponses[responseIndex]);
     }
     
     public void Pass()
@@ -247,6 +280,49 @@ public class SuspectController : NetworkBehaviour
     {
         if (IsServer) return;
         StartCoroutine(PassSequence());
+    }
+
+    void SayExitDialogue(SuspectCharacter suspectCharacter, SuspectData.Verdict verdict)
+    {
+        string exitDialogue = "";
+        string[] exitDialogues;
+
+        switch (verdict)
+        {
+            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEarlyDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
+                break;
+            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsMidDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesMidDays;
+                break;
+            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEndDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesFinalDays;
+                break;
+            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEarlyDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesEarlyDays;
+                break;
+            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsMidDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesMidDays;
+                break;
+            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEndDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesFinalDays;
+                break;
+            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEarlyDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesEarlyDays;
+                break;
+            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsMidDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesMidDays;
+                break;
+            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEndDays:
+                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesFinalDays;
+                break;
+            default:
+                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
+                break;
+        }
+        
+        exitDialogue = exitDialogues[UnityEngine.Random.Range(0, exitDialogues.Length)];
+        DialogueManager.Instance.SayDialogue(suspectCharacter, exitDialogue);
     }
 
     private IEnumerator PassSequence()
@@ -267,7 +343,8 @@ public class SuspectController : NetworkBehaviour
             PassVisualsClientRpc();
         }
 
-        DialogueManager.Instance.SayDialogue(thisCharacter, "Thanks, comrade. I owe ya one.");
+        
+        SayExitDialogue(thisCharacter, SuspectData.Verdict.Passed);
 
         yield return new WaitForSeconds(2f);
 

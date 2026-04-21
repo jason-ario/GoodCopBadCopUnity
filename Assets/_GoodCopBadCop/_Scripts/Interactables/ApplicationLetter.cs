@@ -18,8 +18,24 @@ public class ApplicationLetter : FolderItem
         birthDateText.text = suspectData.DateOfBirth;
         sexText.text = suspectData.Sex;
         idNumberText.text = suspectData.IDNumber;
-        reasonForEntryText.text =
-            suspectData.reasonsForEntry[UnityEngine.Random.Range(0, suspectData.reasonsForEntry.Length)];
+        
+        int dayNo = ShiftManager.Instance.CurrentDay;
+        string[] possibleReasons;
+        
+        if (dayNo < 11)
+        {
+            possibleReasons = suspectData.entryReasons.earlyDaysReasons;
+        } else if (dayNo < 21)
+        {
+            possibleReasons = suspectData.entryReasons.midDaysReasons;
+        }
+        else
+        {
+            possibleReasons = suspectData.entryReasons.finalDaysReasons;
+        }
+
+        int chosenReason = suspectCharacter.ChosenEntryReasonIndex;
+        reasonForEntryText.text = possibleReasons[chosenReason];
         
         CheckAnomalies(suspectCharacter);
         
@@ -97,13 +113,22 @@ public class ApplicationLetter : FolderItem
         }
         else
         {
-            // Set to a random invalid reason from the suspect data
-            if (suspectData.invalidReasonsForEntry != null && suspectData.invalidReasonsForEntry.Length > 0)
+            int dayNo = ShiftManager.Instance.CurrentDay;
+            string[] possibleReasons;
+            
+            if (dayNo < 11)
             {
-                reasonForEntryText.text = suspectData.invalidReasonsForEntry[
-                    UnityEngine.Random.Range(0, suspectData.invalidReasonsForEntry.Length)
-                ];
+                possibleReasons = suspectData.invalidEntryReasons.earlyDaysReasons;
+            } else if (dayNo < 21)
+            {
+                possibleReasons = suspectData.invalidEntryReasons.midDaysReasons;
             }
+            else
+            {
+                possibleReasons = suspectData.invalidEntryReasons.finalDaysReasons;
+            }
+
+            reasonForEntryText.text = possibleReasons[UnityEngine.Random.Range(0, possibleReasons.Length)];
         }
     }
     

@@ -17,6 +17,10 @@ MonoBehaviour:
   Nickname: Dio
   Occupation: Professor
   CharacterDescription: Stoic, calm and professional. Has a deep care for his students.
+  CharacterArc: Professor goes from caring greatly about knowledge to questioning
+    if it even matters if humanity erases it all in the end. He questions if humanity
+    should even have knowledge, since presumedly the nuclear bombs are a man made
+    invention.
   DateOfBirth: 09/03/1953
   Sex: Male
   EntryPermitExpiryDate: 12 JUN
@@ -27,24 +31,155 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 8de7601dc6d14af43838e8b13cedd6a2, type: 3}
   CharacterPrefab: {fileID: 5164911391202306748, guid: a27411530d2c9aa4eab6a559a8832b11, type: 3}
-  reasonsForEntry:
-  - Purchasing books
-  - Visiting mother
-  - Research trip
+  entryReasons:
+    earlyDaysReasons:
+    - 'Returning from university '
+    - Academic duties
+    - Returning home from work
+    midDaysReasons:
+    - University business
+    - Returning from campus
+    - Collecting documents
+    finalDaysReasons:
+    - Returning
+    - Personal business
+    - Collecting belongings
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Verifying something I forgot
+    - Checking if things are still the same
+    - Following a routine
+    midDaysReasons:
+    - Observing the current conditions
+    - Continuing previous work
+    - Maintaining continuity
+    finalDaysReasons:
+    - To see what is left
+    - To confirm it still exists
+    - To witness the outcome
   dialogueResponses: []
-  entryDialogues:
-  - Good evening. I have clearance for a short research stay. I trust everything
-    is in order.
-  - "Hello. I\u2019ll be staying briefly\u2014academic work. I\u2019ve brought all
-    required documents."
-  - Ah, yes. Apologies for the hour. Travel delays. I assume this will only take
-    a moment.
-  anomalyEntryDialogues:
-  - "Good evening. I\u2019ve been here before\u2026 haven\u2019t I? \u2026No, that\u2019s
-    not right. My mistake."
-  - "Hello. I\u2019m here for research. \u2026Strange. I don\u2019t remember what
-    field."
-  - "Ah, yes. My documents. Everything should be correct. I checked them earlier.
-    Or\u2026 I will check them."
+  entryDialoguesFirstEncounter:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Greetings. Here is my paperwork. Knowledge is power after all.
+    - Salutations, officers. I trust everything is in order?
+    - Pleasure to meet you, officers.
+    dialoguesMidDays:
+    - Hello, friends. We need to stick together in these tough times.
+    - Greetings. Here are my papers. I assert you will make the correct judgment.
+    - Here are my papers. I hope it's all okay.
+    dialoguesFinalDays:
+    - Here. Do as you will with it.
+    - Are these checkpoints even necessary?
+    - I'm not sure what the point of these checkpoints are.
+  entryDialoguesLastPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - "Ah, we\u2019ve met before. I appreciate your reasonableness."
+    - Good to see a familiar face. Here are my papers again.
+    - You passed me last time. I trust today will be just as simple.
+    dialoguesMidDays:
+    - "We\u2019ve already done this once. I assume nothing has changed."
+    - You let me through before. I hope good sense still prevails.
+    - Back again. I suppose we continue our ritual.
+    dialoguesFinalDays:
+    - You let me through before. Perhaps that still means something.
+    - "We\u2019ve done this already. Let\u2019s not pretend it matters more now."
+    - You passed me once. I wonder what that was worth.
+  entryDialoguesLastQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - You stopped me before. I trust that was merely caution.
+    - "We met already, if you recall. I\u2019m hoping for a fairer judgment today."
+    - "You sent me back last time. I\u2019d like to think that was a misunderstanding."
+    dialoguesMidDays:
+    - You quarantined me before. I assume you had your reasons.
+    - I was turned away last time. I hope we can be more rational today.
+    - "We\u2019ve already been through this once. Must we repeat it?"
+    dialoguesFinalDays:
+    - "You kept me out before. I\u2019m still here, as you can see."
+    - You quarantined me, and yet the world continued collapsing anyway.
+    - You sent me away before. I wonder what exactly that protected.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - "Thank you. I\u2019ll be on my way."
+    - Much appreciated.
+    - Very good. Have a pleasant day.
+    dialoguesMidDays:
+    - "Thank you. I won\u2019t be long."
+    - Good. At least some judgment remains.
+    - Much appreciated. These are not easy days.
+    dialoguesFinalDays:
+    - "Fine. I\u2019ll go."
+    - "Thank you\u2026 for whatever that still means."
+    - Good. Another gate opens.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - On what grounds?
+    - I see. Very well.
+    - "That seems excessive, doesn\u2019t it?"
+    dialoguesMidDays:
+    - "You really think that\u2019s necessary?"
+    - So that is your decision.
+    - "I\u2019ve done nothing to warrant this."
+    dialoguesFinalDays:
+    - "You\u2019re mistaking procedure for wisdom."
+    - Go on then. Quarantine me.
+    - You think this changes anything?
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "Wait\u2014what are you doing?"
+    - "Officer\u2014"
+    - "No, this is absurd\u2014"
+    dialoguesMidDays:
+    - "Have you lost your mind\u2014?"
+    - "Wait, listen to me\u2014"
+    - "No\u2014!"
+    dialoguesFinalDays:
+    - So this is what it comes to.
+    - Then do it.
+    - Of course.
+  haveYouBeenExperiencingAnySymptomsAnswers:
+    earlyDaysAnswers:
+    - No, none at all.
+    - Nothing unusual, no.
+    - No. I feel perfectly fine.
+    midDaysAnswers:
+    - Nothing serious. Fatigue, perhaps.
+    - Only stress, if that counts.
+    - No true symptoms. Just exhaustion.
+    finalDaysAnswers:
+    - Symptoms? No.
+    - Nothing worth naming.
+    - "We\u2019re all unwell now, aren\u2019t we?"
+  whereAreYouComingFromAnswers:
+    earlyDaysAnswers:
+    - From the university.
+    - From my classroom, more or less.
+    - From home.
+    midDaysAnswers:
+    - From the university grounds.
+    - From the faculty building.
+    - "From home. I haven\u2019t gone far."
+    finalDaysAnswers:
+    - "From what\u2019s left of the university."
+    - Academic affairs
+    - I'm just returning. Is that not enough?
+  whoDoYouLiveWithAnswers:
+    earlyDaysAnswers:
+    - I live alone.
+    - By myself.
+    - Alone. I prefer the quiet.
+    midDaysAnswers:
+    - Alone, still.
+    - No one. I live by myself.
+    - "By myself. It\u2019s simpler that way."
+    finalDaysAnswers:
+    - Alone.
+    - No one now.
+    - By myself, yes.
   voiceAudioClips: []
   IDNumber: 7262765

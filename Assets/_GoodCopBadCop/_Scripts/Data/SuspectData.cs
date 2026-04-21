@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [CreateAssetMenu(menuName = "Scriptable Objects/Suspect Data")]
 public class SuspectData : ScriptableObject
@@ -9,6 +10,8 @@ public class SuspectData : ScriptableObject
     public string Nickname;
     public string Occupation;
     public string CharacterDescription;
+    [TextArea(3, 10)]
+    public string CharacterArc;
     public string DateOfBirth;
     public string Sex;
     public string EntryPermitExpiryDate;
@@ -22,13 +25,73 @@ public class SuspectData : ScriptableObject
 
     public Texture2D IDPhoto;
     public SuspectCharacter CharacterPrefab;
-    public string[] reasonsForEntry;
-    public string[] invalidReasonsForEntry;
 
-    [Header("Dialogue")]
-    public Response[] dialogueResponses; 
-    public string[] entryDialogues;
-    public string[] anomalyEntryDialogues;
+    [System.Serializable]
+    public struct EntryReasonSet
+    {
+        public string[] earlyDaysReasons;   // Days 1-10
+        public string[] midDaysReasons;     // Days 11-20
+        public string[] finalDaysReasons;   // Days 21-30
+    }
+    
+    public EntryReasonSet entryReasons;
+    public EntryReasonSet invalidEntryReasons;
+
+    public enum Verdict
+    {
+        None = 0,
+        Passed = 1,
+        Quarantined = 2,
+        Killed = 3,
+    }
+    
+    [System.Serializable]
+    public struct DialogueByVerdict
+    {
+        public Verdict lastVerdict;
+        [FormerlySerializedAs("entryDialoguesEarlyDays")] public string[] dialoguesEarlyDays;
+        [FormerlySerializedAs("entryDialoguesMidDays")] public string[] dialoguesMidDays;
+        [FormerlySerializedAs("entryDialoguesFinalDays")] public string[] dialoguesFinalDays;
+    
+        public DialogueByVerdict(Verdict verdict, string[] early, string[] mid, string[] final)
+        {
+            lastVerdict = verdict;
+            dialoguesEarlyDays = early;
+            dialoguesMidDays = mid;
+            dialoguesFinalDays = final;
+        }
+    }
+
+    public DialogueByVerdict entryDialoguesFirstEncounter = 
+        new DialogueByVerdict(Verdict.None, new string[3], new string[3], new string[3]);
+    public DialogueByVerdict entryDialoguesLastPassed = 
+        new DialogueByVerdict(Verdict.Passed, new string[3], new string[3], new string[3]);    
+    public DialogueByVerdict entryDialoguesLastQuarantined = 
+        new DialogueByVerdict(Verdict.Quarantined, new string[3], new string[3], new string[3]);    
+    public DialogueByVerdict exitDialoguesPassed = 
+        new DialogueByVerdict(Verdict.Passed, new string[3], new string[3], new string[3]);    
+    public DialogueByVerdict exitDialoguesQuarantined = 
+        new DialogueByVerdict(Verdict.Quarantined, new string[3], new string[3], new string[3]);    
+    public DialogueByVerdict exitDialoguesKilled = 
+        new DialogueByVerdict(Verdict.Killed, new string[3], new string[3], new string[3]);    
+
+    // Questions:
+    // Have you been experiencing any strange symptoms lately?
+    // Where are you coming from?
+    // Who do live with?
+    
+    [System.Serializable]
+    public struct QuestionDialogueSet
+    {
+        public string[] earlyDaysAnswers;   // Days 1-10
+        public string[] midDaysAnswers;     // Days 11-20
+        public string[] finalDaysAnswers;   // Days 21-30
+    }
+
+    public QuestionDialogueSet whereAreYouComingFromAnswers;
+    public QuestionDialogueSet haveYouBeenExperiencingAnySymptomsAnswers;
+    public QuestionDialogueSet whoDoYouLiveWithAnswers;
+    
     public AudioClip[] voiceAudioClips;
     [System.Serializable]
     public struct Response

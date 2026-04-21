@@ -65,7 +65,9 @@ public class ShiftManager : NetworkBehaviour
     public string currentMonth => CurrentGameDateTime.ToString("MMMM");
     public string currentDay => CurrentGameDateTime.ToString("dd");
     public string currentYear => CurrentGameDateTime.ToString("yyyy");
-    
+    public bool IsEarlyDays => CurrentDay < 11;
+    public bool IsMidDays => CurrentDay is >= 11 and < 21; 
+    public bool IsEndDays => CurrentDay >= 21;
     #endregion
 
     private void Awake()

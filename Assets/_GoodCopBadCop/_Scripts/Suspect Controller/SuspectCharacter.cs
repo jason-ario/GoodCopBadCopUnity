@@ -22,7 +22,6 @@ public class SuspectCharacter : Interactable
     
     [SerializeField] bool sealActive;
     
-    public string ReasonForEntry => suspectData.reasonsForEntry[UnityEngine.Random.Range(0, suspectData.reasonsForEntry.Length)];
     public string ExpirationDate => suspectData.EntryPermitExpiryDate;
     public bool SealActive => sealActive;
     
@@ -65,6 +64,12 @@ public class SuspectCharacter : Interactable
     [Header("Anomalies")]
     [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
+    
+    //Responses
+    public int ChosenEntryReasonIndex = -1;
+    public int ChosenSymptomResponseIndex = -1;
+    public int ChosenWhoDoYouLiveWithIndex = -1;
+
     public int radiationAmount = 10;
     private Vector2 radiationNormal = new Vector2(0, 30);
     private Vector2 radiationSuspicious = new Vector2(31, 70);
@@ -72,9 +77,9 @@ public class SuspectCharacter : Interactable
 
     string[] choices = new string[]
     {
-        "State your reason for crossing.", 
-        "What were you doing during the blast?", 
-        "Show me your hands."
+        "Where are you coming from?", 
+        "Have you been experiencing any strange symptoms lately?", 
+        "Who do you live with?"
     };  
 
 
@@ -94,6 +99,9 @@ public class SuspectCharacter : Interactable
     {
         Debug.Log("Initializing Suspect Character");
         anomalyController.Initialize();
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -223,9 +231,26 @@ public class SuspectCharacter : Interactable
     {
         string entryDialogue = "";
         
-        entryDialogue = suspectData.entryDialogues[
-            UnityEngine.Random.Range(0, suspectData.entryDialogues.Length)];
+        //First Get the last verdict of the suspect
+        //TEST: Setting to first encounter. This should be changed based on the last verdict of the suspect.
+        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialoguesFirstEncounter;
+        
+        //Second: Get the day band, 1-10, 11-20, 21-30 etc
+        int dayN0 = ShiftManager.Instance.CurrentDay;
+        string[] entryDialogues;
+        
+        if (dayN0 < 11)
+        {
+            entryDialogues = dialogueByVerdict.dialoguesEarlyDays;
+        } else if (dayN0 < 21)
+        {
+            entryDialogues = dialogueByVerdict.dialoguesMidDays;
+        }
+        else
+        {
+            entryDialogues = dialogueByVerdict.dialoguesFinalDays;
+        }
 
-        return entryDialogue;
+        return entryDialogues[UnityEngine.Random.Range(0, entryDialogues.Length)];
     }
 }
