@@ -9,6 +9,7 @@ public class SuspectData : ScriptableObject
     public string LastName;
     public string Nickname;
     public string Occupation;
+    [TextArea(3, 10)]
     public string CharacterDescription;
     [TextArea(3, 10)]
     public string CharacterArc;
