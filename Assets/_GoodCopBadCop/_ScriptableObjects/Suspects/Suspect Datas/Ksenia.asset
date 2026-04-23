@@ -16,7 +16,11 @@ MonoBehaviour:
   LastName: Darnik
   Nickname: 
   Occupation: Student
-  CharacterDescription: Quiet, wide-eyed, speaks softly, stares a bit too long
+  CharacterDescription: "Quiet, wide-eyed, and speaks in a soft, airy voice. She
+    has a habit of staring at the player\u2019s chin or hands rather than their eyes. "
+  CharacterArc: Her arc is about regression. As the world becomes more terrifying,
+    she retreats into a state of infantile simplicity, eventually treating the apocalypse
+    like a game of pretend that has gone on too long.
   DateOfBirth: 12/06/1981
   Sex: Female
   EntryPermitExpiryDate: 08 OCT
@@ -27,18 +31,69 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 8f8385f1646f13f4293e3177d00b5fa0, type: 3}
   CharacterPrefab: {fileID: 4978373914725814656, guid: c0659c76f2cd77441bfcee0d5defb156, type: 3}
-  reasonsForEntry:
-  - Returning home
-  - Visiting family
-  - Traveling with guardian (not present)
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after primary school.
+    - Resident returning with family members.
+    - Retrieving a lost toy from the park.
+    midDaysReasons:
+    - Escaping the high radiation zones.
+    - Checking on the status of my classroom.
+    - Seeking shelter from the black rain.
+    finalDaysReasons:
+    - Seeking refuge from the falling ash.
+    - Returning to assigned bunk for safety.
+    - Fulfilling mandatory youth census.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to work.
+    - Returning home to see a pet that died last year.
+    - Buying candy from a store that is boarded up.
+    midDaysReasons:
+    - Looking for a teacher who moved away in 1988.
+    - Meeting a friend at the abandoned quarry.
+    - Going to work.
+    finalDaysReasons:
+    - Going home to have tea with the shadows.
+    - I need to go back and find my missing face.
+    - To wait for the monsters to finish their dinner.
   entryDialogues:
-  - "I\u2019m going home now."
-  - My mother said I could pass.
-  - I brought everything I need.
-  anomalyEntryDialogues:
-  - "Hi\u2026 I said everything the way I was told to"
-  - "I\u2019m here now. This is the right place"
-  - "Hello. I didn\u2019t get lost this time"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Hello. My mom said I have to show you this paper.
+    - "It\u2019s very loud out there. Is it always going to be this loud?"
+    - I found a shiny stone in the dirt. Do you want to see?
+    dialoguesMidDays:
+    - Why is your shadow so much longer than you are, mister?
+    - "The playground is empty. The swings move even when there\u2019s no wind."
+    - "I can hear the buildings whispering. They\u2019re cold and they want blankets."
+    dialoguesFinalDays:
+    - "I\u2019m playing hide and seek with the sun. I think I won."
+    - "My dolls told me it\u2019s time to go into the big sleep."
+    - Is it tomorrow yet? Or is today just going to stay forever?
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - "Thank you. I\u2019m going to go see my mom now."
+    dialoguesMidDays:
+    - Don't let the bad air touch you, mister. It bites.
+    dialoguesFinalDays:
+    - "I\u2019m going home to close my eyes. It\u2019s prettier that way."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Is this a time-out? I didn't do anything wrong.
+    dialoguesMidDays:
+    - What? Mom will be mad at me if I'm late for dinner!
+    dialoguesFinalDays:
+    - "I\u2019ll just wait here until the world finishes breaking."
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - I just... I just want to go home!
+    dialoguesMidDays:
+    - "It\u2019s getting very dark. I want to go home now."
+    dialoguesFinalDays:
+    - Is the game over? I don't want to play anymore.
   voiceAudioClips: []
   IDNumber: 2549407

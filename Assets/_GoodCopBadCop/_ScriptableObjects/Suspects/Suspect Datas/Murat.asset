@@ -16,7 +16,11 @@ MonoBehaviour:
   LastName: "\xC7elik"
   Nickname: The Trader
   Occupation: Travelling Trader
-  CharacterDescription: Friendly, expressive, speaks quickly, carries many goods
+  CharacterDescription: 'Whimsical, slightly goofy, and deeply approachable. He carries
+    himself like a classic bazaar merchant who has seen a thousand wonders and just
+    wants to share a good story. '
+  CharacterArc: Even as the world decays, he maintains a twinkly-eyed optimism, treating
+    the apocalypse like a strange, foggy detour in a very long journey.
   DateOfBirth: 07/07/1959
   Sex: Male
   EntryPermitExpiryDate: 12 DEC
@@ -27,18 +31,72 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 75e4f12b7b30fac48b40d9887a3301dc, type: 3}
   CharacterPrefab: {fileID: 8098034281073864286, guid: 6842ef2e3a20cb64fbb66ab4c8c42077, type: 3}
-  reasonsForEntry:
-  - Selling goods
-  - Passing through trade route
-  - Delivering items to clients
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Delivering a shipment of textiles to the market.
+    - Resident returning to the commercial district.
+    - Dropping off scrap metal for the local forge.
+    midDaysReasons:
+    - Transporting medical supplies to the triage center.
+    - Trading salvaged electronics for battery cells.
+    - Seeking shelter from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final curfew.
+    - Seeking refuge from the heavy black ash fall.
+    - Fulfilling mandatory merchant residency count.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Buying a ticket for a train that stopped running in 1970.
+    - Delivering newspapers to a district that burned down.
+    - Renewing a driver's license at a bakery.
+    midDaysReasons:
+    - Returning to a warehouse that was seized by the military.
+    - Meeting a client at a restaurant that was demolished.
+    - Buying a map of a city that changed its name in 1920.
+    finalDaysReasons:
+    - Going home to finish a game of chess with a ghost.
+    - I need to find the shop that sells bottled sunlight.
+    - To see if the birds are still singing in the park.
   entryDialogues:
-  - "Goods to sell, my friend.\t"
-  - Busy road today, yes?
-  - Quick check, I go.
-  anomalyEntryDialogues:
-  - "Good evening, my friend. Long road\u2026 things blur after a while"
-  - Back again. Roads change, but you keep moving
-  - Hello. Travel does something to the mind, you know
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Merhaba, officer! A fine day to be guarding such an important gate, no?
+    - My ID is right here. I keep it next to my lucky chestnut. Never fails me!
+    - "Don't mind my humming. It\u2019s an old song for making the road feel shorter."
+    dialoguesMidDays:
+    - I tried to take a shortcut through the mist. I ended up talking to a very polite
+      cow.
+    - Here is the form. I spilled a little tea on it, but the information is all
+      there.
+    - My boots are squeaking today. I think they are trying to tell me a joke.
+    dialoguesFinalDays:
+    - I found a door in the ruins that wasn't there yesterday. It smelled like cinnamon.
+    - The world is putting on its pajamas. It is getting ready for a very long nap.
+    - Don't be sad, officer. In the next story, maybe I will be the one holding the
+      stamp.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - May your tea always be hot and your path always clear!
+    dialoguesMidDays:
+    - You have a kind face, officer. Don't let the gray air change it.
+    dialoguesFinalDays:
+    - Until we meet again in a brighter chapter. Stay well!
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A little rest in a quiet room? Well, my feet certainly won't complain!
+    dialoguesMidDays:
+    - I hope the walls in there have good stories to tell.
+    dialoguesFinalDays:
+    - It is a small box, but I have a big imagination. I will be fine.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Oh! I suppose... I won't be making... that delivery...
+    dialoguesMidDays:
+    - A very... sudden ending... for such a... long walk...
+    dialoguesFinalDays:
+    - The light... at the end... is finally... coming for me...
   voiceAudioClips: []
   IDNumber: 4118424

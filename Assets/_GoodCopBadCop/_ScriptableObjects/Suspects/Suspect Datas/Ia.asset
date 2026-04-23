@@ -16,7 +16,14 @@ MonoBehaviour:
   LastName: Lomidze
   Nickname: The Witch
   Occupation: Librarian
-  CharacterDescription: Speaks in riddles, avoids direct answers, unsettling calm
+  CharacterDescription: Speaks in riddles, avoids direct answers, unsettling calm.
+    Almost like she knows what's going to happen, and knows your fate, which is ultimately
+    a dark one.
+  CharacterArc: Droopy, heavy-lidded eyes and a piercing gaze. She is unsettlingly
+    calm, speaking in vague riddles and metaphors. Her arc isn't one of fear, but
+    of predestination. She views the apocalypse as a book finally reaching its last
+    chapter, and she treats the player like a character whose ending she has already
+    read.
   DateOfBirth: 30/08/1958
   Sex: Female
   EntryPermitExpiryDate: 05 DEC
@@ -27,18 +34,69 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: bc3f71ff4d3fec84cbcdec8d13ec171d, type: 3}
   CharacterPrefab: {fileID: 7880033083019812546, guid: 692963596e3dede499489345bf734a53, type: 3}
-  reasonsForEntry:
-  - Reading for clients
-  - Visiting regulars
-  - "\u201CCalled here\u201D"
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to the library to organize the archives.
+    - Resident returning from a neighborhood book club.
+    - Picking up a kerosene lamp for the reading room.
+    midDaysReasons:
+    - Escaping the thick smog for the indoor vaults.
+    - Checking the humidity seals in the rare books section.
+    - Seeking shelter from the radioactive fallout.
+    finalDaysReasons:
+    - Returning to assigned bunk for the lockdown.
+    - Seeking refuge from the heavy ash fall.
+    - Fulfilling the mandatory residency count.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Renewing a book that was burned in 1945.
+    - Borrowing a map of a city that doesn't exist.
+    - Delivering a letter to a man who died yesterday.
+    midDaysReasons:
+    - Returning a book to a shelf that was sold off.
+    - Meeting a patron in the basement of a ruin.
+    - Searching for a dictionary that defines the future.
+    finalDaysReasons:
+    - Going home to burn the last of the paper.
+    - To wait for the ink to swallow the world.
+    - I need to go back and finish the last sentence.
   entryDialogues:
-  - "You\u2019ve been expecting me."
-  - The road led me here.
-  - "Let\u2019s see what you decide."
-  anomalyEntryDialogues:
-  - There you are. Right on time
-  - "We\u2019ve reached this moment exactly as we were meant to"
-  - "Go on\u2026 you already know what you\u2019re going to do"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - "You have a very interesting lifeline. It\u2019s shorter than you think."
+    - "I\u2019m just returning. Some stories are better left on the shelf."
+    - "Don't worry about the dust on my coat. We\u2019ll all be dust soon."
+    dialoguesMidDays:
+    - The ink is running dry in the ledger. Can you feel it?
+    - I saw a bird fly backward today. The clock is resetting itself.
+    - "You look like a man who hasn't realized he\u2019s in the final chapter."
+    dialoguesFinalDays:
+    - Why bother with the gate? The walls are already ghosts.
+    - The great silence is coming to turn the final page.
+    - "I\u2019ve seen your ending. It\u2019s quite dark, but very quiet."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Go on then. Your story still has a few pages left.
+    dialoguesMidDays:
+    - "You\u2019re letting the ending inside. I hope you\u2019re ready."
+    dialoguesFinalDays:
+    - It doesn't matter where you go. The ink is already dry.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A room without books. How very dull for us both.
+    dialoguesMidDays:
+    - You think a cage changes the plot? How charmingly naive.
+    dialoguesFinalDays:
+    - Isolation is just a waiting room for the inevitable.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "A violent edit. I suppose that\u2019s one way to end it."
+    dialoguesMidDays:
+    - "You\u2019ve skipped straight to the epilogue. A shame."
+    dialoguesFinalDays:
+    - "And so, the book is closed. I\u2019ll see you in the dark."
   voiceAudioClips: []
   IDNumber: 5569992

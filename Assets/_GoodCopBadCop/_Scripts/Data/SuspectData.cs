@@ -63,12 +63,8 @@ public class SuspectData : ScriptableObject
         }
     }
 
-    public DialogueByVerdict entryDialoguesFirstEncounter = 
+    public DialogueByVerdict entryDialogues = 
         new DialogueByVerdict(Verdict.None, new string[3], new string[3], new string[3]);
-    public DialogueByVerdict entryDialoguesLastPassed = 
-        new DialogueByVerdict(Verdict.Passed, new string[3], new string[3], new string[3]);    
-    public DialogueByVerdict entryDialoguesLastQuarantined = 
-        new DialogueByVerdict(Verdict.Quarantined, new string[3], new string[3], new string[3]);    
     public DialogueByVerdict exitDialoguesPassed = 
         new DialogueByVerdict(Verdict.Passed, new string[3], new string[3], new string[3]);    
     public DialogueByVerdict exitDialoguesQuarantined = 
@@ -81,17 +77,17 @@ public class SuspectData : ScriptableObject
     // Where are you coming from?
     // Who do live with?
     
-    [System.Serializable]
+    /*[System.Serializable]
     public struct QuestionDialogueSet
     {
         public string[] earlyDaysAnswers;   // Days 1-10
         public string[] midDaysAnswers;     // Days 11-20
         public string[] finalDaysAnswers;   // Days 21-30
-    }
+    }*/
 
-    public QuestionDialogueSet whereAreYouComingFromAnswers;
+    /*public QuestionDialogueSet whereAreYouComingFromAnswers;
     public QuestionDialogueSet haveYouBeenExperiencingAnySymptomsAnswers;
-    public QuestionDialogueSet whoDoYouLiveWithAnswers;
+    public QuestionDialogueSet whoDoYouLiveWithAnswers;*/
     
     public AudioClip[] voiceAudioClips;
     [System.Serializable]

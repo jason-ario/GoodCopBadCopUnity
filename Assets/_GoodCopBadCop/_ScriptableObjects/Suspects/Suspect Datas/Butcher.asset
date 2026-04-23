@@ -16,30 +16,86 @@ MonoBehaviour:
   LastName: Asatiani
   Nickname: The Butcher
   Occupation: Butcher
-  CharacterDescription: Large build, smells of raw meat, avoids eye contact
+  CharacterDescription: "Looks creepy and unsettling because he has bandages covering
+    his face due to an accident with the meat grinder. Is actually a nice guy though
+    has a bit of sadistic humor.\t"
+  CharacterArc: Looks creepy and unsettling with bandages covering a "meat grinder
+    accident" on his face. Initially possesses a sadistic sense of humor, but eventually
+    becomes a vessel for a supernatural hunger as doomsday approaches.
   DateOfBirth: 14/03/1952
   Sex: Male
   EntryPermitExpiryDate: 18 NOV
   IsResident: 1
-  GivesPaperwork: 1
+  GivesPaperwork: 0
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 0fcfca4c7492c9d498418140abe8b5dd, type: 3}
   CharacterPrefab: {fileID: 4439616193100157912, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
-  reasonsForEntry:
-  - Returning from livestock trade
-  - Delivering meat to Saplavi market
-  - Visiting cousin (claims urgent)
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to fix the walk-in freezer.
+    - Resident returning to home address.
+    - Coming back to sharpen the cleavers.
+    midDaysReasons:
+    - Checking the seals on the back door.
+    - Escaping the smog for the night.
+    - Picking up more gauze from the clinic.
+    finalDaysReasons:
+    - Reentering to hide in the basement; the wind is too loud.
+    - Returning from the boundary fence; I just wanted to see the sky.
+    - Reentering the gates to find a place to sleep that isn't grey.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Returning from the 1800s to see the horses.
+    - Reentering from the moon; it was very dusty there.
+    - Coming back from the clouds to visit a friend.
+    midDaysReasons:
+    - Returning from the bottom of the ocean; I am dry.
+    - Reentering from yesterday; I think I left my keys there.
+    - Coming from the center of a volcano to stay warm.
+    finalDaysReasons:
+    - I am a government inspector here to ensure all radiation safety protocols are
+      being met.
+    - Coming from a wedding. I was the flower boy.
+    - I am here for a routine dental checkup; my gums are just a bit ticklish.
   entryDialogues:
-  - "Don\u2019t worry\u2026 I only cut meat."
-  - "You\u2019re not on the menu today, eh?"
-  - Relax, officer. I save the knives for work.
-  anomalyEntryDialogues:
-  - "Evening, officer. Always the same routine\u2026 you get used to how things open
-    up"
-  - Here for entry. Funny how everything looks fine until you take a closer look
-  - "Long day. Hands don\u2019t forget the work, even when the rest of you does"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Careful with the permit. My hands are always a bit... slick.
+    - The bandages? Just a little accident at the shop. Don't stare.
+    - I have a special cut of rib waiting for me inside.
+    dialoguesMidDays:
+    - The hunger... it isn't in my stomach anymore. It's in my teeth.
+    - Do you hear the metal grinding, officer? It never truly stops.
+    - I feel the air touching my raw face through the gauze.
+    dialoguesFinalDays:
+    - Here, take my papers. Sorry got a little blood on them. Comes with the profession.
+    - You look like you'd make a good filet mignon.
+    - Hope you're not sick of seeing me. Cause I've been dying to see you.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - "Stop by later. I\u2019ll give you a 'cut' of the profits. Get it?"
+    dialoguesMidDays:
+    - "Try to stay plump, officer. It\u2019s a better look for you."
+    dialoguesFinalDays:
+    - Go on. The world is just one big cold-storage anyway.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Solitary? Well, at least I won't have to share my lunch.
+    dialoguesMidDays:
+    - "I\u2019ll be practicing my knife skills on the wallpaper. Don't worry."
+    dialoguesFinalDays:
+    - A box is a box. Eventually, we all get wrapped up.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Aw, and I was just starting to like your face.
+    dialoguesMidDays:
+    - "A bit overkill, don't you think? I\u2019m already half-mummified."
+    dialoguesFinalDays:
+    - There it is... the big... silent... punchline.
   voiceAudioClips: []
   IDNumber: 9722713

@@ -16,7 +16,12 @@ MonoBehaviour:
   LastName: Gagua
   Nickname: 
   Occupation: Taxi Driver
-  CharacterDescription: Confident, slightly aggressive tone
+  CharacterDescription: Confident, slightly aggressive and macho  tone. Mid 30's
+    male just trying to get by, but comes off as a arrogant and easily aggravated.
+    Clearly has anger issues and unresolved traumas.
+  CharacterArc: 'His arc is one of explosive frustration; as the world stops making
+    sense and his cab becomes useless, he directs his rage at the only thing he can
+    still control: his interactions with the checkpoint.'
   DateOfBirth: 28/12/1963
   Sex: Male
   EntryPermitExpiryDate: 25 SEP
@@ -27,18 +32,74 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: d5651fdd6900dd14fa45f1adfa3633ca, type: 3}
   CharacterPrefab: {fileID: 199770865469659255, guid: 6e920bda57f6de84eba63381a300818a, type: 3}
-  reasonsForEntry:
-  - Picking up passenger
-  - Returning from trip
-  - Transport job
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after a twelve-hour driving shift.
+    - Resident returning to the western residential district.
+    - Dropping off the car at the fleet garage for repairs.
+    midDaysReasons:
+    - Escaping the heavy smog.
+    - Checking on the security of my apartment building.
+    - Seeking shelter from the radioactive fallout.
+    finalDaysReasons:
+    - Seeking refuge from the falling ash.
+    - Returning home.
+    - Fulfilling mandatory residency check-in.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Renewing a taxi license at the public library.
+    - Taking a shortcut through the high-security bunker.
+    - Picking up a passenger at the abandoned airport.
+    midDaysReasons:
+    - Looking for a gas station that hasn't been looted.
+    - Driving a fare to a bridge that collapsed yesterday.
+    - Picking up a spare tire from the grocery store.
+    finalDaysReasons:
+    - Going home to wait for the radio to stop screaming.
+    - I need to find the guy who dented my fender.
+    - To sit in my car and honk until the sky breaks.
   entryDialogues:
-  - Passenger waiting on the other side.
-  - Just doing my job.
-  - "Let\u2019s keep it moving."
-  anomalyEntryDialogues:
-  - Evening. Roads were strange getting here, but I made it
-  - "Got here fine\u2026 don\u2019t really remember the last turn though"
-  - Just another trip. Feels different tonight
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - "Move it along, officer. I\u2019ve got a fare waiting and time is money."
+    - What, you need to see my teeth too? Just check the damn paper.
+    - "This town is going to hell because everyone\u2019s standing around asking
+      questions."
+    dialoguesMidDays:
+    - My car won't start and the streets are full of junk. You happy now?
+    - "Don't look at me like that. I\u2019ve dealt with tougher guys than you before
+      breakfast."
+    - "You think this booth makes you special? We\u2019re all breathing the same
+      poison."
+    dialoguesFinalDays:
+    - "Go ahead, keep me here. There\u2019s nowhere left to drive anyway."
+    - "You\u2019re just a glorified bouncer for a club that\u2019s currently burning
+      down."
+    - "I hope you\u2019re proud of your little rubber stamp. It\u2019s all you\u2019ll
+      have left soon."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Finally. Try to work a bit faster next time, yeah?
+    dialoguesMidDays:
+    - "Yeah, yeah. Watch your back out here. It\u2019s getting ugly."
+    dialoguesFinalDays:
+    - Whatever. Enjoy your little cage while it lasts.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - "You\u2019re kidding me. I don't have time for this circus!"
+    dialoguesMidDays:
+    - Lock me up then. At least I won't have to look at your face.
+    dialoguesFinalDays:
+    - "Fine. It\u2019s probably quieter in there than it is out here."
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "Hey! What are you\u2014!"
+    dialoguesMidDays:
+    - I knew you were looking for an excuse to pull that trigger!
+    dialoguesFinalDays:
+    - About time... someone... shut the world... up.
   voiceAudioClips: []
   IDNumber: 3442788

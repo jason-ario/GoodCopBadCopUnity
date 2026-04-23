@@ -17,6 +17,7 @@ MonoBehaviour:
   Nickname: Mafia Boss
   Occupation: Businessman
   CharacterDescription: Confident, intimidating, maintains strong eye contact
+  CharacterArc: 
   DateOfBirth: 15/05/1955
   Sex: Male
   EntryPermitExpiryDate: 28 DEC
@@ -27,18 +28,104 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 787204351f454a94586a01bf2ac4638b, type: 3}
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
-  reasonsForEntry:
-  - Business meeting
-  - Property inspection
-  - Private matters
-  dialogueResponses: []
-  entryDialogues:
-  - You can let me through.
-  - "We won\u2019t have any problems."
-  - Handle this quickly.
-  anomalyEntryDialogues:
-  - "Good evening. Let\u2019s keep this efficient"
-  - I trust everything will proceed as expected
-  - No need to complicate things tonight
+  entryReasons:
+    earlyDaysReasons:
+    - Reentering after purchasing supplies from the outer district.
+    - Returning from my shift at the apiary outside the walls.
+    - Reentering town after visiting family in the rural sector.
+    midDaysReasons:
+    - Returning to town after scavenging for firewood in the flats.
+    - Reentering to find a doctor; the clinics outside are closed.
+    - Reentering the gates to seek shelter from the black rain.
+    finalDaysReasons:
+    - 
+  invalidEntryReasons:
+    earlyDaysReasons: []
+    midDaysReasons: []
+    finalDaysReasons: []
+  entryDialoguesFirstEncounter:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
+  entryDialoguesLastPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
+  entryDialoguesLastQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   voiceAudioClips: []
   IDNumber: 5025734

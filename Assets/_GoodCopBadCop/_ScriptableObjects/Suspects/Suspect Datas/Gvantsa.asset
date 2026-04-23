@@ -16,7 +16,10 @@ MonoBehaviour:
   LastName: Edisherashvili
   Nickname: 
   Occupation: Student
-  CharacterDescription: Alert, observant, slightly anxious
+  CharacterDescription: Sharp, jittery, and hyper-observant. She notices small details
+    the player might miss. Her arc shifts from high-alert survivalism to a frantic,
+    wide-eyed obsession with "patterns" in the decay.
+  CharacterArc: 
   DateOfBirth: 17/02/1972
   Sex: Female
   EntryPermitExpiryDate: 27 OCT
@@ -27,18 +30,69 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: c3b6bf376c66eaf45bbf9880cde396b0, type: 3}
   CharacterPrefab: {fileID: 6078421262525438805, guid: f85ba637cdbbfae47afded6b54de18ba, type: 3}
-  reasonsForEntry:
-  - Returning home
-  - Visiting family
-  - School break
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home before the streetlights dim.
+    - Resident returning from the university.
+    - Picking up a coat for the winter.
+    midDaysReasons:
+    - Checking on the emergency water rations at home.
+    - Checking on the water supply at home.
+    - Seeking shelter from the low-hanging fog.
+    finalDaysReasons:
+    - Seeking refuge from the falling ash.
+    - Returning to my dorm.
+    - Attending my final lectures.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to a dorm that was demolished.
+    - Buying groceries at the post office.
+    - Visiting a neighbor who left last week.
+    midDaysReasons:
+    - Returning to a floor that isn't there.
+    - Looking for the sun in the basement.
+    - Meeting someone who hasn't been born.
+    finalDaysReasons:
+    - Going home to watch the walls disappear.
+    - To help the shadows fold the laundry.
+    - I need to find the seam in the world.
   entryDialogues:
-  - "Hi\u2026 I\u2019m just heading home."
-  - Is everything okay?
-  - "I have my papers right here\u2026"
-  anomalyEntryDialogues:
-  - "Hi\u2026 I\u2019m heading inside. It feels familiar here"
-  - "Hello. It\u2019s quieter than I expected"
-  - "I\u2019m just going in. People don\u2019t seem to notice much anymore"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - The paint is peeling on your booth. Just noticed.
+    - Is the air always this thick? It feels... heavy today.
+    - "I\u2019m just heading back. I have a lot of reading to do."
+    dialoguesMidDays:
+    - I saw a tree turn gray while I was walking. It was quite pretty.
+    - The static on the TV... if you stare, it looks like snow.
+    - Everything is starting to look like a photograph. Very still.
+    dialoguesFinalDays:
+    - "I\u2019m going to watch the sunset. I think it\u2019s the last one."
+    - Do you feel the world getting thinner? I can see right through it.
+    - "The silence is beautiful. It\u2019s the most honest thing we have."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thanks. You should probably fix that light soon.
+    dialoguesMidDays:
+    - Try not to look at the sky for too long today.
+    dialoguesFinalDays:
+    - "Enjoy the view, officer. It\u2019s quite a show."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - "Wait, why? I\u2019m not sick!"
+    dialoguesMidDays:
+    - "A cell? That\u2019s fine. The view is the same from anywhere."
+    dialoguesFinalDays:
+    - Isolation is just a head start on the end. I don't mind.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Wait... what are you doing?!?
+    dialoguesMidDays:
+    - Wait... No, please!
+    dialoguesFinalDays:
+    - Wait... mommy!
   voiceAudioClips: []
   IDNumber: 2720955

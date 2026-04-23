@@ -17,10 +17,9 @@ MonoBehaviour:
   Nickname: Dio
   Occupation: Professor
   CharacterDescription: Stoic, calm and professional. Has a deep care for his students.
-  CharacterArc: Professor goes from caring greatly about knowledge to questioning
-    if it even matters if humanity erases it all in the end. He questions if humanity
-    should even have knowledge, since presumedly the nuclear bombs are a man made
-    invention.
+  CharacterArc: He begins as a dedicated educator. As the radiation spreads, he becomes
+    nihilistic, questioning the value of human intellect and eventually viewing the
+    "unmaking" of the world as a necessary cleansing of man-made folly.
   DateOfBirth: 09/03/1953
   Sex: Male
   EntryPermitExpiryDate: 12 JUN
@@ -33,153 +32,67 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 5164911391202306748, guid: a27411530d2c9aa4eab6a559a8832b11, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - 'Returning from university '
-    - Academic duties
-    - Returning home from work
+    - Returning to campus for the winter term.
+    - Resident returning from academic leave.
+    - Retrieving essential research materials.
     midDaysReasons:
-    - University business
-    - Returning from campus
-    - Collecting documents
+    - Checking the structural integrity of the lab.
+    - Escaping the fallout for university shelter.
+    - Meeting with the dean regarding safety.
     finalDaysReasons:
-    - Returning
-    - Personal business
-    - Collecting belongings
+    - Returning to my registered faculty housing.
+    - Seeking refuge.
+    - Fulfilling final residency requirements.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Verifying something I forgot
-    - Checking if things are still the same
-    - Following a routine
+    - Lecturing a class of empty chairs.
+    - Grading papers written in human blood.
+    - Searching for a door that leads to 1890.
     midDaysReasons:
-    - Observing the current conditions
-    - Continuing previous work
-    - Maintaining continuity
+    - Teaching the atoms how to stop spinning.
+    - Discussing philosophy with the radiation.
+    - Counting the seconds until the sun breaks.
     finalDaysReasons:
-    - To see what is left
-    - To confirm it still exists
-    - To witness the outcome
-  dialogueResponses: []
-  entryDialoguesFirstEncounter:
+    - To help the shadows finish their dinner.
+    - Attending the graduation ceremony for the dead.
+    - I need to go back and erase the chalkboard.
+  entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Greetings. Here is my paperwork. Knowledge is power after all.
-    - Salutations, officers. I trust everything is in order?
-    - Pleasure to meet you, officers.
+    - "Good day, officer. I\u2019m just returning from the university archives."
+    - "The students are anxious. I\u2019m heading back to provide some stability."
+    - Stoicism is the only logical response to a crisis, wouldn't you agree?
     dialoguesMidDays:
-    - Hello, friends. We need to stick together in these tough times.
-    - Greetings. Here are my papers. I assert you will make the correct judgment.
-    - Here are my papers. I hope it's all okay.
+    - The books are starting to feel... heavy. As if the ink is rotting.
+    - I saw a bird fall from the sky today. It didn't even scream.
+    - Human intellect is a very fragile glass, and the hammer is coming.
     dialoguesFinalDays:
-    - Here. Do as you will with it.
-    - Are these checkpoints even necessary?
-    - I'm not sure what the point of these checkpoints are.
-  entryDialoguesLastPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - "Ah, we\u2019ve met before. I appreciate your reasonableness."
-    - Good to see a familiar face. Here are my papers again.
-    - You passed me last time. I trust today will be just as simple.
-    dialoguesMidDays:
-    - "We\u2019ve already done this once. I assume nothing has changed."
-    - You let me through before. I hope good sense still prevails.
-    - Back again. I suppose we continue our ritual.
-    dialoguesFinalDays:
-    - You let me through before. Perhaps that still means something.
-    - "We\u2019ve done this already. Let\u2019s not pretend it matters more now."
-    - You passed me once. I wonder what that was worth.
-  entryDialoguesLastQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays:
-    - You stopped me before. I trust that was merely caution.
-    - "We met already, if you recall. I\u2019m hoping for a fairer judgment today."
-    - "You sent me back last time. I\u2019d like to think that was a misunderstanding."
-    dialoguesMidDays:
-    - You quarantined me before. I assume you had your reasons.
-    - I was turned away last time. I hope we can be more rational today.
-    - "We\u2019ve already been through this once. Must we repeat it?"
-    dialoguesFinalDays:
-    - "You kept me out before. I\u2019m still here, as you can see."
-    - You quarantined me, and yet the world continued collapsing anyway.
-    - You sent me away before. I wonder what exactly that protected.
+    - The fire is a beautiful editor. It deletes all our mistakes.
+    - Why check the papers? Soon, the ash will be our only record.
+    - I am going home to watch the horizon dissolve into white.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - "Thank you. I\u2019ll be on my way."
-    - Much appreciated.
-    - Very good. Have a pleasant day.
+    - Thank you. Stay focused. Order is our only defense.
     dialoguesMidDays:
-    - "Thank you. I won\u2019t be long."
-    - Good. At least some judgment remains.
-    - Much appreciated. These are not easy days.
+    - "Go home, officer. While there\u2019s still a home to go to."
     dialoguesFinalDays:
-    - "Fine. I\u2019ll go."
-    - "Thank you\u2026 for whatever that still means."
-    - Good. Another gate opens.
+    - "Enter the tomb. It\u2019s warmer than the street."
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - On what grounds?
-    - I see. Very well.
-    - "That seems excessive, doesn\u2019t it?"
+    - A setback, but perhaps a necessary precaution for the group.
     dialoguesMidDays:
-    - "You really think that\u2019s necessary?"
-    - So that is your decision.
-    - "I\u2019ve done nothing to warrant this."
+    - Isolation. A perfect laboratory for watching one's mind fray.
     dialoguesFinalDays:
-    - "You\u2019re mistaking procedure for wisdom."
-    - Go on then. Quarantine me.
-    - You think this changes anything?
+    - Lock me away. The unmaking happens everywhere at once.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - "Wait\u2014what are you doing?"
-    - "Officer\u2014"
-    - "No, this is absurd\u2014"
+    - A very... unrefined solution to a complex problem.
     dialoguesMidDays:
-    - "Have you lost your mind\u2014?"
-    - "Wait, listen to me\u2014"
-    - "No\u2014!"
+    - And so the curriculum ends. I expected a more elegant finale.
     dialoguesFinalDays:
-    - So this is what it comes to.
-    - Then do it.
-    - Of course.
-  haveYouBeenExperiencingAnySymptomsAnswers:
-    earlyDaysAnswers:
-    - No, none at all.
-    - Nothing unusual, no.
-    - No. I feel perfectly fine.
-    midDaysAnswers:
-    - Nothing serious. Fatigue, perhaps.
-    - Only stress, if that counts.
-    - No true symptoms. Just exhaustion.
-    finalDaysAnswers:
-    - Symptoms? No.
-    - Nothing worth naming.
-    - "We\u2019re all unwell now, aren\u2019t we?"
-  whereAreYouComingFromAnswers:
-    earlyDaysAnswers:
-    - From the university.
-    - From my classroom, more or less.
-    - From home.
-    midDaysAnswers:
-    - From the university grounds.
-    - From the faculty building.
-    - "From home. I haven\u2019t gone far."
-    finalDaysAnswers:
-    - "From what\u2019s left of the university."
-    - Academic affairs
-    - I'm just returning. Is that not enough?
-  whoDoYouLiveWithAnswers:
-    earlyDaysAnswers:
-    - I live alone.
-    - By myself.
-    - Alone. I prefer the quiet.
-    midDaysAnswers:
-    - Alone, still.
-    - No one. I live by myself.
-    - "By myself. It\u2019s simpler that way."
-    finalDaysAnswers:
-    - Alone.
-    - No one now.
-    - By myself, yes.
+    - Yes... simplify the equation. Zero is the only true answer.
   voiceAudioClips: []
   IDNumber: 7262765

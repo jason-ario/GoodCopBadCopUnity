@@ -17,6 +17,9 @@ MonoBehaviour:
   Nickname: Conehead
   Occupation: Assistant Beekeeper
   CharacterDescription: Pale, emotionless, speaks slowly
+  CharacterArc: 20s. Extremely pale with a distinct, conical head shape. Speaks with
+    a slow, flat affect. Seems perpetually "buffering," making it unclear if he is
+    deep in thought or completely vacant.
   DateOfBirth: 02/11/1961
   Sex: Male
   EntryPermitExpiryDate: 03 OCT
@@ -27,18 +30,69 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: b372d54a5d442a046b70f629ee1faac8, type: 3}
   CharacterPrefab: {fileID: 1137470412463827199, guid: 1949dc12c0f83bd4ea3dec2eec0c5cb9, type: 3}
-  reasonsForEntry:
-  - Passing through
-  - Lost documents, seeking help
-  - "Visiting \u201Cfriend\u201D"
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to the apiary for sleep.
+    - Resident returning from work shift.
+    - Picking up more smoke canisters.
+    midDaysReasons:
+    - Escaping the yellow fog outside.
+    - Checking the sugar water supplies.
+    - Seeking a medical check for my head.
+    finalDaysReasons:
+    - Seeking shelter.
+    - Returning to my assigned residence.
+    - Coming home to say my goodbyes.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Coming home to feed my pet rock.
+    - Delivering honey to a closed shop.
+    - I am here to see the King.
+    midDaysReasons:
+    - The bees told me to go south.
+    - Returning to a house that burned down.
+    - I am looking for yesterday's sun.
+    finalDaysReasons:
+    - To hatch the eggs in my throat.
+    - The mirror doesn't show me anymore.
+    - Attending the wedding of the dust.
   entryDialogues:
-  - I need to pass.
-  - This is the correct place, yes?
-  - I was told to come here.
-  anomalyEntryDialogues:
-  - Hello. This is the correct place for me to be
-  - "I\u2019ve arrived as expected. Everything seems to be in order"
-  - Good evening. This is where I was meant to come
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Hello. I... have my papers. Somewhere.
+    - The bees are... very quiet today. It is nice.
+    - I am returning. The master says I am finished.
+    dialoguesMidDays:
+    - The hives are melting. But... there is no heat.
+    - My head feels... heavy. Like it is full of honey.
+    - The air tastes like... burnt sugar and metal.
+    dialoguesFinalDays:
+    - I can hear the queen. She is... under my skin.
+    - There is no more Emzar. Only... the swarm.
+    - The sky is a dead eye. I am blinking.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thank you. I... will go now. Slowly.
+    dialoguesMidDays:
+    - The buzzing... it is getting louder inside. Goodbye.
+    dialoguesFinalDays:
+    - We will all... be... together soon.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A small room? That is... fine. I like boxes.
+    dialoguesMidDays:
+    - The walls are white. Like... a fresh comb.
+    dialoguesFinalDays:
+    - The hive is growing here. I can feel it.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Oh. That... was quite... loud.
+    dialoguesMidDays:
+    - Everything is... turning... gold.
+    dialoguesFinalDays:
+    - Finally... the swarm... is free.
   voiceAudioClips: []
   IDNumber: 6391819

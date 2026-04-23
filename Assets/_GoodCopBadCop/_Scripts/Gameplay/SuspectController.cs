@@ -233,7 +233,7 @@ public class SuspectController : NetworkBehaviour
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
-        SuspectData.QuestionDialogueSet questionDialogueSet;
+        /*SuspectData.QuestionDialogueSet questionDialogueSet;
         int responseIndex = 0;
         
         if (choiceIndex == 0)
@@ -266,7 +266,7 @@ public class SuspectController : NetworkBehaviour
             dialogueResponses = questionDialogueSet.finalDaysAnswers;
         }
         
-        DialogueManager.Instance.SayDialogue(suspectCharacter, dialogueResponses[responseIndex]);
+        DialogueManager.Instance.SayDialogue(suspectCharacter, dialogueResponses[responseIndex]);*/
     }
     
     public void Pass()

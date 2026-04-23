@@ -17,7 +17,13 @@ MonoBehaviour:
   Nickname: The Serial Killer
   Occupation: Factory Worker
   CharacterDescription: Friendly, upbeat, constant smile that never drops, eyes feel
-    empty
+    empty. Clearly hiding something but not really trying to hide it that well, almost
+    like he wants you to notice he's a serial killer in secret. Maniacal, creepy
+    grin and soulless eyes.
+  CharacterArc: Maniacal grin, empty white eyes, and a terrifyingly upbeat attitude.
+    His arc is about predatory glee. As society collapses, he stops hiding his nature
+    entirely, viewing the apocalypse as a playground where the rules of man no longer
+    apply.
   DateOfBirth: 18/04/1954
   Sex: Male
   EntryPermitExpiryDate: 19 NOV
@@ -28,18 +34,70 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: c0072b0f37423214fad965cf6682ff95, type: 3}
   CharacterPrefab: {fileID: 7584919870796122196, guid: 3ab329df9f896a74294f492fa0087291, type: 3}
-  reasonsForEntry:
-  - Returning home
-  - Visiting friends
-  - Work-related travel
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to residential block after the late shift.
+    - Resident returning to the industrial district.
+    - Picking up a new pair of industrial work boots.
+    midDaysReasons:
+    - Escaping the rising radiation levels in the sector.
+    - Checking on the status of the factory power grid.
+    - Seeking shelter from the toxic rainfall.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final curfew.
+    - Seeking refuge from the heavy black ash.
+    - Fulfilling mandatory residency check-in.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Picking up a paycheck from a factory that closed in 1982.
+    - Shopping for jewelry at the hardware store.
+    - Visiting a friend who disappeared three years ago.
+    midDaysReasons:
+    - Returning to a house that was turned into a crater.
+    - Buying a shovel to bury a very heavy secret.
+    - Meeting a coworker in the middle of a minefield.
+    finalDaysReasons:
+    - Going home to count the collection in my cellar.
+    - To see if the neighbors have stopped screaming yet.
+    - I need to find out what color the inside of a ghost is.
   entryDialogues:
-  - Good evening, officer.
-  - Always nice to be back.
-  - "You\u2019re doing important work."
-  anomalyEntryDialogues:
-  - Good evening, officer. Nice and calm tonight, just how I like it
-  - Always good to see things running smoothly here
-  - "Evening. Everything\u2019s exactly where it should be"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Beautiful day for a walk, isn't it? I feel absolutely wonderful!
+    - Just heading back from the factory. Hard work makes for a happy heart.
+    - Why the long face, officer? You should try smiling more. Like me!
+    dialoguesMidDays:
+    - "Have you noticed how quiet the alleys are getting? It\u2019s perfect for...
+      hobbies."
+    - "I found a new tool today. It\u2019s heavy, balanced, and very, very sharp."
+    - "Don't look at my eyes. Look at my teeth. They\u2019re much more interesting."
+    dialoguesFinalDays:
+    - The world is finally matching the inside of my head. I love it!
+    - Can you hear the music? It sounds like everyone screaming at once.
+    - "I\u2019m going home to play. There are so many toys left in the dark."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - "See you tomorrow! I\u2019ll bring you something special. Maybe."
+    dialoguesMidDays:
+    - Keep that neck straight, officer. Desk work is awful for your posture.
+    dialoguesFinalDays:
+    - Thanks, comrade. Keep out of trouble now!
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Oh, a private room? How thoughtful of you!
+    dialoguesMidDays:
+    - I hope you have strong locks. For your sake, not mine.
+    dialoguesFinalDays:
+    - "You\u2019re just putting me in a box with more toys. Thank you!"
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Oh! What a surprise! I didn't think you had it in you!
+    dialoguesMidDays:
+    - "Look at all that red! It\u2019s even prettier than I imagined!"
+    dialoguesFinalDays:
+    - Finally... the big... bright... joke... is over.
   voiceAudioClips: []
   IDNumber: 1893438

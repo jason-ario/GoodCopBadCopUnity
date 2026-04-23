@@ -106,8 +106,7 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-      
-        DialogueManager.Instance.InitiateChoices(lookPos, choices);
+        //DialogueManager.Instance.InitiateChoices(lookPos, choices);
     }
 
     public void SetCanInteract(bool canInteract)
@@ -121,7 +120,7 @@ public class SuspectCharacter : Interactable
         if (item == null)
         {
             
-            DialogueManager.Instance.InitiateChoices(lookPos, choices);
+            //DialogueManager.Instance.InitiateChoices(lookPos, choices);
             return;
         }
 
@@ -231,9 +230,8 @@ public class SuspectCharacter : Interactable
     {
         string entryDialogue = "";
         
-        //First Get the last verdict of the suspect
-        //TEST: Setting to first encounter. This should be changed based on the last verdict of the suspect.
-        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialoguesFirstEncounter;
+        // Get entry dialogues
+        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialogues;
         
         //Second: Get the day band, 1-10, 11-20, 21-30 etc
         int dayN0 = ShiftManager.Instance.CurrentDay;
