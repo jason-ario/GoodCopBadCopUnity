@@ -16,8 +16,12 @@ MonoBehaviour:
   LastName: Syrnikov
   Nickname: Mafia Boss
   Occupation: Businessman
-  CharacterDescription: Confident, intimidating, maintains strong eye contact
-  CharacterArc: 
+  CharacterDescription: "An enormous, intimidating man who exudes confidence. He
+    maintains unwavering, aggressive eye contact and speaks with the smooth, dangerous
+    authority of someone who owns the city\u2014and everyone in it."
+  CharacterArc: His arc is about predatory control; he treats the checkpoint like
+    a minor inconvenience, subtly threatening the player while implying that the
+    law is just a suggestion for a man of his stature.
   DateOfBirth: 15/05/1955
   Sex: Male
   EntryPermitExpiryDate: 28 DEC
@@ -30,102 +34,71 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Reentering after purchasing supplies from the outer district.
-    - Returning from my shift at the apiary outside the walls.
-    - Reentering town after visiting family in the rural sector.
+    - Returning to my estate after a "merger" meeting.
+    - Resident returning to the high-security district.
+    - Collecting a private shipment of "medical supplies".
     midDaysReasons:
-    - Returning to town after scavenging for firewood in the flats.
-    - Reentering to find a doctor; the clinics outside are closed.
-    - Reentering the gates to seek shelter from the black rain.
+    - Relocating assets to a more secure underground vault.
+    - Checking on the loyalty of my remaining "employees".
+    - Seeking shelter in my private reinforced bunker.
     finalDaysReasons:
-    - 
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory residency check-in for executives.
   invalidEntryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
-  entryDialoguesFirstEncounter:
+    earlyDaysReasons:
+    - Going to the park to feed the pigeons for six hours.
+    - Buying a bus ticket to a city that was nuked yesterday.
+    - Applying for a job as a low-level janitor at the mall.
+    midDaysReasons:
+    - Returning to a warehouse that was seized by the military.
+    - Buying a wedding ring for a woman I never met.
+    - Going to the tax office to report my illegal earnings.
+    finalDaysReasons:
+    - Going home to prepare for my 100th birthday party.
+    - I need to find the man who sold me a broken sun.
+    - To see if the police still remember how to bleed.
+  entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - "You look nervous, officer. Relax. I\u2019m just a businessman coming home."
+    - "Here are the papers. Make sure you don't smudge the ink; I\u2019m a man who
+      likes things clean."
+    - You have a difficult job. It would be a shame if something made it even harder
+      for you.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - The world is changing, but men like me? We always find a way to stay on top.
+    - "Don't look at the sky, look at me. I\u2019m the one who decides if you have
+      a good night."
+    - "Is there a problem with the date? I\u2019m sure we can reach an... understanding."
     dialoguesFinalDays:
-    - 
-    - 
-    - 
-  entryDialoguesLastPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
-  entryDialoguesLastQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - Even when this city is ash, I will still be the one holding the shovel.
+    - "Stamping that paper is the smartest thing you\u2019ll do all day. Don't disappoint
+      me."
+    - "I\u2019m going home to count what\u2019s left. Get out of my way."
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Smart move. You might actually survive the week.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - "Good choice. I\u2019ll remember your face when the new order starts."
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - "You\u2019re learning. Too bad there\u2019s no time left to use those brains."
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - "You\u2019re making a very expensive mistake, officer."
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - A cell? For me? You clearly don't know who signs your paycheck.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - "Enjoy your little box while it lasts. I\u2019ll be out before you blink."
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - You... don't have... the... courage... to...
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - "I\u2019ll see you... in... the... dirt..."
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - Even death... is... just... a... transaction...
   voiceAudioClips: []
   IDNumber: 5025734

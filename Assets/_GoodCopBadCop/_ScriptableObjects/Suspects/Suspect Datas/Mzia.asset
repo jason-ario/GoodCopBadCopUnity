@@ -16,7 +16,8 @@ MonoBehaviour:
   LastName: Kakulia
   Nickname: Granny
   Occupation: Seamstress
-  CharacterDescription: Frail, kind expression, shaky hands
+  CharacterDescription: Frail, kind expression, shaky hands. Typical grandma babushka.
+  CharacterArc: 
   DateOfBirth: 19/10/1933
   Sex: Female
   EntryPermitExpiryDate: 21 NOV
@@ -27,18 +28,72 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 092c7c3074fc9da439cbc3acb19f7fc9, type: 3}
   CharacterPrefab: {fileID: 6847779261494379404, guid: cf59afdc9e0ffee49924ebb9a0a10e75, type: 3}
-  reasonsForEntry:
-  - Visiting family
-  - Returning home
-  - Delivering Sweets
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after picking up yarn from the market.
+    - Resident returning to the southern apartment block.
+    - Visiting a neighbor to help hem some new curtains.
+    midDaysReasons:
+    - Seeking shelter from the heavy smog in the district.
+    - Checking on the status of the local communal kitchen.
+    - Seeking refuge from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory elderly residency check-in.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to the theater for a 10:00 PM opera.
+    - Picking up a pension check from a bank that closed in 1960.
+    - Buying fresh strawberries in the middle of a blizzard.
+    midDaysReasons:
+    - Returning to a house that was condemned for radiation.
+    - Meeting a sister who passed away during the Great Frost.
+    - Taking a walk in the park while the chemical sirens are active.
+    finalDaysReasons:
+    - Going home to plant flowers in the radioactive ash.
+    - I need to go buy more silk for a wedding dress.
+    - To wait for the sun to come out from behind the smoke.
   entryDialogues:
-  - "I\u2019ve come to see my family."
-  - "It\u2019s been a long trip\u2026"
-  - Please, I just want to go home.
-  anomalyEntryDialogues:
-  - "Good evening\u2026 it\u2019s been a long journey to get here"
-  - "Hello. It doesn\u2019t feel like I\u2019ve been gone that long"
-  - "I\u2019ve come back. Some things feel the same, at least"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Hello, dear. You look thin; are they feeding you enough at this booth?
+    - Here are my papers. I kept them under my Bible so they wouldn't wrinkle.
+    - "It\u2019s a bit chilly today. I hope you\u2019re wearing your thermal vest
+      under that uniform."
+    dialoguesMidDays:
+    - There is a small tear in your sleeve, dear. Bring it here, I have my needle.
+    - "The sky looks so bruised lately. I think I\u2019ll go home and make some soup."
+    - My hands are shaking a bit more today. The air has a very metallic taste.
+    dialoguesFinalDays:
+    - "I\u2019m going home to finish a sweater for my grandson. It\u2019s a very
+      bright red."
+    - "Don't worry about the sirens, dear. It\u2019s just the world having a little
+      tantrum."
+    - "Everything is going to be fine once I finish the mending. You\u2019ll see."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Bless you, dear. Stay warm and don't work too hard.
+    dialoguesMidDays:
+    - Go home soon. The air isn't good for young lungs like yours.
+    dialoguesFinalDays:
+    - "I\u2019ll save a bowl of soup for you. Be safe in the quiet."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Oh, am I staying here? Well, at least it gives me time to knit.
+    dialoguesMidDays:
+    - Is the heater working in there? My bones get so cold these days.
+    dialoguesFinalDays:
+    - A nice quiet room. I can finally finish my stitching in peace.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "Oh... I think... I\u2019ve dropped... my thimble..."
+    dialoguesMidDays:
+    - "My... threads... they\u2019re all... getting tangled..."
+    dialoguesFinalDays:
+    - "It\u2019s okay... the world... was getting... too heavy... anyway..."
   voiceAudioClips: []
   IDNumber: 7802070

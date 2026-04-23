@@ -15,8 +15,13 @@ MonoBehaviour:
   FirstName: Nini
   LastName: Bitsadze
   Nickname: 
-  Occupation: Botanist
+  Occupation: Artist
   CharacterDescription: Blunt and mysterious
+  CharacterArc: Vibrant, expressive, and slightly paint-stained. Her arc is about
+    artistic obsession. As the world loses its color and structure, she becomes fixated
+    on capturing the shifting light and the strange geometry of the decay, viewing
+    the apocalypse as a fleeting masterpiece she must document before the lights
+    go out.
   DateOfBirth: 05/02/1966
   Sex: Female
   EntryPermitExpiryDate: 10 DEC
@@ -27,23 +32,74 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 0a1d83fdb3fe4574990eee09aeaac946, type: 3}
   CharacterPrefab: {fileID: 793074409391834654, guid: afd46dd979f4ef9429d317cb91da466c, type: 3}
-  reasonsForEntry:
-  - Returning from seed purchasing
-  - Returning from research expedition
-  - Plant delivery
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to my studio to finish a commissioned portrait.
+    - Resident returning from the city art gallery.
+    - Picking up a delivery of fresh canvases.
+    midDaysReasons:
+    - Escaping the thick yellow haze in the art district.
+    - Checking on the climate control for my oil paintings.
+    - Seeking shelter from the radioactive dust.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory resident census requirements.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Buying oil paints at the local hardware store.
+    - Setting up an easel in the middle of a high-speed highway.
+    - Selling paintings to a building that was demolished.
+    midDaysReasons:
+    - Returning to a studio that lost its roof in the storm.
+    - Meeting a gallery owner who fled the city last month.
+    - Painting a mural on the side of a falling skyscraper.
+    finalDaysReasons:
+    - Going home to paint the windows so the dark can't see in.
+    - To find a brush made from the hair of a ghost.
+    - To wait for the colors to finally stop screaming.
   entryDialogues:
-  - "Evening. I need to get back inside. The soil out there isn\u2019t right anymore."
-  - "You can check whatever you need. I\u2019ve been outside long enough\u2026 longer
-    than I should have."
-  - "I brought samples, but they won\u2019t last. Things decay faster now. Even when
-    they shouldn\u2019t."
-  anomalyEntryDialogues:
-  - "Evening. I was just\u2026 outside. The plants don\u2019t react to light the
-    same way anymore. They lean toward something else."
-  - "You can check the papers. Everything should match. It did before\u2026 it always
-    does eventually."
-  - "I shouldn\u2019t have stayed out that long. The air felt\u2026 thick. Like it
-    was settling into me."
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Hello. My documents are right here. I hope the charcoal smudges don't bother
+      you.
+    - The way the shadows fall across your booth today is quite striking.
+    - "I\u2019m just heading back to my studio. The morning light was perfect for
+      sketching."
+    dialoguesMidDays:
+    - Have you noticed the sky is turning a shade of violet that shouldn't exist?
+    - "Here is my ID. I\u2019m in a hurry; the horizon is melting and I need to paint
+      it."
+    - "Everything feels like it\u2019s being sketched in shaky lines lately. Do you
+      feel it too?"
+    dialoguesFinalDays:
+    - The world is finally becoming the abstract piece I always dreamed of.
+    - "I\u2019ve run out of red paint, but the sunset is providing plenty of inspiration."
+    - "I\u2019m going home to finish my final canvas. The white space is almost gone."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thank you. Try to stay in the light; the composition is better there.
+    dialoguesMidDays:
+    - "Good luck. Watch the colors\u2014they\u2019re starting to bleed into each
+      other."
+    dialoguesFinalDays:
+    - "I\u2019ll see you in the masterpiece. Don't blink."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - "A room with white walls? Actually, that\u2019s a perfect blank canvas."
+    dialoguesMidDays:
+    - Will you bring me some pencils? I have so much I need to record.
+    dialoguesFinalDays:
+    - Isolation is just a frame for the mind. I don't mind staying here.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Oh... and I haven't even... finished the background...
+    dialoguesMidDays:
+    - Everything is... turning to... black ink...
+    dialoguesFinalDays:
+    - Finally... the perfect... shade of... nothing.
   voiceAudioClips: []
   IDNumber: 9722713

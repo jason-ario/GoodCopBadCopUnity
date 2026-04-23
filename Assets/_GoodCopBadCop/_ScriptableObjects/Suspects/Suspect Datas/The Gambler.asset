@@ -16,7 +16,12 @@ MonoBehaviour:
   LastName: Chkhonia
   Nickname: The Gambler
   Occupation: Card Player
-  CharacterDescription: Nervous, twitchy, avoids direct answers
+  CharacterDescription: 'Nervous, twitchy, avoids direct answers. A man who lives
+    and breathes probability. He has a nervous energy, constantly fiddling with a
+    coin or a deck of cards. '
+  CharacterArc: "He treats the entire checkpoint process\u2014and the apocalypse
+    itself\u2014as a high-stakes game of chance. He isn't necessarily sad about the
+    world ending; he\u2019s just annoyed that the odds are no longer in his favor."
   DateOfBirth: 09/09/1965
   Sex: Male
   EntryPermitExpiryDate: 
@@ -27,18 +32,71 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: dd5af1ad80484714c878f383187e2b3a, type: 3}
   CharacterPrefab: {fileID: 1587370763167483291, guid: 2b5231f856134934a9836d09d5cc74cd, type: 3}
-  reasonsForEntry:
-  - Visiting acquaintances
-  - Business opportunity
-  - Passing through town
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after a night at the underground card club.
+    - Resident returning to the harbor-side apartments.
+    - Meeting a friend to settle a sports debt.
+    midDaysReasons:
+    - Escaping the smog to find a cleaner "table" in the city.
+    - Checking on the security of my hidden "nest egg."
+    - Seeking shelter from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory residency check-in.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to cash in a winning ticket at a bank that closed in 1985.
+    - Buying lottery tickets from a vending machine with no power.
+    - Entering a horse race at a track that was paved over years ago.
+    midDaysReasons:
+    - Returning to a betting parlor that was hit by a missile.
+    - Trying to bet on the weather with a dead meteorologist.
+    - Entering a poker tournament in a flooded basement.
+    finalDaysReasons:
+    - Going home to play solitaire with a deck of 51 cards.
+    - I need to find the guy who owes me a favor from the old world.
+    - To see if the dice still land on six when the world stops spinning.
   entryDialogues:
-  - Hey, quick one, yeah?
-  - "Let\u2019s not make this complicated."
-  - "I\u2019ve got places to be, friend."
-  anomalyEntryDialogues:
-  - "Hey, officer. Feels like I\u2019ve played this hand before"
-  - Just passing through. Got a feeling about how this goes
-  - Evening. Sometimes you already know the outcome
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Heads or tails, officer? Just kidding. Here are my documents.
+    - "I\u2019m betting on a quick recovery for the city. The spread looks good."
+    - You have a "poker face" that would bankrupt me in ten minutes.
+    dialoguesMidDays:
+    - "I put everything on the \"red sky\" theory. Looks like I\u2019m cleaning up."
+    - "Here\u2019s the form. I like my chances today; I found a four-leaf clover
+      in the ash."
+    - The house always wins, doesn't it? And right now, the house is falling down.
+    dialoguesFinalDays:
+    - One last spin of the wheel. Let's see if my ID still carries any value.
+    - "I\u2019m going home to fold my hand. There\u2019s no out-bluffing the end
+      of the world."
+    - "Luck is a lady, but she\u2019s left town on the last bus."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - My lucky streak continues! See you at the next turn.
+    dialoguesMidDays:
+    - "Thanks. I\u2019ll give you 5-to-1 odds that you\u2019re still here tomorrow."
+    dialoguesFinalDays:
+    - The stakes are too high for me now. Take care of yourself.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Put me in the corner pocket? Fine, as long as I can keep my cards.
+    dialoguesMidDays:
+    - "I\u2019ve spent time in worse rooms than this. Is there a light?"
+    dialoguesFinalDays:
+    - A dead end. I should have seen that coming. The math doesn't lie.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - I guess... my luck... finally... ran out...
+    dialoguesMidDays:
+    - "That\u2019s... a hell... of a... bad beat..."
+    dialoguesFinalDays:
+    - Busted... out of... the game... at last.
   voiceAudioClips: []
   IDNumber: 3488018

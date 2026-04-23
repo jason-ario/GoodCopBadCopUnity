@@ -16,9 +16,13 @@ MonoBehaviour:
   LastName: Gelashvili
   Nickname: The Woodsman
   Occupation: Woodsman
-  CharacterDescription: "Weathered face, heavy build, slow deliberate movements.
-    Smells of pine and smoke. Speaks rarely but with certainty. Eyes constantly scanning,
-    like he\u2019s used to being watched."
+  CharacterDescription: "Weathered face and heavy build. He is a man of the deep
+    forest\u2014slow, deliberate, and smells of pine and smoke. He speaks rarely
+    but with absolute certainty, his eyes constantly scanning the environment as
+    if he\u2019s used to being tracked."
+  CharacterArc: His arc is about animalistic survival; while the city dwellers panic
+    over papers, he only cares about the shifting wind and the "wrongness" in the
+    soil.
   DateOfBirth: 11/08/1957
   Sex: Male
   EntryPermitExpiryDate: 03 NOV
@@ -27,20 +31,71 @@ MonoBehaviour:
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
   dailyInfectionProgression: 5
-  IDPhoto: {fileID: 0}
+  IDPhoto: {fileID: 2800000, guid: d03a80ab24358784b9cf7b9eed8c485e, type: 3}
   CharacterPrefab: {fileID: 1896175955159167368, guid: 80fd0ca23a5eedc4585657454979dbec, type: 3}
-  reasonsForEntry:
-  - Bringing wood for heating
-  - Checking on family in town
-  - Delivering trapped animals / supplies
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Delivering a shipment of timber to the city yards.
+    - Resident returning to the rural outskirts.
+    - Buying winter grain for a small livestock plot.
+    midDaysReasons:
+    - Seeking iron traps to catch the "things" in the mist.
+    - Trading wolf pelts for clean water filters.
+    - Seeking shelter from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory woodsman census check-in.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Attending a digital technology convention.
+    - Going to the beach to work on my tan.
+    - Renewing a subscription to a fashion magazine.
+    midDaysReasons:
+    - Going to the theater to see a comedy.
+    - Buying a ticket for a luxury cruise.
+    - Looking for a shop that sells silk ties.
+    finalDaysReasons:
+    - Going home to water my plastic plants.
+    - I need to find the man who sold me a broken compass.
+    - To see if the moon is still made of light.
   entryDialogues:
-  - Need to get inside.
-  - Got work to do in town.
-  - Been out too long.
-  anomalyEntryDialogues:
-  - "Forest\u2019s been quiet. Too quiet."
-  - Animals stopped moving like they should.
-  - "Something\u2019s wrong out there. Not just here."
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Papers. Fresh from the envelope.
+    - The birds left the valley this morning. They know before we do.
+    - I am here for supplies. The trees are starting to taste like copper.
+    dialoguesMidDays:
+    - You have a shadow following you that doesn't match your feet, officer.
+    - The fog is getting teeth. I need to get back to my cabin before it bites.
+    - Take the form. The ink smells like old blood today.
+    dialoguesFinalDays:
+    - The forest is gone. It didn't die; it just... left.
+    - I don't need a name anymore. The wind doesn't use them.
+    - I am going to find a cave. The sky is looking for us.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Stay quiet. Listen to the wind.
+    dialoguesMidDays:
+    - Watch your back, officer. The walls are getting thin.
+    dialoguesFinalDays:
+    - "Bury your heart deep. It\u2019s the only way to keep it."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A cage is just a smaller forest. I will wait.
+    dialoguesMidDays:
+    - "I can smell the rot in these walls. It\u2019s older than you."
+    dialoguesFinalDays:
+    - Lock the door. It won't help, but it feels better.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - The... predator... finally... wins...
+    dialoguesMidDays:
+    - I return... to the... earth...
+    dialoguesFinalDays:
+    - The hunt... is... over.
   voiceAudioClips: []
   IDNumber: 1849021

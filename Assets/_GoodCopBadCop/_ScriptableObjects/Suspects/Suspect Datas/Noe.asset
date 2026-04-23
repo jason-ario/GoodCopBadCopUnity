@@ -17,6 +17,11 @@ MonoBehaviour:
   Nickname: 
   Occupation: Clerk
   CharacterDescription: Expressionless, monotone voice
+  CharacterArc: "Expressionless, with a monotone voice. He represents a youth already
+    burnt out by the scarcity and long lines of 1990. He isn't angry like the older
+    generation; he is simply empty. He treats the checkpoint like just another line
+    he\u2019s forced to stand in, displaying a \"quiet quitter\" energy before the
+    term existed."
   DateOfBirth: 03/03/1968
   Sex: Male
   EntryPermitExpiryDate: 07 SEP
@@ -27,19 +32,69 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 1f7b772189b33d14283861517a55479a, type: 3}
   CharacterPrefab: {fileID: 6108308127370568290, guid: 98ffec2501a15d241a714e86e235255a, type: 3}
-  reasonsForEntry:
-  - Work assignment
-  - Document delivery
-  - Returning home
-  dialogueResponses:
-  - text: 
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after closing the corner grocery store.
+    - Resident returning to the worker apartments.
+    - Dropping off the daily register keys at the manager's.
+    midDaysReasons:
+    - Escaping the heavy smog in the commercial district.
+    - Checking if the industrial freezers still have power.
+    - Seeking shelter from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory residency census requirements.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to restock the shop at 3:00 AM on a Tuesday.
+    - Buying wholesale salt from the local post office.
+    - Selling cigarettes to a primary school student.
+    midDaysReasons:
+    - Returning to a shop that was looted and burned last night.
+    - Looking for a fresh shipment of bread in a dead zone.
+    - Filing a complaint about a customer who hasn't been born.
+    finalDaysReasons:
+    - Going home to count my collection of expired coupons.
+    - I need to find the manager to hand in my apron.
+    - To see if the "Open" sign is still swinging in the wind.
   entryDialogues:
-  - Documents.
-  - Routine entry.
-  - Processing required.
-  anomalyEntryDialogues:
-  - Good evening. Presenting for standard entry processing
-  - Hello. All procedures appear to be functioning normally
-  - Everything is in order
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - "Here\u2019s my ID and the form. I filled them out while waiting for bread."
+    - "I\u2019m just going home. The shop ran out of everything by noon anyway."
+    - Is your stamp working? Everything else in this city seems to be broken.
+    dialoguesMidDays:
+    - People were fighting over batteries today. I just watched. It was like a movie.
+    - "The lights in the shop keep flickering. It\u2019s hard to see the prices."
+    - "Here\u2019s the paper. I don't really care if it's right or not. You decide."
+    dialoguesFinalDays:
+    - I locked the front door, but the windows are already gone. Doesn't matter.
+    - "I\u2019m going to go sit in my room until the sky finishes turning gray."
+    - "My shift is over. I think the whole world\u2019s shift is over."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Cool. Have a fun time in your little box, officer.
+    dialoguesMidDays:
+    - "Right. I\u2019m going to go stare at a wall now."
+    dialoguesFinalDays:
+    - Whatever. See you when the lights go out for good.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A holding cell? Does it have a bed? I could use a nap.
+    dialoguesMidDays:
+    - Fine. At least I don't have to tell people we're out of sugar in there.
+    dialoguesFinalDays:
+    - "Put me wherever. It\u2019s all the same to me at this point."
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Oh. I guess... I don't have to... go to work... tomorrow...
+    dialoguesMidDays:
+    - This is... a very... loud way... to end a shift...
+    dialoguesFinalDays:
+    - Finally... I can... stop... waiting... in lines.
   voiceAudioClips: []
   IDNumber: 5342977

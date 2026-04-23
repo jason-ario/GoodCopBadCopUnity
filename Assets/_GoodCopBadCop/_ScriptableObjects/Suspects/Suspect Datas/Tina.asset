@@ -16,7 +16,12 @@ MonoBehaviour:
   LastName: Meskhi
   Nickname: 
   Occupation: Performer
-  CharacterDescription: Wears mask constantly, refuses to take it off
+  CharacterDescription: 'Dramatic, high-strung, and eerie. She wears a theatrical
+    porcelain mask constantly, claiming it is her "real face" and refusing to remove
+    it even for security. '
+  CharacterArc: Her arc is about dissociative escapism; as the world becomes unwatchable,
+    she treats her entire life as a commedia dell'arte performance, using the mask
+    as a shield against the decaying reality around her.
   DateOfBirth: 01/01/1966
   Sex: Female
   EntryPermitExpiryDate: 02 DEC
@@ -27,18 +32,73 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: b95f411c45eb9a24c86202f9a0008a9f, type: 3}
   CharacterPrefab: {fileID: 1501177916931924578, guid: 572c6160c8045c14eb3dd93c39663819, type: 3}
-  reasonsForEntry:
-  - Performance booking
-  - Visiting venue
-  - Traveling troupe
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after a rehearsal at the Grand Theater.
+    - Resident returning to the performers' collective housing.
+    - Delivering a set of silk costumes to the laundry.
+    midDaysReasons:
+    - "Seeking shelter in the theater\u2019s reinforced basement."
+    - Trading stage jewelry for real canned rations.
+    - Seeking refuge from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory residency census for artists.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Buying a fresh set of lungs at the local grocery store.
+    - Taking a submarine to the mountain peaks.
+    - Applying for a job as a silent mime in a riot zone.
+    midDaysReasons:
+    - Returning to a stage that collapsed during the last tremor.
+    - Meeting a director who disappeared into the fog weeks ago.
+    - Performing a fire-eating act in an oxygen-depleted bunker.
+    finalDaysReasons:
+    - Going home to paint a second face on the back of my head.
+    - I need to find the playwright who wrote this terrible ending.
+    - To see if the spotlight will find me one last time.
   entryDialogues:
-  - Show must go on.
-  - You look like you need a smile.
-  - "I won\u2019t be long."
-  anomalyEntryDialogues:
-  - "Hello\u2026 feels like I\u2019ve already stepped up to this part"
-  - "Evening! Timing\u2019s perfect, like it always is"
-  - "Hi there. You can feel when people are watching, can\u2019t you"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Greetings, seeker of truths! I have brought the scripts... oh, I mean, my papers.
+    - Do you like the paint on the lips? I find it gives me much more character in
+      this light.
+    - I am heading to the stage. Even if the audience is empty, the show must go
+      on.
+    dialoguesMidDays:
+    - "You want me to take it off? Heavens, no! The world isn't ready for what\u2019s
+      underneath."
+    - "The air is so full of static today. It\u2019s like the theater is finally
+      burning down."
+    - Here is my ID. Just imagine my smile is exactly like the one on the porcelain.
+    dialoguesFinalDays:
+    - The curtain is falling, officer. Can't you hear the applause in the wind?
+    - "I\u2019ve forgotten how to blink. The mask has become quite comfortable now."
+    - "I\u2019m going home to wait for my final cue. Don't miss the finale."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Bravo! Your performance as the "Stern Gatekeeper" is flawless.
+    dialoguesMidDays:
+    - "Until the next act. Watch out for the shadows; they\u2019re overacting."
+    dialoguesFinalDays:
+    - The stage is set. See you when the lights go out.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A dressing room? How quaint. I shall begin my preparations.
+    dialoguesMidDays:
+    - Is there a mirror in there? I need to check my cracks.
+    dialoguesFinalDays:
+    - Solitary. The ultimate one-woman show. I accept.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Exit... stage... left... I suppose...
+    dialoguesMidDays:
+    - "The mask... it\u2019s finally... breaking..."
+    dialoguesFinalDays:
+    - And now... for my... final... bow...
   voiceAudioClips: []
   IDNumber: 6703375

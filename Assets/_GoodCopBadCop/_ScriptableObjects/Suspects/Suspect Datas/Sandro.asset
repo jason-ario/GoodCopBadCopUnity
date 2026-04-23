@@ -17,6 +17,11 @@ MonoBehaviour:
   Nickname: 
   Occupation: Mechanic
   CharacterDescription: Greasy hands, confident demeanor
+  CharacterArc: "Dreamy, soft-spoken, and a bit of a romantic. He\u2019s the type
+    of guy who always has a book tucked into his jacket and misses his bus because
+    he was watching a sunset. His arc is about idealistic escapism; he refuses to
+    see the horror of the world, instead framing the collapse as a tragic, beautiful
+    poem or a great adventure he\u2019s simply passing through."
   DateOfBirth: 25/09/1960
   Sex: Male
   EntryPermitExpiryDate: 16 OCT
@@ -27,18 +32,56 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 553ad9a04ac1c6d408c3e899f575f0d7, type: 3}
   CharacterPrefab: {fileID: 5861397257814959656, guid: 3efccd6e2fe946049855ecbd73573e23, type: 3}
-  reasonsForEntry:
-  - Repair job
-  - Returning to workshop
-  - Emergency call
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons: []
+    midDaysReasons: []
+    finalDaysReasons: []
+  invalidEntryReasons:
+    earlyDaysReasons: []
+    midDaysReasons: []
+    finalDaysReasons: []
   entryDialogues:
-  - Got a job inside.
-  - Something broke, I fix it.
-  - Let me through, yeah?
-  anomalyEntryDialogues:
-  - "Evening. Something feels off around here, I\u2019ll check it inside"
-  - "Here for work. Things don\u2019t always break where you expect"
-  - "Hello. I\u2019ll sort it out once I\u2019m in"
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Oh, sorry! I was miles away. Here are my documents, officer.
+    - I was just walking by the river. The way the light hits the ripples is incredible.
+    - "Do you ever feel like we\u2019re all just characters in a very long novel?"
+    dialoguesMidDays:
+    - "People are running around so much. They\u2019re missing how quiet the city
+      has become."
+    - I forgot to fill out the date. Time feels a bit... optional lately, doesn't
+      it?
+    - I found a flower growing through a crack in the concrete today. It looked so
+      brave.
+    dialoguesFinalDays:
+    - "I\u2019m going to the rooftop. I want to see if the stars look different tonight."
+    - "My ID? I think I\u2019m starting to forget what that person in the photo felt
+      like."
+    - "The world is just shedding its skin. We\u2019re going to see what\u2019s underneath
+      soon."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thanks! Try to look up at the clouds once in a while, officer.
+    dialoguesMidDays:
+    - Good luck. I hope you find something beautiful in all this gray.
+    dialoguesFinalDays:
+    - "I\u2019ll see you in the next dream. Sleep well."
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A room all to myself? Maybe I can finally finish my poem.
+    dialoguesMidDays:
+    - "It\u2019s very quiet in here. I think I can hear the building breathing."
+    dialoguesFinalDays:
+    - A cage is just a perspective. My mind is still outside.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Wait... I wasn't... finished... with the first chapter...
+    dialoguesMidDays:
+    - Everything is... fading to... a very... soft white...
+    dialoguesFinalDays:
+    - Finally... I can... fly... away...
   voiceAudioClips: []
   IDNumber: 2988962

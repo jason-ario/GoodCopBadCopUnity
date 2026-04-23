@@ -16,7 +16,13 @@ MonoBehaviour:
   LastName: Eradze
   Nickname: The Priest
   Occupation: Priest
-  CharacterDescription: Calm, composed, intense stare
+  CharacterDescription: 'Calm, composed, intense stare. Intense, energetic, and deeply
+    empathetic. He is not a distant figurehead but a "street priest" who is constantly
+    on the move. '
+  CharacterArc: "His arc is about radical martyrdom; as the world falls apart, he
+    becomes more desperate to save souls, treating every interaction\u2014even a
+    border check\u2014as a vital moment of human connection. He is warm but has a
+    piercing gaze that makes you feel like he\u2019s looking at your conscience."
   DateOfBirth: 21/06/1948
   Sex: Male
   EntryPermitExpiryDate: 22 DEC
@@ -27,19 +33,75 @@ MonoBehaviour:
   dailyInfectionProgression: 5
   IDPhoto: {fileID: 2800000, guid: 0b1c5746b5d7a0d4fa66a6451717e3c9, type: 3}
   CharacterPrefab: {fileID: 4045973627263543197, guid: 638e1c8888f13524bb3f59286c0cc230, type: 3}
-  reasonsForEntry:
-  - Returning to parish
-  - Conducting funeral rites
-  - Visiting sick resident
-  dialogueResponses: []
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to the parish after a youth group meeting.
+    - Resident returning to the church apartments.
+    - Delivering donated blankets to the residential sector.
+    midDaysReasons:
+    - Providing emergency counseling at the triage center.
+    - Organizing a communal soup kitchen in the basement.
+    - Seeking shelter from the radioactive dust storms.
+    finalDaysReasons:
+    - Returning to assigned bunk for the final lockdown.
+    - Seeking refuge from the falling black ash.
+    - Fulfilling mandatory residency census for active clergy.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to a car dealership to buy a red convertible.
+    - Picking up a shipment of imported caviar.
+    - Renewing a license for a nightclub he doesn't own.
+    midDaysReasons:
+    - Returning to a cathedral that was demolished last Tuesday.
+    - Meeting a bishop who left the country months ago.
+    - Buying luxury silk vestments in a disaster zone.
+    finalDaysReasons:
+    - Going home to prepare for a city-wide marathon.
+    - I need to find the man who sells keys to the afterlife.
+    - To see if the street dogs are still finding enough to eat.
   entryDialogues:
-  - God be with you, officer.
-  - "I\u2019ve been called to serve."
-  - There are souls waiting for me.
-  anomalyEntryDialogues:
-  - "Good evening. There\u2019s something heavy in the air tonight"
-  - "I\u2019ve come to attend to matters inside. Some things shouldn\u2019t be left
-    alone"
-  - Bless you. Not everything that watches us is seen
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - "Hello, brother! It\u2019s a bit of a grim morning, but we\u2019re still here,
+      aren't we?"
+    - "Here are my papers. I\u2019ve been out since dawn helping with the water lines."
+    - You look tired, officer. Remember to breathe; the air is heavy, but the spirit
+      is light.
+    dialoguesMidDays:
+    - The ash is getting into everything, even the pews. Here is the application.
+    - I saw the look in the people's eyes today. They need more than bread; they
+      need a reason to smile.
+    - Take the ID. I have a dozen more families to check on before the curfew hits.
+    dialoguesFinalDays:
+    - "I\u2019m going back into the smog. There are people scared and alone who need
+      to hear a kind word."
+    - The bells are cracked, but the message is the same. We are not abandoned, even
+      now.
+    - "Use your stamp, brother. Let\u2019s finish this chapter so we can see what\u2019s
+      on the next page."
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - God bless your work today. Stay strong!
+    dialoguesMidDays:
+    - "Keep your chin up. I\u2019ll mention you in my thoughts tonight."
+    dialoguesFinalDays:
+    - Whatever happens next, know that you did your duty. Peace be with you.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - "If this is where I\u2019m needed most, then this is where I\u2019ll stay."
+    dialoguesMidDays:
+    - "Do the others in there need someone to talk to? I\u2019m ready."
+    dialoguesFinalDays:
+    - A small room is a perfect place for a big prayer. I don't mind.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "Oh... so... it\u2019s time... already..."
+    dialoguesMidDays:
+    - I forgive... you... please... don't carry... this weight...
+    dialoguesFinalDays:
+    - The light... is finally... breaking... through...
   voiceAudioClips: []
   IDNumber: 6328957
