@@ -20,10 +20,13 @@ public class PlayerInstance : NetworkBehaviour
     private PlayerMovementController _playerMovementController;
     private PlayerInteractionController _playerInteractionController;
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
+    public PlayerRadiation PlayerRadiation { get; set; }
+
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerInteractionController = GetComponent<PlayerInteractionController>();
+        PlayerRadiation = GetComponent<PlayerRadiation>();
         
         Instance = this;
 

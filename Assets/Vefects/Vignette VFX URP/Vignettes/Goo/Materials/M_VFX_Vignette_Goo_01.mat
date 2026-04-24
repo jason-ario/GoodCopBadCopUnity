@@ -1,0 +1,121 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_VFX_Vignette_Goo_01
+  m_Shader: {fileID: 4800000, guid: 28282b918c99b6f4b97b67c22711e5e8, type: 3}
+  m_ValidKeywords:
+  - _RECEIVE_SHADOWS_OFF
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _DistortionTexture:
+        m_Texture: {fileID: 2800000, guid: 96dcce1503826c54480ca5fa7f3190a2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DropsTexture:
+        m_Texture: {fileID: 2800000, guid: 62f253e732f26bb42b00198059c3c433, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FakeReflectionsTexture:
+        m_Texture: {fileID: 2800000, guid: 023971914f4dcb747b62c8cacb179a7c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrungeTexture:
+        m_Texture: {fileID: 2800000, guid: cdd5dafc3adfbd140bc0ca312cf12f32, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LUT:
+        m_Texture: {fileID: 2800000, guid: e1dc4f655fd93964d9dc250790e2d7dc, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MudTexture:
+        m_Texture: {fileID: 2800000, guid: 9811522a52331a94dadeb2326e79292d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTexture:
+        m_Texture: {fileID: 2800000, guid: 96dcce1503826c54480ca5fa7f3190a2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _PukeTexture:
+        m_Texture: {fileID: 2800000, guid: c35e70cf3dbb1e14aa634fff55f7483c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _texcoord:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutoff: 0.5
+    - _BGAdd: 0
+    - _Cull1: 2
+    - _DistortionMultiply: 0.3
+    - _Dst1: 10
+    - _Em: 3
+    - _EroSoftness: 1
+    - _FakeReflectionsIntensity: 0.1
+    - _FakeReflectionsNormalVector2: 1
+    - _LUTOffset: 0
+    - _LUTPan: 0
+    - _LUTRange: 1
+    - _NormalStrength: 1
+    - _OpacityMinimum: 1
+    - _OpacityMultiply: 1
+    - _OpacityMultiply1: 1
+    - _OpacityMultiplyFinal: 1.5
+    - _OpacityMultiplyWithDistortion: 0.3
+    - _PerlinOpacity: 0.5
+    - _PukeNoiseNormalStrength: 1.5
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _ReceiveShadows: 0
+    - _Refract: 0.1
+    - _RefractionMax: 1.03
+    - _SpecsOpacity: 1
+    - _Src1: 5
+    - _ZTest1: 2
+    - _ZWrite1: 0
+    m_Colors:
+    - _ColorDark: {r: 0.19215685, g: 0.16078427, b: 0.14117646, a: 0}
+    - _ColorLight: {r: 0.37254897, g: 0.28235298, b: 0.18039218, a: 0}
+    - _DistortionUVPan: {r: -0.001, g: 0.05, b: 0, a: 0}
+    - _DistortionUVScale: {r: 0.25, g: 0.25, b: 0, a: 0}
+    - _DropsUVPan: {r: 0.001, g: 0.3, b: 0, a: 0}
+    - _DropsUVScale: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _FakeReflectionsOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _FakeReflectionsTile: {r: 2, g: 2, b: 0, a: 0}
+    - _NoiseUVPan: {r: 0, g: 0.128, b: 0, a: 0}
+    - _NoiseUVPan1: {r: 0, g: 0.128, b: 0, a: 0}
+    - _NoiseUVScale: {r: 1, g: 1, b: 0, a: 0}
+    - _NoiseUVScale1: {r: 1, g: 1, b: 0, a: 0}
+    - _Puke01UVPan: {r: 0.001, g: 0.25, b: 0, a: 0}
+    - _Puke01UVScale: {r: 0.6, g: 0.6, b: 0, a: 0}
+    - _Puke02UVPan: {r: 0.001, g: 0.2, b: 0, a: 0}
+    - _Puke02UVScale: {r: 1, g: 1, b: 0, a: 0}
+  m_BuildTextureStacks: []

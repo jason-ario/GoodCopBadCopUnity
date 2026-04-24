@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_VFX_Vignette_Speed_Anime_01
+  m_Shader: {fileID: 4800000, guid: bfa87dc0b805835469a699347b0a3806, type: 3}
+  m_ValidKeywords:
+  - _RECEIVE_SHADOWS_OFF
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _DistortionTexture:
+        m_Texture: {fileID: 2800000, guid: 96dcce1503826c54480ca5fa7f3190a2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LinesTexture:
+        m_Texture: {fileID: 2800000, guid: 371a7d80c480597438b3f2ab893cb348, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutoff: 0.5
+    - _Cull1: 2
+    - _DistortionMultiply: 0.01
+    - _DistortionUVSwirl: 0
+    - _Dst1: 10
+    - _Lines01UVSwirl: 0
+    - _Lines02UVSwirl: 0
+    - _LinesMultiply: 100
+    - _MaskPower: 3
+    - _OpacityMultiply: 1
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _ReceiveShadows: 0
+    - _Src1: 5
+    - _ZTest1: 2
+    - _ZWrite1: 0
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 0}
+    - _DistortionUVPanSpeed: {r: 0.1, g: 1, b: 0, a: 0}
+    - _DistortionUVScale: {r: 2, g: 0.1, b: 0, a: 0}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Lines01UVPanSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _Lines01UVScale: {r: 1, g: 1, b: 0, a: 0}
+    - _Lines02UVPanSpeed: {r: 0.1, g: -2, b: 0, a: 0}
+    - _Lines02UVScale: {r: 1, g: 1, b: 0, a: 0}
+    - _Vector4: {r: 0, g: 0.5, b: 0, a: 0}
+  m_BuildTextureStacks: []

@@ -1799,10 +1799,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6430961168979914038}
-  - component: {fileID: 4400296820917143099}
   - component: {fileID: 8114144157912302672}
   - component: {fileID: 4920714151761872927}
-  - component: {fileID: 6151218650352036339}
   - component: {fileID: 1631590888232464511}
   - component: {fileID: 1593978419582628844}
   - component: {fileID: 6075622806358425597}
@@ -1830,33 +1828,6 @@ Transform:
   - {fileID: 8837374372394507285}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!54 &4400296820917143099
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5941529599015958412}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!114 &8114144157912302672
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1928,23 +1899,6 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!114 &6151218650352036339
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5941529599015958412}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkRigidbody
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkRigidbodyBaseExpanded: 0
-  UseRigidBodyForMotion: 0
-  AutoUpdateKinematicState: 1
-  AutoSetKinematicOnDespawn: 1
 --- !u!1773428102 &1631590888232464511
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -2162,7 +2116,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 13
+  rmsCount: 4
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFxFadeOutDuration: 0.25
@@ -2183,11 +2137,10 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Pick Up
-  meshRenderers: []
   itemData: {fileID: 11400000, guid: f5217ba507173ee419b1f7965e8e5f88, type: 2}
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
-  interactableColliders: []
+  insideThisFolder: {fileID: 0}
   nameText: {fileID: 8663262876623949459}
   birthDateText: {fileID: 1029911231049976572}
   expDateText: {fileID: 8947239739569898660}

@@ -5,8 +5,6 @@ using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.Animations;
 
-[RequireComponent(typeof(Rigidbody))]
-[RequireComponent(typeof(NetworkRigidbody))]
 [RequireComponent(typeof(ParentConstraint))]
 public class PickableObject : Interactable
 {
@@ -20,14 +18,12 @@ public class PickableObject : Interactable
     [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
-    private Rigidbody _rigidbody;
 
     public bool CanPickUpManually { get; set; } = true;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _rigidbody.isKinematic = true;
     }
 
     protected override void Awake()
@@ -36,10 +32,6 @@ public class PickableObject : Interactable
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
         interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
-        _rigidbody = GetComponent<Rigidbody>();
-        _rigidbody.linearVelocity = Vector3.zero;
-        _rigidbody.angularVelocity = Vector3.zero;
-        _rigidbody.isKinematic = true;
     }
 
     public virtual void OnPickedUp()
@@ -53,7 +45,6 @@ public class PickableObject : Interactable
 
     public virtual void OnDropped()
     {
-        _rigidbody.isKinematic = true;
         if (putDownSound != null)
         {
             SFXController.Instance.Play(putDownSound);

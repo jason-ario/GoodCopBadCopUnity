@@ -17,58 +17,6 @@ MonoBehaviour:
   clearStencil: 0
   previewInEditMode: 1
   showInPreviewCamera: 1
---- !u!114 &-2805765887043329820
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7cbabd8e2cb2e4f8a930752453adf79a, type: 3}
-  m_Name: Beautify
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::Beautify.Universal.BeautifyRendererFeature
-  m_Active: 1
-  shader: {fileID: 4800000, guid: 55d70ca4ea7504a38b66170bbe587b2f, type: 3}
-  renderPassEvent: 500
-  ignorePostProcessingOption: 0
-  clearXRColorBuffer: 0
-  cameraLayerMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  stripSettings: {fileID: 11400000, guid: 41dc064ad507e3f4ebbee1013314a9f3, type: 2}
-  stripBeautifyTonemappingACES: 0
-  stripBeautifyTonemappingACESFitted: 0
-  stripBeautifyTonemappingAGX: 0
-  stripBeautifySharpen: 0
-  stripBeautifySharpenExclusionMask: 1
-  stripBeautifyDithering: 0
-  stripBeautifyEdgeAA: 0
-  stripBeautifyLUT: 0
-  stripBeautifyLUT3D: 1
-  stripBeautifyColorTweaks: 0
-  stripBeautifyBloom: 0
-  stripBeautifyLensDirt: 0
-  stripBeautifyChromaticAberration: 0
-  stripBeautifyDoF: 0
-  stripBeautifyDoFTransparentSupport: 1
-  stripBeautifyEyeAdaptation: 1
-  stripBeautifyPurkinje: 1
-  stripBeautifyVignetting: 0
-  stripBeautifyVignettingMask: 1
-  stripBeautifyOutline: 1
-  stripBeautifyNightVision: 1
-  stripBeautifyThermalVision: 1
-  stripBeautifyFrame: 1
-  stripBeautifyFilmGrain: 1
-  stripUnityFilmGrain: 0
-  stripUnityDithering: 0
-  stripUnityTonemapping: 0
-  stripUnityBloom: 0
-  stripUnityChromaticAberration: 0
-  stripUnityDistortion: 0
-  stripUnityDebugVariants: 0
 --- !u!114 &-2075444741547056404
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -116,14 +64,12 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
-  - {fileID: 2519212990676095899}
   - {fileID: 8798211543770503462}
   - {fileID: -4038359656389517380}
   - {fileID: -2075444741547056404}
   - {fileID: 6104699316840559988}
   - {fileID: 1841771247995849080}
-  - {fileID: -2805765887043329820}
-  m_RendererFeatureMap: ad6b866f10d7b46c9b53cc1ede0af62226992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f19e4a0df93caea0fd9
+  m_RendererFeatureMap: ad6b866f10d7b46c26992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f19
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -195,26 +141,6 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
---- !u!114 &2519212990676095899
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b00045f12942b46c698459096c89274e, type: 3}
-  m_Name: FullScreenPassRendererFeature
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FullScreenPassRendererFeature
-  m_Active: 0
-  injectionPoint: 600
-  fetchColorBuffer: 1
-  requirements: 0
-  passMaterial: {fileID: 2100000, guid: 656ad13d79ebd7f4abca0aac2f4283fd, type: 2}
-  passIndex: 0
-  bindDepthStencilAttachment: 0
-  m_Version: 1
 --- !u!114 &6104699316840559988
 MonoBehaviour:
   m_ObjectHideFlags: 0
