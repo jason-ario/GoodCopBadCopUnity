@@ -11,7 +11,8 @@ public class SwitchButton : Interactable
     [SerializeField] Transform ikTarget;
     [SerializeField] private CinemachineCamera _camera;
     public bool buttonReady = false;
-
+    private bool powerOn = true;
+    
     protected override void Awake()
     {
         base.Awake();
@@ -21,6 +22,23 @@ public class SwitchButton : Interactable
     void OnShiftReady()
     {
         SetReady(true);
+    }
+
+    public void PowerOff()
+    {
+        powerOn = false;
+        
+        anim.SetBool("Ready", false);
+    }
+
+    public void PowerOn()
+    {
+        powerOn = true;
+
+        if (buttonReady)
+        {
+            SetReady(true);
+        }
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -44,7 +62,7 @@ public class SwitchButton : Interactable
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
         player.playerAnimationController.SetAnimTrigger("PressButton");
 
-        if (buttonReady)
+        if (buttonReady && powerOn)
         {
             SetReady(false);
 
