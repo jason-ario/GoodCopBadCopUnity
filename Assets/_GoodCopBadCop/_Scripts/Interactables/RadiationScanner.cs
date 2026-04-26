@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Animations;
 
+[RequireComponent(typeof(InternalBattery))]
 public class RadiationScanner : PickableObject
 {
     private Coroutine readingCoroutine;
@@ -15,8 +17,16 @@ public class RadiationScanner : PickableObject
     [SerializeField] private float falloffSpeed = 180f;
     [SerializeField] private float rereadInterval = 0.05f;
     [SerializeField] private float readingJitter = 4f;
+    
+    InternalBattery internalBattery;
 
     private float currentReading;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        internalBattery = GetComponent<InternalBattery>();
+    }
 
     public override void OnStartUse()
     {
@@ -30,14 +40,21 @@ public class RadiationScanner : PickableObject
 
         readingCoroutine = StartCoroutine(PerformReading());
     }
-
-    public override void OnStopUse()
+    
+    private void Update()
     {
-        base.OnStopUse();
+        if (isUsing)
+        {
+            internalBattery.DrainBattery();
+            if (internalBattery.IsBatteryEmpty())
+            {
+                ShutOff();
+            }
+        }
+    }
 
-        isUsing = false;
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
-
+    void ShutOff()
+    {
         if (readingCoroutine != null)
         {
             StopCoroutine(readingCoroutine);
@@ -46,6 +63,16 @@ public class RadiationScanner : PickableObject
 
         currentReading = baselineRadiation;
         geigerNeedle.SetRadiationValue(currentReading);
+    }
+
+    public override void OnStopUse()
+    {
+        base.OnStopUse();
+
+        isUsing = false;
+        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+        
+        ShutOff();
     }
 
     private IEnumerator PerformReading()

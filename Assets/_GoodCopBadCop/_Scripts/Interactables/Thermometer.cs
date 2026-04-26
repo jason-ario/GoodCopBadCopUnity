@@ -3,6 +3,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
+[RequireComponent(typeof(InternalBattery))]
 public class Thermometer : PickableObject
 {
     private bool isUsing;
@@ -17,13 +18,54 @@ public class Thermometer : PickableObject
     [SerializeField] private Color highColor;
     [SerializeField] private Color normalColor;
     [SerializeField] private Color idleColor;
+    private InternalBattery internalBattery;
+    protected override void Awake()
+    {
+        base.Awake();
+        internalBattery = GetComponent<InternalBattery>();
+    }
+
     public override void OnStartUse()
     {
         isUsing = true;
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
+
+        if (internalBattery.IsBatteryEmpty())
+        {
+            return;
+        }
         
         if (readingCoroutine != null) StopCoroutine(readingCoroutine);
         readingCoroutine = StartCoroutine(PerformReading());
+    }
+
+    private void Update()
+    {
+        if (isUsing)
+        {
+            internalBattery.DrainBattery();
+            if (internalBattery.IsBatteryEmpty())
+            {
+                ShutOff();
+            }
+        }
+    }
+
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    {
+        base.InteractWithItem(playerInteractionController, item);
+        if (item.name == "Battery")
+        {
+            if (internalBattery.GetBatteryLevel() < 1)
+            {
+                internalBattery.Recharge(1);
+                playerInteractionController.pickupController.DestroyEquippedItem();
+            }
+            else
+            {
+                Debug.Log("Battery is already full");
+            }
+        }
     }
 
     public void FakeNormalReading()
@@ -95,12 +137,24 @@ public class Thermometer : PickableObject
         }
     }
 
-
+    void ShutOff()
+    {
+        thermometerText.text = "off";
+        UpdateScreenColor(idleColor);
+        if (readingCoroutine != null) StopCoroutine(readingCoroutine);
+    }
 
     private IEnumerator PerformReading()
     {
         while (isUsing)
         {
+            internalBattery.DrainBattery();
+            if (internalBattery.IsBatteryEmpty())
+            {
+                ShutOff();
+                yield break;
+            }
+            
             Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
             if (Physics.Raycast(ray, out RaycastHit hit, maxDistance))
             {

@@ -7,7 +7,6 @@ public class Flashlight : PickableObject
     [SerializeField] AudioClip flashlightOnClip;
     [SerializeField] AudioClip flashlightOffClip;
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] private float batteryDrainRate = 0.1f;
     
     private InternalBattery internalBattery;
     private NetworkVariable<bool> _isOn = new NetworkVariable<bool>(false);
@@ -15,18 +14,14 @@ public class Flashlight : PickableObject
     void Start()
     {
         internalBattery = GetComponent<InternalBattery>();
+        internalBattery.OnBatteryDrained += TurnOffServerRpc;
     }
 
     void Update()
     {
         if (_isOn.Value && IsOwner && internalBattery != null)
         {
-            internalBattery.DrainBattery(batteryDrainRate * Time.deltaTime);
-            
-            if (internalBattery.IsBatteryEmpty())
-            {
-                TurnOffServerRpc();
-            }
+            internalBattery.DrainBattery();
         }
     }
 

@@ -1,20 +1,28 @@
 using System;
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.Events;
 
 public class InternalBattery : NetworkBehaviour
 {
     [SerializeField] private float maxBatteryCapacity = 1f;
     private NetworkVariable<float> currentBatteryJuice = new NetworkVariable<float>(1f);
     PickableObject pickableObject;
+    [SerializeField] private float batteryDrainRate = 0.01f;
+    public UnityAction OnBatteryDrained;
 
     void Start()
     {
         pickableObject = GetComponent<PickableObject>();
         currentBatteryJuice.Value = maxBatteryCapacity;
-        pickableObject.OnEquip += PlayerUI.Instance.BatteryBar.Show;
+        pickableObject.OnEquip += ShowBatteryBar;
         pickableObject.OnUnEquip += PlayerUI.Instance.BatteryBar.Hide;
-        PlayerUI.Instance.BatteryBar.UpdateBar(this);
+    }
+
+    void ShowBatteryBar()
+    {
+        PlayerUI.Instance.BatteryBar.UpdateBar(this); 
+        PlayerUI.Instance.BatteryBar.Show();
     }
     
     public void SetJuiceValue(float batteryJuiceValue)
@@ -31,11 +39,11 @@ public class InternalBattery : NetworkBehaviour
         currentBatteryJuice.Value = Mathf.Clamp(batteryJuiceValue, 0f, maxBatteryCapacity);
     }
 
-    public void DrainBattery(float amount)
+    public void DrainBattery()
     {
         if (IsOwner)
         {
-            DrainBatteryServerRpc(amount);
+            DrainBatteryServerRpc(batteryDrainRate * Time.deltaTime);
         }
     }
 

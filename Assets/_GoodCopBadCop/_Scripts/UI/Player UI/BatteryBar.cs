@@ -15,6 +15,7 @@ public class BatteryBar : MonoBehaviour
 
     public void Show()
     {
+        
         gameObject.SetActive(true);
     }
     

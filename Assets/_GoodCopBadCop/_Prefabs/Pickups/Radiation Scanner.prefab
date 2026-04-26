@@ -94,7 +94,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7695398724750281573, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
       propertyPath: m_Name
-      value: Radiation Scanner Variant
+      value: Radiation Scanner
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -115,6 +115,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7695398724750281573, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2084286343883149658}
+    - targetCorrespondingSourceObject: {fileID: 7695398724750281573, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2452897288980540962}
     - targetCorrespondingSourceObject: {fileID: 639363113693363390, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1590931603433180636}
@@ -150,7 +153,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3755298264
+  GlobalObjectIdHash: 2313531188
   InScenePlacedSourceGlobalObjectIdHash: 3755298264
   DeferredDespawnTick: 0
   Ownership: 1
@@ -176,7 +179,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
-  itemsThatCanInteractWith: []
+  itemsThatCanInteractWith:
+  - {fileID: 11400000, guid: 7e9da4fcec610e64a92059e8f29988a0, type: 2}
   interactText: 
   itemData: {fileID: 11400000, guid: 6a1a2824fbdfaf34c85385d034e46c27, type: 2}
   pickupSound: {fileID: 0}
@@ -457,6 +461,21 @@ MonoBehaviour:
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
+--- !u!114 &2452897288980540962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4549720314701780645}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ede24a4b8327d194488cb283b5c2579a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
+  ShowTopMostFoldoutHeaderGroup: 1
+  maxBatteryCapacity: 1
+  batteryDrainRate: 0.01
 --- !u!1 &6716889623341015422 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 639363113693363390, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
