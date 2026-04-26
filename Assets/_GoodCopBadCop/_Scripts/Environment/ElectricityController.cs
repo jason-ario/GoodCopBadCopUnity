@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using Random = System.Random;
 
 public class ElectricityController : MonoBehaviour
 {
@@ -8,7 +9,24 @@ public class ElectricityController : MonoBehaviour
     [SerializeField] private AudioClip powerOffSound;
     [SerializeField] private AudioClip powerOnSound;
     [SerializeField] AudioSource sfxSource;
+    [SerializeField] private Vector2 powerOutageRandomTime = new Vector2(60,120);
+    
+    void Start()
+    {
+        ShiftManager.Instance.OnShiftStart += StartCountdown;
+    }
 
+    void StartCountdown()
+    {
+        StartCoroutine(WaitAndShutDown());
+    }
+
+    IEnumerator WaitAndShutDown()
+    {
+        yield return new WaitForSeconds(UnityEngine.Random.Range(powerOutageRandomTime.x, powerOutageRandomTime.y));
+        PowerOff();
+    }
+    
     [ContextMenu("Power Off")]
     public void PowerOff()
     {
@@ -35,6 +53,7 @@ public class ElectricityController : MonoBehaviour
         }
         
         sfxSource.PlayOneShot(powerOnSound);
-
+        
+        StartCoroutine(WaitAndShutDown());
     }
 }
