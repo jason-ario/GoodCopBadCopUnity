@@ -4,6 +4,7 @@ using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.Animations;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(ParentConstraint))]
 public class PickableObject : Interactable
@@ -18,6 +19,8 @@ public class PickableObject : Interactable
     [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
+    public UnityAction OnEquip;
+    public UnityAction OnUnEquip;
 
     public bool CanPickUpManually { get; set; } = true;
 
@@ -83,6 +86,8 @@ public class PickableObject : Interactable
         {
             playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, true);
         }
+        
+        OnEquip?.Invoke();
     }
     
     public virtual void OnUnequip(PlayerPickupController player)
@@ -99,6 +104,8 @@ public class PickableObject : Interactable
             player.PlayerAnimationController.DisableLeftArmMask();
             player.PlayerAnimationController.DisableRightArmMask();
         }
+        
+        OnUnEquip?.Invoke();
     }
     
     public override void Interact(PlayerInteractionController player)

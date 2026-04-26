@@ -480,4 +480,11 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    public void DestroyEquippedItem()
+    {
+        PickableObject heldObject = _heldObject;
+        HeldObject?.OnDropped();
+        NetworkHelper.Despawn(heldObject.GetComponent<NetworkObject>());
+        DropObject();
+    }
 }

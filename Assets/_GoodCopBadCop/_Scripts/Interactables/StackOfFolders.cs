@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class StackOfFolders : Interactable
@@ -5,10 +6,10 @@ public class StackOfFolders : Interactable
     [SerializeField] private PickableItemData folder;
     private bool folderGrabbedAlready = false;
     [SerializeField] private string[] alreadyHaveFolderTutorialBarks;
+    
 
-    protected override void Awake()
+    private void Start()
     {
-        base.Awake();
         SuspectController.Instance.OnTakeFolder += () => folderGrabbedAlready = false;
     }
 

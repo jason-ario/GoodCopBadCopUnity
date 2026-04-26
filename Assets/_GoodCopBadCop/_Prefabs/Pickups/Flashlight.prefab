@@ -5476,6 +5476,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9115597875648589982}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3103129675927768306}
     - targetCorrespondingSourceObject: {fileID: -5055779229870624550, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2279438647096463115}
@@ -5544,7 +5547,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4203312976
+  GlobalObjectIdHash: 203027823
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -5839,7 +5842,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
-  itemsThatCanInteractWith: []
+  itemsThatCanInteractWith:
+  - {fileID: 11400000, guid: 7e9da4fcec610e64a92059e8f29988a0, type: 2}
   interactText: Pick Up
   itemData: {fileID: 11400000, guid: 0862ad805d4af57469703cdf21195a2d, type: 2}
   pickupSound: {fileID: 0}
@@ -5848,6 +5852,7 @@ MonoBehaviour:
   flashlightOnClip: {fileID: 8300000, guid: 446a67ef39453ee45b9d6a03388f9ebd, type: 3}
   flashlightOffClip: {fileID: 8300000, guid: 7c297f97e9610db429854ad4cc4f284f, type: 3}
   audioSource: {fileID: 9115597875648589982}
+  batteryDrainRate: 0.01
 --- !u!82 &9115597875648589982
 AudioSource:
   m_ObjectHideFlags: 0
@@ -5945,3 +5950,17 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &3103129675927768306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2892484038896273453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ede24a4b8327d194488cb283b5c2579a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
+  ShowTopMostFoldoutHeaderGroup: 1
+  maxBatteryCapacity: 1
