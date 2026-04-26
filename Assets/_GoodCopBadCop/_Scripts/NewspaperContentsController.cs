@@ -21,7 +21,7 @@ public class NewspaperContentsController : MonoBehaviour
     {
         Debug.Log("Populating Newspaper Contents");
         int index = ShiftManager.Instance.CurrentDay - 1;
-        string date = ShiftManager.Instance.CurrentGameDate.ToString("dd MMMM yyyy");
+        string date = ShiftManager.Instance.CurrentGameDate.ToString("dd MMM yyyy");
         Debug.Log(index);
 
         NewspaperContentScriptable newspaperContentScriptable = _newspaperContentScriptables[index];
