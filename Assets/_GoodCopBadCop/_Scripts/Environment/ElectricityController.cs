@@ -10,7 +10,9 @@ public class ElectricityController : MonoBehaviour
     [SerializeField] private AudioClip powerOnSound;
     [SerializeField] AudioSource sfxSource;
     [SerializeField] private Vector2 powerOutageRandomTime = new Vector2(60,120);
-    
+    private bool _isPowerOn;
+    public bool IsPowerOn => _isPowerOn;
+
     void Start()
     {
         ShiftManager.Instance.OnShiftStart += StartCountdown;
@@ -30,6 +32,7 @@ public class ElectricityController : MonoBehaviour
     [ContextMenu("Power Off")]
     public void PowerOff()
     {
+        _isPowerOn = false;
         StartCoroutine(PowerOffCoroutine());
     }
 
@@ -42,11 +45,12 @@ public class ElectricityController : MonoBehaviour
         {
             electricObject.OnElectricityTurnOff?.Invoke();
         }
-        
     }
+    
     [ContextMenu("Power On")]
     public void PowerOn()
     {
+        _isPowerOn = true;
         foreach (var electricObject in electricObjects)
         {
             electricObject.OnElectricityTurnOn?.Invoke();
