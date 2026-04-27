@@ -9,6 +9,7 @@ public class HandOffPoint : PlacementBoard
         FolderController folderController = pickableObject.GetComponent<FolderController>();
         
         if (folderController == null) return;
+        if (SuspectController.Instance.CurrentSuspect == null) return;
         
         if (folderController.IsStamped)
         {

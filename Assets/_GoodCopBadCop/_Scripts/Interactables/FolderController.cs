@@ -181,8 +181,6 @@ public class FolderController : PickableObject
         }
         yield return new WaitForSeconds(.25f);
 
-        playerPickupController.PlayerAnimationController.SetAnimTrigger("UseStamp");
-       // playerPickupController.PlayerAnimationController.ArmRig.weight = 1;
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = stampDownTarget.position;
@@ -199,7 +197,7 @@ public class FolderController : PickableObject
         
         playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f); 
         playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
-        StartCoroutine(LerpRigOnAndOff());
+        playerPickupController.PlayerAnimationController.TurnRightArmRigOnAndOff(.5f,.5f);
         yield return new WaitForSeconds(.5f);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
@@ -229,52 +227,17 @@ public class FolderController : PickableObject
         playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
         yield return new WaitForSeconds(.5f);
 
-
-        playerPickupController.PlayerAnimationController.RightArmRig.weight = 0;
-        playerPickupController.PlayerAnimationController.CamRightArmRig.weight = 0;
-
         isStamping = false;
         
-        yield return new WaitForSeconds(.5f);
         if (IsOwner)
         {
             cinemachineVirtualCamera.SetActive(false);
         }
         if (isLocal) PlayerInstance.Instance.CanControl = true;
         playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
-        
+        GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
+
         onStampedComplete?.Invoke();
-    }
-
-    IEnumerator LerpRigOnAndOff()
-    {
-        float upDuration = 1f;
-        float downDuration = 0.6f;
-        float elapsed = 0f;
-
-        // Phase 1: Lerp Up to 1
-        while (elapsed < upDuration)
-        {
-            elapsed += Time.deltaTime;
-            playerPickupController.PlayerAnimationController.RightArmRig.weight = Mathf.Lerp(0, 1, elapsed / upDuration);
-            playerPickupController.PlayerAnimationController.CamRightArmRig.weight = Mathf.Lerp(0, 1, elapsed / upDuration);
-            yield return null;
-        }
-
-        playerPickupController.PlayerAnimationController.RightArmRig.weight = 1;
-
-        // Phase 2: Lerp Down to 0 (Faster)
-        elapsed = 0f;
-        while (elapsed < downDuration)
-        {
-            elapsed += Time.deltaTime;
-            playerPickupController.PlayerAnimationController.RightArmRig.weight = Mathf.Lerp(1, 0, elapsed / downDuration);
-            playerPickupController.PlayerAnimationController.CamRightArmRig.weight = Mathf.Lerp(1, 0, elapsed / downDuration);
-
-            yield return null;
-        }
-
-        playerPickupController.PlayerAnimationController.RightArmRig.weight = 0;
     }
 
     public override void OnStartUse()
