@@ -20,7 +20,6 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private Transform gatePos;
 
     [Header("Suspects")] 
-    [SerializeField] private SuspectSet suspectList;
     private SuspectCharacter suspectCharacter;
     public SuspectCharacter CurrentSuspect => suspectCharacter;
 
@@ -85,11 +84,13 @@ public class SuspectController : NetworkBehaviour
         SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
     }
 
+    [SerializeField] private DailySuspectManager dailySuspectManager;
     private void SpawnSuspectServer(int lineupIndex, Vector3 position, Quaternion rotation)
     {
         if (!IsServer) return;
 
-        SuspectCharacter suspectPrefab = GetRandomSuspect();
+        SuspectCharacter suspectPrefab = dailySuspectManager.shiftSuspects[lineupIndex].CharacterPrefab;
+        
         if (suspectPrefab == null)
         {
             Debug.LogError($"Could not resolve suspect prefab from SuspectRecord at lineup index {lineupIndex}.");
@@ -117,12 +118,6 @@ public class SuspectController : NetworkBehaviour
         TryInitializeCurrentSuspect();
         AssignReferencesClientRpc(netObj.NetworkObjectId);
     }
-
-    private SuspectCharacter GetRandomSuspect()
-    {
-        return suspectList.suspects[UnityEngine.Random.Range(0, suspectList.suspects.Count - 1)].CharacterPrefab;
-    }
-
 
     [ClientRpc]
     private void AssignReferencesClientRpc(ulong networkObjectId)

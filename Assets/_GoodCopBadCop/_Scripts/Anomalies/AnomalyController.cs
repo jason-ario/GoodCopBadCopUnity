@@ -13,9 +13,7 @@ public class AnomalyController : MonoBehaviour
 
     private Anomaly[] _allPossibleAnomalies;
     public List<Anomaly> activeAnomalies = new List<Anomaly>();
-
-    private int infectionScore = 10; // make this increase over time or go down if they're quarantined
-
+    
     public void Initialize()
     {
         var anomalies = new List<Anomaly>();

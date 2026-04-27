@@ -68,6 +68,10 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 19.88
       objectReference: {fileID: 0}
+    - target: {fileID: 7349446627626156204, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
+      propertyPath: notebook
+      value: 
+      objectReference: {fileID: 8084264744737737008}
     - target: {fileID: 9152542923278550428, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
       propertyPath: m_fontSize
       value: 19.88
@@ -161,6 +165,10 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 19.88
       objectReference: {fileID: 0}
+    - target: {fileID: 7349446627626156204, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
+      propertyPath: notebook
+      value: 
+      objectReference: {fileID: 8084264744737737008}
     - target: {fileID: 9152542923278550428, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
       propertyPath: m_fontSize
       value: 19.88
@@ -396,16 +404,10 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 3869974862551404451}
-    - targetCorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 5867456454437685722}
     - targetCorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8628849863959109688}
-    - targetCorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 7712035634489014575}
     - targetCorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2395975485089277746}
@@ -426,33 +428,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 7489933991060761327, guid: fe989057b8fa53e43a3115b7a8d4071f, type: 3}
   m_PrefabInstance: {fileID: 2043675887436891726}
   m_PrefabAsset: {fileID: 0}
---- !u!54 &3869974862551404451
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8911795920815385761}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!114 &5867456454437685722
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -465,7 +440,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 524862396
+  GlobalObjectIdHash: 612905071
   InScenePlacedSourceGlobalObjectIdHash: 2036701282
   DeferredDespawnTick: 0
   Ownership: 1
@@ -524,23 +499,6 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!114 &7712035634489014575
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8911795920815385761}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkRigidbody
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkRigidbodyBaseExpanded: 0
-  UseRigidBodyForMotion: 0
-  AutoUpdateKinematicState: 1
-  AutoSetKinematicOnDespawn: 1
 --- !u!1773428102 &2395975485089277746
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -856,6 +814,10 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 19.88
       objectReference: {fileID: 0}
+    - target: {fileID: 7349446627626156204, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
+      propertyPath: notebook
+      value: 
+      objectReference: {fileID: 8084264744737737008}
     - target: {fileID: 9152542923278550428, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
       propertyPath: m_fontSize
       value: 19.88
@@ -949,6 +911,10 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 19.88
       objectReference: {fileID: 0}
+    - target: {fileID: 7349446627626156204, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
+      propertyPath: notebook
+      value: 
+      objectReference: {fileID: 8084264744737737008}
     - target: {fileID: 9152542923278550428, guid: 81f4717d300eeea4c975c7ac644436a2, type: 3}
       propertyPath: m_fontSize
       value: 19.88

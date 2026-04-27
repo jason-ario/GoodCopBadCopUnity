@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 2041156714543515751}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.11199999}
+  m_LocalPosition: {x: 0, y: 0.0144, z: -0.153}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -104,8 +104,8 @@ GameObject:
   - component: {fileID: 5336311336844689108}
   - component: {fileID: 7688639020693793064}
   - component: {fileID: 2165246397187875231}
-  - component: {fileID: 6298953259492454785}
-  - component: {fileID: 7897743499680541765}
+  - component: {fileID: 5974956147794270995}
+  - component: {fileID: 1659329089007804956}
   m_Layer: 0
   m_Name: Suspect Controller
   m_TagString: Untagged
@@ -146,7 +146,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2723485867
+  GlobalObjectIdHash: 716774415
   InScenePlacedSourceGlobalObjectIdHash: 2381861949
   DeferredDespawnTick: 0
   Ownership: 1
@@ -176,19 +176,23 @@ MonoBehaviour:
   standPos: {fileID: 4964543990714842239}
   despawnPos: {fileID: 931708208813443907}
   gatePos: {fileID: 2982410289007845196}
-  dailySuspectManager: {fileID: 6298953259492454785}
   spawnedDocuments: []
   idCard: {fileID: 8114144157912302672, guid: ea4c05f16d623b349be212cd550dfcc7, type: 3}
-  applicationForm: {fileID: 4439714717531541461, guid: 811fce5e362f6724b9d260045d605dfa, type: 3}
-  spawnedFolder: {fileID: 0}
-  folderSpawnPos: {fileID: 5826231128880791138}
+  applicationForm: {fileID: 6207787727289640355, guid: 9d0f54ee90d1a0541a9296be09f10a50, type: 3}
   documentSpawnStartPos: {fileID: 5826231128880791138}
   documentSpawnEndPos: {fileID: 7233905168987434914}
   quarantineTimeline: {fileID: 7627075282601385360}
   suspectQuarantineFollowPos: {fileID: 8806315025284105420}
   suspectIndex:
     m_InternalValue: -1
---- !u!114 &6298953259492454785
+  couponCorrectVerdictBonus: 10
+  incorrectVerdictPenalty: 5
+  couponPerfectAnomaliesBonus: 5
+  couponPerCorrectAnomaly: 3
+  couponPenaltyPerMissedAnomaly: 2
+  couponPenaltyPerFalsePositiveAnomaly: 2
+  dailySuspectManager: {fileID: 5974956147794270995}
+--- !u!114 &5974956147794270995
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -200,8 +204,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4df72001d85f8e42b871b9e6b69348c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DailySuspectManager
-  suspectSelectionController: {fileID: 7897743499680541765}
---- !u!114 &7897743499680541765
+  allSuspects: {fileID: 11400000, guid: 99ffb1a8abc9764469e0220edc0ec058, type: 2}
+  shiftSuspects: []
+  suspectsPerShift: {x: 5, y: 5}
+--- !u!114 &1659329089007804956
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -210,20 +216,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 3714583685049143390}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb756b50ef99b0643b2854d66b5417dc, type: 3}
+  m_Script: {fileID: 11500000, guid: 0dfcac7209904144ab2f042fa83a9aaf, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SuspectSelectionController
-  suspectDatabase: {fileID: 0}
-  suspectsPerDay: 6
-  baseWeight: 10
-  unseenBonus: 8
-  returningBonus: 6
-  daysSinceSeenMultiplier: 2
-  highInfectionBonus: 8
-  criticalInfectionBonus: 15
-  recentlySeenPenalty: 12
-  guaranteeAtLeastOneHighInfectionSuspect: 1
-  highInfectionThreshold: 60
+  m_EditorClassIdentifier: '::'
+  allSuspects: {fileID: 0}
+  startingInfectionScore: {x: 0, y: 10}
+  inspectionScoreIncreasePerDay: {x: 5, y: 20}
 --- !u!1 &5360894874155702194
 GameObject:
   m_ObjectHideFlags: 0
@@ -500,7 +498,7 @@ Transform:
   m_GameObject: {fileID: 8662588396610636107}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -0, y: 0.0144, z: 0.295}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1901,11 +1899,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3707384549441437476, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2907287534
+      value: 3313036738
       objectReference: {fileID: 0}
     - target: {fileID: 3707384549441437476, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
       propertyPath: InScenePlacedSourceGlobalObjectIdHash
-      value: 1444054233
+      value: 2381861949
       objectReference: {fileID: 0}
     - target: {fileID: 3749629511357142450, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
       propertyPath: m_LocalPosition.x

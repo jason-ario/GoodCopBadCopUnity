@@ -4,12 +4,18 @@ using UnityEngine;
 public class ExamPage : FolderItem
 {
     [SerializeField] private ChecklistItem[] _checklistItems; 
-    [SerializeField] ExamNotebook notebook;
+    private ExamNotebook notebook;
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
-
+    
     public ChecklistItem[] ChecklistItems => _checklistItems;
+
+    public void Initialize(ExamNotebook notebook)
+    {
+        this.notebook = notebook;
+    }
+    
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
         notebook.AnimateCheckMark(ikAnimationTarget);

@@ -353,8 +353,8 @@ public class PlayerPickupController : NetworkBehaviour
 
             // Match the slot's local transform, then hide the slot placeholder
             ObjectContainer currentObjectContainer = itemData.hand == PickableItemData.Hand.Right ? rightArmCamObjectContainer : leftArmCamObjectContainer;
-
             PickableObject itemInContainer = null;
+            
             foreach (var item in currentObjectContainer.ItemsHeld)
             {
                 if (item.ItemData == itemData)

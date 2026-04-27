@@ -740,6 +740,7 @@ GameObject:
   - component: {fileID: 1701216653970133219}
   - component: {fileID: 7460938723757500394}
   - component: {fileID: 5350706457408493353}
+  - component: {fileID: 820681201371413921}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -993,7 +994,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 3615840691
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1024,7 +1025,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 92d7f584cbed9394aac938b01265850f, type: 2}
   interactText: 
   suspectData: {fileID: 0}
-  sealActive: 0
+  InfectionScore: 0
   lookAnimator: {fileID: 253971976340002767}
   animator: {fileID: 3144101779491009765}
   audioSource: {fileID: 1751970679333441786}
@@ -1451,6 +1452,19 @@ MonoBehaviour:
   - {fileID: 8872331537606341429}
   _environmentalAnomalies: []
   activeAnomalies: []
+--- !u!114 &820681201371413921
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb0ec119a8249a243bbf3bfdbaa5f52b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  record: {fileID: 0}
 --- !u!1 &5484926060462241000
 GameObject:
   m_ObjectHideFlags: 0

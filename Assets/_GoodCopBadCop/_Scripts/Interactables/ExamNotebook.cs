@@ -18,6 +18,7 @@ public class ExamNotebook : PickableObject
         {
             page.SetChecklistInteractable(false);
             page.SetInteractable(false);
+            page.Initialize(this);
         }
 
         pages[currentPage].SetChecklistInteractable(true);

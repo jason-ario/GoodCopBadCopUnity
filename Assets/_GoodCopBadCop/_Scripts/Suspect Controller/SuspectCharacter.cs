@@ -3,27 +3,20 @@ using System.Collections;
 using System.Collections.Generic;
 using FIMSpace.FLook;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 using Random = System.Random;
 
-public enum CharacterStatus
-{
-    Resident,
-    Visitor,
-    Quarantined,
-    Deceased
-}
 
 public class SuspectCharacter : Interactable
 {
     [Header("Suspect Data")]
     [SerializeField] private SuspectData suspectData;
     public SuspectData Data => suspectData;
-    
-    [SerializeField] bool sealActive;
-    
     public string ExpirationDate => suspectData.EntryPermitExpiryDate;
-    public bool SealActive => sealActive;
+
+    [Header("Suspect State")] 
+    public int InfectionScore;
     
     [Header("Suspect Set Up")]
     public FLookAnimator lookAnimator;
@@ -37,6 +30,7 @@ public class SuspectCharacter : Interactable
     public Vector3 standPosOffset;
     public bool attackImmediately;
     [SerializeField] private ParticleSystem[] vomitParticles;
+    SuspectRecordViewer suspectRecordViewer;
     
 
     #region Folder
@@ -87,8 +81,9 @@ public class SuspectCharacter : Interactable
     {
         base.Awake();
 
-        handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
-
+        handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand); 
+        suspectRecordViewer = GetComponent<SuspectRecordViewer>(); 
+        
         if (folderGivingAnimationDatas != null && folderGivingAnimationDatas.Length > 0)
         {
             _folderGivingAnimationData = folderGivingAnimationDatas[0];
@@ -97,8 +92,16 @@ public class SuspectCharacter : Interactable
 
     public void Initialize()
     {
-        Debug.Log("Initializing Suspect Character");
         anomalyController.Initialize();
+        SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+        if (record != null)
+        {
+            suspectRecordViewer.SetRecord(record);
+        }
+        else
+        {
+            Debug.Log("No record found for " + suspectData.name);
+        }
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
