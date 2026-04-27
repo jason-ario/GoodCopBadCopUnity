@@ -83,11 +83,18 @@ public class FolderController : PickableObject
         base.InteractWithItem(playerInteractionController, heldItem);
         ulong clientId = playerInteractionController.NetworkObjectId;
 
-        if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.name == "Stamp_Red" || heldItem.name == "Stamp_Yellow")
+        if (isStamped.Value == false)
         {
-            Debug.Log("Interact with item");
-            var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
-            StartUseStampServerRpc(clientId, inkStamp.StampType);
+            if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.name == "Stamp_Red" || heldItem.name == "Stamp_Yellow")
+            {
+                Debug.Log("Interact with item");
+                var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
+                StartUseStampServerRpc(clientId, inkStamp.StampType);
+            }
+        }
+        else
+        {
+            Debug.Log("Already Stamped");
         }
 
         if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" or "Biological Exam Page" )
