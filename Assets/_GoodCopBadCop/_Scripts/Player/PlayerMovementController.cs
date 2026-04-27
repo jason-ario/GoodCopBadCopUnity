@@ -26,6 +26,11 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private float recoilKickDuration = 0.07f;
     [SerializeField] private float recoilRecoverDuration = 0.2f;
 
+    [Header("Camera Look Down Settings")]
+    [SerializeField] private Transform cameraBasePos;
+    [SerializeField] private Transform cameraLookDownPos;
+    [SerializeField] private float lookDownLerpSpeed = 5f;
+
     private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
     private Vector3 _currentVelocity;
@@ -109,6 +114,12 @@ public class PlayerMovementController : NetworkBehaviour
     {
         camStartPos = cameraTransform.localPosition;
         camStartRot = cameraTransform.localRotation;
+        
+        // If transforms aren't assigned, create virtual positions
+        if (cameraBasePos == null)
+        {
+            cameraBasePos = cameraTransform;
+        }
     }
 
     public override void OnNetworkSpawn()
@@ -196,6 +207,9 @@ public class PlayerMovementController : NetworkBehaviour
             // Combine base aim pitch with procedural recoil rotation
             targetLookEuler = new Vector3(_cameraPitch + _recoilRotation.x, _recoilRotation.y, 0f);
             cameraTransform.localEulerAngles = targetLookEuler;
+            
+            // Update camera position based on look angle
+            UpdateCameraPositionBasedOnLook();
         }
     }
 
@@ -272,6 +286,33 @@ public class PlayerMovementController : NetworkBehaviour
                 if (_cameraPitch > 180) _cameraPitch -= 360;
             });
         }
+    }
+
+    void UpdateCameraPositionBasedOnLook()
+    {
+        // Calculate how far down we're looking (0 to 1, where 1 is maximum down)
+        float lookDownAmount = Mathf.Clamp01((_cameraPitch) / maxLookAngle);
+        
+        Vector3 targetPos;
+        
+        if (cameraLookDownPos != null)
+        {
+            // Lerp between base position and look down position
+            targetPos = Vector3.Lerp(cameraBasePos.localPosition, cameraLookDownPos.localPosition, lookDownAmount);
+        }
+        else
+        {
+            // If no look down position is set, just move forward smoothly
+            Vector3 basePos = cameraBasePos.localPosition;
+            Vector3 forwardOffset = Vector3.forward * lookDownAmount * 0.3f; // Adjust 0.3f for amount of forward movement
+            targetPos = basePos + forwardOffset;
+        }
+        
+        // Apply recoil offset (procedural movement) on top of the lerped position
+        targetPos += _recoilRotation;
+        
+        // Smoothly lerp the camera position
+        cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetPos, lookDownLerpSpeed * Time.deltaTime);
     }
     
     public void ResetCameraPos(bool instant = true, float duration = 0.5f, UnityAction callback = null)
