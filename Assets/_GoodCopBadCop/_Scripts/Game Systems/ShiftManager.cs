@@ -35,9 +35,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private PlayableDirector introCutscene;
     [SerializeField] private AudioSource ambientAudio;
     [SerializeField] private AudioSource buzzerSound;
-
-    public int SuspectsPerShift => suspectsPerShift;
-
+    
     public int suspectsProcessed = 0;
     public int suspectsPassedCorrect = 0;
     public int suspectsPassedWrong = 0;
@@ -88,7 +86,7 @@ public class ShiftManager : NetworkBehaviour
 
     public void SetNextSuspectReady()
     {
-        if (SuspectController.Instance.SuspectIndex >= ShiftManager.Instance.SuspectsPerShift)
+        if (SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
             EndShift();
             return;

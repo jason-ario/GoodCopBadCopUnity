@@ -8,6 +8,13 @@ public class DailySuspectManager : MonoBehaviour
     public List<SuspectData> shiftSuspects;
     [SerializeField] private Vector2 suspectsPerShift;
     
+    public static DailySuspectManager Instance;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
     private void Start()
     {
         ShiftManager.Instance.OnShiftStart += PopulateShiftCharacters;
