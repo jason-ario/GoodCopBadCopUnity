@@ -177,7 +177,7 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3f);
 
-        Debug.Log("Spawn suspect");
+        StartCoroutine(StartShiftSequence());
         SuspectController.Instance.NextSuspect();
     }
 
@@ -332,4 +332,14 @@ public class ShiftManager : NetworkBehaviour
     }
 
 
+    public void SetNextShiftReady()
+    {
+        UIController.Instance.HideEndOfShiftReport();
+        UIController.Instance.FadeIn();
+
+        PlayerInstance.Instance.CanControl = true;
+        PlayerInstance.Instance.SetCanInteract(true);
+        PlayerInstance.Instance.SetCanMove(true);
+        OnShiftReady?.Invoke();
+    }
 }

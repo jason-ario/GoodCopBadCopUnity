@@ -55,6 +55,9 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] int couponPerCorrectAnomaly = 3;
     [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
+
+    [SerializeField] private GameObject entranceCamera;
+    
     private void Awake()
     {
         Instance = this;
@@ -182,7 +185,15 @@ public class SuspectController : NetworkBehaviour
             .OnComplete(SayEntryDialogue);
 
         suspectCharacter.animator.SetBool("Walking", false);
+        StartCoroutine(ShiftToCamera());
         EnableLook();
+    }
+
+    IEnumerator ShiftToCamera()
+    {
+        entranceCamera.SetActive(true);
+        yield return new WaitForSeconds(2f);
+        entranceCamera.SetActive(false);
     }
 
     private void SayEntryDialogue()
