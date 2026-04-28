@@ -27,8 +27,14 @@ public class TutorialManager : MonoBehaviour
 
     private void Start()
     {
+        ShiftManager.Instance.OnShiftReady += SayShiftReadyDialogue;
         ShiftManager.Instance.OnShiftStart += ShowStartShiftTutorial;
         tutorialCanvas.SetActive(false);
+    }
+
+    void SayShiftReadyDialogue()
+    {  
+        ShowTutorialText("All inspectors report to stations for their shift.");
     }
 
     void ShowStartShiftTutorial()

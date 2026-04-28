@@ -73,6 +73,15 @@ public class ShiftManager : NetworkBehaviour
         Instance = this;
         InitializeDateSystem();
     }
+
+    IEnumerator Start()
+    {
+        yield return new WaitForSeconds(5);
+        if (CurrentDay == 1)
+        {
+            OnShiftReady?.Invoke();
+        }
+    }
     
     private void InitializeDateSystem()
     {
