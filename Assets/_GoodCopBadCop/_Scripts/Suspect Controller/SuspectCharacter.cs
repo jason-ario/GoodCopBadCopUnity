@@ -10,16 +10,15 @@ using Random = System.Random;
 
 public class SuspectCharacter : Interactable
 {
-    [Header("Suspect Data")]
-    [SerializeField] private SuspectData suspectData;
+    [Header("Suspect Data")] [SerializeField]
+    private SuspectData suspectData;
+
     public SuspectData Data => suspectData;
     public string ExpirationDate => suspectData.EntryPermitExpiryDate;
 
-    [Header("Suspect State")] 
-    public int InfectionScore;
-    
-    [Header("Suspect Set Up")]
-    public FLookAnimator lookAnimator;
+    [Header("Suspect State")] public int InfectionScore;
+
+    [Header("Suspect Set Up")] public FLookAnimator lookAnimator;
     public Animator animator;
     public AudioSource audioSource;
     [SerializeField] Texture2D idPhoto;
@@ -31,9 +30,10 @@ public class SuspectCharacter : Interactable
     public bool attackImmediately;
     [SerializeField] private ParticleSystem[] vomitParticles;
     SuspectRecordViewer suspectRecordViewer;
-    
+
 
     #region Folder
+
     public enum FolderGivingAnimation
     {
         HandOver,
@@ -51,14 +51,14 @@ public class SuspectCharacter : Interactable
     [SerializeField] private FolderGivingAnimation _folderGivingAnimation = FolderGivingAnimation.HandOver;
     private FolderGivingAnimationData _folderGivingAnimationData;
     [SerializeField] private Transform handSpawnPos;
-    #endregion 
-    
+
+    #endregion
+
     private bool _facingPlayer;
 
-    [Header("Anomalies")]
-    [SerializeField] private AnomalyController anomalyController;
+    [Header("Anomalies")] [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
-    
+
     //Responses
     public int ChosenEntryReasonIndex = -1;
     public int ChosenSymptomResponseIndex = -1;
@@ -69,7 +69,16 @@ public class SuspectCharacter : Interactable
     private Vector2 radiationSuspicious = new Vector2(31, 70);
     private Vector2 radiationInfected = new Vector2(71, 100);
 
-    string[] choices = new string[]
+    public string[] defaultDialogueChoices = new string[]
+    {
+        "Where are you coming from?",
+        "Have you been experiencing any strange symptoms lately?",
+        "Who do you live with?"
+    };
+
+    private string[] choices;
+    
+    public string[] defaultDialogueResponses = new string[]
     {
         "Where are you coming from?", 
         "Have you been experiencing any strange symptoms lately?", 
@@ -80,7 +89,7 @@ public class SuspectCharacter : Interactable
     protected override void Awake()
     {
         base.Awake();
-
+        choices = defaultDialogueChoices;
         handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand); 
         suspectRecordViewer = GetComponent<SuspectRecordViewer>(); 
         
@@ -109,7 +118,7 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        //DialogueManager.Instance.InitiateChoices(lookPos, choices);
+        DialogueManager.Instance.InitiateChoices(lookPos, choices);
     }
 
     public void SetCanInteract(bool canInteract)
@@ -122,8 +131,7 @@ public class SuspectCharacter : Interactable
     {
         if (item == null)
         {
-            
-            //DialogueManager.Instance.InitiateChoices(lookPos, choices);
+            DialogueManager.Instance.InitiateChoices(lookPos, choices);
             return;
         }
 

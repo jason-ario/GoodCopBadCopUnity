@@ -27,8 +27,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
     }
 
     public void ChooseDialogueChoice(int choiceIndex)
-    {
-       CloseDialogueChoices();
+    { 
+        CloseDialogueChoices();
         string playerName = GetPlayerName();
         
         // Request server to broadcast this choice
@@ -52,15 +52,18 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
 
     [ServerRpc(RequireOwnership = false)]
-    private void ChooseDialogueChoiceServerRpc(int choiceIndex, string playerName)
+    private void ChooseDialogueChoiceServerRpc(int choiceIndex, string playerName, ServerRpcParams serverRpcParams = default)
     {
-        SpawnPlayerSubtitleClientRpc(dialogueChoices[choiceIndex].choiceText, playerName);
+        ulong senderClientId = serverRpcParams.Receive.SenderClientId;
+        SpawnPlayerSubtitleClientRpc(dialogueChoices[choiceIndex].choiceText, playerName, senderClientId);
         StartCoroutine(NPCRespondToDialogueChoice(choiceIndex));
     }
 
     [ClientRpc]
-    private void SpawnPlayerSubtitleClientRpc(string choiceText, string playerName)
+    private void SpawnPlayerSubtitleClientRpc(string choiceText, string playerName, ulong senderClientId)
     {
+        if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
+
         DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.darkCyan, true);
     }
     

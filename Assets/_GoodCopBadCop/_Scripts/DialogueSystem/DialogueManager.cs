@@ -30,6 +30,7 @@ public class DialogueManager : NetworkBehaviour
     {
         Instance = this;
     }
+    
 
     public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false,
         bool waitForInput = false, Action onComplete = null)

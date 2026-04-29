@@ -228,7 +228,11 @@ public class UIController : MonoBehaviour
         couldLookBeforePaused = PlayerInstance.Instance.GetComponent<PlayerMovementController>().CanLook;
         showedCursorBeforePaused = Cursor.visible;
 
-        showedReticleBeforePause = PlayerInstance.Instance.PlayerInteractionController.ReticleActive;
+        // Capture reticle state before we disable control (which will deactivate it).
+        // Use couldControlBeforePaused && couldLookBeforePaused as the source of truth,
+        // since the reticleActive flag can be stale when the CanControl setter skips
+        // SetReticleActive due to CanLook being false.
+        showedReticleBeforePause = couldControlBeforePaused && couldLookBeforePaused;
         
         ShowCursor();
         
@@ -239,8 +243,9 @@ public class UIController : MonoBehaviour
     
     public void ClosePauseMenu()
     {
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
+        // Restore CanLook first so the CanControl setter can properly re-enable the reticle.
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
         
         if (showedCursorBeforePaused == false)
         {
