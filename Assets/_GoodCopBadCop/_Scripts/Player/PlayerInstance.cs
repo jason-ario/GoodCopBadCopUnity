@@ -97,4 +97,9 @@ public class PlayerInstance : NetworkBehaviour
     {
         return _playerMovementController.Camera;
     }
+
+    public void Heal(float healAmount)
+    {
+        throw new NotImplementedException();
+    }
 }

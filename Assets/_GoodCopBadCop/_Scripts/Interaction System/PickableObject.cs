@@ -21,6 +21,7 @@ public class PickableObject : Interactable
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
     public UnityAction OnEquip;
     public UnityAction OnUnEquip;
+    protected bool isUsing;
 
     public bool CanPickUpManually { get; set; } = true;
 
@@ -132,6 +133,7 @@ public class PickableObject : Interactable
 
     public virtual void OnStartUse()
     {
+        isUsing = true;
     }
     
     public virtual void OnBodyStartUse()
@@ -146,7 +148,7 @@ public class PickableObject : Interactable
     
     public virtual void OnStopUse()
     {
-        
+        isUsing = false;
     }
 
     public void OnDroppedFromBody()
