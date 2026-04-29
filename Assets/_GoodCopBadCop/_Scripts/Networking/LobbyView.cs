@@ -33,6 +33,6 @@ public class LobbyRow : MonoBehaviour
         LobbyManager.Instance.JoinLobby(lobby.Id);
 
         // ✅ UI transition only (client waiting screen)
-        MainMenuController.Instance.OpenStartCampaignAsClient();
+       //MainMenuController.Instance.OpenStartCampaignAsClient();
     }
 }

@@ -12,12 +12,7 @@ public class MainMenuController : MonoBehaviour
     [Header("Screens")]
     [SerializeField] public GameObject mainMenu;
     [SerializeField] private GameObject homeScreen;
-    [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject settingsScreen;
-    [SerializeField] private GameObject newLoadCampaignScreen;
-    [SerializeField] private GameObject startCampaignScreen;
-    [SerializeField] private GameObject singleplayerOrMultiplayer;
-    [SerializeField] private StartCampaignScreen startCampaignScreenScript;
     [SerializeField] private GameObject joinGameScreen;
     [SerializeField] private Animator screenFade;
 
@@ -49,11 +44,7 @@ public class MainMenuController : MonoBehaviour
         allScreens = new List<GameObject>
         {
             homeScreen,
-            startShiftScreen,
-            newLoadCampaignScreen,
-            startCampaignScreen,
             joinGameScreen,
-            singleplayerOrMultiplayer,
             settingsScreen
         };
     }
@@ -65,7 +56,6 @@ public class MainMenuController : MonoBehaviour
         SwitchToScreen(homeScreen);
         
         playableDirector.gameObject.SetActive(true);
-        //StartCoroutine(WaitAndOpenWindow());
     }
 
     #endregion
@@ -83,14 +73,12 @@ public class MainMenuController : MonoBehaviour
         currentScreen = target;
     }
     
-    public void OpenStartGameScreen() =>
-        SwitchToScreen(singleplayerOrMultiplayer);
-
-    public void OpenStartShiftScreen() =>
-        SwitchToScreen(startShiftScreen);
-
-    public void OpenNewLoadCampaignScreen() =>
-        SwitchToScreen(newLoadCampaignScreen);
+    /// <summary>Starts a new solo session immediately. Co-op is handled in-game via the payphone.</summary>
+    public void StartNewGame()
+    {
+        LobbyManager.Instance.CreateLobby();
+        GameManager.Instance.TryStartGame();
+    }
 
     public void OpenJoinLobbyScreen() =>
         SwitchToScreen(joinGameScreen);
@@ -101,32 +89,12 @@ public class MainMenuController : MonoBehaviour
     public void BackToHomeScreen() =>
         SwitchToScreen(homeScreen);
 
-    public void BackToStartGameScreen() =>
-        SwitchToScreen(singleplayerOrMultiplayer);
-    
+    /// <summary>Backward-compatible alias kept for existing UnityEvent bindings in Cutscenes 2.unity.</summary>
     public void BackToStartShiftScreen() =>
-        SwitchToScreen(startShiftScreen);
+        SwitchToScreen(homeScreen);
 
-    #endregion
-
-    #region Multiplayer Entry Points (UI → LobbyManager)
-
-    /// <summary>
-    /// Host flow: start server + create lobby
-    /// </summary>
-    public void OpenStartCampaignAsHost()
-    {
-        SwitchToScreen(startCampaignScreen);
-        startCampaignScreenScript.StartCampaignAsHost();
-    }
-
-    /// <summary>
-    /// Client flow: waiting screen (actual join triggered elsewhere)
-    /// </summary>
-    public void OpenStartCampaignAsClient()
-    {
-        SwitchToScreen(startCampaignScreen);
-    }
+    /// <summary>Returns true when a save file with meaningful progress exists.</summary>
+    public bool HasSaveFile => SaveDataManager.Instance != null && SaveDataManager.Instance.HasSaveFile;
 
     #endregion
 
@@ -137,6 +105,22 @@ public class MainMenuController : MonoBehaviour
         StopAllCoroutines();
         
         GameManager.Instance.TryStartGame();
+    }
+
+    /// <summary>
+    /// Resumes a previous session. Creates a solo lobby and starts immediately with no transition.
+    /// Only call this when HasSaveFile is true.
+    /// </summary>
+    public void ContinueGame()
+    {
+        if (!HasSaveFile)
+        {
+            Debug.LogWarning("ContinueGame called but no save file exists.");
+            return;
+        }
+
+        LobbyManager.Instance.CreateLobby();
+        GameManager.Instance.TryStartGame(skipTransition: true);
     }
 
     public void HideAllMenus()

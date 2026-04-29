@@ -26,7 +26,11 @@ public class IrradiatedOverlay : MonoBehaviour
     {
         if (playerRadiation == null)
         {
-            playerRadiation = PlayerInstance.Instance.PlayerRadiation;
+            if (PlayerInstance.Instance != null)
+            {
+                playerRadiation = PlayerInstance.Instance.PlayerRadiation;
+            }
+
             return;
         }
 

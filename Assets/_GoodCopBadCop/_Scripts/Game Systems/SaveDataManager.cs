@@ -19,6 +19,9 @@ public class SaveDataManager : MonoBehaviour
         }
     }
 
+    /// <summary>Returns true if a save file exists on disk with meaningful progress.</summary>
+    public bool HasSaveFile => _saveData.HasSeenTutorial;
+
     private void Awake()
     {
         // Singleton setup

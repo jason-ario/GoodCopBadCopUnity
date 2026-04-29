@@ -5,7 +5,6 @@ using TMPro;
 public class JoinLobbyScreen : MonoBehaviour
 {
     [SerializeField] private TMP_InputField inviteCodeInput;
-    [SerializeField] private MainMenuController mainMenuController;
 
     private void Awake()
     {
@@ -40,10 +39,7 @@ public class JoinLobbyScreen : MonoBehaviour
 
         Debug.Log($"Joining lobby {lobbyId}");
 
-        // 🔑 ALL networking handled by LobbyManager
+        // Networking and scene transition handled by LobbyManager
         LobbyManager.Instance.JoinLobby(lobbyId);
-
-        // ✅ UI only — client waiting screen
-        mainMenuController.OpenStartCampaignAsClient();
     }
 }

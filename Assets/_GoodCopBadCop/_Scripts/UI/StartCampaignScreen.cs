@@ -38,6 +38,14 @@ public class StartCampaignScreen : MonoBehaviour
 
     }
 
+    /// <summary>Creates a lobby and immediately starts a single-player session without waiting for a partner.</summary>
+    public void StartSolo()
+    {
+        LobbyManager.Instance.CreateLobby();
+        GameManager.Instance.TryStartGame();
+    }
+
+    /// <summary>Creates a lobby and waits for a partner to join before allowing the host to start.</summary>
     public void StartCampaignAsHost()
     {
         LobbyManager.Instance.CreateLobby();
