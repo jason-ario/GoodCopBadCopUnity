@@ -13,7 +13,7 @@ public class FaxMachine : NetworkBehaviour
     [SerializeField] private MachineShake _machineShake;
     private void Start()
     {
-        ShiftManager.Instance.OnShiftStart += SpawnNewspaper;
+        ShiftManager.Instance.OnShiftReady += SpawnNewspaper;
     }
 
     public void SpawnNewspaper()

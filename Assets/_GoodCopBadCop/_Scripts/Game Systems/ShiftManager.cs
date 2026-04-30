@@ -2,11 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
-using TMPro;
 using Unity.Netcode;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.Playables;
 
 public class ShiftManager : NetworkBehaviour
@@ -16,9 +13,6 @@ public class ShiftManager : NetworkBehaviour
     [Header("Network Variables")]
     public NetworkVariable<bool> shiftStarted = new NetworkVariable<bool>(false);
 
-    [Header("Settings")]
-    [SerializeField] private int suspectsPerShift = 6;
-
     [Header("Set Up")]
     private int _currentDay = 1;
     public int CurrentDay => _currentDay;
@@ -27,7 +21,6 @@ public class ShiftManager : NetworkBehaviour
     
     [SerializeField] private StartShiftScreen _startShiftScreen;
     [SerializeField] private AudioSource bellSound;
-    private bool _shiftStarting = false;
     [SerializeField] private AudioClip endOfLevelSound;
     [SerializeField] private AudioClip knockOnDoorSound;
     [SerializeField] private GameObject cardboardBox;
@@ -35,7 +28,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private PlayableDirector introCutscene;
     [SerializeField] private AudioSource ambientAudio;
     [SerializeField] private AudioSource buzzerSound;
-    
+
     public int suspectsProcessed = 0;
     public int suspectsPassedCorrect = 0;
     public int suspectsPassedWrong = 0;
@@ -53,18 +46,19 @@ public class ShiftManager : NetworkBehaviour
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
-    [SerializeField] DoorController _doorController;
+    [SerializeField] private DoorController _doorController;
     [SerializeField] private Lever lever;
 
-    #region Events
-    public UnityAction OnShiftStart { get; set; }
-    public UnityAction OnShiftReady { get; set; }
+    #region Events & Date Helpers
+    public Action OnShiftStart { get; set; }
+    public Action OnShiftReady { get; set; }
+
     private DateTime CurrentGameDateTime => _startDate.AddDays(_currentDay - 1);
     public string currentMonth => CurrentGameDateTime.ToString("MMMM");
     public string currentDay => CurrentGameDateTime.ToString("dd");
     public string currentYear => CurrentGameDateTime.ToString("yyyy");
     public bool IsEarlyDays => CurrentDay < 11;
-    public bool IsMidDays => CurrentDay is >= 11 and < 21; 
+    public bool IsMidDays => CurrentDay is >= 11 and < 21;
     public bool IsEndDays => CurrentDay >= 21;
     #endregion
 
@@ -73,16 +67,12 @@ public class ShiftManager : NetworkBehaviour
         Instance = this;
         InitializeDateSystem();
     }
-    
+
     private void InitializeDateSystem()
     {
-        // Load saved day or start at day 1
-        int savedDay = PlayerPrefs.GetInt("dayNumber", 1);
-        _currentDay = savedDay;
-        
+        _currentDay = PlayerPrefs.GetInt("dayNumber", 1);
         Debug.Log($"Game started on {_startDate.AddDays(_currentDay - 1):dd MMMM yyyy} (Day {_currentDay})");
     }
-
 
     public void SetNextSuspectReady()
     {
@@ -91,16 +81,8 @@ public class ShiftManager : NetworkBehaviour
             EndShift();
             return;
         }
-        
+
         _switchButton.SetReady(true);
-    }
-    
-    private IEnumerator StartShiftSequence()
-    {
-        bellSound.Play();
-        _startShiftScreen.ShowDayNumber(_currentDay);
-        OnShiftStart?.Invoke();
-        yield break;
     }
 
     public void GiveBonusBox()
@@ -120,8 +102,6 @@ public class ShiftManager : NetworkBehaviour
 
     public void TryStartShift()
     {
-        Debug.Log("Try Start Shift");
-
         if (IsServer)
             StartShiftServer();
         else
@@ -146,13 +126,12 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void StartShiftClientRpc()
     {
-        _shiftStarting = false;
-        StartCoroutine(OpenWindowSequence(true));
+        StartCoroutine(OpenWindowSequence());
     }
 
     public void OpenWindow()
     {
-        StartCoroutine(OpenWindowSequence(false));
+        StartCoroutine(OpenWindowSequence());
     }
 
     public void PlayBuzzerSound()
@@ -160,7 +139,7 @@ public class ShiftManager : NetworkBehaviour
         buzzerSound.Play();
     }
 
-    private IEnumerator OpenWindowSequence(bool startRoundAfterOpening)
+    private IEnumerator OpenWindowSequence()
     {
         PlayBuzzerSound();
         yield return new WaitForSeconds(0.5f);
@@ -168,7 +147,7 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3f);
 
-        StartCoroutine(StartShiftSequence());
+        OnShiftStart?.Invoke();
         SuspectController.Instance.NextSuspect();
     }
 
@@ -193,6 +172,7 @@ public class ShiftManager : NetworkBehaviour
         UIController.Instance.ShowEndShiftReport(rows);
     }
 
+    /// <summary>Records a passed suspect and updates the correct/wrong tally.</summary>
     public void PassedSuspect(SuspectCharacter suspectCharacter)
     {
         suspectsProcessed += 1;
@@ -203,6 +183,7 @@ public class ShiftManager : NetworkBehaviour
             suspectsPassedCorrect += 1;*/
     }
 
+    /// <summary>Records a killed suspect and updates the correct/wrong tally.</summary>
     public void KillSuspect(SuspectCharacter suspectCharacter)
     {
         suspectsProcessed += 1;
@@ -213,6 +194,7 @@ public class ShiftManager : NetworkBehaviour
             suspectsKilledWrong += 1;*/
     }
 
+    /// <summary>Records a quarantined suspect.</summary>
     public void QuarantinedSuspect()
     {
         suspectsProcessed += 1;
@@ -227,7 +209,7 @@ public class ShiftManager : NetworkBehaviour
 
     public void CompletedShift()
     {
-        _currentDay += 1; 
+        _currentDay += 1;
     }
 
     public void ResetEnvironment()
@@ -236,7 +218,7 @@ public class ShiftManager : NetworkBehaviour
         lever.Reset();
     }
 
-    void ResetShiftData()
+    private void ResetShiftData()
     {
         shiftStarted.Value = false;
     }
@@ -248,43 +230,37 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
     }
-    
+
     private IEnumerator NewShiftSequence()
     {
         PlayerPrefs.SetInt("dayNumber", _currentDay);
-        
+
         if (DebugConsole.Instance.skipInitialShiftTransition)
         {
-            PlayerInstance.Instance.CanControl = true;
-            PlayerInstance.Instance.SetCanInteract(true);
-            PlayerInstance.Instance.SetCanMove(true);
             introCutscene.gameObject.SetActive(false);
             UIController.Instance.HideEndOfShiftReport();
             SuspectController.Instance.ResetSuspects();
             yield return new WaitForEndOfFrame();
+            EnablePlayerControl();
             OnShiftReady?.Invoke();
-            StartCoroutine(StartShiftSequence());
+            PlayShiftStartFanfare();
             yield break;
         }
-        
+
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
         introCutscene.gameObject.SetActive(false);
-        
+
         UIController.Instance.HideEndOfShiftReport();
         SuspectController.Instance.ResetSuspects();
 
         yield return new WaitForSeconds(1f);
         UIController.Instance.FadeOut();
-
         yield return new WaitForSeconds(1f);
-        StartCoroutine(StartShiftSequence());
 
-        PlayerInstance.Instance.CanControl = true;
-        PlayerInstance.Instance.SetCanInteract(true);
-        PlayerInstance.Instance.SetCanMove(true);
-        
+        EnablePlayerControl();
         OnShiftReady?.Invoke();
+        PlayShiftStartFanfare();
     }
 
     private void ResetSuspectsProcessed()
@@ -297,6 +273,21 @@ public class ShiftManager : NetworkBehaviour
         suspectsKilledWrong = 0;
     }
 
+    /// <summary>Plays the bell and shows the day number banner at the start of a shift.</summary>
+    private void PlayShiftStartFanfare()
+    {
+        bellSound.Play();
+        _startShiftScreen.ShowDayNumber(_currentDay);
+    }
+
+    /// <summary>Restores full player control.</summary>
+    private void EnablePlayerControl()
+    {
+        PlayerInstance.Instance.CanControl = true;
+        PlayerInstance.Instance.SetCanInteract(true);
+        PlayerInstance.Instance.SetCanMove(true);
+    }
+
     public void InitiateIntroCutscene()
     {
         UIController.Instance.FadeIn();
@@ -304,14 +295,14 @@ public class ShiftManager : NetworkBehaviour
         StartCoroutine(PlayIntroCutscene());
     }
 
-    IEnumerator PlayIntroCutscene()
+    private IEnumerator PlayIntroCutscene()
     {
         ambientAudio.DOFade(0, 2);
         yield return new WaitForSeconds(2f);
         ResetEverything();
         yield return new WaitForSeconds(1);
-        ResetEverything(); // Did this twice because I was having a situation where player wasnt resetting properly
-        introCutscene.gameObject.SetActive(true); 
+        ResetEverything(); // Called twice — player position was not resetting reliably in a single call
+        introCutscene.gameObject.SetActive(true);
         yield return new WaitForSeconds(.5f);
         UIController.Instance.FadeOut();
     }
@@ -322,15 +313,18 @@ public class ShiftManager : NetworkBehaviour
         ambientAudio.DOFade(1, 2);
     }
 
-
     public void SetNextShiftReady()
     {
         UIController.Instance.HideEndOfShiftReport();
         UIController.Instance.FadeIn();
 
-        PlayerInstance.Instance.CanControl = true;
-        PlayerInstance.Instance.SetCanInteract(true);
-        PlayerInstance.Instance.SetCanMove(true);
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        SuspectController.Instance.ResetSuspects();
+
+        PlayerPrefs.SetInt("dayNumber", _currentDay);
+
+        EnablePlayerControl();
         OnShiftReady?.Invoke();
     }
 }
