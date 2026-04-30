@@ -85,7 +85,7 @@ public class FolderController : PickableObject
 
         if (isStamped.Value == false)
         {
-            if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.name == "Stamp_Red" || heldItem.name == "Stamp_Yellow")
+            if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.ItemData.name == "Stamp_Red" || heldItem.ItemData.name == "Stamp_Yellow")
             {
                 Debug.Log("Interact with item");
                 var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();

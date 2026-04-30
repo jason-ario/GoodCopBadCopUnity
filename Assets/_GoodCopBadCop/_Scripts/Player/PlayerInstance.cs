@@ -21,11 +21,13 @@ public class PlayerInstance : NetworkBehaviour
     private PlayerInteractionController _playerInteractionController;
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     public PlayerRadiation PlayerRadiation { get; set; }
+    public PlayerHealth PlayerHealth { get; set; }
 
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerInteractionController = GetComponent<PlayerInteractionController>();
+        PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
         
         Instance = this;
@@ -100,6 +102,6 @@ public class PlayerInstance : NetworkBehaviour
 
     public void Heal(float healAmount)
     {
-        throw new NotImplementedException();
+        PlayerHealth.Heal(healAmount);
     }
 }

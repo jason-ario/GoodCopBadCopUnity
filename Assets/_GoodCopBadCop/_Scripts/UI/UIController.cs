@@ -174,12 +174,14 @@ public class UIController : MonoBehaviour
 
     public void OpenStartShiftScreen()
     {
+        UIController.Instance.ShowCursor();
         startShiftScreen.SetActive(true);
         PlayerInstance.Instance.OpenedUIPanel();
     }
     
     public void CloseStartShiftScreen()
     {
+        UIController.Instance.HideCursor();
         startShiftScreen.SetActive(false);
         PlayerInstance.Instance.ClosedUIPanel();
     }

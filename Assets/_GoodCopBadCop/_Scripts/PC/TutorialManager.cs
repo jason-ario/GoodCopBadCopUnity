@@ -27,9 +27,15 @@ public class TutorialManager : MonoBehaviour
 
     private void Start()
     {
-        ShiftManager.Instance.OnShiftReady += SayShiftReadyDialogue;
         ShiftManager.Instance.OnShiftStart += ShowStartShiftTutorial;
         tutorialCanvas.SetActive(false);
+        StartCoroutine(WaitAndSayStartingDialogue());
+    }
+    
+    IEnumerator WaitAndSayStartingDialogue()
+    {
+        yield return new WaitForSeconds(5);
+        SayShiftReadyDialogue();
     }
 
     void SayShiftReadyDialogue()

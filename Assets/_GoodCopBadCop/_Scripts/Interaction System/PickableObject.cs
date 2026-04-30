@@ -94,6 +94,11 @@ public class PickableObject : Interactable
     public virtual void OnUnequip(PlayerPickupController player)
     {
         SetInteractable(true);
+        
+        if (isUsing)
+        {
+            OnStopUse();
+        }
 
         if (itemData.pickupAnimBool != null)
         {

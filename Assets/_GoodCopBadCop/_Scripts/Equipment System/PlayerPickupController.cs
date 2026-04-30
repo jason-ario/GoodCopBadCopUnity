@@ -401,7 +401,13 @@ public class PlayerPickupController : NetworkBehaviour
         OnPlaceObject?.Invoke();
         pickUpCooldownComplete = false;
 
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject.ItemData).gameObject;
+        if (_heldObject == null)
+        {
+            ObjectPlacer.Instance.DeactivatePlacer();
+            return;
+        }
+
+        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject.ItemData)?.gameObject;
         DisableArmIKs();
         
         if (ObjectPlacer.Instance.PlacementBoard != null)
@@ -411,8 +417,8 @@ public class PlayerPickupController : NetworkBehaviour
         
         if (_heldObject != null)
         {
-            Vector3 dropPos = dropPoint != null ? dropPoint.position : placementItem.transform.position;
-            Quaternion dropRot = dropPoint != null ? dropPoint.rotation : placementItem.transform.rotation;
+            Vector3 dropPos = dropPoint != null ? dropPoint.position : (placementItem != null ? placementItem.transform.position : _heldObject.transform.position);
+            Quaternion dropRot = dropPoint != null ? dropPoint.rotation : (placementItem != null ? placementItem.transform.rotation : _heldObject.transform.rotation);
 
             // Return to the world
             _heldObject.RemoveParent();
@@ -444,15 +450,18 @@ public class PlayerPickupController : NetworkBehaviour
         ObjectPlacer.Instance.DeactivatePlacer();
     }
 
-    void DisableArmIKs()
+    void DisableArmIKs(PickableObject target = null)
     {
-        if (_heldObject.ItemData.useLeftIK)
+        PickableObject source = target ?? _heldObject;
+        if (source == null) return;
+
+        if (source.ItemData.useLeftIK)
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(0,.25f);
             _playerAnimationController.LeftArmRigIKTarget = null;
         }
         
-        if (_heldObject.ItemData.useRightIK)
+        if (source.ItemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(0,.25f);
             _playerAnimationController.RightArmRigIKTarget = null;
@@ -482,9 +491,31 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void DestroyEquippedItem()
     {
+        if (_heldObject == null) return;
+
         PickableObject heldObject = _heldObject;
-        HeldObject?.OnDropped();
+
+        // Unequip from all containers before despawning
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.UnequipItem(this);
+        }
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody(); 
+        rightArmCamObjectContainer.CurrentlyEquippedItem?.OnDropped();
+
+        // Clear state before despawn so DropObject is never called on a destroyed object
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        itemEquippedIndex.Value = -1;
+
+        DisableArmIKs(heldObject);
+        _playerAnimationController.DisableRightArmMask();
+        ObjectPlacer.Instance.DeactivatePlacer();
+        OnPlaceObject?.Invoke();
+        pickUpCooldownComplete = false;
+
         NetworkHelper.Despawn(heldObject.GetComponent<NetworkObject>());
-        DropObject();
     }
 }

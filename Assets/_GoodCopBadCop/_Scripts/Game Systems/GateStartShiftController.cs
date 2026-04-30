@@ -9,7 +9,6 @@ public class GateStartShiftController : Interactable
         base.Interact(player);
 
         UIController.Instance.OpenStartShiftScreen();
-        
     }
 
     public void OpenGate()
