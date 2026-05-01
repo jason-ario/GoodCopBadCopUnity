@@ -65,6 +65,11 @@ public class PlayerPickupController : NetworkBehaviour
         set => _canPickUpAndPlace = value;
     }
 
+    // Non-owner LateUpdate follow: world object tracks this target each frame.
+    private PickableObject _followWorldObj;
+    private Transform _followTarget;
+    private NetworkTransform _followNT;
+
     private void Awake()
     {
         _playerAnimationController = GetComponent<PlayerAnimationController>();
@@ -194,6 +199,25 @@ public class PlayerPickupController : NetworkBehaviour
                 StopUsingObject();
             }
         }
+    }
+
+    private void LateUpdate()
+    {
+        if (_followWorldObj == null || _followTarget == null) return;
+
+        // NT being re-enabled signals a drop has occurred (from DropServerRpc on the server,
+        // or DropBroadcastClientRpc on clients). Stop the follow immediately so we don't
+        // overwrite the drop position that NT is about to broadcast.
+        if (_followNT != null && _followNT.enabled)
+        {
+            _followWorldObj = null;
+            _followTarget   = null;
+            _followNT       = null;
+            return;
+        }
+
+        _followWorldObj.transform.position = _followTarget.position;
+        _followWorldObj.transform.rotation = _followTarget.rotation;
     }
 
     public void TryUseObject()
@@ -381,16 +405,15 @@ public class PlayerPickupController : NetworkBehaviour
                     itemInContainer = item;
             }
 
-            // Direct transform parenting — zero lag, no constraint delay.
-            // Parent to the container itself but adopt the slot's local position/rotation
-            // so the object sits exactly where the slot dictates without being a grandchild of it.
-            // AutoObjectParentSync is disabled so NGO does not replicate this local parent
-            // change; each client sets its own arm-appropriate parent independently.
+            // Use ParentConstraint to track the slot continuously on all clients.
+            // AutoObjectParentSync is disabled so NGO does not replicate the local
+            // parent change; each client sets its own arm-appropriate constraint independently.
+            // Pre-position the object at the slot's world transform so the constraint
+            // activates with a zero offset rather than snapping from wherever it was.
             pickableObject.NetworkObject.AutoObjectParentSync = false;
-            pickableObject.RemoveParent();
-            pickableObject.transform.SetParent(currentObjectContainer.transform, false);
-            pickableObject.transform.localPosition = itemInContainer.transform.localPosition;
-            pickableObject.transform.localRotation = itemInContainer.transform.localRotation;
+            pickableObject.transform.position = itemInContainer.transform.position;
+            pickableObject.transform.rotation = itemInContainer.transform.rotation;
+            pickableObject.SetParent(itemInContainer.transform);
         }
 
         if (itemData.useRightIK)
@@ -453,21 +476,18 @@ public class PlayerPickupController : NetworkBehaviour
             Vector3 dropPos = dropPoint != null ? dropPoint.position : (placementItem != null ? placementItem.transform.position : _heldObject.transform.position);
             Quaternion dropRot = dropPoint != null ? dropPoint.rotation : (placementItem != null ? placementItem.transform.rotation : _heldObject.transform.rotation);
 
-            // Unparent and restore sync locally first.
-            _heldObject.transform.SetParent(null, true);
+            // Remove the ParentConstraint and restore sync locally first.
+            _heldObject.RemoveParent();
             _heldObject.NetworkObject.AutoObjectParentSync = true;
             _heldObject.transform.position = dropPos;
             _heldObject.transform.rotation = dropRot;
 
-            // Send drop position to the server before releasing ownership so the server
-            // sets the authoritative transform first — preventing NetworkTransform from
-            // snapping the object back to the pre-pickup position on non-host clients.
+            // Send drop position to the server. DropServerRpc sets the authoritative
+            // transform and re-enables NetworkTransform there — do NOT re-enable NT here
+            // on the client, because NT would immediately interpolate back toward the
+            // last server-known position (the held slot) before the RPC lands.
             _heldObject.DropServerRpc(dropPos, dropRot);
             _heldObject.ReleaseHolderServerRpc();
-
-            // Re-enable NetworkTransform so the resting position propagates to all clients.
-            NetworkTransform nt = _heldObject.GetComponent<NetworkTransform>();
-            if (nt != null) nt.enabled = true;
 
             if (dropPoint != null)
                 _heldObject.SetParent(dropPoint);
@@ -494,7 +514,7 @@ public class PlayerPickupController : NetworkBehaviour
     }
 
     // =====================================================================
-    // Non-owner body-arm constraint sync
+    // Non-owner body-arm LateUpdate follow
     // =====================================================================
 
     /// <summary>
@@ -523,8 +543,10 @@ public class PlayerPickupController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Parents the world PickableObject directly to the body arm container item so
-    /// non-owner clients see it at the correct third-person position with zero lag.
+    /// Registers the world PickableObject and its body-arm target so LateUpdate can
+    /// snap it to the target's world transform every frame.
+    /// LateUpdate runs after animation, so the target bone is already at its final
+    /// position for this frame — no constraint evaluation delay and no parenting side-effects.
     /// </summary>
     private void ApplyBodyConstraint()
     {
@@ -541,30 +563,31 @@ public class PlayerPickupController : NetworkBehaviour
         if (rb != null) rb.isKinematic = true;
 
         netObj.AutoObjectParentSync = false;
-        worldObj.RemoveParent();
-        // Parent to the container itself, positioned/rotated to match the slot — same logic as the owner path.
-        Transform bodyContainerRoot = _bodyCurrentlyEquippedItem.transform.parent;
-        worldObj.transform.SetParent(bodyContainerRoot, false);
-        worldObj.transform.localPosition = _bodyCurrentlyEquippedItem.transform.localPosition;
-        worldObj.transform.localRotation = _bodyCurrentlyEquippedItem.transform.localRotation;
+
+        _followWorldObj = worldObj;
+        _followTarget   = _bodyCurrentlyEquippedItem.transform;
+        _followNT       = worldObj.GetComponent<NetworkTransform>();
     }
 
-    /// <summary>Unparents the world object from the body arm and restores physics and NetworkTransform.</summary>
+    /// <summary>Clears the LateUpdate follow and restores physics. NT is re-enabled by
+    /// DropBroadcastClientRpc on PickableObject, which sets the correct drop position first —
+    /// re-enabling NT here would snap it to its stale interpolation buffer instead.</summary>
     private void RemoveBodyConstraint(NetworkObjectReference objectRef)
     {
+        _followWorldObj = null;
+        _followTarget   = null;
+        _followNT       = null;
+
         if (!objectRef.TryGet(out NetworkObject netObj)) return;
 
         PickableObject worldObj = netObj.GetComponent<PickableObject>();
         if (worldObj == null) return;
 
-        worldObj.transform.SetParent(null, true);
+        worldObj.RemoveParent();
         netObj.AutoObjectParentSync = true;
 
         Rigidbody rb = worldObj.GetComponent<Rigidbody>();
         if (rb != null) rb.isKinematic = false;
-
-        NetworkTransform nt = worldObj.GetComponent<NetworkTransform>();
-        if (nt != null) nt.enabled = true;
     }
 
     void DisableArmIKs(PickableObject target = null)

@@ -98,13 +98,41 @@ public class PickableObject : Interactable
     /// <summary>
     /// Sets the world position and rotation on the server before releasing ownership,
     /// so NetworkTransform propagates the correct drop location to all clients.
+    /// After setting the authoritative transform, a ClientRpc broadcasts the drop position
+    /// to every client so they can position the object correctly before re-enabling NT —
+    /// preventing NT from snapping to its stale interpolation buffer (the held position at
+    /// pickup time, which may differ if the character moved while carrying the object).
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void DropServerRpc(Vector3 position, Quaternion rotation)
     {
+        RemoveParent();
+
         transform.position = position;
         transform.rotation = rotation;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
         NetworkObject.RemoveOwnership();
+
+        // Tell every client the exact drop position so they set it before re-enabling NT.
+        DropBroadcastClientRpc(position, rotation);
+    }
+
+    /// <summary>
+    /// Received on all clients after a drop. Sets the drop position before re-enabling NT
+    /// so NT never has a chance to interpolate from its stale pre-pickup buffer position.
+    /// </summary>
+    [ClientRpc]
+    private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation)
+    {
+        RemoveParent();
+        transform.position = position;
+        transform.rotation = rotation;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
     }
 
     public virtual void OnPickedUp()
@@ -127,6 +155,11 @@ public class PickableObject : Interactable
         }
     }
 
+    /// <summary>
+    /// Activates the ParentConstraint to track the given transform with zero offset.
+    /// Call this after pre-positioning the object at the source world transform so
+    /// the constraint locks in at exactly the source location.
+    /// </summary>
     public void SetParent(Transform parent)
     {
         ConstraintSource source = new ConstraintSource();
@@ -134,12 +167,16 @@ public class PickableObject : Interactable
         source.sourceTransform = parent;
         source.weight = 1;
         _parentConstraint.AddSource(source);
+        _parentConstraint.SetTranslationOffset(0, Vector3.zero);
+        _parentConstraint.SetRotationOffset(0, Vector3.zero);
         _parentConstraint.constraintActive = true;
     }
 
+    /// <summary>Deactivates the ParentConstraint and removes all sources.</summary>
     public void RemoveParent()
     {
         transform.parent = null;
+        _parentConstraint.constraintActive = false;
         if (_parentConstraint.sourceCount > 0)
         {
             _parentConstraint.RemoveSource(0);
