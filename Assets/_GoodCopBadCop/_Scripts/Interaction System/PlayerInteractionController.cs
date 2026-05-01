@@ -67,14 +67,20 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
+        // Left click: pick up items and use item-on-item interactions
         if (Input.GetMouseButtonDown(0))
         {
-            if (!TryInteract())
+            if (!TryPickupOrItemInteract())
             {
                 Debug.Log("Can Not Interact");
-                // This is where you would call UseObject if interaction failed
-                _playerPickupController.TryUseObject(); 
+                _playerPickupController.TryUseObject();
             }
+        }
+
+        // E key: interact with non-pickup interactables (doors, levers, etc.)
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            TryWorldInteract();
         }
     }
     
@@ -121,7 +127,8 @@ public class PlayerInteractionController : NetworkBehaviour
             {
                 if (inRange)
                 {
-                    reticle.SetInteractState(true, interactable.interactText);
+                    bool isWorldInteract = interactable is not PickableObject;
+                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -225,53 +232,75 @@ public class PlayerInteractionController : NetworkBehaviour
         reticleActive = value;
     }
 
-    bool TryInteract()
+    /// <summary>
+    /// Handles left-click: picks up PickableObjects and performs item-on-item interactions.
+    /// Returns true if an interaction was consumed.
+    /// </summary>
+    bool TryPickupOrItemInteract()
     {
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
+        if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
+            return false;
+
+        Interactable interactable = hit.collider.GetComponent<Interactable>();
+        InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
+
+        if (interactableCollider != null)
+            interactable = interactableCollider.Interactable;
+
+        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
+            return false;
+
+        if (interactable == null || !interactable.enabled)
+            return false;
+
+        // Item-on-item interaction takes priority regardless of interactable type
+        if (pickupController.HeldObject != null)
         {
-            Interactable interactable = hit.collider.GetComponent<Interactable>();
-            InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
-
-            if (interactableCollider != null)
+            if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
             {
-                interactable = interactableCollider.Interactable;
-            }
-
-            if (onlyAllowedInteractable != null)
-            {
-                if (interactable != onlyAllowedInteractable)
-                {
-                    return false;
-                }
-            }
-
-            if (interactable == null)
-            {
-                return false;
-            }
-
-            if (pickupController.HeldObject != null)
-            {
-                if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
-                {
-                    interactable.InteractWithItem(this, pickupController.HeldObject);
-                    _playerPickupController.TryUseObject();
-                    return true;
-                }
-
-                Debug.Log("Held Object is not compatible with this object");
-                return false;
-            }
-
-            if (interactable != null && interactable.enabled)
-            {
-                interactable.Interact(this);
+                interactable.InteractWithItem(this, pickupController.HeldObject);
+                _playerPickupController.TryUseObject();
                 return true;
             }
+
+            Debug.Log("Held Object is not compatible with this object");
+            return false;
+        }
+
+        // Only allow picking up PickableObjects on left click
+        if (interactable is PickableObject)
+        {
+            interactable.Interact(this);
+            return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Handles E key: interacts with non-pickup interactables such as doors and levers.
+    /// </summary>
+    void TryWorldInteract()
+    {
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+
+        if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
+            return;
+
+        Interactable interactable = hit.collider.GetComponent<Interactable>();
+        InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
+
+        if (interactableCollider != null)
+            interactable = interactableCollider.Interactable;
+
+        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
+            return;
+
+        if (interactable == null || !interactable.enabled)
+            return;
+
+        interactable.Interact(this);
     }
 }

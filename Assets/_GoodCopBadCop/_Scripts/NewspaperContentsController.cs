@@ -14,6 +14,7 @@ public class NewspaperContentsController : MonoBehaviour
 
     private void Start()
     {
+        ShiftManager.Instance.OnShiftReady += PopulateNewspaperContents;
         ShiftManager.Instance.OnShiftStart += PopulateNewspaperContents;
     }
 

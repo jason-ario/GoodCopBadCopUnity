@@ -200,7 +200,7 @@ public class EndOfShiftReportUI : MonoBehaviour
     public void OnContinueButtonPressed()
     {
         HideAll();
-        ShiftManager.Instance.SetNextShiftReady();
+        ShiftManager.Instance.StartNewShift();
     }
     
 }

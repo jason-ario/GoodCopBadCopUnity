@@ -54,7 +54,13 @@ public class ReticleController : MonoBehaviour
         );
     }
 
-    public void SetInteractState(bool state, string text = "")
+    /// <summary>
+    /// Updates the interact reticle state and label.
+    /// </summary>
+    /// <param name="state">Whether the reticle is in interact mode.</param>
+    /// <param name="text">Label to display next to the input hint.</param>
+    /// <param name="useKeyPrompt">When true, shows the E-key prompt instead of the mouse-click sprite.</param>
+    public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false)
     {
         canInteract = state;
         if (state) isTooFar = false;
@@ -62,7 +68,7 @@ public class ReticleController : MonoBehaviour
         if (state == true && text != "")
         {
             doText.gameObject.SetActive(true);
-            doText.text = text + " <sprite=0>";
+            doText.text = useKeyPrompt ? $"[E] {text}" : $"{text} <sprite=0>";
         }
         else
         {

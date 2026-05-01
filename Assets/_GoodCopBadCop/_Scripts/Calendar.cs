@@ -10,7 +10,13 @@ public class Calendar : MonoBehaviour
 
     private void Start()
     {
+        ShiftManager.Instance.OnShiftReady += OnShiftReady;
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
+    }
+
+    void OnShiftReady()
+    {
+        SetDate(ShiftManager.Instance.currentMonth, ShiftManager.Instance.currentDay, ShiftManager.Instance.currentYear);
     }
 
     void OnShiftStart()

@@ -164,6 +164,7 @@ public class UIController : MonoBehaviour
 
     public void ShowEndShiftReport(List<EndOfShiftReportUI.ReportRowData> reportRowDatas)
     {
+        ShowCursor();
         endOfShiftReportUI.PlayReport(reportRowDatas);
     }
 
