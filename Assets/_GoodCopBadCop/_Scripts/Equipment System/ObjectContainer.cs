@@ -128,5 +128,9 @@ public class ObjectContainer : MonoBehaviour
                 DestroyImmediate(child.gameObject);
             }
         }
+        
+        #if UNITY_EDITOR
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+        #endif
     }
 }

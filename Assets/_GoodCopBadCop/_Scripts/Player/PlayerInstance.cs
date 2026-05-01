@@ -29,9 +29,6 @@ public class PlayerInstance : NetworkBehaviour
         _playerInteractionController = GetComponent<PlayerInteractionController>();
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
-        
-        Instance = this;
-
     }
 
     public void SetIsOutside(bool value)

@@ -83,6 +83,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3ecd8f213326c63429ae29fb0b6d1ddd, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7388997223057164965}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3ecd8f213326c63429ae29fb0b6d1ddd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2203770111730622586}
   m_SourcePrefab: {fileID: 100100000, guid: 3ecd8f213326c63429ae29fb0b6d1ddd, type: 3}
 --- !u!1 &6708014905591463952 stripped
 GameObject:
@@ -101,7 +104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2219854166
+  GlobalObjectIdHash: 682344253
   InScenePlacedSourceGlobalObjectIdHash: 682344253
   DeferredDespawnTick: 0
   Ownership: 1
@@ -132,6 +135,7 @@ MonoBehaviour:
   itemData: {fileID: 11400000, guid: 7e9da4fcec610e64a92059e8f29988a0, type: 2}
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
+  batteryCapacity: 1
 --- !u!1773428102 &5491336786291702460
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -376,3 +380,49 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.5, y: 0.5, z: 0.5910112}
   m_Center: {x: 0, y: 3.547916e-15, z: -0.045505613}
+--- !u!114 &2203770111730622586
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6708014905591463952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkTransform
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkTransformExpanded: 0
+  AutoOwnerAuthorityTickOffset: 1
+  PositionInterpolationType: 0
+  RotationInterpolationType: 0
+  ScaleInterpolationType: 0
+  PositionLerpSmoothing: 1
+  PositionMaxInterpolationTime: 0.1
+  RotationLerpSmoothing: 1
+  RotationMaxInterpolationTime: 0.1
+  ScaleLerpSmoothing: 1
+  ScaleMaxInterpolationTime: 0.1
+  AuthorityMode: 1
+  TickSyncChildren: 0
+  UseUnreliableDeltas: 0
+  SyncPositionX: 1
+  SyncPositionY: 1
+  SyncPositionZ: 1
+  SyncRotAngleX: 1
+  SyncRotAngleY: 1
+  SyncRotAngleZ: 1
+  SyncScaleX: 1
+  SyncScaleY: 1
+  SyncScaleZ: 1
+  PositionThreshold: 0.001
+  RotAngleThreshold: 0.01
+  ScaleThreshold: 0.01
+  UseQuaternionSynchronization: 0
+  UseQuaternionCompression: 0
+  UseHalfFloatPrecision: 0
+  InLocalSpace: 0
+  SwitchTransformSpaceWhenParented: 0
+  Interpolate: 1
+  SlerpPosition: 0

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -39,6 +40,16 @@ public class PlayerPickupController : NetworkBehaviour
     public PlayerMovementController PlayerMovementController => _playerMovementController;
 
     private NetworkVariable<int> itemEquippedIndex = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Broadcasts which world NetworkObject is currently held so non-owner clients
+    /// can constrain it to the body arm container instead of the camera arm container.
+    /// </summary>
+    private NetworkVariable<NetworkObjectReference> _heldObjectRef = new NetworkVariable<NetworkObjectReference>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner);
+
     private float pickUpUseCooldownTimer = .2f;
     private bool pickUpCooldownComplete = false;
 
@@ -59,6 +70,7 @@ public class PlayerPickupController : NetworkBehaviour
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         objectContainers = GetComponentsInChildren<ObjectContainer>(true);
         itemEquippedIndex.OnValueChanged += OnItemValueChanged;
+        _heldObjectRef.OnValueChanged += OnHeldObjectRefChanged;
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerInteractionController = gameObject.GetComponent<PlayerInteractionController>();
     }
@@ -95,6 +107,12 @@ public class PlayerPickupController : NetworkBehaviour
         rightArmBodyObjectContainer.EquipItem(itemData, this);
 
         _bodyCurrentlyEquippedItem = rightArmBodyObjectContainer.CurrentlyEquippedItem;
+
+        // Non-owner clients constrain the world object to the body arm so they see it there.
+        // (Owner already constrained it to the camera arm in PickUpObject.)
+        // This also acts as a fallback if _heldObjectRef arrived before itemEquippedIndex.
+        if (!IsOwner)
+            ApplyBodyConstraint();
 
         if (itemData.useRightIK)
         {
@@ -177,7 +195,6 @@ public class PlayerPickupController : NetworkBehaviour
             }
         }
     }
-    
 
     public void TryUseObject()
     {
@@ -320,6 +337,10 @@ public class PlayerPickupController : NetworkBehaviour
         {
             return;
         }
+
+        // Transfer ownership to this client so NetworkTransform replicates from our side
+        pickableObject.RequestOwnershipServerRpc();
+        pickableObject.ClaimHolderServerRpc();
         
         PickableItemData itemData = pickableObject.ItemData;
         _heldObject = pickableObject;
@@ -351,21 +372,25 @@ public class PlayerPickupController : NetworkBehaviour
             Rigidbody rb = pickableObject.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = true;
 
-            // Match the slot's local transform, then hide the slot placeholder
             ObjectContainer currentObjectContainer = itemData.hand == PickableItemData.Hand.Right ? rightArmCamObjectContainer : leftArmCamObjectContainer;
             PickableObject itemInContainer = null;
             
             foreach (var item in currentObjectContainer.ItemsHeld)
             {
                 if (item.ItemData == itemData)
-                {
                     itemInContainer = item;
-                }
             }
 
-            pickableObject.SetParent(itemInContainer.transform);
-            pickableObject.transform.position = itemInContainer.transform.position;
-            pickableObject.transform.rotation = itemInContainer.transform.rotation;
+            // Direct transform parenting — zero lag, no constraint delay.
+            // Parent to the container itself but adopt the slot's local position/rotation
+            // so the object sits exactly where the slot dictates without being a grandchild of it.
+            // AutoObjectParentSync is disabled so NGO does not replicate this local parent
+            // change; each client sets its own arm-appropriate parent independently.
+            pickableObject.NetworkObject.AutoObjectParentSync = false;
+            pickableObject.RemoveParent();
+            pickableObject.transform.SetParent(currentObjectContainer.transform, false);
+            pickableObject.transform.localPosition = itemInContainer.transform.localPosition;
+            pickableObject.transform.localRotation = itemInContainer.transform.localRotation;
         }
 
         if (itemData.useRightIK)
@@ -387,6 +412,14 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         pickableObject.OnPickedUp();
+        _heldObjectRef.Value = new NetworkObjectReference(pickableObject.NetworkObject);
+
+        // Disable NetworkTransform while held — ParentConstraint drives position on all
+        // clients (camera arm for the owner, body arm for observers), so interpolation
+        // from NetworkTransform would only cause lag.
+        NetworkTransform nt = pickableObject.GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
         StartCoroutine(PickUpCoolDown());
     }
     
@@ -420,16 +453,25 @@ public class PlayerPickupController : NetworkBehaviour
             Vector3 dropPos = dropPoint != null ? dropPoint.position : (placementItem != null ? placementItem.transform.position : _heldObject.transform.position);
             Quaternion dropRot = dropPoint != null ? dropPoint.rotation : (placementItem != null ? placementItem.transform.rotation : _heldObject.transform.rotation);
 
-            // Return to the world
-            _heldObject.RemoveParent();
+            // Unparent and restore sync locally first.
+            _heldObject.transform.SetParent(null, true);
+            _heldObject.NetworkObject.AutoObjectParentSync = true;
             _heldObject.transform.position = dropPos;
             _heldObject.transform.rotation = dropRot;
-            
+
+            // Send drop position to the server before releasing ownership so the server
+            // sets the authoritative transform first — preventing NetworkTransform from
+            // snapping the object back to the pre-pickup position on non-host clients.
+            _heldObject.DropServerRpc(dropPos, dropRot);
+            _heldObject.ReleaseHolderServerRpc();
+
+            // Re-enable NetworkTransform so the resting position propagates to all clients.
+            NetworkTransform nt = _heldObject.GetComponent<NetworkTransform>();
+            if (nt != null) nt.enabled = true;
+
             if (dropPoint != null)
-            {
                 _heldObject.SetParent(dropPoint);
-            }
-            
+
             _heldObject.OnDropped();
         }
 
@@ -444,10 +486,85 @@ public class PlayerPickupController : NetworkBehaviour
         _bodyCurrentlyEquippedItem = null;
         _heldObject = null;
         _heldObject = null;
+        _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
         
         ObjectPlacer.Instance.DeactivatePlacer();
+    }
+
+    // =====================================================================
+    // Non-owner body-arm constraint sync
+    // =====================================================================
+
+    /// <summary>
+    /// Fired on all clients when the held object reference changes.
+    /// Non-owner clients use this to remove the body-arm constraint on drop,
+    /// and as a secondary pickup path if _heldObjectRef arrives before itemEquippedIndex.
+    /// </summary>
+    private void OnHeldObjectRefChanged(NetworkObjectReference previousValue, NetworkObjectReference newValue)
+    {
+        if (IsOwner) return;
+
+        bool wasHolding = previousValue.NetworkObjectId != 0;
+        bool isHolding  = newValue.NetworkObjectId != 0;
+
+        if (wasHolding && !isHolding)
+        {
+            // Dropped — remove the body constraint using the previous ref
+            RemoveBodyConstraint(previousValue);
+        }
+        else if (isHolding)
+        {
+            // Picked up — try to apply now; if body item isn't ready yet,
+            // OnItemValueChanged will call ApplyBodyConstraint once it is.
+            ApplyBodyConstraint();
+        }
+    }
+
+    /// <summary>
+    /// Parents the world PickableObject directly to the body arm container item so
+    /// non-owner clients see it at the correct third-person position with zero lag.
+    /// </summary>
+    private void ApplyBodyConstraint()
+    {
+        if (_bodyCurrentlyEquippedItem == null) return;
+        if (!_heldObjectRef.Value.TryGet(out NetworkObject netObj)) return;
+
+        PickableObject worldObj = netObj.GetComponent<PickableObject>();
+        if (worldObj == null) return;
+
+        NetworkTransform nt = worldObj.GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
+        Rigidbody rb = worldObj.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+
+        netObj.AutoObjectParentSync = false;
+        worldObj.RemoveParent();
+        // Parent to the container itself, positioned/rotated to match the slot — same logic as the owner path.
+        Transform bodyContainerRoot = _bodyCurrentlyEquippedItem.transform.parent;
+        worldObj.transform.SetParent(bodyContainerRoot, false);
+        worldObj.transform.localPosition = _bodyCurrentlyEquippedItem.transform.localPosition;
+        worldObj.transform.localRotation = _bodyCurrentlyEquippedItem.transform.localRotation;
+    }
+
+    /// <summary>Unparents the world object from the body arm and restores physics and NetworkTransform.</summary>
+    private void RemoveBodyConstraint(NetworkObjectReference objectRef)
+    {
+        if (!objectRef.TryGet(out NetworkObject netObj)) return;
+
+        PickableObject worldObj = netObj.GetComponent<PickableObject>();
+        if (worldObj == null) return;
+
+        worldObj.transform.SetParent(null, true);
+        netObj.AutoObjectParentSync = true;
+
+        Rigidbody rb = worldObj.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = false;
+
+        NetworkTransform nt = worldObj.GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
     }
 
     void DisableArmIKs(PickableObject target = null)
@@ -507,7 +624,9 @@ public class PlayerPickupController : NetworkBehaviour
         // Clear state before despawn so DropObject is never called on a destroyed object
         _camEquippedItem = null;
         _bodyCurrentlyEquippedItem = null;
+        heldObject.ReleaseHolderServerRpc();
         _heldObject = null;
+        _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
 
         DisableArmIKs(heldObject);

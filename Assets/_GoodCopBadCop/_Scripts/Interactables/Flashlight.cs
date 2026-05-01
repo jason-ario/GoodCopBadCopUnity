@@ -11,6 +11,21 @@ public class Flashlight : PickableObject
     private InternalBattery internalBattery;
     private NetworkVariable<bool> _isOn = new NetworkVariable<bool>(false);
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _isOn.OnValueChanged += OnIsOnChanged;
+
+        // Sync the light state for late-joining clients.
+        flashlightLight.SetActive(_isOn.Value);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _isOn.OnValueChanged -= OnIsOnChanged;
+    }
+
     void Start()
     {
         internalBattery = GetComponent<InternalBattery>();
@@ -23,6 +38,13 @@ public class Flashlight : PickableObject
         {
             internalBattery.DrainBattery();
         }
+    }
+
+    /// <summary>Reacts to _isOn changes on all clients, driving the light and audio.</summary>
+    private void OnIsOnChanged(bool previous, bool current)
+    {
+        flashlightLight.SetActive(current);
+        audioSource.PlayOneShot(current ? flashlightOnClip : flashlightOffClip);
     }
 
     public override void OnStartUse()
@@ -58,17 +80,15 @@ public class Flashlight : PickableObject
         }
 
         _isOn.Value = !_isOn.Value;
-        flashlightLight.SetActive(_isOn.Value);
-        audioSource.PlayOneShot(_isOn.Value ? flashlightOnClip : flashlightOffClip);
     }
 
     [Rpc(SendTo.Server)]
     private void TurnOffServerRpc()
     {
         _isOn.Value = false;
-        flashlightLight.SetActive(false);
     }
 
+    /// <summary>Returns the current battery level from the internal battery component.</summary>
     public float GetBatteryLevel()
     {
         return internalBattery?.GetBatteryLevel() ?? 0f;

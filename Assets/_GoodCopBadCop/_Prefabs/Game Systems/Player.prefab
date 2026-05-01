@@ -92,8 +92,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.451, z: 0}
+  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
+  m_LocalPosition: {x: -1.9593265, y: 1.8317341, z: 11.315362}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -131,9 +131,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.12
+  near clip plane: 0.1
   far clip plane: 5000
-  field of view: 65
+  field of view: 60
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -977,11 +977,11 @@ GameObject:
   - component: {fileID: 371220573109159834}
   - component: {fileID: 7541639783584628704}
   - component: {fileID: 7132022092377744834}
-  - component: {fileID: 4843346619952356873}
   - component: {fileID: 5796914842617989879}
   - component: {fileID: 389268076241102053}
   - component: {fileID: 2434796521106099578}
   - component: {fileID: 4149005155147749124}
+  - component: {fileID: 4524794853849239444}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -1053,7 +1053,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4229621594
+  GlobalObjectIdHash: 1936807553
   InScenePlacedSourceGlobalObjectIdHash: 4229621594
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1311,49 +1311,6 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!114 &4843346619952356873
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2953290070593623070}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
-  ShowTopMostFoldoutHeaderGroup: 1
-  TransitionStateInfoList:
-  - IsCrossFadeExit: 0
-    Layer: 2
-    OriginatingState: 776543318
-    DestinationState: -1628668092
-    TransitionDuration: 0.046509624
-    TriggerNameHash: -1316629574
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 2
-    OriginatingState: 1679735006
-    DestinationState: 2119640166
-    TransitionDuration: 0.25
-    TriggerNameHash: 1920565635
-    TransitionIndex: 2
-  - IsCrossFadeExit: 0
-    Layer: 2
-    OriginatingState: -223055991
-    DestinationState: 2119640166
-    TransitionDuration: 0.25
-    TriggerNameHash: 1920565635
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 3
-    OriginatingState: 753088835
-    DestinationState: 1783648139
-    TransitionDuration: 0.25
-    TriggerNameHash: 207596745
-    TransitionIndex: 0
-  m_Animator: {fileID: 5651200760162566270}
 --- !u!114 &5796914842617989879
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1452,6 +1409,49 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff1ecd0df9b347642ac87ac8a533b621, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!114 &4524794853849239444
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99cbb7b25abc9f24eb9bd32f01f2e569, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OwnerNetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  TransitionStateInfoList:
+  - IsCrossFadeExit: 0
+    Layer: 2
+    OriginatingState: 776543318
+    DestinationState: -1628668092
+    TransitionDuration: 0.046509624
+    TriggerNameHash: -1316629574
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 2
+    OriginatingState: 1679735006
+    DestinationState: 2119640166
+    TransitionDuration: 0.25
+    TriggerNameHash: 1920565635
+    TransitionIndex: 2
+  - IsCrossFadeExit: 0
+    Layer: 2
+    OriginatingState: -223055991
+    DestinationState: 2119640166
+    TransitionDuration: 0.25
+    TriggerNameHash: 1920565635
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: 753088835
+    DestinationState: 1783648139
+    TransitionDuration: 0.25
+    TriggerNameHash: 207596745
+    TransitionIndex: 0
+  m_Animator: {fileID: 5651200760162566270}
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0
@@ -3841,15 +3841,15 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 189642f261280254eaa90ff435dde06a, type: 2}
     - target: {fileID: 6373873255720993806, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6373873255720993806, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6373873255720993806, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6850353594364378913, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LocalPosition.x

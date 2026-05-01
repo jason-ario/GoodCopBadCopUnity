@@ -79,6 +79,24 @@ public class PlayerAnimationController : NetworkBehaviour
         new NetworkVariable<Vector3>(
             writePerm: NetworkVariableWritePermission.Owner
         );
+
+    private NetworkVariable<float> netMoveX =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<float> netMoveZ =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<bool> netIsRunning =
+        new NetworkVariable<bool>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<float> netLayer1Weight =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<float> netLayer2Weight =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<float> netLayer4Weight =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
     
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
@@ -158,6 +176,17 @@ public class PlayerAnimationController : NetworkBehaviour
         else
         {
             armsOnBody.GetComponent<SkinnedMeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+
+            // Hide the head bone so it doesn't clip into the local player's camera view.
+            Transform headBone = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
+            if (headBone != null)
+            {
+                headBone.localScale = Vector3.zero;
+            }
+            else
+            {
+                Debug.LogWarning("[PlayerAnimationController] Head bone not found on bodyAnimator. Ensure the avatar is configured as Humanoid.", this);
+            }
         }
     }
 
@@ -167,6 +196,21 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             headLookAtTransform.position = headLookAtPos.Value;
             chestLookAtTransform.position = chestLookAtPos.Value;
+
+            // Apply movement and running state from the owner to this proxy's animators.
+            bodyAnimator.SetFloat("MoveX", netMoveX.Value);
+            bodyAnimator.SetFloat("MoveZ", netMoveZ.Value);
+            armsAnimator.SetFloat("MoveX", netMoveX.Value);
+            armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
+            bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
+
+            // Apply layer weights from the owner.
+            bodyAnimator.SetLayerWeight(1, netLayer1Weight.Value);
+            armsAnimator.SetLayerWeight(1, netLayer1Weight.Value);
+            bodyAnimator.SetLayerWeight(2, netLayer2Weight.Value);
+            armsAnimator.SetLayerWeight(2, netLayer2Weight.Value);
+            bodyAnimator.SetLayerWeight(4, netLayer4Weight.Value);
+            armsAnimator.SetLayerWeight(4, netLayer4Weight.Value);
             return;
         }
 
@@ -178,7 +222,11 @@ public class PlayerAnimationController : NetworkBehaviour
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
 
         bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-        
+
+        netMoveX.Value = currentMoveX;
+        netMoveZ.Value = currentMoveZ;
+        netIsRunning.Value = isRunning;
+
         bodyAnimator.SetBool("IsRunning", isRunning);
         
         // Set the smoothed values to the animator
@@ -191,6 +239,10 @@ public class PlayerAnimationController : NetworkBehaviour
         currentLayer1Weight = Mathf.Lerp(currentLayer1Weight, targetLayer1Weight, Time.deltaTime * animLerpSpeed);
         currentLayer2Weight = Mathf.Lerp(currentLayer2Weight, targetLayer2Weight, Time.deltaTime * animLerpSpeed);
         currentLayer4Weight = Mathf.Lerp(currentLayer4Weight, targetLayer4Weight, Time.deltaTime * animLerpSpeed);
+
+        netLayer1Weight.Value = currentLayer1Weight;
+        netLayer2Weight.Value = currentLayer2Weight;
+        netLayer4Weight.Value = currentLayer4Weight;
 
         bodyAnimator.SetLayerWeight(1, currentLayer1Weight);
         armsAnimator.SetLayerWeight(1, currentLayer1Weight);

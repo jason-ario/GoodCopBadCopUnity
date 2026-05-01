@@ -7,6 +7,7 @@ using UnityEngine.Animations;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(ParentConstraint))]
+[RequireComponent(typeof(NetworkTransform))]
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
@@ -25,9 +26,37 @@ public class PickableObject : Interactable
 
     public bool CanPickUpManually { get; set; } = true;
 
+    /// <summary>
+    /// The client ID of the player currently holding this object.
+    /// Set to ulong.MaxValue when no one is holding it.
+    /// </summary>
+    private NetworkVariable<ulong> _holdingClientId = new NetworkVariable<ulong>(
+        ulong.MaxValue,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Returns true if another player (not the local client) is currently holding this object.</summary>
+    public bool IsHeldByOtherPlayer => _holdingClientId.Value != ulong.MaxValue &&
+                                       _holdingClientId.Value != NetworkManager.Singleton.LocalClientId;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        _holdingClientId.OnValueChanged += OnHoldingClientChanged;
+
+        // Sync collider state to the current network value on late-joining clients.
+        SetInteractable(_holdingClientId.Value == ulong.MaxValue);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _holdingClientId.OnValueChanged -= OnHoldingClientChanged;
+    }
+
+    private void OnHoldingClientChanged(ulong previous, ulong current)
+    {
+        SetInteractable(current == ulong.MaxValue);
     }
 
     protected override void Awake()
@@ -36,6 +65,46 @@ public class PickableObject : Interactable
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
         interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
+    }
+
+    /// <summary>Registers the caller as the player holding this object on the server.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ClaimHolderServerRpc(ServerRpcParams rpcParams = default)
+    {
+        _holdingClientId.Value = rpcParams.Receive.SenderClientId;
+    }
+
+    /// <summary>Clears the holder registration on the server, making the object free to grab.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ReleaseHolderServerRpc()
+    {
+        _holdingClientId.Value = ulong.MaxValue;
+    }
+
+    /// <summary>Transfers NetworkObject ownership to the requesting client.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestOwnershipServerRpc(ServerRpcParams rpcParams = default)
+    {
+        NetworkObject.ChangeOwnership(rpcParams.Receive.SenderClientId);
+    }
+
+    /// <summary>Returns NetworkObject ownership back to the server.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ReleaseOwnershipServerRpc()
+    {
+        NetworkObject.RemoveOwnership();
+    }
+
+    /// <summary>
+    /// Sets the world position and rotation on the server before releasing ownership,
+    /// so NetworkTransform propagates the correct drop location to all clients.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void DropServerRpc(Vector3 position, Quaternion rotation)
+    {
+        transform.position = position;
+        transform.rotation = rotation;
+        NetworkObject.RemoveOwnership();
     }
 
     public virtual void OnPickedUp()
@@ -119,6 +188,7 @@ public class PickableObject : Interactable
         base.Interact(player);
         
         if (!CanPickUpManually) return;
+        if (IsHeldByOtherPlayer) return;
         player.pickupController.PickUpObject(this);
     }
 
