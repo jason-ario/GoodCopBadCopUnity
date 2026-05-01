@@ -1,7 +1,8 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class ShiftClockController : MonoBehaviour
+public class ShiftClockController : NetworkBehaviour
 {
     [Header("Clock Hands")]
     [SerializeField] private Transform hourHand;
@@ -36,57 +37,82 @@ public class ShiftClockController : MonoBehaviour
     [Header("Events")]
     public UnityEvent onShiftEnd;
 
-    public bool ShiftEnded => shiftEnded;
-    public float CurrentTimeInHours => currentTimeMinutes / 60f;
-    public int CurrentHour24 => Mathf.FloorToInt(currentTimeMinutes / 60f) % 24;
-    public int CurrentMinute => Mathf.FloorToInt(currentTimeMinutes) % 60;
+    // Server-authoritative time synced to all clients
+    private NetworkVariable<float> _networkTimeMinutes = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
-    private float currentTimeMinutes;
-    private float endTimeMinutes;
-    private bool shiftEnded;
+    public bool ShiftEnded => _shiftEnded;
+    public float CurrentTimeInHours => _networkTimeMinutes.Value / 60f;
+    public int CurrentHour24 => Mathf.FloorToInt(_networkTimeMinutes.Value / 60f) % 24;
+    public int CurrentMinute => Mathf.FloorToInt(_networkTimeMinutes.Value) % 60;
 
-    private void Start()
+    private float _endTimeMinutes;
+    private bool _shiftEnded;
+
+    public override void OnNetworkSpawn()
     {
-        SetTime(startHour, startMinute);
-        endTimeMinutes = endHour * 60f;
+        base.OnNetworkSpawn();
+        _endTimeMinutes = endHour * 60f;
 
-        UpdateClockVisuals();
+        if (IsServer)
+        {
+            _networkTimeMinutes.Value = startHour * 60f + startMinute;
+        }
+
+        _networkTimeMinutes.OnValueChanged += OnTimeChanged;
+
+        UpdateClockVisuals(_networkTimeMinutes.Value);
         CheckImmediateShiftEnd();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _networkTimeMinutes.OnValueChanged -= OnTimeChanged;
+    }
+
+    private void OnTimeChanged(float oldValue, float newValue)
+    {
+        UpdateClockVisuals(newValue);
     }
 
     private void Update()
     {
-        if (shiftEnded)
-            return;
+        if (!IsServer) return;
+        if (_shiftEnded) return;
 
-        float previousTime = currentTimeMinutes;
-        currentTimeMinutes += gameMinutesPerSecond * Time.deltaTime;
+        float previousTime = _networkTimeMinutes.Value;
+        _networkTimeMinutes.Value += gameMinutesPerSecond * Time.deltaTime;
 
-        UpdateClockVisuals();
-
-        if (previousTime < endTimeMinutes && currentTimeMinutes >= endTimeMinutes)
+        if (previousTime < _endTimeMinutes && _networkTimeMinutes.Value >= _endTimeMinutes)
         {
-            currentTimeMinutes = endTimeMinutes;
-            UpdateClockVisuals();
-
-            shiftEnded = true;
-            onShiftEnd?.Invoke();
+            _networkTimeMinutes.Value = _endTimeMinutes;
+            _shiftEnded = true;
+            TriggerShiftEndClientRpc();
         }
+    }
+
+    [ClientRpc]
+    private void TriggerShiftEndClientRpc()
+    {
+        _shiftEnded = true;
+        onShiftEnd?.Invoke();
     }
 
     public void SetTime(int hour24, int minute)
     {
+        if (!IsServer) return;
         hour24 = Mathf.Clamp(hour24, 0, 23);
         minute = Mathf.Clamp(minute, 0, 59);
-
-        currentTimeMinutes = hour24 * 60f + minute;
-        UpdateClockVisuals();
+        _networkTimeMinutes.Value = hour24 * 60f + minute;
     }
 
     public void SetTime(float totalMinutes)
     {
-        currentTimeMinutes = Mathf.Max(0f, totalMinutes);
-        UpdateClockVisuals();
+        if (!IsServer) return;
+        _networkTimeMinutes.Value = Mathf.Max(0f, totalMinutes);
     }
 
     public void PauseClock()
@@ -101,28 +127,31 @@ public class ShiftClockController : MonoBehaviour
 
     public void StopClock()
     {
-        shiftEnded = true;
+        _shiftEnded = true;
     }
 
     public void RestartShift()
     {
-        shiftEnded = false;
-        currentTimeMinutes = startHour * 60f + startMinute;
-        endTimeMinutes = endHour * 60f;
-        UpdateClockVisuals();
+        _shiftEnded = false;
+        if (IsServer)
+        {
+            _networkTimeMinutes.Value = startHour * 60f + startMinute;
+            _endTimeMinutes = endHour * 60f;
+        }
+        UpdateClockVisuals(_networkTimeMinutes.Value);
         CheckImmediateShiftEnd();
     }
 
     private void CheckImmediateShiftEnd()
     {
-        if (currentTimeMinutes >= endTimeMinutes)
+        if (_networkTimeMinutes.Value >= _endTimeMinutes)
         {
-            shiftEnded = true;
+            _shiftEnded = true;
             onShiftEnd?.Invoke();
         }
     }
 
-    private void UpdateClockVisuals()
+    private void UpdateClockVisuals(float currentTimeMinutes)
     {
         float minutesOn12HourClock = currentTimeMinutes % 720f;
         float minuteInHour = currentTimeMinutes % 60f;

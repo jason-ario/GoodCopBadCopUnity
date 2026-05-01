@@ -78,8 +78,9 @@ public class SimpleNetworkUI : MonoBehaviour
         }
         else if (transport is UnityTransport unityTransport)
         {
-            // Simple LAN fallback
+            // Simple LAN fallback — connect to host running in the other editor window
             unityTransport.SetConnectionData("127.0.0.1", 7777);
+            NetworkManager.Singleton.StartClient();
 
             uiRoot.SetActive(false);
         }

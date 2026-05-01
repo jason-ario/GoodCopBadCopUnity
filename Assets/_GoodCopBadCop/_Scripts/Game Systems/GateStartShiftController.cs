@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class GateStartShiftController : Interactable
@@ -11,13 +12,21 @@ public class GateStartShiftController : Interactable
         UIController.Instance.OpenStartShiftScreen();
     }
 
+    /// <summary>Opens the gate on all clients. Must be called on the server.</summary>
     public void OpenGate()
     {
-        gateAnimator.SetBool("Open", true);
+        SetGateOpenClientRpc(true);
     }
-    
+
+    /// <summary>Closes the gate on all clients. Must be called on the server.</summary>
     public void CloseGate()
     {
-        gateAnimator.SetBool("Open", false);
+        SetGateOpenClientRpc(false);
+    }
+
+    [ClientRpc]
+    private void SetGateOpenClientRpc(bool open)
+    {
+        gateAnimator.SetBool("Open", open);
     }
 }

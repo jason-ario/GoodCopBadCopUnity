@@ -25,6 +25,12 @@ public class Lever : Interactable
 
         // Sync visual state on spawn
         _animator.SetBool(IsUpParam, _isUp.Value);
+
+        // Sync shutter state on spawn (silent — no audio on initial sync)
+        if (_isUp.Value)
+            shutter.OpenShutter();
+        else
+            shutter.CloseShutter();
     }
 
     public override void OnNetworkDespawn()
@@ -42,20 +48,17 @@ public class Lever : Interactable
     private void ToggleLeverServerRpc()
     {
         _isUp.Value = !_isUp.Value;
-        if (_isUp.Value)
-        {
-            shutter.OpenShutter();
-        }
-        else
-        {
-            shutter.CloseShutter();
-        }
     }
 
     private void OnLeverStateChanged(bool oldValue, bool newValue)
     {
         _animator.SetBool(IsUpParam, newValue);
         leverAudio.PlayOneShot(newValue ? leverOnSound : leverOffSound);
+
+        if (newValue)
+            shutter.OpenShutter();
+        else
+            shutter.CloseShutter();
     }
 
     public void Reset()

@@ -144,7 +144,13 @@ public class MainMenuController : MonoBehaviour
     public void TransitionToGameplay()
     {
         mainMenu.SetActive(false);
-        
+
+        if (playableDirector != null)
+        {
+            playableDirector.Stop();
+            playableDirector.gameObject.SetActive(false);
+        }
+
         HideAllMenus();
     }
 }

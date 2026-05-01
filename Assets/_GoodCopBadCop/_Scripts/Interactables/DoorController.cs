@@ -1,80 +1,122 @@
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 public class DoorController : Interactable
 {
-    bool doorOpen = false;
+    private NetworkVariable<bool> _doorOpen = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    // True = opened toward the inside (positive dot product side)
+    private NetworkVariable<bool> _openedIn = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     [SerializeField] private Animator _animator;
-    bool beingInteractedWith = false;
+    private bool _beingInteractedWith = false;
     [SerializeField] private float waitDelay = .5f;
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip doorOpenClip;
     [SerializeField] AudioClip doorCloseClip;
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _doorOpen.OnValueChanged += OnDoorStateChanged;
+        _openedIn.OnValueChanged += OnOpenDirectionChanged;
+
+        // Sync visual state on late join
+        ApplyDoorVisuals(_doorOpen.Value, _openedIn.Value);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _doorOpen.OnValueChanged -= OnDoorStateChanged;
+        _openedIn.OnValueChanged -= OnOpenDirectionChanged;
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
-        if (beingInteractedWith == false)
+        base.Interact(player);
+        if (!_beingInteractedWith)
         {
             StartCoroutine(WaitAndToggleDoor(player));
         }
     }
 
-    void ToggleDoor(PlayerInteractionController player)
+    private IEnumerator WaitAndToggleDoor(PlayerInteractionController player)
     {
-        if (doorOpen)
+        _beingInteractedWith = true;
+        player.playerAnimationController.OpenDoor();
+
+        if (!_doorOpen.Value)
         {
-            doorOpen = false;
-            _animator.SetBool("OpenedIn", false);
-            _animator.SetBool("OpenedOut", false);
-            interactText = "Open";
-            audioSource.PlayOneShot(doorCloseClip);
+            PlayDoorSoundClientRpc(true);
+        }
+
+        yield return new WaitForSeconds(waitDelay);
+
+        // Determine open direction from the interacting player's position
+        Vector3 doorForward = transform.forward;
+        Vector3 playerToDoor = transform.position - player.transform.position;
+        bool openedIn = Vector3.Dot(doorForward, playerToDoor) > 0f;
+
+        ToggleDoorServerRpc(openedIn);
+
+        yield return new WaitForSeconds(waitDelay);
+        _beingInteractedWith = false;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ToggleDoorServerRpc(bool openedIn)
+    {
+        if (_doorOpen.Value)
+        {
+            _doorOpen.Value = false;
+            PlayDoorSoundClientRpc(false);
         }
         else
         {
-            doorOpen = true;
-            interactText = "Close";
-
-            // Calculate if player is in front or behind the door
-            Vector3 doorForward = transform.forward;
-            Vector3 playerToDoor = transform.position - player.transform.position;
-            
-            // Dot product tells us which side the player is on
-            float side = Vector3.Dot(doorForward, playerToDoor);
-            
-            // Set the appropriate bool based on player position
-            if (side > 0)
-            {
-                _animator.SetBool("OpenedIn", true);
-                _animator.SetBool("OpenedOut", false);
-            }
-            else
-            {
-                _animator.SetBool("OpenedIn", false);
-                _animator.SetBool("OpenedOut", true);
-            }
+            _openedIn.Value = openedIn;
+            _doorOpen.Value = true;
         }
     }
 
-    IEnumerator WaitAndToggleDoor(PlayerInteractionController player)
+    [ClientRpc]
+    private void PlayDoorSoundClientRpc(bool opening)
     {
-        if (doorOpen == false)
+        audioSource.PlayOneShot(opening ? doorOpenClip : doorCloseClip);
+    }
+
+    private void OnDoorStateChanged(bool oldValue, bool newValue)
+    {
+        ApplyDoorVisuals(newValue, _openedIn.Value);
+        interactText = newValue ? "Close" : "Open";
+    }
+
+    private void OnOpenDirectionChanged(bool oldValue, bool newValue)
+    {
+        if (_doorOpen.Value)
         {
-            audioSource.PlayOneShot(doorOpenClip);
+            ApplyDoorVisuals(true, newValue);
         }
-        
-        beingInteractedWith = true;
-        player.playerAnimationController.OpenDoor();
-        yield return new WaitForSeconds(waitDelay);
-    
-        ToggleDoor(player);
-        yield return new WaitForSeconds(waitDelay);
-        beingInteractedWith = false;
+    }
+
+    private void ApplyDoorVisuals(bool isOpen, bool openedIn)
+    {
+        _animator.SetBool("OpenedIn", isOpen && openedIn);
+        _animator.SetBool("OpenedOut", isOpen && !openedIn);
     }
 
     public void Reset()
     {
-        _animator.SetBool("OpenedIn", false);
-        _animator.SetBool("OpenedOut", false);
-        doorOpen = false;
+        if (!IsServer) return;
+        _doorOpen.Value = false;
+        _openedIn.Value = false;
     }
 }

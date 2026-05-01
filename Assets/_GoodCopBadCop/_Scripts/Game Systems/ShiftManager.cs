@@ -12,6 +12,9 @@ public class ShiftManager : NetworkBehaviour
 
     [Header("Network Variables")]
     public NetworkVariable<bool> shiftStarted = new NetworkVariable<bool>(false);
+    private NetworkVariable<int> _networkCurrentDay = new NetworkVariable<int>(1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     [Header("Set Up")]
     private int _currentDay = 1;
@@ -66,6 +69,22 @@ public class ShiftManager : NetworkBehaviour
     {
         Instance = this;
         InitializeDateSystem();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _networkCurrentDay.OnValueChanged += OnCurrentDayChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _networkCurrentDay.OnValueChanged -= OnCurrentDayChanged;
+    }
+
+    private void OnCurrentDayChanged(int oldValue, int newValue)
+    {
+        _currentDay = newValue;
     }
 
     private void InitializeDateSystem()
@@ -204,12 +223,28 @@ public class ShiftManager : NetworkBehaviour
     public void StartNewShift()
     {
         ResetEverything();
+        if (IsServer)
+        {
+            StartNewShiftClientRpc();
+        }
+        StartCoroutine(NewShiftSequence());
+    }
+
+    [ClientRpc]
+    private void StartNewShiftClientRpc()
+    {
+        if (IsServer) return;
+        ResetEverything();
         StartCoroutine(NewShiftSequence());
     }
 
     public void CompletedShift()
     {
         _currentDay += 1;
+        if (IsServer)
+        {
+            _networkCurrentDay.Value = _currentDay;
+        }
     }
 
     public void ResetEnvironment()
@@ -288,6 +323,17 @@ public class ShiftManager : NetworkBehaviour
         PlayerInstance.Instance.SetCanMove(true);
     }
 
+    /// <summary>
+    /// Immediately stops the intro cutscene and hides its GameObject.
+    /// Call this on clients that join while the cutscene is already playing on the host.
+    /// </summary>
+    public void StopIntroCutscene()
+    {
+        if (introCutscene == null) return;
+        introCutscene.Stop();
+        introCutscene.gameObject.SetActive(false);
+    }
+
     public void InitiateIntroCutscene()
     {
         UIController.Instance.FadeIn();
@@ -314,6 +360,22 @@ public class ShiftManager : NetworkBehaviour
     }
 
     public void SetNextShiftReady()
+    {
+        if (IsServer)
+        {
+            SetNextShiftReadyClientRpc();
+        }
+        RunSetNextShiftReady();
+    }
+
+    [ClientRpc]
+    private void SetNextShiftReadyClientRpc()
+    {
+        if (IsServer) return;
+        RunSetNextShiftReady();
+    }
+
+    private void RunSetNextShiftReady()
     {
         UIController.Instance.HideEndOfShiftReport();
         UIController.Instance.FadeIn();

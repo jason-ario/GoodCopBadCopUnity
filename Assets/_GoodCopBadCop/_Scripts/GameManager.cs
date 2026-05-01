@@ -21,6 +21,8 @@ public class GameManager : NetworkBehaviour
     private bool _isSinglePlayer;
     public bool IsSinglePlayer => _isSinglePlayer;
 
+    public bool HasGameStarted { get; private set; }
+
     private void Awake()
     {
         Instance = this;
@@ -43,7 +45,32 @@ public class GameManager : NetworkBehaviour
     private void StartGameServer(bool skipTransition = false)
     {
         if (!IsServer) return;
+        HasGameStarted = true;
         StartGameClientRpc(skipTransition);
+    }
+
+    /// <summary>
+    /// Initializes gameplay UI for a single late-joining client without restarting the game.
+    /// SERVER ONLY.
+    /// </summary>
+    public void InitializeLateJoinClient(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        ClientRpcParams rpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        };
+
+        InitializeLateJoinClientRpc(rpcParams);
+    }
+
+    [ClientRpc]
+    private void InitializeLateJoinClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        ShiftManager.Instance.StopIntroCutscene();
+        UIController.Instance.ShowPlayerUI();
+        MainMenuController.Instance.TransitionToGameplay();
     }
 
     [ClientRpc]

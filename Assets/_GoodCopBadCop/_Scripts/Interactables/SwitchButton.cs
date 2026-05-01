@@ -100,9 +100,24 @@ public class SwitchButton : Interactable
         anim.SetTrigger("Push");
     }
 
+    /// <summary>
+    /// Sets the button's ready state on all clients. Must be called on the server.
+    /// </summary>
     public void SetReady(bool b)
     {
-        anim.SetBool("Ready", b);
         buttonReady = b;
+        anim.SetBool("Ready", powerOn && b);
+
+        if (IsServer)
+        {
+            SetReadyClientRpc(b);
+        }
+    }
+
+    [ClientRpc]
+    private void SetReadyClientRpc(bool b)
+    {
+        buttonReady = b;
+        anim.SetBool("Ready", powerOn && b);
     }
 }
