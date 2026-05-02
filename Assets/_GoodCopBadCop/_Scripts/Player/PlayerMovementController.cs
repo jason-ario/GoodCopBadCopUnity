@@ -47,6 +47,7 @@ public class PlayerMovementController : NetworkBehaviour
     // Public properties for animation controller to access
     public float MoveXRaw { get; private set; }
     public float MoveZRaw { get; private set; }
+    public bool IsRunning { get; private set; }
     
     private Vector3 camStartPos;
     private Quaternion camStartRot;
@@ -95,6 +96,8 @@ public class PlayerMovementController : NetworkBehaviour
 
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
+
+    private FootstepsAudio _footstepsAudio;
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
@@ -102,6 +105,7 @@ public class PlayerMovementController : NetworkBehaviour
     {
         _characterController = GetComponent<CharacterController>();
         _playerAnimationController = GetComponent<PlayerAnimationController>();
+        _footstepsAudio = GetComponent<FootstepsAudio>();
         
         CanMove = true;
         CanLook = true;
@@ -162,6 +166,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         // Check run input
         bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        IsRunning = isRunning;
 
         // Pick speed
         float currentSpeed = isRunning ? runSpeed : characterSpeed;
@@ -371,5 +376,23 @@ public class PlayerMovementController : NetworkBehaviour
     {
         CameraTransform.DOMove(cameraTransform.position, moveTime);
         CameraTransform.DORotate(cameraTransform.rotation.eulerAngles, moveTime);
+    }
+
+    /// <summary>
+    /// Called by FootstepsAudio on the local player. Plays the footstep locally
+    /// then notifies all other clients to play it on their copy of this player.
+    /// </summary>
+    public void PlayFootstepNetworked()
+    {
+        _footstepsAudio.PlayFootstep();
+        PlayFootstepClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayFootstepClientRpc()
+    {
+        // Skip the owner — they already played it above.
+        if (IsOwner) return;
+        _footstepsAudio.PlayFootstep();
     }
 }

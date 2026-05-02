@@ -92,8 +92,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
-  m_LocalPosition: {x: -1.9593265, y: 1.8317341, z: 11.315362}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.451, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -131,9 +131,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.1
+  near clip plane: 0.12
   far clip plane: 5000
-  field of view: 60
+  field of view: 65
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -1053,7 +1053,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1936807553
+  GlobalObjectIdHash: 4229621594
   InScenePlacedSourceGlobalObjectIdHash: 4229621594
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1148,12 +1148,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
-    are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:Spine1'\n\tTransform
-    'mixamorig:Spine2'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:Head'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
-    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:RightShoulder'\n\tand more ..."
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -1275,6 +1270,9 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 531613071b1ef9b4793e07bab8acce9c, type: 3}
   - {fileID: 8300000, guid: 625053f3e04f5274e93163b6e1c27b55, type: 3}
   pitchRandomness: 0.1
+  walkStepInterval: 0.55
+  runStepInterval: 0.4
+  movementController: {fileID: 3041942974558453909}
   disable: 0
 --- !u!114 &7132022092377744834
 MonoBehaviour:
@@ -2711,7 +2709,7 @@ Transform:
   m_GameObject: {fileID: 8249481354703023807}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7848554, y: 0.18282016, z: 0.31655395, w: 0.5003722}
-  m_LocalPosition: {x: -0.43947947, y: 2.026537, z: 0.5782108}
+  m_LocalPosition: {x: -0.43947923, y: 2.026537, z: 0.5782108}
   m_LocalScale: {x: 100, y: 99.999954, z: 100}
   m_ConstrainProportionsScale: 0
   m_Children: []
