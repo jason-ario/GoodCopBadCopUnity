@@ -123,6 +123,8 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        Debug.Log($"[GameManager] InitializeLobbyJoinClient sending RPC to clientId={clientId}");
+
         ClientRpcParams rpcParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
@@ -134,16 +136,19 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void InitializeLobbyJoinClientRpc(ClientRpcParams clientRpcParams = default)
     {
+        Debug.Log("[GameManager] InitializeLobbyJoinClientRpc received — starting lobby join sequence");
         StartCoroutine(LobbyJoinClientSequence());
     }
 
     private IEnumerator LobbyJoinClientSequence()
     {
+        Debug.Log("[GameManager] LobbyJoinClientSequence: fading in");
         UIController.Instance.FadeIn();
         AudioManager.Instance.FadeOutAmbientAudio();
 
         yield return new WaitForSeconds(2f);
 
+        Debug.Log("[GameManager] LobbyJoinClientSequence: transitioning to gameplay");
         MainMenuController.Instance.TransitionToGameplay();
         UIController.Instance.ShowPlayerUI();
         AudioManager.Instance.StartAmbientAudio();

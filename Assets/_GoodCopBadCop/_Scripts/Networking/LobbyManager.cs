@@ -240,7 +240,7 @@ public class LobbyManager : MonoBehaviour
 
         await Task.Delay(50);
 
-        Debug.Log($"[OnLobbyEntered] Local members: {CurrentLobby.Members.Count()}");
+        Debug.Log($"[OnLobbyEntered] IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} Members={CurrentLobby.Members.Count()} OwnerSteamId={lobby.Owner.Id}");
 
         OnLobbyUpdated?.Invoke();
 
@@ -253,12 +253,21 @@ public class LobbyManager : MonoBehaviour
             if (facepunchTransport != null)
             {
                 facepunchTransport.targetSteamId = lobby.Owner.Id;
+                Debug.Log($"[OnLobbyEntered] Set targetSteamId={facepunchTransport.targetSteamId}");
+            }
+            else
+            {
+                Debug.LogError("[OnLobbyEntered] facepunchTransport is null — cannot set targetSteamId. StartClient will fail.");
             }
 
             bool started = NetworkManager.Singleton.StartClient();
-            Debug.Log($"StartClient from OnLobbyEntered: {started}");
+            Debug.Log($"[OnLobbyEntered] StartClient={started}");
 
             startingClientFromLobbyFlow = false;
+        }
+        else
+        {
+            Debug.Log($"[OnLobbyEntered] Skipping StartClient — IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} startingClientFromLobbyFlow={startingClientFromLobbyFlow}");
         }
     }
 
@@ -297,34 +306,36 @@ public class LobbyManager : MonoBehaviour
 
         await Task.Delay(50);
 
+        Debug.Log($"[Host] OnClientConnected clientId={clientId} GameManager.Instance={GameManager.Instance != null}");
+
         if (CurrentLobby.Id != 0)
-        {
-            Debug.Log($"[Host] Netcode client connected. Steam members: {CurrentLobby.Members.Count()}");
-        }
-        else
-        {
-            Debug.Log("[Host] Netcode client connected.");
-        }
+            Debug.Log($"[Host] Steam members: {CurrentLobby.Members.Count()}");
 
         OnLobbyUpdated?.Invoke();
 
-        // If the game is already in progress, spawn the late joiner at the booth so they
-        // land alongside the server player. Otherwise spawn at the lobby spawn point as normal.
-        if (GameManager.Instance != null)
+        if (GameManager.Instance == null)
         {
-            if (GameManager.Instance.HasGameStarted)
-            {
-                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
-                GameManager.Instance.InitializeLateJoinClient(clientId);
-            }
-            else if (!GameManager.Instance.IsTransitioningToLobby)
-            {
-                // Spawn immediately for clients joining an existing lobby.
-                // If IsTransitioningToLobby is true, the spawn is deferred to
-                // LobbyTransitionSequence so it happens after the 2-second fade delay.
-                GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
-                GameManager.Instance.InitializeLobbyJoinClient(clientId);
-            }
+            Debug.LogError("[Host] OnClientConnected: GameManager.Instance is null — cannot spawn or send RPC.");
+            return;
+        }
+
+        Debug.Log($"[Host] HasGameStarted={GameManager.Instance.HasGameStarted} IsTransitioningToLobby={GameManager.Instance.IsTransitioningToLobby}");
+
+        if (GameManager.Instance.HasGameStarted)
+        {
+            Debug.Log($"[Host] Spawning late joiner at booth for clientId={clientId}");
+            PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+            GameManager.Instance.InitializeLateJoinClient(clientId);
+        }
+        else if (!GameManager.Instance.IsTransitioningToLobby)
+        {
+            Debug.Log($"[Host] Spawning lobby joiner for clientId={clientId}");
+            GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            GameManager.Instance.InitializeLobbyJoinClient(clientId);
+        }
+        else
+        {
+            Debug.Log($"[Host] IsTransitioningToLobby=true — spawn deferred to LobbyTransitionSequence for clientId={clientId}");
         }
     }
 
