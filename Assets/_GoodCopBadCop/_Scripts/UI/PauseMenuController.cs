@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,7 +12,10 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private GameObject areYouSureMainMenu;
     [SerializeField] private TextButton[] _textButtons;
     [SerializeField] private RectTransform rootRectTransform;
-    
+    [SerializeField] private TextMeshProUGUI lobbyCodeText;
+
+    private const string LobbyCodePrefix = "LOBBY CODE: ";
+
     public void ResumeGame()
     {
         UIController.Instance.ClosePauseMenu();
@@ -21,11 +25,27 @@ public class PauseMenuController : MonoBehaviour
     {
         LayoutRebuilder.ForceRebuildLayoutImmediate(rootRectTransform);
         BackToMainMenu();
+        RefreshLobbyCode();
     }
 
     private void OnDisable()
     {
         BackToMainMenu();
+    }
+
+    /// <summary>Updates the lobby code label. Shows the encoded code when in an active lobby, hides it otherwise.</summary>
+    private void RefreshLobbyCode()
+    {
+        if (lobbyCodeText == null) return;
+
+        bool hasLobby = LobbyManager.Instance != null && LobbyManager.Instance.CurrentLobby.Id != 0;
+        lobbyCodeText.gameObject.SetActive(hasLobby);
+
+        if (hasLobby)
+        {
+            string code = InviteCodeUtility.EncodeLobbyId(LobbyManager.Instance.CurrentLobby.Id);
+            lobbyCodeText.text = LobbyCodePrefix + code;
+        }
     }
 
     public void ShowAreYouSureMainMenu()
