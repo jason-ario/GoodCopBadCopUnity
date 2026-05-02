@@ -12,11 +12,11 @@ public class StampContainer : MonoBehaviour
     {
         Quarantine, Pass, Kill
     }
-    
+        /// <summary>Activates the correct stamp GameObject and records the stamp type.</summary>
     public void PlaceStamp(StampType stampType)
     {
         _stampType = stampType;
-        
+
         switch (stampType)
         {
             case StampType.Pass:

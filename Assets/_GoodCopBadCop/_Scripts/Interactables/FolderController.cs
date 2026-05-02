@@ -15,6 +15,10 @@ public class FolderController : PickableObject
 {
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isStamped = new NetworkVariable<bool>(false);
+    private NetworkVariable<StampContainer.StampType> _syncedStampType = new NetworkVariable<StampContainer.StampType>(
+        StampContainer.StampType.Pass,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     [Header("Documents")] 
     [SerializeField] private MeshRenderer photoID;
@@ -149,6 +153,10 @@ public class FolderController : PickableObject
     {
         // Sync visual state on spawn and when variables change
         isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
+
+        // Late-joiner sync: apply stamp visual immediately if already stamped.
+        if (isStamped.Value)
+            stampContainer.PlaceStamp(_syncedStampType.Value);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -224,14 +232,24 @@ public class FolderController : PickableObject
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
+    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType, ServerRpcParams rpcParams = default)
     {
         if (isStamping) return;
-        StartUseStampClientRpc(interactingPlayerId, stampType);
+        isStamping = true;
+        isStamped.Value = true;
+
+        ClientRpcParams clientRpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { rpcParams.Receive.SenderClientId }
+            }
+        };
+        StartUseStampClientRpc(interactingPlayerId, stampType, clientRpcParams);
     }
 
     [ClientRpc]
-    private void StartUseStampClientRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
+    private void StartUseStampClientRpc(ulong interactingPlayerId, StampContainer.StampType stampType, ClientRpcParams clientRpcParams = default)
     {
         // Find the player instance that initiated the stamp
         NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(interactingPlayerId, out var playerObj);
@@ -239,6 +257,21 @@ public class FolderController : PickableObject
 
         playerPickupController = playerObj.GetComponent<PlayerPickupController>();
         StartCoroutine(UseStampSequence(stampType));
+    }
+
+    /// <summary>Writes the stamp type on the server, then broadcasts the visual to all clients.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void PlaceStampServerRpc(StampContainer.StampType stampType)
+    {
+        _syncedStampType.Value = stampType;
+        PlaceStampClientRpc(stampType);
+    }
+
+    /// <summary>Applies the stamp visual on every client, including the one that triggered the stamp.</summary>
+    [ClientRpc]
+    private void PlaceStampClientRpc(StampContainer.StampType stampType)
+    {
+        stampContainer.PlaceStamp(stampType);
     }
 
     public override void OnEquipped(PlayerPickupController player)
@@ -261,8 +294,6 @@ public class FolderController : PickableObject
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
-        isStamping = true;
-        isStamped.Value = true;
         
         // Only lock controls for the local player who is actually interacting
         bool isLocal = playerPickupController.IsLocalPlayer;
@@ -272,6 +303,7 @@ public class FolderController : PickableObject
         {
             cinemachineVirtualCamera.SetActive(true);
         }
+        
         yield return new WaitForSeconds(.25f);
 
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
@@ -303,8 +335,7 @@ public class FolderController : PickableObject
         playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f)
             .OnComplete(() =>
             {
-                // Only server handles logic state changes
-                if (IsServer) stampContainer.PlaceStamp(stampType);
+                PlaceStampServerRpc(stampType);
             });
 
         yield return new WaitForSeconds(.2f);
