@@ -19,7 +19,6 @@ public class LobbyManager : MonoBehaviour
     public event Action<string> OnJoinFailed;
 
     private FacepunchTransport facepunchTransport;
-    private bool startingClientFromLobbyFlow;
     private bool inviteOverlayWasOpenedByUs;
 
     private void Awake()
@@ -173,21 +172,31 @@ public class LobbyManager : MonoBehaviour
 
             if (joinResult != RoomEnter.Success)
             {
-                Debug.LogError($"Failed to join lobby {lobbyId}. Result: {joinResult}");
+                Debug.LogError($"[JoinLobby] Failed to join lobby {lobbyId}. Result: {joinResult}");
                 OnJoinFailed?.Invoke(joinResult.ToString());
                 return;
             }
 
-            // Do not StartClient() here.
-            // Let OnLobbyEntered handle that so it only happens once.
             CurrentLobby = lobby;
 
-            if (facepunchTransport != null)
+            if (facepunchTransport == null)
             {
-                facepunchTransport.targetSteamId = lobby.Owner.Id;
+                Debug.LogError("[JoinLobby] facepunchTransport is null — cannot connect.");
+                return;
             }
 
-            Debug.Log($"Requested join for lobby {lobbyId}");
+            facepunchTransport.targetSteamId = CurrentLobby.Owner.Id;
+            Debug.Log($"[JoinLobby] Steam join success. targetSteamId={facepunchTransport.targetSteamId}");
+
+            if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
+            {
+                bool started = NetworkManager.Singleton.StartClient();
+                Debug.Log($"[JoinLobby] StartClient={started}");
+            }
+            else
+            {
+                Debug.LogWarning($"[JoinLobby] Skipping StartClient — already IsClient={NetworkManager.Singleton.IsClient} IsHost={NetworkManager.Singleton.IsHost}");
+            }
         }
         else if (transport is UnityTransport unityTransport)
         {
@@ -243,32 +252,6 @@ public class LobbyManager : MonoBehaviour
         Debug.Log($"[OnLobbyEntered] IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} Members={CurrentLobby.Members.Count()} OwnerSteamId={lobby.Owner.Id}");
 
         OnLobbyUpdated?.Invoke();
-
-        if (!NetworkManager.Singleton.IsHost &&
-            !NetworkManager.Singleton.IsClient &&
-            !startingClientFromLobbyFlow)
-        {
-            startingClientFromLobbyFlow = true;
-
-            if (facepunchTransport != null)
-            {
-                facepunchTransport.targetSteamId = lobby.Owner.Id;
-                Debug.Log($"[OnLobbyEntered] Set targetSteamId={facepunchTransport.targetSteamId}");
-            }
-            else
-            {
-                Debug.LogError("[OnLobbyEntered] facepunchTransport is null — cannot set targetSteamId. StartClient will fail.");
-            }
-
-            bool started = NetworkManager.Singleton.StartClient();
-            Debug.Log($"[OnLobbyEntered] StartClient={started}");
-
-            startingClientFromLobbyFlow = false;
-        }
-        else
-        {
-            Debug.Log($"[OnLobbyEntered] Skipping StartClient — IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} startingClientFromLobbyFlow={startingClientFromLobbyFlow}");
-        }
     }
 
     private async void OnLobbyMemberJoined(Lobby lobby, Friend friend)
