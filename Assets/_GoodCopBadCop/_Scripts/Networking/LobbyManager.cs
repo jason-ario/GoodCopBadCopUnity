@@ -13,6 +13,7 @@ public class LobbyManager : MonoBehaviour
     public static LobbyManager Instance;
 
     public Lobby CurrentLobby { get; private set; }
+    public string CurrentLobbyCode { get; private set; }
 
     public event Action OnLobbyUpdated;
     public event Action OnKicked;
@@ -114,6 +115,9 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby.SetJoinable(true);
             CurrentLobby.SetData("host", SteamClient.Name);
 
+            CurrentLobbyCode = InviteCodeUtility.GenerateCode(6);
+            CurrentLobby.SetData("code", CurrentLobbyCode);
+
             // Host targets self for Facepunch transport.
             facepunch.targetSteamId = SteamClient.SteamId;
 
@@ -194,6 +198,31 @@ public class LobbyManager : MonoBehaviour
     // =========================
     // INVITES
     // =========================
+
+    /// <summary>Searches public lobbies for one matching the given short code and joins it.</summary>
+    public async void JoinLobbyByCode(string code)
+    {
+        var transport = NetworkManager.Singleton?.NetworkConfig.NetworkTransport;
+        if (transport is not FacepunchTransport)
+        {
+            Debug.LogWarning("JoinLobbyByCode is only supported with Facepunch transport.");
+            return;
+        }
+
+        Lobby[] lobbies = await SteamMatchmaking.LobbyList
+            .WithKeyValue("code", code.ToUpperInvariant())
+            .RequestAsync();
+
+        if (lobbies == null || lobbies.Length == 0)
+        {
+            Debug.LogWarning($"No lobby found with code: {code}");
+            OnJoinFailed?.Invoke("DoesntExist");
+            return;
+        }
+
+        JoinLobby(lobbies[0].Id);
+    }
+
     public void OpenInviteFriendsPopup()
     {
         if (CurrentLobby.Id == 0)
@@ -227,6 +256,7 @@ public class LobbyManager : MonoBehaviour
     private async void OnLobbyEntered(Lobby lobby)
     {
         CurrentLobby = lobby;
+        CurrentLobbyCode = lobby.GetData("code");
 
         await Task.Delay(50);
 
@@ -344,6 +374,7 @@ public class LobbyManager : MonoBehaviour
         {
             CurrentLobby.Leave();
             CurrentLobby = default;
+            CurrentLobbyCode = null;
         }
 
         OnLobbyUpdated?.Invoke();

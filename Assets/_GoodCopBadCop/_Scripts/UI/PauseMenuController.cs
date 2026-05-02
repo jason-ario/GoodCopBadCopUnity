@@ -43,7 +43,7 @@ public class PauseMenuController : MonoBehaviour
 
         if (hasLobby)
         {
-            string code = InviteCodeUtility.EncodeLobbyId(LobbyManager.Instance.CurrentLobby.Id);
+            string code = LobbyManager.Instance.CurrentLobbyCode ?? string.Empty;
             lobbyCodeText.text = LobbyCodePrefix + code;
         }
     }

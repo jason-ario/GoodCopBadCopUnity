@@ -64,7 +64,7 @@ public class StartCampaignScreen : MonoBehaviour
         Debug.Log("Refreshing UI");
         
         var members = LobbyManager.Instance.GetMembersSnapshot();
-        inviteCodeText.text = InviteCodeUtility.EncodeLobbyId(LobbyManager.Instance.CurrentLobby.Id);
+        inviteCodeText.text = LobbyManager.Instance.CurrentLobbyCode ?? string.Empty;
 
         for (int i = 0; i < playerPanels.Length; i++)
         {

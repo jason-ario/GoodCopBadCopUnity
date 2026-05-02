@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using TMPro;
 
@@ -8,7 +7,6 @@ public class JoinLobbyScreen : MonoBehaviour
     [SerializeField] private TMP_Text statusLabel;
 
     private const string ErrorEmptyCode = "NO CODE ENTERED";
-    private const string ErrorInvalidCode = "INVALID ASSIGNMENT CODE";
     private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
 
     private void Awake()
@@ -42,22 +40,10 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
         }
 
-        ulong lobbyId;
-        try
-        {
-            lobbyId = InviteCodeUtility.DecodeLobbyId(code);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Invalid invite code: {e.Message}");
-            SetStatus(ErrorInvalidCode);
-            return;
-        }
-
-        Debug.Log($"Joining lobby {lobbyId}");
+        Debug.Log($"Joining lobby with code: {code}");
 
         // Networking and scene transition handled by LobbyManager
-        LobbyManager.Instance.JoinLobby(lobbyId);
+        LobbyManager.Instance.JoinLobbyByCode(code);
     }
 
     private void OnJoinFailed(string reason)
