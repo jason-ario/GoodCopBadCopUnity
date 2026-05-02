@@ -34,7 +34,7 @@ public class PlayerSpawner : MonoBehaviour
     /// </summary>
     public void SpawnPlayerAtLobby(ulong clientId, bool isSinglePlayer)
     {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetLobbySpawnPoint(clientId, isSinglePlayer));
+        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true);
     }
 
     /// <summary>
@@ -43,10 +43,10 @@ public class PlayerSpawner : MonoBehaviour
     /// </summary>
     public void SpawnPlayer(ulong clientId, bool isSinglePlayer)
     {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetSpawnPoint(clientId, isSinglePlayer));
+        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetSpawnPoint(clientId, isSinglePlayer), isOutside: false);
     }
 
-    private void SpawnPlayerAtPoint(ulong clientId, bool isSinglePlayer, Transform spawnPoint)
+    private void SpawnPlayerAtPoint(ulong clientId, bool isSinglePlayer, Transform spawnPoint, bool isOutside = false)
     {
         if (!NetworkManager.Singleton.IsServer)
         {
@@ -84,7 +84,11 @@ public class PlayerSpawner : MonoBehaviour
 
         netObj.SpawnAsPlayerObject(clientId, true);
 
-        Debug.Log($"[PlayerSpawner] Spawned player for client {clientId} at {spawnPoint.name}");
+        PlayerInstance playerInstance = player.GetComponent<PlayerInstance>();
+        if (playerInstance != null)
+            playerInstance.SetIsOutside(isOutside);
+
+        Debug.Log($"[PlayerSpawner] Spawned player for client {clientId} at {spawnPoint.name} (isOutside: {isOutside})");
     }
 
     /// <summary>
@@ -126,6 +130,6 @@ public class PlayerSpawner : MonoBehaviour
     /// </summary>
     public void SpawnPlayerAtBooth(ulong clientId)
     {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer: false, GetBoothSpawnPoint(clientId));
+        SpawnPlayerAtPoint(clientId, isSinglePlayer: false, GetBoothSpawnPoint(clientId), isOutside: false);
     }
 }

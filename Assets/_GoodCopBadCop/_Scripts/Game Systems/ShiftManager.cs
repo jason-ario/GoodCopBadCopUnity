@@ -266,6 +266,7 @@ public class ShiftManager : NetworkBehaviour
         if (PlayerInstance.Instance != null)
         {
             PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+            PlayerInstance.Instance.SetIsOutside(false);
         }
     }
 

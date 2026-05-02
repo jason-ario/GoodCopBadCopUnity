@@ -171,6 +171,10 @@ public class GameManager : NetworkBehaviour
             {
                 Transform spawnPoint = PlayerSpawner.Instance.GetSpawnPoint(client.ClientId, isSinglePlayer);
                 client.PlayerObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+
+                PlayerInstance playerInstance = client.PlayerObject.GetComponent<PlayerInstance>();
+                if (playerInstance != null)
+                    playerInstance.SetIsOutside(false);
             }
         }
     }
@@ -218,5 +222,7 @@ public class GameManager : NetworkBehaviour
                 PlayerInstance.Instance.OwnerClientId,
                 _isSinglePlayer
             ).position;
+
+        PlayerInstance.Instance.SetIsOutside(false);
     }
 }

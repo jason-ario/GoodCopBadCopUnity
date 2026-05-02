@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -9,11 +10,21 @@ public class LogoMaterialController : MonoBehaviour
     [SerializeField] private float _delay = 1f;
     [SerializeField] private float _duration = 2f;
     [SerializeField] private float _targetBurnProgress = 0.23f;
-    [SerializeField] AudioClip _burnSound;
+    [SerializeField] AudioClip _burnSound; 
+    bool animationStarted = false;
 
     private void Start()
     {
         StartCoroutine(AnimateBurnProgress());
+        animationStarted = true;
+    }
+
+    private void OnEnable()
+    {
+        if (animationStarted)
+        {
+            _logoMaterial.SetFloat(BurnProgress, _targetBurnProgress);
+        }
     }
 
     /// <summary>

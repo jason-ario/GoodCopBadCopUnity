@@ -7,9 +7,16 @@ public class PlayerInstance : NetworkBehaviour
     public static PlayerInstance Instance;
 
     [SerializeField] private ScreenDamage screenDamage;
-    [SerializeField] private bool isOutside;
-    public bool IsOutside => isOutside;
     [SerializeField] private GameObject playerLight;
+    [SerializeField] private GameObject nameTag;
+
+    private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    public bool IsOutside => _isOutside.Value;
     
     public bool CanControl
     {
@@ -33,7 +40,7 @@ public class PlayerInstance : NetworkBehaviour
 
     public void SetIsOutside(bool value)
     {
-        isOutside = value;
+        _isOutside.Value = value;
         playerLight.SetActive(value);
     }
 
@@ -46,6 +53,9 @@ public class PlayerInstance : NetworkBehaviour
             return;
         }
         
+        playerLight.SetActive(false); 
+        nameTag.SetActive(false);
+
         Instance = this;
     }
 

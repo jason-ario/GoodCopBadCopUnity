@@ -92,8 +92,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.451, z: 0}
+  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
+  m_LocalPosition: {x: -1.9593265, y: 1.8317341, z: 11.315362}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -131,9 +131,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.12
+  near clip plane: 0.1
   far clip plane: 5000
-  field of view: 65
+  field of view: 60
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -1053,7 +1053,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4229621594
+  GlobalObjectIdHash: 1936807553
   InScenePlacedSourceGlobalObjectIdHash: 4229621594
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1148,7 +1148,12 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage: 
+  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
+    are already bound by a Humanoid avatar. These transforms can only be changed
+    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:Spine1'\n\tTransform
+    'mixamorig:Spine2'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:Head'\n\tTransform
+    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
+    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:RightShoulder'\n\tand more ..."
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -1236,8 +1241,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   screenDamage: {fileID: 6856902921673393363}
-  isOutside: 0
   playerLight: {fileID: 5470190593194009012}
+  nameTag: {fileID: 7633988383748146117}
 --- !u!114 &7541639783584628704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1251,7 +1256,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FootstepsAudio
   audioSource: {fileID: 7482045326139760384}
-  footstepClips:
+  outsideFootstepClips:
+  - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
+  - {fileID: 8300000, guid: b5415257ad22548479f1a90f63a64471, type: 3}
+  - {fileID: 8300000, guid: 67f459d44640b944b948a170b424f802, type: 3}
+  - {fileID: 8300000, guid: ed08dcd489d312f4da7bfcef6834eb0a, type: 3}
+  - {fileID: 8300000, guid: 294b4c999f0f65e4ca28a10ea323363d, type: 3}
+  insideFootstepClips:
   - {fileID: 8300000, guid: a42fc632b28f4f24ca796f3bdcdb24c8, type: 3}
   - {fileID: 8300000, guid: 732bb2f088072634ebf8ac37d0188980, type: 3}
   - {fileID: 8300000, guid: 8d482751fe186e54fb4cb8e183c3e1e8, type: 3}
@@ -2647,8 +2658,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14b907d5669ca2241a5b148aa0a04f13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   target: {fileID: 6616138626675467207}
   offset: {x: 0, y: 0.5, z: 0}
+  label: {fileID: 0}
 --- !u!223 &2662028061109145663
 Canvas:
   m_ObjectHideFlags: 0
@@ -2698,7 +2711,7 @@ Transform:
   m_GameObject: {fileID: 8249481354703023807}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7848554, y: 0.18282016, z: 0.31655395, w: 0.5003722}
-  m_LocalPosition: {x: -0.43947923, y: 2.026537, z: 0.5782108}
+  m_LocalPosition: {x: -0.43947947, y: 2.026537, z: 0.5782108}
   m_LocalScale: {x: 100, y: 99.999954, z: 100}
   m_ConstrainProportionsScale: 0
   m_Children: []
