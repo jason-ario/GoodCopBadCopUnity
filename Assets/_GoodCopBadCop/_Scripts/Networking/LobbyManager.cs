@@ -306,8 +306,18 @@ public class LobbyManager : MonoBehaviour
 
         if (GameManager.Instance.HasGameStarted)
         {
-            Debug.Log($"[Host] Spawning late joiner at booth for clientId={clientId}");
-            PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+            // Spawn relative to where the host currently is.
+            bool hostIsOutside = PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside;
+            if (hostIsOutside)
+            {
+                Debug.Log($"[Host] Game started, host is outside — spawning client at lobby for clientId={clientId}");
+                GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            }
+            else
+            {
+                Debug.Log($"[Host] Game started, host is at booth — spawning client at booth for clientId={clientId}");
+                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+            }
             GameManager.Instance.InitializeLateJoinClient(clientId);
         }
         else if (!GameManager.Instance.IsTransitioningToLobby)
