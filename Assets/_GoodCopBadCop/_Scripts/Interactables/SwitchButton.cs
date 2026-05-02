@@ -27,7 +27,6 @@ public class SwitchButton : Interactable
     public void PowerOff()
     {
         powerOn = false;
-        
         anim.SetBool("Ready", false);
     }
 
@@ -52,41 +51,68 @@ public class SwitchButton : Interactable
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
-        
         player.playerAnimationController.RightArmRigIKTarget = ikTarget;
-        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
+        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
-        
+
         yield return new WaitForSeconds(.5f);
         player.playerAnimationController.EnableRightArmMask();
-        player.playerAnimationController.TurnRightArmRigOnAndOff(.2f,.5f);
+        player.playerAnimationController.TurnRightArmRigOnAndOff(.2f, .5f);
         player.playerAnimationController.SetAnimTrigger("PressButton");
 
-        if (buttonReady && powerOn)
-        {
-            SetReady(false);
+        // Route the game-state logic through the server so it is authoritative on all clients.
+        if (IsServer)
+            HandleButtonPressServer();
+        else
+            RequestButtonPressServerRpc();
 
-            if (!ShiftManager.Instance.shiftStarted.Value)
-            {
-                ShiftManager.Instance.TryStartShift();
-            }
-            else
-            {
-                ShiftManager.Instance.PlayBuzzerSound();
-                SuspectController.Instance.NextSuspect();
-            }
-        }
-        
         PlayButtonSoundClientRpc();
 
         yield return new WaitForSeconds(1);
-        player.playerMovementController.ResetCameraPos(false,.25f);
+        player.playerMovementController.ResetCameraPos(false, .25f);
 
-        
         yield return new WaitForSeconds(.25f);
 
         player.playerAnimationController.DisableRightArmMask();
         player.playerMovementController.SetCanControl(true);
+    }
+
+    /// <summary>
+    /// Sends a button-press request to the server from a client.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestButtonPressServerRpc()
+    {
+        HandleButtonPressServer();
+    }
+
+    /// <summary>
+    /// Authoritative button-press logic. Must run on the server only.
+    /// </summary>
+    private void HandleButtonPressServer()
+    {
+        if (!buttonReady || !powerOn) return;
+
+        SetReady(false);
+
+        if (!ShiftManager.Instance.shiftStarted.Value)
+        {
+            ShiftManager.Instance.TryStartShift();
+        }
+        else
+        {
+            PlayBuzzerAndNextSuspectClientRpc();
+        }
+    }
+
+    /// <summary>
+    /// Plays the buzzer and advances to the next suspect on all clients.
+    /// </summary>
+    [ClientRpc]
+    private void PlayBuzzerAndNextSuspectClientRpc()
+    {
+        ShiftManager.Instance.PlayBuzzerSound();
+        SuspectController.Instance.NextSuspect();
     }
 
     [ClientRpc]
@@ -96,7 +122,7 @@ public class SwitchButton : Interactable
         {
             buttonPressSound.Play();
         }
-        
+
         anim.SetTrigger("Push");
     }
 
