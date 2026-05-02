@@ -35,6 +35,7 @@ public class UIController : MonoBehaviour
     bool couldControlBeforePaused = false;
     bool couldLookBeforePaused = false;
     bool showedReticleBeforePause = false;
+    bool playerUIWasActiveBeforePaused = false;
 
     private void Awake()
     {
@@ -236,6 +237,9 @@ public class UIController : MonoBehaviour
         // since the reticleActive flag can be stale when the CanControl setter skips
         // SetReticleActive due to CanLook being false.
         showedReticleBeforePause = couldControlBeforePaused && couldLookBeforePaused;
+
+        playerUIWasActiveBeforePaused = playerUI.activeSelf;
+        playerUI.SetActive(false);
         
         ShowCursor();
         
@@ -256,6 +260,8 @@ public class UIController : MonoBehaviour
         }
         
         PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+
+        playerUI.SetActive(playerUIWasActiveBeforePaused);
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
