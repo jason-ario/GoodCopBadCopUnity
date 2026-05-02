@@ -115,6 +115,42 @@ public class GameManager : NetworkBehaviour
         InitializeLateJoinClientRpc(rpcParams);
     }
 
+    /// <summary>
+    /// Runs the lobby transition sequence for a single client that joined while the host
+    /// is already waiting in the lobby (game not yet started). SERVER ONLY.
+    /// </summary>
+    public void InitializeLobbyJoinClient(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        ClientRpcParams rpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        };
+
+        InitializeLobbyJoinClientRpc(rpcParams);
+    }
+
+    [ClientRpc]
+    private void InitializeLobbyJoinClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        StartCoroutine(LobbyJoinClientSequence());
+    }
+
+    private IEnumerator LobbyJoinClientSequence()
+    {
+        UIController.Instance.FadeIn();
+        AudioManager.Instance.FadeOutAmbientAudio();
+
+        yield return new WaitForSeconds(2f);
+
+        MainMenuController.Instance.TransitionToGameplay();
+        UIController.Instance.ShowPlayerUI();
+        AudioManager.Instance.StartAmbientAudio();
+        UIController.Instance.FadeOut();
+        OnGameStart?.Invoke();
+    }
+
     [ClientRpc]
     private void InitializeLateJoinClientRpc(ClientRpcParams clientRpcParams = default)
     {

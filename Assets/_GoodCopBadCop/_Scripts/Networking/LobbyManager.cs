@@ -121,7 +121,6 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby = createdLobby.Value;
             CurrentLobby.SetPublic();
             CurrentLobby.SetJoinable(true);
-            CurrentLobby.MaxMembers = MaxLobbyMembers;
             CurrentLobby.SetData("host", SteamClient.Name);
 
             // Host targets self for Facepunch transport.
@@ -324,6 +323,7 @@ public class LobbyManager : MonoBehaviour
                 // If IsTransitioningToLobby is true, the spawn is deferred to
                 // LobbyTransitionSequence so it happens after the 2-second fade delay.
                 GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+                GameManager.Instance.InitializeLobbyJoinClient(clientId);
             }
         }
     }
