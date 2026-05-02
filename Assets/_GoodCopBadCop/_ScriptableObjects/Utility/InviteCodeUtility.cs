@@ -6,22 +6,16 @@ public static class InviteCodeUtility
     private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     // Removed confusing chars: 0 O 1 I
 
+    /// <summary>Encodes the full 64-bit Steam lobby ID into a short alphanumeric code.</summary>
     public static string EncodeLobbyId(ulong lobbyId)
     {
-        uint shortId = (uint)(lobbyId & 0xFFFFFFFF);
-        return InviteCodeUtility.Encode(shortId);
+        return InviteCodeUtility.Encode(lobbyId);
     }
-    
+
+    /// <summary>Decodes an alphanumeric invite code back into the original Steam lobby ID.</summary>
     public static ulong DecodeLobbyId(string code)
     {
-        uint shortId = (uint)InviteCodeUtility.Decode(code);
-
-        // Steam lobby CSteamID prefix:
-        // Universe = 1 (Public, bits 56-63), AccountType = 8 (Chat, bits 52-55),
-        // Instance = 0x40000 (lobby flag, bits 32-51)
-        const ulong SteamLobbyPrefix = 0x0180004000000000UL;
-
-        return SteamLobbyPrefix | shortId;
+        return InviteCodeUtility.Decode(code);
     }
     
     public static string Encode(ulong value)

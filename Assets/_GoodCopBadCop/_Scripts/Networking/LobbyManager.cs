@@ -16,6 +16,7 @@ public class LobbyManager : MonoBehaviour
 
     public event Action OnLobbyUpdated;
     public event Action OnKicked;
+    public event Action<string> OnJoinFailed;
 
     private FacepunchTransport facepunchTransport;
     private bool startingClientFromLobbyFlow;
@@ -164,6 +165,7 @@ public class LobbyManager : MonoBehaviour
             if (joinResult != RoomEnter.Success)
             {
                 Debug.LogError($"Failed to join lobby {lobbyId}. Result: {joinResult}");
+                OnJoinFailed?.Invoke(joinResult.ToString());
                 return;
             }
 

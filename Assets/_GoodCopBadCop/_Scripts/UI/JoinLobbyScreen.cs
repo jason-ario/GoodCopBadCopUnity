@@ -9,11 +9,22 @@ public class JoinLobbyScreen : MonoBehaviour
 
     private const string ErrorEmptyCode = "NO CODE ENTERED";
     private const string ErrorInvalidCode = "INVALID ASSIGNMENT CODE";
+    private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
 
     private void Awake()
     {
         inviteCodeInput.onSubmit.AddListener(_ => JoinWithCode());
         inviteCodeInput.onValueChanged.AddListener(_ => ClearStatus());
+    }
+
+    private void OnEnable()
+    {
+        LobbyManager.Instance.OnJoinFailed += OnJoinFailed;
+    }
+
+    private void OnDisable()
+    {
+        LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
     }
 
     /// <summary>Attempts to decode the entered invite code and join the corresponding lobby.</summary>
@@ -47,6 +58,12 @@ public class JoinLobbyScreen : MonoBehaviour
 
         // Networking and scene transition handled by LobbyManager
         LobbyManager.Instance.JoinLobby(lobbyId);
+    }
+
+    private void OnJoinFailed(string reason)
+    {
+        Debug.LogWarning($"Join failed: {reason}");
+        SetStatus(ErrorLobbyNotFound);
     }
 
     private void SetStatus(string message) => statusLabel.text = message;
