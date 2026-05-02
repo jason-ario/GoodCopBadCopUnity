@@ -1,21 +1,53 @@
-using System;
 using UnityEngine;
 
 public class ExamPage : FolderItem
 {
-    [SerializeField] private ChecklistItem[] _checklistItems; 
+    [SerializeField] private ChecklistItem[] _checklistItems;
     private ExamNotebook notebook;
+    private int pageIndex;
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
-    
+
     public ChecklistItem[] ChecklistItems => _checklistItems;
 
     public void Initialize(ExamNotebook notebook)
     {
         this.notebook = notebook;
     }
-    
+
+    /// <summary>
+    /// Called by ExamNotebook.OnNetworkSpawn to assign each checklist item its array index
+    /// and record which page slot this page occupies within the notebook.
+    /// </summary>
+    public void InitializeChecklistIndices()
+    {
+        for (int i = 0; i < _checklistItems.Length; i++)
+            _checklistItems[i].SetIndex(i);
+    }
+
+    /// <summary>Sets which page slot this page occupies, so clicks reference the correct bitmask.</summary>
+    public void SetPageIndex(int index) => pageIndex = index;
+
+    /// <summary>
+    /// Applies an authoritative bitmask to all checklist items on this page.
+    /// Called by ExamNotebook whenever the server writes the NetworkVariable for this page.
+    /// </summary>
+    public void ApplyBitmask(int bitmask)
+    {
+        for (int i = 0; i < _checklistItems.Length; i++)
+            _checklistItems[i].ApplyCheckedState((bitmask & (1 << i)) != 0);
+    }
+
+    /// <summary>
+    /// Called by ChecklistItem when the local player clicks a checkbox.
+    /// Routes through the notebook's NetworkObject since nested NetworkObjects cannot send RPCs.
+    /// </summary>
+    public void SetCheckboxChecked(int itemIndex, bool value)
+    {
+        notebook.SetCheckboxChecked(pageIndex, itemIndex, value);
+    }
+
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
         notebook.AnimateCheckMark(ikAnimationTarget);
@@ -24,9 +56,6 @@ public class ExamPage : FolderItem
     public void SetChecklistInteractable(bool b)
     {
         foreach (ChecklistItem item in _checklistItems)
-        {
             item.SetInteractable(b);
-        }
     }
-    
 }
