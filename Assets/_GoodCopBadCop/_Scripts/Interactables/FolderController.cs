@@ -8,6 +8,9 @@ using UnityEngine.Events;
 using UnityEngine.WSA;
 using Application = UnityEngine.Application;
 
+// Must execute after PlayerPickupController (default order 0) so LateUpdate fires
+// after the folder has already been moved to the body-arm target position.
+[DefaultExecutionOrder(1)]
 public class FolderController : PickableObject
 {
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
@@ -58,6 +61,89 @@ public class FolderController : PickableObject
     public StampContainer.StampType StampType => stampContainer.Stamp;
     private NetworkVariable<bool> isHandedOff = new NetworkVariable<bool>();
     public List<PickableObject> documents;
+
+    /// <summary>
+    /// Server-authoritative list of documents currently inside this folder.
+    /// Populated via RegisterDocumentServerRpc so CleanupSpawnedFolder can despawn
+    /// them on the server even though InteractWithItem only fires on the local client.
+    /// </summary>
+    private readonly List<NetworkObjectReference> _serverDocuments = new List<NetworkObjectReference>();
+
+    /// <summary>
+    /// Per-client list of (document, slot) pairs driven by LateUpdate.
+    /// Populated by PlaceInSlotClientRpc and cleared by UnregisterDocumentClientRpc.
+    /// </summary>
+    private readonly List<(PickableObject document, Transform slot)> _localDocuments
+        = new List<(PickableObject, Transform)>();
+
+    /// <summary>Registers a document with this folder on the server so it can be despawned later.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RegisterDocumentServerRpc(NetworkObjectReference documentRef)
+    {
+        if (!_serverDocuments.Contains(documentRef))
+            _serverDocuments.Add(documentRef);
+    }
+
+    /// <summary>
+    /// Removes a document from the server-side despawn list and broadcasts the removal to
+    /// all clients so they stop following it in LateUpdate.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void UnregisterDocumentServerRpc(NetworkObjectReference documentRef)
+    {
+        _serverDocuments.Remove(documentRef);
+        UnregisterDocumentClientRpc(documentRef);
+    }
+
+    [ClientRpc]
+    private void UnregisterDocumentClientRpc(NetworkObjectReference documentRef)
+    {
+        if (!documentRef.TryGet(out NetworkObject netObj)) return;
+        PickableObject doc = netObj.GetComponent<PickableObject>();
+        _localDocuments.RemoveAll(pair => pair.document == doc);
+    }
+
+    /// <summary>
+    /// Registers a (document, slot) pair on this client for LateUpdate-based following.
+    /// Called from PlaceInSlotClientRpc on every machine so all clients track the document.
+    /// </summary>
+    public void RegisterLocalDocument(PickableObject document, Transform slot)
+    {
+        _localDocuments.RemoveAll(pair => pair.document == document);
+        _localDocuments.Add((document, slot));
+    }
+
+    /// <summary>Despawns all server-tracked documents. Called by SuspectController before despawning the folder.</summary>
+    public void DespawnTrackedDocuments()
+    {
+        foreach (NetworkObjectReference docRef in _serverDocuments)
+        {
+            if (docRef.TryGet(out NetworkObject netObj))
+                NetworkHelper.Despawn(netObj);
+        }
+        _serverDocuments.Clear();
+    }
+
+    /// <summary>
+    /// Snaps each slotted document to its slot's current world transform.
+    /// Runs at execution order 1 — after PlayerPickupController (order 0) has already
+    /// moved the folder to the body-arm target — so documents are always in sync with
+    /// the folder in the same frame with zero lag.
+    /// </summary>
+    private void LateUpdate()
+    {
+        for (int i = _localDocuments.Count - 1; i >= 0; i--)
+        {
+            var (doc, slot) = _localDocuments[i];
+            if (doc == null || slot == null)
+            {
+                _localDocuments.RemoveAt(i);
+                continue;
+            }
+            doc.transform.position = slot.position;
+            doc.transform.rotation = slot.rotation;
+        }
+    }
 
     public override void OnNetworkSpawn()
     {

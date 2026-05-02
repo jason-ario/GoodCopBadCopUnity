@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.WSA;
 
@@ -24,6 +25,7 @@ public class FolderItem : PickableObject
         base.OnEquipped(player);
         if (insideThisFolder != null)
         {
+            insideThisFolder.UnregisterDocumentServerRpc(new NetworkObjectReference(NetworkObject));
             RemovePromFolder();
         }
     }

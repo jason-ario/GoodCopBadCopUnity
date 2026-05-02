@@ -482,16 +482,48 @@ public class PlayerPickupController : NetworkBehaviour
             _heldObject.transform.position = dropPos;
             _heldObject.transform.rotation = dropRot;
 
-            // Send drop position to the server. DropServerRpc sets the authoritative
-            // transform and re-enables NetworkTransform there — do NOT re-enable NT here
-            // on the client, because NT would immediately interpolate back toward the
-            // last server-known position (the held slot) before the RPC lands.
-            _heldObject.DropServerRpc(dropPos, dropRot);
-            _heldObject.ReleaseHolderServerRpc();
-
             if (dropPoint != null)
-                _heldObject.SetParent(dropPoint);
+            {
+                // Placing the document into a folder slot: instead of re-enabling NT (which
+                // would fight the ParentConstraint and leave observers without a constraint),
+                // broadcast a slot-constraint to every client so the document follows the
+                // folder on all machines while NT stays disabled.
+                NetworkObject slotOwnerNetObj = dropPoint.GetComponentInParent<NetworkObject>();
+                if (slotOwnerNetObj != null)
+                {
+                    // Build the relative path of the slot inside its NetworkObject's hierarchy.
+                    string slotPath = GetRelativePath(slotOwnerNetObj.transform, dropPoint);
+                    _heldObject.PlaceInSlotServerRpc(
+                        new NetworkObjectReference(slotOwnerNetObj),
+                        slotPath,
+                        dropPos,
+                        dropRot);
 
+                    // Register with FolderController on the server so it can despawn this
+                    // document later. InteractWithItem only runs on the local client, so the
+                    // server-side documents list on FolderController is always empty otherwise.
+                    FolderController folder = slotOwnerNetObj.GetComponent<FolderController>();
+                    if (folder != null)
+                        folder.RegisterDocumentServerRpc(new NetworkObjectReference(_heldObject.NetworkObject));
+                }
+                else
+                {
+                    // Fallback: treat as a normal drop if the slot has no NetworkObject ancestor.
+                    _heldObject.DropServerRpc(dropPos, dropRot);
+                }
+
+                _heldObject.SetParent(dropPoint);
+            }
+            else
+            {
+                // Send drop position to the server. DropServerRpc sets the authoritative
+                // transform and re-enables NetworkTransform there — do NOT re-enable NT here
+                // on the client, because NT would immediately interpolate back toward the
+                // last server-known position (the held slot) before the RPC lands.
+                _heldObject.DropServerRpc(dropPos, dropRot);
+            }
+
+            _heldObject.ReleaseHolderServerRpc();
             _heldObject.OnDropped();
         }
 
@@ -569,25 +601,35 @@ public class PlayerPickupController : NetworkBehaviour
         _followNT       = worldObj.GetComponent<NetworkTransform>();
     }
 
-    /// <summary>Clears the LateUpdate follow and restores physics. NT is re-enabled by
-    /// DropBroadcastClientRpc on PickableObject, which sets the correct drop position first —
-    /// re-enabling NT here would snap it to its stale interpolation buffer instead.</summary>
+    /// <summary>
+    /// Clears the LateUpdate follow fields. All object-level cleanup (RemoveParent, isKinematic,
+    /// AutoObjectParentSync) is handled by DropBroadcastClientRpc (free drop) or
+    /// PlaceInSlotClientRpc (slot placement) so this method never races with those RPCs.
+    /// </summary>
     private void RemoveBodyConstraint(NetworkObjectReference objectRef)
     {
         _followWorldObj = null;
         _followTarget   = null;
         _followNT       = null;
+    }
 
-        if (!objectRef.TryGet(out NetworkObject netObj)) return;
+    /// <summary>
+    /// Builds a slash-separated relative path from <paramref name="root"/> down to
+    /// <paramref name="target"/>, e.g. "Body/Slots/IDCardSlot".
+    /// Returns an empty string when target == root.
+    /// </summary>
+    private static string GetRelativePath(Transform root, Transform target)
+    {
+        if (target == root) return string.Empty;
 
-        PickableObject worldObj = netObj.GetComponent<PickableObject>();
-        if (worldObj == null) return;
-
-        worldObj.RemoveParent();
-        netObj.AutoObjectParentSync = true;
-
-        Rigidbody rb = worldObj.GetComponent<Rigidbody>();
-        if (rb != null) rb.isKinematic = false;
+        System.Collections.Generic.List<string> parts = new System.Collections.Generic.List<string>();
+        Transform current = target;
+        while (current != null && current != root)
+        {
+            parts.Insert(0, current.name);
+            current = current.parent;
+        }
+        return string.Join("/", parts);
     }
 
     void DisableArmIKs(PickableObject target = null)

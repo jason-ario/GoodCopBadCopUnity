@@ -636,14 +636,18 @@ public class SuspectController : NetworkBehaviour
 
     private void CleanupSpawnedFolder()
     {
-        if (spawnedFolder != null && spawnedFolder.IsSpawned)
+        if (spawnedFolder == null) return;
+
+        // Despawn documents first — they are not hierarchy children of the folder
+        // (ParentConstraint tracks them without reparenting), so DespawnWithChildren
+        // won't reach them. DespawnTrackedDocuments uses the server-authoritative list
+        // populated via RegisterDocumentServerRpc, since InteractWithItem only fires
+        // on the local client and never populates documents on the server.
+        spawnedFolder.DespawnTrackedDocuments();
+
+        if (spawnedFolder.IsSpawned)
         {
             NetworkHelper.DespawnWithChildren(spawnedFolder.GetComponent<NetworkObject>());
-        }
-
-        foreach (PickableObject pickableObject in spawnedFolder.documents)
-        {
-            NetworkHelper.Despawn(pickableObject.GetComponent<NetworkObject>());
         }
 
         spawnedFolder = null;

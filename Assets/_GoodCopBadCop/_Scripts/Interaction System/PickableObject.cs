@@ -96,6 +96,76 @@ public class PickableObject : Interactable
     }
 
     /// <summary>
+    /// Places this object into a slot that is a child of another NetworkObject (e.g. a folder slot).
+    /// NT stays disabled on all clients; the ParentConstraint is applied to the resolved slot so
+    /// the document follows the folder everywhere — on the server and all observer clients.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void PlaceInSlotServerRpc(NetworkObjectReference slotOwnerRef, string slotRelativePath, Vector3 position, Quaternion rotation)
+    {
+        RemoveParent();
+        transform.position = position;
+        transform.rotation = rotation;
+
+        NetworkObject.RemoveOwnership();
+
+        // Disable NT on server — the ParentConstraint will drive position on all clients.
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
+        PlaceInSlotClientRpc(slotOwnerRef, slotRelativePath, position, rotation);
+    }
+
+    /// <summary>
+    /// Received on all clients. Resolves the slot transform and either registers the document
+    /// with FolderController for lag-free LateUpdate following, or falls back to SetParent
+    /// (ParentConstraint) for non-folder slot owners.
+    /// </summary>
+    [ClientRpc]
+    private void PlaceInSlotClientRpc(NetworkObjectReference slotOwnerRef, string slotRelativePath, Vector3 position, Quaternion rotation)
+    {
+        RemoveParent();
+        transform.position = position;
+        transform.rotation = rotation;
+
+        // Keep NT disabled — position is driven on all clients without NetworkTransform.
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
+        // Stay kinematic while in the slot; AutoObjectParentSync stays false so
+        // NGO does not try to replicate the local constraint-driven parent.
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+
+        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner)) return;
+
+        Transform slot = string.IsNullOrEmpty(slotRelativePath)
+            ? slotOwner.transform
+            : slotOwner.transform.Find(slotRelativePath);
+
+        if (slot == null)
+        {
+            Debug.LogWarning($"PlaceInSlotClientRpc: could not find slot '{slotRelativePath}' on {slotOwner.name}");
+            return;
+        }
+
+        // Prefer LateUpdate-based following when the slot owner is a FolderController.
+        // FolderController.LateUpdate runs at execution order 1 — after PlayerPickupController
+        // (order 0) has moved the folder — so documents are always in sync with zero lag.
+        // ParentConstraint evaluation happens before LateUpdate and would always be one
+        // frame behind when the folder is held, so we skip SetParent in this case.
+        FolderController folder = slotOwner.GetComponent<FolderController>();
+        if (folder != null)
+        {
+            folder.RegisterLocalDocument(this, slot);
+        }
+        else
+        {
+            SetParent(slot);
+        }
+    }
+
+    /// <summary>
     /// Sets the world position and rotation on the server before releasing ownership,
     /// so NetworkTransform propagates the correct drop location to all clients.
     /// After setting the authoritative transform, a ClientRpc broadcasts the drop position
@@ -121,8 +191,9 @@ public class PickableObject : Interactable
     }
 
     /// <summary>
-    /// Received on all clients after a drop. Sets the drop position before re-enabling NT
+    /// Received on all clients after a free drop. Sets the drop position before re-enabling NT
     /// so NT never has a chance to interpolate from its stale pre-pickup buffer position.
+    /// Also restores physics and parent sync that were suppressed during the hold.
     /// </summary>
     [ClientRpc]
     private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation)
@@ -130,6 +201,11 @@ public class PickableObject : Interactable
         RemoveParent();
         transform.position = position;
         transform.rotation = rotation;
+
+        NetworkObject.AutoObjectParentSync = true;
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = false;
 
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;
