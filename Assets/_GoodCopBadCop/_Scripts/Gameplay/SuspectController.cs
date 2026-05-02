@@ -350,7 +350,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         
-        SayExitDialogue(thisCharacter, SuspectData.Verdict.Passed);
+        if (IsServer) SayExitDialogue(thisCharacter, SuspectData.Verdict.Passed);
 
         yield return new WaitForSeconds(2f);
 
@@ -563,7 +563,7 @@ public class SuspectController : NetworkBehaviour
             quarantineTimeline.Play();
         }
 
-        DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
+        if (IsServer) DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
 
         yield return new WaitForSeconds(2f);
 
@@ -627,7 +627,7 @@ public class SuspectController : NetworkBehaviour
 
         yield return new WaitForSeconds(1f);
 
-        DialogueManager.Instance.SayDialogue(thisCharacter, "Wait... NO!!!");
+        if (IsServer) DialogueManager.Instance.SayDialogue(thisCharacter, "Wait... NO!!!");
         thisCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
 
