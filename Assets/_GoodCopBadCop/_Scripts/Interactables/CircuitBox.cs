@@ -1,29 +1,44 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class CircuitBox : Interactable
 {
-    [SerializeField] Animator animator;
-    bool isOpened = false;
+    [SerializeField] private Animator animator;
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] AudioClip circuitBoxOpenSound;
-    [SerializeField] AudioClip circuitBoxCloseSound;
+    [SerializeField] private AudioClip circuitBoxOpenSound;
+    [SerializeField] private AudioClip circuitBoxCloseSound;
     [SerializeField] private ElectricityController electricityController;
-    
+
+    private bool _isOpened = false;
+
     public override void Interact(PlayerInteractionController player)
     {
-        base.Interact(player); 
-        ToggleCircuitBox();
+        base.Interact(player);
+        ToggleCircuitBoxServerRpc();
     }
-    
-    void ToggleCircuitBox()
+
+    /// <summary>
+    /// Requests a circuit box toggle from any client. The server validates and
+    /// broadcasts the result so all clients stay in sync.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ToggleCircuitBoxServerRpc()
     {
-        if (electricityController.IsPowerOn == false)
+        if (!electricityController.IsPowerOn)
         {
             electricityController.PowerOn();
         }
-        
-        isOpened = !isOpened;
-        if (isOpened)
+
+        _isOpened = !_isOpened;
+        UpdateCircuitBoxClientRpc(_isOpened);
+    }
+
+    [ClientRpc]
+    private void UpdateCircuitBoxClientRpc(bool opened)
+    {
+        _isOpened = opened;
+
+        if (_isOpened)
         {
             audioSource.PlayOneShot(circuitBoxOpenSound);
             animator.SetBool("Open", true);
