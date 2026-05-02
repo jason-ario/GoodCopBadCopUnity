@@ -433,27 +433,23 @@ public class SuspectController : NetworkBehaviour
     }
 
 
+    /// <summary>
+    /// Calculates payout values, credits the shared cash pool on the server, and
+    /// broadcasts popup notifications to every connected client.
+    /// Must only be called on the server.
+    /// </summary>
     private void PayOutResults()
     {
-        StartCoroutine(ShowCashPopUpSequence());
-    }
-    
-    IEnumerator ShowCashPopUpSequence()
-    {
-        // Calculate coupon payouts
+        if (!IsServer) return;
+
         int correctAnomalyBonus = correctlyMarkedAnomalies * couponPerCorrectAnomaly;
-        int missedAnomalyPenalty =
-            (totalAnomaliesInLastSuspect - correctlyMarkedAnomalies) * couponPenaltyPerMissedAnomaly;
+        int missedAnomalyPenalty = (totalAnomaliesInLastSuspect - correctlyMarkedAnomalies) * couponPenaltyPerMissedAnomaly;
         int falsePositivePenalty = incorrectlyMarkedAnomalies * couponPenaltyPerFalsePositiveAnomaly;
-        int perfectBonusAmount =
-            (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
-                ? couponPerfectAnomaliesBonus
-                : 0;
+        int perfectBonusAmount = (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
+            ? couponPerfectAnomaliesBonus
+            : 0;
+        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount + couponCorrectVerdictBonus;
 
-        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount +
-                           couponCorrectVerdictBonus;
-
-    // Calculate accuracy percentage
         int accuracyPercent = 100;
         if (totalAnomaliesInLastSuspect > 0 || incorrectlyMarkedAnomalies > 0)
         {
@@ -461,47 +457,71 @@ public class SuspectController : NetworkBehaviour
             accuracyPercent = totalToIdentify > 0 ? (correctlyMarkedAnomalies * 100) / totalToIdentify : 100;
         }
 
-        yield return new WaitForSeconds(2f);
-        
-        // Add money to player account
+        // Credit the shared pool — server-authoritative write.
         GlobalHostVariables.Instance.AddMoney(totalCoupons);
 
-        // Message 1: Anomalies Identified with accuracy percentage and breakdown
-        string anomalyMessage =
-            $"Anomalies Identified: {accuracyPercent}%\n({correctlyMarkedAnomalies}/{totalAnomaliesInLastSuspect} correct)";
-        int anomalyAmount = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty;
+        Debug.Log(
+            $"Payout — Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Verdict Bonus: +{couponCorrectVerdictBonus}, Total: {totalCoupons}");
+
+        // Broadcast popup sequence to all clients.
+        ShowCashPopUpSequenceClientRpc(
+            correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty,
+            accuracyPercent,
+            correctlyMarkedAnomalies,
+            totalAnomaliesInLastSuspect,
+            couponCorrectVerdictBonus,
+            perfectBonusAmount,
+            totalCoupons);
+    }
+
+    [ClientRpc]
+    private void ShowCashPopUpSequenceClientRpc(
+        int anomalyAmount,
+        int accuracyPercent,
+        int correctCount,
+        int totalCount,
+        int verdictBonus,
+        int perfectBonus,
+        int totalCoupons)
+    {
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, accuracyPercent, correctCount, totalCount, verdictBonus, perfectBonus, totalCoupons));
+    }
+
+    private IEnumerator ShowCashPopUpSequence(
+        int anomalyAmount,
+        int accuracyPercent,
+        int correctCount,
+        int totalCount,
+        int verdictBonus,
+        int perfectBonus,
+        int totalCoupons)
+    {
+        yield return new WaitForSeconds(2f);
+
+        // Message 1: Anomaly accuracy breakdown.
+        string anomalyMessage = $"Anomalies Identified: {accuracyPercent}%\n({correctCount}/{totalCount} correct)";
         UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
 
         yield return new WaitForSeconds(2f);
 
-        // Message 2: Verdict message (you'll need to determine the verdict type)
-        string verdictMessage = GetVerdictMessage(); // Implement based on your verdict logic
-        UIController.Instance.ShowCashPopUpNotification(couponCorrectVerdictBonus, verdictMessage);
+        // Message 2: Verdict bonus.
+        UIController.Instance.ShowCashPopUpNotification(verdictBonus, GetVerdictMessage());
 
         yield return new WaitForSeconds(2f);
 
-        // Message 3: Perfect bonus (if applicable)
-        if (perfectBonusAmount > 0)
+        // Message 3: Perfect identification bonus (if earned).
+        if (perfectBonus > 0)
         {
-            UIController.Instance.ShowCashPopUpNotification(perfectBonusAmount, "Perfect Identification Bonus");
+            UIController.Instance.ShowCashPopUpNotification(perfectBonus, "Perfect Identification Bonus");
+            yield return new WaitForSeconds(2f);
         }
 
-        yield return new WaitForSeconds(2f);
-
-        // Message 4: Final payout
+        // Message 4: Total payout summary.
         UIController.Instance.ShowCashPopUpNotification(totalCoupons, "Payout Issued");
-
-
-
-        // Debug log for verification
-        Debug.Log(
-            $"Anomaly Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positive: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Verdict Bonus: +{couponCorrectVerdictBonus}, Total: {totalCoupons}");
     }
 
     private string GetVerdictMessage()
     {
-        // Implement this based on your verdict logic
-        // For now, returning a placeholder - adjust based on how you determine verdict
         return "Verdict: CIVILIAN CORRECTLY QUARANTINED";
     }
     
@@ -689,12 +709,54 @@ public class SuspectController : NetworkBehaviour
         spawnedFolder = null;
     }
 
+    /// <summary>
+    /// Entry point called by any client when a stamped folder is handed off.
+    /// Routes to the server for authoritative payout calculation and verdict execution.
+    /// </summary>
     public void DeliverVerdict(FolderController folder)
     {
         SetCanInteract(false);
-        spawnedFolder = folder;
         folder.OnHandOff();
-        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter); 
+
+        if (IsServer)
+        {
+            ExecuteVerdict(folder);
+        }
+        else
+        {
+            DeliverVerdictServerRpc(folder.GetComponent<NetworkObject>().NetworkObjectId);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void DeliverVerdictServerRpc(ulong folderNetworkObjectId)
+    {
+        if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(folderNetworkObjectId, out NetworkObject folderNetObj))
+        {
+            Debug.LogError($"DeliverVerdictServerRpc: could not find NetworkObject with id {folderNetworkObjectId}.");
+            return;
+        }
+
+        FolderController folder = folderNetObj.GetComponent<FolderController>();
+        if (folder == null)
+        {
+            Debug.LogError("DeliverVerdictServerRpc: NetworkObject does not have a FolderController.");
+            return;
+        }
+
+        ExecuteVerdict(folder);
+    }
+
+    /// <summary>
+    /// Performs the full verdict sequence: accuracy calculation, payout, and suspect processing.
+    /// Must only be called on the server.
+    /// </summary>
+    private void ExecuteVerdict(FolderController folder)
+    {
+        if (!IsServer) return;
+
+        spawnedFolder = folder;
+        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);
         PayOutResults();
 
         switch (folder.StampType)
