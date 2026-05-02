@@ -263,7 +263,10 @@ public class ShiftManager : NetworkBehaviour
         ResetShiftData();
         ResetEnvironment();
         ResetSuspectsProcessed();
-        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        }
     }
 
     private IEnumerator NewShiftSequence()
@@ -318,6 +321,12 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>Restores full player control.</summary>
     private void EnablePlayerControl()
     {
+        if (PlayerInstance.Instance == null)
+        {
+            Debug.LogWarning("[ShiftManager] EnablePlayerControl: PlayerInstance not ready yet.");
+            return;
+        }
+
         PlayerInstance.Instance.CanControl = true;
         PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.SetCanMove(true);
@@ -334,9 +343,35 @@ public class ShiftManager : NetworkBehaviour
         introCutscene.gameObject.SetActive(false);
     }
 
+    /// <summary>
+    /// Call this from anywhere — server or client. Routes through the server so
+    /// the cutscene is triggered on all connected clients simultaneously.
+    /// </summary>
     public void InitiateIntroCutscene()
     {
+        if (IsServer)
+            InitiateIntroCutsceneClientRpc();
+        else
+            RequestInitiateIntroCutsceneServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestInitiateIntroCutsceneServerRpc()
+    {
+        InitiateIntroCutsceneClientRpc();
+    }
+
+    [ClientRpc]
+    private void InitiateIntroCutsceneClientRpc()
+    {
+        RunInitiateIntroCutscene();
+    }
+
+    private void RunInitiateIntroCutscene()
+    {
         UIController.Instance.FadeIn();
+        PlayerInstance.Instance.SetCanInteract(false);
+        PlayerInstance.Instance.SetCanMove(false);
         PlayerInstance.Instance.DisableReticle();
         StartCoroutine(PlayIntroCutscene());
     }

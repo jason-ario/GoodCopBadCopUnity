@@ -285,6 +285,13 @@ public class LobbyManager : MonoBehaviour
         }
 
         OnLobbyUpdated?.Invoke();
+
+        // Spawn the connecting player at the lobby spawn point.
+        // PlayerSpawner's double-spawn guard prevents duplicates if TransitionToGameplay already spawned them.
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+        }
     }
 
     // =========================

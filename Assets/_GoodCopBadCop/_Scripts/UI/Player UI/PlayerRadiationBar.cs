@@ -16,6 +16,7 @@ public class RadiationBarUI : MonoBehaviour
     {
         if (_playerRadiation == null)
         {
+            if (PlayerInstance.Instance == null) return;
             _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
             _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
             UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
@@ -24,6 +25,7 @@ public class RadiationBarUI : MonoBehaviour
 
     private void OnDisable()
     {
+        if (PlayerInstance.Instance == null) return;
         PlayerInstance.Instance.PlayerRadiation.OnRadiationChanged.RemoveListener(UpdateBar);
     }
 

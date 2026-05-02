@@ -12,6 +12,8 @@ public class ClickDetector : MonoBehaviour
     {
         if (renderCamera == null)
         {
+            if (PlayerInstance.Instance == null) return;
+            
             renderCamera = PlayerInstance.Instance.GetCamera();
         }
         

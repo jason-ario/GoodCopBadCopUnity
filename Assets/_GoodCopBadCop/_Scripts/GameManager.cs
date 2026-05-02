@@ -80,29 +80,64 @@ public class GameManager : NetworkBehaviour
         StartCoroutine(TransitionToGameplay(skipTransition));
     }
 
-    private void SpawnPlayersServer()
+    /// <summary>
+    /// Spawns a single connecting player at the lobby spawn point.
+    /// Call this from the networking layer when a client joins (server only).
+    /// </summary>
+    public void SpawnPlayerAtLobbyServer(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        _isSinglePlayer = isSinglePlayer;
+
+        PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
+    }
+
+    private void SpawnAllPlayersAtLobby()
     {
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
         _isSinglePlayer = isSinglePlayer;
 
-        Debug.Log("Is Single Player " + isSinglePlayer);
-        Debug.Log("Connected Clients " + NetworkManager.Singleton.ConnectedClientsList.Count);
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            PlayerSpawner.Instance.SpawnPlayerAtLobby(client.ClientId, isSinglePlayer);
+        }
+    }
+
+    /// <summary>
+    /// Teleports all connected players from the lobby to their gameplay spawn points.
+    /// Called after the intro cutscene begins so players land at the booth for Day 1.
+    /// SERVER ONLY.
+    /// </summary>
+    public void TeleportPlayersToGameplaySpawnPoints()
+    {
+        if (!IsServer) return;
+
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            PlayerSpawner.Instance.SpawnPlayer(client.ClientId, isSinglePlayer);
+            if (client.PlayerObject != null)
+            {
+                Transform spawnPoint = PlayerSpawner.Instance.GetSpawnPoint(client.ClientId, isSinglePlayer);
+                client.PlayerObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+            }
         }
     }
 
     private IEnumerator TransitionToGameplay(bool skipTransition = false)
     {
+        _isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+
         if (skipTransition)
         {
             MainMenuController.Instance.TransitionToGameplay();
 
             if (IsServer)
             {
-                SpawnPlayersServer();
+                SpawnAllPlayersAtLobby();
+                TeleportPlayersToGameplaySpawnPoints();
             }
 
             StoryProgressionManager.Instance.StartGame();
@@ -120,10 +155,8 @@ public class GameManager : NetworkBehaviour
 
         if (IsServer)
         {
-            SpawnPlayersServer();
+            SpawnAllPlayersAtLobby();
         }
-
-        ShiftManager.Instance.StartNewShift();
 
         UIController.Instance.FadeOut();
         OnGameStart?.Invoke();

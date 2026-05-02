@@ -81,8 +81,8 @@ public static class QuickConnect
 
         if (gm.HasGameStarted)
         {
-            Debug.Log($"[QuickConnect] Late join — spawning player for client {clientId}.");
-            PlayerSpawner.Instance.SpawnPlayer(clientId, isSinglePlayer: false);
+            Debug.Log($"[QuickConnect] Late join — spawning player at lobby for client {clientId}.");
+            PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer: false);
             gm.InitializeLateJoinClient(clientId);
         }
         else
