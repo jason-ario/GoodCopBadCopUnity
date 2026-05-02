@@ -84,6 +84,8 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
+    private const int MaxLobbyMembers = 2;
+
     // =========================
     // HOST
     // =========================
@@ -97,11 +99,18 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton == null)
             return false;
 
+        // Clean up any previous lobby before creating a new one.
+        if (CurrentLobby.Id != 0)
+        {
+            CurrentLobby.Leave();
+            CurrentLobby = default;
+        }
+
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
         if (transport is FacepunchTransport facepunch)
         {
-            var createdLobby = await SteamMatchmaking.CreateLobbyAsync(2);
+            var createdLobby = await SteamMatchmaking.CreateLobbyAsync(MaxLobbyMembers);
 
             if (!createdLobby.HasValue)
             {
@@ -112,6 +121,7 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby = createdLobby.Value;
             CurrentLobby.SetPublic();
             CurrentLobby.SetJoinable(true);
+            CurrentLobby.MaxMembers = MaxLobbyMembers;
             CurrentLobby.SetData("host", SteamClient.Name);
 
             // Host targets self for Facepunch transport.
