@@ -7,6 +7,7 @@ public class JoinLobbyScreen : MonoBehaviour
     [SerializeField] private TMP_Text statusLabel;
 
     private const string ErrorEmptyCode = "NO CODE ENTERED";
+    private const string ErrorInvalidCode = "INVALID LOBBY ID";
     private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
 
     private void Awake()
@@ -25,25 +26,25 @@ public class JoinLobbyScreen : MonoBehaviour
         LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
     }
 
-    /// <summary>Attempts to decode the entered invite code and join the corresponding lobby.</summary>
+    /// <summary>Parses the entered lobby ID and joins the corresponding Steam lobby directly.</summary>
     public void JoinWithCode()
     {
-        string code = inviteCodeInput.text
-            .Trim()
-            .Replace("-", "")
-            .Replace(" ", "")
-            .ToUpper();
+        string raw = inviteCodeInput.text.Trim();
 
-        if (string.IsNullOrEmpty(code))
+        if (string.IsNullOrEmpty(raw))
         {
             SetStatus(ErrorEmptyCode);
             return;
         }
 
-        Debug.Log($"Joining lobby with code: {code}");
+        if (!ulong.TryParse(raw, out ulong lobbyId) || lobbyId == 0)
+        {
+            SetStatus(ErrorInvalidCode);
+            return;
+        }
 
-        // Networking and scene transition handled by LobbyManager
-        LobbyManager.Instance.JoinLobbyByCode(code);
+        Debug.Log($"Joining lobby with ID: {lobbyId}");
+        LobbyManager.Instance.JoinLobby(lobbyId);
     }
 
     private void OnJoinFailed(string reason)
