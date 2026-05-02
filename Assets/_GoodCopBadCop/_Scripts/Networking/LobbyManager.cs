@@ -86,10 +86,15 @@ public class LobbyManager : MonoBehaviour
     // =========================
     // HOST
     // =========================
-    public async void CreateLobby()
+
+    /// <summary>
+    /// Creates a lobby and starts the NGO host. Returns true on success, false on failure.
+    /// Awaiting this ensures NetworkManager is fully started before any RPC calls are made.
+    /// </summary>
+    public async Task<bool> CreateLobby()
     {
         if (NetworkManager.Singleton == null)
-            return;
+            return false;
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
@@ -100,7 +105,7 @@ public class LobbyManager : MonoBehaviour
             if (!createdLobby.HasValue)
             {
                 Debug.LogError("Failed to create Steam lobby.");
-                return;
+                return false;
             }
 
             CurrentLobby = createdLobby.Value;
@@ -118,12 +123,13 @@ public class LobbyManager : MonoBehaviour
                     Debug.LogError("Failed to start NGO host.");
                     CurrentLobby.Leave();
                     CurrentLobby = default;
-                    return;
+                    return false;
                 }
             }
 
             OnLobbyUpdated?.Invoke();
             Debug.Log($"Created lobby: {CurrentLobby.Id}");
+            return true;
         }
         else if (transport is UnityTransport)
         {
@@ -133,7 +139,11 @@ public class LobbyManager : MonoBehaviour
             {
                 NetworkManager.Singleton.StartHost();
             }
+
+            return true;
         }
+
+        return false;
     }
 
     // =========================
@@ -295,8 +305,11 @@ public class LobbyManager : MonoBehaviour
                 PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
                 GameManager.Instance.InitializeLateJoinClient(clientId);
             }
-            else
+            else if (!GameManager.Instance.IsTransitioningToLobby)
             {
+                // Spawn immediately for clients joining an existing lobby.
+                // If IsTransitioningToLobby is true, the spawn is deferred to
+                // LobbyTransitionSequence so it happens after the 2-second fade delay.
                 GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
             }
         }

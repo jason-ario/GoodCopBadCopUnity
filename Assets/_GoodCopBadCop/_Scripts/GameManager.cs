@@ -23,10 +23,22 @@ public class GameManager : NetworkBehaviour
 
     public bool HasGameStarted { get; private set; }
 
+    /// <summary>
+    /// True while a lobby transition sequence is in progress and the spawn is being deferred.
+    /// Set before CreateLobby() so OnClientConnected skips the immediate spawn.
+    /// </summary>
+    public bool IsTransitioningToLobby { get; private set; }
+
     private void Awake()
     {
         Instance = this;
     }
+
+    /// <summary>Reserves the lobby spawn for the transition sequence. Call before CreateLobby().</summary>
+    public void BeginLobbyTransition() => IsTransitioningToLobby = true;
+
+    /// <summary>Clears the transition flag without running the sequence. Call on lobby creation failure.</summary>
+    public void CancelLobbyTransition() => IsTransitioningToLobby = false;
 
     public void TryStartGame(bool skipTransition = false)
     {
@@ -34,6 +46,44 @@ public class GameManager : NetworkBehaviour
             StartGameServer(skipTransition);
         else
             RequestStartGameServerRpc(skipTransition);
+    }
+
+    /// <summary>
+    /// Runs the visual transition from the main menu into the lobby area on all clients.
+    /// Does not start the game or move players to the booth — call TryStartGame for that.
+    /// SERVER ONLY.
+    /// </summary>
+    public void TransitionToLobby()
+    {
+        if (!IsServer) return;
+        TransitionToLobbyClientRpc();
+    }
+
+    [ClientRpc]
+    private void TransitionToLobbyClientRpc()
+    {
+        StartCoroutine(LobbyTransitionSequence());
+    }
+
+    private IEnumerator LobbyTransitionSequence()
+    {
+        UIController.Instance.FadeIn();
+        AudioManager.Instance.FadeOutAmbientAudio();
+        SFXController.Instance.Play(transitionToGameplayStinger);
+
+        yield return new WaitForSeconds(2f);
+
+        if (IsServer)
+        {
+            SpawnAllPlayersAtLobby();
+            IsTransitioningToLobby = false;
+        }
+
+        MainMenuController.Instance.TransitionToGameplay();
+        UIController.Instance.ShowPlayerUI();
+        AudioManager.Instance.StartAmbientAudio();
+        UIController.Instance.FadeOut();
+        OnGameStart?.Invoke();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -77,7 +127,6 @@ public class GameManager : NetworkBehaviour
     private void StartGameClientRpc(bool skipTransition = false)
     {
         UIController.Instance.ShowPlayerUI();
-        StartCoroutine(TransitionToGameplay(skipTransition));
     }
 
     /// <summary>

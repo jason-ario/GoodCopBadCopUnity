@@ -26,7 +26,6 @@ public class PlayerInteractionController : NetworkBehaviour
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
         playerMovementController = GetComponent<PlayerMovementController>();
-        reticle = GameObject.FindFirstObjectByType<ReticleController>();
         _playerPickupController = GetComponent<PlayerPickupController>();
     }
     
@@ -53,6 +52,15 @@ public class PlayerInteractionController : NetworkBehaviour
         if (IsLocalPlayer == false)
         {
             return;
+        }
+
+        if (reticle == null)
+        {
+            reticle = GameObject.FindFirstObjectByType<ReticleController>();
+            if (reticle == null)
+            {
+                return;
+            }
         }
 
         if (UIController.Instance.IsPaused) return;

@@ -7,6 +7,7 @@ public class AudioManager : MonoBehaviour
     
     [SerializeField] private AudioSource ambientAudio;
     private float ambientAudioOriginalVolume;
+
     private void Awake()
     {
         ambientAudioOriginalVolume = ambientAudio.volume;
@@ -18,8 +19,10 @@ public class AudioManager : MonoBehaviour
         ambientAudio.DOFade(0, 3).OnComplete(ambientAudio.Stop);
     }
 
+    /// <summary>Cancels any in-progress fade-out and immediately starts ambient audio at full volume.</summary>
     public void StartAmbientAudio()
     {
+        ambientAudio.DOKill();
         ambientAudio.volume = ambientAudioOriginalVolume;
         ambientAudio.Play();
     }

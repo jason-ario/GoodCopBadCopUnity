@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using DG.Tweening;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -73,11 +74,15 @@ public class MainMenuController : MonoBehaviour
         currentScreen = target;
     }
     
-    /// <summary>Starts a new solo session immediately. Co-op is handled in-game via the payphone.</summary>
-    public void StartNewGame()
+    /// <summary>Starts a new solo session. Creates a lobby, spawns the player at the lobby position, and fades the menu out.</summary>
+    public async void StartNewGame()
     {
-        LobbyManager.Instance.CreateLobby();
-        GameManager.Instance.TryStartGame();
+        GameManager.Instance.BeginLobbyTransition();
+        bool success = await LobbyManager.Instance.CreateLobby();
+        if (success)
+            GameManager.Instance.TransitionToLobby();
+        else
+            GameManager.Instance.CancelLobbyTransition();
     }
 
     public void OpenJoinLobbyScreen() =>
@@ -111,7 +116,7 @@ public class MainMenuController : MonoBehaviour
     /// Resumes a previous session. Creates a solo lobby and starts immediately with no transition.
     /// Only call this when HasSaveFile is true.
     /// </summary>
-    public void ContinueGame()
+    public async void ContinueGame()
     {
         if (!HasSaveFile)
         {
@@ -119,8 +124,9 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        LobbyManager.Instance.CreateLobby();
-        GameManager.Instance.TryStartGame(skipTransition: true);
+        bool success = await LobbyManager.Instance.CreateLobby();
+        if (success)
+            GameManager.Instance.TryStartGame(skipTransition: true);
     }
 
     public void HideAllMenus()
