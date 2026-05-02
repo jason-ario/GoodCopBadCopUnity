@@ -59,6 +59,9 @@ public class SuspectCharacter : Interactable
     [Header("Anomalies")] [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
 
+    /// <summary>Returns true if this suspect has at least one active anomaly.</summary>
+    public bool IsInfected => anomalyController != null && anomalyController.activeAnomalies.Count > 0;
+
     //Responses
     public int ChosenEntryReasonIndex = -1;
     public int ChosenSymptomResponseIndex = -1;

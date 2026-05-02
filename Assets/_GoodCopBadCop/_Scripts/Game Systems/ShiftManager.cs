@@ -196,10 +196,10 @@ public class ShiftManager : NetworkBehaviour
     {
         suspectsProcessed += 1;
 
-        /*if (suspectCharacter.IsInfected)
+        if (suspectCharacter.IsInfected)
             suspectsPassedWrong += 1;
         else
-            suspectsPassedCorrect += 1;*/
+            suspectsPassedCorrect += 1;
     }
 
     /// <summary>Records a killed suspect and updates the correct/wrong tally.</summary>
@@ -207,14 +207,14 @@ public class ShiftManager : NetworkBehaviour
     {
         suspectsProcessed += 1;
 
-        /*if (suspectCharacter.IsInfected)
+        if (suspectCharacter.IsInfected)
             suspectsKilledCorrect += 1;
         else
-            suspectsKilledWrong += 1;*/
+            suspectsKilledWrong += 1;
     }
 
-    /// <summary>Records a quarantined suspect.</summary>
-    public void QuarantinedSuspect()
+    /// <summary>Records a quarantined suspect and updates the correct/wrong tally.</summary>
+    public void QuarantinedSuspect(SuspectCharacter suspectCharacter)
     {
         suspectsProcessed += 1;
         suspectsQuarantined += 1;
