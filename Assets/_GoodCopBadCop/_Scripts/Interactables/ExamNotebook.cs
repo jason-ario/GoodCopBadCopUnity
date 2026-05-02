@@ -1,5 +1,7 @@
 using System.Collections;
 using HighlightPlus;
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 
 public class ExamNotebook : PickableObject
@@ -22,6 +24,23 @@ public class ExamNotebook : PickableObject
         }
 
         pages[currentPage].SetChecklistInteractable(true);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // Pages are scene-hierarchy children of the notebook NetworkObject, so NGO's
+        // AutoObjectParentSync keeps them under the correct parent on all clients.
+        // Their own NetworkTransform would independently interpolate world-space position,
+        // causing them to lag behind the notebook on non-server clients. Disable it here
+        // on every client — it will be re-evaluated (and left disabled) by PlaceInSlotServerRpc
+        // when a page is eventually ripped out and slotted into the folder.
+        foreach (var page in pages)
+        {
+            NetworkTransform nt = page.GetComponent<NetworkTransform>();
+            if (nt != null) nt.enabled = false;
+        }
     }
 
     public override void OnEquipped(PlayerPickupController player)
@@ -102,10 +121,14 @@ public class ExamNotebook : PickableObject
     {
         yield return new WaitForSeconds(.5f);
         rippedPage.pageAnimator.SetTrigger("RipOut");
-        yield return new WaitForSeconds(.3f);
-        rippedPage.SetParent(playerPickupController.RightArmCamObjectContainer.transform);
-        yield return new WaitForSeconds(.1f);
+        yield return new WaitForSeconds(.4f);
+
+        // Place the page directly into the folder slot via the network-safe path.
+        // FolderController.AddDocument (dropObject=false) calls PlaceInSlotServerRpc so
+        // NT is disabled and all clients register the document in LateUpdate — no local
+        // hand-parent step needed, which was only visible on the owner anyway.
         folder.AddDocument(rippedPage, playerPickupController, false);
+
         GetComponent<HighlightEffect>().SetupMaterial();
         rippedPage.pageAnimator.SetTrigger("Reset");
         currentPage += 1;

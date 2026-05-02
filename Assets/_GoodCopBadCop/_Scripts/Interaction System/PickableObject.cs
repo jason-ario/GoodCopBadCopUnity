@@ -107,6 +107,9 @@ public class PickableObject : Interactable
         transform.position = position;
         transform.rotation = rotation;
 
+        // Prevent NGO from fighting the slot constraint by re-syncing the scene-hierarchy parent.
+        NetworkObject.AutoObjectParentSync = false;
+
         NetworkObject.RemoveOwnership();
 
         // Disable NT on server — the ParentConstraint will drive position on all clients.
@@ -127,6 +130,9 @@ public class PickableObject : Interactable
         RemoveParent();
         transform.position = position;
         transform.rotation = rotation;
+
+        // Prevent NGO from re-syncing the scene-hierarchy parent and fighting the constraint.
+        NetworkObject.AutoObjectParentSync = false;
 
         // Keep NT disabled — position is driven on all clients without NetworkTransform.
         NetworkTransform nt = GetComponent<NetworkTransform>();

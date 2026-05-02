@@ -393,6 +393,63 @@ public class FolderController : PickableObject
         isOpeningOrClosing = false;
     }
 
+    /// <summary>
+    /// Returns the slot Transform for the given exam page item name, or null if not applicable.
+    /// </summary>
+    public Transform GetSlotForPage(string itemName)
+    {
+        return itemName switch
+        {
+            "Behavior Exam Page"      => behavioralExamSlot,
+            "Mutation Exam Page"      => mutationExamSlot,
+            "Reality Exam Page"       => realityExamSlot,
+            "Documentation Exam Page" => documentationExamSlot,
+            "Biological Exam Page"    => biologicalExamSlot,
+            "ID card"                 => idCardSlot,
+            "Application"             => applicationSlot,
+            _                         => null,
+        };
+    }
+
+    /// <summary>
+    /// Registers a page into a slot using the same network-safe path that DropObject uses:
+    /// PlaceInSlotServerRpc disables NT everywhere and broadcasts PlaceInSlotClientRpc so all
+    /// clients register the document in FolderController.LateUpdate.
+    /// </summary>
+    private void PlacePageInSlotNetworked(PickableObject page, Transform slot)
+    {
+        NetworkObject slotOwner = slot.GetComponentInParent<NetworkObject>();
+        if (slotOwner == null)
+        {
+            // Fallback: local constraint only (should never happen in practice).
+            page.SetParent(slot);
+            return;
+        }
+
+        string slotPath = GetRelativePath(slotOwner.transform, slot);
+        page.PlaceInSlotServerRpc(
+            new NetworkObjectReference(slotOwner),
+            slotPath,
+            slot.position,
+            slot.rotation);
+
+        RegisterDocumentServerRpc(new NetworkObjectReference(page.NetworkObject));
+    }
+
+    // Mirrors PlayerPickupController.GetRelativePath so we can build slot paths from here.
+    private static string GetRelativePath(Transform root, Transform target)
+    {
+        if (target == root) return string.Empty;
+        System.Collections.Generic.List<string> parts = new System.Collections.Generic.List<string>();
+        Transform current = target;
+        while (current != null && current != root)
+        {
+            parts.Insert(0, current.name);
+            current = current.parent;
+        }
+        return string.Join("/", parts);
+    }
+
     public void AddDocument(PickableObject pickableObject, PlayerPickupController player, bool dropObject)
     {
         string itemName = pickableObject.ItemData.name;
@@ -438,7 +495,7 @@ public class FolderController : PickableObject
             }
             else
             {
-                behaviorExamPage.SetParent(behavioralExamSlot);
+                PlacePageInSlotNetworked(behaviorExamPage, behavioralExamSlot);
             }
             
             behaviorExamPage.AddToFolder(this);
@@ -459,7 +516,7 @@ public class FolderController : PickableObject
             }
             else
             {
-                mutationExamPage.SetParent(mutationExamSlot);
+                PlacePageInSlotNetworked(mutationExamPage, mutationExamSlot);
             }
             
             mutationExamPage.AddToFolder(this);
@@ -480,7 +537,7 @@ public class FolderController : PickableObject
             }
             else
             {
-                realityExamPage.SetParent(realityExamSlot);
+                PlacePageInSlotNetworked(realityExamPage, realityExamSlot);
             }
             
             realityExamPage.AddToFolder(this);
@@ -501,7 +558,7 @@ public class FolderController : PickableObject
             }
             else
             {
-                documentationExamPage.SetParent(documentationExamSlot);
+                PlacePageInSlotNetworked(documentationExamPage, documentationExamSlot);
             }
             
             documentationExamPage.AddToFolder(this);
@@ -522,7 +579,7 @@ public class FolderController : PickableObject
             }
             else
             {
-                biologicalExamPage.SetParent(biologicalExamSlot);
+                PlacePageInSlotNetworked(biologicalExamPage, biologicalExamSlot);
             }
             
             biologicalExamPage.AddToFolder(this);

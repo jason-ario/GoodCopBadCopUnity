@@ -286,11 +286,19 @@ public class LobbyManager : MonoBehaviour
 
         OnLobbyUpdated?.Invoke();
 
-        // Spawn the connecting player at the lobby spawn point.
-        // PlayerSpawner's double-spawn guard prevents duplicates if TransitionToGameplay already spawned them.
+        // If the game is already in progress, spawn the late joiner at the booth so they
+        // land alongside the server player. Otherwise spawn at the lobby spawn point as normal.
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            if (GameManager.Instance.HasGameStarted)
+            {
+                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+                GameManager.Instance.InitializeLateJoinClient(clientId);
+            }
+            else
+            {
+                GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            }
         }
     }
 

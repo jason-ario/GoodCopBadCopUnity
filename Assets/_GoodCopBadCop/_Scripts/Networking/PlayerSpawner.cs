@@ -119,4 +119,13 @@ public class PlayerSpawner : MonoBehaviour
         int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
         return multiplayerSpawnPoints[index];
     }
+
+    /// <summary>
+    /// Spawns a player for the given client directly at the booth gameplay spawn point.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnPlayerAtBooth(ulong clientId)
+    {
+        SpawnPlayerAtPoint(clientId, isSinglePlayer: false, GetBoothSpawnPoint(clientId));
+    }
 }
