@@ -16,8 +16,10 @@ public static class InviteCodeUtility
     {
         uint shortId = (uint)InviteCodeUtility.Decode(code);
 
-        const ulong SteamLobbyPrefix = 0x110000100000000; 
-        // This prefix matches Steam lobby IDs
+        // Steam lobby CSteamID prefix:
+        // Universe = 1 (Public, bits 56-63), AccountType = 8 (Chat, bits 52-55),
+        // Instance = 0x40000 (lobby flag, bits 32-51)
+        const ulong SteamLobbyPrefix = 0x0180004000000000UL;
 
         return SteamLobbyPrefix | shortId;
     }
