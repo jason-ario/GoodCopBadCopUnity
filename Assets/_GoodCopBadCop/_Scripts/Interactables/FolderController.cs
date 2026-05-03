@@ -169,7 +169,7 @@ public class FolderController : PickableObject
     public void OnHandOff()
     {
         isHandedOff.Value = true;
-        isOpen.Value = false;
+        SetOpenServerRpc(false);
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
@@ -368,28 +368,31 @@ public class FolderController : PickableObject
     {
         if (isOpeningOrClosing == false && isOpen.Value == false)
         {
-            Debug.Log("Open");
             playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
             StopAllCoroutines();
             StartCoroutine(WaitAndOpen());
         }
         else
         {
-            Debug.Log("Close");
             playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
             StopAllCoroutines();
-            isOpen.Value = false;
-            anim.SetBool("Open", false);
+            SetOpenServerRpc(false);
             isOpeningOrClosing = false;
         }
     }
-    
+
+    /// <summary>Routes open/close state changes through the server so the NetworkVariable write is always authoritative.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void SetOpenServerRpc(bool open)
+    {
+        isOpen.Value = open;
+    }
+
     IEnumerator WaitAndOpen()
     {
         isOpeningOrClosing = true;
         yield return new WaitForSeconds(.4f);
-        isOpen.Value = true;
-        anim.SetBool("Open", true);
+        SetOpenServerRpc(true);
         isOpeningOrClosing = false;
     }
 
