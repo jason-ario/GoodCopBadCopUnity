@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class Guard : Interactable
@@ -8,18 +9,36 @@ public class Guard : Interactable
     [SerializeField] private AudioSource audioSource;
 
     /// <summary>
-    /// Makes the guard say a blurb and play voice audio via the dialogue manager.
+    /// Makes the guard say a blurb and play voice audio via the dialogue manager on all clients.
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        DialogueManager.Instance.SpawnSubtitles(dialogueBlurb, guardName, Color.white);
+
+        if (IsServer)
+        {
+            ShowDialogueClientRpc(dialogueBlurb, guardName);
+        }
+        else
+        {
+            ShowDialogueServerRpc(dialogueBlurb, guardName);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ShowDialogueServerRpc(string dialogue, string speakerName)
+    {
+        ShowDialogueClientRpc(dialogue, speakerName);
+    }
+
+    [ClientRpc]
+    private void ShowDialogueClientRpc(string dialogue, string speakerName)
+    {
+        DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white);
 
         if (voiceAudioClips != null && voiceAudioClips.Length > 0 && audioSource != null)
         {
-            DialogueManager.Instance.PlayDialogueAudio(dialogueBlurb, voiceAudioClips, audioSource);
+            DialogueManager.Instance.PlayDialogueAudio(dialogue, voiceAudioClips, audioSource);
         }
     }
-    
-    
 }
