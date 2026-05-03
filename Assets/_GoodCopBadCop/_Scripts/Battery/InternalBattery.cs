@@ -15,8 +15,23 @@ public class InternalBattery : NetworkBehaviour
     {
         pickableObject = GetComponent<PickableObject>();
         currentBatteryJuice.Value = maxBatteryCapacity;
+        currentBatteryJuice.OnValueChanged += OnBatteryJuiceChanged;
         pickableObject.OnEquip += ShowBatteryBar;
         pickableObject.OnUnEquip += PlayerUI.Instance.BatteryBar.Hide;
+    }
+
+    public override void OnDestroy()
+    {
+        currentBatteryJuice.OnValueChanged -= OnBatteryJuiceChanged;
+        base.OnDestroy();
+    }
+
+    private void OnBatteryJuiceChanged(float previousValue, float newValue)
+    {
+        if (PlayerUI.Instance != null && PlayerUI.Instance.BatteryBar.gameObject.activeSelf)
+        {
+            PlayerUI.Instance.BatteryBar.UpdateBar(this);
+        }
     }
 
     void ShowBatteryBar()
@@ -51,7 +66,6 @@ public class InternalBattery : NetworkBehaviour
     private void DrainBatteryServerRpc(float amount)
     {
         currentBatteryJuice.Value = Mathf.Max(currentBatteryJuice.Value - amount, 0f);
-        PlayerUI.Instance.BatteryBar.UpdateBar(this);
     }
 
     public void Recharge(float amount)

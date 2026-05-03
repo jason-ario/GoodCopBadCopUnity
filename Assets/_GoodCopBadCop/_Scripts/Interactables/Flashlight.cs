@@ -10,6 +10,9 @@ public class Flashlight : PickableObject
     
     private InternalBattery internalBattery;
     private NetworkVariable<bool> _isOn = new NetworkVariable<bool>(false);
+    [SerializeField] private MeshRenderer _meshRenderer;
+    [SerializeField] Material offMaterial;
+    [SerializeField] Material onMaterial;
 
     public override void OnNetworkSpawn()
     {
@@ -45,6 +48,10 @@ public class Flashlight : PickableObject
     {
         flashlightLight.SetActive(current);
         audioSource.PlayOneShot(current ? flashlightOnClip : flashlightOffClip);
+        
+        Material[] materials = _meshRenderer.materials;
+        materials[1] = current ? onMaterial : offMaterial;
+        _meshRenderer.materials = materials;
     }
 
     public override void OnStartUse()

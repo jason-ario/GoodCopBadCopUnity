@@ -5436,6 +5436,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b846c651e3d2dff45aa10a5f6ec58ad9, type: 2}
+    - target: {fileID: -7166418665509197319, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: b846c651e3d2dff45aa10a5f6ec58ad9, type: 2}
     - target: {fileID: -679330397548344201, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -5547,7 +5551,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4203312976
+  GlobalObjectIdHash: 2241049605
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -5852,6 +5856,9 @@ MonoBehaviour:
   flashlightOnClip: {fileID: 8300000, guid: 446a67ef39453ee45b9d6a03388f9ebd, type: 3}
   flashlightOffClip: {fileID: 8300000, guid: 7c297f97e9610db429854ad4cc4f284f, type: 3}
   audioSource: {fileID: 9115597875648589982}
+  _meshRenderer: {fileID: 4066335982099831941}
+  offMaterial: {fileID: 2100000, guid: b846c651e3d2dff45aa10a5f6ec58ad9, type: 2}
+  onMaterial: {fileID: 2100000, guid: dfa807d6379fd2e44aa9c98e41a7a915, type: 2}
 --- !u!82 &9115597875648589982
 AudioSource:
   m_ObjectHideFlags: 0
@@ -5964,3 +5971,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxBatteryCapacity: 1
   batteryDrainRate: 0.01
+--- !u!23 &4066335982099831941 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7166418665509197319, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
+  m_PrefabInstance: {fileID: 2658605068951713148}
+  m_PrefabAsset: {fileID: 0}
