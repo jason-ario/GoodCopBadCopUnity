@@ -36,6 +36,9 @@ public class NameTag : NetworkBehaviour
 
         if (IsOwner)
         {
+            // Hide the local player's own name tag.
+            gameObject.SetActive(false);
+
             // Only set the Steam name when using Facepunch transport.
             if (NetworkManager.Singleton != null &&
                 NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport)
@@ -45,8 +48,11 @@ public class NameTag : NetworkBehaviour
         }
         else
         {
-            // Apply the current value that was already synced.
-            ApplyName(_playerName.Value.ToString());
+            // Apply the current value if it has already been synced by the time we spawn.
+            // OnValueChanged will handle late arrivals if the value isn't set yet.
+            string currentName = _playerName.Value.ToString();
+            if (!string.IsNullOrEmpty(currentName))
+                ApplyName(currentName);
         }
     }
 
