@@ -279,6 +279,8 @@ public class ShiftManager : NetworkBehaviour
             introCutscene.gameObject.SetActive(false);
             UIController.Instance.HideEndOfShiftReport();
             SuspectController.Instance.ResetSuspects();
+            if (PlayerInstance.Instance != null)
+                PlayerInstance.Instance.SetIsOutside(false);
             yield return new WaitForEndOfFrame();
             EnablePlayerControl();
             OnShiftReady?.Invoke();
