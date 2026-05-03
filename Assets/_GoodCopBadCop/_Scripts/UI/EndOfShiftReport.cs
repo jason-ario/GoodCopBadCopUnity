@@ -145,7 +145,8 @@ public class EndOfShiftReportUI : MonoBehaviour
             yield return new WaitForSeconds(lineRevealDelay);
         }
 
-        GlobalHostVariables.Instance.AddMoney(total);
+        if (GlobalHostVariables.Instance.IsServer)
+            GlobalHostVariables.Instance.AddMoney(total);
         
         yield return RevealNetTotal(total);
 

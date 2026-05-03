@@ -172,22 +172,49 @@ public class ShiftManager : NetworkBehaviour
 
     public void EndShift()
     {
+        if (!IsServer) return;
+
+        CompletedShift();
+
+        EndShiftClientRpc(
+            suspectsProcessed,
+            suspectsPassedCorrect,
+            suspectsPassedWrong,
+            suspectsQuarantined,
+            suspectsKilledCorrect,
+            suspectsKilledWrong,
+            couponsPerPassed,
+            couponsPenaltyPerPassed,
+            couponsPerKilled,
+            couponsPenaltyPerKilled,
+            couponsPerQuarantined,
+            couponsPenaltyPerQuarantined
+        );
+    }
+
+    [ClientRpc]
+    private void EndShiftClientRpc(
+        int processed, int passedCorrect, int passedWrong,
+        int quarantined, int killedCorrect, int killedWrong,
+        int perPassed, int penaltyPerPassed,
+        int perKilled, int penaltyPerKilled,
+        int perQuarantined, int penaltyPerQuarantined)
+    {
         SFXController.Instance.Play(endOfLevelSound);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().StopMoving();
 
         var rows = new List<EndOfShiftReportUI.ReportRowData>
         {
-            new EndOfShiftReportUI.ReportRowData("Processed: " + suspectsProcessed + " Citizens", 0, false, true),
-            new EndOfShiftReportUI.ReportRowData("Passed: " + (suspectsPassedCorrect + suspectsPassedWrong), 0, false, true),
-            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + suspectsPassedCorrect, couponsPerPassed * suspectsPassedCorrect, false),
-            new EndOfShiftReportUI.ReportRowData("    Infected: " + suspectsPassedWrong, couponsPerPassed * suspectsPassedWrong, true),
-            new EndOfShiftReportUI.ReportRowData("Quarantined: " + suspectsQuarantined, 0, false, false),
-            new EndOfShiftReportUI.ReportRowData("Killed: " + (suspectsKilledCorrect + suspectsKilledWrong), 0, false, true),
-            new EndOfShiftReportUI.ReportRowData("    Infected: " + suspectsKilledCorrect, couponsPerKilled * suspectsKilledCorrect, false),
-            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + suspectsKilledWrong, couponsPenaltyPerKilled * suspectsKilledWrong, true),
+            new EndOfShiftReportUI.ReportRowData("Processed: " + processed + " Citizens", 0, false, true),
+            new EndOfShiftReportUI.ReportRowData("Passed: " + (passedCorrect + passedWrong), 0, false, true),
+            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + passedCorrect, perPassed * passedCorrect, false),
+            new EndOfShiftReportUI.ReportRowData("    Infected: " + passedWrong, perPassed * passedWrong, true),
+            new EndOfShiftReportUI.ReportRowData("Quarantined: " + quarantined, 0, false, false),
+            new EndOfShiftReportUI.ReportRowData("Killed: " + (killedCorrect + killedWrong), 0, false, true),
+            new EndOfShiftReportUI.ReportRowData("    Infected: " + killedCorrect, perKilled * killedCorrect, false),
+            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + killedWrong, penaltyPerKilled * killedWrong, true),
         };
 
-        CompletedShift();
         UIController.Instance.ShowEndShiftReport(rows);
     }
 
