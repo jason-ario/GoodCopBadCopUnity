@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -77,12 +78,50 @@ public class MainMenuController : MonoBehaviour
     /// <summary>Starts a new solo session. Creates a lobby, spawns the player at the lobby position, and fades the menu out.</summary>
     public async void StartNewGame()
     {
-        GameManager.Instance.BeginLobbyTransition();
-        bool success = await LobbyManager.Instance.CreateLobby();
-        if (success)
-            GameManager.Instance.TransitionToLobby();
-        else
+        Debug.Log("[StartNewGame] Called.");
+        try
+        {
+            Debug.Log("[StartNewGame] Calling BeginLobbyTransition.");
+            GameManager.Instance.BeginLobbyTransition();
+
+            Debug.Log("[StartNewGame] Awaiting CreateLobby...");
+            bool success = await LobbyManager.Instance.CreateLobby();
+            Debug.Log($"[StartNewGame] CreateLobby returned: {success}");
+
+            if (success)
+            {
+                await WaitUntilHostReady();
+                Debug.Log($"[StartNewGame] IsServer={GameManager.Instance.IsServer} IsHost={Unity.Netcode.NetworkManager.Singleton.IsHost} — calling TransitionToLobby.");
+                GameManager.Instance.TransitionToLobby();
+            }
+            else
+            {
+                Debug.LogError("[StartNewGame] CreateLobby failed — cancelling transition.");
+                GameManager.Instance.CancelLobbyTransition();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[StartNewGame] Unhandled exception: {e}");
             GameManager.Instance.CancelLobbyTransition();
+        }
+    }
+
+    /// <summary>Waits until the NetworkManager has fully promoted this peer to host/server.</summary>
+    private static async System.Threading.Tasks.Task WaitUntilHostReady()
+    {
+        const int TimeoutMs = 5000;
+        const int PollIntervalMs = 50;
+        int elapsed = 0;
+
+        while (!Unity.Netcode.NetworkManager.Singleton.IsHost && elapsed < TimeoutMs)
+        {
+            await System.Threading.Tasks.Task.Delay(PollIntervalMs);
+            elapsed += PollIntervalMs;
+        }
+
+        if (!Unity.Netcode.NetworkManager.Singleton.IsHost)
+            Debug.LogWarning("[StartNewGame] Timed out waiting for host to be ready.");
     }
 
     public void OpenJoinLobbyScreen() =>

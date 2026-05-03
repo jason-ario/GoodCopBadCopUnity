@@ -43,7 +43,7 @@ public class LobbyManager : MonoBehaviour
 
         facepunchTransport = NetworkManager.Singleton.GetComponent<FacepunchTransport>();
 
-        NetworkTransport networkTransport = NetworkManager.Singleton.GetComponent<NetworkTransport>();
+        NetworkTransport networkTransport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
         if (networkTransport is FacepunchTransport)
         {
@@ -55,6 +55,11 @@ public class LobbyManager : MonoBehaviour
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+    }
+
+    private void Update()
+    {
+        SteamClient.RunCallbacks();
     }
 
     private void OnDestroy()
@@ -109,11 +114,12 @@ public class LobbyManager : MonoBehaviour
 
         if (transport is FacepunchTransport facepunch)
         {
+            Debug.Log("[CreateLobby] FacepunchTransport detected — creating Steam lobby...");
             var createdLobby = await SteamMatchmaking.CreateLobbyAsync(MaxLobbyMembers);
 
             if (!createdLobby.HasValue)
             {
-                Debug.LogError("Failed to create Steam lobby.");
+                Debug.LogError("[CreateLobby] Failed to create Steam lobby — CreateLobbyAsync returned null.");
                 return false;
             }
 
@@ -124,20 +130,27 @@ public class LobbyManager : MonoBehaviour
 
             // Host targets self for Facepunch transport.
             facepunch.targetSteamId = SteamClient.SteamId;
+            Debug.Log($"[CreateLobby] Steam lobby created: {CurrentLobby.Id}, targetSteamId={facepunch.targetSteamId}");
 
             if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
             {
+                Debug.Log("[CreateLobby] Calling StartHost...");
                 if (!NetworkManager.Singleton.StartHost())
                 {
-                    Debug.LogError("Failed to start NGO host.");
+                    Debug.LogError("[CreateLobby] Failed to start NGO host.");
                     CurrentLobby.Leave();
                     CurrentLobby = default;
                     return false;
                 }
+                Debug.Log("[CreateLobby] StartHost succeeded.");
+            }
+            else
+            {
+                Debug.Log($"[CreateLobby] Skipping StartHost — already IsHost={NetworkManager.Singleton.IsHost} IsServer={NetworkManager.Singleton.IsServer}");
             }
 
             OnLobbyUpdated?.Invoke();
-            Debug.Log($"Created lobby: {CurrentLobby.Id}");
+            Debug.Log($"[CreateLobby] Done. Lobby: {CurrentLobby.Id}");
             return true;
         }
         else if (transport is UnityTransport)
