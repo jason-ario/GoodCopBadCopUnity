@@ -227,15 +227,15 @@ public class SuspectController : NetworkBehaviour
         Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newIDCard = Instantiate(idCard, randomPos, Quaternion.identity) as NetworkObject;
-        newIDCard.GetComponent<IDCard>().SetInfo(suspectCharacter);
         newIDCard.Spawn();
+        newIDCard.GetComponent<IDCard>().SetInfo(suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
         randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
-        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
         newApplicationForm.Spawn();
+        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
     }
 

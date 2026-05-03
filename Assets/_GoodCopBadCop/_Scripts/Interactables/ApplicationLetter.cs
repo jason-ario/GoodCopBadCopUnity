@@ -1,6 +1,7 @@
 using System.Linq;
 using HighlightPlus;
 using TMPro;
+using Unity.Netcode;
 using UnityEngine;
 
 public class ApplicationLetter : FolderItem
@@ -11,6 +12,11 @@ public class ApplicationLetter : FolderItem
     [SerializeField] private TextMeshPro reasonForEntryText;
     [SerializeField] private TextMeshPro idNumberText;
 
+    /// <summary>
+    /// Populates the letter locally (host/server) then broadcasts the final display strings —
+    /// including any server-side anomaly mutations — to all clients.
+    /// Must be called after Spawn() so the ClientRpc can be delivered.
+    /// </summary>
     public void SetInfo(SuspectCharacter suspectCharacter)
     {
         SuspectData suspectData = suspectCharacter.Data;
@@ -18,14 +24,15 @@ public class ApplicationLetter : FolderItem
         birthDateText.text = suspectData.DateOfBirth;
         sexText.text = suspectData.Sex;
         idNumberText.text = suspectData.IDNumber;
-        
+
         int dayNo = ShiftManager.Instance.CurrentDay;
         string[] possibleReasons;
-        
+
         if (dayNo < 11)
         {
             possibleReasons = suspectData.entryReasons.earlyDaysReasons;
-        } else if (dayNo < 21)
+        }
+        else if (dayNo < 21)
         {
             possibleReasons = suspectData.entryReasons.midDaysReasons;
         }
@@ -36,14 +43,37 @@ public class ApplicationLetter : FolderItem
 
         int chosenReason = suspectCharacter.ChosenEntryReasonIndex;
         reasonForEntryText.text = possibleReasons[chosenReason];
-        
+
+        // Anomaly mutations use Random — run on server only and ship final strings.
         CheckAnomalies(suspectCharacter);
-        
-        //Change fonts
+
+        // Change fonts
         nameText.font = suspectData.handwritingFont;
         reasonForEntryText.font = suspectData.handwritingFont;
         birthDateText.font = suspectData.handwritingFont;
         sexText.font = suspectData.handwritingFont;
+
+        // Broadcast the final (post-anomaly) display strings to clients.
+        SyncToClientsClientRpc(
+            nameText.text,
+            birthDateText.text,
+            sexText.text,
+            idNumberText.text,
+            reasonForEntryText.text
+        );
+    }
+
+    /// <summary>Applies all pre-computed display strings sent from the server.</summary>
+    [ClientRpc]
+    private void SyncToClientsClientRpc(string name, string dob, string sex, string idNumber, string entryReason)
+    {
+        // Host already applied values in SetInfo; skip to avoid double-apply.
+        if (IsServer) return;
+        nameText.text = name;
+        birthDateText.text = dob;
+        sexText.text = sex;
+        idNumberText.text = idNumber;
+        reasonForEntryText.text = entryReason;
     }
 
     void CheckAnomalies(SuspectCharacter suspectCharacter)
