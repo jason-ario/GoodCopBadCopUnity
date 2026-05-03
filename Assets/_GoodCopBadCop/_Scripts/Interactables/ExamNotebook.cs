@@ -230,7 +230,13 @@ public class ExamNotebook : PickableObject
         yield return new WaitForSeconds(.5f);
 
         int pageIndex = System.Array.IndexOf(pages, rippedPage);
-        RipOutPageClientRpc(pageIndex);
+
+        // All three calls below must originate from the server so their ClientRpc broadcasts
+        // reach every connected client. A non-host client calling a [ClientRpc] directly only
+        // executes it locally — the other clients never see it. Routing through [ServerRpc]
+        // wrappers ensures the server is always the one invoking the ClientRpc, regardless of
+        // which client initiated the rip-out.
+        BroadcastRipOutPageServerRpc(pageIndex);
 
         yield return new WaitForSeconds(.4f);
 
@@ -239,15 +245,32 @@ public class ExamNotebook : PickableObject
         // NT is disabled and all clients register the document in LateUpdate.
         folder.AddDocument(rippedPage, playerPickupController, false);
 
-        // Route the page advance through a ServerRpc so it works regardless of whether
-        // the interacting client is the host or a pure client. The server writes the
-        // NetworkVariable which fires OnValueChanged → ApplyCurrentPage on all clients.
         AdvancePageServerRpc(pageIndex);
 
         // SetupMaterial is deferred inside ResetPageClientRpc to ensure PlaceInSlotClientRpc
         // has detached the page from this hierarchy before HighlightEffect scans children.
-        ResetPageClientRpc(pageIndex);
+        BroadcastResetPageServerRpc(pageIndex);
         addingToFolder = false;
+    }
+
+    /// <summary>
+    /// Routes RipOutPageClientRpc through the server so it broadcasts to all clients
+    /// regardless of whether the initiating machine is the host or a pure client.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void BroadcastRipOutPageServerRpc(int pageIndex)
+    {
+        RipOutPageClientRpc(pageIndex);
+    }
+
+    /// <summary>
+    /// Routes ResetPageClientRpc through the server so it broadcasts to all clients
+    /// regardless of whether the initiating machine is the host or a pure client.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void BroadcastResetPageServerRpc(int pageIndex)
+    {
+        ResetPageClientRpc(pageIndex);
     }
 
     /// <summary>
