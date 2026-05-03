@@ -158,7 +158,16 @@ public class LobbyManager : MonoBehaviour
     // =========================
     // CLIENT
     // =========================
-    public async void JoinLobby(ulong lobbyId)
+
+    /// <summary>Joins a Steam lobby by ID (Facepunch transport) or connects to a LAN host at 127.0.0.1 (UnityTransport).
+    /// Pass lobbyId = 0 when using UnityTransport to fall through to the LAN path.</summary>
+    public async void JoinLobby(ulong lobbyId) => await JoinLobbyInternal(lobbyId, "127.0.0.1");
+
+    /// <summary>Joins a LAN host at the given IP address using UnityTransport.
+    /// Ignored when FacepunchTransport is the active transport.</summary>
+    public async void JoinLobbyLAN(string address) => await JoinLobbyInternal(0, address);
+
+    private async Task JoinLobbyInternal(ulong lobbyId, string lanAddress)
     {
         if (NetworkManager.Singleton == null)
             return;
@@ -200,7 +209,8 @@ public class LobbyManager : MonoBehaviour
         }
         else if (transport is UnityTransport unityTransport)
         {
-            unityTransport.SetConnectionData("127.0.0.1", 7777);
+            unityTransport.SetConnectionData(lanAddress, 7777);
+            Debug.Log($"[JoinLobby] Connecting to LAN host at {lanAddress}:7777");
 
             if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
             {
