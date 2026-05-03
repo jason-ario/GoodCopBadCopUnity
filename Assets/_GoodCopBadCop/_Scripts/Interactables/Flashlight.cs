@@ -20,7 +20,15 @@ public class Flashlight : PickableObject
         _isOn.OnValueChanged += OnIsOnChanged;
 
         // Sync the light state for late-joining clients.
+        UpdateLight();
+    }
+
+    void UpdateLight()
+    {
         flashlightLight.SetActive(_isOn.Value);
+        Material[] materials = _meshRenderer.materials;
+        materials[1] = _isOn.Value ? onMaterial : offMaterial;
+        _meshRenderer.materials = materials;
     }
 
     public override void OnNetworkDespawn()
@@ -48,10 +56,7 @@ public class Flashlight : PickableObject
     {
         flashlightLight.SetActive(current);
         audioSource.PlayOneShot(current ? flashlightOnClip : flashlightOffClip);
-        
-        Material[] materials = _meshRenderer.materials;
-        materials[1] = current ? onMaterial : offMaterial;
-        _meshRenderer.materials = materials;
+        UpdateLight();
     }
 
     public override void OnStartUse()

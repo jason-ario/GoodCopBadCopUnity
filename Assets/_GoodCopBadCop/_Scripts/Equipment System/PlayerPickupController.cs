@@ -80,6 +80,21 @@ public class PlayerPickupController : NetworkBehaviour
         _playerInteractionController = gameObject.GetComponent<PlayerInteractionController>();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // Late-join sync: if both NetworkVariables already hold valid pickup state,
+        // reconstruct the body-arm follow immediately without waiting for OnValueChanged.
+        if (!IsOwner && itemEquippedIndex.Value >= 0 && _heldObjectRef.Value.NetworkObjectId != 0)
+        {
+            // Trigger the item-equipped path so containers and body item are set up first,
+            // then apply the world-object follow.
+            OnItemValueChanged(-1, itemEquippedIndex.Value);
+            ApplyBodyConstraint();
+        }
+    }
+
     private void Start()
     {
         if (!IsOwner)
@@ -115,7 +130,9 @@ public class PlayerPickupController : NetworkBehaviour
 
         // Non-owner clients constrain the world object to the body arm so they see it there.
         // (Owner already constrained it to the camera arm in PickUpObject.)
-        // This also acts as a fallback if _heldObjectRef arrived before itemEquippedIndex.
+        // Called here regardless of _heldObjectRef order — ApplyBodyConstraint guards
+        // internally against missing refs and will no-op if _heldObjectRef hasn't arrived yet;
+        // OnHeldObjectRefChanged will call it again once that variable syncs.
         if (!IsOwner)
             ApplyBodyConstraint();
 
