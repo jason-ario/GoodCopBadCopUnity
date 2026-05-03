@@ -12,6 +12,10 @@ public class ExamNotebook : PickableObject
 
     private int currentPage = 0;
 
+    // Synced so any client that picks up the notebook after a page has been ripped out
+    // knows which page is now active and can enable its checklist correctly.
+    private NetworkVariable<int> _currentPage = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     // One bitmask per page slot — bit N = checklist item N is checked.
     // Declared as fields so NGO registers and syncs them from the notebook's NetworkObject,
     // which is the only properly spawned NetworkObject in this hierarchy.
@@ -31,10 +35,36 @@ public class ExamNotebook : PickableObject
         {
             page.SetChecklistInteractable(false);
             page.SetInteractable(false);
+            page.CanPickUpManually = false;
             page.Initialize(this);
         }
 
         pages[currentPage].SetChecklistInteractable(true);
+
+        // Remove page-owned InteractableColliders from the notebook's own cache so that
+        // PickableObject.SetInteractable (called on equip/unequip) never re-enables them.
+        // Each page manages its own collider state independently via SetInteractable.
+        ExcludePageCollidersFromCache();
+    }
+
+    /// <summary>
+    /// Rebuilds the notebook's InteractableCollider cache excluding any colliders that belong
+    /// to a page. Pages manage their own collider state — the notebook must not touch them.
+    /// Call this after Awake and again after a page is ripped out.
+    /// </summary>
+    private void ExcludePageCollidersFromCache()
+    {
+        var pageColliderSet = new System.Collections.Generic.HashSet<InteractableCollider>();
+        foreach (var page in pages)
+        {
+            if (page == null) continue;
+            foreach (var ic in page.GetComponentsInChildren<InteractableCollider>(true))
+                pageColliderSet.Add(ic);
+        }
+
+        var all = GetComponentsInChildren<InteractableCollider>(true);
+        var notebookOnly = System.Array.FindAll(all, ic => !pageColliderSet.Contains(ic));
+        OverrideInteractableColliders(notebookOnly);
     }
 
     public override void OnNetworkSpawn()
@@ -66,6 +96,25 @@ public class ExamNotebook : PickableObject
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
                 pages[capturedPage].ApplyBitmask(newValue);
+        }
+
+        // Sync the active page for late joiners: disable all non-ripped pages' checklists,
+        // then enable only the current active page's checklist.
+        ApplyCurrentPage(_currentPage.Value);
+        _currentPage.OnValueChanged += (_, newValue) => ApplyCurrentPage(newValue);
+    }
+
+    /// <summary>
+    /// Enables the checklist on the active page and disables it on all others.
+    /// Safe to call on any client at any time.
+    /// </summary>
+    private void ApplyCurrentPage(int page)
+    {
+        currentPage = page;
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i] == null) continue;
+            pages[i].SetChecklistInteractable(i == currentPage && !pages[i].isRippedOut);
         }
     }
 
@@ -123,6 +172,15 @@ public class ExamNotebook : PickableObject
     public override void OnUnequip(PlayerPickupController player)
     {
         base.OnUnequip(player);
+
+        // base.OnUnequip calls SetInteractable(true), which walks GetComponentsInChildren<InteractableCollider>
+        // and re-enables colliders on pages that are still bound to the notebook. Re-disable them.
+        foreach (var page in pages)
+        {
+            if (page == null || page.isRippedOut) continue;
+            page.SetInteractable(false);
+        }
+
         foreach (var itemHeld in player.RightArmCamObjectContainer.ItemsHeld)
         {
             if (itemHeld.ItemData.name == "RedPencil")
@@ -170,7 +228,10 @@ public class ExamNotebook : PickableObject
     IEnumerator WaitAndParent(ExamPage rippedPage, FolderController folder)
     {
         yield return new WaitForSeconds(.5f);
-        rippedPage.pageAnimator.SetTrigger("RipOut");
+
+        int pageIndex = System.Array.IndexOf(pages, rippedPage);
+        RipOutPageClientRpc(pageIndex);
+
         yield return new WaitForSeconds(.4f);
 
         // Place the page directly into the folder slot via the network-safe path.
@@ -178,10 +239,78 @@ public class ExamNotebook : PickableObject
         // NT is disabled and all clients register the document in LateUpdate.
         folder.AddDocument(rippedPage, playerPickupController, false);
 
-        GetComponent<HighlightEffect>().SetupMaterial();
-        rippedPage.pageAnimator.SetTrigger("Reset");
-        currentPage += 1;
-        pages[currentPage].SetChecklistInteractable(true);
+        // Route the page advance through a ServerRpc so it works regardless of whether
+        // the interacting client is the host or a pure client. The server writes the
+        // NetworkVariable which fires OnValueChanged → ApplyCurrentPage on all clients.
+        AdvancePageServerRpc(pageIndex);
+
+        // SetupMaterial is deferred inside ResetPageClientRpc to ensure PlaceInSlotClientRpc
+        // has detached the page from this hierarchy before HighlightEffect scans children.
+        ResetPageClientRpc(pageIndex);
         addingToFolder = false;
+    }
+
+    /// <summary>
+    /// Asks the server to advance _currentPage to pageIndex+1.
+    /// Using a ServerRpc ensures this works whether called from host or a pure client.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void AdvancePageServerRpc(int pageIndex)
+    {
+        int nextPage = pageIndex + 1;
+        if (nextPage < pages.Length)
+            _currentPage.Value = nextPage;
+    }
+
+    /// <summary>
+    /// Broadcasts the RipOut animator trigger and marks the page as detached on all clients.
+    /// Called before the network placement RPC so the animation plays in sync everywhere.
+    /// </summary>
+    [ClientRpc]
+    private void RipOutPageClientRpc(int pageIndex)
+    {
+        if (pageIndex < 0 || pageIndex >= pages.Length) return;
+        ExamPage page = pages[pageIndex];
+        page.isRippedOut = true;
+        page.CanPickUpManually = true;
+        page.pageAnimator.SetTrigger("RipOut");
+    }
+
+    /// <summary>
+    /// Broadcasts the Reset animator trigger after the page has been placed into the folder slot.
+    /// Also refreshes the notebook's InteractableCollider cache and rebuilds HighlightEffect's
+    /// material list on every client once the page has fully detached from this hierarchy.
+    /// </summary>
+    [ClientRpc]
+    private void ResetPageClientRpc(int pageIndex)
+    {
+        if (pageIndex < 0 || pageIndex >= pages.Length) return;
+        pages[pageIndex].pageAnimator.SetTrigger("Reset");
+
+        // Rebuild the cache excluding all page colliders (ripped or not) so SetInteractable
+        // on the notebook never re-enables a page's own physics collider.
+        ExcludePageCollidersFromCache();
+
+        // Poll each frame until the page has detached, then rebuild HighlightEffect.
+        // A fixed one-frame delay is not reliable because PlaceInSlotClientRpc arrives from
+        // a different NetworkObject with no ordering guarantee relative to this RPC.
+        StartCoroutine(RefreshHighlightAfterDetach(pages[pageIndex]));
+    }
+
+    /// <summary>
+    /// Waits until the given page's renderers are no longer children of this transform,
+    /// then rebuilds HighlightEffect's material list. This is more reliable than a fixed
+    /// one-frame delay because PlaceInSlotClientRpc arrives from a different NetworkObject
+    /// with no ordering guarantee relative to RPCs on this object.
+    /// </summary>
+    private IEnumerator RefreshHighlightAfterDetach(ExamPage page)
+    {
+        // Poll each frame until the page transform is no longer under this hierarchy.
+        while (page != null && page.transform.IsChildOf(transform))
+        {
+            yield return null;
+        }
+
+        GetComponent<HighlightEffect>().SetupMaterial();
     }
 }

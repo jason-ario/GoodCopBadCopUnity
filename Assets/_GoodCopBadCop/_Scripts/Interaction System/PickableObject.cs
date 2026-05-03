@@ -307,8 +307,38 @@ public class PickableObject : Interactable
         base.Interact(player);
         
         if (!CanPickUpManually) return;
+
+        // IsHeldByOtherPlayer relies on a NetworkVariable that only updates after a server
+        // round-trip. To close the race window where two players click the same object in the
+        // same frame, also reject the interaction if the object's colliders are already
+        // disabled — they are disabled locally and immediately in PickUpObject before the RPC
+        // lands, acting as an optimistic lock visible to both players on the same client.
         if (IsHeldByOtherPlayer) return;
+        if (!IsInteractable()) return;
+
         player.pickupController.PickUpObject(this);
+    }
+
+    /// <summary>
+    /// Returns true if at least one of this object's own colliders is currently enabled,
+    /// meaning no one has yet claimed an optimistic local lock on it.
+    /// </summary>
+    private bool IsInteractable()
+    {
+        foreach (Collider col in GetComponents<Collider>())
+        {
+            if (col.enabled) return true;
+        }
+
+        if (interactableColliders.Length > 0)
+        {
+            foreach (var ic in interactableColliders)
+            {
+                if (ic.GetComponent<Collider>().enabled) return true;
+            }
+        }
+
+        return false;
     }
 
     public void SetInteractable(bool value)
@@ -321,8 +351,34 @@ public class PickableObject : Interactable
         if (interactableColliders.Length <= 0) return;
         foreach (var interactableCollider in interactableColliders)
         {
+            if (interactableCollider == null) continue;
+            // Disable both the physics Collider and the InteractableCollider MonoBehaviour.
+            // PlayerInteractionController resolves the Interactable from InteractableCollider
+            // and gates on interactable.enabled — if the collider component itself is disabled
+            // the raycast misses it, but disabling the MonoBehaviour is a belt-and-suspenders
+            // guard that also prevents hover-highlighting non-interactable child objects.
+            interactableCollider.enabled = value;
             interactableCollider.GetComponent<Collider>().enabled = value;
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the cached interactable collider list from current children.
+    /// Call this after a child object is detached so stale despawned references are cleared.
+    /// </summary>
+    protected void RefreshInteractableColliders()
+    {
+        interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
+    }
+
+    /// <summary>
+    /// Replaces the interactable collider cache with an explicit array.
+    /// Use this when the default GetComponentsInChildren scan would include colliders
+    /// from child objects that manage their own interactability independently.
+    /// </summary>
+    protected void OverrideInteractableColliders(InteractableCollider[] colliders)
+    {
+        interactableColliders = colliders;
     }
 
     public virtual void OnStartUse()

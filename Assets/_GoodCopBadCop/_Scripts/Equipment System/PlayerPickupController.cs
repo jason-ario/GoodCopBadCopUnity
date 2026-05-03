@@ -379,6 +379,12 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        // Disable colliders immediately as an optimistic lock so no other player's raycast
+        // can pick up the same object during the network round-trip for ClaimHolderServerRpc.
+        // OnEquipped will call SetInteractable(false) again once constraints are established,
+        // and DropBroadcastClientRpc / OnUnequip restore it via SetInteractable(true).
+        pickableObject.SetInteractable(false);
+
         // Transfer ownership to this client so NetworkTransform replicates from our side
         pickableObject.RequestOwnershipServerRpc();
         pickableObject.ClaimHolderServerRpc();

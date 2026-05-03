@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class ExamPage : FolderItem
@@ -8,6 +9,18 @@ public class ExamPage : FolderItem
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // PickableObject.OnNetworkSpawn calls SetInteractable(true) when no one holds the object,
+        // which would re-enable the page's collider after ExamNotebook.Awake disabled it —
+        // causing a race where the page could be picked up instead of the notebook.
+        // Guard: a page that hasn't been ripped out is never independently interactable.
+        if (!isRippedOut)
+            SetInteractable(false);
+    }
 
     public ChecklistItem[] ChecklistItems => _checklistItems;
 
