@@ -8,54 +8,119 @@ public class Telephone : Interactable
 {
     [SerializeField] private ParentConstraint _handSet;
     [SerializeField] private Transform _ikTarget;
-    [SerializeField] Transform _camera;
-    private NetworkVariable<bool> isGrabbed = new NetworkVariable<bool>(false);
+    [SerializeField] private Transform _camera;
     [SerializeField] private Transform _handsetPos;
     [SerializeField] private AudioSource phoneSound;
-    [SerializeField] AudioClip phoneGrabSound;
-    [SerializeField] AudioClip phonePlaceSound;
-    
+    [SerializeField] private AudioClip phoneGrabSound;
+    [SerializeField] private AudioClip phonePlaceSound;
+
+    // Only the server writes this; all clients can read it.
+    private NetworkVariable<bool> _isGrabbed = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    // Tracks which client is currently holding the phone.
+    private NetworkVariable<ulong> _grabbingClientId = new NetworkVariable<ulong>(
+        ulong.MaxValue,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     public override void Interact(PlayerInteractionController player)
     {
-        // Interact
         base.Interact(player);
 
-        if (isGrabbed.Value == false)
+        if (_isGrabbed.Value == false)
         {
-            StartCoroutine(GrabPhoneSequence(player));
+            RequestGrabServerRpc(player.OwnerClientId);
         }
-        else
+        else if (_grabbingClientId.Value == player.OwnerClientId)
         {
-            StartCoroutine(PutPhoneDownSequence(player));
+            // Only the player currently holding it can put it down.
+            RequestPutDownServerRpc(player.OwnerClientId);
         }
     }
-    
-    IEnumerator PutPhoneDownSequence(PlayerInteractionController player)
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestGrabServerRpc(ulong clientId)
+    {
+        if (_isGrabbed.Value) return;
+
+        _isGrabbed.Value = true;
+        _grabbingClientId.Value = clientId;
+
+        ExecuteGrabSequenceClientRpc(clientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestPutDownServerRpc(ulong clientId)
+    {
+        if (!_isGrabbed.Value || _grabbingClientId.Value != clientId) return;
+
+        _isGrabbed.Value = false;
+        _grabbingClientId.Value = ulong.MaxValue;
+
+        ExecutePutDownSequenceClientRpc(clientId);
+    }
+
+    [ClientRpc]
+    private void ExecuteGrabSequenceClientRpc(ulong clientId)
+    {
+        PlayerInteractionController player = FindPlayerByClientId(clientId);
+        if (player == null) return;
+
+        StartCoroutine(GrabPhoneSequence(player));
+    }
+
+    [ClientRpc]
+    private void ExecutePutDownSequenceClientRpc(ulong clientId)
+    {
+        PlayerInteractionController player = FindPlayerByClientId(clientId);
+        if (player == null) return;
+
+        StartCoroutine(PutPhoneDownSequence(player));
+    }
+
+    /// <summary>
+    /// Finds the PlayerInteractionController belonging to the given client ID.
+    /// </summary>
+    private PlayerInteractionController FindPlayerByClientId(ulong clientId)
+    {
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.ClientId == clientId && client.PlayerObject != null)
+            {
+                return client.PlayerObject.GetComponent<PlayerInteractionController>();
+            }
+        }
+        return null;
+    }
+
+    private IEnumerator PutPhoneDownSequence(PlayerInteractionController player)
     {
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
-        
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
         player.playerAnimationController.LeftArmRigIKTarget = _ikTarget;
 
-        Vector3 cameraPos = player.playerMovementController.CameraTransform.localPosition;
-        Vector3 cameraRot = player.playerMovementController.CameraTransform.localEulerAngles;
-        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
+        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
-        
+
         phoneSound.PlayOneShot(phonePlaceSound);
-        
+
         player.playerAnimationController.SetAnimBool("HoldingPhone", false);
-        player.playerAnimationController.TurnLeftRigOnAndOff(.2f,.25f);
-        
+        player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
+
         yield return new WaitForSeconds(.5f);
         player.playerAnimationController.DisableLeftArmMask();
         _handSet.enabled = false;
         _handSet.constraintActive = false;
         _handSet.transform.position = _handsetPos.position;
         _handSet.transform.rotation = _handsetPos.rotation;
-        player.playerMovementController.ResetCameraPos(false,.25f);
+        player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
@@ -63,25 +128,20 @@ public class Telephone : Interactable
         player.playerMovementController.SetCanControl(true);
 
         interactText = "Pick Up";
-        isGrabbed.Value = false;
     }
-    
-    
-    IEnumerator GrabPhoneSequence(PlayerInteractionController player)
+
+    private IEnumerator GrabPhoneSequence(PlayerInteractionController player)
     {
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
-        
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
         player.playerAnimationController.LeftArmRigIKTarget = _ikTarget;
 
-        Vector3 cameraPos = player.playerMovementController.CameraTransform.localPosition;
-        Vector3 cameraRot = player.playerMovementController.CameraTransform.localEulerAngles;
-        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f); 
+        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
         player.playerAnimationController.EnableLeftArmMask();
-        player.playerAnimationController.TurnLeftRigOnAndOff(.2f,.25f);
+        player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
         player.playerAnimationController.SetAnimBool("HoldingPhone", true);
         yield return new WaitForSeconds(.25f);
 
@@ -94,16 +154,14 @@ public class Telephone : Interactable
         _handSet.SetSource(0, source);
         _handSet.enabled = true;
         _handSet.constraintActive = true;
-        
-        player.playerMovementController.ResetCameraPos(false,.25f);
-        
+
+        player.playerMovementController.ResetCameraPos(false, .25f);
+
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
         player.playerAnimationController.LeftArmRigIKTarget = null;
         player.playerMovementController.SetCanControl(true);
 
         interactText = "Put Down";
-        isGrabbed.Value = true;
     }
-    
 }

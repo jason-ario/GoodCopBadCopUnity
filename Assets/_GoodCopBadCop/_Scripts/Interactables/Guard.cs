@@ -3,10 +3,18 @@ using UnityEngine;
 
 public class Guard : Interactable
 {
+    private const string InteractLabel = "Talk";
+
     [SerializeField] private string guardName = "Guard";
     [SerializeField] private string[] dialogueBlurbs;
     [SerializeField] private AudioClip[] voiceAudioClips;
     [SerializeField] private AudioSource audioSource;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        interactText = InteractLabel;
+    }
 
     /// <summary>
     /// Makes the guard say a blurb and play voice audio via the dialogue manager on all clients.
