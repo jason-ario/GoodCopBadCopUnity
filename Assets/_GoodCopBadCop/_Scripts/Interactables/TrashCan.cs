@@ -6,4 +6,9 @@ public class TrashCan : Interactable
     {
         //throw trash
     }
+
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    {
+        base.InteractWithItem(playerInteractionController, item);
+    }
 }

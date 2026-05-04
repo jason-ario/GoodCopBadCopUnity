@@ -12,6 +12,12 @@ public class UIController : MonoBehaviour
 {
     public static UIController Instance;
 
+    /// <summary>Fired when the End of Shift Report becomes visible.</summary>
+    public Action OnReportShown { get; set; }
+
+    /// <summary>Fired when the End of Shift Report is hidden.</summary>
+    public Action OnReportHidden { get; set; }
+
     [SerializeField] RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
@@ -167,11 +173,13 @@ public class UIController : MonoBehaviour
     {
         ShowCursor();
         endOfShiftReportUI.PlayReport(reportRowDatas);
+        OnReportShown?.Invoke();
     }
 
     public void HideEndOfShiftReport()
     {
         endOfShiftReportUI.gameObject.SetActive(false);
+        OnReportHidden?.Invoke();
     }
 
     public void OpenStartShiftScreen()

@@ -27,12 +27,20 @@ public class ElectricityController : NetworkBehaviour
     private void Start()
     {
         ShiftManager.Instance.OnShiftStart += StartCountdown;
+        UIController.Instance.OnReportShown += PauseCountdown;
+        UIController.Instance.OnReportHidden += ResumeCountdown;
     }
 
     private void OnDestroy()
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftStart -= StartCountdown;
+
+        if (UIController.Instance != null)
+        {
+            UIController.Instance.OnReportShown -= PauseCountdown;
+            UIController.Instance.OnReportHidden -= ResumeCountdown;
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -45,6 +53,10 @@ public class ElectricityController : NetworkBehaviour
     // ------------------------------------------------------------------
 
     [SerializeField, ReadOnly] private float _countdownRemaining = 0f;
+    private bool _isCountdownPaused = false;
+
+    private void PauseCountdown() => _isCountdownPaused = true;
+    private void ResumeCountdown() => _isCountdownPaused = false;
 
     private void StartCountdown()
     {
@@ -61,7 +73,8 @@ public class ElectricityController : NetworkBehaviour
         while (_countdownRemaining > 0f)
         {
             yield return null;
-            _countdownRemaining -= Time.deltaTime;
+            if (!_isCountdownPaused)
+                _countdownRemaining -= Time.deltaTime;
         }
 
         _countdownRemaining = 0f;

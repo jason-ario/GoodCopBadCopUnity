@@ -11,32 +11,26 @@ public class FaxMachine : NetworkBehaviour
     [SerializeField] AudioClip faxClip;
     [SerializeField] private Animator _animator;
     [SerializeField] private MachineShake _machineShake;
-    private void Start()
+    public override void OnNetworkSpawn()
     {
-        ShiftManager.Instance.OnShiftReady += SpawnNewspaper;
-    }
-
-    public void SpawnNewspaper()
-    {
+        base.OnNetworkSpawn();
         if (IsServer)
         {
-            SpawnNewspaperServer();
+            ShiftManager.Instance.OnShiftReady += SpawnNewspaper;
         }
-        else
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        if (IsServer)
         {
-            RequestSpawnNewspaperServerRpc();
+            ShiftManager.Instance.OnShiftReady -= SpawnNewspaper;
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestSpawnNewspaperServerRpc()
+    private void SpawnNewspaper()
     {
-        SpawnNewspaperServer();
-    }
-
-    private void SpawnNewspaperServer()
-    {
-        if (!IsServer) return; 
         StartCoroutine(WaitAndSpawnNewspaper());
     }
     
