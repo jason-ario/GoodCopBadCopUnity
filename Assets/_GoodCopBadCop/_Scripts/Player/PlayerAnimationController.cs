@@ -105,12 +105,39 @@ public class PlayerAnimationController : NetworkBehaviour
     private NetworkVariable<float> netPitch =
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
 
+    /// <summary>
+    /// Synced body lean factor [0, 1]. Owner writes whenever a scripted interaction
+    /// drives a lean; proxy clients read it to replicate the bone bend.
+    /// </summary>
+    private NetworkVariable<float> netLeanFactor =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Synced lean direction: +1 = forward, -1 = backward.
+    /// </summary>
+    private NetworkVariable<float> netLeanDirection =
+        new NetworkVariable<float>(1f, writePerm: NetworkVariableWritePermission.Owner);
+
     [Header("Vertical Look Bone Rotation")]
     [SerializeField] [Range(0f, 1f)] private float headPitchWeight  = 0.40f;
     [SerializeField] [Range(0f, 1f)] private float neckPitchWeight  = 0.30f;
     [SerializeField] [Range(0f, 1f)] private float spinePitchWeight = 0.30f;
     [Tooltip("How much the upper arm rotates toward the look direction when holding an object. Only applied on proxy clients.")]
     [SerializeField] [Range(0f, 1f)] private float armHoldPitchWeight = 0.50f;
+
+    [Header("Local Body Lean (Camera Offset)")]
+    [Tooltip("Maximum pitch (degrees) applied to the spine bone at full lean.")]
+    [SerializeField] private float leanSpineMax  = 12f;
+    [Tooltip("Maximum pitch (degrees) applied to the neck bone at full lean.")]
+    [SerializeField] private float leanNeckMax   = 6f;
+    [Tooltip("How quickly the lean smooths in and out.")]
+    [SerializeField] private float leanLerpSpeed = 6f;
+
+    // Current smoothed lean factor [0, 1] set by PlayerMovementController each frame.
+    private float _targetLeanFactor;
+    private float _currentLeanFactor;
+    // +1 = lean forward/down, -1 = lean back/up. Derived from camera pitch by default.
+    private float _leanDirection = 1f;
 
     // Cached bone transforms resolved once after spawn.
     private Transform _headBone;
@@ -168,6 +195,8 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             ShrugEmote();
         }
+
+        ApplyLocalBodyLean();
     }
 
     void ShrugEmote()
@@ -308,6 +337,29 @@ public class PlayerAnimationController : NetworkBehaviour
             _spineBone.localRotation *= Quaternion.Euler(pitch * spinePitchWeight, 0f, 0f);
         }
 
+        // Apply synced body lean on top of the pitch rotation.
+        float leanFactor = Mathf.Lerp(
+            _currentLeanFactor,
+            netLeanFactor.Value,
+            leanLerpSpeed * Time.deltaTime
+        );
+        _currentLeanFactor = leanFactor;
+
+        if (leanFactor > 0.001f)
+        {
+            float dir = netLeanDirection.Value;
+
+            if (_spineBone != null)
+            {
+                _spineBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanSpineMax, 0f, 0f);
+            }
+
+            if (_neckBone != null)
+            {
+                _neckBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanNeckMax, 0f, 0f);
+            }
+        }
+
         // Swing the upper arm bones up/down when the owner's camera arm has something equipped.
         // netLayer1Weight (single right-hand hold) and netLayer2Weight (two-hand hold) are synced
         // from the owner and are non-zero whenever the camera arm is holding something — the
@@ -329,6 +381,64 @@ public class PlayerAnimationController : NetworkBehaviour
             _leftUpperArmBone.rotation =
                 Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
                 * _leftUpperArmBone.rotation;
+        }
+    }
+
+    /// <summary>
+    /// Called by PlayerMovementController each frame with a normalized [0, 1] value
+    /// representing how far the camera has drifted from its base position.
+    /// The lean is applied to spine and neck bones in LateUpdate on the local player only.
+    /// </summary>
+    public void SetLocalBodyLeanFactor(float factor)
+    {
+        _targetLeanFactor = Mathf.Clamp01(factor);
+        // Direction is derived live from camera pitch in the camera-offset driven path.
+        _leanDirection = _playerMovementController.CameraPitch >= 0f ? 1f : -1f;
+
+        if (IsOwner)
+        {
+            netLeanFactor.Value    = _targetLeanFactor;
+            netLeanDirection.Value = _leanDirection;
+        }
+    }
+
+    /// <summary>
+    /// Directly sets the body lean factor to a target value, bypassing the camera-offset
+    /// calculation. Use this when the camera is moved externally (e.g. scripted interactions)
+    /// and you want to drive the lean manually.
+    /// Pass direction as +1 (lean forward) or -1 (lean back).
+    /// </summary>
+    public void SetBodyLeanDirect(float factor, float direction = 1f)
+    {
+        _targetLeanFactor = Mathf.Clamp01(factor);
+        _leanDirection    = Mathf.Sign(direction != 0f ? direction : 1f);
+
+        if (IsOwner)
+        {
+            netLeanFactor.Value    = _targetLeanFactor;
+            netLeanDirection.Value = _leanDirection;
+        }
+    }
+
+    /// <summary>
+    /// Procedurally tilts the spine and neck bones toward the camera offset direction
+    /// on the local player so the character appears to lean when looking far away.
+    /// Must run in LateUpdate after the Animator has evaluated.
+    /// </summary>
+    private void ApplyLocalBodyLean()
+    {
+        _currentLeanFactor = Mathf.Lerp(_currentLeanFactor, _targetLeanFactor, leanLerpSpeed * Time.deltaTime);
+
+        if (_currentLeanFactor < 0.001f) return;
+
+        if (_spineBone != null)
+        {
+            _spineBone.localRotation *= Quaternion.Euler(_leanDirection * _currentLeanFactor * leanSpineMax, 0f, 0f);
+        }
+
+        if (_neckBone != null)
+        {
+            _neckBone.localRotation *= Quaternion.Euler(_leanDirection * _currentLeanFactor * leanNeckMax, 0f, 0f);
         }
     }
 

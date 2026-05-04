@@ -1094,6 +1094,7 @@ MonoBehaviour:
   cameraBasePos: {fileID: 3311676270079322307}
   cameraLookDownPos: {fileID: 1875048912981118398}
   lookDownLerpSpeed: 20
+  maxCameraOffsetForLean: 0.3
   gravity: -20
   CanMove: 1
   CanLook: 1
@@ -1135,6 +1136,9 @@ MonoBehaviour:
   neckPitchWeight: 0.2
   spinePitchWeight: 0.2
   armHoldPitchWeight: 1
+  leanSpineMax: 25
+  leanNeckMax: 10
+  leanLerpSpeed: 6
 --- !u!95 &5651200760162566270
 Animator:
   serializedVersion: 7

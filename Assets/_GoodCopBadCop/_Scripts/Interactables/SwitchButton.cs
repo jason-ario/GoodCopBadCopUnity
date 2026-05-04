@@ -55,6 +55,9 @@ public class SwitchButton : Interactable
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
 
+        // Lean the body forward as the camera moves toward the switch.
+        player.playerAnimationController.SetBodyLeanDirect(1f, 1f);
+
         yield return new WaitForSeconds(.5f);
         player.playerAnimationController.EnableRightArmMask();
         player.playerAnimationController.TurnRightArmRigOnAndOff(.2f, .5f);
@@ -69,6 +72,9 @@ public class SwitchButton : Interactable
         PlayButtonSoundClientRpc();
 
         yield return new WaitForSeconds(1);
+
+        // Release the lean as the camera returns.
+        player.playerAnimationController.SetBodyLeanDirect(0f);
         player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);

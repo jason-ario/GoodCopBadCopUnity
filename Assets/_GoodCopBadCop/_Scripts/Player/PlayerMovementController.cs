@@ -30,6 +30,8 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Transform cameraBasePos;
     [SerializeField] private Transform cameraLookDownPos;
     [SerializeField] private float lookDownLerpSpeed = 5f;
+    [Tooltip("Camera offset magnitude (local units) at which body lean reaches its maximum. Tune to match your cameraLookDownPos distance.")]
+    [SerializeField] private float maxCameraOffsetForLean = 0.3f;
 
     private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
@@ -324,6 +326,15 @@ public class PlayerMovementController : NetworkBehaviour
         
         // Smoothly lerp the camera position
         cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetPos, lookDownLerpSpeed * Time.deltaTime);
+
+        // Drive body lean based on how far the camera has moved from its base position.
+        // This makes the character visually bend toward whatever they are looking at.
+        if (_playerAnimationController != null && maxCameraOffsetForLean > 0f)
+        {
+            float offsetMagnitude = Vector3.Distance(cameraTransform.localPosition, cameraBasePos.localPosition);
+            float leanFactor = Mathf.Clamp01(offsetMagnitude / maxCameraOffsetForLean);
+            _playerAnimationController.SetLocalBodyLeanFactor(leanFactor);
+        }
     }
     
     public void ResetCameraPos(bool instant = true, float duration = 0.5f, UnityAction callback = null)
