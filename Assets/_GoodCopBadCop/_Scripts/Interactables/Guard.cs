@@ -4,7 +4,7 @@ using UnityEngine;
 public class Guard : Interactable
 {
     [SerializeField] private string guardName = "Guard";
-    [SerializeField] private string dialogueBlurb = "Move along now.";
+    [SerializeField] private string[] dialogueBlurbs;
     [SerializeField] private AudioClip[] voiceAudioClips;
     [SerializeField] private AudioSource audioSource;
 
@@ -14,6 +14,7 @@ public class Guard : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+        string dialogueBlurb = dialogueBlurbs[UnityEngine.Random.Range(0, dialogueBlurbs.Length)];
 
         if (IsServer)
         {
