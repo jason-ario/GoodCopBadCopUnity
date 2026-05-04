@@ -285,6 +285,16 @@ public class PlayerAnimationController : NetworkBehaviour
         SetAnimBoolServerRpc(animString, value);
     }
 
+    /// <summary>
+    /// Sets an animator bool directly on the local animators without ownership checks or RPC.
+    /// Use this when the calling coroutine already runs on every client (e.g. stamp sequence).
+    /// </summary>
+    public void SetAnimBoolLocal(string animString, bool value)
+    {
+        bodyAnimator.SetBool(animString, value);
+        armsAnimator.SetBool(animString, value);
+    }
+
     [ServerRpc]
     private void SetAnimBoolServerRpc(string animString, bool value)
     {

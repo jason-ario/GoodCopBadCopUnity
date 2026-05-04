@@ -139,7 +139,8 @@ public class PlayerPickupController : NetworkBehaviour
         if (itemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            if (IsOwner)
+                _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
             _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
         }
         else
@@ -151,7 +152,8 @@ public class PlayerPickupController : NetworkBehaviour
         if (itemData.useLeftIK)
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
-            _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            if (IsOwner)
+                _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
             _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
         }
         else

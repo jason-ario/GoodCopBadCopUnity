@@ -232,24 +232,17 @@ public class FolderController : PickableObject
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType, ServerRpcParams rpcParams = default)
+    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
     {
         if (isStamping) return;
         isStamping = true;
         isStamped.Value = true;
 
-        ClientRpcParams clientRpcParams = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new[] { rpcParams.Receive.SenderClientId }
-            }
-        };
-        StartUseStampClientRpc(interactingPlayerId, stampType, clientRpcParams);
+        StartUseStampClientRpc(interactingPlayerId, stampType);
     }
 
     [ClientRpc]
-    private void StartUseStampClientRpc(ulong interactingPlayerId, StampContainer.StampType stampType, ClientRpcParams clientRpcParams = default)
+    private void StartUseStampClientRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
     {
         // Find the player instance that initiated the stamp
         NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(interactingPlayerId, out var playerObj);
@@ -294,71 +287,111 @@ public class FolderController : PickableObject
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
-        
-        // Only lock controls for the local player who is actually interacting
-        bool isLocal = playerPickupController.IsLocalPlayer;
-        if (isLocal) PlayerInstance.Instance.CanControl = false;
 
-        if (IsOwner)
+        // Only the stamping player's local client locks controls and activates the cinematic camera.
+        bool isStampingLocalPlayer = playerPickupController.IsLocalPlayer;
+        if (isStampingLocalPlayer) PlayerInstance.Instance.CanControl = false;
+
+        if (isStampingLocalPlayer)
         {
             cinemachineVirtualCamera.SetActive(true);
         }
-        
+
+        playerPickupController.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", true);
+
+        // Detach the passthrough targets so LateUpdate stops overriding the body IK target
+        // for the duration of the sequence, then restore them when it completes.
+        Transform savedRightArmRigIKTarget = playerPickupController.PlayerAnimationController.RightArmRigIKTarget;
+        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = null;
+
+        Transform savedCamRightArmRigIKTarget = null;
+        if (isStampingLocalPlayer)
+        {
+            savedCamRightArmRigIKTarget = playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget;
+            playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget = null;
+        }
+
         yield return new WaitForSeconds(.25f);
 
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
+        // Drive the body-arm IK target on all clients so observers see the arm move.
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = stampDownTarget.position;
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.position = stampDownTarget.position;
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
-            stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
 
-        
-        
-        
-        playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f); 
-        playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.TurnRightArmRigOnAndOff(.5f,.5f);
+        // Drive the camera-arm IK target only on the stamping player's local client.
+        if (isStampingLocalPlayer)
+        {
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.position = stampDownTarget.position;
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+                stampUpTarget.rotation.eulerAngles, .25f);
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
+
+            playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f);
+            playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
+        }
+
+        playerPickupController.PlayerAnimationController.TurnRightArmRigOnAndOff(.5f, .5f);
         yield return new WaitForSeconds(.5f);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampDownTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
-            stampDownTarget.rotation.eulerAngles, .25f);
-        SFXController.Instance.Play(stampSound);
-     
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f)
-            .OnComplete(() =>
-            {
-                PlaceStampServerRpc(stampType);
-            });
+
+        if (isStampingLocalPlayer)
+        {
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+                stampDownTarget.rotation.eulerAngles, .25f);
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f);
+        }
+
+        SFXController.Instance.Play(stampSound);
+
+        // Only the stamping player sends the ServerRpc — avoids duplicate calls from every client.
+        if (isStampingLocalPlayer)
+        {
+            yield return new WaitForSeconds(.25f);
+            PlaceStampServerRpc(stampType);
+        }
 
         yield return new WaitForSeconds(.2f);
         _impulseSource.GenerateImpulse();
         yield return new WaitForSeconds(.25f);
 
-
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
             stampUpTarget.rotation.eulerAngles, .25f);
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
-            stampUpTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
+
+        if (isStampingLocalPlayer)
+        {
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+                stampUpTarget.rotation.eulerAngles, .25f);
+            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
+        }
+
         yield return new WaitForSeconds(.5f);
 
         isStamping = false;
-        
-        if (IsOwner)
+
+        // Restore the IK passthrough targets so the pickup system resumes driving them.
+        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = savedRightArmRigIKTarget;
+
+        if (isStampingLocalPlayer)
+        {
+            playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget = savedCamRightArmRigIKTarget;
+        }
+
+        playerPickupController.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", false);
+
+        if (isStampingLocalPlayer)
         {
             cinemachineVirtualCamera.SetActive(false);
+            PlayerInstance.Instance.CanControl = true;
+            playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
         }
-        if (isLocal) PlayerInstance.Instance.CanControl = true;
-        playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
+
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
 
         onStampedComplete?.Invoke();
