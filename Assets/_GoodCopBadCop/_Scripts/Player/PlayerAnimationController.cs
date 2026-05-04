@@ -106,14 +106,18 @@ public class PlayerAnimationController : NetworkBehaviour
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
 
     [Header("Vertical Look Bone Rotation")]
-    [SerializeField] [Range(0f, 1f)] private float headPitchWeight   = 0.40f;
-    [SerializeField] [Range(0f, 1f)] private float neckPitchWeight   = 0.30f;
-    [SerializeField] [Range(0f, 1f)] private float spinePitchWeight  = 0.30f;
+    [SerializeField] [Range(0f, 1f)] private float headPitchWeight  = 0.40f;
+    [SerializeField] [Range(0f, 1f)] private float neckPitchWeight  = 0.30f;
+    [SerializeField] [Range(0f, 1f)] private float spinePitchWeight = 0.30f;
+    [Tooltip("How much the upper arm rotates toward the look direction when holding an object. Only applied on proxy clients.")]
+    [SerializeField] [Range(0f, 1f)] private float armHoldPitchWeight = 0.50f;
 
     // Cached bone transforms resolved once after spawn.
     private Transform _headBone;
     private Transform _neckBone;
     private Transform _spineBone;
+    private Transform _rightUpperArmBone;
+    private Transform _leftUpperArmBone;
 
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
@@ -183,9 +187,11 @@ public class PlayerAnimationController : NetworkBehaviour
         base.OnNetworkSpawn();
 
         // Cache bones used for procedural vertical-look rotation on both owner and proxies.
-        _headBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
-        _neckBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.Neck);
-        _spineBone = bodyAnimator.GetBoneTransform(HumanBodyBones.Spine);
+        _headBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
+        _neckBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Neck);
+        _spineBone         = bodyAnimator.GetBoneTransform(HumanBodyBones.Spine);
+        _rightUpperArmBone = bodyAnimator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        _leftUpperArmBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
 
         if (IsLocalPlayer == false)
         {
@@ -278,9 +284,10 @@ public class PlayerAnimationController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Applies a procedural X-axis (pitch) rotation to the head, neck, and spine bones
-    /// on proxy clients based on the synced <see cref="netPitch"/> value.
-    /// Must be called in LateUpdate so it runs after the Animator has evaluated.
+    /// Applies a procedural pitch rotation to head, neck, and spine bones on proxy clients,
+    /// and — when an arm is actively holding something — swings that upper arm bone up/down
+    /// to match the observed player's vertical look direction.
+    /// Must be called in LateUpdate so it runs after the Animator and Animation Rigging have evaluated.
     /// </summary>
     private void ApplyProxyPitchBones()
     {
@@ -299,6 +306,29 @@ public class PlayerAnimationController : NetworkBehaviour
         if (_spineBone != null)
         {
             _spineBone.localRotation *= Quaternion.Euler(pitch * spinePitchWeight, 0f, 0f);
+        }
+
+        // Swing the upper arm bones up/down when the owner's camera arm has something equipped.
+        // netLayer1Weight (single right-hand hold) and netLayer2Weight (two-hand hold) are synced
+        // from the owner and are non-zero whenever the camera arm is holding something — the
+        // local currentLayer* fields are only updated on the owner and are always 0 on proxies.
+        // Rotation axis is transform.right: the held arm sits in front of the character, so
+        // rotating around the lateral axis pitches it up/down in the same plane as the camera.
+        bool rightArmHolding = netLayer1Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
+        bool leftArmHolding  = netLayer4Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
+
+        if (rightArmHolding && _rightUpperArmBone != null)
+        {
+            _rightUpperArmBone.rotation =
+                Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
+                * _rightUpperArmBone.rotation;
+        }
+
+        if (leftArmHolding && _leftUpperArmBone != null)
+        {
+            _leftUpperArmBone.rotation =
+                Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
+                * _leftUpperArmBone.rotation;
         }
     }
 
