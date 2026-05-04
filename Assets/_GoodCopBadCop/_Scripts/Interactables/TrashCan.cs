@@ -10,5 +10,6 @@ public class TrashCan : Interactable
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);
+        playerInteractionController.pickupController.DestroyEquippedItem();
     }
 }
