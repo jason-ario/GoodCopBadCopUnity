@@ -71,7 +71,17 @@ public class Telephone : Interactable
         PlayerInteractionController player = FindPlayerByClientId(clientId);
         if (player == null) return;
 
-        StartCoroutine(GrabPhoneSequence(player));
+        bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
+
+        if (isLocalPlayer)
+        {
+            StartCoroutine(GrabPhoneSequence(player));
+        }
+        else
+        {
+            // Observers still need the constraint set up so they see the handset move.
+            StartCoroutine(ObserverGrabConstraintSequence(player));
+        }
     }
 
     [ClientRpc]
@@ -80,7 +90,50 @@ public class Telephone : Interactable
         PlayerInteractionController player = FindPlayerByClientId(clientId);
         if (player == null) return;
 
-        StartCoroutine(PutPhoneDownSequence(player));
+        bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
+
+        if (isLocalPlayer)
+        {
+            StartCoroutine(PutPhoneDownSequence(player));
+        }
+        else
+        {
+            StartCoroutine(ObserverPutDownConstraintSequence());
+        }
+    }
+
+    /// <summary>
+    /// Run on all non-grabbing clients: waits to match the grab animation timing then
+    /// attaches the ParentConstraint to the remote player's hand socket.
+    /// </summary>
+    private IEnumerator ObserverGrabConstraintSequence(PlayerInteractionController player)
+    {
+        // Match the two WaitForSeconds(.25f) in GrabPhoneSequence before the constraint is set.
+        yield return new WaitForSeconds(.5f);
+
+        ConstraintSource source = new ConstraintSource
+        {
+            sourceTransform = player.pickupController.LeftHandSocket.transform,
+            weight = 1
+        };
+        _handSet.SetSource(0, source);
+        _handSet.enabled = true;
+        _handSet.constraintActive = true;
+    }
+
+    /// <summary>
+    /// Run on all non-grabbing clients: waits to match the put-down animation timing then
+    /// detaches the ParentConstraint and resets the handset to its resting position.
+    /// </summary>
+    private IEnumerator ObserverPutDownConstraintSequence()
+    {
+        // Match the WaitForSeconds(.5f) in PutPhoneDownSequence before the constraint is cleared.
+        yield return new WaitForSeconds(.5f);
+
+        _handSet.enabled = false;
+        _handSet.constraintActive = false;
+        _handSet.transform.position = _handsetPos.position;
+        _handSet.transform.rotation = _handsetPos.rotation;
     }
 
     /// <summary>

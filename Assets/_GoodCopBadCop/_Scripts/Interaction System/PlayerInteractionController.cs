@@ -236,6 +236,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
     public void SetReticleActive(bool value)
     {
+        if (reticle == null) return;
         reticle.gameObject.SetActive(value);
         reticleActive = value;
     }
