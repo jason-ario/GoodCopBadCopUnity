@@ -48,6 +48,12 @@ public class PlayerMovementController : NetworkBehaviour
     public float MoveXRaw { get; private set; }
     public float MoveZRaw { get; private set; }
     public bool IsRunning { get; private set; }
+
+    /// <summary>
+    /// Current vertical look pitch in degrees, clamped to [-maxLookAngle, maxLookAngle].
+    /// Negative values = looking up, positive = looking down.
+    /// </summary>
+    public float CameraPitch => _cameraPitch;
     
     private Vector3 camStartPos;
     private Quaternion camStartRot;

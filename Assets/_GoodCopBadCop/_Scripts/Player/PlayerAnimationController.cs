@@ -97,7 +97,24 @@ public class PlayerAnimationController : NetworkBehaviour
 
     private NetworkVariable<float> netLayer4Weight =
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
-    
+
+    /// <summary>
+    /// Synced vertical look pitch in degrees. Owner writes local camera pitch;
+    /// proxy clients read it to drive procedural head/neck/spine bone rotation.
+    /// </summary>
+    private NetworkVariable<float> netPitch =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    [Header("Vertical Look Bone Rotation")]
+    [SerializeField] [Range(0f, 1f)] private float headPitchWeight   = 0.40f;
+    [SerializeField] [Range(0f, 1f)] private float neckPitchWeight   = 0.30f;
+    [SerializeField] [Range(0f, 1f)] private float spinePitchWeight  = 0.30f;
+
+    // Cached bone transforms resolved once after spawn.
+    private Transform _headBone;
+    private Transform _neckBone;
+    private Transform _spineBone;
+
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
 
@@ -132,15 +149,16 @@ public class PlayerAnimationController : NetworkBehaviour
             camLeftArmIKTarget.position = CamLeftArmRigIKTarget.position;
             camLeftArmIKTarget.rotation = CamLeftArmRigIKTarget.rotation;
         }
-        
+
         if (IsOwner == false)
         {
+            // Proxy: drive animations from NetworkVariables, then apply bone-level pitch.
+            UpdateAnimations();
+            ApplyProxyPitchBones();
             return;
         }
-        else
-        {
-            UpdateAnimations();
-        }
+
+        UpdateAnimations();
         
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
@@ -163,7 +181,12 @@ public class PlayerAnimationController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        
+
+        // Cache bones used for procedural vertical-look rotation on both owner and proxies.
+        _headBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
+        _neckBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.Neck);
+        _spineBone = bodyAnimator.GetBoneTransform(HumanBodyBones.Spine);
+
         if (IsLocalPlayer == false)
         {
             armsOnBody.layer = LayerMask.NameToLayer("Default");
@@ -178,10 +201,9 @@ public class PlayerAnimationController : NetworkBehaviour
             armsOnBody.GetComponent<SkinnedMeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 
             // Hide the head bone so it doesn't clip into the local player's camera view.
-            Transform headBone = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
-            if (headBone != null)
+            if (_headBone != null)
             {
-                headBone.localScale = Vector3.zero;
+                _headBone.localScale = Vector3.zero;
             }
             else
             {
@@ -217,6 +239,9 @@ public class PlayerAnimationController : NetworkBehaviour
         headLookAtPos.Value = headLookAtTransform.position;
         chestLookAtPos.Value = chestLookAtTransform.position;
 
+        // Sync the local camera pitch so proxy clients can drive bone rotation.
+        netPitch.Value = _playerMovementController.CameraPitch;
+
         // Smoothly lerp between current and target values
         currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * animLerpSpeed);
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
@@ -250,6 +275,31 @@ public class PlayerAnimationController : NetworkBehaviour
         armsAnimator.SetLayerWeight(2, currentLayer2Weight);
         bodyAnimator.SetLayerWeight(4, currentLayer4Weight);
         armsAnimator.SetLayerWeight(4, currentLayer4Weight);
+    }
+
+    /// <summary>
+    /// Applies a procedural X-axis (pitch) rotation to the head, neck, and spine bones
+    /// on proxy clients based on the synced <see cref="netPitch"/> value.
+    /// Must be called in LateUpdate so it runs after the Animator has evaluated.
+    /// </summary>
+    private void ApplyProxyPitchBones()
+    {
+        float pitch = netPitch.Value;
+
+        if (_headBone != null)
+        {
+            _headBone.localRotation *= Quaternion.Euler(pitch * headPitchWeight, 0f, 0f);
+        }
+
+        if (_neckBone != null)
+        {
+            _neckBone.localRotation *= Quaternion.Euler(pitch * neckPitchWeight, 0f, 0f);
+        }
+
+        if (_spineBone != null)
+        {
+            _spineBone.localRotation *= Quaternion.Euler(pitch * spinePitchWeight, 0f, 0f);
+        }
     }
 
     public void EnableRightArmMask()
