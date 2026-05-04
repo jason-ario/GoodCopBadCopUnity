@@ -187,6 +187,11 @@ public class DialogueManager : NetworkBehaviour
         return subtitles.gameObject;
     }
 
+    /// <summary>
+    /// Returns true while dialogue audio is actively playing.
+    /// </summary>
+    public bool IsSpeaking => audioDialogueCoroutine != null;
+
     private bool _dialogueInputReceived = false;
 
     /// <summary>

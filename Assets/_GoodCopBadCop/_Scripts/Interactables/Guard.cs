@@ -10,9 +10,13 @@ public class Guard : Interactable
 
     /// <summary>
     /// Makes the guard say a blurb and play voice audio via the dialogue manager on all clients.
+    /// Ignored while the guard is still finishing a previous statement.
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
+        if (DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking)
+            return;
+
         base.Interact(player);
         string dialogueBlurb = dialogueBlurbs[UnityEngine.Random.Range(0, dialogueBlurbs.Length)];
 
