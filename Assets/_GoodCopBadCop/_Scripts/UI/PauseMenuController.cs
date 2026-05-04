@@ -43,8 +43,8 @@ public class PauseMenuController : MonoBehaviour
 
         if (hasLobby)
         {
-            ulong lobbyId = LobbyManager.Instance.CurrentLobby.Id;
-            lobbyCodeText.text = LobbyCodePrefix + lobbyId.ToString();
+            string joinCode = LobbyManager.Instance.CurrentJoinCode;
+            lobbyCodeText.text = LobbyCodePrefix + joinCode;
         }
     }
 

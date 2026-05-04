@@ -90,6 +90,21 @@ public class LobbyManager : MonoBehaviour
 
     private const int MaxLobbyMembers = 2;
 
+    private const string LobbyDataKeyJoinCode = "join_code";
+    private const int JoinCodeLength = 6;
+    private const string JoinCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    public string CurrentJoinCode { get; private set; }
+
+    /// <summary>Generates a random uppercase alphanumeric join code.</summary>
+    private static string GenerateJoinCode()
+    {
+        var result = new System.Text.StringBuilder(JoinCodeLength);
+        for (int i = 0; i < JoinCodeLength; i++)
+            result.Append(JoinCodeChars[UnityEngine.Random.Range(0, JoinCodeChars.Length)]);
+        return result.ToString();
+    }
+
     // =========================
     // HOST
     // =========================
@@ -127,6 +142,10 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby.SetPublic();
             CurrentLobby.SetJoinable(true);
             CurrentLobby.SetData("host", SteamClient.Name);
+
+            CurrentJoinCode = GenerateJoinCode();
+            CurrentLobby.SetData(LobbyDataKeyJoinCode, CurrentJoinCode);
+            Debug.Log($"[CreateLobby] Join code: {CurrentJoinCode}");
 
             // Host targets self for Facepunch transport.
             facepunch.targetSteamId = SteamClient.SteamId;
@@ -179,6 +198,37 @@ public class LobbyManager : MonoBehaviour
     /// <summary>Joins a LAN host at the given IP address using UnityTransport.
     /// Ignored when FacepunchTransport is the active transport.</summary>
     public async void JoinLobbyLAN(string address) => await JoinLobbyInternal(0, address);
+
+    /// <summary>
+    /// Searches public Steam lobbies for one whose join_code metadata matches <paramref name="code"/>
+    /// and joins it. Fires <see cref="OnJoinFailed"/> if no matching lobby is found.
+    /// Only valid when FacepunchTransport is active.
+    /// </summary>
+    public async void JoinLobbyByCode(string code)
+    {
+        if (NetworkManager.Singleton == null)
+            return;
+
+        var normalizedCode = code.Trim().ToUpperInvariant();
+
+        Debug.Log($"[JoinLobbyByCode] Searching for lobby with join code: {normalizedCode}");
+
+        var lobbies = await SteamMatchmaking.LobbyList
+            .WithKeyValue(LobbyDataKeyJoinCode, normalizedCode)
+            .RequestAsync();
+
+        if (lobbies == null || lobbies.Length == 0)
+        {
+            Debug.LogWarning($"[JoinLobbyByCode] No lobby found for code '{normalizedCode}'.");
+            OnJoinFailed?.Invoke("CODE_NOT_FOUND");
+            return;
+        }
+
+        // Take the first match; codes are unique per active session.
+        var target = lobbies[0];
+        Debug.Log($"[JoinLobbyByCode] Found lobby {target.Id} for code '{normalizedCode}'.");
+        await JoinLobbyInternal(target.Id, "127.0.0.1");
+    }
 
     private async Task JoinLobbyInternal(ulong lobbyId, string lanAddress)
     {
@@ -371,6 +421,7 @@ public class LobbyManager : MonoBehaviour
     public void ExitLobby()
     {
         inviteOverlayWasOpenedByUs = false;
+        CurrentJoinCode = null;
 
         if (NetworkManager.Singleton != null &&
             (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))

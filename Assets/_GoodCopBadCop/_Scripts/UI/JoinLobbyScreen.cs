@@ -8,10 +8,10 @@ public class JoinLobbyScreen : MonoBehaviour
     [SerializeField] private TMP_InputField inviteCodeInput;
     [SerializeField] private TMP_Text statusLabel;
 
-    private const string ErrorEmptyCode    = "NO CODE ENTERED";
-    private const string ErrorInvalidCode  = "INVALID LOBBY ID";
+    private const string ErrorEmptyCode     = "NO CODE ENTERED";
+    private const string ErrorInvalidCode   = "INVALID JOIN CODE";
     private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
-    private const string ErrorInvalidIP    = "INVALID IP ADDRESS";
+    private const string ErrorInvalidIP     = "INVALID IP ADDRESS";
 
     private void Awake()
     {
@@ -32,7 +32,7 @@ public class JoinLobbyScreen : MonoBehaviour
 
     /// <summary>
     /// Reads the input field and joins via the active transport:
-    /// FacepunchTransport — expects a Steam lobby ID (ulong).
+    /// FacepunchTransport — expects a 6-character join code.
     /// UnityTransport     — expects an IPv4 address string; defaults to 127.0.0.1 if empty.
     /// </summary>
     public void JoinWithCode()
@@ -61,14 +61,16 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
         }
 
-        if (!ulong.TryParse(raw, out ulong lobbyId) || lobbyId == 0)
+        string code = raw.ToUpperInvariant();
+
+        if (code.Length != 6)
         {
             SetStatus(ErrorInvalidCode);
             return;
         }
 
-        Debug.Log($"[JoinLobbyScreen] Joining Steam lobby: {lobbyId}");
-        LobbyManager.Instance.JoinLobby(lobbyId);
+        Debug.Log($"[JoinLobbyScreen] Joining Steam lobby by code: {code}");
+        LobbyManager.Instance.JoinLobbyByCode(code);
     }
 
     private void JoinLAN(string raw)
@@ -106,7 +108,7 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
 
         bool isSteam = NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport;
-        placeholder.text = isSteam ? "Enter Steam lobby ID" : "Enter host IP (default: 127.0.0.1)";
+        placeholder.text = isSteam ? "Enter join code (e.g. ABC123)" : "Enter host IP (default: 127.0.0.1)";
     }
 
     private static bool IsValidIPv4(string address)
