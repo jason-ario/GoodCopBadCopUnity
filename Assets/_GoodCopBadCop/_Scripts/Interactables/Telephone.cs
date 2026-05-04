@@ -104,7 +104,7 @@ public class Telephone : Interactable
 
     /// <summary>
     /// Run on all non-grabbing clients: waits to match the grab animation timing then
-    /// attaches the ParentConstraint to the remote player's hand socket.
+    /// attaches the ParentConstraint to the remote player's body left-arm container.
     /// </summary>
     private IEnumerator ObserverGrabConstraintSequence(PlayerInteractionController player)
     {
@@ -113,7 +113,7 @@ public class Telephone : Interactable
 
         ConstraintSource source = new ConstraintSource
         {
-            sourceTransform = player.pickupController.LeftHandSocket.transform,
+            sourceTransform = GetHandSocketForClient(player, isLocalPlayer: false),
             weight = 1
         };
         _handSet.SetSource(0, source);
@@ -149,6 +149,17 @@ public class Telephone : Interactable
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Returns the correct hand socket transform for the ParentConstraint source.
+    /// Local (owner) players use the cam left-arm container; observers use the body left-arm container.
+    /// </summary>
+    private Transform GetHandSocketForClient(PlayerInteractionController player, bool isLocalPlayer)
+    {
+        return isLocalPlayer
+            ? player.pickupController.LeftArmCamObjectContainer.transform
+            : player.pickupController.LeftArmBodyObjectContainer.transform;
     }
 
     private IEnumerator PutPhoneDownSequence(PlayerInteractionController player)
@@ -201,9 +212,11 @@ public class Telephone : Interactable
         phoneSound.PlayOneShot(phoneGrabSound);
 
         yield return new WaitForSeconds(.25f);
-        ConstraintSource source = new ConstraintSource();
-        source.sourceTransform = player.pickupController.LeftHandSocket.transform;
-        source.weight = 1;
+        ConstraintSource source = new ConstraintSource
+        {
+            sourceTransform = GetHandSocketForClient(player, isLocalPlayer: true),
+            weight = 1
+        };
         _handSet.SetSource(0, source);
         _handSet.enabled = true;
         _handSet.constraintActive = true;
