@@ -98,8 +98,11 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
     }
     
-    public void OpenToolShop(Transform toolShopLookTarget)
+    private ToolsLocker _activeToolsLocker;
+
+    public void OpenToolShop(Transform toolShopLookTarget, ToolsLocker locker)
     {
+        _activeToolsLocker = locker;
         PlayerInstance.Instance.SetCanInteract(false);
         ShowCursor();
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
@@ -121,6 +124,12 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
         PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
+
+        if (_activeToolsLocker != null)
+        {
+            _activeToolsLocker.NotifyPlayerClosedServerRpc();
+            _activeToolsLocker = null;
+        }
     }
 
     public void ClosePlayerUI()

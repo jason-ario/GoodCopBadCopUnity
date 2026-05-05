@@ -214,6 +214,14 @@ public class DoorController : Interactable
         if (!IsServer) return;
         _doorOpen.Value = false;
         _openedIn.Value = false;
+        ForceCloseVisualsClientRpc();
+    }
+
+    [ClientRpc]
+    private void ForceCloseVisualsClientRpc()
+    {
+        ApplyDoorVisuals(false, false);
+        audioSource.PlayOneShot(doorCloseClip);
     }
 
     /// <summary>

@@ -58,8 +58,6 @@ public class SuspectController : NetworkBehaviour
 
     private StampContainer.StampType _lastVerdictStampType;
     private bool _lastVerdictWasCorrect;
-
-    [SerializeField] private GameObject entranceCamera;
     
     private void Awake()
     {
@@ -188,15 +186,7 @@ public class SuspectController : NetworkBehaviour
             .OnComplete(SayEntryDialogue);
 
         suspectCharacter.animator.SetBool("Walking", false);
-        StartCoroutine(ShiftToCamera());
         EnableLook();
-    }
-
-    IEnumerator ShiftToCamera()
-    {
-        entranceCamera.SetActive(true);
-        yield return new WaitForSeconds(2f);
-        entranceCamera.SetActive(false);
     }
 
     private void SayEntryDialogue()
@@ -510,7 +500,7 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(2f);
 
         // Message 1: Anomaly accuracy breakdown.
-        string anomalyMessage = $"Anomalies Identified: {accuracyPercent}%\n({correctCount}/{totalCount} correct)";
+        string anomalyMessage = $"Anomalies Identified: {accuracyPercent}%\n({correctCount}/{totalCount} identified)";
         UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
 
         yield return new WaitForSeconds(2f);

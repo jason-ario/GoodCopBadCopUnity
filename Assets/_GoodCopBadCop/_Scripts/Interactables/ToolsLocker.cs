@@ -6,6 +6,7 @@ public class ToolsLocker : Interactable
 {
     [SerializeField] private Animator anim;
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
+    private NetworkVariable<int> viewerCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     [SerializeField] private PurchaseLocker[] miniLockers;
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip lockerOpenSound;
@@ -13,19 +14,25 @@ public class ToolsLocker : Interactable
     [SerializeField] private Transform lookTarget;
     [SerializeField] private GameObject[] decor;
     Coroutine closeCoroutine;
-    
+
     public override void OnNetworkSpawn()
     {
         isOpen.OnValueChanged += (oldValue, newValue) =>
         {
             anim.SetBool("Open", newValue);
 
-            if (newValue == true)
+            if (newValue)
             {
+                audioSource.PlayOneShot(lockerOpenSound);
+
                 foreach (var decoration in decor)
                 {
-                    decoration.SetActive(newValue);
+                    decoration.SetActive(true);
                 }
+            }
+            else
+            {
+                audioSource.PlayOneShot(lockerCloseSound);
             }
         };
     }
@@ -39,17 +46,33 @@ public class ToolsLocker : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         Debug.Log("Toggle Tool Locker");
-        UIController.Instance.OpenToolShop(lookTarget);
-        
+        UIController.Instance.OpenToolShop(lookTarget, this);
         OpenLockerServerRpc();
     }
 
-    [ServerRpc]
+    /// <summary>Called by each local client when they close the tool shop UI. Decrements the viewer count and closes the locker when no viewers remain.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyPlayerClosedServerRpc()
+    {
+        viewerCount.Value = Mathf.Max(0, viewerCount.Value - 1);
+
+        if (viewerCount.Value == 0)
+        {
+            CloseLockerInternal();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void CloseLockerServerRpc()
     {
-        isOpen.Value = false;
+        CloseLockerInternal();
+    }
 
-        audioSource.PlayOneShot(lockerCloseSound);
+    private void CloseLockerInternal()
+    {
+        isOpen.Value = false;
+        viewerCount.Value = 0;
+
         foreach (var miniLocker in miniLockers)
         {
             miniLocker.CloseServerRpc();
@@ -69,13 +92,17 @@ public class ToolsLocker : Interactable
             }
         }
     }
-    
-    
-    [ServerRpc]
+
+    [ServerRpc(RequireOwnership = false)]
     public void OpenLockerServerRpc()
     {
+        if (closeCoroutine != null)
+        {
+            StopCoroutine(closeCoroutine);
+            closeCoroutine = null;
+        }
+
+        viewerCount.Value++;
         isOpen.Value = true;
-        StopCoroutine(closeCoroutine);
-        audioSource.PlayOneShot(lockerOpenSound);
     }
 }

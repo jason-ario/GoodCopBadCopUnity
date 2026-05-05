@@ -11,6 +11,14 @@ public class AnomalyController : MonoBehaviour
     [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies;
     [SerializeField] private List<EnvironmentalAnomaly> _environmentalAnomalies;
 
+    [Header("Anomaly Distribution")]
+    [Tooltip("Probability (0–1) that this suspect spawns with no anomalies.")]
+    [SerializeField] [Range(0f, 1f)] private float _cleanChance = 0.65f;
+    [Tooltip("Minimum number of anomalies when the suspect is not clean.")]
+    [SerializeField] private int _minAnomalies = 1;
+    [Tooltip("Maximum number of anomalies (inclusive) when the suspect is not clean.")]
+    [SerializeField] private int _maxAnomalies = 2;
+
     private Anomaly[] _allPossibleAnomalies;
     public List<Anomaly> activeAnomalies = new List<Anomaly>();
     
@@ -55,10 +63,19 @@ public class AnomalyController : MonoBehaviour
 
     public void ActivateAnomalies()
     {
-        int anomalyCount = Random.Range(2, 3);
+        // Chance (0–1) that this suspect spawns with no anomalies at all.
+        if (Random.value < _cleanChance)
+        {
+            Debug.Log("Suspect is clean — no anomalies activated.");
+            return;
+        }
+
+        int anomalyCount = Random.Range(_minAnomalies, _maxAnomalies + 1);
 
         for (int i = 0; i < anomalyCount; i++)
         {
+            if (_allPossibleAnomalies.Length == 0) break;
+
             Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
             
             // Skip if this anomaly is already active

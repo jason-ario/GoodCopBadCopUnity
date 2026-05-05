@@ -14,7 +14,7 @@ public class CashEarnedNotification : MonoBehaviour
         mainText.text = message;
         couponAmountText.text = cashAmount.ToString();
         
-        if (cashAmount > 0)
+        if (cashAmount >= 0)
         {
             mainText.color = Color.white;
             couponAmountText.color = positiveColor;
