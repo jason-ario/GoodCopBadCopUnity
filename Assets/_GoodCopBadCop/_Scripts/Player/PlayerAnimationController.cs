@@ -410,17 +410,11 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         float pitch = Mathf.Clamp(netPitch.Value, -pitchClampUp, pitchClampDown);
 
-        // Suppress all spine bone overrides while an arm IK rig is active.
-        // Animation Rigging solves the arm chain in world space before LateUpdate runs;
-        // rotating the spine afterward drags the shoulder with it and breaks the IK result.
-        // Head and neck are safe — they are above the shoulder joint and don't affect arm bones.
-        bool anyRigActive = netRightArmRigActive.Value || netLeftArmRigActive.Value
-                         || rightArmRig.weight > 0.01f  || leftArmRig.weight > 0.01f;
-
         // --- IK Reach Lean ---
-        // When the right arm IK rig is active, lean the spine forward if the IK target is beyond
-        // comfortable arm reach. This runs first so all subsequent pitch/lean rotations stack on top.
-        if (!anyRigActive && _rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null)
+        // When the right arm IK rig is active and the target is beyond comfortable arm reach,
+        // lean the spine toward the IK target to sell the stretch. Runs before the arm snapshot
+        // below so the body lean contributes naturally to the arm's world position.
+        if (_rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null && rightArmRigIKTarget != null)
         {
             float targetIKLeanAngle = 0f;
 
@@ -435,56 +429,74 @@ public class PlayerAnimationController : NetworkBehaviour
 
             if (_currentIKLeanAngle > 0.01f)
             {
-                _spineBone.localRotation *= Quaternion.Euler(_currentIKLeanAngle, 0f, 0f);
+                Vector3 toTarget = (rightArmRigIKTarget.position - _spineBone.position).normalized;
+                Vector3 leanAxis = Vector3.Cross(Vector3.up, toTarget).normalized;
+                if (leanAxis.sqrMagnitude > 0.001f)
+                    _spineBone.rotation = Quaternion.AngleAxis(_currentIKLeanAngle, leanAxis) * _spineBone.rotation;
             }
         }
 
-        if (_headBone != null)
+        // --- Arm world-transform snapshot ---
+        // Spine pitch and body lean run after Animation Rigging has already solved the arm chain.
+        // Rotating the spine drags the shoulder with it and breaks the IK result in world space.
+        // Solution: snapshot the upper arm world position+rotation after the reach lean (which is
+        // intentional), apply all pitch/lean to the spine normally, then restore the arm so it
+        // stays exactly where the IK solver placed it. Head and neck can follow freely.
+        bool rightIKActive = netRightArmRigActive.Value || rightArmRig.weight > 0.01f;
+        bool leftIKActive  = netLeftArmRigActive.Value  || leftArmRig.weight  > 0.01f;
+
+        Vector3    savedRightArmPos = Vector3.zero;
+        Quaternion savedRightArmRot = Quaternion.identity;
+        Vector3    savedLeftArmPos  = Vector3.zero;
+        Quaternion savedLeftArmRot  = Quaternion.identity;
+
+        if (rightIKActive && _rightUpperArmBone != null)
         {
-            _headBone.localRotation *= Quaternion.Euler(pitch * headPitchWeight, 0f, 0f);
+            savedRightArmPos = _rightUpperArmBone.position;
+            savedRightArmRot = _rightUpperArmBone.rotation;
         }
+
+        if (leftIKActive && _leftUpperArmBone != null)
+        {
+            savedLeftArmPos = _leftUpperArmBone.position;
+            savedLeftArmRot = _leftUpperArmBone.rotation;
+        }
+
+        // --- Pitch and lean ---
+
+        if (_headBone != null)
+            _headBone.localRotation *= Quaternion.Euler(pitch * headPitchWeight, 0f, 0f);
 
         if (_neckBone != null)
-        {
             _neckBone.localRotation *= Quaternion.Euler(pitch * neckPitchWeight, 0f, 0f);
-        }
 
-        if (!anyRigActive && _spineBone != null)
-        {
+        if (_spineBone != null)
             _spineBone.localRotation *= Quaternion.Euler(pitch * spinePitchWeight, 0f, 0f);
-        }
 
-        // Apply synced body lean on top of the pitch rotation.
-        float leanFactor = Mathf.Lerp(
-            _currentLeanFactor,
-            netLeanFactor.Value,
-            leanLerpSpeed * Time.deltaTime
-        );
+        float leanFactor = Mathf.Lerp(_currentLeanFactor, netLeanFactor.Value, leanLerpSpeed * Time.deltaTime);
         _currentLeanFactor = leanFactor;
 
         if (leanFactor > 0.001f)
         {
             float dir = netLeanDirection.Value;
 
-            if (!anyRigActive && _spineBone != null)
-            {
+            if (_spineBone != null)
                 _spineBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanSpineMax, 0f, 0f);
-            }
 
             if (_neckBone != null)
-            {
                 _neckBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanNeckMax, 0f, 0f);
-            }
         }
 
+        // --- Restore arm world transforms ---
+        // Forearm and hand are children of the upper arm, so they follow automatically.
+        if (rightIKActive && _rightUpperArmBone != null)
+            _rightUpperArmBone.SetPositionAndRotation(savedRightArmPos, savedRightArmRot);
+
+        if (leftIKActive && _leftUpperArmBone != null)
+            _leftUpperArmBone.SetPositionAndRotation(savedLeftArmPos, savedLeftArmRot);
+
         // Swing the upper arm bones up/down when the owner's camera arm has something equipped.
-        // netLayer1Weight (single right-hand hold) and netLayer2Weight (two-hand hold) are synced
-        // from the owner and are non-zero whenever the camera arm is holding something — the
-        // local currentLayer* fields are only updated on the owner and are always 0 on proxies.
-        // Rotation axis is transform.right: the held arm sits in front of the character, so
-        // rotating around the lateral axis pitches it up/down in the same plane as the camera.
-        // Skip the bone override while the IK rig is active — the rig solver already drives the
-        // full arm chain and overwriting the upper arm bone here would destroy its result.
+        // Skip while IK is active — the world-transform restore above already locked the arm.
         bool rightArmHolding = netLayer1Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
         bool leftArmHolding  = netLayer4Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
 
