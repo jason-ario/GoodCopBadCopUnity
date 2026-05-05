@@ -44,6 +44,24 @@ public class PlayerInstance : NetworkBehaviour
         playerLight.SetActive(value);
     }
 
+    /// <summary>
+    /// Sets the player's outside state from any context.
+    /// Routes through a ServerRpc when called on a client.
+    /// </summary>
+    public void RequestSetIsOutside(bool value)
+    {
+        if (IsServer)
+            SetIsOutside(value);
+        else
+            SetIsOutsideServerRpc(value);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetIsOutsideServerRpc(bool value)
+    {
+        SetIsOutside(value);
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();

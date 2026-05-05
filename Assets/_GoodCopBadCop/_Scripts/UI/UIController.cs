@@ -18,6 +18,9 @@ public class UIController : MonoBehaviour
     /// <summary>Fired when the End of Shift Report is hidden.</summary>
     public Action OnReportHidden { get; set; }
 
+    /// <summary>Fired on the local client whenever any player opens the tool shop.</summary>
+    public static event Action OnToolShopOpened;
+
     [SerializeField] RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
@@ -101,6 +104,7 @@ public class UIController : MonoBehaviour
         ShowCursor();
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(toolShopLookTarget);
+        OnToolShopOpened?.Invoke();
         StartCoroutine(WaitAndOpenShopUI());
     }
 

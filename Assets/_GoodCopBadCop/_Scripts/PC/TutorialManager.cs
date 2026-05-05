@@ -42,6 +42,42 @@ public class TutorialManager : MonoBehaviour
         ShowTutorialText("All inspectors report to stations for their shift.");
     }
 
+    /// <summary>Played when the player dismisses the end-of-shift report and enters the night phase.</summary>
+    public void SayEndOfShiftDialogue()
+    {
+        StartCoroutine(EndOfShiftDialogueSequence());
+    }
+
+    private IEnumerator EndOfShiftDialogueSequence()
+    {
+        ShowTutorialText("Your shift is over.");
+
+        // Wait for the first line to finish speaking before queuing the next.
+        yield return new WaitUntil(() => !isSpeaking);
+
+        yield return new WaitForSeconds(3f);
+
+        ShowTutorialText("Complete your tasks to prepare for your next shift.");
+    }
+
+    /// <summary>Played at the start of the night phase after the end-of-shift report is dismissed.</summary>
+    public void SayBetweenShiftReady()
+    {
+        ShowTutorialText("You may now prepare for your next shift");
+    }
+
+    /// <summary>Played when all night-phase tasks are complete and the shift-start button is ready.</summary>
+    public void SayAllTasksComplete()
+    {
+        ShowTutorialText("All tasks complete. Return to booth to begin the next shift.");
+    }
+
+    /// <summary>Played when all night-phase tasks are complete and the shift-start button is ready.</summary>
+    public void SayBeginShiftNow()
+    {
+        ShowTutorialText("Begin your next shift immediately");
+    }
+
     void ShowStartShiftTutorial()
     {
         if (PlayerPrefs.GetInt("Tutorial") == 0)

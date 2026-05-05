@@ -55,5 +55,15 @@ public class DebugConsole : MonoBehaviour
         {
             GlobalHostVariables.Instance.AddMoney(1000);
         }
+
+        if (Input.GetKeyDown(KeyCode.F8))
+        {
+            ShiftManager.Instance.EndShift();
+        }
+
+        if (Input.GetKeyDown(KeyCode.F9))
+        {
+            ShiftManager.Instance.DebugForceTasksComplete();
+        }
     }
 }

@@ -54,7 +54,12 @@ public class ShiftManager : NetworkBehaviour
 
     #region Events & Date Helpers
     public Action OnShiftStart { get; set; }
+    public Action OnShiftEnd { get; set; }
     public Action OnShiftReady { get; set; }
+    /// <summary>Fired when the booth door should force-close and lock. Subscribe in DoorController.</summary>
+    public Action OnDoorLock { get; set; }
+    /// <summary>Fired after the end-of-shift dialogue finishes, signalling the door should unlock.</summary>
+    public Action OnDoorUnlock { get; set; }
 
     private DateTime CurrentGameDateTime => _startDate.AddDays(_currentDay - 1);
     public string currentMonth => CurrentGameDateTime.ToString("MMMM");
@@ -69,6 +74,16 @@ public class ShiftManager : NetworkBehaviour
     {
         Instance = this;
         InitializeDateSystem();
+    }
+
+    private void OnEnable()
+    {
+        BetweenShiftTaskManager.OnAllTasksComplete += OnNightPhaseTasksComplete;
+    }
+
+    private void OnDisable()
+    {
+        BetweenShiftTaskManager.OnAllTasksComplete -= OnNightPhaseTasksComplete;
     }
 
     public override void OnNetworkSpawn()
@@ -122,24 +137,49 @@ public class ShiftManager : NetworkBehaviour
     public void TryStartShift()
     {
         if (IsServer)
-            StartShiftServer();
+            StartShiftServer(NetworkManager.Singleton.LocalClientId);
         else
             RequestStartShiftServerRpc();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestStartShiftServerRpc()
+    private void RequestStartShiftServerRpc(ServerRpcParams rpcParams = default)
     {
-        StartShiftServer();
+        StartShiftServer(rpcParams.Receive.SenderClientId);
     }
 
-    private void StartShiftServer()
+    private void StartShiftServer(ulong requestingClientId)
     {
         if (!IsServer) return;
         if (shiftStarted.Value) return;
 
+        if (!AreAllPlayersInsideBooth())
+        {
+            NotifyNotAllInsideClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { requestingClientId } }
+            });
+            return;
+        }
+
         shiftStarted.Value = true;
         StartShiftClientRpc();
+    }
+
+    /// <summary>Returns true when every connected player has IsOutside == false.</summary>
+    private bool AreAllPlayersInsideBooth()
+    {
+        foreach (var player in FindObjectsByType<PlayerInstance>(FindObjectsSortMode.None))
+        {
+            if (player.IsOutside) return false;
+        }
+        return true;
+    }
+
+    [ClientRpc]
+    private void NotifyNotAllInsideClientRpc(ClientRpcParams rpcParams = default)
+    {
+        TutorialManager.Instance.ShowTutorialText("All inspectors must be inside the booth to begin the shift.");
     }
 
     [ClientRpc]
@@ -160,13 +200,22 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator OpenWindowSequence()
     {
+        ResetEnvironment();
+        ResetSuspectsProcessed();
+        SuspectController.Instance.ResetSuspects();
+
+        OnDoorLock?.Invoke();
         PlayBuzzerSound();
+        PlayShiftStartFanfare();
+
+        yield return new WaitForSeconds(3f);
+
+        OnShiftStart?.Invoke();
         yield return new WaitForSeconds(0.5f);
         windowLampController.TurnGreen();
 
         yield return new WaitForSeconds(3f);
 
-        OnShiftStart?.Invoke();
         SuspectController.Instance.NextSuspect();
     }
 
@@ -202,6 +251,7 @@ public class ShiftManager : NetworkBehaviour
     {
         SFXController.Instance.Play(endOfLevelSound);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().StopMoving();
+        OnShiftEnd?.Invoke();
 
         var rows = new List<EndOfShiftReportUI.ReportRowData>
         {
@@ -255,6 +305,35 @@ public class ShiftManager : NetworkBehaviour
             StartNewShiftClientRpc();
         }
         StartCoroutine(NewShiftSequence());
+    }
+
+    /// <summary>
+    /// Called when the player presses Continue on the end-of-shift report.
+    /// Fades the screen, re-enables player movement, and begins the between-shift
+    /// night phase without marking the shift as ready yet.
+    /// </summary>
+    public void StartInBetweenShiftSequence()
+    {
+        StartCoroutine(InBetweenShiftSequence());
+
+        if (IsServer && BetweenShiftTaskManager.Instance != null)
+            BetweenShiftTaskManager.Instance.BeginNightPhase();
+    }
+
+    private IEnumerator InBetweenShiftSequence()
+    {
+        UIController.Instance.FadeIn();
+        yield return new WaitForSeconds(1.5f);
+        UIController.Instance.HideEndOfShiftReport();
+        yield return new WaitForSeconds(0.5f);
+        UIController.Instance.FadeOut();
+        yield return new WaitForSeconds(1f);
+
+        EnablePlayerControl();
+
+        TutorialManager.Instance.SayEndOfShiftDialogue();
+
+        OnDoorUnlock?.Invoke();
     }
 
     [ClientRpc]
@@ -327,8 +406,27 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(1f);
 
         EnablePlayerControl();
+        TutorialManager.Instance.ShowTutorialText("You may now prepare for your next shift");
+
+        if (IsServer && BetweenShiftTaskManager.Instance != null)
+            BetweenShiftTaskManager.Instance.BeginNightPhase();
+        // OnShiftReady is invoked by OnNightPhaseTasksComplete once all tasks are done.
+    }
+
+    /// <summary>
+    /// Called on all clients when BetweenShiftTaskManager signals that every night-phase task is complete.
+    /// Primes the switch button via OnShiftReady so players can walk back and start the next shift.
+    /// </summary>
+    private void OnNightPhaseTasksComplete()
+    {
+        TutorialManager.Instance.SayAllTasksComplete();
         OnShiftReady?.Invoke();
-        PlayShiftStartFanfare();
+    }
+
+    /// <summary>Debug helper — simulates all night-phase tasks being completed.</summary>
+    public void DebugForceTasksComplete()
+    {
+        OnNightPhaseTasksComplete();
     }
 
     private void ResetSuspectsProcessed()
@@ -422,8 +520,53 @@ public class ShiftManager : NetworkBehaviour
     public void EndIntroCutscene()
     {
         UIController.Instance.ShowPlayerUI();
-        StartNewShift();
         ambientAudio.DOFade(1, 2);
+
+        if (IsServer)
+            EndIntroCutsceneClientRpc();
+        else
+            StartCoroutine(EndIntroCutsceneSequence());
+    }
+
+    [ClientRpc]
+    private void EndIntroCutsceneClientRpc()
+    {
+        StartCoroutine(EndIntroCutsceneSequence());
+    }
+
+    /// <summary>
+    /// Transitions from the intro cutscene directly into a "shift ready" state.
+    /// Resets the environment and player, then fires <see cref="OnShiftReady"/> so
+    /// the switch button is primed — without starting the shift or triggering the
+    /// night-phase task system.
+    /// </summary>
+    private IEnumerator EndIntroCutsceneSequence()
+    {
+        PlayerPrefs.SetInt("dayNumber", _currentDay);
+
+        UIController.Instance.FadeIn();
+        yield return new WaitForSeconds(2f);
+        introCutscene.gameObject.SetActive(false);
+
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        ResetEnvironment();
+        SuspectController.Instance.ResetSuspects();
+
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+            PlayerInstance.Instance.SetIsOutside(false);
+        }
+
+        yield return new WaitForSeconds(1f);
+        UIController.Instance.FadeOut();
+        yield return new WaitForSeconds(1f);
+
+        EnablePlayerControl();
+        OnDoorLock?.Invoke();
+        OnShiftReady?.Invoke();
+        PlayShiftStartFanfare();
     }
 
     public void SetNextShiftReady()
