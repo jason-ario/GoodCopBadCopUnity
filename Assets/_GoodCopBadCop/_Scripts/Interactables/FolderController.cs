@@ -307,8 +307,13 @@ public class FolderController : PickableObject
     {
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
 
+        // Capture into a local so that any subsequent write to the instance field
+        // (e.g. from OnEquipped on another interaction) cannot corrupt this coroutine
+        // across its yield points.
+        PlayerPickupController ppc = playerPickupController;
+
         // Only the stamping player's local client locks controls and activates the cinematic camera.
-        bool isStampingLocalPlayer = playerPickupController.IsLocalPlayer;
+        bool isStampingLocalPlayer = ppc.IsLocalPlayer;
         if (isStampingLocalPlayer) PlayerInstance.Instance.CanControl = false;
 
         if (isStampingLocalPlayer)
@@ -316,59 +321,74 @@ public class FolderController : PickableObject
             cinemachineVirtualCamera.SetActive(true);
         }
 
-        playerPickupController.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", true);
+        ppc.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", true);
 
-        // Detach the passthrough targets so LateUpdate stops overriding the body IK target
-        // for the duration of the sequence, then restore them when it completes.
-        Transform savedRightArmRigIKTarget = playerPickupController.PlayerAnimationController.RightArmRigIKTarget;
-        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = null;
+        // Detach the external IK target so LateUpdate stops overriding the rig target
+        // for the duration of the sequence, then restore it when the sequence completes.
+        // We then drive rightArmRigIKTarget (the fixed rig constraint target) directly via DOTween.
+        Transform savedRightArmIKTarget = ppc.PlayerAnimationController.RightArmIKTarget;
+        ppc.PlayerAnimationController.RightArmIKTarget = null;
 
         Transform savedCamRightArmRigIKTarget = null;
         if (isStampingLocalPlayer)
         {
-            savedCamRightArmRigIKTarget = playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget;
-            playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget = null;
+            savedCamRightArmRigIKTarget = ppc.PlayerAnimationController.CamRightArmRigIKTarget;
+            ppc.PlayerAnimationController.CamRightArmRigIKTarget = null;
         }
 
         yield return new WaitForSeconds(.25f);
 
-        playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
+        ppc.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         // Resolve body-arm targets, falling back to the camera-arm targets when unassigned.
         Transform bodyUp   = bodyStampUpTarget   != null ? bodyStampUpTarget   : stampUpTarget;
         Transform bodyDown = bodyStampDownTarget != null ? bodyStampDownTarget : stampDownTarget;
 
-        // Drive the body-arm IK target on all clients so observers see the arm move
-        // using targets calibrated for the body skeleton's shoulder origin.
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = bodyDown.position;
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
-            bodyUp.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyUp.position, .5f);
+        // Diagnostic: log the IK target state on every client so we can verify what's null.
+        Debug.Log($"[FolderController] UseStampSequence — client={NetworkManager.Singleton.LocalClientId} " +
+                  $"isStampingLocalPlayer={isStampingLocalPlayer} " +
+                  $"ppc={ppc?.name ?? "NULL"} " +
+                  $"RightArmRigIKTarget={ppc?.PlayerAnimationController?.RightArmRigIKTarget?.name ?? "NULL"} " +
+                  $"bodyUp={bodyUp?.name ?? "NULL"} bodyDown={bodyDown?.name ?? "NULL"}");
+
+        // Drive the fixed rig constraint target directly (external passthrough is null'd above).
+        // This works on all clients because the coroutine is started via ClientRpc.
+        if (ppc.PlayerAnimationController.RightArmRigIKTarget != null)
+        {
+            ppc.PlayerAnimationController.RightArmRigIKTarget.position = bodyDown.position;
+            ppc.PlayerAnimationController.RightArmRigIKTarget.DORotate(
+                bodyUp.rotation.eulerAngles, .25f);
+            ppc.PlayerAnimationController.RightArmRigIKTarget.DOMove(bodyUp.position, .5f);
+        }
+        else
+        {
+            Debug.LogError("[FolderController] RightArmRigIKTarget is null on this client — body arm IK will not drive during stamp.");
+        }
 
         // Drive the camera-arm IK target only on the stamping player's local client.
         if (isStampingLocalPlayer)
         {
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.position = stampDownTarget.position;
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            ppc.PlayerAnimationController.CamRightArmIKTarget.position = stampDownTarget.position;
+            ppc.PlayerAnimationController.CamRightArmIKTarget.DORotate(
                 stampUpTarget.rotation.eulerAngles, .25f);
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
+            ppc.PlayerAnimationController.CamRightArmIKTarget.DOMove(stampUpTarget.position, .5f);
 
-            playerPickupController.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f);
-            playerPickupController.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
+            ppc.PlayerMovementController.CameraTransform.DOMove(cameraRigPos.transform.position, .25f);
+            ppc.PlayerMovementController.CameraTransform.DORotate(cameraRigPos.transform.rotation.eulerAngles, .25f);
         }
 
-        playerPickupController.PlayerAnimationController.TurnRightArmRigOnAndOff(.5f, .5f);
+        ppc.PlayerAnimationController.TurnRightArmRigOnAndOff(.5f, .5f);
         yield return new WaitForSeconds(.5f);
 
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
+        ppc.PlayerAnimationController.RightArmRigIKTarget?.DORotate(
             bodyDown.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyDown.position, .25f);
+        ppc.PlayerAnimationController.RightArmRigIKTarget?.DOMove(bodyDown.position, .25f);
 
         if (isStampingLocalPlayer)
         {
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            ppc.PlayerAnimationController.CamRightArmIKTarget?.DORotate(
                 stampDownTarget.rotation.eulerAngles, .25f);
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f);
+            ppc.PlayerAnimationController.CamRightArmIKTarget?.DOMove(stampDownTarget.position, .25f);
         }
 
         SFXController.Instance.Play(stampSound);
@@ -384,36 +404,36 @@ public class FolderController : PickableObject
         _impulseSource.GenerateImpulse();
         yield return new WaitForSeconds(.25f);
 
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
+        ppc.PlayerAnimationController.RightArmRigIKTarget?.DORotate(
             bodyUp.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyUp.position, .25f);
+        ppc.PlayerAnimationController.RightArmRigIKTarget?.DOMove(bodyUp.position, .25f);
 
         if (isStampingLocalPlayer)
         {
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DORotate(
+            ppc.PlayerAnimationController.CamRightArmIKTarget?.DORotate(
                 stampUpTarget.rotation.eulerAngles, .25f);
-            playerPickupController.PlayerAnimationController.CamRightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
+            ppc.PlayerAnimationController.CamRightArmIKTarget?.DOMove(stampUpTarget.position, .25f);
         }
 
         yield return new WaitForSeconds(.5f);
 
         isStamping = false;
 
-        // Restore the IK passthrough targets so the pickup system resumes driving them.
-        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = savedRightArmRigIKTarget;
+        // Restore the external IK target so the pickup system resumes driving the rig target.
+        ppc.PlayerAnimationController.RightArmIKTarget = savedRightArmIKTarget;
 
         if (isStampingLocalPlayer)
         {
-            playerPickupController.PlayerAnimationController.CamRightArmRigIKTarget = savedCamRightArmRigIKTarget;
+            ppc.PlayerAnimationController.CamRightArmRigIKTarget = savedCamRightArmRigIKTarget;
         }
 
-        playerPickupController.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", false);
+        ppc.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", false);
 
         if (isStampingLocalPlayer)
         {
             cinemachineVirtualCamera.SetActive(false);
             PlayerInstance.Instance.CanControl = true;
-            playerPickupController.PlayerMovementController.ResetCameraPos(false, .5f);
+            ppc.PlayerMovementController.ResetCameraPos(false, .5f);
         }
 
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;

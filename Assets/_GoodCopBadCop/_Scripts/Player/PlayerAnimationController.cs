@@ -34,13 +34,26 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private Rig leftArmRig;
     [SerializeField] private Rig shoulderRig;
 
-    [SerializeField] private Transform rightArmIKTarget; 
-    [SerializeField] private Transform leftArmIKTarget;
+    /// <summary>
+    /// Fixed Transform in the player hierarchy that the body right-arm rig constraint targets.
+    /// Its world position is driven each frame by <see cref="RightArmIKTarget"/> when that is non-null.
+    /// Never reassigned at runtime — use <see cref="RightArmIKTarget"/> to point the arm at something,
+    /// or DOTween this directly when you want full manual control (e.g. stamp sequence).
+    /// </summary>
+    [SerializeField, FormerlySerializedAs("rightArmIKTarget")]
+    private Transform rightArmRigIKTarget;
+
+    /// <summary>
+    /// Fixed Transform in the player hierarchy that the body left-arm rig constraint targets.
+    /// Driven each frame by <see cref="LeftArmIKTarget"/> when that is non-null.
+    /// </summary>
+    [SerializeField, FormerlySerializedAs("leftArmIKTarget")]
+    private Transform leftArmRigIKTarget;
 
     [Header("Camera Arm Rigs")]
     [SerializeField] private Rig camRightArmRig;
     [SerializeField] private Rig camLeftArmRig;
-    [SerializeField] private Transform camRightArmIKTarget; 
+    [SerializeField] private Transform camRightArmIKTarget;
     [SerializeField] private Transform camLeftArmIKTarget;
 
     public Rig RightArmRig => rightArmRig;
@@ -49,22 +62,29 @@ public class PlayerAnimationController : NetworkBehaviour
     public Rig LeftArmRig => leftArmRig;
     public Rig CamLeftArmRig => camLeftArmRig;
 
+    /// <summary>Read-only accessor for the fixed rig constraint target. DOTween this directly for full manual control.</summary>
+    public Transform RightArmRigIKTarget => rightArmRigIKTarget;
 
-    public Transform RightArmIKTarget => rightArmIKTarget;
-    public Transform LeftArmIKTarget => leftArmIKTarget;
+    /// <summary>Read-only accessor for the fixed left-arm rig constraint target.</summary>
+    public Transform LeftArmRigIKTarget => leftArmRigIKTarget;
 
-    public Transform RightArmRigIKTarget { get; set; } //USE THIS ONE
+    /// <summary>
+    /// External IK target for the body right arm. Set to any scene Transform to make the arm reach toward it.
+    /// LateUpdate copies its world position/rotation to <see cref="RightArmRigIKTarget"/> each frame.
+    /// Set to null to stop the passthrough and drive <see cref="RightArmRigIKTarget"/> directly.
+    /// </summary>
+    public Transform RightArmIKTarget { get; set; }
 
-    public Transform LeftArmRigIKTarget { get; set; } // USE THIS ONE
+    /// <summary>
+    /// External IK target for the body left arm. Same passthrough pattern as <see cref="RightArmIKTarget"/>.
+    /// </summary>
+    public Transform LeftArmIKTarget { get; set; }
 
     public Transform CamRightArmIKTarget
     {
         get => camRightArmIKTarget;
-        set
-        {
-            camRightArmIKTarget = value;
-        }
-    } 
+        set => camRightArmIKTarget = value;
+    }
     public Transform CamLeftArmIKTarget => camLeftArmIKTarget;
     public Transform CamRightArmRigIKTarget { get; set; }
     public Transform CamLeftArmRigIKTarget { get; set; }
@@ -117,6 +137,20 @@ public class PlayerAnimationController : NetworkBehaviour
     /// </summary>
     private NetworkVariable<float> netLeanDirection =
         new NetworkVariable<float>(1f, writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Synced flag: true while the body right-arm IK rig is active (weight > 0).
+    /// Owner writes when enabling/disabling the rig; proxy clients read to suppress
+    /// the arm-pitch bone override that would otherwise fight the IK result.
+    /// </summary>
+    private NetworkVariable<bool> netRightArmRigActive =
+        new NetworkVariable<bool>(false, writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Synced flag: true while the body left-arm IK rig is active (weight > 0).
+    /// </summary>
+    private NetworkVariable<bool> netLeftArmRigActive =
+        new NetworkVariable<bool>(false, writePerm: NetworkVariableWritePermission.Owner);
 
     [Header("Vertical Look Bone Rotation")]
     [SerializeField] [Range(0f, 1f)] private float headPitchWeight  = 0.40f;
@@ -178,32 +212,40 @@ public class PlayerAnimationController : NetworkBehaviour
     }
     
 
-    private void LateUpdate()
+    /// <summary>
+    /// Feeds all IK rig targets their current-frame world position and rotation.
+    /// Must run in Update so Animation Rigging — which evaluates between Update and LateUpdate —
+    /// solves the constraint against up-to-date data rather than the previous frame's values.
+    /// </summary>
+    private void Update()
     {
-        if (RightArmRigIKTarget != null)
+        if (RightArmIKTarget != null)
         {
-            rightArmIKTarget.position = RightArmRigIKTarget.position;
-            rightArmIKTarget.rotation = RightArmRigIKTarget.rotation;
+            rightArmRigIKTarget.position = RightArmIKTarget.position;
+            rightArmRigIKTarget.rotation = RightArmIKTarget.rotation;
         }
-        
-        if (LeftArmRigIKTarget != null)
+
+        if (LeftArmIKTarget != null)
         {
-            leftArmIKTarget.position = LeftArmRigIKTarget.position;
-            leftArmIKTarget.rotation = LeftArmRigIKTarget.rotation;
+            leftArmRigIKTarget.position = LeftArmIKTarget.position;
+            leftArmRigIKTarget.rotation = LeftArmIKTarget.rotation;
         }
-        
+
         if (CamRightArmRigIKTarget != null)
         {
             camRightArmIKTarget.position = CamRightArmRigIKTarget.position;
             camRightArmIKTarget.rotation = CamRightArmRigIKTarget.rotation;
         }
-        
+
         if (CamLeftArmRigIKTarget != null)
         {
             camLeftArmIKTarget.position = CamLeftArmRigIKTarget.position;
             camLeftArmIKTarget.rotation = CamLeftArmRigIKTarget.rotation;
         }
+    }
 
+    private void LateUpdate()
+    {
         if (IsOwner == false)
         {
             // Proxy: drive animations from NetworkVariables, then apply bone-level pitch.
@@ -368,16 +410,23 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         float pitch = Mathf.Clamp(netPitch.Value, -pitchClampUp, pitchClampDown);
 
+        // Suppress all spine bone overrides while an arm IK rig is active.
+        // Animation Rigging solves the arm chain in world space before LateUpdate runs;
+        // rotating the spine afterward drags the shoulder with it and breaks the IK result.
+        // Head and neck are safe — they are above the shoulder joint and don't affect arm bones.
+        bool anyRigActive = netRightArmRigActive.Value || netLeftArmRigActive.Value
+                         || rightArmRig.weight > 0.01f  || leftArmRig.weight > 0.01f;
+
         // --- IK Reach Lean ---
         // When the right arm IK rig is active, lean the spine forward if the IK target is beyond
         // comfortable arm reach. This runs first so all subsequent pitch/lean rotations stack on top.
-        if (_rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null)
+        if (!anyRigActive && _rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null)
         {
             float targetIKLeanAngle = 0f;
 
             if (rightArmRig.weight > 0.01f)
             {
-                float dist    = Vector3.Distance(_rightUpperArmBone.position, rightArmIKTarget.position);
+                float dist    = Vector3.Distance(_rightUpperArmBone.position, rightArmRigIKTarget.position);
                 float deficit = Mathf.Max(0f, dist - _rightArmReach);
                 targetIKLeanAngle = Mathf.Clamp(deficit * ikLeanResponseScale, 0f, ikLeanMaxAngle);
             }
@@ -400,7 +449,7 @@ public class PlayerAnimationController : NetworkBehaviour
             _neckBone.localRotation *= Quaternion.Euler(pitch * neckPitchWeight, 0f, 0f);
         }
 
-        if (_spineBone != null)
+        if (!anyRigActive && _spineBone != null)
         {
             _spineBone.localRotation *= Quaternion.Euler(pitch * spinePitchWeight, 0f, 0f);
         }
@@ -417,7 +466,7 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             float dir = netLeanDirection.Value;
 
-            if (_spineBone != null)
+            if (!anyRigActive && _spineBone != null)
             {
                 _spineBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanSpineMax, 0f, 0f);
             }
@@ -441,14 +490,14 @@ public class PlayerAnimationController : NetworkBehaviour
 
         float armPitch = Mathf.Clamp(netPitch.Value, -armPitchClampUp, armPitchClampDown);
 
-        if (rightArmHolding && _rightUpperArmBone != null && rightArmRig.weight < 0.01f)
+        if (rightArmHolding && _rightUpperArmBone != null && !netRightArmRigActive.Value && rightArmRig.weight < 0.01f)
         {
             _rightUpperArmBone.rotation =
                 Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
                 * _rightUpperArmBone.rotation;
         }
 
-        if (leftArmHolding && _leftUpperArmBone != null && leftArmRig.weight < 0.01f)
+        if (leftArmHolding && _leftUpperArmBone != null && !netLeftArmRigActive.Value && leftArmRig.weight < 0.01f)
         {
             _leftUpperArmBone.rotation =
                 Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
@@ -596,12 +645,17 @@ public class PlayerAnimationController : NetworkBehaviour
         DOTween.Kill(rightArmRig);
         DOTween.To(() => rightArmRig.weight, x => rightArmRig.weight = x, smoothWeight, smoothTime).SetTarget(rightArmRig);
 
-        // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients
-        // so its evaluation does not override the body arm rig's bone results on observers.
-        if (IsOwner && camRightArmRig != null)
+        if (IsOwner)
         {
-            DOTween.Kill(camRightArmRig);
-            DOTween.To(() => camRightArmRig.weight, x => camRightArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camRightArmRig);
+            netRightArmRigActive.Value = smoothWeight > 0f;
+
+            // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients
+            // so its evaluation does not override the body arm rig's bone results on observers.
+            if (camRightArmRig != null)
+            {
+                DOTween.Kill(camRightArmRig);
+                DOTween.To(() => camRightArmRig.weight, x => camRightArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camRightArmRig);
+            }
         }
     }
     
@@ -610,11 +664,16 @@ public class PlayerAnimationController : NetworkBehaviour
         DOTween.Kill(leftArmRig);
         DOTween.To(() => leftArmRig.weight, x => leftArmRig.weight = x, smoothWeight, smoothTime).SetTarget(leftArmRig);
 
-        // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients.
-        if (IsOwner && camLeftArmRig != null)
+        if (IsOwner)
         {
-            DOTween.Kill(camLeftArmRig);
-            DOTween.To(() => camLeftArmRig.weight, x => camLeftArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camLeftArmRig);
+            netLeftArmRigActive.Value = smoothWeight > 0f;
+
+            // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients.
+            if (camLeftArmRig != null)
+            {
+                DOTween.Kill(camLeftArmRig);
+                DOTween.To(() => camLeftArmRig.weight, x => camLeftArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camLeftArmRig);
+            }
         }
     }
 
@@ -646,6 +705,8 @@ public class PlayerAnimationController : NetworkBehaviour
         // so it cannot fight the coroutine's manual lerp below.
         DOTween.Kill(rightArmRig);
 
+        if (IsOwner) netRightArmRigActive.Value = true;
+
         float elapsed = 0;
         // Phase 1: Lerp Up to 1
         while (elapsed < smoothOnDuration)
@@ -674,6 +735,7 @@ public class PlayerAnimationController : NetworkBehaviour
         }
         
         RightArmRig.weight = 0;
+        if (IsOwner) netRightArmRigActive.Value = false;
     }
 
     public void TurnLeftRigOnAndOff(float smoothOnDuration, float onDuration)
@@ -690,6 +752,8 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         // Kill any in-flight DOTween targeting leftArmRig so it cannot fight the coroutine.
         DOTween.Kill(leftArmRig);
+
+        if (IsOwner) netLeftArmRigActive.Value = true;
 
         float elapsed = 0;
         // Phase 1: Lerp Up to 1
@@ -719,6 +783,7 @@ public class PlayerAnimationController : NetworkBehaviour
         }
         
         LeftArmRig.weight = 0;
+        if (IsOwner) netLeftArmRigActive.Value = false;
     }
 
     public void EnableLeftArmMask()

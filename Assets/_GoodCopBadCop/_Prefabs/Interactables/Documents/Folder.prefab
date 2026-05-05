@@ -210,6 +210,8 @@ Transform:
   m_Children:
   - {fileID: 5412411234339117797}
   - {fileID: 5009774770003864379}
+  - {fileID: 2690564497719807427}
+  - {fileID: 5010116641301851180}
   - {fileID: 7291620212759529881}
   m_Father: {fileID: 5868401806740368025}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -244,6 +246,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5797473811882092525}
   m_LocalEulerAnglesHint: {x: -14.48, y: 1.524, z: -72.642}
+--- !u!1 &746598087823415693
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5010116641301851180}
+  m_Layer: 0
+  m_Name: ik Down Target (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5010116641301851180
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 746598087823415693}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.6570923, y: 0.7320871, z: 0.044072736, w: 0.17417209}
+  m_LocalPosition: {x: -0.00073022465, y: -0.102000006, z: -0.16095927}
+  m_LocalScale: {x: 0.39594737, y: 0.39594698, z: 0.39594728}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5797473811882092525}
+  m_LocalEulerAnglesHint: {x: -189.46, y: -378.497, z: -97.724}
 --- !u!1 &1682053320584128725
 GameObject:
   m_ObjectHideFlags: 0
@@ -891,6 +924,8 @@ MonoBehaviour:
   anim: {fileID: 2308801506894084094}
   stampUpTarget: {fileID: 5412411234339117797}
   stampDownTarget: {fileID: 5009774770003864379}
+  bodyStampUpTarget: {fileID: 2690564497719807427}
+  bodyStampDownTarget: {fileID: 5010116641301851180}
   stampContainer: {fileID: 7524354045242739557}
   stampSound: {fileID: 8300000, guid: 1d79c4c28350a7248bd3224566a0a5d8, type: 3}
   cinemachineVirtualCamera: {fileID: 2072641713059432028}
@@ -1419,6 +1454,37 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 3366753895646477281}
   m_maskType: 0
+--- !u!1 &3854685312822636751
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2690564497719807427}
+  m_Layer: 0
+  m_Name: Ik Up Target (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2690564497719807427
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3854685312822636751}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.80274117, y: -0.5743251, z: -0.0064597167, w: -0.16036117}
+  m_LocalPosition: {x: -0.08627032, y: -0.27334023, z: -0.23404117}
+  m_LocalScale: {x: 0.39594737, y: 0.39594698, z: 0.3959473}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5797473811882092525}
+  m_LocalEulerAnglesHint: {x: -194.48, y: -11.593018, z: -72.642}
 --- !u!1 &3946566431140309067
 GameObject:
   m_ObjectHideFlags: 0

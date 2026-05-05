@@ -51,7 +51,7 @@ public class SwitchButton : Interactable
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
-        player.playerAnimationController.RightArmRigIKTarget = ikTarget;
+        player.playerAnimationController.RightArmIKTarget = ikTarget;
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
 

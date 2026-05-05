@@ -141,12 +141,12 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
             if (IsOwner)
                 _playerAnimationController.CamRightArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().rightIKTarget;
-            _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.RightArmIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
         }
         else
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(0, .2f);
-            _playerAnimationController.RightArmRigIKTarget = null;
+            _playerAnimationController.RightArmIKTarget = null;
         }
 
         if (itemData.useLeftIK)
@@ -154,12 +154,12 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
             if (IsOwner)
                 _playerAnimationController.CamLeftArmRigIKTarget = _camEquippedItem.GetComponent<IkTargets>().leftIKTarget;
-            _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.LeftArmIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
         }
         else
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(0, .2f);
-            _playerAnimationController.LeftArmRigIKTarget = null;
+            _playerAnimationController.LeftArmIKTarget = null;
         }
         
         if (itemData.useAimIK)
@@ -445,13 +445,13 @@ public class PlayerPickupController : NetworkBehaviour
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
             _playerAnimationController.CamRightArmRigIKTarget = pickableObject.GetComponent<IkTargets>()?.rightIKTarget ?? _camEquippedItem?.GetComponent<IkTargets>().rightIKTarget;
-            _playerAnimationController.RightArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
+            _playerAnimationController.RightArmIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().rightIKTarget;
         }
         if (itemData.useLeftIK)
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(1, .2f);
             _playerAnimationController.CamLeftArmRigIKTarget = pickableObject.GetComponent<IkTargets>()?.leftIKTarget ?? _camEquippedItem?.GetComponent<IkTargets>().leftIKTarget;
-            _playerAnimationController.LeftArmRigIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
+            _playerAnimationController.LeftArmIKTarget = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>().leftIKTarget;
         }
 
         if (itemData.useAimIK)
@@ -665,13 +665,13 @@ public class PlayerPickupController : NetworkBehaviour
         if (source.ItemData.useLeftIK)
         {
             _playerAnimationController.SetLeftArmRigWeightSmooth(0,.25f);
-            _playerAnimationController.LeftArmRigIKTarget = null;
+            _playerAnimationController.LeftArmIKTarget = null;
         }
         
         if (source.ItemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(0,.25f);
-            _playerAnimationController.RightArmRigIKTarget = null;
+            _playerAnimationController.RightArmIKTarget = null;
         }
     }
 

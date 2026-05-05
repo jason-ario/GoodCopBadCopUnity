@@ -145,7 +145,7 @@ public class ExamNotebook : PickableObject
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
         IsChecking = true;
-        playerPickupController.PlayerAnimationController.RightArmRigIKTarget = ikAnimationTarget;
+        playerPickupController.PlayerAnimationController.RightArmIKTarget = ikAnimationTarget;
         StartCoroutine(TurnRightArmRigOff());
     }
 

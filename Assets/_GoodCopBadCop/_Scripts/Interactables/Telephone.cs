@@ -168,7 +168,7 @@ public class Telephone : Interactable
         player.playerMovementController.LookAtTarget(transform);
 
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
-        player.playerAnimationController.LeftArmRigIKTarget = _ikTarget;
+        player.playerAnimationController.LeftArmIKTarget = _ikTarget;
 
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
@@ -188,7 +188,7 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
-        player.playerAnimationController.LeftArmRigIKTarget = null;
+        player.playerAnimationController.LeftArmIKTarget = null;
         player.playerMovementController.SetCanControl(true);
 
         interactText = "Pick Up";
@@ -200,7 +200,7 @@ public class Telephone : Interactable
         player.playerMovementController.LookAtTarget(transform);
 
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
-        player.playerAnimationController.LeftArmRigIKTarget = _ikTarget;
+        player.playerAnimationController.LeftArmIKTarget = _ikTarget;
 
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
@@ -225,7 +225,7 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
-        player.playerAnimationController.LeftArmRigIKTarget = null;
+        player.playerAnimationController.LeftArmIKTarget = null;
         player.playerMovementController.SetCanControl(true);
 
         interactText = "Put Down";
