@@ -123,10 +123,15 @@ public class PlayerPickupController : NetworkBehaviour
         }
         
         PickableItemData itemData = rightArmCamObjectContainer.GetItemData(newValue);
-        
-        rightArmBodyObjectContainer.EquipItem(itemData, this);
 
-        _bodyCurrentlyEquippedItem = rightArmBodyObjectContainer.CurrentlyEquippedItem;
+        // Route to the correct body container based on which hand the item belongs to.
+        ObjectContainer targetBodyContainer = itemData.hand == PickableItemData.Hand.Left
+            ? leftArmBodyObjectContainer
+            : rightArmBodyObjectContainer;
+
+        targetBodyContainer.EquipItem(itemData, this);
+
+        _bodyCurrentlyEquippedItem = targetBodyContainer.CurrentlyEquippedItem;
 
         // Non-owner clients constrain the world object to the body arm so they see it there.
         // (Owner already constrained it to the camera arm in PickUpObject.)
@@ -553,6 +558,7 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
 
         foreach (var objectContainer in objectContainers)
         {
@@ -569,10 +575,6 @@ public class PlayerPickupController : NetworkBehaviour
         
         ObjectPlacer.Instance.DeactivatePlacer();
     }
-
-    // =====================================================================
-    // Non-owner body-arm LateUpdate follow
-    // =====================================================================
 
     /// <summary>
     /// Fired on all clients when the held object reference changes.
@@ -708,7 +710,8 @@ public class PlayerPickupController : NetworkBehaviour
             objectContainer.UnequipItem(this);
         }
 
-        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody(); 
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
         rightArmCamObjectContainer.CurrentlyEquippedItem?.OnDropped();
 
         // Clear state before despawn so DropObject is never called on a destroyed object

@@ -160,13 +160,7 @@ public class ExamNotebook : PickableObject
     {
         base.OnEquipped(player);
 
-        foreach (var itemHeld in player.RightArmCamObjectContainer.ItemsHeld)
-        {
-            if (itemHeld.ItemData.name == "RedPencil")
-            {
-                itemHeld.gameObject.SetActive(true);
-            }
-        }
+        SetRedPencilActive(player, true);
     }
 
     public override void OnUnequip(PlayerPickupController player)
@@ -181,11 +175,32 @@ public class ExamNotebook : PickableObject
             page.SetInteractable(false);
         }
 
-        foreach (var itemHeld in player.RightArmCamObjectContainer.ItemsHeld)
+        SetRedPencilActive(player, false);
+    }
+
+    /// <summary>
+    /// Activates or deactivates the Red Pencil in every arm container on the player so
+    /// both the owner (camera arm) and observers (body arm) see the correct state.
+    /// </summary>
+    private void SetRedPencilActive(PlayerPickupController player, bool active)
+    {
+        const string RedPencilName = "RedPencil";
+
+        ObjectContainer[] containers =
         {
-            if (itemHeld.ItemData.name == "RedPencil")
+            player.RightArmCamObjectContainer,
+            player.RightArmBodyObjectContainer,
+            player.LeftArmCamObjectContainer,
+            player.LeftArmBodyObjectContainer,
+        };
+
+        foreach (var container in containers)
+        {
+            if (container == null) continue;
+            foreach (var itemHeld in container.ItemsHeld)
             {
-                itemHeld.gameObject.SetActive(false);
+                if (itemHeld != null && itemHeld.ItemData.name == RedPencilName)
+                    itemHeld.gameObject.SetActive(active);
             }
         }
     }
