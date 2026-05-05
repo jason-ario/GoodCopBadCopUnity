@@ -328,6 +328,9 @@ public class FolderController : PickableObject
         // We then drive rightArmRigIKTarget (the fixed rig constraint target) directly via DOTween.
         Transform savedRightArmIKTarget = ppc.PlayerAnimationController.RightArmIKTarget;
         ppc.PlayerAnimationController.RightArmIKTarget = null;
+        // Tell the proxy passthrough in Update not to overwrite the rig target while the
+        // stamp sequence owns it directly via DOTween.
+        ppc.PlayerAnimationController.DriveRightArmRigTargetDirectly = true;
 
         Transform savedCamRightArmRigIKTarget = null;
         if (isStampingLocalPlayer)
@@ -419,8 +422,10 @@ public class FolderController : PickableObject
 
         isStamping = false;
 
-        // Restore the external IK target so the pickup system resumes driving the rig target.
+        // Restore the external IK target so the pickup system resumes driving the rig target,
+        // and release the direct-drive lock so the proxy passthrough resumes.
         ppc.PlayerAnimationController.RightArmIKTarget = savedRightArmIKTarget;
+        ppc.PlayerAnimationController.DriveRightArmRigTargetDirectly = false;
 
         if (isStampingLocalPlayer)
         {

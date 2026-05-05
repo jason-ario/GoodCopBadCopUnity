@@ -76,6 +76,14 @@ public class PlayerAnimationController : NetworkBehaviour
     public Transform RightArmIKTarget { get; set; }
 
     /// <summary>
+    /// When true, <see cref="rightArmRigIKTarget"/> is being driven directly by a local sequence
+    /// (e.g. the stamp DOTween) and the network-position proxy passthrough must not overwrite it.
+    /// Set to true before DOTweening <see cref="RightArmRigIKTarget"/> directly, and back to false
+    /// when the sequence finishes and <see cref="RightArmIKTarget"/> is restored.
+    /// </summary>
+    public bool DriveRightArmRigTargetDirectly { get; set; }
+
+    /// <summary>
     /// External IK target for the body left arm. Same passthrough pattern as <see cref="RightArmIKTarget"/>.
     /// </summary>
     public Transform LeftArmIKTarget { get; set; }
@@ -152,6 +160,21 @@ public class PlayerAnimationController : NetworkBehaviour
     private NetworkVariable<bool> netLeftArmRigActive =
         new NetworkVariable<bool>(false, writePerm: NetworkVariableWritePermission.Owner);
 
+    /// <summary>
+    /// Synced world-space position of the right-arm IK target.
+    /// Owner writes each frame when <see cref="RightArmIKTarget"/> is assigned;
+    /// proxy clients read it to keep <see cref="rightArmRigIKTarget"/> up to date
+    /// without needing a direct Transform reference.
+    /// </summary>
+    private NetworkVariable<Vector3> netRightArmIKPos =
+        new NetworkVariable<Vector3>(writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Synced world-space rotation of the right-arm IK target.
+    /// </summary>
+    private NetworkVariable<Quaternion> netRightArmIKRot =
+        new NetworkVariable<Quaternion>(Quaternion.identity, writePerm: NetworkVariableWritePermission.Owner);
+
     [Header("Vertical Look Bone Rotation")]
     [SerializeField] [Range(0f, 1f)] private float headPitchWeight  = 0.40f;
     [SerializeField] [Range(0f, 1f)] private float neckPitchWeight  = 0.30f;
@@ -223,6 +246,22 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             rightArmRigIKTarget.position = RightArmIKTarget.position;
             rightArmRigIKTarget.rotation = RightArmIKTarget.rotation;
+
+            // Publish the world-space target so proxy clients can mirror it without needing
+            // a direct Transform reference to the button's ikTarget.
+            if (IsOwner)
+            {
+                netRightArmIKPos.Value = RightArmIKTarget.position;
+                netRightArmIKRot.Value = RightArmIKTarget.rotation;
+            }
+        }
+        else if (!IsOwner && netRightArmRigActive.Value && !DriveRightArmRigTargetDirectly)
+        {
+            // Proxy: no local target set, but the rig is active — drive the rig target from
+            // the synced world position so the arm reaches toward the same point as the owner.
+            // Suppressed when a local sequence (e.g. stamp DOTween) is driving the target directly.
+            rightArmRigIKTarget.position = netRightArmIKPos.Value;
+            rightArmRigIKTarget.rotation = netRightArmIKRot.Value;
         }
 
         if (LeftArmIKTarget != null)
@@ -280,6 +319,11 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        // Proxy clients mirror the owner's rig weight by reacting to the netRightArmRigActive flag.
+        // The owner drives its own weight directly inside the coroutine/DOTween, so it is excluded.
+        if (!IsOwner)
+            netRightArmRigActive.OnValueChanged += OnProxyRightArmRigActiveChanged;
+
         // Cache bones used for procedural vertical-look rotation on both owner and proxies.
         _headBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
         _neckBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Neck);
@@ -316,6 +360,25 @@ public class PlayerAnimationController : NetworkBehaviour
                 Debug.LogWarning("[PlayerAnimationController] Head bone not found on bodyAnimator. Ensure the avatar is configured as Humanoid.", this);
             }
         }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+
+        if (!IsOwner)
+            netRightArmRigActive.OnValueChanged -= OnProxyRightArmRigActiveChanged;
+    }
+
+    /// <summary>
+    /// Called on proxy clients when the owner toggles the right-arm IK rig.
+    /// Smoothly fades the local <see cref="rightArmRig"/> weight in or out so the
+    /// IK constraint activates without needing a coroutine to run on every client.
+    /// </summary>
+    private void OnProxyRightArmRigActiveChanged(bool previous, bool current)
+    {
+        const float ProxyRigSmoothTime = 0.2f;
+        SetRightArmRigWeightSmooth(current ? 1f : 0f, ProxyRigSmoothTime);
     }
 
     /// <summary>
