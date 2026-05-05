@@ -124,6 +124,14 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] [Range(0f, 1f)] private float spinePitchWeight = 0.30f;
     [Tooltip("How much the upper arm rotates toward the look direction when holding an object. Only applied on proxy clients.")]
     [SerializeField] [Range(0f, 1f)] private float armHoldPitchWeight = 0.50f;
+    [Tooltip("Maximum downward arm pitch (positive degrees) applied when holding an object. Clamps the arm from rotating too far down.")]
+    [SerializeField] private float armPitchClampDown = 20f;
+    [Tooltip("Maximum upward arm pitch (positive degrees) applied when holding an object. Stored as a positive value and applied as a negative clamp.")]
+    [SerializeField] private float armPitchClampUp   = 30f;
+    [Tooltip("Maximum downward pitch (positive degrees) that body bones will follow. Clamps the body from bending too far down.")]
+    [SerializeField] private float pitchClampDown = 40f;
+    [Tooltip("Maximum upward pitch (positive degrees) that body bones will follow. Stored as a positive value and applied as a negative clamp.")]
+    [SerializeField] private float pitchClampUp   = 30f;
 
     [Header("Local Body Lean (Camera Offset)")]
     [Tooltip("Maximum pitch (degrees) applied to the spine bone at full lean.")]
@@ -139,12 +147,27 @@ public class PlayerAnimationController : NetworkBehaviour
     // +1 = lean forward/down, -1 = lean back/up. Derived from camera pitch by default.
     private float _leanDirection = 1f;
 
+    [Header("IK Reach Lean (Proxy)")]
+    [Tooltip("Degrees of forward spine tilt applied per unit the IK target exceeds arm reach.")]
+    [SerializeField] private float ikLeanResponseScale = 40f;
+    [Tooltip("Maximum forward lean angle (degrees) the IK reach system can apply.")]
+    [SerializeField] [Range(0f, 45f)] private float ikLeanMaxAngle = 20f;
+    [Tooltip("How quickly the IK reach lean smooths in and out.")]
+    [SerializeField] private float ikLeanSpeed = 8f;
+
+    // Cached arm reach (upper arm + forearm lengths) measured once after spawn.
+    private float _rightArmReach;
+    // Smoothed spine tilt angle driven by the IK reach lean system.
+    private float _currentIKLeanAngle;
+
     // Cached bone transforms resolved once after spawn.
     private Transform _headBone;
     private Transform _neckBone;
     private Transform _spineBone;
     private Transform _rightUpperArmBone;
     private Transform _leftUpperArmBone;
+    private Transform _rightForeArmBone;
+    private Transform _rightHandBone;
 
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
@@ -221,6 +244,12 @@ public class PlayerAnimationController : NetworkBehaviour
         _spineBone         = bodyAnimator.GetBoneTransform(HumanBodyBones.Spine);
         _rightUpperArmBone = bodyAnimator.GetBoneTransform(HumanBodyBones.RightUpperArm);
         _leftUpperArmBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        _rightForeArmBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.RightLowerArm);
+        _rightHandBone     = bodyAnimator.GetBoneTransform(HumanBodyBones.RightHand);
+
+        // Measure the arm reach after one frame so the Animator has evaluated
+        // and bone positions are valid in world space.
+        StartCoroutine(MeasureArmReachCR());
 
         if (IsLocalPlayer == false)
         {
@@ -244,6 +273,23 @@ public class PlayerAnimationController : NetworkBehaviour
             {
                 Debug.LogWarning("[PlayerAnimationController] Head bone not found on bodyAnimator. Ensure the avatar is configured as Humanoid.", this);
             }
+        }
+    }
+
+    /// <summary>
+    /// Waits one frame so the Animator has evaluated and bone world positions are valid,
+    /// then measures the right arm reach (upper arm + forearm lengths) used by the IK lean system.
+    /// </summary>
+    private IEnumerator MeasureArmReachCR()
+    {
+        yield return null;
+
+        if (_rightUpperArmBone != null && _rightForeArmBone != null && _rightHandBone != null)
+        {
+            float upperLen = Vector3.Distance(_rightUpperArmBone.position, _rightForeArmBone.position);
+            float foreLen  = Vector3.Distance(_rightForeArmBone.position, _rightHandBone.position);
+            // Use 90% of total reach so the lean starts slightly before full extension.
+            _rightArmReach = (upperLen + foreLen) * 0.90f;
         }
     }
 
@@ -320,7 +366,29 @@ public class PlayerAnimationController : NetworkBehaviour
     /// </summary>
     private void ApplyProxyPitchBones()
     {
-        float pitch = netPitch.Value;
+        float pitch = Mathf.Clamp(netPitch.Value, -pitchClampUp, pitchClampDown);
+
+        // --- IK Reach Lean ---
+        // When the right arm IK rig is active, lean the spine forward if the IK target is beyond
+        // comfortable arm reach. This runs first so all subsequent pitch/lean rotations stack on top.
+        if (_rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null)
+        {
+            float targetIKLeanAngle = 0f;
+
+            if (rightArmRig.weight > 0.01f)
+            {
+                float dist    = Vector3.Distance(_rightUpperArmBone.position, rightArmIKTarget.position);
+                float deficit = Mathf.Max(0f, dist - _rightArmReach);
+                targetIKLeanAngle = Mathf.Clamp(deficit * ikLeanResponseScale, 0f, ikLeanMaxAngle);
+            }
+
+            _currentIKLeanAngle = Mathf.Lerp(_currentIKLeanAngle, targetIKLeanAngle, ikLeanSpeed * Time.deltaTime);
+
+            if (_currentIKLeanAngle > 0.01f)
+            {
+                _spineBone.localRotation *= Quaternion.Euler(_currentIKLeanAngle, 0f, 0f);
+            }
+        }
 
         if (_headBone != null)
         {
@@ -371,17 +439,19 @@ public class PlayerAnimationController : NetworkBehaviour
         bool rightArmHolding = netLayer1Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
         bool leftArmHolding  = netLayer4Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
 
+        float armPitch = Mathf.Clamp(netPitch.Value, -armPitchClampUp, armPitchClampDown);
+
         if (rightArmHolding && _rightUpperArmBone != null && rightArmRig.weight < 0.01f)
         {
             _rightUpperArmBone.rotation =
-                Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
+                Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
                 * _rightUpperArmBone.rotation;
         }
 
         if (leftArmHolding && _leftUpperArmBone != null && leftArmRig.weight < 0.01f)
         {
             _leftUpperArmBone.rotation =
-                Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
+                Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
                 * _leftUpperArmBone.rotation;
         }
     }
@@ -454,6 +524,7 @@ public class PlayerAnimationController : NetworkBehaviour
     public void DisableRightArmMask()
     {
         targetLayer1Weight = 0f;
+        targetLayer2Weight = 0f;
     }
 
     public void EnableHoldObjectTwoArmsMask()
