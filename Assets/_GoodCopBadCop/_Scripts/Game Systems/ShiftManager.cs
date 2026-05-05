@@ -400,6 +400,7 @@ public class ShiftManager : NetworkBehaviour
     private void RunInitiateIntroCutscene()
     {
         UIController.Instance.FadeIn();
+        UIController.Instance.ClosePlayerUI();
         PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.SetCanMove(false);
         PlayerInstance.Instance.DisableReticle();
@@ -420,6 +421,7 @@ public class ShiftManager : NetworkBehaviour
 
     public void EndIntroCutscene()
     {
+        UIController.Instance.ShowPlayerUI();
         StartNewShift();
         ambientAudio.DOFade(1, 2);
     }

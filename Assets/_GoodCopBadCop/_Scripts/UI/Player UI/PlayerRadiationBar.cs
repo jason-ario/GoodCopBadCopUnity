@@ -12,21 +12,31 @@ public class RadiationBarUI : MonoBehaviour
        
     }
 
+    private void OnEnable()
+    {
+        if (PlayerInstance.Instance == null) return;
+
+        if (_playerRadiation == null)
+            _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
+
+        _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
+        UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
+    }
+
     private void Update()
     {
-        if (_playerRadiation == null)
-        {
-            if (PlayerInstance.Instance == null) return;
-            _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
-            _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
-            UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
-        }
+        if (_playerRadiation != null) return;
+        if (PlayerInstance.Instance == null) return;
+
+        _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
+        _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
+        UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
     }
 
     private void OnDisable()
     {
-        if (PlayerInstance.Instance == null) return;
-        PlayerInstance.Instance.PlayerRadiation.OnRadiationChanged.RemoveListener(UpdateBar);
+        if (_playerRadiation == null) return;
+        _playerRadiation.OnRadiationChanged.RemoveListener(UpdateBar);
     }
 
     private void UpdateBar(float current, float max)

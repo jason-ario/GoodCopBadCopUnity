@@ -17,11 +17,13 @@ public class CashEarnedNotification : MonoBehaviour
         if (cashAmount > 0)
         {
             mainText.color = Color.white;
+            couponAmountText.color = positiveColor;
             couponLabelText.color = positiveColor;
         }
         else
         {
             mainText.color = negativeColor;
+            couponAmountText.color = negativeColor;
             couponLabelText.color = negativeColor;
         }
     }

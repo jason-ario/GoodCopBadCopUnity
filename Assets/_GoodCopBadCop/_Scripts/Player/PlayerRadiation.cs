@@ -12,6 +12,12 @@ public class PlayerRadiation : MonoBehaviour
     [SerializeField] private float pillReductionAmount = 30f;
     [SerializeField] private float pillReductionDuration = 6f;
 
+    [Header("Radiation Damage")]
+    [Tooltip("Radiation level (0–1) above which the player starts taking damage.")]
+    [SerializeField] private float radiationDamageThreshold = 0.75f;
+    [Tooltip("Maximum health damage per second dealt at 100% radiation.")]
+    [SerializeField] private float maxRadiationDamagePerSecond = 5f;
+
     [Header("Death")]
     [SerializeField] private bool dieAtMaxRadiation = true;
 
@@ -24,10 +30,17 @@ public class PlayerRadiation : MonoBehaviour
     private float pillDrainPerSecond;
     private bool hasTriggeredCritical;
 
+    private PlayerHealth playerHealth;
+
     public float CurrentRadiation => currentRadiation;
     public float MaxRadiation => maxRadiation;
     public float Normalized => currentRadiation / maxRadiation;
     [SerializeField] private GameObject hurtVignette;
+
+    private void Awake()
+    {
+        playerHealth = GetComponent<PlayerHealth>();
+    }
 
     private void Update()
     {
@@ -42,7 +55,23 @@ public class PlayerRadiation : MonoBehaviour
                 isTakingPill = false;
         }
 
+        ApplyRadiationDamage();
         CheckRadiationState();
+    }
+
+    /// <summary>
+    /// Deals damage to the player scaled linearly between the threshold and max radiation.
+    /// No damage is applied below the threshold.
+    /// </summary>
+    private void ApplyRadiationDamage()
+    {
+        if (playerHealth == null || Normalized <= radiationDamageThreshold)
+            return;
+
+        // Remap normalized radiation from [threshold, 1] to [0, 1].
+        float damageScale = (Normalized - radiationDamageThreshold) / (1f - radiationDamageThreshold);
+        float damage = maxRadiationDamagePerSecond * damageScale * Time.deltaTime;
+        playerHealth.TakeDamage(damage);
     }
 
     public void AddRadiation(float amount)

@@ -92,8 +92,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.451, z: 0}
+  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
+  m_LocalPosition: {x: -1.9593265, y: 1.8317341, z: 11.315362}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -131,9 +131,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.12
+  near clip plane: 0.1
   far clip plane: 5000
-  field of view: 65
+  field of view: 60
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -1053,7 +1053,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4229621594
+  GlobalObjectIdHash: 1936807553
   InScenePlacedSourceGlobalObjectIdHash: 4229621594
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1126,21 +1126,21 @@ MonoBehaviour:
   rightArmRig: {fileID: 1056227873483522273}
   leftArmRig: {fileID: 1765805994537522180}
   shoulderRig: {fileID: 4639465485347709350}
-  rightArmIKTarget: {fileID: 5935172276807229573}
-  leftArmIKTarget: {fileID: 7127060559169552779}
+  rightArmRigIKTarget: {fileID: 5935172276807229573}
+  leftArmRigIKTarget: {fileID: 7127060559169552779}
   camRightArmRig: {fileID: 1804250457091512115}
   camLeftArmRig: {fileID: 3074006920022377660}
   camRightArmIKTarget: {fileID: 8624350057523593228}
   camLeftArmIKTarget: {fileID: 368350669728821417}
   headPitchWeight: 0.1
-  neckPitchWeight: 0.2
+  neckPitchWeight: 0.1
   spinePitchWeight: 0.2
   armHoldPitchWeight: 1
   armPitchClampDown: 20
   armPitchClampUp: 30
   pitchClampDown: 60
   pitchClampUp: 30
-  leanSpineMax: 25
+  leanSpineMax: 15
   leanNeckMax: 10
   leanLerpSpeed: 6
   ikLeanResponseScale: 40
@@ -1410,6 +1410,8 @@ MonoBehaviour:
   passiveRadiationPerSecond: 0.15
   pillReductionAmount: 30
   pillReductionDuration: 6
+  radiationDamageThreshold: 0.75
+  maxRadiationDamagePerSecond: 5
   dieAtMaxRadiation: 1
   OnRadiationChanged:
     m_PersistentCalls:
