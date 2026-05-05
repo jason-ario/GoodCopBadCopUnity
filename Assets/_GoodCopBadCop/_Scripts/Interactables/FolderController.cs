@@ -27,8 +27,27 @@ public class FolderController : PickableObject
     [Header("Set Up")]
     [SerializeField] private AudioClip folderPlaceClip;
     [SerializeField] Animator anim;
+
+    /// <summary>IK target position for the camera (first-person) arm at the top of the stamp arc.</summary>
     public Transform stampUpTarget;
+    /// <summary>IK target position for the camera (first-person) arm at the bottom of the stamp arc.</summary>
     public Transform stampDownTarget;
+
+    /// <summary>
+    /// IK target position for the body (third-person) arm at the top of the stamp arc.
+    /// Calibrated to the body skeleton's shoulder origin so the arm reaches the folder correctly
+    /// from an observer's perspective. Falls back to stampUpTarget when left unassigned.
+    /// </summary>
+    [Tooltip("Body-arm IK target for the top of the stamp arc. Needs separate calibration from the camera-arm target. Falls back to stampUpTarget if unassigned.")]
+    public Transform bodyStampUpTarget;
+
+    /// <summary>
+    /// IK target position for the body (third-person) arm at the bottom of the stamp arc.
+    /// Falls back to stampDownTarget when left unassigned.
+    /// </summary>
+    [Tooltip("Body-arm IK target for the bottom of the stamp arc. Falls back to stampDownTarget if unassigned.")]
+    public Transform bodyStampDownTarget;
+
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
     private StampContainer.StampType _stampType;
@@ -315,11 +334,16 @@ public class FolderController : PickableObject
 
         playerPickupController.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
-        // Drive the body-arm IK target on all clients so observers see the arm move.
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = stampDownTarget.position;
+        // Resolve body-arm targets, falling back to the camera-arm targets when unassigned.
+        Transform bodyUp   = bodyStampUpTarget   != null ? bodyStampUpTarget   : stampUpTarget;
+        Transform bodyDown = bodyStampDownTarget != null ? bodyStampDownTarget : stampDownTarget;
+
+        // Drive the body-arm IK target on all clients so observers see the arm move
+        // using targets calibrated for the body skeleton's shoulder origin.
+        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.position = bodyDown.position;
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
-            stampUpTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .5f);
+            bodyUp.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyUp.position, .5f);
 
         // Drive the camera-arm IK target only on the stamping player's local client.
         if (isStampingLocalPlayer)
@@ -337,8 +361,8 @@ public class FolderController : PickableObject
         yield return new WaitForSeconds(.5f);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
-            stampDownTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampDownTarget.position, .25f);
+            bodyDown.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyDown.position, .25f);
 
         if (isStampingLocalPlayer)
         {
@@ -361,8 +385,8 @@ public class FolderController : PickableObject
         yield return new WaitForSeconds(.25f);
 
         playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DORotate(
-            stampUpTarget.rotation.eulerAngles, .25f);
-        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(stampUpTarget.position, .25f);
+            bodyUp.rotation.eulerAngles, .25f);
+        playerPickupController.PlayerAnimationController.RightArmIKTarget.transform.DOMove(bodyUp.position, .25f);
 
         if (isStampingLocalPlayer)
         {

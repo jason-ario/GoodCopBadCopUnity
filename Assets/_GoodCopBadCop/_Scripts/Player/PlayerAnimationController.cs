@@ -366,17 +366,19 @@ public class PlayerAnimationController : NetworkBehaviour
         // local currentLayer* fields are only updated on the owner and are always 0 on proxies.
         // Rotation axis is transform.right: the held arm sits in front of the character, so
         // rotating around the lateral axis pitches it up/down in the same plane as the camera.
+        // Skip the bone override while the IK rig is active — the rig solver already drives the
+        // full arm chain and overwriting the upper arm bone here would destroy its result.
         bool rightArmHolding = netLayer1Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
         bool leftArmHolding  = netLayer4Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
 
-        if (rightArmHolding && _rightUpperArmBone != null)
+        if (rightArmHolding && _rightUpperArmBone != null && rightArmRig.weight < 0.01f)
         {
             _rightUpperArmBone.rotation =
                 Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
                 * _rightUpperArmBone.rotation;
         }
 
-        if (leftArmHolding && _leftUpperArmBone != null)
+        if (leftArmHolding && _leftUpperArmBone != null && leftArmRig.weight < 0.01f)
         {
             _leftUpperArmBone.rotation =
                 Quaternion.AngleAxis(pitch * armHoldPitchWeight, transform.right)
@@ -520,25 +522,28 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void SetRightArmRigWeightSmooth(float smoothWeight, float smoothTime)
     {
-        DOTween.Kill(rightArmRig.weight);
-        DOTween.To(() => rightArmRig.weight, x => rightArmRig.weight = x, smoothWeight, smoothTime);
-        
-        if (camRightArmRig != null)
+        DOTween.Kill(rightArmRig);
+        DOTween.To(() => rightArmRig.weight, x => rightArmRig.weight = x, smoothWeight, smoothTime).SetTarget(rightArmRig);
+
+        // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients
+        // so its evaluation does not override the body arm rig's bone results on observers.
+        if (IsOwner && camRightArmRig != null)
         {
-            DOTween.Kill(camRightArmRig.weight);
-            DOTween.To(() => camRightArmRig.weight, x => camRightArmRig.weight = x, smoothWeight, smoothTime);
+            DOTween.Kill(camRightArmRig);
+            DOTween.To(() => camRightArmRig.weight, x => camRightArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camRightArmRig);
         }
     }
     
     public void SetLeftArmRigWeightSmooth(float smoothWeight, float smoothTime)
     {
-        DOTween.Kill(leftArmRig.weight);
-        DOTween.To(() => leftArmRig.weight, x => leftArmRig.weight = x, smoothWeight, smoothTime);
+        DOTween.Kill(leftArmRig);
+        DOTween.To(() => leftArmRig.weight, x => leftArmRig.weight = x, smoothWeight, smoothTime).SetTarget(leftArmRig);
 
-        if (camLeftArmRig != null)
+        // Camera arm rig is only relevant for the local/owner player — skip it on proxy clients.
+        if (IsOwner && camLeftArmRig != null)
         {
-            DOTween.Kill(camLeftArmRig.weight);
-            DOTween.To(() => camLeftArmRig.weight, x => camLeftArmRig.weight = x, smoothWeight, smoothTime);
+            DOTween.Kill(camLeftArmRig);
+            DOTween.To(() => camLeftArmRig.weight, x => camLeftArmRig.weight = x, smoothWeight, smoothTime).SetTarget(camLeftArmRig);
         }
     }
 
@@ -550,14 +555,8 @@ public class PlayerAnimationController : NetworkBehaviour
 
     public void SetAimRigWeightSmooth(float smoothWeight, float smoothTime)
     {
-        DOTween.Kill(shoulderRig.weight);
-        DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime);
-
-        if (camLeftArmRig != null)
-        {
-            DOTween.Kill(shoulderRig.weight);
-            DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime);
-        }
+        DOTween.Kill(shoulderRig);
+        DOTween.To(() => shoulderRig.weight, x => shoulderRig.weight = x, smoothWeight, smoothTime).SetTarget(shoulderRig);
     }
 
     public void TurnRightArmRigOnAndOff(float smoothOnDuration, float onDuration)
@@ -572,13 +571,20 @@ public class PlayerAnimationController : NetworkBehaviour
 
     IEnumerator TurnRightArmRigOnAndOffCR(float smoothOnDuration, float onDuration)
     {
+        // Kill any in-flight DOTween targeting rightArmRig (e.g. from SetRightArmRigWeightSmooth)
+        // so it cannot fight the coroutine's manual lerp below.
+        DOTween.Kill(rightArmRig);
+
         float elapsed = 0;
         // Phase 1: Lerp Up to 1
         while (elapsed < smoothOnDuration)
         {
             elapsed += Time.deltaTime;
-            RightArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
-            CamRightArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            float t = elapsed / smoothOnDuration;
+            RightArmRig.weight = Mathf.Lerp(0, 1, t);
+            // Camera arm rig is only meaningful on the local owner — proxy clients must not
+            // evaluate it during the stamp so it doesn't override the body arm rig's bones.
+            if (IsOwner) CamRightArmRig.weight = Mathf.Lerp(0, 1, t);
             yield return null;
         }
 
@@ -590,9 +596,9 @@ public class PlayerAnimationController : NetworkBehaviour
         while (elapsed < smoothOnDuration)
         {
             elapsed += Time.deltaTime;
-            RightArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
-            CamRightArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
-
+            float t = elapsed / smoothOnDuration;
+            RightArmRig.weight = Mathf.Lerp(1, 0, t);
+            if (IsOwner) CamRightArmRig.weight = Mathf.Lerp(1, 0, t);
             yield return null;
         }
         
@@ -611,13 +617,19 @@ public class PlayerAnimationController : NetworkBehaviour
     
     IEnumerator TurnLeftArmRigOnAndOffCR(float smoothOnDuration, float onDuration)
     {
+        // Kill any in-flight DOTween targeting leftArmRig so it cannot fight the coroutine.
+        DOTween.Kill(leftArmRig);
+
         float elapsed = 0;
         // Phase 1: Lerp Up to 1
         while (elapsed < smoothOnDuration)
         {
             elapsed += Time.deltaTime;
-            LeftArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
-            CamLeftArmRig.weight = Mathf.Lerp(0, 1, elapsed / smoothOnDuration);
+            float t = elapsed / smoothOnDuration;
+            LeftArmRig.weight = Mathf.Lerp(0, 1, t);
+            // Camera arm rig is only meaningful on the local owner — proxy clients must not
+            // evaluate it during interactions so it doesn't override the body arm rig's bones.
+            if (IsOwner) CamLeftArmRig.weight = Mathf.Lerp(0, 1, t);
             yield return null;
         }
 
@@ -629,9 +641,9 @@ public class PlayerAnimationController : NetworkBehaviour
         while (elapsed < smoothOnDuration)
         {
             elapsed += Time.deltaTime;
-            LeftArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
-            CamLeftArmRig.weight = Mathf.Lerp(1, 0, elapsed / smoothOnDuration);
-
+            float t = elapsed / smoothOnDuration;
+            LeftArmRig.weight = Mathf.Lerp(1, 0, t);
+            if (IsOwner) CamLeftArmRig.weight = Mathf.Lerp(1, 0, t);
             yield return null;
         }
         
