@@ -392,9 +392,9 @@ public class PlayerPickupController : NetworkBehaviour
         // and DropBroadcastClientRpc / OnUnequip restore it via SetInteractable(true).
         pickableObject.SetInteractable(false);
 
-        // Transfer ownership to this client so NetworkTransform replicates from our side
+        // Transfer ownership to this client so NetworkTransform replicates from our side.
+        // Ownership RPC also claims the holder in one round-trip (no separate ClaimHolderServerRpc needed).
         pickableObject.RequestOwnershipServerRpc();
-        pickableObject.ClaimHolderServerRpc();
         
         PickableItemData itemData = pickableObject.ItemData;
         _heldObject = pickableObject;

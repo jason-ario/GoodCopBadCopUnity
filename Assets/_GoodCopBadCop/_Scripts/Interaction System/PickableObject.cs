@@ -84,11 +84,16 @@ public class PickableObject : Interactable
         _holdingClientId.Value = ulong.MaxValue;
     }
 
-    /// <summary>Transfers NetworkObject ownership to the requesting client.</summary>
+    /// <summary>
+    /// Transfers NetworkObject ownership to the requesting client and simultaneously
+    /// registers them as the holder, eliminating the need for a separate ClaimHolderServerRpc call.
+    /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void RequestOwnershipServerRpc(ServerRpcParams rpcParams = default)
     {
-        NetworkObject.ChangeOwnership(rpcParams.Receive.SenderClientId);
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        NetworkObject.ChangeOwnership(clientId);
+        _holdingClientId.Value = clientId;
     }
 
     /// <summary>Returns NetworkObject ownership back to the server.</summary>

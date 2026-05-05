@@ -54,36 +54,61 @@ public class DoorController : Interactable
         _beingInteractedWith = true;
         player.playerAnimationController.OpenDoor();
 
-        if (!_doorOpen.Value)
+        // Determine open direction before the delay so prediction is correct.
+        Vector3 doorForward = transform.forward;
+        Vector3 playerToDoor = transform.position - player.transform.position;
+        bool openedIn = Vector3.Dot(doorForward, playerToDoor) > 0f;
+        bool willBeOpen = !_doorOpen.Value;
+
+        if (willBeOpen)
         {
             PlayDoorSoundClientRpc(true);
         }
 
         yield return new WaitForSeconds(waitDelay);
 
-        // Determine open direction from the interacting player's position
-        Vector3 doorForward = transform.forward;
-        Vector3 playerToDoor = transform.position - player.transform.position;
-        bool openedIn = Vector3.Dot(doorForward, playerToDoor) > 0f;
+        // Apply visuals immediately on the interacting client — no RTT wait.
+        ApplyDoorVisuals(willBeOpen, openedIn);
+        if (!willBeOpen)
+        {
+            audioSource.PlayOneShot(doorCloseClip);
+        }
 
-        ToggleDoorServerRpc(openedIn);
+        ToggleDoorServerRpc(openedIn, NetworkManager.Singleton.LocalClientId);
 
         yield return new WaitForSeconds(waitDelay);
         _beingInteractedWith = false;
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void ToggleDoorServerRpc(bool openedIn)
+    private void ToggleDoorServerRpc(bool openedIn, ulong senderClientId)
     {
         if (_doorOpen.Value)
         {
             _doorOpen.Value = false;
-            PlayDoorSoundClientRpc(false);
         }
         else
         {
             _openedIn.Value = openedIn;
             _doorOpen.Value = true;
+        }
+
+        // Broadcast visuals to all clients except the one that already predicted.
+        BroadcastDoorStateClientRpc(_doorOpen.Value, _openedIn.Value, senderClientId);
+    }
+
+    /// <summary>
+    /// Applies door visuals on all clients except the one that predicted it locally.
+    /// </summary>
+    [ClientRpc]
+    private void BroadcastDoorStateClientRpc(bool isOpen, bool openedIn, ulong excludeClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId == excludeClientId) return;
+
+        ApplyDoorVisuals(isOpen, openedIn);
+        if (!isOpen)
+        {
+            audioSource.PlayOneShot(doorCloseClip);
         }
     }
 
@@ -95,22 +120,20 @@ public class DoorController : Interactable
 
     private void OnDoorStateChanged(bool oldValue, bool newValue)
     {
-        ApplyDoorVisuals(newValue, _openedIn.Value);
+        // Only used for late-joining clients that missed the BroadcastDoorStateClientRpc.
         interactText = newValue ? "Close" : "Open";
     }
 
     private void OnOpenDirectionChanged(bool oldValue, bool newValue)
     {
-        if (_doorOpen.Value)
-        {
-            ApplyDoorVisuals(true, newValue);
-        }
+        // Only used for late-joining clients that missed the BroadcastDoorStateClientRpc.
     }
 
     private void ApplyDoorVisuals(bool isOpen, bool openedIn)
     {
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
+        interactText = isOpen ? "Close" : "Open";
     }
 
     public void Reset()

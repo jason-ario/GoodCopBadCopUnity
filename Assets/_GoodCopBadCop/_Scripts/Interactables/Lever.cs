@@ -41,21 +41,44 @@ public class Lever : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        ToggleLeverServerRpc();
+
+        // Apply visuals immediately on the interacting client — no RTT wait.
+        bool predicted = !_isUp.Value;
+        ApplyLeverVisuals(predicted);
+
+        ToggleLeverServerRpc(NetworkManager.Singleton.LocalClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void ToggleLeverServerRpc()
+    private void ToggleLeverServerRpc(ulong senderClientId)
     {
         _isUp.Value = !_isUp.Value;
+
+        // Broadcast visuals to all clients except the one that already predicted.
+        BroadcastLeverStateClientRpc(_isUp.Value, senderClientId);
+    }
+
+    /// <summary>
+    /// Applies the lever visual to all clients except the one that predicted it locally.
+    /// </summary>
+    [ClientRpc]
+    private void BroadcastLeverStateClientRpc(bool isUp, ulong excludeClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId == excludeClientId) return;
+        ApplyLeverVisuals(isUp);
     }
 
     private void OnLeverStateChanged(bool oldValue, bool newValue)
     {
-        _animator.SetBool(IsUpParam, newValue);
-        leverAudio.PlayOneShot(newValue ? leverOnSound : leverOffSound);
+        // Only used for late-joining clients that missed the BroadcastLeverStateClientRpc.
+    }
 
-        if (newValue)
+    private void ApplyLeverVisuals(bool isUp)
+    {
+        _animator.SetBool(IsUpParam, isUp);
+        leverAudio.PlayOneShot(isUp ? leverOnSound : leverOffSound);
+
+        if (isUp)
             shutter.OpenShutter();
         else
             shutter.CloseShutter();

@@ -30,18 +30,41 @@ public class Drawer : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        ToggleDrawerServerRpc();
+
+        // Apply visuals immediately on the interacting client — no RTT wait.
+        bool predicted = !isOpen.Value;
+        ApplyDrawerVisuals(predicted);
+
+        ToggleDrawerServerRpc(NetworkManager.Singleton.LocalClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void ToggleDrawerServerRpc()
+    private void ToggleDrawerServerRpc(ulong senderClientId)
     {
         isOpen.Value = !isOpen.Value;
+
+        // Broadcast visuals to all clients except the one that already predicted.
+        BroadcastDrawerStateClientRpc(isOpen.Value, senderClientId);
+    }
+
+    /// <summary>
+    /// Applies the drawer visual to all clients except the one that predicted it locally.
+    /// </summary>
+    [ClientRpc]
+    private void BroadcastDrawerStateClientRpc(bool open, ulong excludeClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId == excludeClientId) return;
+        ApplyDrawerVisuals(open);
     }
 
     private void OnDrawerStateChanged(bool oldValue, bool newValue)
     {
-        animator.SetBool("Open", newValue);
-        audioSource.PlayOneShot(newValue ? drawerOpenSound : drawerCloseSound);
+        // Only used for late-joining clients that missed the BroadcastDrawerStateClientRpc.
+    }
+
+    private void ApplyDrawerVisuals(bool open)
+    {
+        animator.SetBool("Open", open);
+        audioSource.PlayOneShot(open ? drawerOpenSound : drawerCloseSound);
     }
 }
