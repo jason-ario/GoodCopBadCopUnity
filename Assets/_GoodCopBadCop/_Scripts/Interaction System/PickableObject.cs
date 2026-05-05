@@ -35,6 +35,9 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>Returns true if any player is currently holding this object.</summary>
+    public bool IsHeld => _holdingClientId.Value != ulong.MaxValue;
+
     /// <summary>Returns true if another player (not the local client) is currently holding this object.</summary>
     public bool IsHeldByOtherPlayer => _holdingClientId.Value != ulong.MaxValue &&
                                        _holdingClientId.Value != NetworkManager.Singleton.LocalClientId;

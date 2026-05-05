@@ -192,7 +192,14 @@ public class FolderController : PickableObject
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
-    { 
+    {
+        // Block all item interactions while the folder is being held by any player.
+        // The holding player's client disables colliders optimistically in PickUpObject,
+        // and _holdingClientId propagates the same state to every other client via
+        // OnHoldingClientChanged → SetInteractable. This guard is a belt-and-suspenders
+        // check that also catches edge cases where the collider state arrives late.
+        if (IsHeld) return;
+
         base.InteractWithItem(playerInteractionController, heldItem);
         ulong clientId = playerInteractionController.NetworkObjectId;
 
@@ -266,6 +273,9 @@ public class FolderController : PickableObject
         // Find the player instance that initiated the stamp
         NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(interactingPlayerId, out var playerObj);
         if (playerObj == null) return;
+
+        // Lock the folder against pickup on every client for the duration of the sequence.
+        SetInteractable(false);
 
         playerPickupController = playerObj.GetComponent<PlayerPickupController>();
         StartCoroutine(UseStampSequence(stampType));
@@ -442,6 +452,12 @@ public class FolderController : PickableObject
         }
 
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
+
+        // Restore interactability now that the sequence is done.
+        // Skip if the folder was picked up mid-sequence — _holdingClientId already
+        // controls the collider state in that case and must not be overridden here.
+        if (!IsHeld)
+            SetInteractable(true);
 
         onStampedComplete?.Invoke();
     }
