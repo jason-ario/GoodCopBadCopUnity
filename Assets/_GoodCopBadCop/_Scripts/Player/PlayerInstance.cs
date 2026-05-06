@@ -9,6 +9,7 @@ public class PlayerInstance : NetworkBehaviour
     [SerializeField] private ScreenDamage screenDamage;
     [SerializeField] private GameObject playerLight;
     [SerializeField] private GameObject nameTag;
+    [SerializeField] private RagdollController ragdollController;
 
     private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
         false,
@@ -36,6 +37,15 @@ public class PlayerInstance : NetworkBehaviour
         _playerInteractionController = GetComponent<PlayerInteractionController>();
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
+
+        if (PlayerHealth != null)
+            PlayerHealth.OnDeath += Die;
+    }
+
+    private void OnDestroy()
+    {
+        if (PlayerHealth != null)
+            PlayerHealth.OnDeath -= Die;
     }
 
     public void SetIsOutside(bool value)
@@ -102,6 +112,20 @@ public class PlayerInstance : NetworkBehaviour
     public void HurtPlayer()
     {
         screenDamage.CurrentHealth -= 1;
+    }
+
+    /// <summary>
+    /// Kills the local player: disables movement and interaction, then activates the ragdoll.
+    /// </summary>
+    public void Die()
+    {
+        CanControl = false;
+        SetCanInteract(false);
+        SetCanMove(false);
+        DisableReticle();
+
+        if (ragdollController != null)
+            ragdollController.SetRagdollActive(true);
     }
 
     public void SetPosition(Transform position)

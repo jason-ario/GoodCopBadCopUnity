@@ -282,6 +282,8 @@ public class PlayerInteractionController : NetworkBehaviour
         if (interactable is PickableObject)
         {
             interactable.Interact(this);
+            reticle.SetInteractState(false);
+            reticle.SetTooFarState(false);
             return true;
         }
 
