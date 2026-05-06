@@ -38,14 +38,14 @@ public class PlayerInstance : NetworkBehaviour
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
 
-        if (PlayerHealth != null)
-            PlayerHealth.OnDeath += Die;
+        //if (PlayerHealth != null)
+           // PlayerHealth.OnDeath += Die;
     }
 
     private void OnDestroy()
     {
-        if (PlayerHealth != null)
-            PlayerHealth.OnDeath -= Die;
+       // if (PlayerHealth != null)
+           // PlayerHealth.OnDeath -= Die;
     }
 
     public void SetIsOutside(bool value)
@@ -119,6 +119,8 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     public void Die()
     {
+        return;
+        
         CanControl = false;
         SetCanInteract(false);
         SetCanMove(false);
