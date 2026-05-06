@@ -25,4 +25,17 @@ public class GlobalHostVariables : NetworkBehaviour
             money.Value = 0;
         }
     }
+
+    /// <summary>
+    /// Attempts to subtract <paramref name="amount"/> from the shared money pool.
+    /// Must only be called on the server. Returns true if funds were sufficient.
+    /// </summary>
+    public bool SubtractMoney(int amount)
+    {
+        if (money.Value < amount)
+            return false;
+
+        money.Value -= amount;
+        return true;
+    }
 }

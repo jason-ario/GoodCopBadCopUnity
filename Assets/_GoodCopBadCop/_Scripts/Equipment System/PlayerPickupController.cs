@@ -379,6 +379,82 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Initiates a shop purchase: deducts coupons on the server and spawns + equips the item.
+    /// Validates ownership, held state, item data, and available funds before proceeding.
+    /// </summary>
+    public void PurchaseAndPickUp(PickableItemData itemData, int price, Transform spawnPos)
+    {
+        if (!IsOwner) return;
+        if (HeldObject != null) return;
+        if (itemData == null || itemData.PickUpPrefab == null) return;
+
+        int itemIndex = ItemDatabase.Instance.GetItemIndex(itemData);
+        if (itemIndex < 0)
+        {
+            Debug.LogError($"PlayerPickupController: Could not find item index for {itemData.name}");
+            return;
+        }
+
+        PurchaseAndPickUpServerRpc(itemIndex, price, spawnPos.position, spawnPos.rotation);
+    }
+
+    [ServerRpc]
+    private void PurchaseAndPickUpServerRpc(int itemIndex, int price, Vector3 position, Quaternion rotation, ServerRpcParams rpcParams = default)
+    {
+        if (GlobalHostVariables.Instance == null)
+        {
+            Debug.LogError("PurchaseAndPickUpServerRpc: GlobalHostVariables not found.");
+            return;
+        }
+
+        bool spent = GlobalHostVariables.Instance.SubtractMoney(price);
+        if (!spent)
+        {
+            PurchaseFailedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
+        PickableItemData itemData = ItemDatabase.Instance.GetItemByIndex(itemIndex);
+        if (itemData == null || itemData.PickUpPrefab == null)
+        {
+            Debug.LogError($"PurchaseAndPickUpServerRpc: invalid item index {itemIndex}");
+            // Refund since we already subtracted.
+            GlobalHostVariables.Instance.AddMoney(price);
+            return;
+        }
+
+        GameObject spawnedObject = Instantiate(itemData.PickUpPrefab, position, rotation);
+        NetworkObject networkObject = spawnedObject.GetComponent<NetworkObject>();
+        if (networkObject == null)
+        {
+            Debug.LogError($"Purchased pickup prefab {itemData.name} has no NetworkObject component.");
+            Destroy(spawnedObject);
+            GlobalHostVariables.Instance.AddMoney(price);
+            return;
+        }
+
+        networkObject.Spawn(true);
+
+        SpawnAndPickUpClientRpc(
+            new NetworkObjectReference(networkObject),
+            new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            }
+        );
+    }
+
+    [ClientRpc]
+    private void PurchaseFailedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner) return;
+        UIController.Instance.ShowShopNotification("Not enough coupons!");
+    }
+
     public void PickUpObject(PickableObject pickableObject)
     {
         if (HeldObject != null)

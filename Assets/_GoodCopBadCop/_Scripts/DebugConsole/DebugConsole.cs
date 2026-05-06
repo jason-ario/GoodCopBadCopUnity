@@ -65,5 +65,10 @@ public class DebugConsole : MonoBehaviour
         {
             ShiftManager.Instance.DebugForceTasksComplete();
         }
+
+        if (Input.GetKeyDown(KeyCode.F10))
+        {
+            ShiftManager.Instance.EndIntroCutscene();
+        }
     }
 }

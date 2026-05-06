@@ -33,6 +33,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
+    [SerializeField] private ShopNotificationManager shopNotificationManager;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     public bool IsPaused => pauseMenuOpened;
 
@@ -291,5 +292,11 @@ public class UIController : MonoBehaviour
     public void ShowCashPopUpNotification(int amount, string message)
     {
         cashNotificationPopupManager.SpawnCashNotification(amount, message);
+    }
+
+    /// <summary>Displays a transient shop alert notification (purchase confirmed, error, etc.).</summary>
+    public void ShowShopNotification(string message)
+    {
+        shopNotificationManager.ShowNotification(message);
     }
 }
