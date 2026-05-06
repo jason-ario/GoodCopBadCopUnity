@@ -71,7 +71,30 @@ public class ExamNotebook : PickableObject
     {
         base.OnNetworkSpawn();
 
-        // Pages are scene-hierarchy children of this notebook NetworkObject.
+        // When the notebook is spawned dynamically at runtime (e.g. purchased from shop),
+        // NGO does not spawn nested child NetworkObjects — only scene-placed objects get that.
+        // Explicitly spawn each page NetworkObject on the server if it isn't already spawned.
+        // We must temporarily detach the page from the notebook hierarchy for Spawn() to succeed,
+        // then immediately re-parent it back via TrySetParent so NGO replicates the parent
+        // relationship to all clients — the pages will again appear as notebook children everywhere.
+        if (IsServer)
+        {
+            foreach (var page in pages)
+            {
+                NetworkObject pageNetObj = page.GetComponent<NetworkObject>();
+                if (pageNetObj != null && !pageNetObj.IsSpawned)
+                {
+                    // Temporarily detach so Spawn() registers this as a root-level NetworkObject.
+                    page.transform.SetParent(null, worldPositionStays: true);
+                    pageNetObj.Spawn(destroyWithScene: true);
+
+                    // Re-parent back to the notebook through NGO so all clients mirror this hierarchy.
+                    pageNetObj.TrySetParent(NetworkObject, worldPositionStays: true);
+                }
+            }
+        }
+
+        // Pages are scene-hierarchy children of this notebook NetworkObject (or now detached).
         // Their own NetworkTransform would independently interpolate world-space position,
         // causing them to lag behind the notebook on non-server clients. Disable it here —
         // it will be left disabled by PlaceInSlotServerRpc when a page is ripped out.
