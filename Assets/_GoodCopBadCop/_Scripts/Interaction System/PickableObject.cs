@@ -265,7 +265,6 @@ public class PickableObject : Interactable
     /// <summary>Deactivates the ParentConstraint and removes all sources.</summary>
     public void RemoveParent()
     {
-        transform.parent = null;
         _parentConstraint.constraintActive = false;
         if (_parentConstraint.sourceCount > 0)
         {
