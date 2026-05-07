@@ -468,6 +468,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   _batteryBar: {fileID: 0}
+  _healthBar: {fileID: 3410940245443061609}
 --- !u!1 &6722200451724470575
 GameObject:
   m_ObjectHideFlags: 0
@@ -892,13 +893,45 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3978550335771790365, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3410940245443061609}
   m_SourcePrefab: {fileID: 100100000, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
+--- !u!1 &2457375900845327482 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3978550335771790365, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
+  m_PrefabInstance: {fileID: 1525871656018217063}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3410940245443061609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2457375900845327482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16c191e5a7d96e142a472647e0eae939, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthBar
+  fillImage: {fileID: 8289778272257518540}
 --- !u!224 &7091753326306990402 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8594561596053033253, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
   m_PrefabInstance: {fileID: 1525871656018217063}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8289778272257518540 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7361073414911861675, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
+  m_PrefabInstance: {fileID: 1525871656018217063}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
 --- !u!1001 &1939036042187262111
 PrefabInstance:
   m_ObjectHideFlags: 0

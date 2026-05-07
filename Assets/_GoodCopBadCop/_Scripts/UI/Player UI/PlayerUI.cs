@@ -1,12 +1,14 @@
-using System;
 using UnityEngine;
 
 public class PlayerUI : MonoBehaviour
 {
     public static PlayerUI Instance;
-    
-    [SerializeField] BatteryBar _batteryBar;
+
+    [SerializeField] private BatteryBar _batteryBar;
     public BatteryBar BatteryBar => _batteryBar;
+
+    [SerializeField] private HealthBar _healthBar;
+    public HealthBar HealthBar => _healthBar;
 
     private void Awake()
     {
