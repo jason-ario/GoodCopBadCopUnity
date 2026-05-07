@@ -73,11 +73,22 @@ public class FolderController : PickableObject
 
     private FolderItem idCard;
     private FolderItem application;
+
+    // ExamPage slot references are kept as plain C# fields on the server for local logic
+    // (SetInteractable, AddToFolder calls). Occupancy is synced separately via NetworkVariables
+    // so every client can guard against double-adds and notebook interactions correctly.
     private ExamPage behaviorExamPage;
     private ExamPage realityExamPage;
     private ExamPage mutationExamPage;
     private ExamPage biologicalExamPage;
     private ExamPage documentationExamPage;
+
+    // One flag per exam-page slot. Written by the server; read by all clients.
+    private readonly NetworkVariable<bool> _behaviorSlotOccupied     = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<bool> _realitySlotOccupied      = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<bool> _mutationSlotOccupied     = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<bool> _biologicalSlotOccupied   = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<bool> _documentationSlotOccupied = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public bool IsOpen => isOpen.Value;
     public bool IsStamped => isStamped.Value;
@@ -134,6 +145,7 @@ public class FolderController : PickableObject
     {
         _localDocuments.RemoveAll(pair => pair.document == document);
         _localDocuments.Add((document, slot));
+        Debug.Log($"[FolderController] RegisterLocalDocument: {document.name} → slot={slot.name} on client {NetworkManager.Singleton.LocalClientId} | total tracked={_localDocuments.Count}");
     }
 
     /// <summary>Despawns all server-tracked documents. Called by SuspectController before despawning the folder.</summary>
@@ -198,6 +210,7 @@ public class FolderController : PickableObject
         // and _holdingClientId propagates the same state to every other client via
         // OnHoldingClientChanged → SetInteractable. This guard is a belt-and-suspenders
         // check that also catches edge cases where the collider state arrives late.
+        Debug.Log($"[FolderController] InteractWithItem on client {NetworkManager.Singleton.LocalClientId}: held={heldItem?.ItemData?.name ?? "NULL"}, IsHeld={IsHeld}");
         if (IsHeld) return;
 
         base.InteractWithItem(playerInteractionController, heldItem);
@@ -224,6 +237,7 @@ public class FolderController : PickableObject
 
         if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Reality Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook")
         {
+            Debug.Log($"[FolderController] Notebook interaction on client {NetworkManager.Singleton.LocalClientId}: held={heldItem.ItemData.name}, hasPage={HasNotebookPage(heldItem.ItemData.name)}");
             if (HasNotebookPage(heldItem.ItemData.name) == false)
             {
                 AddNotebookPaper(heldItem.ItemData.name, playerInteractionController.pickupController);
@@ -234,25 +248,15 @@ public class FolderController : PickableObject
     bool HasNotebookPage(string itemName)
     {
         if (itemName == "Mutation Exam Notebook")
-        {
-            return mutationExamPage != null;
-        }
+            return _mutationSlotOccupied.Value;
         if (itemName == "Behavior Exam Notebook")
-        {
-            return behaviorExamPage != null;
-        }
+            return _behaviorSlotOccupied.Value;
         if (itemName == "Reality Exam Notebook")
-        {
-            return realityExamPage != null;
-        }
+            return _realitySlotOccupied.Value;
         if (itemName == "Documentation Exam Notebook")
-        {
-            return documentationExamPage != null;
-        }
+            return _documentationSlotOccupied.Value;
         if (itemName == "Biological Exam Notebook")
-        {
-            return biologicalExamPage != null;
-        }
+            return _biologicalSlotOccupied.Value;
 
         return false;
     }
@@ -523,22 +527,28 @@ public class FolderController : PickableObject
         if (slotOwner == null)
         {
             // Fallback: local constraint only (should never happen in practice).
+            Debug.LogError($"[FolderController] PlacePageInSlotNetworked: no NetworkObject parent found for slot '{slot.name}' — falling back to local constraint.");
             page.SetParent(slot);
             return;
         }
 
-        string slotPath = GetRelativePath(slotOwner.transform, slot);
-        page.PlaceInSlotServerRpc(
-            new NetworkObjectReference(slotOwner),
-            slotPath,
-            slot.position,
-            slot.rotation);
+        Debug.Log($"[FolderController] PlacePageInSlotNetworked: server prep for {page.name} → slot={slot.name} slotOwner={slotOwner.name} IsSpawned={page.NetworkObject?.IsSpawned}");
+
+        // Server-side prep: release the constraint, hand ownership back to server, and stop NGO
+        // from replicating parent changes. ExamNotebook.NotifyPagePlacedInFolderClientRpc (sent by
+        // RequestAddToFolderServerRpc after AddDocument) handles all client-side detach and slot
+        // registration via the notebook's NetworkObject, which reliably reaches all clients.
+        page.RemoveParent();
+        page.NetworkObject.RemoveOwnership();
+        page.NetworkObject.AutoObjectParentSync = false;
 
         RegisterDocumentServerRpc(new NetworkObjectReference(page.NetworkObject));
     }
 
     // Mirrors PlayerPickupController.GetRelativePath so we can build slot paths from here.
-    private static string GetRelativePath(Transform root, Transform target)
+    // Public so ExamNotebook.RequestAddToFolderServerRpc can compute the slot path when
+    // broadcasting NotifyPagePlacedInFolderClientRpc.
+    public static string GetRelativePath(Transform root, Transform target)
     {
         if (target == root) return string.Empty;
         System.Collections.Generic.List<string> parts = new System.Collections.Generic.List<string>();
@@ -583,12 +593,13 @@ public class FolderController : PickableObject
         
         if (itemName == "Behavior Exam Page")
         {
-            if (behaviorExamPage != null)
+            if (_behaviorSlotOccupied.Value)
             {
                 return;
             }
-            
+
             behaviorExamPage = pickableObject.GetComponent<ExamPage>();
+            _behaviorSlotOccupied.Value = true;
 
             if (dropObject)
             {
@@ -604,12 +615,13 @@ public class FolderController : PickableObject
         
         if (itemName == "Mutation Exam Page")
         {
-            if (mutationExamPage != null)
+            if (_mutationSlotOccupied.Value)
             {
                 return;
             }
-            
+
             mutationExamPage = pickableObject.GetComponent<ExamPage>();
+            _mutationSlotOccupied.Value = true;
 
             if (dropObject)
             {
@@ -625,12 +637,13 @@ public class FolderController : PickableObject
         
         if (itemName == "Reality Exam Page")
         {
-            if (realityExamPage != null)
+            if (_realitySlotOccupied.Value)
             {
                 return;
             }
-            
+
             realityExamPage = pickableObject.GetComponent<ExamPage>();
+            _realitySlotOccupied.Value = true;
 
             if (dropObject)
             {
@@ -646,12 +659,13 @@ public class FolderController : PickableObject
         
         if (itemName == "Documentation Exam Page")
         {
-            if (documentationExamPage != null)
+            if (_documentationSlotOccupied.Value)
             {
                 return;
             }
-            
+
             documentationExamPage = pickableObject.GetComponent<ExamPage>();
+            _documentationSlotOccupied.Value = true;
 
             if (dropObject)
             {
@@ -667,12 +681,13 @@ public class FolderController : PickableObject
         
         if (itemName == "Biological Exam Page")
         {
-            if (biologicalExamPage != null)
+            if (_biologicalSlotOccupied.Value)
             {
                 return;
             }
-            
+
             biologicalExamPage = pickableObject.GetComponent<ExamPage>();
+            _biologicalSlotOccupied.Value = true;
 
             if (dropObject)
             {
@@ -705,26 +720,31 @@ public class FolderController : PickableObject
         if (itemName == "Mutation Exam Page")
         {
             mutationExamPage = null;
+            _mutationSlotOccupied.Value = false;
         }
         
         if (itemName == "Behavior Exam Page")
         {
             behaviorExamPage = null;
+            _behaviorSlotOccupied.Value = false;
         }
         
         if (itemName == "Reality Exam Page")
         {
             realityExamPage = null;
+            _realitySlotOccupied.Value = false;
         }
         
         if (itemName == "Documentation Exam Page")
         {
             documentationExamPage = null;
+            _documentationSlotOccupied.Value = false;
         }
         
         if (itemName == "Biological Exam Page")
         {
             biologicalExamPage = null;
+            _biologicalSlotOccupied.Value = false;
         }
     }
 

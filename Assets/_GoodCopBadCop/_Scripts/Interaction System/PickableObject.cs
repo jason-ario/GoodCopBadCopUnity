@@ -111,12 +111,32 @@ public class PickableObject : Interactable
     [ServerRpc(RequireOwnership = false)]
     public void PlaceInSlotServerRpc(NetworkObjectReference slotOwnerRef, string slotRelativePath, Vector3 position, Quaternion rotation)
     {
+        PlaceInSlotFromServer(slotOwnerRef, slotRelativePath, position, rotation);
+    }
+
+    /// <summary>
+    /// Server-only equivalent of PlaceInSlotServerRpc. Performs the server-side slot work and
+    /// broadcasts PlaceInSlotClientRpc to all clients. Call this when already executing on the
+    /// server (e.g. from within another ServerRpc or any server-only method) to avoid the
+    /// ServerRpc code-gen wrapper suppressing the subsequent ClientRpc broadcast.
+    /// </summary>
+    public void PlaceInSlotFromServer(NetworkObjectReference slotOwnerRef, string slotRelativePath, Vector3 position, Quaternion rotation)
+    {
+        Debug.Assert(IsServer, $"[PickableObject] PlaceInSlotFromServer called on non-server for {name}");
+
         RemoveParent();
-        transform.position = position;
-        transform.rotation = rotation;
 
         // Prevent NGO from fighting the slot constraint by re-syncing the scene-hierarchy parent.
         NetworkObject.AutoObjectParentSync = false;
+
+        // Escape any NGO-established parent hierarchy (e.g. when spawned as a notebook child
+        // via TrySetParent). Must be done after disabling AutoObjectParentSync so NGO does not
+        // replicate this local detach — each client handles it independently in the ClientRpc.
+        if (transform.parent != null)
+            transform.SetParent(null, worldPositionStays: true);
+
+        transform.position = position;
+        transform.rotation = rotation;
 
         NetworkObject.RemoveOwnership();
 
@@ -124,6 +144,7 @@ public class PickableObject : Interactable
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = false;
 
+        Debug.Log($"[PickableObject] PlaceInSlotFromServer: broadcasting PlaceInSlotClientRpc for {name} slotPath='{slotRelativePath}'");
         PlaceInSlotClientRpc(slotOwnerRef, slotRelativePath, position, rotation);
     }
 
@@ -135,12 +156,21 @@ public class PickableObject : Interactable
     [ClientRpc]
     private void PlaceInSlotClientRpc(NetworkObjectReference slotOwnerRef, string slotRelativePath, Vector3 position, Quaternion rotation)
     {
+        Debug.Log($"[PlaceInSlotClientRpc] Received on client {NetworkManager.Singleton.LocalClientId} for {name} | slotRelativePath='{slotRelativePath}' | currentParent={transform.parent?.name ?? "none"}");
+
         RemoveParent();
-        transform.position = position;
-        transform.rotation = rotation;
 
         // Prevent NGO from re-syncing the scene-hierarchy parent and fighting the constraint.
         NetworkObject.AutoObjectParentSync = false;
+
+        // Escape any NGO-established parent hierarchy (e.g. when this page was spawned as a
+        // child of the notebook via TrySetParent). Must happen after disabling AutoObjectParentSync
+        // so NGO treats this as a local-only detach and does not replicate it.
+        if (transform.parent != null)
+            transform.SetParent(null, worldPositionStays: true);
+
+        transform.position = position;
+        transform.rotation = rotation;
 
         // Keep NT disabled — position is driven on all clients without NetworkTransform.
         NetworkTransform nt = GetComponent<NetworkTransform>();
@@ -151,7 +181,11 @@ public class PickableObject : Interactable
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null) rb.isKinematic = true;
 
-        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner)) return;
+        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
+        {
+            Debug.LogError($"[PlaceInSlotClientRpc] Could not resolve slotOwnerRef on client {NetworkManager.Singleton.LocalClientId} for {name}");
+            return;
+        }
 
         Transform slot = string.IsNullOrEmpty(slotRelativePath)
             ? slotOwner.transform
@@ -171,6 +205,7 @@ public class PickableObject : Interactable
         FolderController folder = slotOwner.GetComponent<FolderController>();
         if (folder != null)
         {
+            Debug.Log($"[PlaceInSlotClientRpc] Registering {name} in folder {folder.name} slot={slot.name} on client {NetworkManager.Singleton.LocalClientId}");
             folder.RegisterLocalDocument(this, slot);
         }
         else

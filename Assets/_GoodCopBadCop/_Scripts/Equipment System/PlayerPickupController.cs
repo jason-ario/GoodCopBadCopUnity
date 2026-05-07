@@ -437,7 +437,31 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        networkObject.Spawn(true);
+        // NGO only supports nested NetworkObjects for scene-placed objects, not dynamically spawned ones.
+        // The inline ExamPage children in the notebook prefab have a different globalObjectIdHash
+        // from the standalone registered page prefabs — clients can't match them and their spawn fails.
+        // SpawnAndWirePages instantiates from the registered prefab assets instead, so clients can
+        // create matching instances and RPCs/ClientRpcs on those NetworkObjects are delivered correctly.
+        ExamNotebook notebook = networkObject.GetComponent<ExamNotebook>();
+        if (notebook != null)
+        {
+            networkObject.Spawn(true);
+
+            var spawnedPages = notebook.SpawnAndWirePages();
+
+            if (spawnedPages.Count > 0)
+            {
+                var pageRefs = new NetworkObjectReference[spawnedPages.Count];
+                for (int i = 0; i < spawnedPages.Count; i++)
+                    pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
+                notebook.SetPageReferencesClientRpc(pageRefs);
+            }
+        }
+        else
+        {
+            // Non-notebook object — plain spawn, no nested NetworkObject handling needed.
+            networkObject.Spawn(true);
+        }
 
         SpawnAndPickUpClientRpc(
             new NetworkObjectReference(networkObject),
