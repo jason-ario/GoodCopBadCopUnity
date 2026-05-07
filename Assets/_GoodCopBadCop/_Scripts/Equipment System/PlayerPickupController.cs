@@ -828,6 +828,6 @@ public class PlayerPickupController : NetworkBehaviour
         OnPlaceObject?.Invoke();
         pickUpCooldownComplete = false;
 
-        NetworkHelper.Despawn(heldObject.GetComponent<NetworkObject>());
+        heldObject.DespawnServerRpc();
     }
 }

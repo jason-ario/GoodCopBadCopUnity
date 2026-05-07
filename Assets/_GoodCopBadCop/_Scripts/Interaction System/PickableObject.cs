@@ -104,6 +104,16 @@ public class PickableObject : Interactable
     }
 
     /// <summary>
+    /// Asks the server to despawn this object. Safe to call from any client —
+    /// the server validates the object is still spawned before despawning.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void DespawnServerRpc()
+    {
+        NetworkHelper.Despawn(NetworkObject);
+    }
+
+    /// <summary>
     /// Places this object into a slot that is a child of another NetworkObject (e.g. a folder slot).
     /// NT stays disabled on all clients; the ParentConstraint is applied to the resolved slot so
     /// the document follows the folder everywhere — on the server and all observer clients.

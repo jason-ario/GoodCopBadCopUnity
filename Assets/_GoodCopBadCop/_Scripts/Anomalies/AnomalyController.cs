@@ -13,7 +13,7 @@ public class AnomalyController : MonoBehaviour
 
     [Header("Anomaly Distribution")]
     [Tooltip("Probability (0–1) that this suspect spawns with no anomalies.")]
-    [SerializeField] [Range(0f, 1f)] private float _cleanChance = 0.65f;
+    [SerializeField] [Range(0f, 1f)] private float _cleanChance = 0.5f;
     [Tooltip("Minimum number of anomalies when the suspect is not clean.")]
     [SerializeField] private int _minAnomalies = 1;
     [Tooltip("Maximum number of anomalies (inclusive) when the suspect is not clean.")]

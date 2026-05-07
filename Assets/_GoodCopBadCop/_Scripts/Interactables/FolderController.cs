@@ -220,6 +220,18 @@ public class FolderController : PickableObject
         {
             if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.ItemData.name == "Stamp_Red" || heldItem.ItemData.name == "Stamp_Yellow")
             {
+                if (isOpen.Value)
+                {
+                    // Cannot stamp while the folder is open — close it instead.
+                    Debug.Log("[FolderController] Stamp blocked: folder is open. Closing folder.");
+                    if (playerPickupController != null)
+                        playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
+                    StopAllCoroutines();
+                    SetOpenServerRpc(false);
+                    isOpeningOrClosing = false;
+                    return;
+                }
+
                 Debug.Log("Interact with item");
                 var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
                 StartUseStampServerRpc(clientId, inkStamp.StampType);
@@ -265,6 +277,7 @@ public class FolderController : PickableObject
     private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
     {
         if (isStamping) return;
+        if (isOpen.Value) return;
         isStamping = true;
         isStamped.Value = true;
 
