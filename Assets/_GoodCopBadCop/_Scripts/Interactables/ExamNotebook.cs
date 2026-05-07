@@ -57,6 +57,12 @@ public class ExamNotebook : PickableObject
         // pages[] is empty at design time — nothing to iterate here.
         // It gets populated at runtime via SpawnAndWirePages → SetPageReferencesClientRpc.
         ExcludePageCollidersFromCache();
+
+        foreach (Transform slot in pagePositions)
+        {
+            if (slot != null)
+                slot.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -484,6 +490,10 @@ public class ExamNotebook : PickableObject
 
         Debug.Log($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: registering {page.name} → {folder.name}/{slot.name} on client {NetworkManager.Singleton.LocalClientId}");
         folder.RegisterLocalDocument(page, slot);
+
+        // The page was kept non-interactable while bound to the notebook.
+        // Now that it's placed in the folder it should behave like a normal pickable object.
+        page.SetInteractable(true);
     }
 
     /// <summary>
