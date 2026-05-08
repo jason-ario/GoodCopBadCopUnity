@@ -8,6 +8,9 @@ using UnityEngine.Animations;
 using UnityEngine.Events;
 using UnityEngine.Serialization;
 
+// LateUpdate must run after PlayerAnimationController (default order 0) so the world object
+// is snapped to the body arm container after pitch bones have already been applied.
+[DefaultExecutionOrder(1)]
 public class PlayerPickupController : NetworkBehaviour
 {
     public Transform holdPoint;
@@ -226,6 +229,17 @@ public class PlayerPickupController : NetworkBehaviour
     }
 
     private void LateUpdate()
+    {
+        SyncWorldObjectToBody();
+    }
+
+    /// <summary>
+    /// Snaps the held world object to the body arm target's current world transform.
+    /// Called both from LateUpdate and explicitly by PlayerAnimationController after
+    /// bone pitch manipulation, so the held object always reflects the final bone state
+    /// regardless of script execution order.
+    /// </summary>
+    public void SyncWorldObjectToBody()
     {
         if (_followWorldObj == null || _followTarget == null) return;
 

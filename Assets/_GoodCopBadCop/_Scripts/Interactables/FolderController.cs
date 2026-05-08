@@ -8,9 +8,9 @@ using UnityEngine.Events;
 using UnityEngine.WSA;
 using Application = UnityEngine.Application;
 
-// Must execute after PlayerPickupController (default order 0) so LateUpdate fires
+// Must execute after PlayerPickupController (order 1) so LateUpdate fires
 // after the folder has already been moved to the body-arm target position.
-[DefaultExecutionOrder(1)]
+[DefaultExecutionOrder(2)]
 public class FolderController : PickableObject
 {
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
@@ -368,6 +368,14 @@ public class FolderController : PickableObject
 
         yield return new WaitForSeconds(.25f);
 
+        // Freeze the body lean for the duration of the stamp so the spine/shoulder
+        // don't shift and fight the IK targets that were baked at sequence start.
+        if (isStampingLocalPlayer)
+        {
+            ppc.PlayerAnimationController.SetBodyLeanDirect(0f);
+            ppc.PlayerAnimationController.SuppressLocalBodyLean = true;
+        }
+
         ppc.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         // Resolve body-arm targets, falling back to the camera-arm targets when unassigned.
@@ -464,6 +472,9 @@ public class FolderController : PickableObject
         if (isStampingLocalPlayer)
         {
             cinemachineVirtualCamera.SetActive(false);
+            // Restore lean to zero — PlayerMovementController will resume driving it naturally.
+            ppc.PlayerAnimationController.SetBodyLeanDirect(0f);
+            ppc.PlayerAnimationController.SuppressLocalBodyLean = false;
             PlayerInstance.Instance.CanControl = true;
             ppc.PlayerMovementController.ResetCameraPos(false, .5f);
         }
