@@ -175,6 +175,20 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.transform
             .DOMove(standPos.position + suspectCharacter.standPosOffset, 3f)
             .OnComplete(ArrivedAtPosition);
+
+        // Notify all clients so they can show the booth-waiting notification if needed.
+        NotifySuspectArrivingClientRpc();
+    }
+
+    /// <summary>
+    /// Fires on every client when a new suspect begins walking to the window.
+    /// Shows the booth-waiting notification only if the local player is away from the booth.
+    /// </summary>
+    [ClientRpc]
+    private void NotifySuspectArrivingClientRpc()
+    {
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside)
+            UIController.Instance.ShowBoothWaitingNotification();
     }
 
     private void ArrivedAtPosition()

@@ -52,10 +52,24 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private DoorController _doorController;
     [SerializeField] private Lever lever;
 
+    [Header("Suspect Scheduling")]
+    [Tooltip("Min and max seconds before the very first suspect arrives after a shift starts.")]
+    [SerializeField] private Vector2 firstSuspectArrivalInterval = new Vector2(5f, 10f);
+    [Tooltip("Min and max seconds to wait between subsequent suspects during a shift.")]
+    [SerializeField] private Vector2 suspectArrivalInterval = new Vector2(30f, 90f);
+
+    private Coroutine _suspectSchedulerCoroutine;
+
     #region Events & Date Helpers
     public Action OnShiftStart { get; set; }
     public Action OnShiftEnd { get; set; }
     public Action OnShiftReady { get; set; }
+    /// <summary>
+    /// Fired once per workday when the player enters the booth and the day officially starts
+    /// (after the intro cutscene or between-shift transition). Use this for day-start effects
+    /// such as the fax machine newspaper spawn. Not fired again when the shift button is pressed.
+    /// </summary>
+    public Action OnDayStart { get; set; }
     /// <summary>Fired when the booth door should force-close and lock. Subscribe in DoorController.</summary>
     public Action OnDoorLock { get; set; }
     /// <summary>Fired after the end-of-shift dialogue finishes, signalling the door should unlock.</summary>
@@ -78,12 +92,10 @@ public class ShiftManager : NetworkBehaviour
 
     private void OnEnable()
     {
-        BetweenShiftTaskManager.OnAllTasksComplete += OnNightPhaseTasksComplete;
     }
 
     private void OnDisable()
     {
-        BetweenShiftTaskManager.OnAllTasksComplete -= OnNightPhaseTasksComplete;
     }
 
     public override void OnNetworkSpawn()
@@ -108,15 +120,37 @@ public class ShiftManager : NetworkBehaviour
         Debug.Log($"Game started on {_startDate.AddDays(_currentDay - 1):dd MMMM yyyy} (Day {_currentDay})");
     }
 
+    /// <summary>
+    /// Called by SuspectController after a suspect is resolved. Schedules the next suspect
+    /// to arrive after a random interval, or ends the shift if all suspects have been processed.
+    /// Must only be called on the server.
+    /// </summary>
     public void SetNextSuspectReady()
     {
+        if (!IsServer) return;
+
         if (SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
             EndShift();
             return;
         }
 
-        _switchButton.SetReady(true);
+        if (_suspectSchedulerCoroutine != null)
+            StopCoroutine(_suspectSchedulerCoroutine);
+
+        _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival());
+    }
+
+    /// <summary>
+    /// Waits a random interval then triggers the next suspect to approach the booth.
+    /// Runs on the server only. Uses <paramref name="interval"/> if provided, otherwise falls back to <see cref="suspectArrivalInterval"/>.
+    /// </summary>
+    private IEnumerator ScheduledSuspectArrival(Vector2? interval = null)
+    {
+        Vector2 range = interval ?? suspectArrivalInterval;
+        float delay = UnityEngine.Random.Range(range.x, range.y);
+        yield return new WaitForSeconds(delay);
+        SuspectController.Instance.NextSuspect();
     }
 
     public void GiveBonusBox()
@@ -204,9 +238,7 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
-        OnDoorLock?.Invoke();
         PlayBuzzerSound();
-        PlayShiftStartFanfare();
 
         yield return new WaitForSeconds(3f);
 
@@ -216,12 +248,26 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3f);
 
-        SuspectController.Instance.NextSuspect();
+        // First suspect arrives quickly on the server — use the shorter initial interval.
+        if (IsServer)
+        {
+            if (_suspectSchedulerCoroutine != null)
+                StopCoroutine(_suspectSchedulerCoroutine);
+
+            _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival(firstSuspectArrivalInterval));
+        }
     }
 
     public void EndShift()
     {
         if (!IsServer) return;
+
+        // Stop any pending suspect arrival.
+        if (_suspectSchedulerCoroutine != null)
+        {
+            StopCoroutine(_suspectSchedulerCoroutine);
+            _suspectSchedulerCoroutine = null;
+        }
 
         CompletedShift();
 
@@ -310,7 +356,7 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>
     /// Called when the player presses Continue on the end-of-shift report.
     /// Fades the screen, re-enables player movement, and begins the between-shift
-    /// night phase without marking the shift as ready yet.
+    /// night phase — tasks now run concurrently throughout the whole work day.
     /// </summary>
     public void StartInBetweenShiftSequence()
     {
@@ -332,8 +378,6 @@ public class ShiftManager : NetworkBehaviour
         EnablePlayerControl();
 
         TutorialManager.Instance.SayEndOfShiftDialogue();
-
-        OnDoorUnlock?.Invoke();
     }
 
     [ClientRpc]
@@ -390,6 +434,7 @@ public class ShiftManager : NetworkBehaviour
             yield return new WaitForEndOfFrame();
             EnablePlayerControl();
             OnShiftReady?.Invoke();
+            OnDayStart?.Invoke();
             PlayShiftStartFanfare();
             yield break;
         }
@@ -408,25 +453,12 @@ public class ShiftManager : NetworkBehaviour
         EnablePlayerControl();
         TutorialManager.Instance.ShowTutorialText("You may now prepare for your next shift");
 
+        // Tasks run concurrently during the work day — shift ready fires immediately.
         if (IsServer && BetweenShiftTaskManager.Instance != null)
             BetweenShiftTaskManager.Instance.BeginNightPhase();
-        // OnShiftReady is invoked by OnNightPhaseTasksComplete once all tasks are done.
-    }
 
-    /// <summary>
-    /// Called on all clients when BetweenShiftTaskManager signals that every night-phase task is complete.
-    /// Primes the switch button via OnShiftReady so players can walk back and start the next shift.
-    /// </summary>
-    private void OnNightPhaseTasksComplete()
-    {
-        TutorialManager.Instance.SayAllTasksComplete();
         OnShiftReady?.Invoke();
-    }
-
-    /// <summary>Debug helper — simulates all night-phase tasks being completed.</summary>
-    public void DebugForceTasksComplete()
-    {
-        OnNightPhaseTasksComplete();
+        OnDayStart?.Invoke();
     }
 
     private void ResetSuspectsProcessed()
@@ -564,8 +596,8 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(1f);
 
         EnablePlayerControl();
-        OnDoorLock?.Invoke();
         OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
         PlayShiftStartFanfare();
     }
 

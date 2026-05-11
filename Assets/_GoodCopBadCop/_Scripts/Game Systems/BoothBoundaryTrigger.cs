@@ -14,7 +14,13 @@ public class BoothBoundaryTrigger : MonoBehaviour
 
         var player = other.GetComponentInParent<PlayerInstance>();
         if (player != null && player.IsLocalPlayer)
+        {
             player.RequestSetIsOutside(false);
+
+            // Dismiss the booth-waiting notification when the player returns.
+            if (UIController.Instance != null)
+                UIController.Instance.HideBoothWaitingNotification();
+        }
     }
 
     private void OnTriggerExit(Collider other)

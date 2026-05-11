@@ -105,20 +105,6 @@ public class SwitchButton : Interactable
         {
             ShiftManager.Instance.TryStartShift();
         }
-        else
-        {
-            PlayBuzzerAndNextSuspectClientRpc();
-        }
-    }
-
-    /// <summary>
-    /// Plays the buzzer and advances to the next suspect on all clients.
-    /// </summary>
-    [ClientRpc]
-    private void PlayBuzzerAndNextSuspectClientRpc()
-    {
-        ShiftManager.Instance.PlayBuzzerSound();
-        SuspectController.Instance.NextSuspect();
     }
 
     [ClientRpc]

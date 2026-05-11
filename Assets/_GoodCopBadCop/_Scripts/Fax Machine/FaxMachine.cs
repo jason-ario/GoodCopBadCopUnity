@@ -16,7 +16,7 @@ public class FaxMachine : NetworkBehaviour
         base.OnNetworkSpawn();
         if (IsServer)
         {
-            ShiftManager.Instance.OnShiftReady += SpawnNewspaper;
+            ShiftManager.Instance.OnDayStart += SpawnNewspaper;
         }
     }
 
@@ -25,7 +25,7 @@ public class FaxMachine : NetworkBehaviour
         base.OnNetworkDespawn();
         if (IsServer)
         {
-            ShiftManager.Instance.OnShiftReady -= SpawnNewspaper;
+            ShiftManager.Instance.OnDayStart -= SpawnNewspaper;
         }
     }
 

@@ -34,6 +34,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
+    [SerializeField] private BoothWaitingNotification boothWaitingNotification;
     public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
     public bool IsPaused => pauseMenuOpened;
 
@@ -298,5 +299,22 @@ public class UIController : MonoBehaviour
     public void ShowShopNotification(string message)
     {
         shopNotificationManager.ShowNotification(message);
+    }
+
+    /// <summary>
+    /// Shows the "someone is waiting at the booth" notification in the bottom-centre of the screen.
+    /// Call this only on the local client and only when the player is away from the booth.
+    /// </summary>
+    public void ShowBoothWaitingNotification()
+    {
+        if (boothWaitingNotification != null)
+            boothWaitingNotification.Show();
+    }
+
+    /// <summary>Hides the booth waiting notification.</summary>
+    public void HideBoothWaitingNotification()
+    {
+        if (boothWaitingNotification != null)
+            boothWaitingNotification.Hide();
     }
 }
