@@ -239,12 +239,12 @@ public class ShiftManager : NetworkBehaviour
         SuspectController.Instance.ResetSuspects();
 
         PlayBuzzerSound();
+        windowLampController.TurnGreen();
 
         yield return new WaitForSeconds(3f);
 
         OnShiftStart?.Invoke();
         yield return new WaitForSeconds(0.5f);
-        windowLampController.TurnGreen();
 
         yield return new WaitForSeconds(3f);
 
