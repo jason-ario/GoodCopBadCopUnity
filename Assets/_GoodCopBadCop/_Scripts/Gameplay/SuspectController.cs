@@ -13,6 +13,9 @@ public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
 
+    [Header("Booth")]
+    [SerializeField] private ShutterController shutterController;
+
     [Header("Spawn Points")]
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
@@ -209,10 +212,10 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
-        if (IsAnyPlayerInsideBooth())
+        if (IsAnyPlayerInsideBooth() && IsShutterOpen())
             SayEntryDialogue();
         else
-            StartCoroutine(WaitForPlayerInsideBooth());
+            StartCoroutine(WaitForBoothReady());
     }
 
     /// <summary>
@@ -233,13 +236,19 @@ public class SuspectController : NetworkBehaviour
         return false;
     }
 
-    /// <summary>
-    /// Polls every half-second until at least one player is inside the booth,
-    /// then triggers the entry dialogue.
-    /// </summary>
-    private IEnumerator WaitForPlayerInsideBooth()
+    /// <summary>Returns true while the booth window shutter is open.</summary>
+    private bool IsShutterOpen()
     {
-        while (!IsAnyPlayerInsideBooth())
+        return shutterController != null && shutterController.IsOpen;
+    }
+
+    /// <summary>
+    /// Polls every half-second until at least one player is inside the booth
+    /// and the shutter is open, then triggers the entry dialogue.
+    /// </summary>
+    private IEnumerator WaitForBoothReady()
+    {
+        while (!IsAnyPlayerInsideBooth() || !IsShutterOpen())
             yield return new WaitForSeconds(0.5f);
 
         SayEntryDialogue();
