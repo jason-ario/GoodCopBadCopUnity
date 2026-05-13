@@ -203,6 +203,9 @@ public class Telephone : Interactable
 
         phoneSound.PlayOneShot(phoneGrabSound);
 
+        handSet.SetTarget(GetHandSocketForClient(player, isLocalPlayer: true));
+        handSet.enabled = true;
+
         yield return new WaitForSeconds(.25f);
 
         player.playerMovementController.ResetCameraPos(false, .25f);

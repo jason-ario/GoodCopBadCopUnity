@@ -51,6 +51,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private DoorController _doorController;
     [SerializeField] private Lever lever;
+    [SerializeField] private TimecardMachine _timecardMachine;
 
     [Header("Suspect Scheduling")]
     [Tooltip("Min and max seconds before the very first suspect arrives after a shift starts.")]
@@ -122,7 +123,8 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>
     /// Called by SuspectController after a suspect is resolved. Schedules the next suspect
-    /// to arrive after a random interval, or ends the shift if all suspects have been processed.
+    /// to arrive after a random interval, or signals the player to clock out if all suspects
+    /// have been processed.
     /// Must only be called on the server.
     /// </summary>
     public void SetNextSuspectReady()
@@ -131,7 +133,10 @@ public class ShiftManager : NetworkBehaviour
 
         if (SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
-            EndShift();
+            if (_timecardMachine != null)
+                _timecardMachine.EnableClockOut();
+
+            NotifyClockOutReadyClientRpc();
             return;
         }
 
@@ -139,6 +144,12 @@ public class ShiftManager : NetworkBehaviour
             StopCoroutine(_suspectSchedulerCoroutine);
 
         _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival());
+    }
+
+    [ClientRpc]
+    private void NotifyClockOutReadyClientRpc()
+    {
+        TutorialManager.Instance.ShowTutorialText("Your shift is over. Clock out to end the day.");
     }
 
     /// <summary>
@@ -401,6 +412,9 @@ public class ShiftManager : NetworkBehaviour
     {
         windowLampController.TurnRed();
         lever.Reset();
+
+        if (_timecardMachine != null)
+            _timecardMachine.Reset();
     }
 
     private void ResetShiftData()
