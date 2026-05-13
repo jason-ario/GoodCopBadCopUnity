@@ -65,30 +65,36 @@ public class FolderController : PickableObject
     [Header("Document Slots")]
     [SerializeField] private Transform idCardSlot;
     [SerializeField] private Transform applicationSlot;
-    [SerializeField] private Transform mutationExamSlot;
-    [SerializeField] private Transform biologicalExamSlot;
-    [SerializeField] private Transform behavioralExamSlot;
-    [SerializeField] private Transform documentationExamSlot;
-    [SerializeField] private Transform realityExamSlot;
+
+    /// <summary>
+    /// Five generic exam-page slots used as a FIFO queue.
+    /// Pages fill slot 0 → 4 in order of insertion. When a page is removed all
+    /// subsequent pages shift down so the queue stays contiguous from slot 0.
+    /// </summary>
+    [SerializeField] private Transform[] examPageSlots = new Transform[5];
 
     private FolderItem idCard;
     private FolderItem application;
 
-    // ExamPage slot references are kept as plain C# fields on the server for local logic
-    // (SetInteractable, AddToFolder calls). Occupancy is synced separately via NetworkVariables
-    // so every client can guard against double-adds and notebook interactions correctly.
-    private ExamPage behaviorExamPage;
-    private ExamPage realityExamPage;
-    private ExamPage mutationExamPage;
-    private ExamPage biologicalExamPage;
-    private ExamPage documentationExamPage;
+    // Server-side ordered list: element i is the ExamPage currently in examPageSlots[i].
+    // null entries mean the slot is empty. Only written on the server.
+    private readonly ExamPage[] _examPageQueue = new ExamPage[5];
 
-    // One flag per exam-page slot. Written by the server; read by all clients.
-    private readonly NetworkVariable<bool> _behaviorSlotOccupied     = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    private readonly NetworkVariable<bool> _realitySlotOccupied      = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    private readonly NetworkVariable<bool> _mutationSlotOccupied     = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    private readonly NetworkVariable<bool> _biologicalSlotOccupied   = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    private readonly NetworkVariable<bool> _documentationSlotOccupied = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // Synced queue occupancy: each slot stores the item-data name of the page it holds,
+    // or an empty string when the slot is free. Written by the server, read by all clients.
+    // Used by every client to guard against duplicate adds and notebook interactions.
+    private readonly NetworkVariable<Unity.Collections.FixedString64Bytes> _queueSlot0 =
+        new NetworkVariable<Unity.Collections.FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<Unity.Collections.FixedString64Bytes> _queueSlot1 =
+        new NetworkVariable<Unity.Collections.FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<Unity.Collections.FixedString64Bytes> _queueSlot2 =
+        new NetworkVariable<Unity.Collections.FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<Unity.Collections.FixedString64Bytes> _queueSlot3 =
+        new NetworkVariable<Unity.Collections.FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<Unity.Collections.FixedString64Bytes> _queueSlot4 =
+        new NetworkVariable<Unity.Collections.FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private NetworkVariable<Unity.Collections.FixedString64Bytes>[] _queueSlots;
 
     public bool IsOpen => isOpen.Value;
     public bool IsStamped => isStamped.Value;
@@ -188,6 +194,12 @@ public class FolderController : PickableObject
         // Late-joiner sync: apply stamp visual immediately if already stamped.
         if (isStamped.Value)
             stampContainer.PlaceStamp(_syncedStampType.Value);
+
+        // Build the array accessor for the five synced queue slots.
+        _queueSlots = new NetworkVariable<Unity.Collections.FixedString64Bytes>[]
+        {
+            _queueSlot0, _queueSlot1, _queueSlot2, _queueSlot3, _queueSlot4
+        };
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -259,18 +271,68 @@ public class FolderController : PickableObject
 
     bool HasNotebookPage(string itemName)
     {
-        if (itemName == "Mutation Exam Notebook")
-            return _mutationSlotOccupied.Value;
-        if (itemName == "Behavior Exam Notebook")
-            return _behaviorSlotOccupied.Value;
-        if (itemName == "Reality Exam Notebook")
-            return _realitySlotOccupied.Value;
-        if (itemName == "Documentation Exam Notebook")
-            return _documentationSlotOccupied.Value;
-        if (itemName == "Biological Exam Notebook")
-            return _biologicalSlotOccupied.Value;
+        // Map notebook name → corresponding page item-data name.
+        string pageName = itemName switch
+        {
+            "Mutation Exam Notebook"       => "Mutation Exam Page",
+            "Behavior Exam Notebook"       => "Behavior Exam Page",
+            "Reality Exam Notebook"        => "Reality Exam Page",
+            "Documentation Exam Notebook"  => "Documentation Exam Page",
+            "Biological Exam Notebook"     => "Biological Exam Page",
+            _                              => null,
+        };
 
+        if (pageName == null) return false;
+        return IsExamPageTypeInQueue(pageName);
+    }
+
+    /// <summary>
+    /// Returns true if a page with the given item-data name is already present in the queue.
+    /// On the server, reads the authoritative C# array. On clients, reads the synced
+    /// NetworkVariables so the check works correctly everywhere.
+    /// </summary>
+    private bool IsExamPageTypeInQueue(string pageName)
+    {
+        if (IsServer)
+        {
+            foreach (ExamPage page in _examPageQueue)
+            {
+                if (page != null && page.ItemData.name == pageName) return true;
+            }
+            return false;
+        }
+
+        if (_queueSlots == null) return false;
+        Unity.Collections.FixedString64Bytes key = pageName;
+        foreach (var slot in _queueSlots)
+        {
+            if (slot.Value == key) return true;
+        }
         return false;
+    }
+
+    /// <summary>
+    /// Returns the index (0–4) of the first free queue slot, or -1 if all slots are full.
+    /// On the server, reads the authoritative C# array. On clients, reads the synced
+    /// NetworkVariables.
+    /// </summary>
+    private int GetFreeQueueSlotIndex()
+    {
+        if (IsServer)
+        {
+            for (int i = 0; i < _examPageQueue.Length; i++)
+            {
+                if (_examPageQueue[i] == null) return i;
+            }
+            return -1;
+        }
+
+        if (_queueSlots == null) return -1;
+        for (int i = 0; i < _queueSlots.Length; i++)
+        {
+            if (_queueSlots[i].Value.IsEmpty) return i;
+        }
+        return -1;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -523,21 +585,34 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
-    /// Returns the slot Transform for the given exam page item name, or null if not applicable.
+    /// Returns the slot Transform for the given item name.
+    /// For exam pages this is the next free slot in the FIFO queue; for ID card and
+    /// Application it returns their dedicated slots.
+    /// Returns null if the item type is unknown or all exam slots are full.
     /// </summary>
     public Transform GetSlotForPage(string itemName)
     {
-        return itemName switch
+        if (itemName == "ID card")        return idCardSlot;
+        if (itemName == "Application")    return applicationSlot;
+
+        // For any exam page, find the current slot this type already occupies (used
+        // when resolving an existing placement from the server side after AddDocument),
+        // or fall back to the next free slot when called from RequestAddToFolderServerRpc.
+        if (_queueSlots != null)
         {
-            "Behavior Exam Page"      => behavioralExamSlot,
-            "Mutation Exam Page"      => mutationExamSlot,
-            "Reality Exam Page"       => realityExamSlot,
-            "Documentation Exam Page" => documentationExamSlot,
-            "Biological Exam Page"    => biologicalExamSlot,
-            "ID card"                 => idCardSlot,
-            "Application"             => applicationSlot,
-            _                         => null,
-        };
+            Unity.Collections.FixedString64Bytes key = itemName;
+            for (int i = 0; i < _queueSlots.Length; i++)
+            {
+                if (_queueSlots[i].Value == key)
+                    return (i < examPageSlots.Length) ? examPageSlots[i] : null;
+            }
+
+            // Not yet in queue — return the next free slot (used during AddDocument flow).
+            int free = GetFreeQueueSlotIndex();
+            return (free >= 0 && free < examPageSlots.Length) ? examPageSlots[free] : null;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -592,138 +667,78 @@ public class FolderController : PickableObject
 
         if (itemName == "ID card")
         {
-            if (idCard != null)
-            {
-                return;
-            }
-            
+            if (idCard != null) return;
             player.DropObject(idCardSlot);
             idCard = pickableObject.GetComponent<IDCard>();
-            
             idCard.AddToFolder(this);
+            return;
         }
 
         if (itemName == "Application")
         {
-            if (application != null)
-            {
-                return;
-            }
-            
+            if (application != null) return;
             player.DropObject(applicationSlot);
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
+            return;
         }
-        
-        if (itemName == "Behavior Exam Page")
+
+        // --- Exam pages: queue logic ---
+        bool isExamPage = itemName is
+            "Behavior Exam Page" or "Mutation Exam Page" or "Reality Exam Page" or
+            "Documentation Exam Page" or "Biological Exam Page";
+
+        if (!isExamPage) return;
+
+        // One page per type.
+        if (IsExamPageTypeInQueue(itemName)) return;
+
+        int slotIndex = GetFreeQueueSlotIndex();
+        if (slotIndex < 0)
         {
-            if (_behaviorSlotOccupied.Value)
-            {
-                return;
-            }
-
-            behaviorExamPage = pickableObject.GetComponent<ExamPage>();
-            _behaviorSlotOccupied.Value = true;
-
-            if (dropObject)
-            {
-                player.DropObject(behavioralExamSlot);
-            }
-            else
-            {
-                PlacePageInSlotNetworked(behaviorExamPage, behavioralExamSlot);
-            }
-            
-            behaviorExamPage.AddToFolder(this);
+            Debug.LogWarning($"[FolderController] AddDocument: all {examPageSlots.Length} exam slots are full — cannot add {itemName}.");
+            return;
         }
-        
-        if (itemName == "Mutation Exam Page")
+
+        Transform targetSlot = examPageSlots[slotIndex];
+        ExamPage examPage = pickableObject.GetComponent<ExamPage>();
+
+        if (dropObject)
         {
-            if (_mutationSlotOccupied.Value)
-            {
-                return;
-            }
-
-            mutationExamPage = pickableObject.GetComponent<ExamPage>();
-            _mutationSlotOccupied.Value = true;
-
-            if (dropObject)
-            {
-                player.DropObject(mutationExamSlot);
-            }
-            else
-            {
-                PlacePageInSlotNetworked(mutationExamPage, mutationExamSlot);
-            }
-            
-            mutationExamPage.AddToFolder(this);
+            // Direct-drop path: called on the local client from InteractWithItem.
+            // The slot selection and NetworkVariable write must happen on the server
+            // so all clients see the correct occupancy. We pass the slot index so the
+            // server can write _examPageQueue and _queueSlots authoritatively.
+            RegisterExamPageInQueueServerRpc(new NetworkObjectReference(pickableObject.NetworkObject), slotIndex);
+            player.DropObject(targetSlot);
         }
-        
-        if (itemName == "Reality Exam Page")
+        else
         {
-            if (_realitySlotOccupied.Value)
-            {
-                return;
-            }
-
-            realityExamPage = pickableObject.GetComponent<ExamPage>();
-            _realitySlotOccupied.Value = true;
-
-            if (dropObject)
-            {
-                player.DropObject(realityExamSlot);
-            }
-            else
-            {
-                PlacePageInSlotNetworked(realityExamPage, realityExamSlot);
-            }
-            
-            realityExamPage.AddToFolder(this);
+            // Notebook path: always called on the server from RequestAddToFolderServerRpc.
+            _examPageQueue[slotIndex] = examPage;
+            _queueSlots[slotIndex].Value = itemName;
+            PlacePageInSlotNetworked(examPage, targetSlot);
         }
-        
-        if (itemName == "Documentation Exam Page")
-        {
-            if (_documentationSlotOccupied.Value)
-            {
-                return;
-            }
 
-            documentationExamPage = pickableObject.GetComponent<ExamPage>();
-            _documentationSlotOccupied.Value = true;
+        examPage.AddToFolder(this);
+    }
 
-            if (dropObject)
-            {
-                player.DropObject(documentationExamSlot);
-            }
-            else
-            {
-                PlacePageInSlotNetworked(documentationExamPage, documentationExamSlot);
-            }
-            
-            documentationExamPage.AddToFolder(this);
-        }
-        
-        if (itemName == "Biological Exam Page")
-        {
-            if (_biologicalSlotOccupied.Value)
-            {
-                return;
-            }
+    /// <summary>
+    /// Server-authoritative registration of a directly-dropped exam page into the queue.
+    /// Called from AddDocument (dropObject=true) so the _examPageQueue and _queueSlots
+    /// writes always happen on the server regardless of which client initiated the drop.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void RegisterExamPageInQueueServerRpc(NetworkObjectReference pageRef, int slotIndex)
+    {
+        if (!pageRef.TryGet(out NetworkObject netObj)) return;
+        ExamPage examPage = netObj.GetComponent<ExamPage>();
+        if (examPage == null) return;
+        if (slotIndex < 0 || slotIndex >= _examPageQueue.Length) return;
 
-            biologicalExamPage = pickableObject.GetComponent<ExamPage>();
-            _biologicalSlotOccupied.Value = true;
-
-            if (dropObject)
-            {
-                player.DropObject(biologicalExamSlot);
-            }
-            else
-            {
-                PlacePageInSlotNetworked(biologicalExamPage, biologicalExamSlot);
-            }
-            
-            biologicalExamPage.AddToFolder(this);
-        }
+        _examPageQueue[slotIndex] = examPage;
+        _queueSlots[slotIndex].Value = examPage.ItemData.name;
+        Debug.Log($"[FolderController] RegisterExamPageInQueueServerRpc: registered {examPage.ItemData.name} at queue slot {slotIndex}");
     }
 
     public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)
@@ -734,42 +749,64 @@ public class FolderController : PickableObject
         if (itemName == "ID card")
         {
             idCard = null;
+            return;
         }
         
         if (itemName == "Application")
         {
             application = null;
+            return;
         }
-        
-        if (itemName == "Mutation Exam Page")
+
+        // --- Exam pages: find, remove, and compact the queue ---
+        int removedIndex = -1;
+        for (int i = 0; i < _examPageQueue.Length; i++)
         {
-            mutationExamPage = null;
-            _mutationSlotOccupied.Value = false;
+            if (_examPageQueue[i] != null && _examPageQueue[i].ItemData.name == itemName)
+            {
+                removedIndex = i;
+                break;
+            }
         }
-        
-        if (itemName == "Behavior Exam Page")
+
+        if (removedIndex < 0) return;
+
+        // Shift all entries after the removed index one step forward.
+        int lastIndex = _examPageQueue.Length - 1;
+        for (int i = removedIndex; i < lastIndex; i++)
         {
-            behaviorExamPage = null;
-            _behaviorSlotOccupied.Value = false;
+            _examPageQueue[i]    = _examPageQueue[i + 1];
+            _queueSlots[i].Value = _queueSlots[i + 1].Value;
+
+            // If the slot still has a page, update that page's tracked slot in _localDocuments
+            // so LateUpdate keeps snapping it to the correct (shifted) transform.
+            if (_examPageQueue[i] != null)
+            {
+                RegisterLocalDocument(_examPageQueue[i], examPageSlots[i]);
+                ShiftDocumentSlotClientRpc(
+                    new NetworkObjectReference(_examPageQueue[i].NetworkObject),
+                    i);
+            }
         }
-        
-        if (itemName == "Reality Exam Page")
-        {
-            realityExamPage = null;
-            _realitySlotOccupied.Value = false;
-        }
-        
-        if (itemName == "Documentation Exam Page")
-        {
-            documentationExamPage = null;
-            _documentationSlotOccupied.Value = false;
-        }
-        
-        if (itemName == "Biological Exam Page")
-        {
-            biologicalExamPage = null;
-            _biologicalSlotOccupied.Value = false;
-        }
+
+        // Clear the last slot.
+        _examPageQueue[lastIndex]    = null;
+        _queueSlots[lastIndex].Value = default;
+    }
+
+    /// <summary>
+    /// Broadcasts a slot-shift to all clients so every machine's _localDocuments list
+    /// points to the correct new slot Transform after a page is removed from the queue.
+    /// </summary>
+    [ClientRpc]
+    private void ShiftDocumentSlotClientRpc(NetworkObjectReference pageRef, int newSlotIndex)
+    {
+        if (!pageRef.TryGet(out NetworkObject netObj)) return;
+        PickableObject doc = netObj.GetComponent<PickableObject>();
+        if (doc == null || newSlotIndex < 0 || newSlotIndex >= examPageSlots.Length) return;
+
+        // Re-register with the new slot so LateUpdate snaps to the right position.
+        RegisterLocalDocument(doc, examPageSlots[newSlotIndex]);
     }
 
     public void AddNotebookPaper(string itemName, PlayerPickupController player)
@@ -812,37 +849,19 @@ public class FolderController : PickableObject
 
     public bool ExamContainsAnomaly(Anomaly anomaly)
     {
-        // Get all exam pages that are added to the folder
-        ExamPage[] examPages = new ExamPage[] 
-        { 
-            behaviorExamPage, 
-            realityExamPage, 
-            mutationExamPage, 
-            biologicalExamPage, 
-            documentationExamPage 
-        };
-
-        // Check each exam page for the anomaly
-        foreach (ExamPage examPage in examPages)
+        foreach (ExamPage examPage in _examPageQueue)
         {
-            if (examPage == null) continue; 
+            if (examPage == null) continue;
             Debug.Log("Checking exam page:" + examPage.name);
 
-            // Get the checklist items from the exam page
-            ChecklistItem[] checklistItems = examPage.GetComponent<ExamPage>().ChecklistItems;
-            
+            ChecklistItem[] checklistItems = examPage.ChecklistItems;
             if (checklistItems == null) continue;
 
-            // Check each checklist item
             foreach (ChecklistItem item in checklistItems)
             {
                 Debug.Log($"Checking: {item.AnomalyTypeName} vs {anomaly.GetType().Name}, IsChecked: {item.IsChecked}");
-                
-                // Check if this checklist item references the anomaly type and is checked
                 if (item.AnomalyTypeName == anomaly.GetType().Name && item.IsChecked)
-                {
                     return true;
-                }
             }
         }
 
@@ -852,39 +871,22 @@ public class FolderController : PickableObject
     public Anomaly[] GetAnomaliesInFolder()
     {
         List<Anomaly> anomaliesFound = new List<Anomaly>();
-    
-        // Check all exam pages in the folder
-        ExamPage[] examPages = new ExamPage[]
-        {
-            behaviorExamPage,
-            mutationExamPage,
-            biologicalExamPage,
-            documentationExamPage,
-            realityExamPage
-        };
-    
-        // Iterate through each exam page
-        foreach (ExamPage examPage in examPages)
+
+        foreach (ExamPage examPage in _examPageQueue)
         {
             if (examPage == null) continue;
-        
-            // Get all checklist items in this exam page
+
             ChecklistItem[] checklistItems = examPage.ChecklistItems;
-        
-            // Check which items have been marked as checked
             foreach (ChecklistItem item in checklistItems)
             {
                 if (item != null && item.IsChecked && item.AnomalyTypeReference is Anomaly anomaly)
                 {
-                    // Add the anomaly if it's not already in the list
                     if (!anomaliesFound.Contains(anomaly))
-                    {
                         anomaliesFound.Add(anomaly);
-                    }
                 }
             }
         }
-    
+
         return anomaliesFound.ToArray();
     }
 }
