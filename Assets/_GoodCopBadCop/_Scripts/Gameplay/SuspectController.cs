@@ -183,11 +183,13 @@ public class SuspectController : NetworkBehaviour
     /// <summary>
     /// Fires on every client when a new suspect begins walking to the window.
     /// Shows the booth-waiting notification only if the local player is away from the booth.
+    /// Uses <see cref="PlayerInstance.IsOutsideLocal"/> to avoid a false negative caused
+    /// by the NetworkVariable server round-trip not yet completing.
     /// </summary>
     [ClientRpc]
     private void NotifySuspectArrivingClientRpc()
     {
-        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside)
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
             UIController.Instance.ShowBoothWaitingNotification();
     }
 
@@ -197,10 +199,50 @@ public class SuspectController : NetworkBehaviour
 
         suspectCharacter.transform
             .DORotateQuaternion(standPos.rotation, 0.5f)
-            .OnComplete(SayEntryDialogue);
+            .OnComplete(OnRotationComplete);
 
         suspectCharacter.animator.SetBool("Walking", false);
         EnableLook();
+    }
+
+    private void OnRotationComplete()
+    {
+        if (suspectCharacter == null) return;
+
+        if (IsAnyPlayerInsideBooth())
+            SayEntryDialogue();
+        else
+            StartCoroutine(WaitForPlayerInsideBooth());
+    }
+
+    /// <summary>
+    /// Returns true if at least one connected player is currently inside the booth.
+    /// Runs on the server, reading the replicated IsOutside NetworkVariable.
+    /// </summary>
+    private bool IsAnyPlayerInsideBooth()
+    {
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            var player = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (player != null && !player.IsOutside)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Polls every half-second until at least one player is inside the booth,
+    /// then triggers the entry dialogue.
+    /// </summary>
+    private IEnumerator WaitForPlayerInsideBooth()
+    {
+        while (!IsAnyPlayerInsideBooth())
+            yield return new WaitForSeconds(0.5f);
+
+        SayEntryDialogue();
     }
 
     private void SayEntryDialogue()

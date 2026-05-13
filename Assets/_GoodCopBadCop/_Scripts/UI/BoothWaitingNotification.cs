@@ -1,18 +1,18 @@
 using System.Collections;
 using DG.Tweening;
-using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// Persistent bottom-centre notification displayed when a suspect arrives at the booth
-/// and the local player is away. Shows white text that fades out after a configurable duration.
+/// and the local player is away. Reveals text character-by-character via TMPTextReveal,
+/// then fades out after a configurable duration.
 /// Assign to the player UI canvas in the Inspector and wire up via UIController.
 /// </summary>
 public class BoothWaitingNotification : MonoBehaviour
 {
     private const string DefaultMessage = "Someone is waiting at the booth";
 
-    [SerializeField] private TextMeshProUGUI _messageText;
+    [SerializeField] private TMPTextReveal _textReveal;
     [SerializeField] private CanvasGroup _canvasGroup;
     [SerializeField] private float _displayDuration = 4f;
     [SerializeField] private float _fadeDuration = 0.4f;
@@ -33,19 +33,19 @@ public class BoothWaitingNotification : MonoBehaviour
         Show(DefaultMessage);
     }
 
-    /// <summary>Shows the notification with a custom message.</summary>
+    /// <summary>Shows the notification with a custom message, revealed character by character.</summary>
     public void Show(string message)
     {
-        if (_messageText != null)
-            _messageText.text = message;
-
         gameObject.SetActive(true);
 
         if (_canvasGroup != null)
         {
             DOTween.Kill(_canvasGroup);
-            _canvasGroup.DOFade(1f, _fadeDuration);
+            _canvasGroup.alpha = 1f;
         }
+
+        if (_textReveal != null)
+            _textReveal.RevealText(message);
 
         if (_hideCoroutine != null)
             StopCoroutine(_hideCoroutine);
@@ -65,10 +65,19 @@ public class BoothWaitingNotification : MonoBehaviour
         if (_canvasGroup != null)
         {
             DOTween.Kill(_canvasGroup);
-            _canvasGroup.DOFade(0f, _fadeDuration).OnComplete(() => gameObject.SetActive(false));
+            _canvasGroup.DOFade(0f, _fadeDuration).OnComplete(() =>
+            {
+                if (_textReveal != null)
+                    _textReveal.Clear();
+
+                gameObject.SetActive(false);
+            });
         }
         else
         {
+            if (_textReveal != null)
+                _textReveal.Clear();
+
             gameObject.SetActive(false);
         }
     }
