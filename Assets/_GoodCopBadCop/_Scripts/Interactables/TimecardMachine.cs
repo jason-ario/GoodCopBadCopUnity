@@ -1,15 +1,22 @@
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
 /// A timecard machine the player interacts with to clock out at the end of a shift.
 /// Becomes interactable only after ShiftManager signals that all suspects have been processed.
-/// Interacting calls ShiftManager.EndShift() through the server.
+/// Interacting plays the punch animation and sound, then triggers EndShift after a short delay.
 /// </summary>
 public class TimecardMachine : Interactable
 {
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
+    [SerializeField] private Animator _animator;
+
+    /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift report.</summary>
+    [SerializeField] private float _punchToReportDelay = 1.5f;
+
+    private static readonly int PunchTrigger = Animator.StringToHash("Punch");
 
     private bool _clockOutReady = false;
 
@@ -42,13 +49,20 @@ public class TimecardMachine : Interactable
         if (!_clockOutReady) return;
 
         _clockOutReady = false;
-        DisableClockOutClientRpc();
+        PunchCardClientRpc();
+        StartCoroutine(EndShiftAfterDelay(_punchToReportDelay));
+    }
+
+    private IEnumerator EndShiftAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
         ShiftManager.Instance.EndShift();
     }
 
     /// <summary>
     /// Called by ShiftManager on the server when all suspects have been processed.
-    /// Enables clock-out interaction on all clients.
+    /// Enables clock-out interaction on all clients. The tutorial notification is
+    /// already shown by ShiftManager.NotifyClockOutReadyClientRpc.
     /// </summary>
     public void EnableClockOut()
     {
@@ -70,15 +84,18 @@ public class TimecardMachine : Interactable
     {
         _clockOutReady = true;
         Highlight(true);
-
-        if (_audioSource != null && _clockOutSound != null)
-            _audioSource.PlayOneShot(_clockOutSound);
     }
 
     [ClientRpc]
-    private void DisableClockOutClientRpc()
+    private void PunchCardClientRpc()
     {
         _clockOutReady = false;
         Highlight(false);
+
+        if (_audioSource != null && _clockOutSound != null)
+            _audioSource.PlayOneShot(_clockOutSound);
+
+        if (_animator != null)
+            _animator.SetTrigger(PunchTrigger);
     }
 }

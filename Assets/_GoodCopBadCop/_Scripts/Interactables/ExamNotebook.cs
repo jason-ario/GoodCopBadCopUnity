@@ -88,8 +88,22 @@ public class ExamNotebook : PickableObject
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        // pages[] is always empty at spawn time — the server fills it via SpawnAndWirePages
-        // and broadcasts references to all clients via SetPageReferencesClientRpc.
+
+        // For dynamically-purchased notebooks the purchase flow calls SpawnAndWirePages and
+        // SetPageReferencesClientRpc explicitly after spawning. For notebooks that were
+        // already placed in the scene (IsSceneObject) no external caller triggers that flow,
+        // so the server does it here on spawn.
+        if (IsServer && NetworkObject.IsSceneObject == true)
+        {
+            var spawnedPages = SpawnAndWirePages();
+            if (spawnedPages.Count > 0)
+            {
+                var pageRefs = new NetworkObjectReference[spawnedPages.Count];
+                for (int i = 0; i < spawnedPages.Count; i++)
+                    pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
+                SetPageReferencesClientRpc(pageRefs);
+            }
+        }
     }
 
     /// <summary>
