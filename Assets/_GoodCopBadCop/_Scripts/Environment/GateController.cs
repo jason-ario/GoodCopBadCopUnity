@@ -1,7 +1,9 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
+[RequireComponent(typeof(NavMeshObstacle))]
 public class GateController : Interactable
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
@@ -23,10 +25,12 @@ public class GateController : Interactable
     [SerializeField] private AudioClip doorOpenClip;
     [SerializeField] private AudioClip doorCloseClip;
     [SerializeField] private Transform forwardMarker;
+    private NavMeshObstacle _navMeshObstacle;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        _navMeshObstacle = GetComponent<NavMeshObstacle>();
         _gateOpen.OnValueChanged += OnGateStateChanged;
         _openedIn.OnValueChanged += OnOpenDirectionChanged;
 
@@ -122,6 +126,9 @@ public class GateController : Interactable
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
         interactText = isOpen ? "Close" : "Open";
+
+        if (_navMeshObstacle != null)
+            _navMeshObstacle.enabled = !isOpen;
     }
 
     /// <summary>Resets the gate to its closed state. Must be called on the server.</summary>
