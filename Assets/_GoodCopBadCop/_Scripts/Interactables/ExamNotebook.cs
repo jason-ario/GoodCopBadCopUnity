@@ -503,7 +503,7 @@ public class ExamNotebook : PickableObject
         if (rb != null) rb.isKinematic = true;
 
         Debug.Log($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: registering {page.name} → {folder.name}/{slot.name} on client {NetworkManager.Singleton.LocalClientId}");
-        folder.RegisterLocalDocument(page, slot);
+        page.SetSocketFollow(slot);
 
         // The page was kept non-interactable while bound to the notebook.
         // Now that it's placed in the folder it should behave like a normal pickable object.

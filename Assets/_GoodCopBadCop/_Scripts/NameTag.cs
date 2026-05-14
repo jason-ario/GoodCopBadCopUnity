@@ -1,3 +1,4 @@
+using System.Collections;
 using Netcode.Transports.Facepunch;
 using Steamworks;
 using TMPro;
@@ -32,30 +33,20 @@ public class NameTag : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        // Always subscribe on all clients — the owner's own tag is hidden anyway,
+        // but subscribing unconditionally avoids missing an update if ownership transfers.
+        _playerName.OnValueChanged += OnPlayerNameChanged;
+
         if (IsOwner)
         {
-            // Hide the local player's own name tag.
-            gameObject.SetActive(false);
-
-            // Only set the Steam name when using Facepunch transport.
-            if (NetworkManager.Singleton != null &&
-                NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport)
-            {
-                string steamName = SteamClient.Name;
-                if (string.IsNullOrEmpty(steamName))
-                    Debug.LogWarning("[NameTag] SteamClient.Name is empty at spawn time — name tag will be blank for other players.");
-
-                _playerName.Value = new FixedString64Bytes(steamName ?? string.Empty);
-            }
-
-            // No need to observe our own variable changes.
+            // Defer the write by one frame so NGO has finished initialising the
+            // NetworkVariable on all connected clients before the value replicates.
+            StartCoroutine(SetNameNextFrame());
             return;
         }
 
-        // Subscribe before reading the current value so we never miss a change.
-        _playerName.OnValueChanged += OnPlayerNameChanged;
-
-        // Apply whatever value is already replicated; OnValueChanged covers future updates.
+        // Non-owner: apply whatever value is already present (covers late-joiners
+        // whose NetworkVariable snapshot already contains the correct name).
         string currentName = _playerName.Value.ToString();
         if (!string.IsNullOrEmpty(currentName))
             ApplyName(currentName);
@@ -64,9 +55,28 @@ public class NameTag : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+        _playerName.OnValueChanged -= OnPlayerNameChanged;
+    }
 
-        if (!IsOwner)
-            _playerName.OnValueChanged -= OnPlayerNameChanged;
+    /// <summary>Waits one frame then writes the local Steam display name into the NetworkVariable.</summary>
+    private IEnumerator SetNameNextFrame()
+    {
+        yield return null;
+
+        bool usesSteam = NetworkManager.Singleton != null &&
+                         NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport;
+
+        if (!usesSteam)
+            yield break;
+
+        string steamName = SteamClient.Name;
+        if (string.IsNullOrEmpty(steamName))
+        {
+            Debug.LogWarning("[NameTag] SteamClient.Name is empty after one frame — name tag will be blank for other players.");
+            yield break;
+        }
+
+        _playerName.Value = new FixedString64Bytes(steamName);
     }
 
     private void OnPlayerNameChanged(FixedString64Bytes previous, FixedString64Bytes current)

@@ -2,10 +2,12 @@ using UnityEngine;
 using UnityEngine.Animations;
 
 /// <summary>
-/// Syncs this transform's position (and optionally rotation) to a source transform in LateUpdate,
-/// ensuring it runs after look rotation updates and avoids constraint pipeline timing issues.
+/// Syncs this transform's position (and optionally rotation) to a source transform in LateUpdate.
+/// Runs at execution order 2 — after PlayerPickupController (order 1) has moved the folder to the
+/// body-arm target — so folder documents always match the folder's final pitched position.
 /// Mirrors the ParentConstraint API (SetSource, constraintActive) for drop-in compatibility.
 /// </summary>
+[DefaultExecutionOrder(2)]
 public class SocketFollow : MonoBehaviour
 {
     [SerializeField] private Transform _source;
