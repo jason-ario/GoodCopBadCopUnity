@@ -11,19 +11,46 @@ public class InternalBattery : NetworkBehaviour
     [SerializeField] private float batteryDrainRate = 0.01f;
     public UnityAction OnBatteryDrained;
 
-    void Start()
+    private void Awake()
     {
         pickableObject = GetComponent<PickableObject>();
-        currentBatteryJuice.Value = maxBatteryCapacity;
-        currentBatteryJuice.OnValueChanged += OnBatteryJuiceChanged;
         pickableObject.OnEquip += ShowBatteryBar;
-        pickableObject.OnUnEquip += PlayerUI.Instance.BatteryBar.Hide;
+        pickableObject.OnUnEquip += HideBatteryBar;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        currentBatteryJuice.OnValueChanged += OnBatteryJuiceChanged;
+
+        if (IsServer)
+        {
+            currentBatteryJuice.Value = maxBatteryCapacity;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentBatteryJuice.OnValueChanged -= OnBatteryJuiceChanged;
+        base.OnNetworkDespawn();
     }
 
     public override void OnDestroy()
     {
-        currentBatteryJuice.OnValueChanged -= OnBatteryJuiceChanged;
+        if (pickableObject != null)
+        {
+            pickableObject.OnEquip -= ShowBatteryBar;
+            pickableObject.OnUnEquip -= HideBatteryBar;
+        }
         base.OnDestroy();
+    }
+
+    private void HideBatteryBar()
+    {
+        if (PlayerUI.Instance != null)
+        {
+            PlayerUI.Instance.BatteryBar.Hide();
+        }
     }
 
     private void OnBatteryJuiceChanged(float previousValue, float newValue)
@@ -36,8 +63,9 @@ public class InternalBattery : NetworkBehaviour
 
     void ShowBatteryBar()
     {
-        PlayerUI.Instance.BatteryBar.UpdateBar(this); 
+        if (PlayerUI.Instance == null) return;
         PlayerUI.Instance.BatteryBar.Show();
+        PlayerUI.Instance.BatteryBar.UpdateBar(this);
     }
     
     public void SetJuiceValue(float batteryJuiceValue)
