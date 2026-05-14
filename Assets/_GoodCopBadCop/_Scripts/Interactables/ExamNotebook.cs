@@ -6,7 +6,30 @@ using UnityEngine;
 
 public class ExamNotebook : PickableObject
 {
-    [SerializeField] private ExamPage[] pages;
+    // Populated at runtime via SpawnAndWirePages (server) → SetPageReferencesClientRpc (clients).
+    // Empty at design time — no page children live in the notebook prefab.
+    private ExamPage[] pages = System.Array.Empty<ExamPage>();
+
+    /// <summary>The registered page prefab asset for this notebook type. Must match the entry in the NetworkManager's Network Prefabs list.</summary>
+    [SerializeField] private NetworkObject pagePrefab;
+
+    /// <summary>
+    /// An inactive copy of the page prefab parented inside this notebook at design time.
+    /// Because it is a child of the notebook it inherits the correct local scale,
+    /// so its lossyScale is used as the authoritative world scale for live pages that
+    /// follow the notebook via LateUpdate rather than through NGO parenting.
+    /// </summary>
+    [SerializeField] private Transform pageScaleReference;
+
+    /// <summary>
+    /// World-position anchors for each page slot, defined as child Transforms of the notebook.
+    /// Page i snaps to pagePositions[i] each LateUpdate while it is still bound to the notebook.
+    /// Supports up to 5 slots — one per _pageBitmask field.
+    /// </summary>
+    [SerializeField] private Transform[] pagePositions = new Transform[5];
+
+    /// <summary>Number of page instances to spawn when this notebook is purchased.</summary>
+    [SerializeField] private int pageCount = 1;
     bool addingToFolder = false;
     public bool IsChecking { get; set; }
 
@@ -31,20 +54,15 @@ public class ExamNotebook : PickableObject
     protected override void Awake()
     {
         base.Awake();
-        foreach (var page in pages)
-        {
-            page.SetChecklistInteractable(false);
-            page.SetInteractable(false);
-            page.CanPickUpManually = false;
-            page.Initialize(this);
-        }
-
-        pages[currentPage].SetChecklistInteractable(true);
-
-        // Remove page-owned InteractableColliders from the notebook's own cache so that
-        // PickableObject.SetInteractable (called on equip/unequip) never re-enables them.
-        // Each page manages its own collider state independently via SetInteractable.
+        // pages[] is empty at design time — nothing to iterate here.
+        // It gets populated at runtime via SpawnAndWirePages → SetPageReferencesClientRpc.
         ExcludePageCollidersFromCache();
+
+        foreach (Transform slot in pagePositions)
+        {
+            if (slot != null)
+                slot.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -71,58 +89,130 @@ public class ExamNotebook : PickableObject
     {
         base.OnNetworkSpawn();
 
-        // When the notebook is spawned dynamically at runtime (e.g. purchased from shop),
-        // NGO does not spawn nested child NetworkObjects — only scene-placed objects get that.
-        // Explicitly spawn each page NetworkObject on the server if it isn't already spawned.
-        // We must temporarily detach the page from the notebook hierarchy for Spawn() to succeed,
-        // then immediately re-parent it back via TrySetParent so NGO replicates the parent
-        // relationship to all clients — the pages will again appear as notebook children everywhere.
-        if (IsServer)
+        // For dynamically-purchased notebooks the purchase flow calls SpawnAndWirePages and
+        // SetPageReferencesClientRpc explicitly after spawning. For notebooks that were
+        // already placed in the scene (IsSceneObject) no external caller triggers that flow,
+        // so the server does it here on spawn.
+        if (IsServer && NetworkObject.IsSceneObject == true)
         {
-            foreach (var page in pages)
+            var spawnedPages = SpawnAndWirePages();
+            if (spawnedPages.Count > 0)
             {
-                NetworkObject pageNetObj = page.GetComponent<NetworkObject>();
-                if (pageNetObj != null && !pageNetObj.IsSpawned)
-                {
-                    // Temporarily detach so Spawn() registers this as a root-level NetworkObject.
-                    page.transform.SetParent(null, worldPositionStays: true);
-                    pageNetObj.Spawn(destroyWithScene: true);
-
-                    // Re-parent back to the notebook through NGO so all clients mirror this hierarchy.
-                    pageNetObj.TrySetParent(NetworkObject, worldPositionStays: true);
-                }
+                var pageRefs = new NetworkObjectReference[spawnedPages.Count];
+                for (int i = 0; i < spawnedPages.Count; i++)
+                    pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
+                SetPageReferencesClientRpc(pageRefs);
             }
         }
+    }
 
-        // Pages are scene-hierarchy children of this notebook NetworkObject (or now detached).
-        // Their own NetworkTransform would independently interpolate world-space position,
-        // causing them to lag behind the notebook on non-server clients. Disable it here —
-        // it will be left disabled by PlaceInSlotServerRpc when a page is ripped out.
-        foreach (var page in pages)
+    /// <summary>
+    /// Called by the server (via PurchaseAndPickUpServerRpc) after the notebook NetworkObject is
+    /// spawned. Instantiates fresh copies of the registered page prefabs, spawns each one, and
+    /// re-parents it under this notebook — replacing the inline prefab children whose
+    /// globalObjectIdHash does not match any registered prefab on clients.
+    /// Returns the ordered list of spawned page NetworkObjects so the caller can send
+    /// SetPageReferencesClientRpc with authoritative references.
+    /// </summary>
+    public System.Collections.Generic.List<NetworkObject> SpawnAndWirePages()
+    {
+        var spawned = new System.Collections.Generic.List<NetworkObject>();
+
+        if (pagePrefab == null)
         {
-            NetworkTransform nt = page.GetComponent<NetworkTransform>();
-            if (nt != null) nt.enabled = false;
+            Debug.LogWarning($"[ExamNotebook] SpawnAndWirePages: pagePrefab not assigned on {name} — skipping page spawn.");
+            return spawned;
         }
 
-        // Map the fixed fields into an indexed array for easy access.
-        _pageBitmasks = new NetworkVariable<int>[] { _pageBitmask0, _pageBitmask1, _pageBitmask2, _pageBitmask3, _pageBitmask4 };
+        pages = new ExamPage[pageCount];
 
-        // Assign each checklist item its index within its page, and subscribe to bitmask changes.
+        for (int i = 0; i < pageCount; i++)
+        {
+            NetworkObject pageNetObj = Instantiate(pagePrefab);
+
+            // Disable NetworkTransform before spawn — pages follow the notebook via
+            // LateUpdate instead of NGO parenting, so NT would only fight our manual
+            // positioning. AutoObjectParentSync is also disabled for the same reason.
+            NetworkTransform nt = pageNetObj.GetComponent<NetworkTransform>();
+            if (nt != null) nt.enabled = false;
+            pageNetObj.AutoObjectParentSync = false;
+
+            pageNetObj.Spawn(destroyWithScene: true);
+
+            ExamPage page = pageNetObj.GetComponent<ExamPage>();
+            if (page == null)
+            {
+                Debug.LogError($"[ExamNotebook] SpawnAndWirePages: pagePrefab has no ExamPage component.");
+                continue;
+            }
+
+            pages[i] = page;
+            spawned.Add(pageNetObj);
+        }
+
+        return spawned;
+    }
+    ///
+    /// On the host the RPC also runs locally. Because pages[] already holds the real spawned
+    /// objects on the server, realPage == pages[i] for every slot and nothing is destroyed —
+    /// the loop only disables NT and calls initialization.
+    /// </summary>
+    [ClientRpc]
+    public void SetPageReferencesClientRpc(NetworkObjectReference[] pageRefs)
+    {
+        StartCoroutine(ApplyPageReferences(pageRefs));
+    }
+
+    private IEnumerator ApplyPageReferences(NetworkObjectReference[] pageRefs)
+    {
+        // Wait until every referenced NetworkObject is registered locally before touching pages[].
+        for (int i = 0; i < pageRefs.Length; i++)
+        {
+            while (!pageRefs[i].TryGet(out _))
+                yield return null;
+        }
+
+        pages = new ExamPage[pageRefs.Length];
+        for (int i = 0; i < pageRefs.Length; i++)
+        {
+            if (!pageRefs[i].TryGet(out NetworkObject pageNetObj)) continue;
+
+            ExamPage page = pageNetObj.GetComponent<ExamPage>();
+            if (page == null) continue;
+
+            // Pages follow the notebook via LateUpdate — suppress any NGO parent sync.
+            pageNetObj.AutoObjectParentSync = false;
+            NetworkTransform nt = pageNetObj.GetComponent<NetworkTransform>();
+            if (nt != null) nt.enabled = false;
+
+            page.Initialize(this);
+            pages[i] = page;
+        }
+
+        ExcludePageCollidersFromCache();
+        InitializePageBehavior();
+    }
+
+    /// <summary>Wires up NetworkVariable listeners and syncs initial checklist/page state.</summary>
+    private void InitializePageBehavior()
+    {
+        _pageBitmasks = new NetworkVariable<int>[]
+        {
+            _pageBitmask0, _pageBitmask1, _pageBitmask2, _pageBitmask3, _pageBitmask4
+        };
+
         for (int p = 0; p < pages.Length && p < _pageBitmasks.Length; p++)
         {
             int capturedPage = p;
             pages[p].SetPageIndex(p);
             pages[p].InitializeChecklistIndices();
 
-            // Apply current value immediately for late joiners.
             pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value);
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
                 pages[capturedPage].ApplyBitmask(newValue);
         }
 
-        // Sync the active page for late joiners: disable all non-ripped pages' checklists,
-        // then enable only the current active page's checklist.
         ApplyCurrentPage(_currentPage.Value);
         _currentPage.OnValueChanged += (_, newValue) => ApplyCurrentPage(newValue);
     }
@@ -255,6 +345,7 @@ public class ExamNotebook : PickableObject
 
     public void AddToFolder(FolderController folder)
     {
+        Debug.Log($"[ExamNotebook] AddToFolder called on client {NetworkManager.Singleton.LocalClientId} | playerPickupController={(playerPickupController != null ? playerPickupController.name : "NULL")} | currentPage={currentPage} | addingToFolder={addingToFolder}");
         addingToFolder = true;
         pages[currentPage].SetChecklistInteractable(false);
 
@@ -265,9 +356,11 @@ public class ExamNotebook : PickableObject
 
     IEnumerator WaitAndParent(ExamPage rippedPage, FolderController folder)
     {
+        Debug.Log($"[ExamNotebook] WaitAndParent started on client {NetworkManager.Singleton.LocalClientId}");
         yield return new WaitForSeconds(.5f);
 
         int pageIndex = System.Array.IndexOf(pages, rippedPage);
+        Debug.Log($"[ExamNotebook] WaitAndParent — pageIndex={pageIndex} | rippedPage={(rippedPage != null ? rippedPage.name : "NULL")} | folder={(folder != null ? folder.name : "NULL")}");
 
         // All three calls below must originate from the server so their ClientRpc broadcasts
         // reach every connected client. A non-host client calling a [ClientRpc] directly only
@@ -278,10 +371,13 @@ public class ExamNotebook : PickableObject
 
         yield return new WaitForSeconds(.4f);
 
-        // Place the page directly into the folder slot via the network-safe path.
-        // FolderController.AddDocument (dropObject=false) calls PlaceInSlotServerRpc so
-        // NT is disabled and all clients register the document in LateUpdate.
-        folder.AddDocument(rippedPage, playerPickupController, false);
+        // Route AddDocument through a ServerRpc so the server resolves the real spawned
+        // NetworkObject instances. On a pure client, pages[pageIndex] is the local prefab
+        // child instantiated by NGO — NOT the separately-spawned NetworkObject. Calling
+        // PlaceInSlotServerRpc on that local instance causes a NullReferenceException inside
+        // __endSendServerRpc because NGO has no network state for that unspawned object.
+        Debug.Log($"[ExamNotebook] WaitAndParent — sending RequestAddToFolderServerRpc pageIndex={pageIndex} folder={folder?.name ?? "NULL"} on client {NetworkManager.Singleton.LocalClientId}");
+        RequestAddToFolderServerRpc(pageIndex, new NetworkObjectReference(folder.NetworkObject));
 
         AdvancePageServerRpc(pageIndex);
 
@@ -289,6 +385,129 @@ public class ExamNotebook : PickableObject
         // has detached the page from this hierarchy before HighlightEffect scans children.
         BroadcastResetPageServerRpc(pageIndex);
         addingToFolder = false;
+    }
+
+    /// <summary>
+    /// Asks the server to place the ripped page (identified by index) into the folder.
+    /// The server resolves the real spawned NetworkObject for the page — avoiding the
+    /// NullReferenceException that occurs when a client RPC is sent from an unspawned
+    /// prefab-child instance rather than a true NetworkObject.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestAddToFolderServerRpc(int pageIndex, NetworkObjectReference folderRef)
+    {
+        if (pageIndex < 0 || pageIndex >= pages.Length)
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: invalid pageIndex={pageIndex}");
+            return;
+        }
+
+        if (!folderRef.TryGet(out NetworkObject folderNetObj))
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: could not resolve folder NetworkObject");
+            return;
+        }
+
+        FolderController folder = folderNetObj.GetComponent<FolderController>();
+        if (folder == null)
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: folder NetworkObject has no FolderController");
+            return;
+        }
+
+        // On the server, pages[pageIndex] is the real spawned NetworkObject — safe to call RPCs on.
+        // playerPickupController is not needed here because dropObject=false bypasses DropObject.
+        ExamPage serverPage = pages[pageIndex];
+        Debug.Log($"[ExamNotebook] RequestAddToFolderServerRpc: pageIndex={pageIndex} page={serverPage?.name ?? "NULL"} IsSpawned={serverPage?.NetworkObject?.IsSpawned} NetworkObjectId={serverPage?.NetworkObject?.NetworkObjectId}");
+        folder.AddDocument(serverPage, playerPickupController, false);
+
+        // PlacePageInSlotNetworked (called inside AddDocument) no longer sends PlaceInSlotClientRpc
+        // via the page's NetworkObject because that RPC is silently dropped on non-host clients
+        // when triggered through a server-side ServerRpc call chain. Broadcast the slot assignment
+        // here instead, via the notebook's NetworkObject which is known to reach all clients.
+        Transform slot = folder.GetSlotForPage(serverPage.ItemData.name);
+        if (slot == null)
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: no slot found for {serverPage.ItemData.name}");
+            return;
+        }
+
+        NetworkObject slotOwner = slot.GetComponentInParent<NetworkObject>();
+        if (slotOwner == null)
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: slot '{slot.name}' has no NetworkObject parent");
+            return;
+        }
+
+        string slotPath = FolderController.GetRelativePath(slotOwner.transform, slot);
+        NotifyPagePlacedInFolderClientRpc(
+            new NetworkObjectReference(serverPage.NetworkObject),
+            new NetworkObjectReference(slotOwner),
+            slotPath,
+            slot.position,
+            slot.rotation);
+    }
+
+    /// <summary>
+    /// Received on all clients. Detaches the page from the notebook hierarchy and registers it
+    /// with FolderController for LateUpdate-based slot following. Sent via the notebook's
+    /// NetworkObject so it reliably reaches all clients — unlike the page's own PlaceInSlotClientRpc
+    /// which is silently dropped when triggered through a server-side ServerRpc call chain.
+    /// </summary>
+    [ClientRpc]
+    private void NotifyPagePlacedInFolderClientRpc(
+        NetworkObjectReference pageRef,
+        NetworkObjectReference slotOwnerRef,
+        string slotPath,
+        Vector3 position,
+        Quaternion rotation)
+    {
+        if (!pageRef.TryGet(out NetworkObject pageNetObj))
+        {
+            Debug.LogError($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: could not resolve page on client {NetworkManager.Singleton.LocalClientId}");
+            return;
+        }
+
+        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
+        {
+            Debug.LogError($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: could not resolve slot owner on client {NetworkManager.Singleton.LocalClientId}");
+            return;
+        }
+
+        PickableObject page = pageNetObj.GetComponent<PickableObject>();
+        FolderController folder = slotOwner.GetComponent<FolderController>();
+        if (page == null || folder == null) return;
+
+        Transform slot = string.IsNullOrEmpty(slotPath)
+            ? slotOwner.transform
+            : slotOwner.transform.Find(slotPath);
+
+        if (slot == null)
+        {
+            Debug.LogWarning($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: slot '{slotPath}' not found on {slotOwner.name}");
+            return;
+        }
+
+        // Detach the page from the notebook hierarchy without NGO replicating the change.
+        pageNetObj.AutoObjectParentSync = false;
+        if (page.transform.parent != null)
+            page.transform.SetParent(null, worldPositionStays: true);
+
+        page.transform.position = position;
+        page.transform.rotation = rotation;
+
+        NetworkTransform nt = page.GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
+        Rigidbody rb = page.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+
+        Debug.Log($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: registering {page.name} → {folder.name}/{slot.name} on client {NetworkManager.Singleton.LocalClientId}");
+        folder.RegisterLocalDocument(page, slot);
+
+        // The page was kept non-interactable while bound to the notebook.
+        // Now that it's placed in the folder it should behave like a normal pickable object.
+        page.SetInteractable(true);
     }
 
     /// <summary>
@@ -359,18 +578,38 @@ public class ExamNotebook : PickableObject
     }
 
     /// <summary>
-    /// Waits until the given page's renderers are no longer children of this transform,
-    /// then rebuilds HighlightEffect's material list. This is more reliable than a fixed
-    /// one-frame delay because PlaceInSlotClientRpc arrives from a different NetworkObject
-    /// with no ordering guarantee relative to RPCs on this object.
+    /// Snaps every un-ripped page to the notebook's world position and rotation each frame.
+    /// Pages are intentionally NOT NGO-parented to avoid client-side transform desync;
+    /// LateUpdate runs after all physics and animation so the position is stable.
+    /// </summary>
+    private void LateUpdate()
+    {
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i] == null || pages[i].isRippedOut) continue;
+
+            Transform anchor = (pagePositions != null && i < pagePositions.Length) ? pagePositions[i] : null;
+            Vector3 pos = anchor != null ? anchor.position : transform.position;
+            Quaternion rot = anchor != null ? anchor.rotation : transform.rotation;
+
+            pages[i].transform.SetPositionAndRotation(pos, rot);
+            if (pageScaleReference != null)
+                pages[i].transform.localScale = pageScaleReference.lossyScale;
+        }
+    }
+
+    /// <summary>
+    /// Waits until the given page is ripped out (its isRippedOut flag is set), then
+    /// rebuilds HighlightEffect's material list. Pages are no longer parented to the
+    /// notebook so we can't rely on IsChildOf — the ripped flag is the reliable signal.
     /// </summary>
     private IEnumerator RefreshHighlightAfterDetach(ExamPage page)
     {
-        // Poll each frame until the page transform is no longer under this hierarchy.
-        while (page != null && page.transform.IsChildOf(transform))
-        {
+        while (page != null && !page.isRippedOut)
             yield return null;
-        }
+
+        // Give the folder placement RPC one extra frame to move the renderer.
+        yield return null;
 
         GetComponent<HighlightEffect>().SetupMaterial();
     }

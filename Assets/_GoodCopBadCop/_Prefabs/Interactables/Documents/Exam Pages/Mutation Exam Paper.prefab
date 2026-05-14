@@ -104,7 +104,7 @@ GameObject:
   - component: {fileID: 5368318159825244251}
   - component: {fileID: 8758509896245454651}
   - component: {fileID: 2609041704838751066}
-  m_Layer: 0
+  m_Layer: 17
   m_Name: Mutation Exam Paper
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -119,9 +119,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 597383063050032403}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7071069, y: 0.00000013411045, z: -0.00000016391277, w: 0.70710677}
-  m_LocalPosition: {x: 1.2096542, y: 0.0670158, z: 0.03125143}
-  m_LocalScale: {x: 100, y: 100, z: 100}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 129.20074, y: 129.20074, z: 129.20074}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4049039371460068577}
@@ -139,7 +139,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3581485627
+  GlobalObjectIdHash: 2046019031
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -177,7 +177,6 @@ MonoBehaviour:
   - {fileID: 8678018251360299461}
   - {fileID: 2477871920702043147}
   - {fileID: 5433313532473490089}
-  notebook: {fileID: 0}
   pageAnimator: {fileID: 4748860156081436253}
   isRippedOut: 0
 --- !u!114 &5368318159825244251
@@ -843,6 +842,14 @@ PrefabInstance:
       propertyPath: examPage
       value: 
       objectReference: {fileID: 8221146621586711891}
+    - target: {fileID: 2996385420236208900, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
+      propertyPath: anomalyTypeName
+      value: RandomTumorAnomaly
+      objectReference: {fileID: 0}
+    - target: {fileID: 2996385420236208900, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
+      propertyPath: anomalyTypeReference
+      value: 
+      objectReference: {fileID: 11500000, guid: 0d4a87f77061e524ea807eb73f6f2bb8, type: 3}
     - target: {fileID: 3869367393776563161, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
       propertyPath: examPage
       value: 
@@ -885,7 +892,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7141337971291041644, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
       propertyPath: m_text
-      value: Extra Limbs
+      value: Tentacles
       objectReference: {fileID: 0}
     - target: {fileID: 7191803416237735917, guid: 70eb0c609e14901408a4757615e8c6aa, type: 3}
       propertyPath: m_LocalScale.x

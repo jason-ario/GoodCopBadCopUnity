@@ -13,6 +13,9 @@ public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
 
+    [Header("Booth")]
+    [SerializeField] private ShutterController shutterController;
+
     [Header("Spawn Points")]
     [SerializeField] private Transform spawnPos;
     [SerializeField] private Transform standPos;
@@ -175,6 +178,22 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.transform
             .DOMove(standPos.position + suspectCharacter.standPosOffset, 3f)
             .OnComplete(ArrivedAtPosition);
+
+        // Notify all clients so they can show the booth-waiting notification if needed.
+        NotifySuspectArrivingClientRpc();
+    }
+
+    /// <summary>
+    /// Fires on every client when a new suspect begins walking to the window.
+    /// Shows the booth-waiting notification only if the local player is away from the booth.
+    /// Uses <see cref="PlayerInstance.IsOutsideLocal"/> to avoid a false negative caused
+    /// by the NetworkVariable server round-trip not yet completing.
+    /// </summary>
+    [ClientRpc]
+    private void NotifySuspectArrivingClientRpc()
+    {
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+            UIController.Instance.ShowBoothWaitingNotification();
     }
 
     private void ArrivedAtPosition()
@@ -183,10 +202,56 @@ public class SuspectController : NetworkBehaviour
 
         suspectCharacter.transform
             .DORotateQuaternion(standPos.rotation, 0.5f)
-            .OnComplete(SayEntryDialogue);
+            .OnComplete(OnRotationComplete);
 
         suspectCharacter.animator.SetBool("Walking", false);
         EnableLook();
+    }
+
+    private void OnRotationComplete()
+    {
+        if (suspectCharacter == null) return;
+
+        if (IsAnyPlayerInsideBooth() && IsShutterOpen())
+            SayEntryDialogue();
+        else
+            StartCoroutine(WaitForBoothReady());
+    }
+
+    /// <summary>
+    /// Returns true if at least one connected player is currently inside the booth.
+    /// Runs on the server, reading the replicated IsOutside NetworkVariable.
+    /// </summary>
+    private bool IsAnyPlayerInsideBooth()
+    {
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            var player = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (player != null && !player.IsOutside)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Returns true while the booth window shutter is open.</summary>
+    private bool IsShutterOpen()
+    {
+        return shutterController != null && shutterController.IsOpen;
+    }
+
+    /// <summary>
+    /// Polls every half-second until at least one player is inside the booth
+    /// and the shutter is open, then triggers the entry dialogue.
+    /// </summary>
+    private IEnumerator WaitForBoothReady()
+    {
+        while (!IsAnyPlayerInsideBooth() || !IsShutterOpen())
+            yield return new WaitForSeconds(0.5f);
+
+        SayEntryDialogue();
     }
 
     private void SayEntryDialogue()

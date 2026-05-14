@@ -3,11 +3,12 @@ using UnityEngine.Events;
 
 public class PlayerHealth : MonoBehaviour
 {
-    public float MaxHealth { get; set; }
+    [SerializeField] private float maxHealth = 100;
+    public float MaxHealth => maxHealth;
     public UnityAction OnHealthChanged;
     public UnityAction OnDeath;
 
-    private float _health;
+    private float _health= 100;
     private bool _isDead;
 
     public bool IsDead => _isDead;

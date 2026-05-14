@@ -2,7 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class InkStamp : Interactable
+public class InkStamp : Interactable, IPickupSlot
 {
     [SerializeField] private PlaceObjectSlot stampPlaceObjectSlot;
     public StampContainer.StampType StampType;
@@ -39,6 +39,25 @@ public class InkStamp : Interactable
         inkStamp.Spawn();
 
         spawnedInkStamp = inkStamp.GetComponent<PickableObject>();
+
+        // Disable direct interaction on all clients — pickup is only via the InkStamp slot.
+        SetSlottedStampInteractableClientRpc(spawnedInkStamp.NetworkObject, false);
+    }
+
+    /// <summary>
+    /// Enables or disables direct interaction with the slotted stamp pickup on all clients.
+    /// Call with false after spawning (slot owns pickup), and true only if the stamp needs
+    /// to be released back into the world as a free-standing interactable.
+    /// </summary>
+    [ClientRpc]
+    private void SetSlottedStampInteractableClientRpc(NetworkObjectReference stampRef, bool interactable)
+    {
+        if (!stampRef.TryGet(out NetworkObject stampNetObj)) return;
+        PickableObject stamp = stampNetObj.GetComponent<PickableObject>();
+        if (stamp == null) return;
+
+        stamp.CanPickUpManually = interactable;
+        stamp.SetInteractable(interactable);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -47,6 +66,11 @@ public class InkStamp : Interactable
         if (player.pickupController.HeldObject == null && stampPlaceObjectSlot.IsPlaced)
         {
             stampPlaceObjectSlot.IsPlaced = false;
+
+            // Re-enable the pickup so PickUpObject can claim it; it will immediately disable
+            // interactability again as its optimistic lock before the ownership RPC lands.
+            spawnedInkStamp.CanPickUpManually = true;
+            spawnedInkStamp.SetInteractable(true);
 
             player.pickupController.PickUpObject(spawnedInkStamp);
         }

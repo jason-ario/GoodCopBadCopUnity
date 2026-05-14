@@ -32,8 +32,6 @@ public class NameTag : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        _playerName.OnValueChanged += OnPlayerNameChanged;
-
         if (IsOwner)
         {
             // Hide the local player's own name tag.
@@ -43,23 +41,32 @@ public class NameTag : NetworkBehaviour
             if (NetworkManager.Singleton != null &&
                 NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport)
             {
-                _playerName.Value = new FixedString64Bytes(SteamClient.Name);
+                string steamName = SteamClient.Name;
+                if (string.IsNullOrEmpty(steamName))
+                    Debug.LogWarning("[NameTag] SteamClient.Name is empty at spawn time — name tag will be blank for other players.");
+
+                _playerName.Value = new FixedString64Bytes(steamName ?? string.Empty);
             }
+
+            // No need to observe our own variable changes.
+            return;
         }
-        else
-        {
-            // Apply the current value if it has already been synced by the time we spawn.
-            // OnValueChanged will handle late arrivals if the value isn't set yet.
-            string currentName = _playerName.Value.ToString();
-            if (!string.IsNullOrEmpty(currentName))
-                ApplyName(currentName);
-        }
+
+        // Subscribe before reading the current value so we never miss a change.
+        _playerName.OnValueChanged += OnPlayerNameChanged;
+
+        // Apply whatever value is already replicated; OnValueChanged covers future updates.
+        string currentName = _playerName.Value.ToString();
+        if (!string.IsNullOrEmpty(currentName))
+            ApplyName(currentName);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _playerName.OnValueChanged -= OnPlayerNameChanged;
+
+        if (!IsOwner)
+            _playerName.OnValueChanged -= OnPlayerNameChanged;
     }
 
     private void OnPlayerNameChanged(FixedString64Bytes previous, FixedString64Bytes current)

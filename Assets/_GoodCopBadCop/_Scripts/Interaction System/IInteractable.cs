@@ -7,8 +7,13 @@ using UnityEngine.Events;
 public interface IInteractable
 {
     void Interact(PlayerInteractionController player);
-    
 }
+
+/// <summary>
+/// Marker interface for interactables that act as pickup slots (e.g. InkStamp).
+/// Left-clicking one with empty hands should call Interact(), just like a PickableObject.
+/// </summary>
+public interface IPickupSlot { }
 
 [RequireComponent(typeof(HighlightEffect))]
 public abstract class Interactable : NetworkBehaviour, IInteractable

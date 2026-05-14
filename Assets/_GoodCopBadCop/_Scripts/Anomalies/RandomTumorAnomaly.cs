@@ -5,85 +5,128 @@ using Random = UnityEngine.Random;
 public class RandomTumorAnomaly : MutationAnomaly
 {
     [SerializeField] private GameObject[] tumors;
-    
-    private Transform skeletonRoot;
-    private Transform[] bones;
-    private Vector3[] initialPositions;
-    private Quaternion[] initialRotations;
-    private Transform[] parentBones;
+    [SerializeField] private Transform[] parentBones;
 
-    private void Initialize()
+    private void Awake()
     {
-        skeletonRoot = transform.root.GetComponent<SuspectCharacter>().animator.avatarRoot;
-        
-        // Get all bones in the character
-        bones = skeletonRoot.GetComponentsInChildren<Transform>();
-        
-        // Store initial positions and rotations, and find closest bone for each tumor
-        initialPositions = new Vector3[tumors.Length];
-        initialRotations = new Quaternion[tumors.Length];
-        parentBones = new Transform[tumors.Length];
-        
-        for (int i = 0; i < tumors.Length; i++)
-        {
-            if (tumors[i] != null)
-            {
-                initialPositions[i] = tumors[i].transform.localPosition;
-                initialRotations[i] = tumors[i].transform.localRotation;
-                
-                // Find the closest bone
-                parentBones[i] = FindClosestBone(tumors[i].transform.position);
-                
-                tumors[i].SetActive(false);
-            }
-        }
+        InitializeTumors();
     }
 
-    private Transform FindClosestBone(Vector3 tumorPosition)
+    void InitializeTumors()
     {
-        Transform closestBone = null;
-        float closestDistance = float.MaxValue;
-        
-        foreach (var bone in bones)
+        for (var i = 0; i < tumors.Length; i++)
         {
-            // Skip the root itself if you prefer
-            if (bone == skeletonRoot)
-                continue;
-                
-            float distance = Vector3.Distance(tumorPosition, bone.position);
-            
-            if (distance < closestDistance)
-            {
-                closestDistance = distance;
-                closestBone = bone;
-            }
+            var tumor = tumors[i];
+            tumor.transform.parent = parentBones[i];
         }
-        
-        return closestBone != null ? closestBone : skeletonRoot;
     }
 
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
-        Initialize();
         ActivateTumor();
     }
 
-    void ActivateTumor()
+    private void ActivateTumor()
     {
-        int tumorIndex = Random.Range(0, tumors.Length);
-        GameObject selectedTumor = tumors[tumorIndex];
-        
-        if (selectedTumor != null && parentBones[tumorIndex] != null)
+        int randomTumorAmount = Random.Range(1, tumors.Length + 1);
+
+        ShuffleTumors();
+
+        for (int i = 0; i < randomTumorAmount; i++)
         {
-            // Parent the tumor to its closest bone
-            selectedTumor.transform.SetParent(parentBones[tumorIndex]);
-            
-            // Restore the initial position and rotation as local to the bone
-            selectedTumor.transform.localPosition = initialPositions[tumorIndex];
-            selectedTumor.transform.localRotation = initialRotations[tumorIndex];
-            
-            selectedTumor.SetActive(true);
+            tumors[i].SetActive(true);
         }
+    }
+
+    private void ShuffleTumors()
+    {
+        for (int i = tumors.Length - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (tumors[i], tumors[j]) = (tumors[j], tumors[i]);
+        }
+    }
+
+    /// <summary>
+    /// For each tumor, finds and assigns the closest skeleton bone in the SuspectCharacter's avatar.
+    /// Run this from the Inspector context menu while the prefab is open in Prefab Mode (T-Pose).
+    /// Only considers actual humanoid bones — mesh renderers and other non-bone transforms are excluded.
+    /// </summary>
+    [ContextMenu("Auto-Assign Parent Bones")]
+    private void AutoAssignParentBones()
+    {
+        SuspectCharacter suspect = transform.root.GetComponent<SuspectCharacter>();
+        if (suspect == null)
+        {
+            Debug.LogError("[RandomTumorAnomaly] No SuspectCharacter found in hierarchy root.");
+            return;
+        }
+
+        Animator animator = suspect.animator;
+        Transform skeletonRoot = animator.avatarRoot;
+        if (skeletonRoot == null)
+        {
+            Debug.LogError("[RandomTumorAnomaly] Animator avatarRoot is null. Open the prefab in Prefab Mode and try again.");
+            return;
+        }
+
+        Transform[] bones = CollectHumanoidBones(animator);
+        parentBones = new Transform[tumors.Length];
+
+        for (int i = 0; i < tumors.Length; i++)
+        {
+            if (tumors[i] == null)
+                continue;
+
+            parentBones[i] = FindClosestBone(tumors[i].transform.position, bones);
+        }
+
+        Debug.Log($"[RandomTumorAnomaly] Assigned {parentBones.Length} parent bones from {bones.Length} humanoid bones.");
+
+#if UNITY_EDITOR
+        UnityEditor.EditorUtility.SetDirty(this);
+#endif
+    }
+
+    /// <summary>
+    /// Returns every humanoid bone transform the Animator exposes via <see cref="HumanBodyBones"/>.
+    /// This explicitly excludes mesh objects and other non-bone transforms that happen to be
+    /// children of the skeleton root.
+    /// </summary>
+    private static Transform[] CollectHumanoidBones(Animator animator)
+    {
+        var bones = new System.Collections.Generic.List<Transform>();
+
+        foreach (HumanBodyBones boneId in System.Enum.GetValues(typeof(HumanBodyBones)))
+        {
+            if (boneId == HumanBodyBones.LastBone)
+                continue;
+
+            Transform bone = animator.GetBoneTransform(boneId);
+            if (bone != null)
+                bones.Add(bone);
+        }
+
+        return bones.ToArray();
+    }
+
+    /// <summary>Returns the bone whose world position is closest to <paramref name="worldPos"/>.</summary>
+    private static Transform FindClosestBone(Vector3 worldPos, Transform[] bones)
+    {
+        Transform closest = null;
+        float closestSqDist = float.MaxValue;
+
+        foreach (Transform bone in bones)
+        {
+            float sqDist = (worldPos - bone.position).sqrMagnitude;
+            if (sqDist < closestSqDist)
+            {
+                closestSqDist = sqDist;
+                closest = bone;
+            }
+        }
+
+        return closest;
     }
 }

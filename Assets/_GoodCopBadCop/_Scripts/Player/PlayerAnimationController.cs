@@ -12,6 +12,7 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private Animator bodyAnimator;
     [SerializeField] private Animator armsAnimator;
     private PlayerMovementController _playerMovementController;
+    private PlayerPickupController _playerPickupController;
     [SerializeField] private GameObject armsOnBody;
     
     [SerializeField] private float animLerpSpeed = 5f;
@@ -74,6 +75,12 @@ public class PlayerAnimationController : NetworkBehaviour
     /// Set to null to stop the passthrough and drive <see cref="RightArmRigIKTarget"/> directly.
     /// </summary>
     public Transform RightArmIKTarget { get; set; }
+
+    /// <summary>
+    /// When true, <see cref="ApplyLocalBodyLean"/> is suppressed so scripted sequences
+    /// (e.g. the stamp DOTween) can lock the spine/shoulder without fighting the lean system.
+    /// </summary>
+    public bool SuppressLocalBodyLean { get; set; }
 
     /// <summary>
     /// When true, <see cref="rightArmRigIKTarget"/> is being driven directly by a local sequence
@@ -232,6 +239,7 @@ public class PlayerAnimationController : NetworkBehaviour
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
+        _playerPickupController   = GetComponent<PlayerPickupController>();
     }
     
 
@@ -578,6 +586,12 @@ public class PlayerAnimationController : NetworkBehaviour
                 Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
                 * _leftUpperArmBone.rotation;
         }
+
+        // Snap the held world object to the body arm target now that all bone manipulation
+        // is complete. This is the authoritative sync — LateUpdate in PlayerPickupController
+        // also calls this as a fallback, but execution order means it may run before bones
+        // are pitched. Calling it here guarantees the correct final position.
+        _playerPickupController?.SyncWorldObjectToBody();
     }
 
     /// <summary>
@@ -623,6 +637,8 @@ public class PlayerAnimationController : NetworkBehaviour
     /// </summary>
     private void ApplyLocalBodyLean()
     {
+        if (SuppressLocalBodyLean) return;
+
         _currentLeanFactor = Mathf.Lerp(_currentLeanFactor, _targetLeanFactor, leanLerpSpeed * Time.deltaTime);
 
         if (_currentLeanFactor < 0.001f) return;

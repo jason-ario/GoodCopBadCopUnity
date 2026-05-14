@@ -6,7 +6,7 @@ using UnityEngine.Animations;
 
 public class Telephone : Interactable
 {
-    [SerializeField] private ParentConstraint _handSet;
+    [SerializeField] private SocketFollow handSet;
     [SerializeField] private Transform _ikTarget;
     [SerializeField] private Transform _camera;
     [SerializeField] private Transform _handsetPos;
@@ -109,16 +109,10 @@ public class Telephone : Interactable
     private IEnumerator ObserverGrabConstraintSequence(PlayerInteractionController player)
     {
         // Match the two WaitForSeconds(.25f) in GrabPhoneSequence before the constraint is set.
-        yield return new WaitForSeconds(.5f);
-
-        ConstraintSource source = new ConstraintSource
-        {
-            sourceTransform = GetHandSocketForClient(player, isLocalPlayer: false),
-            weight = 1
-        };
-        _handSet.SetSource(0, source);
-        _handSet.enabled = true;
-        _handSet.constraintActive = true;
+        yield return new WaitForSeconds(.25f);
+        
+        handSet.SetTarget(GetHandSocketForClient(player, isLocalPlayer: false));
+        handSet.enabled = true;
     }
 
     /// <summary>
@@ -130,10 +124,9 @@ public class Telephone : Interactable
         // Match the WaitForSeconds(.5f) in PutPhoneDownSequence before the constraint is cleared.
         yield return new WaitForSeconds(.5f);
 
-        _handSet.enabled = false;
-        _handSet.constraintActive = false;
-        _handSet.transform.position = _handsetPos.position;
-        _handSet.transform.rotation = _handsetPos.rotation;
+        handSet.enabled = false;
+        handSet.transform.position = _handsetPos.position;
+        handSet.transform.rotation = _handsetPos.rotation;
     }
 
     /// <summary>
@@ -180,10 +173,9 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.5f);
         player.playerAnimationController.DisableLeftArmMask();
-        _handSet.enabled = false;
-        _handSet.constraintActive = false;
-        _handSet.transform.position = _handsetPos.position;
-        _handSet.transform.rotation = _handsetPos.rotation;
+        handSet.enabled = false;
+        handSet.transform.position = _handsetPos.position;
+        handSet.transform.rotation = _handsetPos.rotation;
         player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);
@@ -211,15 +203,10 @@ public class Telephone : Interactable
 
         phoneSound.PlayOneShot(phoneGrabSound);
 
+        handSet.SetTarget(GetHandSocketForClient(player, isLocalPlayer: true));
+        handSet.enabled = true;
+
         yield return new WaitForSeconds(.25f);
-        ConstraintSource source = new ConstraintSource
-        {
-            sourceTransform = GetHandSocketForClient(player, isLocalPlayer: true),
-            weight = 1
-        };
-        _handSet.SetSource(0, source);
-        _handSet.enabled = true;
-        _handSet.constraintActive = true;
 
         player.playerMovementController.ResetCameraPos(false, .25f);
 

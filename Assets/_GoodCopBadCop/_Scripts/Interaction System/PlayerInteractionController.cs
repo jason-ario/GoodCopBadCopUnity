@@ -287,6 +287,15 @@ public class PlayerInteractionController : NetworkBehaviour
             return true;
         }
 
+        // Pickup slots (e.g. InkStamp) act like PickableObjects on left click with empty hands
+        if (interactable is IPickupSlot && pickupController.HeldObject == null)
+        {
+            interactable.Interact(this);
+            reticle.SetInteractState(false);
+            reticle.SetTooFarState(false);
+            return true;
+        }
+
         return false;
     }
 

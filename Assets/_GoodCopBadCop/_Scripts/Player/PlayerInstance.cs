@@ -18,6 +18,12 @@ public class PlayerInstance : NetworkBehaviour
     );
 
     public bool IsOutside => _isOutside.Value;
+
+    // Local-only cache updated immediately on the owning client, bypassing
+    // the server round-trip so UI checks (e.g. ClientRpc notifications) see
+    // the correct state even before the NetworkVariable replicates.
+    private bool _isOutsideLocal;
+    public bool IsOutsideLocal => _isOutsideLocal;
     
     public bool CanControl
     {
@@ -51,15 +57,22 @@ public class PlayerInstance : NetworkBehaviour
     public void SetIsOutside(bool value)
     {
         _isOutside.Value = value;
+        _isOutsideLocal = value;
         playerLight.SetActive(value);
     }
 
     /// <summary>
     /// Sets the player's outside state from any context.
-    /// Routes through a ServerRpc when called on a client.
+    /// Updates <see cref="IsOutsideLocal"/> immediately on the calling client so
+    /// that UI checks don't have to wait for the NetworkVariable server round-trip.
+    /// Routes the authoritative write through a ServerRpc when called on a client.
     /// </summary>
     public void RequestSetIsOutside(bool value)
     {
+        // Mirror the value locally right away so ClientRpc handlers reading
+        // IsOutsideLocal see the correct state without waiting for replication.
+        _isOutsideLocal = value;
+
         if (IsServer)
             SetIsOutside(value);
         else
