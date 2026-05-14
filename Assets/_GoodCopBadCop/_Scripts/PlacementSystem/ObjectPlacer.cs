@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using HighlightPlus;
 using UnityEngine;
 using UnityEngine.Animations;
 
@@ -13,11 +12,23 @@ public class ObjectPlacer : MonoBehaviour
     [SerializeField] private int arcSegments = 20;
     [SerializeField] private float arcHeight = 1f;
 
+    [SerializeField] private Color inRangeColor = Color.white;
+    [SerializeField] private Color outOfRangeColor = Color.red;
+
     private PickableItemData _pickableItemData;
     private PickableObject _clonedItem;
     private PlacementBoard _currentPlacementBoard;
     public bool IsActive;
+    public bool IsInRange { get; private set; } = true;
+
+    /// <summary>
+    /// True for one frame after DeactivatePlacer is called, AND the placer was in range when it was deactivated.
+    /// Used by PlayerPickupController to confirm a valid drop on right-click release.
+    /// </summary>
     public bool deactivatedThisFrame = false;
+    private bool _wasInRangeWhenDeactivated = false;
+    public bool WasInRangeWhenDeactivated => _wasInRangeWhenDeactivated;
+
     public PlacementBoard PlacementBoard => _currentPlacementBoard;
 
     private void Awake()
@@ -165,7 +176,11 @@ public class ObjectPlacer : MonoBehaviour
         
     }
 
-    public void ActivatePlacer(PlacementBoard placementBoard)
+    /// <summary>
+    /// Activates the placer ghost at the current transform position.
+    /// Pass null for placementBoard when placing on an arbitrary surface.
+    /// </summary>
+    public void ActivatePlacer(PlacementBoard placementBoard = null)
     {
         _currentPlacementBoard = placementBoard;
         container.gameObject.SetActive(true);
@@ -187,6 +202,8 @@ public class ObjectPlacer : MonoBehaviour
             _clonedItem = null;
         }
 
+        _wasInRangeWhenDeactivated = IsInRange;
+        IsInRange = true;
         container.gameObject.SetActive(false);
         IsActive = false;
 
@@ -210,5 +227,20 @@ public class ObjectPlacer : MonoBehaviour
         }
         
         return null;
+    }
+
+    /// <summary>
+    /// Tints the arc line white (in range, can place) or red (out of range, cannot place).
+    /// Safe to call every frame while the placer is active.
+    /// </summary>
+    public void SetInRange(bool inRange)
+    {
+        IsInRange = inRange;
+
+        if (arcLine == null) return;
+
+        Color color = inRange ? inRangeColor : outOfRangeColor;
+        arcLine.startColor = color;
+        arcLine.endColor = color;
     }
 }

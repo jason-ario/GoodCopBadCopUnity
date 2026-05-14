@@ -200,7 +200,7 @@ public class PlayerPickupController : NetworkBehaviour
 
         if (HeldObject != null)
         {
-            // Drop with E or right-click
+            // Release right-click: place the held object only if the placer is active and in range
             if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
             {
                 if (HeldObject == null)
@@ -215,7 +215,7 @@ public class PlayerPickupController : NetworkBehaviour
                     return;
                 }
                 
-                if (ObjectPlacer.Instance.IsActive || ObjectPlacer.Instance.deactivatedThisFrame)
+                if ((ObjectPlacer.Instance.IsActive && ObjectPlacer.Instance.IsInRange) || (ObjectPlacer.Instance.deactivatedThisFrame && ObjectPlacer.Instance.WasInRangeWhenDeactivated))
                 {
                     DropObject();
                 }
