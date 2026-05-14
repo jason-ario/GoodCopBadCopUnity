@@ -8,20 +8,58 @@ public class InkStamp : Interactable, IPickupSlot
     public StampContainer.StampType StampType;
     [SerializeField] private PickableObject inkStampPickup;
     private PickableObject spawnedInkStamp;
+
+    /// <summary>
+    /// Tracks the spawned stamp NetworkObject across all clients so that non-host
+    /// clients can resolve <see cref="spawnedInkStamp"/> as soon as the value is set,
+    /// without relying on ClientRpc ordering relative to OnNetworkSpawn.
+    /// </summary>
+    private NetworkVariable<NetworkObjectReference> _spawnedStampRef = new NetworkVariable<NetworkObjectReference>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        // Sync visual state immediately on spawn
         stampPlaceObjectSlot.IsPlaced = true;
+
+        _spawnedStampRef.OnValueChanged += OnSpawnedStampRefChanged;
 
         if (IsServer)
         {
             SpawnInkStamp();
         }
+        else
+        {
+            // On clients, the NetworkVariable may already be populated if we joined late.
+            TryResolveSpawnedStamp(_spawnedStampRef.Value);
+        }
     }
-    
-    
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _spawnedStampRef.OnValueChanged -= OnSpawnedStampRefChanged;
+    }
+
+    private void OnSpawnedStampRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
+    {
+        TryResolveSpawnedStamp(current);
+    }
+
+    private void TryResolveSpawnedStamp(NetworkObjectReference stampRef)
+    {
+        if (!stampRef.TryGet(out NetworkObject stampNetObj)) return;
+        PickableObject stamp = stampNetObj.GetComponent<PickableObject>();
+        if (stamp == null) return;
+
+        spawnedInkStamp = stamp;
+        stamp.CanPickUpManually = false;
+        stamp.SetInteractable(false);
+    }
+
     private void SpawnInkStamp()
     {
         NetworkObject inkStampNetObj = inkStampPickup.GetComponent<NetworkObject>();
@@ -39,30 +77,24 @@ public class InkStamp : Interactable, IPickupSlot
         inkStamp.Spawn();
 
         spawnedInkStamp = inkStamp.GetComponent<PickableObject>();
+        spawnedInkStamp.CanPickUpManually = false;
+        spawnedInkStamp.SetInteractable(false);
 
-        // Disable direct interaction on all clients — pickup is only via the InkStamp slot.
-        SetSlottedStampInteractableClientRpc(spawnedInkStamp.NetworkObject, false);
-    }
-
-    /// <summary>
-    /// Enables or disables direct interaction with the slotted stamp pickup on all clients.
-    /// Call with false after spawning (slot owns pickup), and true only if the stamp needs
-    /// to be released back into the world as a free-standing interactable.
-    /// </summary>
-    [ClientRpc]
-    private void SetSlottedStampInteractableClientRpc(NetworkObjectReference stampRef, bool interactable)
-    {
-        if (!stampRef.TryGet(out NetworkObject stampNetObj)) return;
-        PickableObject stamp = stampNetObj.GetComponent<PickableObject>();
-        if (stamp == null) return;
-
-        stamp.CanPickUpManually = interactable;
-        stamp.SetInteractable(interactable);
+        // Publishing to the NetworkVariable replicates the reference to all clients,
+        // triggering OnSpawnedStampRefChanged which resolves spawnedInkStamp there too.
+        _spawnedStampRef.Value = inkStamp;
     }
 
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+
+        if (spawnedInkStamp == null)
+        {
+            Debug.LogWarning("InkStamp.Interact: spawnedInkStamp is not yet resolved on this client.");
+            return;
+        }
+
         if (player.pickupController.HeldObject == null && stampPlaceObjectSlot.IsPlaced)
         {
             stampPlaceObjectSlot.IsPlaced = false;
