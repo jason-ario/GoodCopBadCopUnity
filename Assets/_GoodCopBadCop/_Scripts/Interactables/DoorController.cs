@@ -1,7 +1,9 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
+[RequireComponent(typeof(NavMeshObstacle))]
 public class DoorController : Interactable
 {
     private NetworkVariable<bool> _doorOpen = new NetworkVariable<bool>(
@@ -28,6 +30,7 @@ public class DoorController : Interactable
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip doorOpenClip;
     [SerializeField] AudioClip doorCloseClip;
+    private NavMeshObstacle _navMeshObstacle;
 
     [Header("Lock")]
     [SerializeField] private MachineShake _machineShake;
@@ -45,6 +48,7 @@ public class DoorController : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        _navMeshObstacle = GetComponent<NavMeshObstacle>();
         _doorOpen.OnValueChanged += OnDoorStateChanged;
         _openedIn.OnValueChanged += OnOpenDirectionChanged;
         _isLocked.OnValueChanged += OnLockedStateChanged;
@@ -201,6 +205,9 @@ public class DoorController : Interactable
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
         interactText = isOpen ? "Close" : "Open";
+
+        if (_navMeshObstacle != null)
+            _navMeshObstacle.enabled = !isOpen;
     }
 
     private void ApplyLockedVisuals(bool isLocked)

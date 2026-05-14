@@ -8,9 +8,9 @@ using UnityEngine.Events;
 using UnityEngine.WSA;
 using Application = UnityEngine.Application;
 
-// Must execute after PlayerPickupController (order 1) so LateUpdate fires
-// after the folder has already been moved to the body-arm target position.
-[DefaultExecutionOrder(2)]
+// DefaultExecutionOrder removed — LateUpdate was replaced by per-document SocketFollow components
+// (execution order 2) which track slot transforms directly and are unaffected by the folder's
+// own script order.
 public class FolderController : PickableObject
 {
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
@@ -109,13 +109,6 @@ public class FolderController : PickableObject
     /// </summary>
     private readonly List<NetworkObjectReference> _serverDocuments = new List<NetworkObjectReference>();
 
-    /// <summary>
-    /// Per-client list of (document, slot) pairs driven by LateUpdate.
-    /// Populated by PlaceInSlotClientRpc and cleared by UnregisterDocumentClientRpc.
-    /// </summary>
-    private readonly List<(PickableObject document, Transform slot)> _localDocuments
-        = new List<(PickableObject, Transform)>();
-
     /// <summary>Registers a document with this folder on the server so it can be despawned later.</summary>
     [ServerRpc(RequireOwnership = false)]
     public void RegisterDocumentServerRpc(NetworkObjectReference documentRef)
@@ -140,18 +133,7 @@ public class FolderController : PickableObject
     {
         if (!documentRef.TryGet(out NetworkObject netObj)) return;
         PickableObject doc = netObj.GetComponent<PickableObject>();
-        _localDocuments.RemoveAll(pair => pair.document == doc);
-    }
-
-    /// <summary>
-    /// Registers a (document, slot) pair on this client for LateUpdate-based following.
-    /// Called from PlaceInSlotClientRpc on every machine so all clients track the document.
-    /// </summary>
-    public void RegisterLocalDocument(PickableObject document, Transform slot)
-    {
-        _localDocuments.RemoveAll(pair => pair.document == document);
-        _localDocuments.Add((document, slot));
-        Debug.Log($"[FolderController] RegisterLocalDocument: {document.name} → slot={slot.name} on client {NetworkManager.Singleton.LocalClientId} | total tracked={_localDocuments.Count}");
+        if (doc != null) doc.ClearSocketFollow();
     }
 
     /// <summary>Despawns all server-tracked documents. Called by SuspectController before despawning the folder.</summary>
@@ -163,27 +145,6 @@ public class FolderController : PickableObject
                 NetworkHelper.Despawn(netObj);
         }
         _serverDocuments.Clear();
-    }
-
-    /// <summary>
-    /// Snaps each slotted document to its slot's current world transform.
-    /// Runs at execution order 1 — after PlayerPickupController (order 0) has already
-    /// moved the folder to the body-arm target — so documents are always in sync with
-    /// the folder in the same frame with zero lag.
-    /// </summary>
-    private void LateUpdate()
-    {
-        for (int i = _localDocuments.Count - 1; i >= 0; i--)
-        {
-            var (doc, slot) = _localDocuments[i];
-            if (doc == null || slot == null)
-            {
-                _localDocuments.RemoveAt(i);
-                continue;
-            }
-            doc.transform.position = slot.position;
-            doc.transform.rotation = slot.rotation;
-        }
     }
 
     public override void OnNetworkSpawn()
@@ -778,11 +739,9 @@ public class FolderController : PickableObject
             _examPageQueue[i]    = _examPageQueue[i + 1];
             _queueSlots[i].Value = _queueSlots[i + 1].Value;
 
-            // If the slot still has a page, update that page's tracked slot in _localDocuments
-            // so LateUpdate keeps snapping it to the correct (shifted) transform.
+            // Shift the page's SocketFollow target to the new slot so it tracks correctly.
             if (_examPageQueue[i] != null)
             {
-                RegisterLocalDocument(_examPageQueue[i], examPageSlots[i]);
                 ShiftDocumentSlotClientRpc(
                     new NetworkObjectReference(_examPageQueue[i].NetworkObject),
                     i);
@@ -795,8 +754,8 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
-    /// Broadcasts a slot-shift to all clients so every machine's _localDocuments list
-    /// points to the correct new slot Transform after a page is removed from the queue.
+    /// Broadcasts a slot-shift to all clients so every machine's SocketFollow component
+    /// on the page points to the correct new slot Transform after a page is removed from the queue.
     /// </summary>
     [ClientRpc]
     private void ShiftDocumentSlotClientRpc(NetworkObjectReference pageRef, int newSlotIndex)
@@ -805,8 +764,8 @@ public class FolderController : PickableObject
         PickableObject doc = netObj.GetComponent<PickableObject>();
         if (doc == null || newSlotIndex < 0 || newSlotIndex >= examPageSlots.Length) return;
 
-        // Re-register with the new slot so LateUpdate snaps to the right position.
-        RegisterLocalDocument(doc, examPageSlots[newSlotIndex]);
+        // Redirect the SocketFollow to the new slot — no list bookkeeping needed.
+        doc.SetSocketFollow(examPageSlots[newSlotIndex]);
     }
 
     public void AddNotebookPaper(string itemName, PlayerPickupController player)

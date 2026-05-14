@@ -161,6 +161,7 @@ GameObject:
   - component: {fileID: 6452183772137343010}
   - component: {fileID: 3246070810775736324}
   - component: {fileID: 6727408754721584028}
+  - component: {fileID: 2367411213243704145}
   m_Layer: 0
   m_Name: door
   m_TagString: Untagged
@@ -531,8 +532,25 @@ MonoBehaviour:
   _lockedDoorAudio: {fileID: 5375063884755632023}
   _doorShakeClip: {fileID: 8300000, guid: e280aa7166cd17143ad3bdfa5a3590b0, type: 3}
   _tryToLeaveTutorialText: []
+  _lockDuringShift: 0
   _unlockSound: {fileID: 8300000, guid: 64ab40104b045af4983916902c67beec, type: 3}
   _unlockedIndicator: {fileID: 0}
+--- !u!208 &2367411213243704145
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2510468480342907530}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 1
+  m_Extents: {x: 0.59, y: 0.5, z: 0.395}
+  m_MoveThreshold: 0.1
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 0.51, y: -0.75, z: -0.12}
+  m_TimeToStationary: 0.5
 --- !u!1 &2994875756095852405
 GameObject:
   m_ObjectHideFlags: 0

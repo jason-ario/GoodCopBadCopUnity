@@ -8,6 +8,10 @@ public class PlayerInteractionController : NetworkBehaviour
     public Camera cam;
     public float interactDistance = 3f;
     public LayerMask interactLayer;
+
+    [Tooltip("Layers that count as valid free-placement surfaces (floors, desks, world geometry, etc.)")]
+    public LayerMask placementLayer;
+
     public PlayerPickupController pickupController;
     public PlayerMovementController playerMovementController;
     public ReticleController reticle;
@@ -165,7 +169,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 return;
             }
             
-            // Handle non-interactable placement surfaces (like PlacementBoard)
+            // Handle non-interactable placement surfaces (like PlacementBoard) and free placement
             if (inRange)
             {
                 if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
@@ -175,19 +179,62 @@ public class PlayerInteractionController : NetworkBehaviour
 
                 if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace)
                 {
-                    CheckActivatePlacer(placementBoard, hit);
+                    CheckActivatePlacer(placementBoard, hit, true);
                 }
                 else
                 {
                     if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
                 }
                 
-                // If we are over a placement board but it's not an "interactable" per se,
-                // we might still want to return if CheckActivatePlacer sets a reticle state.
-                if (placementBoard != null && _playerPickupController.IsHoldingObject) return;
+                if (_playerPickupController.IsHoldingObject) return;
+            }
+            else
+            {
+                // Out of range — keep the placer visible but tint it red so the player knows they can't drop here
+                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
+                {
+                    CheckActivatePlacer(placementBoard, hit, false);
+                }
+                else if (ObjectPlacer.Instance.IsActive)
+                {
+                    ObjectPlacer.Instance.DeactivatePlacer();
+                }
+
+                if (_playerPickupController.IsHoldingObject) return;
             }
             
             lastInteractable = null;
+        }
+        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, interactDistance, placementLayer))
+        {
+            // No interactable hit but we did hit a placement surface — handle free placement
+            if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
+            {
+                _placerBlocked = true;
+            }
+
+            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace)
+            {
+                CheckActivatePlacer(null, surfaceHit, true);
+            }
+            else
+            {
+                if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+            }
+
+            if (_playerPickupController.IsHoldingObject) return;
+        }
+        else
+        {
+            // Nothing hit — keep the placer visible but red if it is already active
+            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject && ObjectPlacer.Instance.IsActive)
+            {
+                ObjectPlacer.Instance.SetInRange(false);
+            }
+            else if (ObjectPlacer.Instance.IsActive)
+            {
+                ObjectPlacer.Instance.DeactivatePlacer();
+            }
         }
 
         // Reset both states if no valid target was found or returned early
@@ -195,42 +242,52 @@ public class PlayerInteractionController : NetworkBehaviour
         reticle.SetTooFarState(false);
     }
 
-    void CheckActivatePlacer(PlacementBoard placementBoard, RaycastHit hit)
+    /// <summary>
+    /// Activates the ObjectPlacer toward the current hit point.
+    /// When placementBoard is null, the object is placed freely on the surface at hit.point,
+    /// oriented by the surface normal. When a PlacementBoard is provided, its transform
+    /// orientation is used instead.
+    /// </summary>
+    void CheckActivatePlacer(PlacementBoard placementBoard, RaycastHit hit, bool inRange)
     {
-        //Placement Board?
-        if (_playerPickupController.IsHoldingObject && placementBoard != null)
+        if (!_playerPickupController.IsHoldingObject) return;
+
+        // Per-item opt-out
+        if (_playerPickupController.HeldObject.ItemData.canUsePlacementBoard == false)
         {
-            if (placementBoard.IsHanging && _playerPickupController.HeldObject.ItemData.canBeHung == false || _playerPickupController.HeldObject.ItemData.canUsePlacementBoard == false)
-            {
-                reticle.SetInteractState(false);
-                if (ObjectPlacer.Instance.IsActive)
-                {
-                    ObjectPlacer.Instance.DeactivatePlacer();
-                }
-                
-                lastInteractable = null;
-                return;
-            }
-                
             reticle.SetInteractState(false);
-            
-            if (!ObjectPlacer.Instance.IsActive)
-            {
-                ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject.ItemData); // Set the item BEFORE activating
-                ObjectPlacer.Instance.ActivatePlacer(placementBoard);
-                ObjectPlacer.Instance.transform.rotation = placementBoard.transform.rotation;
-                ObjectPlacer.Instance.transform.position = hit.point;
-            }
-                
-            ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, placementBoard.transform.rotation, Time.deltaTime * objectPlacerLerpSpeed);
-            ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, hit.point, Time.deltaTime * objectPlacerLerpSpeed);
+            if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+            lastInteractable = null;
             return;
         }
 
-        if (ObjectPlacer.Instance.IsActive)
+        // Hanging items need a hanging board
+        if (placementBoard != null && placementBoard.IsHanging && _playerPickupController.HeldObject.ItemData.canBeHung == false)
         {
-            ObjectPlacer.Instance.DeactivatePlacer();
+            reticle.SetInteractState(false);
+            if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+            lastInteractable = null;
+            return;
         }
+
+        // Determine placement rotation: board rotation when available, otherwise align to surface normal
+        Quaternion targetRotation = placementBoard != null
+            ? placementBoard.transform.rotation
+            : Quaternion.FromToRotation(Vector3.up, hit.normal);
+
+        reticle.SetInteractState(false);
+
+        if (!ObjectPlacer.Instance.IsActive)
+        {
+            ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject.ItemData);
+            ObjectPlacer.Instance.ActivatePlacer(placementBoard);
+            ObjectPlacer.Instance.transform.rotation = targetRotation;
+            ObjectPlacer.Instance.transform.position = hit.point;
+        }
+
+        ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, targetRotation, Time.deltaTime * objectPlacerLerpSpeed);
+        ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, hit.point, Time.deltaTime * objectPlacerLerpSpeed);
+        ObjectPlacer.Instance.SetInRange(inRange);
     }
     
 

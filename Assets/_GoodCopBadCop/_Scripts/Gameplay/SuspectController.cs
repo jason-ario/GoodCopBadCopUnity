@@ -608,26 +608,31 @@ public class SuspectController : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void QuarantineVisualsClientRpc()
+    private void QuarantineVisualsClientRpc(double serverTimeAtTimelineStart)
     {
         if (IsServer) return;
-        StartCoroutine(QuarantineSequence());
+        StartCoroutine(QuarantineSequence(serverTimeAtTimelineStart));
     }
 
-    private IEnumerator QuarantineSequence()
+    private IEnumerator QuarantineSequence(double serverTimeAtTimelineStart = -1)
     {
         if (suspectCharacter == null)
             yield break;
 
+        bool isClient = !IsServer;
+
         ShiftManager.Instance.QuarantinedSuspect(suspectCharacter);
 
-        suspectCharacter.animator.SetTrigger("Give");
-        yield return new WaitForSeconds(1f);
-
-        if (IsServer)
+        if (!isClient)
         {
+            suspectCharacter.animator.SetTrigger("Give");
+            yield return new WaitForSeconds(1f);
+
             CleanupSpawnedFolder();
-            QuarantineVisualsClientRpc();
+
+            // Stamp the server time right before the shared visual phase begins,
+            // so the client can seek the timeline to the correct playhead position.
+            QuarantineVisualsClientRpc(NetworkManager.Singleton.ServerTime.Time);
         }
 
         yield return new WaitForSeconds(2f);
@@ -637,6 +642,20 @@ public class SuspectController : NetworkBehaviour
         {
             quarantineTimeline.gameObject.SetActive(true);
             quarantineTimeline.Play();
+
+            // Seek the client's timeline forward to compensate for network latency only.
+            // Both sides wait the same 2 seconds after the RPC, so we subtract that shared
+            // delay — leaving just the one-way network latency as the seek offset.
+            if (isClient && serverTimeAtTimelineStart > 0)
+            {
+                const double sharedDelaySeconds = 2.0;
+                double elapsed = NetworkManager.Singleton.ServerTime.Time - serverTimeAtTimelineStart - sharedDelaySeconds;
+                if (elapsed > 0)
+                {
+                    quarantineTimeline.time = elapsed;
+                    quarantineTimeline.Evaluate();
+                }
+            }
         }
 
         if (IsServer) DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
@@ -658,7 +677,7 @@ public class SuspectController : NetworkBehaviour
             yield return new WaitForEndOfFrame();
 
             if (suspectCharacter == null)
-                yield break;
+                break;
 
             suspectCharacter.transform.position = suspectQuarantineFollowPos.position;
             suspectCharacter.transform.rotation = suspectQuarantineFollowPos.rotation;

@@ -19,6 +19,7 @@ public class PickableObject : Interactable
     [SerializeField] AudioClip pickupSound;
     [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
+    private SocketFollow _socketFollow;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
     public UnityAction OnEquip;
     public UnityAction OnUnEquip;
@@ -68,6 +69,7 @@ public class PickableObject : Interactable
         meshRenderers = GetComponentsInChildren<MeshRenderer>(true);
         interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
+        _socketFollow = GetComponent<SocketFollow>();
     }
 
     /// <summary>Registers the caller as the player holding this object on the server.</summary>
@@ -207,16 +209,14 @@ public class PickableObject : Interactable
             return;
         }
 
-        // Prefer LateUpdate-based following when the slot owner is a FolderController.
-        // FolderController.LateUpdate runs at execution order 1 — after PlayerPickupController
-        // (order 0) has moved the folder — so documents are always in sync with zero lag.
-        // ParentConstraint evaluation happens before LateUpdate and would always be one
-        // frame behind when the folder is held, so we skip SetParent in this case.
+        // Use SocketFollow for folder slots so documents track the slot at execution order 2,
+        // after PlayerPickupController (order 1) has already moved the folder to its final
+        // pitched position. ParentConstraint evaluates before LateUpdate and would lag one frame.
         FolderController folder = slotOwner.GetComponent<FolderController>();
         if (folder != null)
         {
-            Debug.Log($"[PlaceInSlotClientRpc] Registering {name} in folder {folder.name} slot={slot.name} on client {NetworkManager.Singleton.LocalClientId}");
-            folder.RegisterLocalDocument(this, slot);
+            Debug.Log($"[PlaceInSlotClientRpc] SocketFollow {name} → slot={slot.name} on client {NetworkManager.Singleton.LocalClientId}");
+            SetSocketFollow(slot);
         }
         else
         {
@@ -258,6 +258,7 @@ public class PickableObject : Interactable
     private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation)
     {
         RemoveParent();
+        ClearSocketFollow();
         transform.position = position;
         transform.rotation = rotation;
 
@@ -315,6 +316,49 @@ public class PickableObject : Interactable
         {
             _parentConstraint.RemoveSource(0);
         }
+    }
+
+    /// <summary>
+    /// Enables the <see cref="SocketFollow"/> component on this object and points it at
+    /// <paramref name="slot"/> so it tracks the slot's world transform every LateUpdate.
+    /// Creates the component lazily if the prefab does not already have one.
+    /// </summary>
+    public void SetSocketFollow(Transform slot)
+    {
+        if (_socketFollow == null)
+            _socketFollow = gameObject.AddComponent<SocketFollow>();
+
+        _socketFollow.SetTarget(slot);
+        _socketFollow.enabled = true;
+    }
+
+    /// <summary>
+    /// Enables the <see cref="SocketFollow"/> component and configures it to follow
+    /// <paramref name="source"/> using a fixed local-space offset rather than reading a
+    /// child transform's world position. Position is computed via
+    /// <c>source.TransformPoint(localPosition)</c> and rotation via
+    /// <c>source.rotation * localRotation</c>, so the result always reflects the source's
+    /// definitive per-frame transform — including pitch applied after animation rigging.
+    /// Creates the component lazily if the prefab does not already have one.
+    /// </summary>
+    public void SetSocketFollowWithLocalOffset(Transform source, Vector3 localPosition, Quaternion localRotation)
+    {
+        if (_socketFollow == null)
+            _socketFollow = gameObject.AddComponent<SocketFollow>();
+
+        _socketFollow.SetTargetWithLocalOffset(source, localPosition, localRotation);
+        _socketFollow.enabled = true;
+    }
+
+    /// <summary>
+    /// Disables and clears the <see cref="SocketFollow"/> component so this object stops
+    /// tracking a folder slot. Call this on drop or when the slot is no longer valid.
+    /// </summary>
+    public void ClearSocketFollow()
+    {
+        if (_socketFollow == null) return;
+        _socketFollow.SetTarget(null);
+        _socketFollow.enabled = false;
     }
 
     public virtual void OnEquipped(PlayerPickupController player)
