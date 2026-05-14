@@ -4,6 +4,10 @@ using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
 
+// LateUpdate must run after PlayerAnimationController (default order 0) and
+// PlayerPickupController (order 1) so pages snap to the notebook's final
+// world position for the frame — not the position from the previous frame.
+[DefaultExecutionOrder(2)]
 public class ExamNotebook : PickableObject
 {
     // Populated at runtime via SpawnAndWirePages (server) → SetPageReferencesClientRpc (clients).
@@ -89,12 +93,11 @@ public class ExamNotebook : PickableObject
     {
         base.OnNetworkSpawn();
 
-        // For dynamically-purchased notebooks the purchase flow calls SpawnAndWirePages and
-        // SetPageReferencesClientRpc explicitly after spawning. For notebooks that were
-        // already placed in the scene (IsSceneObject) no external caller triggers that flow,
-        // so the server does it here on spawn.
         if (IsServer && NetworkObject.IsSceneObject == true)
         {
+            // Server: spawn pages and broadcast references to any clients that are already
+            // connected. Clients that join after this point will request references themselves
+            // via RequestPageReferencesServerRpc → SetPageReferencesClientRpc (targeted).
             var spawnedPages = SpawnAndWirePages();
             if (spawnedPages.Count > 0)
             {
@@ -104,6 +107,45 @@ public class ExamNotebook : PickableObject
                 SetPageReferencesClientRpc(pageRefs);
             }
         }
+        else if (!IsServer && NetworkObject.IsSceneObject == true)
+        {
+            // Non-host client: SetPageReferencesClientRpc was broadcast during the server's
+            // OnNetworkSpawn, which runs before clients finish connecting — so the RPC is
+            // never received. Request page references from the server now that this client
+            // is fully registered and listening.
+            RequestPageReferencesServerRpc();
+        }
+    }
+
+    /// <summary>
+    /// Sent by a non-host client on OnNetworkSpawn for scene-object notebooks.
+    /// The server responds with a targeted SetPageReferencesClientRpc so the client
+    /// gets its pages[] wired up even though it missed the original broadcast.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestPageReferencesServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (pages == null || pages.Length == 0)
+        {
+            Debug.LogWarning($"[ExamNotebook] RequestPageReferencesServerRpc: pages not yet spawned on server — client {rpcParams.Receive.SenderClientId} will receive empty list.");
+            return;
+        }
+
+        var pageRefs = new NetworkObjectReference[pages.Length];
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i] != null)
+                pageRefs[i] = new NetworkObjectReference(pages[i].NetworkObject);
+        }
+
+        var targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { rpcParams.Receive.SenderClientId }
+            }
+        };
+        SetPageReferencesClientRpc(pageRefs, targetParams);
     }
 
     /// <summary>
@@ -130,11 +172,12 @@ public class ExamNotebook : PickableObject
         {
             NetworkObject pageNetObj = Instantiate(pagePrefab);
 
-            // Disable NetworkTransform before spawn — pages follow the notebook via
-            // LateUpdate instead of NGO parenting, so NT would only fight our manual
-            // positioning. AutoObjectParentSync is also disabled for the same reason.
-            NetworkTransform nt = pageNetObj.GetComponent<NetworkTransform>();
-            if (nt != null) nt.enabled = false;
+            // AutoObjectParentSync must be off before Spawn so NGO never replicates
+            // a parent change. NetworkTransform is left enabled here so clients receive
+            // the initial transform replication during spawn synchronisation. It is
+            // disabled on all machines inside ApplyPageReferences (called via
+            // SetPageReferencesClientRpc) once every client has resolved the reference
+            // and is ready to hand off positioning to LateUpdate.
             pageNetObj.AutoObjectParentSync = false;
 
             pageNetObj.Spawn(destroyWithScene: true);
@@ -145,6 +188,11 @@ public class ExamNotebook : PickableObject
                 Debug.LogError($"[ExamNotebook] SpawnAndWirePages: pagePrefab has no ExamPage component.");
                 continue;
             }
+
+            // Disable NT on the server after spawn so LateUpdate owns positioning here
+            // without NT fighting it. Clients disable theirs inside ApplyPageReferences.
+            NetworkTransform nt = pageNetObj.GetComponent<NetworkTransform>();
+            if (nt != null) nt.enabled = false;
 
             pages[i] = page;
             spawned.Add(pageNetObj);
@@ -158,7 +206,7 @@ public class ExamNotebook : PickableObject
     /// the loop only disables NT and calls initialization.
     /// </summary>
     [ClientRpc]
-    public void SetPageReferencesClientRpc(NetworkObjectReference[] pageRefs)
+    public void SetPageReferencesClientRpc(NetworkObjectReference[] pageRefs, ClientRpcParams clientRpcParams = default)
     {
         StartCoroutine(ApplyPageReferences(pageRefs));
     }
@@ -180,10 +228,20 @@ public class ExamNotebook : PickableObject
             ExamPage page = pageNetObj.GetComponent<ExamPage>();
             if (page == null) continue;
 
-            // Pages follow the notebook via LateUpdate — suppress any NGO parent sync.
+            // Disable NT and NGO parent sync — pages follow the notebook via SocketFollow.
             pageNetObj.AutoObjectParentSync = false;
             NetworkTransform nt = pageNetObj.GetComponent<NetworkTransform>();
             if (nt != null) nt.enabled = false;
+
+            // Point SocketFollow at the notebook root with the anchor's local offset baked in.
+            // This avoids reading anchor.position / anchor.rotation through Unity's child-transform
+            // hierarchy on inactive GameObjects, which can return stale cached values.
+            // SocketFollow runs at order 2, after SyncWorldObjectToBody (order 0/1) has set the
+            // notebook's definitive per-frame position and rotation — including arm pitch.
+            Transform anchor = (pagePositions != null && i < pagePositions.Length) ? pagePositions[i] : null;
+            Vector3    localPos = anchor != null ? anchor.localPosition : Vector3.zero;
+            Quaternion localRot = anchor != null ? anchor.localRotation : Quaternion.identity;
+            page.SetSocketFollowWithLocalOffset(transform, localPos, localRot);
 
             page.Initialize(this);
             pages[i] = page;
@@ -578,23 +636,20 @@ public class ExamNotebook : PickableObject
     }
 
     /// <summary>
-    /// Snaps every un-ripped page to the notebook's world position and rotation each frame.
-    /// Pages are intentionally NOT NGO-parented to avoid client-side transform desync;
-    /// LateUpdate runs after all physics and animation so the position is stable.
+    /// Snaps every un-ripped page to its anchor socket on the notebook each frame.
+    /// Pages are separate NetworkObjects and are not NGO-parented to the notebook;
+    /// SocketFollow drives their world transform instead. This LateUpdate only handles
+    /// scale, which SocketFollow does not manage.
     /// </summary>
     private void LateUpdate()
     {
+        if (pageScaleReference == null) return;
+
+        Vector3 targetScale = pageScaleReference.lossyScale;
         for (int i = 0; i < pages.Length; i++)
         {
             if (pages[i] == null || pages[i].isRippedOut) continue;
-
-            Transform anchor = (pagePositions != null && i < pagePositions.Length) ? pagePositions[i] : null;
-            Vector3 pos = anchor != null ? anchor.position : transform.position;
-            Quaternion rot = anchor != null ? anchor.rotation : transform.rotation;
-
-            pages[i].transform.SetPositionAndRotation(pos, rot);
-            if (pageScaleReference != null)
-                pages[i].transform.localScale = pageScaleReference.lossyScale;
+            pages[i].transform.localScale = targetScale;
         }
     }
 

@@ -333,6 +333,24 @@ public class PickableObject : Interactable
     }
 
     /// <summary>
+    /// Enables the <see cref="SocketFollow"/> component and configures it to follow
+    /// <paramref name="source"/> using a fixed local-space offset rather than reading a
+    /// child transform's world position. Position is computed via
+    /// <c>source.TransformPoint(localPosition)</c> and rotation via
+    /// <c>source.rotation * localRotation</c>, so the result always reflects the source's
+    /// definitive per-frame transform — including pitch applied after animation rigging.
+    /// Creates the component lazily if the prefab does not already have one.
+    /// </summary>
+    public void SetSocketFollowWithLocalOffset(Transform source, Vector3 localPosition, Quaternion localRotation)
+    {
+        if (_socketFollow == null)
+            _socketFollow = gameObject.AddComponent<SocketFollow>();
+
+        _socketFollow.SetTargetWithLocalOffset(source, localPosition, localRotation);
+        _socketFollow.enabled = true;
+    }
+
+    /// <summary>
     /// Disables and clears the <see cref="SocketFollow"/> component so this object stops
     /// tracking a folder slot. Call this on drop or when the slot is no longer valid.
     /// </summary>
