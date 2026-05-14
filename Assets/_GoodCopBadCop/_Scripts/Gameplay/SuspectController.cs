@@ -677,7 +677,7 @@ public class SuspectController : NetworkBehaviour
             yield return new WaitForEndOfFrame();
 
             if (suspectCharacter == null)
-                yield break;
+                break;
 
             suspectCharacter.transform.position = suspectQuarantineFollowPos.position;
             suspectCharacter.transform.rotation = suspectQuarantineFollowPos.rotation;
