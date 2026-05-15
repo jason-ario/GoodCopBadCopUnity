@@ -93,10 +93,23 @@ public class ShiftManager : NetworkBehaviour
 
     private void OnEnable()
     {
+        BetweenShiftTaskManager.OnAllTasksComplete += HandleAllTasksComplete;
     }
 
     private void OnDisable()
     {
+        BetweenShiftTaskManager.OnAllTasksComplete -= HandleAllTasksComplete;
+    }
+
+    /// <summary>
+    /// Called on all clients when every between-shift task has been completed.
+    /// Fires <see cref="OnShiftReady"/> so the switch button becomes pressable,
+    /// and prompts the player to return to the booth.
+    /// </summary>
+    private void HandleAllTasksComplete()
+    {
+        OnShiftReady?.Invoke();
+        TutorialManager.Instance.SayAllTasksComplete();
     }
 
     public override void OnNetworkSpawn()
@@ -367,7 +380,8 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>
     /// Called when the player presses Continue on the end-of-shift report.
     /// Fades the screen, re-enables player movement, and begins the between-shift
-    /// night phase — tasks now run concurrently throughout the whole work day.
+    /// night phase. The shift-start button becomes pressable only after all tasks
+    /// are completed and <see cref="BetweenShiftTaskManager.OnAllTasksComplete"/> fires.
     /// </summary>
     public void StartInBetweenShiftSequence()
     {
@@ -465,13 +479,9 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(1f);
 
         EnablePlayerControl();
-        TutorialManager.Instance.ShowTutorialText("You may now prepare for your next shift");
 
-        // Tasks run concurrently during the work day — shift ready fires immediately.
-        if (IsServer && BetweenShiftTaskManager.Instance != null)
-            BetweenShiftTaskManager.Instance.BeginNightPhase();
-
-        OnShiftReady?.Invoke();
+        // OnShiftReady is deferred until all between-shift tasks are complete.
+        // BetweenShiftTaskManager.OnAllTasksComplete → HandleAllTasksComplete will fire it.
         OnDayStart?.Invoke();
     }
 

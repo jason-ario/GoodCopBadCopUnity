@@ -69,7 +69,7 @@ public class TutorialManager : MonoBehaviour
     /// <summary>Played when all night-phase tasks are complete and the shift-start button is ready.</summary>
     public void SayAllTasksComplete()
     {
-        ShowTutorialText("All tasks complete. Return to booth to begin the next shift.");
+        ShowTutorialText("All tasks completed, return to the booth for the next shift.");
     }
 
     /// <summary>Played when all night-phase tasks are complete and the shift-start button is ready.</summary>

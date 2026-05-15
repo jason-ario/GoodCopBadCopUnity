@@ -63,7 +63,7 @@ public class DebugConsole : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.F9))
         {
-            // DebugForceTasksComplete removed — tasks now run concurrently during shifts.
+            BetweenShiftTaskManager.Instance.ForceCompleteAllTasks();
         }
 
         if (Input.GetKeyDown(KeyCode.F10))

@@ -109,4 +109,22 @@ public class BetweenShiftTaskManager : NetworkBehaviour
         if (_completedTaskCount >= _tasks.Length)
             _allTasksComplete.Value = true;
     }
+
+    /// <summary>
+    /// Debug helper — immediately marks all tasks as complete regardless of actual task state.
+    /// Routes through the server so the NetworkVariable replicates correctly.
+    /// </summary>
+    public void ForceCompleteAllTasks()
+    {
+        if (IsServer)
+            _allTasksComplete.Value = true;
+        else
+            ForceCompleteAllTasksServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ForceCompleteAllTasksServerRpc()
+    {
+        _allTasksComplete.Value = true;
+    }
 }
