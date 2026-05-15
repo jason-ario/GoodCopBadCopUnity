@@ -4,6 +4,8 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
+public enum DeathBehaviour { Destroy, PlayAnimation }
+
 /// <summary>
 /// Server-authoritative mutant NPC.
 /// Chases the nearest living player and attacks them when within range.
@@ -28,6 +30,21 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Delay in seconds from the start of the attack animation to the melee impact frame.")]
     [SerializeField] private float attackHitDelay = 0.4f;
+
+    [Header("Hit Feedback")]
+    [Tooltip("Particle prefab instantiated on all clients at the point of impact when this enemy is hit.")]
+    [SerializeField] private GameObject hitParticlePrefab;
+
+    [Header("Death")]
+    [Tooltip("Destroy: despawns immediately on death. PlayAnimation: triggers the death animation then despawns after a delay.")]
+    [SerializeField] private DeathBehaviour deathBehaviour = DeathBehaviour.Destroy;
+
+    [Tooltip("Seconds to wait after triggering the death animation before despawning. Only used when Death Behaviour is PlayAnimation.")]
+    [Min(0f)]
+    [SerializeField] private float deathAnimationDuration = 2f;
+
+    [Tooltip("Sound played on all clients when this enemy dies.")]
+    [SerializeField] private AudioClip deathSound;
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -220,15 +237,31 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Apply damage to this enemy. Call from the server (e.g. from a weapon script).
     /// </summary>
-    public void TakeDamage(float amount)
+    /// <param name="amount">Damage to apply.</param>
+    /// <param name="hitPoint">World-space point of impact used to position the hit particle.</param>
+    public void TakeDamage(float amount, Vector3 hitPoint)
     {
         if (!IsServer || _isDead)
             return;
 
         _health -= amount;
 
+        SpawnHitParticleClientRpc(hitPoint);
+
         if (_health <= 0f)
             Die();
+    }
+
+    [ClientRpc]
+    private void SpawnHitParticleClientRpc(Vector3 position)
+    {
+        if (hitParticlePrefab == null)
+            return;
+
+        GameObject fx = Instantiate(hitParticlePrefab, position, Quaternion.identity);
+
+        if (fx.GetComponentInChildren<AutoDestroy>() == null)
+            fx.AddComponent<AutoDestroy>();
     }
 
     private void Die()
@@ -238,8 +271,18 @@ public class MutantEnemy : NetworkBehaviour
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
 
-        TriggerDeathAnimationClientRpc();
-        StartCoroutine(DespawnAfterDelay(2f));
+        if (deathBehaviour == DeathBehaviour.PlayAnimation)
+        {
+            TriggerDeathAnimationClientRpc();
+            StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
+        }
+        else
+        {
+            PlayDeathSoundClientRpc();
+
+            if (IsSpawned)
+                NetworkObject.Despawn();
+        }
     }
 
     [ClientRpc]
@@ -247,6 +290,16 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (animator != null && !string.IsNullOrEmpty(deathTriggerName))
             animator.SetTrigger(deathTriggerName);
+
+        if (deathSound != null)
+            SFXController.Instance.Play(deathSound);
+    }
+
+    [ClientRpc]
+    private void PlayDeathSoundClientRpc()
+    {
+        if (deathSound != null)
+            SFXController.Instance.Play(deathSound);
     }
 
     private IEnumerator DespawnAfterDelay(float delay)

@@ -4,9 +4,11 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Server-authoritative spawner that periodically creates MutantEnemy instances
+/// Server-authoritative spawner that periodically creates bursts of MutantEnemy instances
 /// at random positions within a configurable box volume in the woods.
 /// The box is centred on this GameObject's position.
+/// Spawn intervals are randomised between <see cref="spawnIntervalMin"/> and <see cref="spawnIntervalMax"/>.
+/// Each interval triggers a burst: a rapid sequence of spawns with a short delay between each one.
 /// </summary>
 public class MutantSpawner : NetworkBehaviour
 {
@@ -21,17 +23,27 @@ public class MutantSpawner : NetworkBehaviour
     [SerializeField] private Vector3 spawnBoxHalfExtents = new Vector3(20f, 0f, 20f);
 
     [Header("Timing")]
-    [Tooltip("Seconds before the first spawn wave after the game starts.")]
+    [Tooltip("Seconds before the first burst after the game starts.")]
     [SerializeField] private float initialDelay = 10f;
 
-    [Tooltip("Seconds between consecutive spawn waves.")]
-    [SerializeField] private float spawnInterval = 30f;
+    [Tooltip("Minimum seconds between consecutive bursts.")]
+    [SerializeField] private float spawnIntervalMin = 30f;
 
-    [Header("Count")]
-    [Tooltip("How many enemies to spawn per wave.")]
-    [SerializeField] private int enemiesPerWave = 3;
+    [Tooltip("Maximum seconds between consecutive bursts.")]
+    [SerializeField] private float spawnIntervalMax = 60f;
 
-    [Tooltip("Maximum number of active enemies this spawner will maintain. No new wave starts while at or above this cap.")]
+    [Header("Burst")]
+    [Tooltip("Minimum number of enemies spawned per burst.")]
+    [SerializeField] private int burstCountMin = 2;
+
+    [Tooltip("Maximum number of enemies spawned per burst.")]
+    [SerializeField] private int burstCountMax = 5;
+
+    [Tooltip("Seconds between each individual spawn within a burst.")]
+    [SerializeField] private float burstSpawnDelay = 0.5f;
+
+    [Header("Cap")]
+    [Tooltip("Maximum number of active enemies this spawner will maintain. Individual burst spawns are skipped once at or above this cap.")]
     [SerializeField] private int maxActiveEnemies = 10;
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -72,26 +84,37 @@ public class MutantSpawner : NetworkBehaviour
 
         while (_isRunning)
         {
-            PruneDeadEnemies();
+            yield return StartCoroutine(SpawnBurst());
 
-            if (_activeEnemies.Count < maxActiveEnemies)
-                SpawnWave();
-
-            yield return new WaitForSeconds(spawnInterval);
+            float interval = Random.Range(spawnIntervalMin, spawnIntervalMax);
+            yield return new WaitForSeconds(interval);
         }
     }
 
     // ── Spawning ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Spawns a single wave of enemies, up to the per-wave count and the global cap.
+    /// Spawns a rapid sequence of enemies, one at a time, with <see cref="burstSpawnDelay"/> between each.
+    /// The burst count is randomised between <see cref="burstCountMin"/> and <see cref="burstCountMax"/>.
+    /// Individual spawns are skipped (but the delay still elapses) when the active cap is reached.
     /// </summary>
-    private void SpawnWave()
+    private IEnumerator SpawnBurst()
     {
-        int toSpawn = Mathf.Min(enemiesPerWave, maxActiveEnemies - _activeEnemies.Count);
+        int count = Random.Range(burstCountMin, burstCountMax + 1);
 
-        for (int i = 0; i < toSpawn; i++)
-            SpawnSingleEnemy();
+        for (int i = 0; i < count; i++)
+        {
+            if (!_isRunning)
+                yield break;
+
+            PruneDeadEnemies();
+
+            if (_activeEnemies.Count < maxActiveEnemies)
+                SpawnSingleEnemy();
+
+            if (i < count - 1)
+                yield return new WaitForSeconds(burstSpawnDelay);
+        }
     }
 
     private void SpawnSingleEnemy()
@@ -130,15 +153,14 @@ public class MutantSpawner : NetworkBehaviour
     // ── Public API ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Manually triggers an immediate spawn wave. SERVER ONLY.
+    /// Manually triggers an immediate burst. SERVER ONLY.
     /// </summary>
-    public void ForceSpawnWave()
+    public void ForceSpawn()
     {
         if (!IsServer)
             return;
 
-        PruneDeadEnemies();
-        SpawnWave();
+        StartCoroutine(SpawnBurst());
     }
 
     /// <summary>
