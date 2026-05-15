@@ -5,8 +5,8 @@ using UnityEngine;
 
 /// <summary>
 /// Server-authoritative spawner that periodically creates MutantEnemy instances
-/// at designated spawn points in the woods.
-/// Place in the scene alongside a set of child Transform spawn points.
+/// at random positions within a configurable box volume in the woods.
+/// The box is centred on this GameObject's position.
 /// </summary>
 public class MutantSpawner : NetworkBehaviour
 {
@@ -16,9 +16,9 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Networked prefab containing a MutantEnemy component. Must be registered in NetworkManager's prefab list.")]
     [SerializeField] private GameObject mutantPrefab;
 
-    [Header("Spawn Points")]
-    [Tooltip("World positions used as spawn locations. Enemies are placed at a random point from this list each wave.")]
-    [SerializeField] private Transform[] spawnPoints;
+    [Header("Spawn Area")]
+    [Tooltip("Half-extents of the axis-aligned box (in local space) within which enemies can spawn. The box is centred on this GameObject's position.")]
+    [SerializeField] private Vector3 spawnBoxHalfExtents = new Vector3(20f, 0f, 20f);
 
     [Header("Timing")]
     [Tooltip("Seconds before the first spawn wave after the game starts.")]
@@ -51,12 +51,6 @@ public class MutantSpawner : NetworkBehaviour
         if (mutantPrefab == null)
         {
             Debug.LogError("[MutantSpawner] mutantPrefab is not assigned. Spawner will not run.", this);
-            return;
-        }
-
-        if (spawnPoints == null || spawnPoints.Length == 0)
-        {
-            Debug.LogWarning("[MutantSpawner] No spawn points assigned. Add child Transforms to the spawnPoints array.", this);
             return;
         }
 
@@ -102,9 +96,16 @@ public class MutantSpawner : NetworkBehaviour
 
     private void SpawnSingleEnemy()
     {
-        Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        Vector3 localOffset = new Vector3(
+            Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
+            Random.Range(-spawnBoxHalfExtents.y, spawnBoxHalfExtents.y),
+            Random.Range(-spawnBoxHalfExtents.z, spawnBoxHalfExtents.z)
+        );
 
-        GameObject instance = Instantiate(mutantPrefab, point.position, point.rotation);
+        Vector3 spawnPosition = transform.TransformPoint(localOffset);
+        Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+        GameObject instance = Instantiate(mutantPrefab, spawnPosition, spawnRotation);
         NetworkObject netObj = instance.GetComponent<NetworkObject>();
 
         if (netObj == null)
@@ -175,5 +176,17 @@ public class MutantSpawner : NetworkBehaviour
         }
 
         _activeEnemies.Clear();
+    }
+
+    // ── Gizmos ─────────────────────────────────────────────────────────────────
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(1f, 0.5f, 0f, 0.25f);
+        Gizmos.matrix = transform.localToWorldMatrix;
+        Gizmos.DrawCube(Vector3.zero, spawnBoxHalfExtents * 2f);
+
+        Gizmos.color = new Color(1f, 0.5f, 0f, 0.8f);
+        Gizmos.DrawWireCube(Vector3.zero, spawnBoxHalfExtents * 2f);
     }
 }

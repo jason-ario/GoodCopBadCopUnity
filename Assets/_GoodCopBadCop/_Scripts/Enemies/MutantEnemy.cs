@@ -22,6 +22,13 @@ public class MutantEnemy : NetworkBehaviour
     [SerializeField] private string attackTriggerName = "Attack";
     [SerializeField] private string deathTriggerName = "Death";
 
+    [Header("Attack Hitbox")]
+    [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
+    [SerializeField] private MutantAttackHitbox attackHitbox;
+
+    [Tooltip("Delay in seconds from the start of the attack animation to the melee impact frame.")]
+    [SerializeField] private float attackHitDelay = 0.4f;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private NavMeshAgent _agent;
@@ -91,8 +98,19 @@ public class MutantEnemy : NetworkBehaviour
     {
         const float retargetInterval = 0.5f;
 
+        // Wait one frame for the NavMeshAgent to place itself on the NavMesh surface
+        // after being instantiated at runtime. Without this, SetDestination silently
+        // fails on freshly spawned agents that haven't yet been linked to the mesh.
+        yield return null;
+
         while (!_isDead)
         {
+            if (!_agent.isOnNavMesh)
+            {
+                yield return new WaitForSeconds(retargetInterval);
+                continue;
+            }
+
             _currentTarget = FindNearestLivingPlayer();
 
             if (_currentTarget != null)
@@ -168,11 +186,26 @@ public class MutantEnemy : NetworkBehaviour
             return;
 
         PlayerHealth targetHealth = _currentTarget.GetComponent<PlayerHealth>();
-        if (targetHealth != null && !targetHealth.IsDead)
-        {
-            targetHealth.TakeDamage(data.damagePerHit);
-            TriggerAttackAnimationClientRpc();
-        }
+        if (targetHealth == null || targetHealth.IsDead)
+            return;
+
+        TriggerAttackAnimationClientRpc();
+
+        // Schedule the sphere-cast to fire at the melee impact frame on the server.
+        StartCoroutine(DelayedHitScan(data.damagePerHit));
+    }
+
+    /// <summary>
+    /// Waits for the animation's melee point, then runs the hitbox sphere-cast on the server.
+    /// </summary>
+    private IEnumerator DelayedHitScan(float damage)
+    {
+        yield return new WaitForSeconds(attackHitDelay);
+
+        if (_isDead || attackHitbox == null)
+            yield break;
+
+        attackHitbox.PerformHitScan(damage);
     }
 
     [ClientRpc]

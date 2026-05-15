@@ -29,7 +29,7 @@ public class RandomTentacleAnomaly : MutationAnomaly
 
     private void ActivateTumor()
     {
-        int randomTumorAmount = Random.Range(1, tentacles.Length + 1);
+        int randomTumorAmount = Random.Range(2, tentacles.Length + 1);
 
         ShuffleTumors();
 
