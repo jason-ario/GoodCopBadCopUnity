@@ -68,6 +68,21 @@ namespace FIMSpace
 
 
         /// <summary>
+        /// Choosing random 360 direction and returning min-max distance circle position using X and Z axis (y = 0)
+        /// </summary>
+        public static Vector3 RandomRadiusPositionNoYMinMax(float min, float max)
+        {
+            float range = UnityEngine.Random.Range(min, max);
+            Vector3 radiusPos = new Vector3();
+            float period = UnityEngine.Random.Range(0, Mathf.PI);
+            radiusPos.x = Mathf.Sin(period) * range;
+            radiusPos.y = 0f;
+            radiusPos.z = Mathf.Cos(period) * range;
+            return radiusPos;
+        }
+
+
+        /// <summary>
         /// Returning position on screen for UI element in reference to position in world 3D space, the 'z' will be negative if text is behind camera
         /// </summary>
         public static Vector3 GetUIPositionFromWorldPosition(Vector3 position, Camera camera, RectTransform canvas)

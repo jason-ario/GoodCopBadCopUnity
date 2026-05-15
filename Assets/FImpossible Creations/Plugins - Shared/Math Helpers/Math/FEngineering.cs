@@ -263,6 +263,9 @@ namespace FIMSpace
         public static float PointDisperse( int index, int baseV = 2 )
         {
             float sum = 0f; float functionV = 1f / baseV; int i = index;
+#if UNITY_EDITOR
+            if( i < 0 ) UnityEngine.Debug.Log( "[PointDisperse] Warning -> used negative index, it will not work!" );
+#endif
             while( i > 0 ) { sum += functionV * ( i % baseV ); i = Mathf.FloorToInt( i / baseV ); functionV /= baseV; }
             return ( sum - 0.5f );
         }

@@ -168,6 +168,9 @@ public class Telephone : Interactable
 
         phoneSound.PlayOneShot(phonePlaceSound);
 
+        // Close the HQ order screen before putting the phone down.
+        UIController.Instance.CloseHQOrderScreen();
+
         player.playerAnimationController.SetAnimBool("HoldingPhone", false);
         player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
 
@@ -214,6 +217,9 @@ public class Telephone : Interactable
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
         player.playerAnimationController.LeftArmIKTarget = null;
         player.playerMovementController.SetCanControl(true);
+
+        // Open the HQ order screen once the grab animation has finished.
+        UIController.Instance.OpenHQOrderScreen();
 
         interactText = "Put Down";
     }

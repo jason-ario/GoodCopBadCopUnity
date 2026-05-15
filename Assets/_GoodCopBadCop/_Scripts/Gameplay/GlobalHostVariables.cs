@@ -38,4 +38,22 @@ public class GlobalHostVariables : NetworkBehaviour
         money.Value -= amount;
         return true;
     }
+
+    /// <summary>
+    /// Callable from any client. Routes the deduction through a ServerRpc so the
+    /// NetworkVariable write always happens on the server.
+    /// </summary>
+    public void SubtractMoneyFromClient(int amount)
+    {
+        if (IsServer)
+            SubtractMoney(amount);
+        else
+            SubtractMoneyServerRpc(amount);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SubtractMoneyServerRpc(int amount)
+    {
+        SubtractMoney(amount);
+    }
 }

@@ -177,5 +177,17 @@ namespace FIMSpace
             return path;
         }
 
+        public static bool IsObjectAddedToWorld( GameObject gameObject )
+        {
+            return ( gameObject.scene.rootCount != 0 && gameObject.scene.isLoaded );
+        }
+
+        /// <summary> If not instantiated yet in the scene </summary>
+        public static bool IsObjectJustProjectFile( GameObject gameObject )
+        {
+            return !IsObjectAddedToWorld( gameObject );
+        }
+
+
     }
 }

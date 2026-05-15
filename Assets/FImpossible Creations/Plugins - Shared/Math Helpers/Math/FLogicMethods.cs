@@ -242,5 +242,41 @@ namespace FIMSpace
             return true;
         }
 
+
+        public static void AdjustCount<T>( List<T> list, int targetCount, bool addNulls ) where T : class, new()
+        {
+            if( list.Count == targetCount ) return;
+
+            if( list.Count < targetCount )
+            {
+                if( addNulls )
+                {
+                    while( list.Count < targetCount ) list.Add( null );
+                }
+                else
+                {
+                    while( list.Count < targetCount ) list.Add( new T() );
+                }
+            }
+            else
+            {
+                while( list.Count > targetCount ) list.RemoveAt( list.Count - 1 );
+            }
+        }
+
+        public static void AdjustCount<T>( List<T> list, int targetCount )
+        {
+            if( list.Count == targetCount ) return;
+
+            if( list.Count < targetCount )
+            {
+                while( list.Count < targetCount ) list.Add( default );
+            }
+            else
+            {
+                while( list.Count > targetCount ) list.RemoveAt( list.Count - 1 );
+            }
+        }
+
     }
 }

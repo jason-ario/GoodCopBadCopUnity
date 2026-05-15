@@ -21,10 +21,11 @@ public class UIController : MonoBehaviour
     /// <summary>Fired on the local client whenever any player opens the tool shop.</summary>
     public static event Action OnToolShopOpened;
 
-    [SerializeField] RawImage cameraImage;
+    [SerializeField] private RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
     [SerializeField] private GameObject toolShopUI;
+    [SerializeField] private GameObject hqOrderScreenUI;
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
@@ -132,6 +133,29 @@ public class UIController : MonoBehaviour
             _activeToolsLocker.NotifyPlayerClosedServerRpc();
             _activeToolsLocker = null;
         }
+    }
+
+    /// <summary>
+    /// Opens the HQ Order Screen. Disables player movement and interaction, shows cursor.
+    /// Call this when the player picks up the telephone.
+    /// </summary>
+    public void OpenHQOrderScreen()
+    {
+        PlayerInstance.Instance.OpenedUIPanel();
+        ShowCursor();
+        playerUI.SetActive(false);
+        hqOrderScreenUI.SetActive(true);
+    }
+
+    /// <summary>
+    /// Closes the HQ Order Screen and restores player movement and interaction.
+    /// </summary>
+    public void CloseHQOrderScreen()
+    {
+        hqOrderScreenUI.SetActive(false);
+        playerUI.SetActive(true);
+        HideCursor();
+        PlayerInstance.Instance.ClosedUIPanel();
     }
 
     public void ClosePlayerUI()

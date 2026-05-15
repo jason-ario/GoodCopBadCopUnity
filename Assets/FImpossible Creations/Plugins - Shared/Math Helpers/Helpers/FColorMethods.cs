@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace FIMSpace
 {
@@ -37,6 +38,32 @@ namespace FIMSpace
         public static Color ChangeColorsValue(this Color color, float brightenOrDarken = 0f)
         {
             return new Color(color.r + brightenOrDarken, color.g + brightenOrDarken, color.b + brightenOrDarken, color.a);
+        }
+
+        /// <summary>
+        /// Changing color brightness or darkness value (adding / subliming .r .g .b) -1 to 1 value
+        /// </summary>
+        public static Color MultiplyColorsValue(this Color color, float brightenOrDarken = 0f)
+        {
+            return new Color(color.r * brightenOrDarken, color.g * brightenOrDarken, color.b * brightenOrDarken, color.a);
+        }
+
+        /// <summary>
+        /// Changing color brightness or darkness value (adding / subliming .r .g .b) -1 to 1 value
+        /// </summary>
+        public static Color MoveTowards(this Color color, Color newValue, float delta)
+        {
+            float r = color.r;
+            float g = color.g;
+            float b = color.b;
+            float a = color.a;
+
+            r = Mathf.MoveTowards(r, newValue.r, delta);
+            g = Mathf.MoveTowards(g, newValue.g, delta);
+            b = Mathf.MoveTowards(b, newValue.b, delta);
+            a = Mathf.MoveTowards(a, newValue.a, delta);
+
+            return new Color(r,g,b,a);
         }
 
         /// <summary>
@@ -109,6 +136,11 @@ namespace FIMSpace
 
             Color currentColor = mat.GetColor(property);
             mat.SetColor(property, Color.Lerp(currentColor, targetColor, Time.deltaTime * deltaMultiplier));
+        }
+
+        public static Color MoveTowards(Color color, object value, float v)
+        {
+            throw new NotImplementedException();
         }
     }
 }

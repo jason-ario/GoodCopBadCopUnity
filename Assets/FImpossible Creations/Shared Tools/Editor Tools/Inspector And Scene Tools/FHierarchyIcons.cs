@@ -10,6 +10,28 @@ using UnityEngine;
 #endif
 public class FHierarchyIcons
 {
+
+#if UNITY_6000_4_OR_NEWER
+    static FHierarchyIcons()
+    {
+#if UNITY_EDITOR
+        EditorApplication.hierarchyWindowItemByEntityIdOnGUI += EvaluateIcons;
+#endif
+    }
+
+    private static void EvaluateIcons(EntityId instanceId, Rect selectionRect)
+    {
+#if UNITY_EDITOR
+        GameObject go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
+        if (go == null) return;
+
+        IFHierarchyIcon slotCon = go.GetComponent<IFHierarchyIcon>();
+        if (slotCon != null) DrawIcon(slotCon.EditorIconPath, selectionRect);
+#endif
+    }
+
+#else
+
     static FHierarchyIcons()
     {
 #if UNITY_EDITOR
@@ -28,6 +50,8 @@ public class FHierarchyIcons
 #endif
     }
 
+#endif
+
     private static void DrawIcon(string texName, Rect rect)
     {
 #if UNITY_EDITOR
@@ -45,6 +69,7 @@ public class FHierarchyIcons
         return null;
 #endif
     }
+
 }
 
 public interface IFHierarchyIcon
@@ -52,12 +77,3 @@ public interface IFHierarchyIcon
     string EditorIconPath { get; }
 }
 
-/*
-
-{...}
-    public class ItemUiSlot : MonoBehaviour, IDropHandler, FIHierarchyIcon
-    {
-        public string EditorIconPath { get { return "LogoGrey";  } }
-{...}
-
-*/
