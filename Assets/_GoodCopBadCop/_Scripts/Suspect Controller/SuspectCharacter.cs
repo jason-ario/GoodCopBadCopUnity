@@ -117,6 +117,38 @@ public class SuspectCharacter : Interactable
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        // Relay server-chosen tentacle indices to clients so they show the same
+        // tentacles without running independent RNG.
+        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
+            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        // Relay server-chosen tumor indices to clients so they show the same
+        // tumors without running independent RNG.
+        foreach (var kvp in anomalyController.TumorAnomalyIndices)
+            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+    }
+
+    /// <summary>
+    /// Tells clients which tentacle indices the server activated for a specific
+    /// RandomTentacleAnomaly, identified by its sibling index in the hierarchy.
+    /// </summary>
+    [ClientRpc]
+    private void SyncTentacleAnomalyClientRpc(int siblingIndex, int[] activeIndices)
+    {
+        if (IsServer) return;
+        anomalyController.ApplyTentacleIndicesOnClient(siblingIndex, activeIndices);
+    }
+
+    /// <summary>
+    /// Tells clients which tumor indices the server activated for a specific
+    /// RandomTumorAnomaly, identified by its sibling index in the hierarchy.
+    /// </summary>
+    [ClientRpc]
+    private void SyncTumorAnomalyClientRpc(int siblingIndex, int[] activeIndices)
+    {
+        if (IsServer) return;
+        anomalyController.ApplyTumorIndicesOnClient(siblingIndex, activeIndices);
     }
 
     public override void Interact(PlayerInteractionController player)

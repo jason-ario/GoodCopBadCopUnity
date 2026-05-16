@@ -24,28 +24,56 @@ public class RandomTumorAnomaly : MutationAnomaly
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
-        ActivateTumor();
+
+        int[] activeIndices = PickActiveIndices();
+        ApplyActiveIndices(activeIndices);
     }
 
-    private void ActivateTumor()
+    /// <summary>
+    /// Activates the specified tumor indices. Called on clients to replicate
+    /// the server's activation without running independent RNG.
+    /// </summary>
+    public void ActivateWithIndices(int[] activeIndices)
     {
-        int randomTumorAmount = Random.Range(1, tumors.Length + 1);
+        ApplyActiveIndices(activeIndices);
+    }
 
-        ShuffleTumors();
+    /// <summary>
+    /// Picks a random subset of tumor indices using a Fisher-Yates shuffle
+    /// and returns them. Only call this on the server.
+    /// </summary>
+    public int[] PickActiveIndices()
+    {
+        int[] indices = BuildShuffledIndices();
+        int count = Random.Range(1, tumors.Length + 1);
+        int[] activeIndices = new int[count];
+        Array.Copy(indices, activeIndices, count);
+        return activeIndices;
+    }
 
-        for (int i = 0; i < randomTumorAmount; i++)
+    private void ApplyActiveIndices(int[] activeIndices)
+    {
+        foreach (int index in activeIndices)
         {
-            tumors[i].SetActive(true);
+            if (index >= 0 && index < tumors.Length)
+                tumors[index].SetActive(true);
         }
     }
 
-    private void ShuffleTumors()
+    /// <summary>Returns a Fisher-Yates shuffled array of tumor indices.</summary>
+    private int[] BuildShuffledIndices()
     {
-        for (int i = tumors.Length - 1; i > 0; i--)
+        int[] indices = new int[tumors.Length];
+        for (int i = 0; i < indices.Length; i++)
+            indices[i] = i;
+
+        for (int i = indices.Length - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
-            (tumors[i], tumors[j]) = (tumors[j], tumors[i]);
+            (indices[i], indices[j]) = (indices[j], indices[i]);
         }
+
+        return indices;
     }
 
     /// <summary>

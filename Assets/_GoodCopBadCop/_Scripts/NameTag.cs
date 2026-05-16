@@ -1,8 +1,8 @@
 using System.Collections;
 using Netcode.Transports.Facepunch;
 using Steamworks;
+using Steamworks.Data;
 using TMPro;
-using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -16,9 +16,14 @@ public class NameTag : NetworkBehaviour
 
     [SerializeField] private TMP_Text label;
 
-    private readonly NetworkVariable<FixedString64Bytes> _playerName =
-        new NetworkVariable<FixedString64Bytes>(
-            default,
+    /// <summary>
+    /// Stores the owner's Steam ID so every client can independently resolve
+    /// the display name — avoiding any replication-timing race on FixedString.
+    /// Written by the owner; readable by all.
+    /// </summary>
+    private readonly NetworkVariable<ulong> _ownerSteamId =
+        new NetworkVariable<ulong>(
+            0UL,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Owner);
 
@@ -33,55 +38,76 @@ public class NameTag : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        // Always subscribe on all clients — the owner's own tag is hidden anyway,
-        // but subscribing unconditionally avoids missing an update if ownership transfers.
-        _playerName.OnValueChanged += OnPlayerNameChanged;
+        _ownerSteamId.OnValueChanged += OnSteamIdChanged;
 
         if (IsOwner)
         {
-            // Defer the write by one frame so NGO has finished initialising the
-            // NetworkVariable on all connected clients before the value replicates.
-            StartCoroutine(SetNameNextFrame());
+            // Publish the local player's Steam ID so every other client can resolve the name.
+            StartCoroutine(PublishSteamIdNextFrame());
             return;
         }
 
-        // Non-owner: apply whatever value is already present (covers late-joiners
-        // whose NetworkVariable snapshot already contains the correct name).
-        string currentName = _playerName.Value.ToString();
-        if (!string.IsNullOrEmpty(currentName))
-            ApplyName(currentName);
+        // Non-owner: if the NetworkVariable snapshot already contains a valid ID
+        // (e.g. late-joiner receiving initial state), resolve immediately.
+        if (_ownerSteamId.Value != 0UL)
+            StartCoroutine(ResolveSteamName(_ownerSteamId.Value));
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _playerName.OnValueChanged -= OnPlayerNameChanged;
+        _ownerSteamId.OnValueChanged -= OnSteamIdChanged;
     }
 
-    /// <summary>Waits one frame then writes the local Steam display name into the NetworkVariable.</summary>
-    private IEnumerator SetNameNextFrame()
+    /// <summary>Waits one frame then writes the local SteamId into the NetworkVariable.</summary>
+    private IEnumerator PublishSteamIdNextFrame()
     {
         yield return null;
 
         bool usesSteam = NetworkManager.Singleton != null &&
                          NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport;
 
-        if (!usesSteam)
+        if (!usesSteam || !SteamClient.IsValid)
             yield break;
 
-        string steamName = SteamClient.Name;
-        if (string.IsNullOrEmpty(steamName))
+        _ownerSteamId.Value = SteamClient.SteamId.Value;
+    }
+
+    private void OnSteamIdChanged(ulong previous, ulong current)
+    {
+        // Only non-owners need to react; owners never show their own tag.
+        if (IsOwner || current == 0UL)
+            return;
+
+        StartCoroutine(ResolveSteamName(current));
+    }
+
+    /// <summary>
+    /// Resolves the display name for <paramref name="steamId"/> by calling
+    /// <see cref="Friend.RequestInfoAsync"/> so the name is fetched from Steam
+    /// even when the user is not in the local friend list.
+    /// </summary>
+    private IEnumerator ResolveSteamName(ulong steamId)
+    {
+        if (!SteamClient.IsValid)
+            yield break;
+
+        var friend = new Friend(steamId);
+        var task = friend.RequestInfoAsync();
+
+        // Yield until the async request completes.
+        while (!task.IsCompleted)
+            yield return null;
+
+        string resolvedName = friend.Name;
+
+        if (string.IsNullOrEmpty(resolvedName))
         {
-            Debug.LogWarning("[NameTag] SteamClient.Name is empty after one frame — name tag will be blank for other players.");
+            Debug.LogWarning($"[NameTag] Could not resolve Steam name for SteamId={steamId}.");
             yield break;
         }
 
-        _playerName.Value = new FixedString64Bytes(steamName);
-    }
-
-    private void OnPlayerNameChanged(FixedString64Bytes previous, FixedString64Bytes current)
-    {
-        ApplyName(current.ToString());
+        ApplyName(resolvedName);
     }
 
     private void ApplyName(string playerName)

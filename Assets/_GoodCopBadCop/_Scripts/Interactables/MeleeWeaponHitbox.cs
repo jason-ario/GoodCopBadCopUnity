@@ -17,9 +17,6 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     [Tooltip("Radius of the OverlapSphere centered on this transform.")]
     [SerializeField] private float hitRadius = 0.8f;
 
-    [Tooltip("Tag used to identify enemy GameObjects. Must match the enemy prefab tag.")]
-    [SerializeField] private string enemyTag = "Enemy";
-
     private const string PlayerTag = "Player";
 
     // ── Events ─────────────────────────────────────────────────────────────────
@@ -103,15 +100,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             anyNonSelfHit = true;
 
-            if (!root.CompareTag(enemyTag))
-                continue;
-
-            MutantEnemy enemy = root.GetComponentInChildren<MutantEnemy>();
+            // Walk up from the hit collider to find a MutantEnemy — no tag dependency.
+            MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             if (enemy == null)
                 continue;
 
             enemy.TakeDamage(damage, col.ClosestPoint(attackOrigin));
-            Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{root.name}' via '{col.name}' for {damage} damage.", this);
+            Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
 
             NotifyHitClientRpc(ownerParams);
             return;

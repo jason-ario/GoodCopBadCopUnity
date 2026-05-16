@@ -21,7 +21,21 @@ public class AnomalyController : MonoBehaviour
 
     private Anomaly[] _allPossibleAnomalies;
     public List<Anomaly> activeAnomalies = new List<Anomaly>();
-    
+
+    /// <summary>
+    /// Stores the deterministic active indices chosen on the server for each
+    /// RandomTentacleAnomaly, keyed by the anomaly's sibling index in the hierarchy.
+    /// Used by SuspectCharacter to relay the selection to clients via ClientRpc.
+    /// </summary>
+    public Dictionary<int, int[]> TentacleAnomalyIndices { get; } = new Dictionary<int, int[]>();
+
+    /// <summary>
+    /// Stores the deterministic active indices chosen on the server for each
+    /// RandomTumorAnomaly, keyed by the anomaly's sibling index in the hierarchy.
+    /// Used by SuspectCharacter to relay the selection to clients via ClientRpc.
+    /// </summary>
+    public Dictionary<int, int[]> TumorAnomalyIndices { get; } = new Dictionary<int, int[]>();
+
     public void Initialize()
     {
         var anomalies = new List<Anomaly>();
@@ -87,9 +101,57 @@ public class AnomalyController : MonoBehaviour
             
             Debug.Log("Activated " + anomaly.name);
             activeAnomalies.Add(anomaly);
-            anomaly.ActivateAnomaly();
+
+            // For tentacle anomalies, pick indices on the server side and store them
+            // so SuspectCharacter can relay the exact selection to clients.
+            if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
+            {
+                int[] indices = tentacleAnomaly.PickActiveIndices();
+                TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+                tentacleAnomaly.ActivateWithIndices(indices);
+            }
+            else if (anomaly is RandomTumorAnomaly tumorAnomaly)
+            {
+                int[] indices = tumorAnomaly.PickActiveIndices();
+                TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+                tumorAnomaly.ActivateWithIndices(indices);
+            }
+            else
+            {
+                anomaly.ActivateAnomaly();
+            }
         }
     }
     
+    /// <summary>
+    /// Applies tentacle indices that were chosen on the server. Called on clients
+    /// after receiving the synced index data from SuspectCharacter.
+    /// </summary>
+    public void ApplyTentacleIndicesOnClient(int siblingIndex, int[] indices)
+    {
+        RandomTentacleAnomaly tentacleAnomaly = GetComponentsInChildren<RandomTentacleAnomaly>(true)
+            .FirstOrDefault(t => t.transform.GetSiblingIndex() == siblingIndex);
+
+        if (tentacleAnomaly != null)
+            tentacleAnomaly.ActivateWithIndices(indices);
+        else
+            Debug.LogWarning($"[AnomalyController] No RandomTentacleAnomaly found at sibling index {siblingIndex}.");
+    }
+
+    /// <summary>
+    /// Applies tumor indices that were chosen on the server. Called on clients
+    /// after receiving the synced index data from SuspectCharacter.
+    /// </summary>
+    public void ApplyTumorIndicesOnClient(int siblingIndex, int[] indices)
+    {
+        RandomTumorAnomaly tumorAnomaly = GetComponentsInChildren<RandomTumorAnomaly>(true)
+            .FirstOrDefault(t => t.transform.GetSiblingIndex() == siblingIndex);
+
+        if (tumorAnomaly != null)
+            tumorAnomaly.ActivateWithIndices(indices);
+        else
+            Debug.LogWarning($"[AnomalyController] No RandomTumorAnomaly found at sibling index {siblingIndex}.");
+    }
+
     public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
 }

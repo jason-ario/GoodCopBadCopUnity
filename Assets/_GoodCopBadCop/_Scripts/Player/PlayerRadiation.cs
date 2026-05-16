@@ -1,7 +1,8 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class PlayerRadiation : MonoBehaviour
+public class PlayerRadiation : NetworkBehaviour
 {
     [Header("Radiation")]
     [SerializeField] private float maxRadiation = 100f;
@@ -44,6 +45,12 @@ public class PlayerRadiation : MonoBehaviour
 
     private void Update()
     {
+        // Only the server drives radiation damage to avoid per-frame ServerRpc spam.
+        // Cosmetic radiation state (vignette, UI) should subscribe to a networked variable
+        // if you want it to display on all clients in the future.
+        if (!IsServer)
+            return;
+
         AddRadiation(passiveRadiationPerSecond * Time.deltaTime);
 
         if (isTakingPill)

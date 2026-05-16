@@ -9,43 +9,71 @@ public class RandomTentacleAnomaly : MutationAnomaly
 
     private void Awake()
     {
-        InitializeTumors();
+        InitializeTentacles();
     }
 
-    void InitializeTumors()
+    private void InitializeTentacles()
     {
         for (var i = 0; i < tentacles.Length; i++)
         {
-            var tumor = tentacles[i];
-            tumor.transform.parent = parentBones[i];
+            var tentacle = tentacles[i];
+            tentacle.transform.parent = parentBones[i];
         }
     }
 
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
-        ActivateTumor();
+
+        int[] activeIndices = PickActiveIndices();
+        ApplyActiveIndices(activeIndices);
     }
 
-    private void ActivateTumor()
+    /// <summary>
+    /// Activates the specified tentacle indices. Called on clients to replicate
+    /// the server's activation without running independent RNG.
+    /// </summary>
+    public void ActivateWithIndices(int[] activeIndices)
     {
-        int randomTumorAmount = Random.Range(2, tentacles.Length + 1);
+        ApplyActiveIndices(activeIndices);
+    }
 
-        ShuffleTumors();
+    /// <summary>
+    /// Picks a random subset of tentacle indices using a Fisher-Yates shuffle
+    /// and returns them. Only call this on the server.
+    /// </summary>
+    public int[] PickActiveIndices()
+    {
+        int[] indices = BuildShuffledIndices();
+        int count = Random.Range(2, tentacles.Length + 1);
+        int[] activeIndices = new int[count];
+        Array.Copy(indices, activeIndices, count);
+        return activeIndices;
+    }
 
-        for (int i = 0; i < randomTumorAmount; i++)
+    private void ApplyActiveIndices(int[] activeIndices)
+    {
+        foreach (int index in activeIndices)
         {
-            tentacles[i].SetActive(true);
+            if (index >= 0 && index < tentacles.Length)
+                tentacles[index].SetActive(true);
         }
     }
 
-    private void ShuffleTumors()
+    /// <summary>Returns a Fisher-Yates shuffled array of tentacle indices.</summary>
+    private int[] BuildShuffledIndices()
     {
-        for (int i = tentacles.Length - 1; i > 0; i--)
+        int[] indices = new int[tentacles.Length];
+        for (int i = 0; i < indices.Length; i++)
+            indices[i] = i;
+
+        for (int i = indices.Length - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
-            (tentacles[i], tentacles[j]) = (tentacles[j], tentacles[i]);
+            (indices[i], indices[j]) = (indices[j], indices[i]);
         }
+
+        return indices;
     }
 
     /// <summary>

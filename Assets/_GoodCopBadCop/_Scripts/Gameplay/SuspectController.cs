@@ -52,15 +52,10 @@ public class SuspectController : NetworkBehaviour
     private int incorrectlyMarkedAnomalies = 0;
     
     [Header("Coupon Payouts")]
-    [SerializeField] int couponCorrectVerdictBonus = 10;
-    [SerializeField] int incorrectVerdictPenalty = 5;
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
     [SerializeField] int couponPerCorrectAnomaly = 3;
     [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
-
-    private StampContainer.StampType _lastVerdictStampType;
-    private bool _lastVerdictWasCorrect;
     
     private void Awake()
     {
@@ -492,8 +487,8 @@ public class SuspectController : NetworkBehaviour
 
 
     /// <summary>
-    /// Calculates payout values, credits the shared cash pool on the server, and
-    /// broadcasts popup notifications to every connected client.
+    /// Calculates payout values based solely on anomaly identification, credits the shared
+    /// cash pool on the server, and broadcasts popup notifications to every connected client.
     /// Must only be called on the server.
     /// </summary>
     private void PayOutResults()
@@ -507,8 +502,7 @@ public class SuspectController : NetworkBehaviour
             ? couponPerfectAnomaliesBonus
             : 0;
 
-        int verdictAmount = _lastVerdictWasCorrect ? couponCorrectVerdictBonus : -incorrectVerdictPenalty;
-        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount + verdictAmount;
+        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount;
 
         int accuracyPercent = 100;
         if (totalAnomaliesInLastSuspect > 0 || incorrectlyMarkedAnomalies > 0)
@@ -521,7 +515,7 @@ public class SuspectController : NetworkBehaviour
         GlobalHostVariables.Instance.AddMoney(totalCoupons);
 
         Debug.Log(
-            $"Payout — Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Verdict: {verdictAmount}, Total: {totalCoupons}");
+            $"Payout — Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total: {totalCoupons}");
 
         // Broadcast popup sequence to all clients.
         ShowCashPopUpSequenceClientRpc(
@@ -529,11 +523,8 @@ public class SuspectController : NetworkBehaviour
             accuracyPercent,
             correctlyMarkedAnomalies,
             totalAnomaliesInLastSuspect,
-            verdictAmount,
             perfectBonusAmount,
-            totalCoupons,
-            _lastVerdictStampType,
-            _lastVerdictWasCorrect);
+            totalCoupons);
     }
 
     [ClientRpc]
@@ -542,13 +533,10 @@ public class SuspectController : NetworkBehaviour
         int accuracyPercent,
         int correctCount,
         int totalCount,
-        int verdictAmount,
         int perfectBonus,
-        int totalCoupons,
-        StampContainer.StampType stampType,
-        bool verdictWasCorrect)
+        int totalCoupons)
     {
-        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, accuracyPercent, correctCount, totalCount, verdictAmount, perfectBonus, totalCoupons, stampType, verdictWasCorrect));
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, accuracyPercent, correctCount, totalCount, perfectBonus, totalCoupons));
     }
 
     private IEnumerator ShowCashPopUpSequence(
@@ -556,11 +544,8 @@ public class SuspectController : NetworkBehaviour
         int accuracyPercent,
         int correctCount,
         int totalCount,
-        int verdictAmount,
         int perfectBonus,
-        int totalCoupons,
-        StampContainer.StampType stampType,
-        bool verdictWasCorrect)
+        int totalCoupons)
     {
         yield return new WaitForSeconds(2f);
 
@@ -570,35 +555,15 @@ public class SuspectController : NetworkBehaviour
 
         yield return new WaitForSeconds(2f);
 
-        // Message 2: Verdict bonus or penalty.
-        UIController.Instance.ShowCashPopUpNotification(verdictAmount, GetVerdictMessage(stampType, verdictWasCorrect));
-
-        yield return new WaitForSeconds(2f);
-
-        // Message 3: Perfect identification bonus (if earned).
+        // Message 2: Perfect identification bonus (if earned).
         if (perfectBonus > 0)
         {
             UIController.Instance.ShowCashPopUpNotification(perfectBonus, "Perfect Identification Bonus");
             yield return new WaitForSeconds(2f);
         }
 
-        // Message 4: Total payout summary.
+        // Message 3: Total payout summary.
         UIController.Instance.ShowCashPopUpNotification(totalCoupons, "Payout Issued");
-    }
-
-    /// <summary>Builds a human-readable verdict result message for the cash popup.</summary>
-    private string GetVerdictMessage(StampContainer.StampType stampType, bool wasCorrect)
-    {
-        string verdictLabel = stampType switch
-        {
-            StampContainer.StampType.Pass => "PASSED",
-            StampContainer.StampType.Kill => "EXECUTED",
-            StampContainer.StampType.Quarantine => "QUARANTINED",
-            _ => "PROCESSED"
-        };
-
-        string outcomeLabel = wasCorrect ? "CORRECT" : "INCORRECT";
-        return $"Verdict: {outcomeLabel} — {verdictLabel}";
     }
     
     public void Quarantine()
@@ -853,9 +818,6 @@ public class SuspectController : NetworkBehaviour
         spawnedFolder = folder;
         accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);
 
-        _lastVerdictStampType = folder.StampType;
-        _lastVerdictWasCorrect = DetermineVerdictCorrectness(folder.StampType, suspectCharacter);
-
         PayOutResults();
 
         switch (folder.StampType)
@@ -872,22 +834,5 @@ public class SuspectController : NetworkBehaviour
         }
     }
 
-    /// <summary>
-    /// Returns true when the given stamp verdict matches what should have been done for this suspect.
-    /// Pass is correct for non-infected suspects; Kill is correct for infected suspects;
-    /// Quarantine is always considered a neutral/safe choice and treated as correct.
-    /// </summary>
-    private bool DetermineVerdictCorrectness(StampContainer.StampType stampType, SuspectCharacter suspect)
-    {
-        bool isInfected = suspect != null && suspect.IsInfected;
-
-        return stampType switch
-        {
-            StampContainer.StampType.Pass => !isInfected,
-            StampContainer.StampType.Kill => isInfected,
-            StampContainer.StampType.Quarantine => true,
-            _ => false
-        };
-    }
     
 }
