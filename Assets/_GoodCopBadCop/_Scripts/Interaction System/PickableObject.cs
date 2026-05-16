@@ -437,7 +437,7 @@ public class PickableObject : Interactable
         return false;
     }
 
-    public void SetInteractable(bool value)
+    public virtual void SetInteractable(bool value)
     {
         foreach (Collider col in GetComponents<Collider>())
         {

@@ -848,4 +848,22 @@ public class FolderController : PickableObject
 
         return anomaliesFound.ToArray();
     }
+
+    /// <summary>
+    /// Returns true if this folder is currently held by another player and contains a page
+    /// matching <paramref name="itemName"/> in its synced queue slots.
+    /// Safe to call on any client — uses only networked state (_holdingClientId, _queueSlots).
+    /// </summary>
+    public bool IsPageHeldByAnotherPlayer(string itemName)
+    {
+        if (!IsHeldByOtherPlayer) return false;
+        if (_queueSlots == null) return false;
+
+        Unity.Collections.FixedString64Bytes key = itemName;
+        foreach (var slot in _queueSlots)
+        {
+            if (slot.Value == key) return true;
+        }
+        return false;
+    }
 }

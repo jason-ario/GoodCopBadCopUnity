@@ -71,4 +71,23 @@ public class ExamPage : FolderItem
         foreach (ChecklistItem item in _checklistItems)
             item.SetInteractable(b);
     }
+
+    /// <summary>
+    /// Blocks interaction when this page is slotted inside a folder that another player
+    /// is currently holding. Uses the SocketFollow target to locate the owning FolderController
+    /// without relying on the non-networked insideThisFolder field, so the guard works correctly
+    /// on every client.
+    /// </summary>
+    public override void Interact(PlayerInteractionController player)
+    {
+        SocketFollow socketFollow = GetComponent<SocketFollow>();
+        if (socketFollow != null && socketFollow.Target != null)
+        {
+            FolderController folder = socketFollow.Target.GetComponentInParent<FolderController>();
+            if (folder != null && folder.IsPageHeldByAnotherPlayer(ItemData.name))
+                return;
+        }
+
+        base.Interact(player);
+    }
 }

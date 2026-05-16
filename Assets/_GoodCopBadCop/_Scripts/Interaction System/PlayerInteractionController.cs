@@ -126,7 +126,10 @@ public class PlayerInteractionController : NetworkBehaviour
             {
                 interactable = interactableCollider.Interactable;
             }
-            
+
+            if (IsControlledByOtherPlayer(interactable))
+                return;
+
             if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
             {
                 return;
@@ -315,6 +318,9 @@ public class PlayerInteractionController : NetworkBehaviour
         if (interactableCollider != null)
             interactable = interactableCollider.Interactable;
 
+        if (IsControlledByOtherPlayer(interactable))
+            return false;
+
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
             return false;
 
@@ -372,6 +378,9 @@ public class PlayerInteractionController : NetworkBehaviour
         if (interactableCollider != null)
             interactable = interactableCollider.Interactable;
 
+        if (IsControlledByOtherPlayer(interactable))
+            return;
+
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
             return;
 
@@ -379,5 +388,29 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
 
         interactable.Interact(this);
+    }
+
+    /// <summary>
+    /// Returns true when the resolved interactable is already under another player's control —
+    /// either because that player is holding the object itself, or because the object is a
+    /// document sitting inside a folder that another player is holding. In both cases the local
+    /// player's interaction controller should treat the object as invisible.
+    /// </summary>
+    private bool IsControlledByOtherPlayer(Interactable interactable)
+    {
+        if (interactable == null)
+            return false;
+
+        if (interactable is FolderItem folderItem)
+        {
+            // Document inside a held folder — block regardless of who holds the folder.
+            if (folderItem.insideThisFolder != null && folderItem.insideThisFolder.IsHeldByOtherPlayer)
+                return true;
+        }
+
+        if (interactable is PickableObject pickable)
+            return pickable.IsHeldByOtherPlayer;
+
+        return false;
     }
 }

@@ -554,6 +554,12 @@ public class PlayerPickupController : NetworkBehaviour
             // parent change; each client sets its own arm-appropriate constraint independently.
             // Pre-position the object at the slot's world transform so the constraint
             // activates with a zero offset rather than snapping from wherever it was.
+            // Clear any active SocketFollow before establishing the ParentConstraint.
+            // If this object was sitting in a folder slot, SocketFollow (execution order 2)
+            // runs after ParentConstraint and overrides the hand position every LateUpdate,
+            // making the object appear stuck in the folder. Clearing it here is an optimistic
+            // local fix; FolderItem.OnEquipped broadcasts the clear to all other clients.
+            pickableObject.ClearSocketFollow();
             pickableObject.NetworkObject.AutoObjectParentSync = false;
             pickableObject.transform.position = itemInContainer.transform.position;
             pickableObject.transform.rotation = itemInContainer.transform.rotation;

@@ -50,7 +50,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1240996398
+  GlobalObjectIdHash: 3107953825
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -106,6 +106,9 @@ MonoBehaviour:
   attackHitbox: {fileID: 291297765939751491}
   attackHitDelay: 0.4
   hitParticlePrefab: {fileID: 893913727056456344, guid: 57847ba3edbb34f4e9d1ea10ad1289a6, type: 3}
+  deathBehaviour: 0
+  deathAnimationDuration: 2
+  deathSound: {fileID: 0}
 --- !u!114 &7127085182576174026
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -199,7 +202,7 @@ Transform:
   m_GameObject: {fileID: 7932345873243114423}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.5, z: 0.6}
+  m_LocalPosition: {x: 0, y: 1.78, z: 3.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -217,7 +220,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 76ded94e1afd4f74e9465c5e22adf8c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MutantAttackHitbox
-  sphereRadius: 0.6
+  sphereRadius: 1.17
   playerTag: Player
   damageOverride: 0
 --- !u!1001 &4175378260622791920
