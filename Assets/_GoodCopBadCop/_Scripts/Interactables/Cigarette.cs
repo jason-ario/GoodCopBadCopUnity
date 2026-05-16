@@ -33,7 +33,7 @@ public class Cigarette : PickableObject
    {
       if (!isUsing) return;
       
-      PlayerInstance.Instance.Heal(healAmount * Time.deltaTime);
+      PlayerInstance.Instance.Heal(healAmount);
       PlayerInstance.Instance.PlayerRadiation.AddRadiation(radiationAmount);
       float blendShapeWeight = _skinnedMeshRenderer.GetBlendShapeWeight(0) + reductionAmountPerFrame * Time.deltaTime;
          

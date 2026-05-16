@@ -1,26 +1,18 @@
-using System;
 using UnityEngine;
-using UnityEngine.UI;
 
-public class RadiationBarUI : MonoBehaviour
+/// <summary>
+/// Subscribes to <see cref="PlayerRadiation.OnRadiationChanged"/> and drives
+/// the inherited <see cref="StatBar"/> visuals with current radiation values.
+/// </summary>
+public class RadiationBarUI : StatBar
 {
-    [SerializeField] private Image fillImage;
     private PlayerRadiation _playerRadiation;
-    
-    void Start()
-    {
-       
-    }
 
     private void OnEnable()
     {
         if (PlayerInstance.Instance == null) return;
 
-        if (_playerRadiation == null)
-            _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
-
-        _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
-        UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
+        SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
     }
 
     private void Update()
@@ -28,19 +20,27 @@ public class RadiationBarUI : MonoBehaviour
         if (_playerRadiation != null) return;
         if (PlayerInstance.Instance == null) return;
 
-        _playerRadiation = PlayerInstance.Instance.PlayerRadiation;
-        _playerRadiation.OnRadiationChanged.AddListener(UpdateBar);
-        UpdateBar(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
+        SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
     }
 
-    private void OnDisable()
+    protected override void OnDisable()
     {
-        if (_playerRadiation == null) return;
-        _playerRadiation.OnRadiationChanged.RemoveListener(UpdateBar);
+        if (_playerRadiation != null)
+        {
+            _playerRadiation.OnRadiationChanged.RemoveListener(OnRadiationChanged);
+            _playerRadiation = null;
+        }
+
+        base.OnDisable();
     }
 
-    private void UpdateBar(float current, float max)
+    /// <summary>Subscribes to the given PlayerRadiation instance and immediately refreshes the bar.</summary>
+    private void SubscribeTo(PlayerRadiation playerRadiation)
     {
-        fillImage.fillAmount = current / max;
+        _playerRadiation = playerRadiation;
+        _playerRadiation.OnRadiationChanged.AddListener(OnRadiationChanged);
+        OnRadiationChanged(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
     }
+
+    private void OnRadiationChanged(float current, float max) => UpdateBar(current, max);
 }

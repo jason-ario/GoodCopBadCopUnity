@@ -1,10 +1,11 @@
 using UnityEngine;
-using UnityEngine.UI;
 
-public class HealthBar : MonoBehaviour
+/// <summary>
+/// Subscribes to <see cref="PlayerHealth.OnHealthChanged"/> and drives
+/// the inherited <see cref="StatBar"/> visuals with current health values.
+/// </summary>
+public class HealthBar : StatBar
 {
-    [SerializeField] private Image fillImage;
-
     private PlayerHealth _playerHealth;
 
     private void OnEnable()
@@ -22,32 +23,29 @@ public class HealthBar : MonoBehaviour
         SubscribeTo(PlayerInstance.Instance.PlayerHealth);
     }
 
-    private void OnDisable()
+    protected override void OnDisable()
     {
-        if (_playerHealth == null) return;
-        _playerHealth.OnHealthChanged -= UpdateBar;
-        _playerHealth = null;
+        if (_playerHealth != null)
+        {
+            _playerHealth.OnHealthChanged -= OnHealthChanged;
+            _playerHealth = null;
+        }
+
+        base.OnDisable();
     }
 
     /// <summary>Subscribes to the given PlayerHealth instance and immediately refreshes the bar.</summary>
     private void SubscribeTo(PlayerHealth playerHealth)
     {
         _playerHealth = playerHealth;
-        _playerHealth.OnHealthChanged += UpdateBar;
-        UpdateBar();
+        _playerHealth.OnHealthChanged += OnHealthChanged;
+        OnHealthChanged();
     }
 
-    private void UpdateBar()
+    private void OnHealthChanged()
     {
-        if (_playerHealth == null || fillImage == null) return;
-        fillImage.fillAmount = _playerHealth.MaxHealth > 0f
-            ? _playerHealth.Health / _playerHealth.MaxHealth
-            : 0f;
+        if (_playerHealth == null) return;
+
+        UpdateBar(_playerHealth.Health, _playerHealth.MaxHealth);
     }
-
-    /// <summary>Shows the health bar.</summary>
-    public void Show() => gameObject.SetActive(true);
-
-    /// <summary>Hides the health bar.</summary>
-    public void Hide() => gameObject.SetActive(false);
 }
