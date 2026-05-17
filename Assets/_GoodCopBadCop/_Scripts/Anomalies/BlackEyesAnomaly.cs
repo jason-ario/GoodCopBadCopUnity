@@ -2,17 +2,20 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Gradually fades the character's eyes to pure black using the Black Eyes shader's
-/// _BlackEyesStrength property. Uses a MaterialPropertyBlock to avoid material instancing,
-/// allowing multiple characters to share the same material asset.
+/// Gradually fades the character's eyes to pure black using the Character shader's
+/// TCP2_BLACK_EYES keyword and _BlackEyesStrength property. The keyword is toggled on
+/// a per-instance material so other characters sharing the same asset are unaffected.
+/// A MaterialPropertyBlock handles the animated float to avoid redundant material duplication.
 /// </summary>
 public class BlackEyesAnomaly : MutationAnomaly
 {
+    private const string BlackEyesKeyword = "TCP2_BLACK_EYES";
     private static readonly int BlackEyesStrengthId = Shader.PropertyToID("_BlackEyesStrength");
 
     [SerializeField] private Renderer headRenderer;
     [SerializeField] private float fadeDuration = 2.5f;
 
+    private Material _materialInstance;
     private MaterialPropertyBlock _propertyBlock;
     private Coroutine _activeCoroutine;
 
@@ -24,39 +27,43 @@ public class BlackEyesAnomaly : MutationAnomaly
             return;
         }
 
+        // renderer.material creates a per-instance material, needed to toggle the shader keyword
+        // without affecting other characters sharing the same material asset.
+        _materialInstance = headRenderer.material;
         _propertyBlock = new MaterialPropertyBlock();
         headRenderer.GetPropertyBlock(_propertyBlock);
     }
 
-    /// <summary>Fades eyes to black over fadeDuration seconds.</summary>
+    /// <summary>Enables the black eyes keyword and fades strength to 1 over fadeDuration seconds.</summary>
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
 
         if (headRenderer == null) return;
 
+        _materialInstance.EnableKeyword(BlackEyesKeyword);
         StartFade(0f, 1f);
     }
 
-    /// <summary>Fades eyes back to normal over fadeDuration seconds.</summary>
+    /// <summary>Fades strength back to 0 and disables the black eyes keyword.</summary>
     public override void DeactivateAnomaly()
     {
         base.DeactivateAnomaly();
 
         if (headRenderer == null) return;
 
-        StartFade(1f, 0f);
+        StartFade(1f, 0f, onComplete: () => _materialInstance.DisableKeyword(BlackEyesKeyword));
     }
 
-    private void StartFade(float from, float to)
+    private void StartFade(float from, float to, System.Action onComplete = null)
     {
         if (_activeCoroutine != null)
             StopCoroutine(_activeCoroutine);
 
-        _activeCoroutine = StartCoroutine(AnimateBlackEyes(from, to));
+        _activeCoroutine = StartCoroutine(AnimateStrength(from, to, onComplete));
     }
 
-    private IEnumerator AnimateBlackEyes(float from, float to)
+    private IEnumerator AnimateStrength(float from, float to, System.Action onComplete)
     {
         float elapsed = 0f;
 
@@ -76,5 +83,7 @@ public class BlackEyesAnomaly : MutationAnomaly
         _propertyBlock.SetFloat(BlackEyesStrengthId, to);
         headRenderer.SetPropertyBlock(_propertyBlock);
         _activeCoroutine = null;
+
+        onComplete?.Invoke();
     }
 }
