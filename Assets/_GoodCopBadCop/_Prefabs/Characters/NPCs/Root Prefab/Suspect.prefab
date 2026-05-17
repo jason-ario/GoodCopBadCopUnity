@@ -773,7 +773,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1793420743
+  GlobalObjectIdHash: 2906151116
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1606,6 +1606,7 @@ Transform:
   - {fileID: 336304273433905559}
   - {fileID: 4530754943830343801}
   - {fileID: 2419036610818256898}
+  - {fileID: 7036954384269948024}
   m_Father: {fileID: 2926345404913525736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8397459436044611539
@@ -1683,6 +1684,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2926345404913525736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8845115931742292278
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7036954384269948024}
+  - component: {fileID: 6657026380098968827}
+  m_Layer: 11
+  m_Name: Blue Veins
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7036954384269948024
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8845115931742292278}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 218149521530335478}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6657026380098968827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8845115931742292278}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6c389343c4553346a313845053f190e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BlueVeinsAnomaly
+  renderers: []
+  uvLight: {fileID: 0}
+  fallbackRadius: 1
 --- !u!1001 &560751498284347426
 PrefabInstance:
   m_ObjectHideFlags: 0

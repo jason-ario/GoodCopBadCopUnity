@@ -53,6 +53,12 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		_LesionMaskMap ("Lesion Texture", 2D) = "black" {}
 		_LesionStrength ("Lesion Strength", Range(0,1)) = 0
 		[TCP2Separator]
+
+		[TCP2HeaderHelp(Blue Veins)]
+		[Toggle(TCP2_BLUE_VEINS)] _UseBlueVeins ("Enable Blue Veins", Float) = 0
+		_VeinMap ("Vein Texture", 2D) = "black" {}
+		_UVLightFalloff ("UV Light Falloff", Range(0.01,1)) = 0.3
+		[TCP2Separator]
 		
 		[TCP2HeaderHelp(Outline)]
 		_OutlineWidth ("Width", Range(0.1,4)) = 1
@@ -116,6 +122,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
 		TCP2_TEX2D_WITH_SAMPLER(_EyeMaskMap);
 		TCP2_TEX2D_WITH_SAMPLER(_LesionMaskMap);
+		TCP2_TEX2D_WITH_SAMPLER(_VeinMap);
 
 		CBUFFER_START(UnityPerMaterial)
 			
@@ -135,6 +142,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			half _BlackEyesStrength;
 			float4 _LesionMaskMap_ST;
 			half _LesionStrength;
+			float4 _VeinMap_ST;
+			float _UVLightFalloff;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			float _WobbleAmplitude;
@@ -143,6 +152,14 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			//================================
 
 		CBUFFER_END
+
+		// UV light arrays — declared outside UnityPerMaterial so they can be set
+		// per-renderer via MaterialPropertyBlock (arrays cannot live inside a CBuffer
+		// and still be overridden per-renderer in URP).
+		#define UV_LIGHT_MAX_COUNT 4
+		float4 _UVLightPositions[UV_LIGHT_MAX_COUNT];
+		float  _UVLightRadii[UV_LIGHT_MAX_COUNT];
+		int    _UVLightCount;
 
 		// Hash without sin and uniform across platforms
 		// Adapted from: https://www.shadertoy.com/view/4djSRW (c) 2014 - Dave Hoskins - CC BY-SA 4.0 License
@@ -381,6 +398,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			#pragma shader_feature_local_fragment TCP2_SKETCH
 			#pragma shader_feature_local_fragment TCP2_BLACK_EYES
 			#pragma shader_feature_local_fragment TCP2_LESION
+			#pragma shader_feature_local_fragment TCP2_BLUE_VEINS
 
 			// vertex input
 			struct Attributes
@@ -732,6 +750,23 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 				{
 					half4 lesionSample = TCP2_TEX2D_SAMPLE(_LesionMaskMap, _LesionMaskMap, input.pack1.xy * _LesionMaskMap_ST.xy + _LesionMaskMap_ST.zw);
 					color.rgb = lerp(color.rgb, lesionSample.rgb, lesionSample.a * _LesionStrength);
+				}
+				#endif
+
+				// Blue veins effect — reveals a vein texture within each active UV light's world-space sphere.
+				// Positions and radii are pushed per-renderer from C# via MaterialPropertyBlock.
+				// Multiple lights are combined by taking the maximum contribution per fragment.
+				#if defined(TCP2_BLUE_VEINS)
+				{
+					float combinedMask = 0.0;
+					for (int uvIdx = 0; uvIdx < _UVLightCount; uvIdx++)
+					{
+						float dist  = distance(positionWS, _UVLightPositions[uvIdx].xyz);
+						float inner = _UVLightRadii[uvIdx] * (1.0 - _UVLightFalloff);
+						combinedMask = max(combinedMask, 1.0 - smoothstep(inner, _UVLightRadii[uvIdx], dist));
+					}
+					half4 veinSample = TCP2_TEX2D_SAMPLE(_VeinMap, _VeinMap, input.pack1.xy * _VeinMap_ST.xy + _VeinMap_ST.zw);
+					color.rgb = lerp(color.rgb, veinSample.rgb, veinSample.a * combinedMask);
 				}
 				#endif
 
