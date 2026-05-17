@@ -13,6 +13,8 @@ public class Thermometer : PickableObject
     private Coroutine readingCoroutine;
     private float currentReading;
     private const float TargetBaseTemp = 45.5f;
+    private const float NormalBaseTemp = 36.5f;
+    private const float NormalJitterRange = 0.3f;
     
     [SerializeField] private MeshRenderer screenRenderer;
     [SerializeField] private Color highColor;
@@ -161,6 +163,12 @@ public class Thermometer : PickableObject
                 SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
                 if (suspect != null)
                 {
+                    // Resolve temperature target from the anomaly component if present and active.
+                    HighTemperatureAnomaly tempAnomaly = suspect.GetComponentInChildren<HighTemperatureAnomaly>();
+                    bool hasAnomaly = tempAnomaly != null && tempAnomaly.IsActive;
+                    float targetTemp  = hasAnomaly ? tempAnomaly.ElevatedTemperature : NormalBaseTemp;
+                    float jitterRange = hasAnomaly ? tempAnomaly.JitterRange : NormalJitterRange;
+
                     // Initial Ramp up
                     float startTemp = 0f;
                     float elapsed = 0f;
@@ -169,7 +177,7 @@ public class Thermometer : PickableObject
                     while (elapsed < duration)
                     {
                         elapsed += Time.deltaTime;
-                        currentReading = Mathf.Lerp(startTemp, TargetBaseTemp, elapsed / duration);
+                        currentReading = Mathf.Lerp(startTemp, targetTemp, elapsed / duration);
                         thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
                         yield return null;
                     }
@@ -182,8 +190,8 @@ public class Thermometer : PickableObject
                         if (Physics.Raycast(continuousRay, out RaycastHit continuousHit, maxDistance) && 
                             continuousHit.collider.GetComponentInParent<SuspectCharacter>() != null)
                         {
-                            float jitter = UnityEngine.Random.Range(-1f, 1f);
-                            currentReading = TargetBaseTemp + jitter;
+                            float jitter = UnityEngine.Random.Range(-jitterRange, jitterRange);
+                            currentReading = targetTemp + jitter;
                             thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
                             SetColorFromTemp(currentReading);
                         }
