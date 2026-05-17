@@ -29,14 +29,16 @@ public class UIController : MonoBehaviour
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
     [SerializeField] private Button backButton;
-    [SerializeField] private ScreenDamageCanvas _screenDamageCanvas;
+    [SerializeField] private ScreenDamage _screenDamage;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
-    public ScreenDamageCanvas ScreenDamageCanvas => _screenDamageCanvas;
+
+    /// <summary>The <see cref="ScreenDamage"/> component driving the screen hurt overlay.</summary>
+    public ScreenDamage ScreenDamage => _screenDamage;
     public bool IsPaused => pauseMenuOpened;
 
     [SerializeField] private AudioClip transitionToGameplayStinger;

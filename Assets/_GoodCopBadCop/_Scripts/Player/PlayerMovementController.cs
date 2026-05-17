@@ -261,6 +261,13 @@ public class PlayerMovementController : NetworkBehaviour
     public void SetCanMove(bool value)
     {
         CanMove = value;
+
+        if (!value)
+        {
+            MoveXRaw = 0f;
+            MoveZRaw = 0f;
+            IsRunning = false;
+        }
     }
 
     public void SetCanLook(bool value)

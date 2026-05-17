@@ -559,7 +559,6 @@ public class ShiftManager : NetworkBehaviour
 
     public void EndIntroCutscene()
     {
-        UIController.Instance.ShowPlayerUI();
         ambientAudio.DOFade(1, 2);
 
         if (IsServer)
@@ -603,6 +602,7 @@ public class ShiftManager : NetworkBehaviour
         UIController.Instance.FadeOut();
         yield return new WaitForSeconds(1f);
 
+        UIController.Instance.ShowPlayerUI();
         EnablePlayerControl();
         OnShiftReady?.Invoke();
         OnDayStart?.Invoke();

@@ -28,9 +28,29 @@ public class TutorialManager : MonoBehaviour
     private void Start()
     {
         ShiftManager.Instance.OnShiftStart += ShowStartShiftTutorial;
+        GameManager.Instance.OnGameStart += OnGameStart;
         tutorialCanvas.SetActive(false);
     }
-    
+
+    private void OnDestroy()
+    {
+        if (GameManager.Instance != null)
+            GameManager.Instance.OnGameStart -= OnGameStart;
+    }
+
+    private void OnGameStart()
+    {
+        StartCoroutine(GameStartBarkCoroutine());
+    }
+
+    private IEnumerator GameStartBarkCoroutine()
+    {
+        yield return new WaitForSeconds(12f);
+
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+            ShowTutorialText("All inspectors please report to duty.");
+    }
+
     IEnumerator WaitAndSayStartingDialogue()
     {
         yield return new WaitForSeconds(5);

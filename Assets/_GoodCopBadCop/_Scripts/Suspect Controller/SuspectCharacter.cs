@@ -232,7 +232,7 @@ public class SuspectCharacter : Interactable
 
         while (true)
         {
-            PlayerInstance.Instance.HurtPlayer();
+            PlayerInstance.Instance.PlayerHealth.TakeDamage(1f);
             yield return new WaitForSeconds(.5f);
         }
     }

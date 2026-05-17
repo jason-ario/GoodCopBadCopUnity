@@ -15,8 +15,8 @@ public class MutantSpawner : NetworkBehaviour
     // ── Configuration ──────────────────────────────────────────────────────────
 
     [Header("Enemy Setup")]
-    [Tooltip("Networked prefab containing a MutantEnemy component. Must be registered in NetworkManager's prefab list.")]
-    [SerializeField] private GameObject mutantPrefab;
+    [Tooltip("Networked prefabs to choose from at random. Each must contain a MutantEnemy component and be registered in NetworkManager's prefab list.")]
+    [SerializeField] private GameObject[] mutantPrefabs;
 
     [Header("Spawn Area")]
     [Tooltip("Half-extents of the axis-aligned box (in local space) within which enemies can spawn. The box is centred on this GameObject's position.")]
@@ -60,9 +60,9 @@ public class MutantSpawner : NetworkBehaviour
         if (!IsServer)
             return;
 
-        if (mutantPrefab == null)
+        if (mutantPrefabs == null || mutantPrefabs.Length == 0)
         {
-            Debug.LogError("[MutantSpawner] mutantPrefab is not assigned. Spawner will not run.", this);
+            Debug.LogError("[MutantSpawner] mutantPrefabs is empty. Spawner will not run.", this);
             return;
         }
 
@@ -128,12 +128,13 @@ public class MutantSpawner : NetworkBehaviour
         Vector3 spawnPosition = transform.TransformPoint(localOffset);
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-        GameObject instance = Instantiate(mutantPrefab, spawnPosition, spawnRotation);
+        GameObject prefab = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+        GameObject instance = Instantiate(prefab, spawnPosition, spawnRotation);
         NetworkObject netObj = instance.GetComponent<NetworkObject>();
 
         if (netObj == null)
         {
-            Debug.LogError("[MutantSpawner] mutantPrefab is missing a NetworkObject component.", this);
+            Debug.LogError("[MutantSpawner] A prefab in mutantPrefabs is missing a NetworkObject component.", this);
             Destroy(instance);
             return;
         }

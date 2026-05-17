@@ -6,7 +6,6 @@ public class PlayerInstance : NetworkBehaviour
 {
     public static PlayerInstance Instance;
 
-    [SerializeField] private ScreenDamage screenDamage;
     [SerializeField] private GameObject playerLight;
     [SerializeField] private GameObject nameTag;
     [SerializeField] private RagdollController ragdollController;
@@ -120,11 +119,6 @@ public class PlayerInstance : NetworkBehaviour
     public void SetCanMove(bool value)
     {
         _playerMovementController.SetCanMove(value);
-    }
-
-    public void HurtPlayer()
-    {
-        screenDamage.CurrentHealth -= 1;
     }
 
     /// <summary>
