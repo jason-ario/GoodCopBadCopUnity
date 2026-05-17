@@ -47,6 +47,12 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		_EyeMaskMap ("Eye Mask", 2D) = "black" {}
 		_BlackEyesStrength ("Black Eyes Strength", Range(0,1)) = 0
 		[TCP2Separator]
+
+		[TCP2HeaderHelp(Lesions)]
+		[Toggle(TCP2_LESION)] _UseLesion ("Enable Lesion", Float) = 0
+		_LesionMaskMap ("Lesion Texture", 2D) = "black" {}
+		_LesionStrength ("Lesion Strength", Range(0,1)) = 0
+		[TCP2Separator]
 		
 		[TCP2HeaderHelp(Outline)]
 		_OutlineWidth ("Width", Range(0.1,4)) = 1
@@ -109,6 +115,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
 		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
 		TCP2_TEX2D_WITH_SAMPLER(_EyeMaskMap);
+		TCP2_TEX2D_WITH_SAMPLER(_LesionMaskMap);
 
 		CBUFFER_START(UnityPerMaterial)
 			
@@ -126,6 +133,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			fixed4 _HColor;
 			float4 _EyeMaskMap_ST;
 			half _BlackEyesStrength;
+			float4 _LesionMaskMap_ST;
+			half _LesionStrength;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			float _WobbleAmplitude;
@@ -371,6 +380,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		#pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON
 			#pragma shader_feature_local_fragment TCP2_SKETCH
 			#pragma shader_feature_local_fragment TCP2_BLACK_EYES
+			#pragma shader_feature_local_fragment TCP2_LESION
 
 			// vertex input
 			struct Attributes
@@ -712,6 +722,16 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 					half eyeMask = TCP2_TEX2D_SAMPLE(_EyeMaskMap, _EyeMaskMap, input.pack1.xy * _EyeMaskMap_ST.xy + _EyeMaskMap_ST.zw).r;
 					half blackWeight = eyeMask * _BlackEyesStrength;
 					color = lerp(color, half3(0, 0, 0), blackWeight);
+				}
+				#endif
+
+				// Lesion effect — alpha-masked overlay using the texture's own RGBA.
+				// Transparent areas are ignored; opaque areas (including black) replace the surface color.
+				// _LesionStrength scales the alpha so the effect can be animated in/out.
+				#if defined(TCP2_LESION)
+				{
+					half4 lesionSample = TCP2_TEX2D_SAMPLE(_LesionMaskMap, _LesionMaskMap, input.pack1.xy * _LesionMaskMap_ST.xy + _LesionMaskMap_ST.zw);
+					color.rgb = lerp(color.rgb, lesionSample.rgb, lesionSample.a * _LesionStrength);
 				}
 				#endif
 
