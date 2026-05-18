@@ -11,6 +11,10 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float amplitudeGainRumble;
     [SerializeField] private float frequencyGainRumble;
 
+    [Header("Hit Impulse")]
+    [Tooltip("Impulse source used when the player takes damage.")]
+    [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
+
     public void TurnOnRumble()
     {
         CinemachineBasicMultiChannelPerlin cinemachineBasicMultiChannelPerlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
@@ -26,5 +30,17 @@ public class PlayerCameraController : MonoBehaviour
         cinemachineBasicMultiChannelPerlin.NoiseProfile = normalNoiseSettings;
         cinemachineBasicMultiChannelPerlin.AmplitudeGain = amplitudeGainNormal;
         cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainNormal;
+    }
+
+    /// <summary>Fires a one-shot Cinemachine impulse to simulate a camera hit shake.</summary>
+    public void TriggerHitImpulse()
+    {
+        if (_hitImpulseSource == null)
+        {
+            Debug.LogWarning("[PlayerCameraController] Hit impulse source is not assigned.", this);
+            return;
+        }
+
+        _hitImpulseSource.GenerateImpulse();
     }
 }

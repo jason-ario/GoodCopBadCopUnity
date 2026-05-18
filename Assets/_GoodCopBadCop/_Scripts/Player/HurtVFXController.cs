@@ -5,6 +5,7 @@ using UnityEngine;
 /// <summary>
 /// Keeps <see cref="UIController.ScreenDamage"/> in sync with <see cref="PlayerHealth"/>
 /// and plays a random hurt sound whenever the local owner takes damage.
+/// Also triggers a Cinemachine impulse shake via <see cref="PlayerCameraController"/>.
 /// Only reacts on the owning client — non-owners are ignored entirely.
 /// </summary>
 public class HurtVFXController : NetworkBehaviour
@@ -20,6 +21,7 @@ public class HurtVFXController : NetworkBehaviour
 
     private PlayerHealth _playerHealth;
     private ScreenDamage _screenDamage;
+    private PlayerCameraController _cameraController;
     private float _previousHealth;
 
     public override void OnNetworkSpawn()
@@ -35,6 +37,10 @@ public class HurtVFXController : NetworkBehaviour
             Debug.LogError("[HurtVFXController] PlayerHealth component not found on the same GameObject.", this);
             return;
         }
+
+        _cameraController = GetComponentInChildren<PlayerCameraController>();
+        if (_cameraController == null)
+            Debug.LogWarning("[HurtVFXController] PlayerCameraController not found — hit impulse will be skipped.", this);
 
         // Defer subscription until after all Start() calls have run so ScreenDamage
         // is fully initialised (its animator field is assigned in Start()).
@@ -75,7 +81,10 @@ public class HurtVFXController : NetworkBehaviour
         _screenDamage.CurrentHealth = currentHealth;
 
         if (currentHealth < _previousHealth)
+        {
             PlayHurtAudio();
+            _cameraController?.TriggerHitImpulse();
+        }
 
         _previousHealth = currentHealth;
     }

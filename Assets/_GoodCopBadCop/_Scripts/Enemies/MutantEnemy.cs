@@ -21,8 +21,8 @@ public class MutantEnemy : NetworkBehaviour
     [Header("Animation (optional)")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParameterName = "Speed";
-    [SerializeField] private string attackTriggerName = "Attack";
-    [SerializeField] private string deathTriggerName = "Death";
+    [SerializeField] private string attackBoolName = "Attack";
+    [SerializeField] private string deathBoolName = "Death";
 
     [Header("Attack Hitbox")]
     [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
@@ -53,6 +53,11 @@ public class MutantEnemy : NetworkBehaviour
     private float _health;
     private float _attackCooldownTimer;
     private bool _isDead;
+
+    /// <summary>
+    /// True once this enemy has died, regardless of whether it has been despawned yet.
+    /// </summary>
+    public bool IsDead => _isDead;
 
     // Synced animator speed so non-owners see movement blend correctly
     private readonly NetworkVariable<float> _networkSpeed = new NetworkVariable<float>(
@@ -210,6 +215,26 @@ public class MutantEnemy : NetworkBehaviour
 
         // Schedule the sphere-cast to fire at the melee impact frame on the server.
         StartCoroutine(DelayedHitScan(data.damagePerHit));
+
+        // Reset the Attack bool after the attack cooldown so the animator returns to locomotion.
+        StartCoroutine(ResetAttackBoolAfterDelay(data.attackCooldown));
+    }
+
+    /// <summary>
+    /// Waits for the attack animation to finish (approximated by the cooldown duration),
+    /// then clears the Attack bool on all clients so the animator transitions back to locomotion.
+    /// </summary>
+    private IEnumerator ResetAttackBoolAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        ResetAttackAnimationClientRpc();
+    }
+
+    [ClientRpc]
+    private void ResetAttackAnimationClientRpc()
+    {
+        if (animator != null && !string.IsNullOrEmpty(attackBoolName))
+            animator.SetBool(attackBoolName, false);
     }
 
     /// <summary>
@@ -228,8 +253,8 @@ public class MutantEnemy : NetworkBehaviour
     [ClientRpc]
     private void TriggerAttackAnimationClientRpc()
     {
-        if (animator != null && !string.IsNullOrEmpty(attackTriggerName))
-            animator.SetTrigger(attackTriggerName);
+        if (animator != null && !string.IsNullOrEmpty(attackBoolName))
+            animator.SetBool(attackBoolName, true);
     }
 
     // ── Damage / Death ─────────────────────────────────────────────────────────
@@ -274,7 +299,7 @@ public class MutantEnemy : NetworkBehaviour
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {
             TriggerDeathAnimationClientRpc();
-            StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
+            //StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
         }
         else
         {
@@ -288,8 +313,8 @@ public class MutantEnemy : NetworkBehaviour
     [ClientRpc]
     private void TriggerDeathAnimationClientRpc()
     {
-        if (animator != null && !string.IsNullOrEmpty(deathTriggerName))
-            animator.SetTrigger(deathTriggerName);
+        if (animator != null && !string.IsNullOrEmpty(deathBoolName))
+            animator.SetBool(deathBoolName, true);
 
         if (deathSound != null)
             SFXController.Instance.Play(deathSound);

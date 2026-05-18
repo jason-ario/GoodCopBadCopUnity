@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,7 +38,10 @@ public class ScreenDamage : MonoBehaviour
     public float autoHealTime = 2f;     
     
     [Tooltip("Set an event to trigger on death.")]
-    public UnityEvent deathEvent;     
+    public UnityEvent deathEvent;
+
+    [Tooltip("Multiplier applied to the overlay opacity. 1 = full, 0.5 = half opacity."), Range(0f, 1f)]
+    public float opacityScale = 0.5f;
 
 
     #region SYSTEM VARIABLES
@@ -140,7 +143,7 @@ public class ScreenDamage : MonoBehaviour
 
 
             // calculate the opacity
-            opacity = 1f - (_health / maxHealth);
+            opacity = (1f - (_health / maxHealth)) * opacityScale;
 
 
             // change image opacity value
@@ -372,7 +375,7 @@ public class ScreenDamage : MonoBehaviour
         hideDamage = false;
 
         bloodyFrame.enabled = true;
-        opacity = 1f - (shownValue / maxHealth);
+        opacity = (1f - (shownValue / maxHealth)) * opacityScale;
 
         var tempColor = bloodyFrame.color;
         tempColor = new Color(255, 255, 255, opacity);

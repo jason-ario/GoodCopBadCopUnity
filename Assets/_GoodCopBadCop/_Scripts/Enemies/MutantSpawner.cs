@@ -144,11 +144,19 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Removes entries from the active list that have already been despawned.
+    /// Removes entries from the active list that have already been despawned or have died
+    /// (death animation may still be playing before despawn occurs).
     /// </summary>
     private void PruneDeadEnemies()
     {
-        _activeEnemies.RemoveAll(netObj => netObj == null || !netObj.IsSpawned);
+        _activeEnemies.RemoveAll(netObj =>
+        {
+            if (netObj == null || !netObj.IsSpawned)
+                return true;
+
+            MutantEnemy enemy = netObj.GetComponent<MutantEnemy>();
+            return enemy != null && enemy.IsDead;
+        });
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
