@@ -667,6 +667,14 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(KillSequence());
     }
 
+    /// <summary>Triggers the kill machine sequence on all clients simultaneously with the server.</summary>
+    [ClientRpc]
+    private void KillVisualsClientRpc()
+    {
+        if (IsServer) return;
+        KillMachineController.Instance.Kill();
+    }
+
     private IEnumerator KillSequence()
     {
         if (suspectCharacter == null)
@@ -691,6 +699,7 @@ public class SuspectController : NetworkBehaviour
         thisCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
 
+        KillVisualsClientRpc();
         KillMachineController.Instance.Kill();
 
         yield return new WaitForSeconds(8f);

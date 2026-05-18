@@ -41,7 +41,7 @@ public class ScreenDamage : MonoBehaviour
     public UnityEvent deathEvent;
 
     [Tooltip("Multiplier applied to the overlay opacity. 1 = full, 0.5 = half opacity."), Range(0f, 1f)]
-    public float opacityScale = 0.5f;
+    public float opacityScale = 0.2f;
 
 
     #region SYSTEM VARIABLES

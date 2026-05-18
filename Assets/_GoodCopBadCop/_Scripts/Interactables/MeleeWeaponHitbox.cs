@@ -42,26 +42,49 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        // Cache every collider in the weapon hierarchy so they can be skipped during hit scans.
-        foreach (Collider col in GetComponentsInChildren<Collider>(true))
+        // Cache every collider in the entire weapon NetworkObject hierarchy so they can be
+        // skipped during hit scans. Using GetComponentInParent<NetworkObject> ensures we
+        // collect colliders from the root weapon GameObject (e.g. the shovel BoxCollider)
+        // and all of its children, not just from this component's own subtree.
+        NetworkObject weaponRoot = GetComponentInParent<NetworkObject>();
+        Component searchRoot = weaponRoot != null ? (Component)weaponRoot : this;
+        foreach (Collider col in searchRoot.GetComponentsInChildren<Collider>(true))
             _ownColliders.Add(col);
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Called on the local client. Forwards the overlap check to the server using
-    /// the current world position of the attack point.
+    /// Called on the local client (or server). Forwards the overlap check to the server
+    /// using the current world position of the attack point. When already on the server
+    /// (host player), the scan runs immediately without a network round-trip.
     /// </summary>
     public void PerformHitScan(float damage)
     {
-        PerformHitScanServerRpc(transform.position, damage);
+        if (IsServer)
+        {
+            // Host player: skip the RPC and run directly, targeting the host's own client ID.
+            PerformHitScanInternal(transform.position, damage, OwnerClientId);
+        }
+        else
+        {
+            PerformHitScanServerRpc(transform.position, damage);
+        }
     }
 
     // ── Server ─────────────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
     private void PerformHitScanServerRpc(Vector3 attackOrigin, float damage, ServerRpcParams rpcParams = default)
+    {
+        PerformHitScanInternal(attackOrigin, damage, rpcParams.Receive.SenderClientId);
+    }
+
+    /// <summary>
+    /// Runs the OverlapSphere hit scan on the server. Called either directly for host players
+    /// or via <see cref="PerformHitScanServerRpc"/> for remote clients.
+    /// </summary>
+    private void PerformHitScanInternal(Vector3 attackOrigin, float damage, ulong senderClientId)
     {
         int hitCount = Physics.OverlapSphereNonAlloc(
             attackOrigin,
@@ -70,13 +93,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             Physics.AllLayers,
             QueryTriggerInteraction.Collide);
 
-        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} — {hitCount} colliders.", this);
+        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} — {hitCount} colliders. Sender={senderClientId}", this);
 
         ClientRpcParams ownerParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams
             {
-                TargetClientIds = new[] { rpcParams.Receive.SenderClientId }
+                TargetClientIds = new[] { senderClientId }
             }
         };
 

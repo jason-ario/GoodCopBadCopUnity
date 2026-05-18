@@ -684,7 +684,11 @@ public class PlayerAnimationController : NetworkBehaviour
     public void SetAnimBool(string animString, bool value)
     {
         if (!IsOwner) return;
-        
+
+        // Apply locally and immediately so the owner sees no round-trip delay.
+        bodyAnimator.SetBool(animString, value);
+        armsAnimator.SetBool(animString, value);
+
         SetAnimBoolServerRpc(animString, value);
     }
 
