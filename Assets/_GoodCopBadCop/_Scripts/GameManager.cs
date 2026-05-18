@@ -24,6 +24,18 @@ public class GameManager : NetworkBehaviour
     public bool HasGameStarted { get; private set; }
 
     /// <summary>
+    /// True once the intro cutscene has been initiated on the server.
+    /// Used to distinguish clients who join during the lobby phase (game started but cutscene not yet)
+    /// from clients who join after the cutscene is already playing.
+    /// </summary>
+    public bool HasIntroCutsceneStarted { get; private set; }
+
+    /// <summary>
+    /// Marks the intro cutscene as started. Call this server-side when the cutscene is initiated.
+    /// </summary>
+    public void SetIntroCutsceneStarted() => HasIntroCutsceneStarted = true;
+
+    /// <summary>
     /// True while a lobby transition sequence is in progress and the spawn is being deferred.
     /// Set before CreateLobby() so OnClientConnected skips the immediate spawn.
     /// </summary>

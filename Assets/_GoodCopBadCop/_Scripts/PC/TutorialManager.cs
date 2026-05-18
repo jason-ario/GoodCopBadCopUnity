@@ -47,7 +47,7 @@ public class TutorialManager : MonoBehaviour
     {
         yield return new WaitForSeconds(12f);
 
-        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside)
             ShowTutorialText("All inspectors please report to duty.");
     }
 

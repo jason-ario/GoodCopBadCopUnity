@@ -377,7 +377,7 @@ public class LobbyManager : MonoBehaviour
 
         Debug.Log($"[Host] HasGameStarted={GameManager.Instance.HasGameStarted} IsTransitioningToLobby={GameManager.Instance.IsTransitioningToLobby}");
 
-        if (GameManager.Instance.HasGameStarted)
+        if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
         {
             // Spawn relative to where the host currently is.
             bool hostIsOutside = PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside;
@@ -392,6 +392,13 @@ public class LobbyManager : MonoBehaviour
                 PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
             }
             GameManager.Instance.InitializeLateJoinClient(clientId);
+        }
+        else if (GameManager.Instance.HasGameStarted && !GameManager.Instance.HasIntroCutsceneStarted)
+        {
+            // Game started but intro cutscene not yet — treat this joiner as a lobby joiner so they get OnGameStart.
+            Debug.Log($"[Host] Game started, intro cutscene not yet — spawning as lobby joiner for clientId={clientId}");
+            GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            GameManager.Instance.InitializeLobbyJoinClient(clientId);
         }
         else if (!GameManager.Instance.IsTransitioningToLobby)
         {

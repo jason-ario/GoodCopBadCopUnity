@@ -518,7 +518,10 @@ public class ShiftManager : NetworkBehaviour
     public void InitiateIntroCutscene()
     {
         if (IsServer)
+        {
+            GameManager.Instance.SetIntroCutsceneStarted();
             InitiateIntroCutsceneClientRpc();
+        }
         else
             RequestInitiateIntroCutsceneServerRpc();
     }
@@ -526,6 +529,7 @@ public class ShiftManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestInitiateIntroCutsceneServerRpc()
     {
+        GameManager.Instance.SetIntroCutsceneStarted();
         InitiateIntroCutsceneClientRpc();
     }
 
