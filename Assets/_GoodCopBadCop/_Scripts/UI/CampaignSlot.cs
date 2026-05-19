@@ -1,28 +1,83 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
+/// <summary>
+/// Represents a single campaign save slot on the campaign selection screen.
+/// Populates itself from <see cref="SaveDataManager"/> and notifies
+/// <see cref="CampaignScreenController"/> when the player interacts with it.
+/// </summary>
 public class CampaignSlot : MonoBehaviour
 {
-    [SerializeField] private TextMeshProUGUI slotName;
-    [SerializeField] private TextMeshProUGUI dayNumber;
-    [SerializeField] private TextMeshProUGUI cashAmount;
-    [SerializeField] Transform slotContainer;
-    [SerializeField] Transform newGameContainer;
+    [Header("Layout")]
+    [SerializeField] private GameObject emptySlotContainer;
+    [SerializeField] private GameObject occupiedSlotContainer;
 
-    private void Start()
+    [Header("Occupied Slot UI")]
+    [SerializeField] private TextMeshProUGUI slotNameText;
+    [SerializeField] private TextMeshProUGUI dayNumberText;
+    [SerializeField] private TextMeshProUGUI cashAmountText;
+    [SerializeField] private TextMeshProUGUI lastSavedText;
+    [SerializeField] private Button deleteButton;
+
+    [Header("Slot Index")]
+    [SerializeField] private int slotIndex;
+
+    private CampaignScreenController _screen;
+
+    // ---------------------------------------------------------------------------
+    // Initialisation
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Called by <see cref="CampaignScreenController"/> after instantiation.</summary>
+    public void Initialise(CampaignScreenController screen, int index)
     {
-        newGameContainer.gameObject.SetActive(true);
-        slotContainer.gameObject.SetActive(false);
+        _screen = screen;
+        slotIndex = index;
+        Refresh();
     }
 
-    public void PopulateSlotInfo(string slotName, string dayNumber, string cashAmount)
+    // ---------------------------------------------------------------------------
+    // Public API
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Re-reads save data and refreshes displayed values.</summary>
+    public void Refresh()
     {
-        this.slotName.text = slotName;
-        this.dayNumber.text = dayNumber;
-        this.cashAmount.text = cashAmount;
-        
-        newGameContainer.gameObject.SetActive(false);
-        slotContainer.gameObject.SetActive(true);
+        SaveSlot slot = SaveDataManager.Instance.GetSlot(slotIndex);
+        bool occupied = slot != null && slot.IsOccupied;
+
+        emptySlotContainer.SetActive(!occupied);
+        occupiedSlotContainer.SetActive(occupied);
+
+        if (!occupied)
+            return;
+
+        slotNameText.text = slot.SlotName;
+        dayNumberText.text = $"Day {slot.CurrentDay + 1}";
+        cashAmountText.text = $"${slot.TotalCashEarned:N0}";
+        lastSavedText.text = slot.LastSaved != default
+            ? slot.LastSaved.ToLocalTime().ToString("MMM d, yyyy")
+            : string.Empty;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Button Handlers (wire up in the Inspector)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Called by the slot's main button — selects this slot and proceeds.</summary>
+    public void OnSlotSelected()
+    {
+        SaveDataManager.Instance.SelectSlot(slotIndex);
+        _screen?.OnSlotChosen(slotIndex);
+    }
+
+    /// <summary>Called by the delete button — deletes save data after confirmation.</summary>
+    public void OnDeletePressed()
+    {
+        // TODO: Drive a confirmation dialog before deleting.
+        SaveDataManager.Instance.DeleteSlot(slotIndex);
+        Refresh();
     }
 }
