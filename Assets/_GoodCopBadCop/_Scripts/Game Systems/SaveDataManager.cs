@@ -76,6 +76,10 @@ public class SaveDataManager : MonoBehaviour
     /// Selects a slot as the active campaign slot. If it is empty, initialises a new save in it.
     /// Call this when the player clicks a slot on the campaign screen.
     /// </summary>
+    /// <summary>
+    /// Sets the active slot index in memory only. Does not write to disk.
+    /// Call <see cref="InitialiseActiveSlot"/> once the game actually starts to commit new slots.
+    /// </summary>
     public void SelectSlot(int index)
     {
         if (index < 0 || index >= SlotCount)
@@ -85,20 +89,34 @@ public class SaveDataManager : MonoBehaviour
         }
 
         ActiveSlotIndex = index;
+        Debug.Log($"[SaveDataManager] Slot {index} selected (not yet committed to disk).");
+    }
 
-        SaveSlot slot = _saveData.Slots[index];
-        if (!slot.IsOccupied)
+    /// <summary>
+    /// Marks the active slot as occupied and saves to disk.
+    /// Only call this once the player has confirmed they want to start/resume — not on slot selection.
+    /// </summary>
+    public void InitialiseActiveSlot()
+    {
+        if (ActiveSlot == null)
         {
-            slot.IsOccupied = true;
-            slot.SlotName = $"Save {index + 1}";
-            slot.LastSaved = DateTime.UtcNow;
-            Save();
-            Debug.Log($"[SaveDataManager] New save created in slot {index}.");
+            Debug.LogWarning("[SaveDataManager] InitialiseActiveSlot called with no active slot.");
+            return;
+        }
+
+        if (!ActiveSlot.IsOccupied)
+        {
+            ActiveSlot.IsOccupied = true;
+            ActiveSlot.SlotName = $"Save {ActiveSlotIndex + 1}";
+            ActiveSlot.LastSaved = DateTime.UtcNow;
+            Debug.Log($"[SaveDataManager] New save created in slot {ActiveSlotIndex}.");
         }
         else
         {
-            Debug.Log($"[SaveDataManager] Slot {index} selected — resuming '{slot.SlotName}'.");
+            Debug.Log($"[SaveDataManager] Resuming slot {ActiveSlotIndex} ('{ActiveSlot.SlotName}').");
         }
+
+        Save();
     }
 
     /// <summary>Persists any in-memory changes to the active slot.</summary>
