@@ -5,6 +5,7 @@ public class ChecklistItem : MonoBehaviour
     [SerializeField] private ExamPage examPage;
     [SerializeField] private Checkbox checkbox;
     [SerializeField] private SpriteRenderer sr;
+    [SerializeField] private GameObject container;
 
     // Assigned automatically by ExamPage.InitializeChecklistIndices() at OnNetworkSpawn
     // so it always matches the item's position in the _checklistItems array.
@@ -49,5 +50,15 @@ public class ChecklistItem : MonoBehaviour
             checkbox.CheckVisual();
         else
             checkbox.Uncheck();
+    }
+
+    /// <summary>
+    /// Shows or hides the container GameObject for this checklist item.
+    /// Called by ExamPage when the anomaly's lock state is evaluated.
+    /// </summary>
+    public void ApplyLockState(bool locked)
+    {
+        if (container != null)
+            container.SetActive(!locked);
     }
 }

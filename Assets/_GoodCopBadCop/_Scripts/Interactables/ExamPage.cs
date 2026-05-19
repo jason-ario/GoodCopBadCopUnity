@@ -9,6 +9,7 @@ public class ExamPage : FolderItem
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
+    [SerializeField] private GameObject container;
 
     public override void OnNetworkSpawn()
     {
@@ -20,6 +21,21 @@ public class ExamPage : FolderItem
         // Guard: a page that hasn't been ripped out is never independently interactable.
         if (!isRippedOut)
             SetInteractable(false);
+
+        ApplyAnomalyLocks();
+    }
+
+    /// <summary>
+    /// Evaluates each checklist item's anomaly type reference against AnomalyManager and
+    /// shows or hides its container accordingly.
+    /// </summary>
+    public void ApplyAnomalyLocks()
+    {
+        if (AnomalyManager.Instance == null)
+            return;
+
+        foreach (ChecklistItem item in _checklistItems)
+            item.ApplyLockState(AnomalyManager.Instance.IsAnomalyLocked(item.AnomalyTypeReference));
     }
 
     public ChecklistItem[] ChecklistItems => _checklistItems;
