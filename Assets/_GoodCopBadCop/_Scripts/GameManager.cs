@@ -92,9 +92,14 @@ public class GameManager : NetworkBehaviour
         }
 
         MainMenuController.Instance.TransitionToGameplay();
-        UIController.Instance.ShowPlayerUI();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
+
+        // Wait for the fade-out animation to finish before revealing the HUD.
+        const float FadeOutDuration = 0.65f;
+        yield return new WaitForSeconds(FadeOutDuration);
+
+        UIController.Instance.ShowPlayerUI();
         OnGameStart?.Invoke();
     }
 
@@ -179,7 +184,6 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void StartGameClientRpc(bool skipTransition = false)
     {
-        UIController.Instance.ShowPlayerUI();
     }
 
     /// <summary>

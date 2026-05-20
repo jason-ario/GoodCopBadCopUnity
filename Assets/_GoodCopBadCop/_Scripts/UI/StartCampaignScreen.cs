@@ -251,12 +251,14 @@ public class StartCampaignScreen : MonoBehaviour
     /// </summary>
     public void StartGame()
     {
-        bool hasSave = SaveDataManager.Instance.ActiveSlot?.HasSeenTutorial ?? false;
+        // Commit the slot to disk now that the player has confirmed they want to play.
+        SaveDataManager.Instance.InitialiseActiveSlot();
 
-        if (hasSave)
-            GameManager.Instance.TryStartGame(skipTransition: true);
-        else
-            GameManager.Instance.TryStartGame();
+        // Run the full transition: fade out UI, play fanfare stinger, spawn players,
+        // switch cameras, then fade back in. TryStartGame sets HasGameStarted so
+        // late-joining logic works correctly.
+        GameManager.Instance.TransitionToLobby();
+        GameManager.Instance.TryStartGame();
     }
 
     /// <summary>
