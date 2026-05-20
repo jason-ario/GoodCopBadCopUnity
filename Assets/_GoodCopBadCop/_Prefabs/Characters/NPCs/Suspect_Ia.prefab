@@ -77,6 +77,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8021001004253913084, guid: 41e0964089a7f6843bc95cf61288fd54, type: 3}
   m_PrefabInstance: {fileID: 1326750936077611014}
   m_PrefabAsset: {fileID: 0}
+--- !u!137 &1343510353986090974 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -9165797768001435688, guid: 41e0964089a7f6843bc95cf61288fd54, type: 3}
+  m_PrefabInstance: {fileID: 1326750936077611014}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1577149989018130413 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 41e0964089a7f6843bc95cf61288fd54, type: 3}
@@ -114,6 +119,11 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!137 &3284419172261911021 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -4612520378060379669, guid: 41e0964089a7f6843bc95cf61288fd54, type: 3}
+  m_PrefabInstance: {fileID: 1326750936077611014}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4696174956279721731 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6000407479487422213, guid: 41e0964089a7f6843bc95cf61288fd54, type: 3}
@@ -633,6 +643,18 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1343510353986090974}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[1]'
+      value: 
+      objectReference: {fileID: 3284419172261911021}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
