@@ -20,6 +20,11 @@ Shader "GoodCopBadCop/BurningPaper"
         _WaveFrequency  ("Wave Frequency",         Range(1, 40))   = 18.0
         _WaveSpeed      ("Wave Speed",             Range(0, 8))    = 3.5
 
+        // --- Glitch Effect ---
+        // _GlitchStrength is driven at runtime by LogoMaterialController.
+        // Set it directly on the material to preview the effect in the Editor.
+        _GlitchStrength     ("Glitch Strength",          Range(0, 1))    = 0.0
+
         // --- Stencil (required for Canvas UI masking) ---
         _StencilComp    ("Stencil Comparison",     Float)          = 8
         _Stencil        ("Stencil ID",             Float)          = 0
@@ -86,6 +91,7 @@ Shader "GoodCopBadCop/BurningPaper"
                 half   _WaveAmplitude;
                 half   _WaveFrequency;
                 half   _WaveSpeed;
+                half   _GlitchStrength;
             CBUFFER_END
 
             // ----------------------------------------------------------------
@@ -182,6 +188,17 @@ Shader "GoodCopBadCop/BurningPaper"
             }
 
             // ----------------------------------------------------------------
+            // Glitch helpers
+            // ----------------------------------------------------------------
+
+            // Returns a pseudo-random float in [0,1] for a given integer seed.
+            // Used only for per-frame visual pattern variation (scanlines, chroma).
+            float GlitchRand(float seed)
+            {
+                return frac(sin(seed * 127.1 + 311.7) * 43758.5453123);
+            }
+
+            // ----------------------------------------------------------------
             // Vertex
             // ----------------------------------------------------------------
             Varyings vert(Attributes IN)
@@ -206,14 +223,29 @@ Shader "GoodCopBadCop/BurningPaper"
                 float  t  = _Time.y;
                 float  nt = t * _NoiseSpeed;
 
+                // --- Glitch: strength is written each frame by LogoMaterialController ---
+                float  glitch   = _GlitchStrength;
+
+                // Sub-frame seeds so each glitch characteristic looks independent
+                float  gSeed0   = floor(t * 23.0);   // scanline band seed (fast)
+                float  gSeed1   = floor(t * 11.0);   // block shift seed (medium)
+                float  gSeed2   = floor(t * 5.0);    // chromatic seed (slow)
+
                 // --- Wave distortion: shimmering heat-haze on the texture sample UV ---
                 float2 waveUV = uv;
                 waveUV.x += sin(uv.y * _WaveFrequency + t * _WaveSpeed)             * _WaveAmplitude;
                 waveUV.y += sin(uv.x * _WaveFrequency * 0.7 + t * _WaveSpeed * 1.3) * _WaveAmplitude * 0.6;
 
+                // --- Glitch: horizontal scanline block shift ---
+                // Divide UV-Y into coarse bands; each band independently shifts in X.
+                float  bandSize   = lerp(0.15, 0.04, GlitchRand(gSeed1));
+                float  bandIndex  = floor(uv.y / bandSize);
+                float  bandShift  = (GlitchRand(bandIndex + gSeed1 * 7.3) * 2.0 - 1.0) * 0.08;
+                // Only a subset of bands actually shift (threshold > 0.6 → ~40% of bands)
+                float  bandActive = step(0.6, GlitchRand(bandIndex + gSeed0 * 3.7));
+                waveUV.x += bandShift * bandActive * glitch;
+
                 // --- Domain warp: morphing warp field, no UV translation ---
-                // The warp layers evolve at different rates so hole edges reshape
-                // independently on each axis.
                 float2 warpUV = uv * _NoiseScale;
                 float2 warp   = float2(
                     MorphFractal(warpUV + float2(1.3, 0.0), nt * 0.65),
@@ -228,12 +260,18 @@ Shader "GoodCopBadCop/BurningPaper"
                 half4 texColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, waveUV);
                 texColor      *= IN.color;  // UI vertex color tint
 
+                // --- Glitch: chromatic aberration on RGB channels ---
+                float  chromaShift = (GlitchRand(gSeed2) * 2.0 - 1.0) * 0.025 * glitch;
+                half   rChannel    = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, waveUV + float2( chromaShift, 0.0)).r;
+                half   bChannel    = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, waveUV + float2(-chromaShift, 0.0)).b;
+                texColor.r = lerp(texColor.r, rChannel * IN.color.r, glitch);
+                texColor.b = lerp(texColor.b, bChannel * IN.color.b, glitch);
+
+                // --- Glitch: brief brightness flicker ---
+                float  flicker  = lerp(1.0, GlitchRand(gSeed0 + 0.5) * 0.6 + 0.7, glitch);
+                texColor.rgb   *= flicker;
+
                 // --- Burn mask ---
-                // Map noise [0,1] to burn threshold:
-                //   burnThreshold > 0  → unburned region
-                //   burnThreshold < 0  → hole (fully consumed)
-                // At _BurnProgress=0, all thresholds are positive → image fully intact.
-                // At _BurnProgress=1, all thresholds are negative → image fully gone.
                 float burnThreshold = noise - _BurnProgress;
 
                 // Normalized position within the burn edge band [0=hole edge, 1=unburned]
@@ -245,7 +283,6 @@ Shader "GoodCopBadCop/BurningPaper"
                 half alpha    = holeMask * texColor.a;
 
                 // Only apply edge coloring within the burn band; beyond it use original
-                // edgeT==0 → deepest char, edgeT==0.5 → peak ember glow, edgeT==1 → original
                 half3 charZone  = _CharColor.rgb;
                 half3 glowZone  = _BurnColor.rgb;
                 half3 origZone  = texColor.rgb;

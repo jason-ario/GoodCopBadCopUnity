@@ -72,30 +72,18 @@ public class SuspectData : ScriptableObject
     public DialogueByVerdict exitDialoguesKilled = 
         new DialogueByVerdict(Verdict.Killed, new string[3], new string[3], new string[3]);    
 
-    // Questions:
-    // Have you been experiencing any strange symptoms lately?
-    // Where are you coming from?
-    // Who do live with?
-    
-    /*[System.Serializable]
-    public struct QuestionDialogueSet
-    {
-        public string[] earlyDaysAnswers;   // Days 1-10
-        public string[] midDaysAnswers;     // Days 11-20
-        public string[] finalDaysAnswers;   // Days 21-30
-    }*/
-
-    /*public QuestionDialogueSet whereAreYouComingFromAnswers;
-    public QuestionDialogueSet haveYouBeenExperiencingAnySymptomsAnswers;
-    public QuestionDialogueSet whoDoYouLiveWithAnswers;*/
-    
     public AudioClip[] voiceAudioClips;
+
     [System.Serializable]
-    public struct Response
+    public struct QuestionResponseSet
     {
-        [TextArea(3, 10)]
-        public string text;
+        [TextArea(1, 3)] public string question;
+        [TextArea(2, 6)] public string earlyDaysAnswer;
+        [TextArea(2, 6)] public string midDaysAnswer;
+        [TextArea(2, 6)] public string finalDaysAnswer;
     }
+
+    public QuestionResponseSet[] questionResponses;
 
     public string IDNumber;
 

@@ -4,24 +4,29 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler
 {
     [SerializeField] private Animator anim;
     [SerializeField] private AudioClip sfxOnSelect;
     [SerializeField] private AudioClip sfxOnClick;
-    [SerializeField] AudioSource audioSource;
     Button button;
     public bool disableAnimation;
 
     public void OnPointerEnter(PointerEventData eventData)
     {
         anim.SetBool("Selected", true);
-        audioSource.Play();
+        SFXController.Instance?.Play(sfxOnSelect);
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         anim.SetBool("Selected", false);
+    }
+
+    /// <summary>Plays the click sound on pointer down, before any OnClick listener can deactivate the GameObject.</summary>
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        SFXController.Instance?.Play(sfxOnClick);
     }
 
     public void Reset()

@@ -93,6 +93,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8021001004253913084, guid: a825fae927f375b4690690016ee6b7ab, type: 3}
   m_PrefabInstance: {fileID: 3171630812086071844}
   m_PrefabAsset: {fileID: 0}
+--- !u!137 &5101668940949411071 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1526964690268444965, guid: a825fae927f375b4690690016ee6b7ab, type: 3}
+  m_PrefabInstance: {fileID: 3171630812086071844}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &5638306303211326393 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7078722787440015773, guid: a825fae927f375b4690690016ee6b7ab, type: 3}
@@ -759,6 +764,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 9036878108284833717}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speaking
+      value: 
+      objectReference: {fileID: 169257335509343292}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: suspectData
       value: 
       objectReference: {fileID: 11400000, guid: cc89b8eef7dc6da46b2e2cc65527e23f, type: 2}
@@ -832,7 +841,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2302891591
+      value: 3167258039
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: InScenePlacedSourceGlobalObjectIdHash
@@ -842,6 +851,14 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 5101668940949411071}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -930,6 +947,14 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 0.184
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speakerName
+      value: Father Shota
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: cc89b8eef7dc6da46b2e2cc65527e23f, type: 2}
     - target: {fileID: 8003048771164921036, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.459
@@ -1147,6 +1172,17 @@ PrefabInstance:
       addedObject: {fileID: 3137139865396680143}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+--- !u!114 &169257335509343292 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 8008333111906739591}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
 --- !u!4 &1157587071400474670 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}

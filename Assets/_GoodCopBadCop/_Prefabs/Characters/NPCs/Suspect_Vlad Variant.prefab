@@ -57,6 +57,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: daa6136123ca31e4092b6f50051f85f7, type: 3}
+--- !u!137 &500792162430514158 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4292484576610936137, guid: daa6136123ca31e4092b6f50051f85f7, type: 3}
+  m_PrefabInstance: {fileID: 4423339862804174503}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1258473847968035697 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3176202563834111446, guid: daa6136123ca31e4092b6f50051f85f7, type: 3}
@@ -80,6 +85,11 @@ Transform:
 --- !u!4 &3456438489354248994 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1339082384057185669, guid: daa6136123ca31e4092b6f50051f85f7, type: 3}
+  m_PrefabInstance: {fileID: 4423339862804174503}
+  m_PrefabAsset: {fileID: 0}
+--- !u!137 &4003694029992596600 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 787328024202379999, guid: daa6136123ca31e4092b6f50051f85f7, type: 3}
   m_PrefabInstance: {fileID: 4423339862804174503}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &4433572866061563119 stripped
@@ -700,6 +710,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2453432782779554562}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speaking
+      value: 
+      objectReference: {fileID: 2337645654998082960}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: suspectData
       value: 
       objectReference: {fileID: 11400000, guid: dc830ace5de6bca429afec1f68e82c99, type: 2}
@@ -803,6 +817,18 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 4003694029992596600}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[1]'
+      value: 
+      objectReference: {fileID: 500792162430514158}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -863,6 +889,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -663.094
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speakerName
+      value: Vlad
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: dc830ace5de6bca429afec1f68e82c99, type: 2}
     - target: {fileID: 8003048771164921036, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.11786617
@@ -1068,6 +1102,17 @@ PrefabInstance:
       addedObject: {fileID: 4959934833382848013}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+--- !u!114 &2337645654998082960 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 5551529287011507243}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
 --- !u!4 &3618991665196581250 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}

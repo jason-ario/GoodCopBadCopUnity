@@ -292,40 +292,11 @@ public class SuspectController : NetworkBehaviour
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
-        /*SuspectData.QuestionDialogueSet questionDialogueSet;
-        int responseIndex = 0;
-        
-        if (choiceIndex == 0)
-        {
-            questionDialogueSet = suspectCharacter.Data.whereAreYouComingFromAnswers;
-            responseIndex = suspectCharacter.ChosenEntryReasonIndex;
-        } else if (choiceIndex == 1)
-        {
-            questionDialogueSet = suspectCharacter.Data.haveYouBeenExperiencingAnySymptomsAnswers;
-            responseIndex = suspectCharacter.ChosenSymptomResponseIndex;
-        }
-        else
-        {
-            questionDialogueSet = suspectCharacter.Data.whoDoYouLiveWithAnswers;
-            responseIndex = suspectCharacter.ChosenWhoDoYouLiveWithIndex;
-        }
-        
-        string[] dialogueResponses;
 
-        if (ShiftManager.Instance.IsEarlyDays)
-        {
-            dialogueResponses = questionDialogueSet.earlyDaysAnswers;
-        }
-        else if (ShiftManager.Instance.IsMidDays)
-        {
-            dialogueResponses = questionDialogueSet.midDaysAnswers;
-        }
-        else
-        {
-            dialogueResponses = questionDialogueSet.finalDaysAnswers;
-        }
-        
-        DialogueManager.Instance.SayDialogue(suspectCharacter, dialogueResponses[responseIndex]);*/
+        string response = suspectCharacter.GetQuestionResponse(choiceIndex);
+        if (response == null) return;
+
+        DialogueManager.Instance.SayDialogue(suspectCharacter, response);
     }
     
     public void Pass()

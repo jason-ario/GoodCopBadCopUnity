@@ -22,7 +22,6 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private Subtitles NPCSubtitlesPrefab;
     [SerializeField] private Subtitles playerSubtitlesPrefab;
     [SerializeField] RectTransform subtitlesContainer;
-    private SuspectCharacter characterTalking;
 
     private Subtitles _waitingSubtitle;
 
@@ -32,13 +31,13 @@ public class DialogueManager : NetworkBehaviour
     }
     
 
-    public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false,
+    public void SayDialogue(SpeakingInteraction speaking, string dialogue, bool clearHistory = false,
         bool waitForInput = false, Action onComplete = null)
     {
         ulong networkObjectId = ulong.MaxValue;
-        if (character != null)
+        if (speaking != null)
         {
-            var netObj = character.GetComponent<NetworkObject>();
+            var netObj = speaking.GetComponent<NetworkObject>();
             if (netObj != null) networkObjectId = netObj.NetworkObjectId;
         }
 
@@ -57,6 +56,16 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Convenience overload that resolves the SpeakingInteraction from a SuspectCharacter.
+    /// Kept for backwards compatibility with SuspectController and DialogueSequence.
+    /// </summary>
+    public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false,
+        bool waitForInput = false, Action onComplete = null)
+    {
+        SayDialogue(character != null ? character.Speaking : null, dialogue, clearHistory, waitForInput, onComplete);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false, bool waitForInput = false)
     {
@@ -68,36 +77,24 @@ public class DialogueManager : NetworkBehaviour
     {
         StopDialogueAudio();
 
-        SuspectCharacter character = null;
+        SpeakingInteraction speaking = null;
         if (networkObjectId != ulong.MaxValue &&
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(networkObjectId, out var netObj))
         {
-            character = netObj.GetComponent<SuspectCharacter>();
+            speaking = netObj.GetComponent<SpeakingInteraction>();
         }
 
-        if (character == null && SuspectController.Instance != null)
-            character = SuspectController.Instance.CurrentSuspect;
+        if (speaking == null && SuspectController.Instance != null && SuspectController.Instance.CurrentSuspect != null)
+            speaking = SuspectController.Instance.CurrentSuspect.Speaking;
 
-        if (character == null)
+        if (speaking == null)
         {
-            Debug.LogWarning("DialogueManager: No character resolved for dialogue: " + dialogue);
+            Debug.LogWarning("DialogueManager: No SpeakingInteraction resolved for dialogue: " + dialogue);
             return;
         }
 
-        GameObject subtitle = SpawnSubtitles(dialogue, character.Data.FirstName, Color.white, false, clearHistory, waitForInput);
-
-        PlayDialogueAudio(dialogue, character.Data.voiceAudioClips, character.audioSource);
-        /*
-        if (character.audioSource != null &&
-            character.Data.voiceAudioClips != null &&
-            character.Data.voiceAudioClips.Length > 0)
-        {
-            audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(
-                dialogue,
-                character.audioSource,
-                character.Data.voiceAudioClips,
-                subtitle));
-        }*/
+        SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, waitForInput);
+        PlayDialogueAudio(dialogue, speaking.VoiceAudioClips, speaking.AudioSource);
     }
 
     public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null)

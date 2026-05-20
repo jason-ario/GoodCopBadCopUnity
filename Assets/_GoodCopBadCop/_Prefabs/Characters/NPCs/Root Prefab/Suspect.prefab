@@ -477,6 +477,51 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 65e69ade54c24f24e81dbf9115d6eb22, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BirthDateWrong
+--- !u!1 &3609701965567258146
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6975137538311554872}
+  - component: {fileID: 8748127185504150103}
+  m_Layer: 11
+  m_Name: uv light
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6975137538311554872
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3609701965567258146}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.3, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9165884929875893673}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8748127185504150103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3609701965567258146}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90836e53cb8749f4591abbf80579140a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UVLight
+  fallbackRadius: 2.43
 --- !u!1 &3736317329971349890
 GameObject:
   m_ObjectHideFlags: 0
@@ -614,6 +659,7 @@ GameObject:
   - component: {fileID: 7460938723757500394}
   - component: {fileID: 5350706457408493353}
   - component: {fileID: 820681201371413921}
+  - component: {fileID: 7888620099599006139}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -639,6 +685,7 @@ Transform:
   - {fileID: 5330771091470271895}
   - {fileID: 8012428775956440192}
   - {fileID: 2926345404913525736}
+  - {fileID: 6975137538311554872}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!114 &253971976340002767
@@ -867,7 +914,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 1793420743
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -902,6 +949,7 @@ MonoBehaviour:
   lookAnimator: {fileID: 253971976340002767}
   animator: {fileID: 3144101779491009765}
   audioSource: {fileID: 1751970679333441786}
+  speaking: {fileID: 0}
   idPhoto: {fileID: 0}
   interactionCollider: {fileID: 7460938723757500394}
   bloodExplosion: {fileID: 8015446583675946598}
@@ -921,14 +969,6 @@ MonoBehaviour:
   ChosenSymptomResponseIndex: -1
   ChosenWhoDoYouLiveWithIndex: -1
   radiationAmount: 10
-  defaultDialogueChoices:
-  - Where are you coming from?
-  - Have you been experiencing any strange symptoms lately?
-  - Who do you live with?
-  defaultDialogueResponses:
-  - Where are you coming from?
-  - Have you been experiencing any strange symptoms lately?
-  - Who do you live with?
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1361,6 +1401,25 @@ MonoBehaviour:
     daysShown: 0
     lastDayShown: 0
     infectionScore: 0
+--- !u!114 &7888620099599006139
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
+  ShowTopMostFoldoutHeaderGroup: 1
+  speakerName: Suspect
+  voiceAudioClips: []
+  audioSource: {fileID: 1751970679333441786}
+  dialogueChoices: []
+  suspectData: {fileID: 0}
+  lookTarget: {fileID: 5330771091470271895}
 --- !u!1 &4585279910345806039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1930,7 +1989,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlueVeinsAnomaly
   renderers: []
-  _previewInEditor: 0
+  _previewInEditor: 1
 --- !u!1001 &560751498284347426
 PrefabInstance:
   m_ObjectHideFlags: 0

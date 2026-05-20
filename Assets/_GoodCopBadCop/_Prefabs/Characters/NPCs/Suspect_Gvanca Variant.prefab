@@ -677,6 +677,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8368016503851673015}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speaking
+      value: 
+      objectReference: {fileID: 7936924583843537140}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: suspectData
       value: 
       objectReference: {fileID: 11400000, guid: 869309962129a3b4a88dc55555116b7a, type: 2}
@@ -758,7 +762,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 4070997503
+      value: 2906151116
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: InScenePlacedSourceGlobalObjectIdHash
@@ -774,12 +778,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: renderers.Array.size
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: 'renderers.Array.data[0]'
       value: 
-      objectReference: {fileID: 1815489722340111070}
+      objectReference: {fileID: 2904042312839697736}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[1]'
+      value: 
+      objectReference: {fileID: 517547218344104347}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -884,6 +892,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -643.549
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speakerName
+      value: Gvantsa
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: 869309962129a3b4a88dc55555116b7a, type: 2}
     - target: {fileID: 8003048771164921036, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.08858971
@@ -1143,6 +1159,17 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &7936924583843537140 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 243085477384935759}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4558848336114407372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
 --- !u!4 &8965645634204730598 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
@@ -1343,6 +1370,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7829577706673091268, guid: 00e391129ecafc649895963006e04543, type: 3}
   m_PrefabInstance: {fileID: 7917772105554884416}
   m_PrefabAsset: {fileID: 0}
+--- !u!137 &517547218344104347 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1526964690268444965, guid: 00e391129ecafc649895963006e04543, type: 3}
+  m_PrefabInstance: {fileID: 7917772105554884416}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &714225276426875531 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7208261743932278219, guid: 00e391129ecafc649895963006e04543, type: 3}
@@ -1353,9 +1385,9 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 9140253385185518857, guid: 00e391129ecafc649895963006e04543, type: 3}
   m_PrefabInstance: {fileID: 7917772105554884416}
   m_PrefabAsset: {fileID: 0}
---- !u!137 &1815489722340111070 stripped
+--- !u!137 &2904042312839697736 stripped
 SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 8417361359673230750, guid: 00e391129ecafc649895963006e04543, type: 3}
+  m_CorrespondingSourceObject: {fileID: -4202798675411607032, guid: 00e391129ecafc649895963006e04543, type: 3}
   m_PrefabInstance: {fileID: 7917772105554884416}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &4480731412988173396 stripped

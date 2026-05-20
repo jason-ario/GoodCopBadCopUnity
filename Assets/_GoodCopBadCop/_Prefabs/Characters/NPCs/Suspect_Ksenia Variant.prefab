@@ -134,6 +134,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -3302972225415322985, guid: 416121be4a2f4ad4996b4e75a59d055d, type: 3}
   m_PrefabInstance: {fileID: 1834692782894700235}
   m_PrefabAsset: {fileID: 0}
+--- !u!137 &7901102457227662165 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8417361359673230750, guid: 416121be4a2f4ad4996b4e75a59d055d, type: 3}
+  m_PrefabInstance: {fileID: 1834692782894700235}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8493256928879207439 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7829577706673091268, guid: 416121be4a2f4ad4996b4e75a59d055d, type: 3}
@@ -552,6 +557,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 5196229231174609754}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speaking
+      value: 
+      objectReference: {fileID: 8395062055264841047}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: suspectData
       value: 
       objectReference: {fileID: 11400000, guid: 22e91bd74adec144a8d72e115586ad40, type: 2}
@@ -575,6 +584,14 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 7901102457227662165}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -639,6 +656,14 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 1.565389
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speakerName
+      value: Ksenia
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: 22e91bd74adec144a8d72e115586ad40, type: 2}
     - target: {fileID: 8003048771164921036, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.091247104
@@ -833,3 +858,14 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
   m_PrefabInstance: {fileID: 1872163026630677740}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8395062055264841047 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 1872163026630677740}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction

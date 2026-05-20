@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -8,7 +9,7 @@ using UnityEngine.UI;
 /// Populates itself from <see cref="SaveDataManager"/> and notifies
 /// <see cref="CampaignScreenController"/> when the player interacts with it.
 /// </summary>
-public class CampaignSlot : MonoBehaviour
+public class CampaignSlot : MonoBehaviour, IPointerEnterHandler
 {
     [Header("Layout")]
     [SerializeField] private GameObject emptySlotContainer;
@@ -23,6 +24,10 @@ public class CampaignSlot : MonoBehaviour
 
     [Header("Slot Index")]
     [SerializeField] private int slotIndex;
+
+    [Header("Audio")]
+    [SerializeField] private AudioClip hoverClip;
+    [SerializeField] private AudioClip clickClip;
 
     private CampaignScreenController _screen;
 
@@ -69,6 +74,7 @@ public class CampaignSlot : MonoBehaviour
     /// <summary>Called by the slot's main button — selects this slot and proceeds.</summary>
     public void OnSlotSelected()
     {
+        SFXController.Instance?.Play(clickClip);
         SaveDataManager.Instance.SelectSlot(slotIndex);
         _screen?.OnSlotChosen(slotIndex);
     }
@@ -79,5 +85,11 @@ public class CampaignSlot : MonoBehaviour
         // TODO: Drive a confirmation dialog before deleting.
         SaveDataManager.Instance.DeleteSlot(slotIndex);
         Refresh();
+    }
+
+    /// <summary>Plays the hover sound when the pointer enters the slot.</summary>
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        SFXController.Instance?.Play(hoverClip);
     }
 }

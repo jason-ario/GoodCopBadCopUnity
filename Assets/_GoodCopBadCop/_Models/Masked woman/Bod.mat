@@ -8,10 +8,11 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Bod
-  m_Shader: {fileID: 4800000, guid: cee48b891b6c5034291f6435e1bd81f1, type: 3}
+  m_Shader: {fileID: 4800000, guid: e249050cfbc5dcb48bec67c10f23582e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - TCP2_LESION
   - TCP2_UV_NORMALS_FULL
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -49,6 +50,14 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _EyeMaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LesionMaskMap:
+        m_Texture: {fileID: 2800000, guid: e3730e708c0f82847b69119fce0b513d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: cf5c2759c7b75994fa2021960c1a53e2, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -77,6 +86,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: 608c8f119ceafdc439c32f936e29b63c, type: 3}
         m_Scale: {x: 10, y: 10}
         m_Offset: {x: 0, y: 0}
+    - _VeinMap:
+        m_Texture: {fileID: 2800000, guid: 831405186592bc346a8da3edd045cdc8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WorldDisplacementTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -98,6 +111,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
+    - _BlackEyesStrength: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -114,6 +128,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _LesionStrength: 1
     - _Metallic: 0
     - _Mode: 0
     - _NormalsSource: 0
@@ -126,6 +141,7 @@ Material:
     - _RampThreshold: 0.5
     - _ReceiveShadows: 1
     - _ReceiveShadowsOff: 1
+    - _RenderingMode: 0
     - _SketchTexture_OffsetSpeed: 120
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
@@ -133,7 +149,11 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _UVLightFalloff: 1
     - _UVSec: 0
+    - _UseBlackEyes: 0
+    - _UseBlueVeins: 1
+    - _UseLesion: 1
     - _UseSketch: 0
     - _WobbleAmplitude: 0.001
     - _WobbleFrequency: 15

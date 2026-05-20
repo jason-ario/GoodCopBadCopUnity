@@ -577,6 +577,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 5828970946141691868}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speaking
+      value: 
+      objectReference: {fileID: 7721598538317028745}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: suspectData
       value: 
       objectReference: {fileID: 11400000, guid: ce919b57b663b0e4cbccdd51c0dae137, type: 2}
@@ -628,6 +632,14 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2252012816710678067}
     - target: {fileID: 7002689430193017530, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -688,6 +700,14 @@ PrefabInstance:
       propertyPath: m_LocalScale.z
       value: 0.158892
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: speakerName
+      value: Sandro
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: ce919b57b663b0e4cbccdd51c0dae137, type: 2}
     - target: {fileID: 8003048771164921036, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.12098537
@@ -897,6 +917,17 @@ PrefabInstance:
       addedObject: {fileID: 8216071435142821635}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+--- !u!114 &7721598538317028745 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 455605573297447986}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
 --- !u!4 &8746378728567667099 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
@@ -969,6 +1000,11 @@ PrefabInstance:
 --- !u!4 &1707793153538763125 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3882685230603631185, guid: 331bd09c72993094288b6739d4acd8f6, type: 3}
+  m_PrefabInstance: {fileID: 2472860433708307236}
+  m_PrefabAsset: {fileID: 0}
+--- !u!137 &2252012816710678067 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4400470727345038615, guid: 331bd09c72993094288b6739d4acd8f6, type: 3}
   m_PrefabInstance: {fileID: 2472860433708307236}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &2623852041284281728 stripped

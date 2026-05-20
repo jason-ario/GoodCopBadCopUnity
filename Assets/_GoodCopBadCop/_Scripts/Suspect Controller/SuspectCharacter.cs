@@ -21,6 +21,7 @@ public class SuspectCharacter : Interactable
     [Header("Suspect Set Up")] public FLookAnimator lookAnimator;
     public Animator animator;
     public AudioSource audioSource;
+    [SerializeField] private SpeakingInteraction speaking;
     [SerializeField] Texture2D idPhoto;
     public Texture2D IDPhoto => idPhoto;
     [SerializeField] Collider interactionCollider;
@@ -72,27 +73,13 @@ public class SuspectCharacter : Interactable
     private Vector2 radiationSuspicious = new Vector2(31, 70);
     private Vector2 radiationInfected = new Vector2(71, 100);
 
-    public string[] defaultDialogueChoices = new string[]
-    {
-        "Where are you coming from?",
-        "Have you been experiencing any strange symptoms lately?",
-        "Who do you live with?"
-    };
-
-    private string[] choices;
-    
-    public string[] defaultDialogueResponses = new string[]
-    {
-        "Where are you coming from?", 
-        "Have you been experiencing any strange symptoms lately?", 
-        "Who do you live with?"
-    };  
+    /// <summary>The SpeakingInteraction component that handles networked speech and dialogue choices.</summary>
+    public SpeakingInteraction Speaking => speaking;
 
 
     protected override void Awake()
     {
         base.Awake();
-        choices = defaultDialogueChoices;
         handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand); 
         suspectRecordViewer = GetComponent<SuspectRecordViewer>(); 
         
@@ -153,7 +140,7 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        DialogueManager.Instance.InitiateChoices(lookPos, choices);
+        speaking.InitiateChoices();
     }
 
     public void SetCanInteract(bool canInteract)
@@ -166,7 +153,7 @@ public class SuspectCharacter : Interactable
     {
         if (item == null)
         {
-            DialogueManager.Instance.InitiateChoices(lookPos, choices);
+            speaking.InitiateChoices();
             return;
         }
 
@@ -226,7 +213,7 @@ public class SuspectCharacter : Interactable
         _facingPlayer = true;
         yield return new WaitForSeconds(1);
         animator.SetBool("Aiming Rifle", true);
-        DialogueManager.Instance.SayDialogue(this, "You.. You're a traitor!!");
+        speaking.Say("You.. You're a traitor!!");
         yield return new WaitForSeconds(2);
         animator.SetBool("FiringRifle", true);
 
@@ -296,5 +283,27 @@ public class SuspectCharacter : Interactable
         }
 
         return entryDialogues[UnityEngine.Random.Range(0, entryDialogues.Length)];
+    }
+
+    /// <summary>
+    /// Returns the response string for the given choice index based on the current day band.
+    /// Returns null if the index is out of range or the response text is empty.
+    /// </summary>
+    public string GetQuestionResponse(int choiceIndex)
+    {
+        if (suspectData.questionResponses == null || choiceIndex >= suspectData.questionResponses.Length)
+            return null;
+
+        SuspectData.QuestionResponseSet set = suspectData.questionResponses[choiceIndex];
+
+        string answer;
+        if (ShiftManager.Instance.IsEarlyDays)
+            answer = set.earlyDaysAnswer;
+        else if (ShiftManager.Instance.IsMidDays)
+            answer = set.midDaysAnswer;
+        else
+            answer = set.finalDaysAnswer;
+
+        return string.IsNullOrEmpty(answer) ? null : answer;
     }
 }
