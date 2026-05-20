@@ -437,7 +437,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!114 &3527557832943114128
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -916,6 +916,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HealthBar
   fillImage: {fileID: 8289778272257518540}
+  glowRect: {fileID: 0}
+  glowEnabled: 1
+  glowLingerDuration: 0.5
+  glowRateThreshold: 0.1
 --- !u!224 &7091753326306990402 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8594561596053033253, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}
@@ -1110,6 +1114,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   fillImage: {fileID: 8993440262183512884}
+  glowRect: {fileID: 0}
+  glowEnabled: 1
+  glowLingerDuration: 0.5
+  glowRateThreshold: 0.1
 --- !u!224 &7903486657472813498 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8594561596053033253, guid: 548be59197d5f6e448ec822c5a9e1079, type: 3}

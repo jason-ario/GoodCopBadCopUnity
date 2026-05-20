@@ -16,11 +16,20 @@ public class BetweenShiftTaskManager : NetworkBehaviour
     /// </summary>
     public static event Action OnAllTasksComplete;
 
+    /// <summary>
+    /// Fired locally when a new set of tasks is assigned at the start of a night phase.
+    /// GuidebookIcon subscribes to this to show the notification badge.
+    /// </summary>
+    public static event Action OnTasksAssigned;
+
     private readonly NetworkVariable<bool> _allTasksComplete = new(false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
     public bool AllTasksComplete => _allTasksComplete.Value;
+
+    /// <summary>Read-only view of all registered tasks. Used by GuidebookTaskListContents.</summary>
+    public IBetweenShiftTask[] Tasks => _tasks;
 
     /// <summary>
     /// Assign all IBetweenShiftTask MonoBehaviours here via the Inspector.
@@ -78,6 +87,8 @@ public class BetweenShiftTaskManager : NetworkBehaviour
 
         foreach (var task in _tasks)
             task?.ResetTask();
+
+        OnTasksAssigned?.Invoke();
     }
 
     /// <summary>

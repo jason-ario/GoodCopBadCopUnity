@@ -72,10 +72,21 @@ public class PlayerTutorialUI : MonoBehaviour
         textReveal.Clear();
         textReveal.gameObject.SetActive(false);
         _animator.SetBool(BlackBarsOn, false);
+        SetPlayerUIActive(true);
+    }
+
+    private void SetPlayerUIActive(bool active)
+    {
+        if (PlayerUI.Instance != null)
+            PlayerUI.Instance.gameObject.SetActive(active);
+        else
+            Debug.LogWarning("[PlayerTutorialUI] PlayerUI.Instance is null — could not toggle Player UI.", this);
     }
 
     private IEnumerator SequenceCoroutine(string message, float holdDuration)
     {
+        SetPlayerUIActive(false);
+
         textReveal.gameObject.SetActive(true);
         _animator.SetBool(BlackBarsOn, true);
 
