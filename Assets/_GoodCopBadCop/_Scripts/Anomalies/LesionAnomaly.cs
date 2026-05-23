@@ -54,7 +54,7 @@ public class LesionAnomaly : MutationAnomaly
             mat?.DisableKeyword(LesionKeyword);
     }
 
-    /// <summary>Enables the lesion keyword on all renderers and immediately sets strength to 1.</summary>
+    /// <summary>Enables the lesion keyword on all renderers and fades strength from 0 to 1.</summary>
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
@@ -64,10 +64,7 @@ public class LesionAnomaly : MutationAnomaly
         foreach (Material mat in _materialInstances)
             mat?.EnableKeyword(LesionKeyword);
 
-        if (_activeCoroutine != null)
-            StopCoroutine(_activeCoroutine);
-
-        ApplyStrengthToAll(1f);
+        StartFade(0f, 1f);
     }
 
     /// <summary>Fades strength back to 0 then disables the lesion keyword on all renderers.</summary>

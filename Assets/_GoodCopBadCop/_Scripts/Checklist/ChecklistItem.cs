@@ -12,11 +12,47 @@ public class ChecklistItem : MonoBehaviour
     private int index;
 
     public bool IsChecking => examPage.IsChecking;
+
     [SerializeField] private UnityEngine.Object anomalyTypeReference;
     public UnityEngine.Object AnomalyTypeReference => anomalyTypeReference;
-    [SerializeField] private string anomalyTypeName;
+
+    /// <summary>
+    /// Populated automatically from anomalyTypeReference in the Editor via OnValidate.
+    /// Stores the C# class name so it is available at runtime without UnityEditor APIs.
+    /// </summary>
+    [SerializeField] [HideInInspector] private string anomalyTypeName;
+
+    /// <summary>The anomaly C# class name used to match against anomaly.GetType().Name at scoring time.</summary>
     public string AnomalyTypeName => anomalyTypeName;
+
     public bool IsChecked => checkbox.IsChecked;
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (anomalyTypeReference == null)
+        {
+            anomalyTypeName = string.Empty;
+            return;
+        }
+
+        // anomalyTypeReference is a MonoScript asset. GetClass() returns the actual C# type,
+        // whose Name matches GetType().Name on live anomaly instances — regardless of filename.
+        if (anomalyTypeReference is UnityEditor.MonoScript monoScript)
+        {
+            System.Type scriptClass = monoScript.GetClass();
+            if (scriptClass != null)
+                anomalyTypeName = scriptClass.Name;
+            else
+                Debug.LogWarning($"[ChecklistItem] {name}: MonoScript '{monoScript.name}' has no class — anomalyTypeName not updated.", this);
+        }
+        else
+        {
+            // Fallback for non-MonoScript references (ScriptableObjects, etc.).
+            anomalyTypeName = anomalyTypeReference.GetType().Name;
+        }
+    }
+#endif
 
     private void Awake()
     {

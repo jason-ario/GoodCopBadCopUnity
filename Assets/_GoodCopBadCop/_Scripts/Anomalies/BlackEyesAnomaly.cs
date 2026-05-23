@@ -48,20 +48,16 @@ public class BlackEyesAnomaly : MutationAnomaly
         _materialInstance?.DisableKeyword(BlackEyesKeyword);
     }
 
-    /// <summary>Enables the black eyes keyword and immediately sets strength to 1.</summary>
+    /// <summary>Enables the black eyes keyword and fades strength from 0 to 1.</summary>
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
 
         if (headRenderer == null) return;
 
-        if (_activeCoroutine != null)
-            StopCoroutine(_activeCoroutine);
-
         _materialInstance.EnableKeyword(BlackEyesKeyword);
 
-        _propertyBlock.SetFloat(BlackEyesStrengthId, 1f);
-        headRenderer.SetPropertyBlock(_propertyBlock);
+        StartFade(0f, 1f);
     }
 
     /// <summary>Fades strength back to 0 and disables the black eyes keyword.</summary>

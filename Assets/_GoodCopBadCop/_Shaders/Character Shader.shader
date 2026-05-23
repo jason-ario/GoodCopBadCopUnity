@@ -393,10 +393,10 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			//--------------------------------------
 			// Toony Colors Pro 2 keywords
 		#pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON
-			#pragma shader_feature_local_fragment TCP2_SKETCH
-			#pragma shader_feature_local_fragment TCP2_BLACK_EYES
-			#pragma shader_feature_local_fragment TCP2_LESION
-			#pragma shader_feature_local_fragment TCP2_BLUE_VEINS
+			#pragma multi_compile_local_fragment _ TCP2_SKETCH
+			#pragma multi_compile_local_fragment _ TCP2_BLACK_EYES
+			#pragma multi_compile_local_fragment _ TCP2_LESION
+			#pragma multi_compile_local_fragment _ TCP2_BLUE_VEINS
 
 			// vertex input
 			struct Attributes

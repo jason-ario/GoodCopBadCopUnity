@@ -45,10 +45,18 @@ public class BlueVeinsAnomaly : MutationAnomaly
     private void OnEnable()
     {
         if (Application.isPlaying)
+        {
+            // Always clear the keyword from the shared material before instantiating
+            // per-instance copies, so a previously dirty shared asset can't leak
+            // TCP2_BLUE_VEINS into new material instances.
+            SetSharedKeywords(false);
             InitializeRuntime();
+        }
         else
         {
             _propertyBlock ??= new MaterialPropertyBlock();
+            // Always reset first to ensure a clean baseline, then apply preview state.
+            SetSharedKeywords(false);
             SetSharedKeywords(_previewInEditor);
         }
     }
@@ -64,6 +72,8 @@ public class BlueVeinsAnomaly : MutationAnomaly
         if (Application.isPlaying) return;
 
         _propertyBlock ??= new MaterialPropertyBlock();
+        // Always reset first to ensure a clean baseline, then apply preview state.
+        SetSharedKeywords(false);
         SetSharedKeywords(_previewInEditor);
     }
 
