@@ -98,7 +98,6 @@ public class GuidebookController : MonoBehaviour
         IsOpen = false;
 
         _animationController.SetAnimBool(AnimParam, false);
-        _animationController.DisableRightArmMask();
 
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
@@ -106,11 +105,23 @@ public class GuidebookController : MonoBehaviour
         if (_contentsContainer != null)
             _contentsContainer.gameObject.SetActive(false);
 
-        // Restore held object.
+        // Restore held object then re-apply the correct arm mask for it.
         if (_deactivatedHeldObject != null)
         {
             _deactivatedHeldObject.SetActive(true);
+
+            PickableObject pickable = _deactivatedHeldObject.GetComponent<PickableObject>();
+            if (pickable != null && pickable.ItemData.usesTwoArms)
+                _animationController.EnableHoldObjectTwoArmsMask();
+            else
+                _animationController.EnableRightArmMask();
+
             _deactivatedHeldObject = null;
+        }
+        else
+        {
+            // Nothing held — clear all arm layers.
+            _animationController.DisableRightArmMask();
         }
 
         // Restore look first so SetCanControl finds CanLook == true and re-enables the reticle.

@@ -138,6 +138,31 @@ MonoBehaviour:
   m_OffsetY:
     m_OverrideState: 0
     m_Value: 0
+--- !u!114 &-6307138085519639187
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29fa0085f50d5e54f8144f766051a691, type: 3}
+  m_Name: FilmGrain
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FilmGrain
+  active: 1
+  type:
+    m_OverrideState: 1
+    m_Value: 0
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0.09
+  response:
+    m_OverrideState: 1
+    m_Value: 0.8
+  texture:
+    m_OverrideState: 0
+    m_Value: {fileID: 0}
 --- !u!114 &-6183130183920739414
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -178,7 +203,7 @@ MonoBehaviour:
     m_Value: 1
   contrast:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 15.1
   colorFilter:
     m_OverrideState: 1
     m_Value: {r: 1, g: 1, b: 1, a: 1}
@@ -187,7 +212,7 @@ MonoBehaviour:
     m_Value: -1
   saturation:
     m_OverrideState: 1
-    m_Value: 20.3
+    m_Value: -5
 --- !u!114 &-675193509401890554
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -311,6 +336,7 @@ MonoBehaviour:
   - {fileID: -8982763933432261747}
   - {fileID: 6164926614321786720}
   - {fileID: -6183130183920739414}
+  - {fileID: -6307138085519639187}
 --- !u!114 &3175878613428323006
 MonoBehaviour:
   m_ObjectHideFlags: 3

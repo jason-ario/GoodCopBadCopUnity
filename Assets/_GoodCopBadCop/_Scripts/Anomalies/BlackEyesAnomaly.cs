@@ -11,6 +11,7 @@ public class BlackEyesAnomaly : MutationAnomaly
 {
     private const string BlackEyesKeyword = "TCP2_BLACK_EYES";
     private static readonly int BlackEyesStrengthId = Shader.PropertyToID("_BlackEyesStrength");
+    private static readonly int UseBlackEyesId = Shader.PropertyToID("_UseBlackEyes");
 
     [SerializeField] private Renderer headRenderer;
     [SerializeField] private float fadeDuration = 2.5f;
@@ -45,7 +46,9 @@ public class BlackEyesAnomaly : MutationAnomaly
         _propertyBlock.SetFloat(BlackEyesStrengthId, 0f);
         headRenderer.SetPropertyBlock(_propertyBlock);
 
-        _materialInstance?.DisableKeyword(BlackEyesKeyword);
+        if (_materialInstance == null) return;
+        _materialInstance.SetFloat(UseBlackEyesId, 0f);
+        _materialInstance.DisableKeyword(BlackEyesKeyword);
     }
 
     /// <summary>Enables the black eyes keyword and fades strength from 0 to 1.</summary>
@@ -55,6 +58,7 @@ public class BlackEyesAnomaly : MutationAnomaly
 
         if (headRenderer == null) return;
 
+        _materialInstance.SetFloat(UseBlackEyesId, 1f);
         _materialInstance.EnableKeyword(BlackEyesKeyword);
 
         StartFade(0f, 1f);
@@ -67,7 +71,11 @@ public class BlackEyesAnomaly : MutationAnomaly
 
         if (headRenderer == null) return;
 
-        StartFade(1f, 0f, onComplete: () => _materialInstance.DisableKeyword(BlackEyesKeyword));
+        StartFade(1f, 0f, onComplete: () =>
+        {
+            _materialInstance.SetFloat(UseBlackEyesId, 0f);
+            _materialInstance.DisableKeyword(BlackEyesKeyword);
+        });
     }
 
     private void StartFade(float from, float to, System.Action onComplete = null)
