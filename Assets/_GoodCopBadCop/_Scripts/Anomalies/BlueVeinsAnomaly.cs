@@ -67,6 +67,32 @@ public class BlueVeinsAnomaly : MutationAnomaly
         SetSharedKeywords(_previewInEditor);
     }
 
+    /// <summary>
+    /// Immediately disables the blue veins keyword on all renderers and zeroes out the light data.
+    /// Call this on anomalies that were not selected to ensure the shader is in a clean state.
+    /// </summary>
+    public override void InitializeDisabled()
+    {
+        if (_materialInstances == null) return;
+
+        // Push zeroed light data so no veins bleed through.
+        for (int i = 0; i < MaxLights; i++)
+        {
+            _positionBuffer[i] = Vector4.zero;
+            _radiusBuffer[i]   = 0f;
+        }
+
+        _propertyBlock.SetVectorArray(UVLightPositionsId, _positionBuffer);
+        _propertyBlock.SetFloatArray(UVLightRadiiId, _radiusBuffer);
+        _propertyBlock.SetInteger(UVLightCountId, 0);
+
+        foreach (Renderer r in renderers)
+            r?.SetPropertyBlock(_propertyBlock);
+
+        foreach (Material mat in _materialInstances)
+            mat?.DisableKeyword(BlueVeinsKeyword);
+    }
+
     /// <summary>Enables the blue veins keyword on all renderers and begins tracking active UV lights.</summary>
     public override void ActivateAnomaly()
     {

@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Hands
-  m_Shader: {fileID: 4800000, guid: cee48b891b6c5034291f6435e1bd81f1, type: 3}
+  m_Shader: {fileID: 4800000, guid: e249050cfbc5dcb48bec67c10f23582e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -62,6 +62,14 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _EyeMaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _LesionMaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: cec65b543b48da146971935a16eed4d5, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -90,6 +98,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: ebbb2bec16a72fe48b8463e62d47d076, type: 3}
         m_Scale: {x: 10, y: 10}
         m_Offset: {x: 0, y: 0}
+    - _VeinMap:
+        m_Texture: {fileID: 2800000, guid: 3672038a606fd354883b6fb3d9f2f2ac, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WorldDisplacementTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -111,6 +123,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
+    - _BlackEyesStrength: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -127,6 +140,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _LesionStrength: 0
     - _Metallic: 0
     - _Mode: 0
     - _NormalsSource: 0
@@ -139,6 +153,7 @@ Material:
     - _RampThreshold: 0.624
     - _ReceiveShadows: 1
     - _ReceiveShadowsOff: 1
+    - _RenderingMode: 0
     - _SketchTexture_OffsetSpeed: 120
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
@@ -147,6 +162,9 @@ Material:
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _UVSec: 0
+    - _UseBlackEyes: 0
+    - _UseBlueVeins: 1
+    - _UseLesion: 0
     - _UseSketch: 0
     - _WobbleAmplitude: 0.001
     - _WobbleFrequency: 15

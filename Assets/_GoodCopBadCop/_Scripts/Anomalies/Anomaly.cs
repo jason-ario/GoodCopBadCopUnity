@@ -11,6 +11,13 @@ public class Anomaly : MonoBehaviour
     {
         Debug.Log("Activated Anomaly: " + gameObject.name);
     }
+
+    /// <summary>
+    /// Puts the anomaly into a clean disabled state without any transition effects.
+    /// Override in subclasses that drive shader properties to ensure those properties
+    /// are zeroed out when the anomaly is not selected for a suspect.
+    /// </summary>
+    public virtual void InitializeDisabled() { }
 }
 
 [System.Serializable]

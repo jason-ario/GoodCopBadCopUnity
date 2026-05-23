@@ -81,6 +81,10 @@ public class AnomalyController : MonoBehaviour
         if (Random.value < _cleanChance)
         {
             Debug.Log("Suspect is clean — no anomalies activated.");
+
+            foreach (Anomaly anomaly in _allPossibleAnomalies)
+                anomaly.InitializeDisabled();
+
             return;
         }
 
@@ -120,6 +124,13 @@ public class AnomalyController : MonoBehaviour
             {
                 anomaly.ActivateAnomaly();
             }
+        }
+
+        // Ensure every anomaly that was not selected has its shader state explicitly cleared.
+        foreach (Anomaly anomaly in _allPossibleAnomalies)
+        {
+            if (!activeAnomalies.Contains(anomaly))
+                anomaly.InitializeDisabled();
         }
     }
     

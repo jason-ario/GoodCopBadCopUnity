@@ -34,15 +34,34 @@ public class BlackEyesAnomaly : MutationAnomaly
         headRenderer.GetPropertyBlock(_propertyBlock);
     }
 
-    /// <summary>Enables the black eyes keyword and fades strength to 1 over fadeDuration seconds.</summary>
+    /// <summary>
+    /// Immediately sets the black eyes strength to 0 and disables the keyword without any fade.
+    /// Call this on anomalies that were not selected to ensure the shader is in a clean state.
+    /// </summary>
+    public override void InitializeDisabled()
+    {
+        if (headRenderer == null) return;
+
+        _propertyBlock.SetFloat(BlackEyesStrengthId, 0f);
+        headRenderer.SetPropertyBlock(_propertyBlock);
+
+        _materialInstance?.DisableKeyword(BlackEyesKeyword);
+    }
+
+    /// <summary>Enables the black eyes keyword and immediately sets strength to 1.</summary>
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
 
         if (headRenderer == null) return;
 
+        if (_activeCoroutine != null)
+            StopCoroutine(_activeCoroutine);
+
         _materialInstance.EnableKeyword(BlackEyesKeyword);
-        StartFade(0f, 1f);
+
+        _propertyBlock.SetFloat(BlackEyesStrengthId, 1f);
+        headRenderer.SetPropertyBlock(_propertyBlock);
     }
 
     /// <summary>Fades strength back to 0 and disables the black eyes keyword.</summary>

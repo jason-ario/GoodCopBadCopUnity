@@ -668,6 +668,18 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5350706457408493353, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: _mutationAnomalies.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 5350706457408493353, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: '_mutationAnomalies.Array.data[2]'
+      value: 
+      objectReference: {fileID: 1666716411081088100}
+    - target: {fileID: 5350706457408493353, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: '_mutationAnomalies.Array.data[3]'
+      value: 
+      objectReference: {fileID: 3961850757458545977}
     - target: {fileID: 5463161838283403662, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: 'parentBones.Array.data[0]'
       value: 
@@ -965,6 +977,14 @@ PrefabInstance:
       propertyPath: m_LocalScale.z
       value: 0.15808706
       objectReference: {fileID: 0}
+    - target: {fileID: 9059146522512625062, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: renderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 9059146522512625062, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'renderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 5957961696641539008}
     - target: {fileID: 9105570664979770960, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.15808707
@@ -1046,3 +1066,25 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
   m_PrefabInstance: {fileID: 7681399874970571202}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1666716411081088100 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9059146522512625062, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 7681399874970571202}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70e8709341cae494ea9656fc2695a968, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LesionAnomaly
+--- !u!114 &3961850757458545977 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6657026380098968827, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 7681399874970571202}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6c389343c4553346a313845053f190e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BlueVeinsAnomaly

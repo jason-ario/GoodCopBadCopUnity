@@ -57,7 +57,6 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		[TCP2HeaderHelp(Blue Veins)]
 		[Toggle(TCP2_BLUE_VEINS)] _UseBlueVeins ("Enable Blue Veins", Float) = 0
 		_VeinMap ("Vein Texture", 2D) = "black" {}
-		_UVLightFalloff ("UV Light Falloff", Range(0.01,1)) = 0.3
 		[TCP2Separator]
 		
 		[TCP2HeaderHelp(Outline)]
@@ -143,7 +142,6 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			float4 _LesionMaskMap_ST;
 			half _LesionStrength;
 			float4 _VeinMap_ST;
-			float _UVLightFalloff;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			float _WobbleAmplitude;
@@ -762,8 +760,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 					for (int uvIdx = 0; uvIdx < _UVLightCount; uvIdx++)
 					{
 						float dist  = distance(positionWS, _UVLightPositions[uvIdx].xyz);
-						float inner = _UVLightRadii[uvIdx] * (1.0 - _UVLightFalloff);
-						combinedMask = max(combinedMask, 1.0 - smoothstep(inner, _UVLightRadii[uvIdx], dist));
+						combinedMask = max(combinedMask, step(dist, _UVLightRadii[uvIdx]));
 					}
 					half4 veinSample = TCP2_TEX2D_SAMPLE(_VeinMap, _VeinMap, input.pack1.xy * _VeinMap_ST.xy + _VeinMap_ST.zw);
 					color.rgb = lerp(color.rgb, veinSample.rgb, veinSample.a * combinedMask);
