@@ -8,8 +8,10 @@ public class ToolShopVisitTask : MonoBehaviour, IBetweenShiftTask
 {
     private bool _isComplete;
 
-    public string TaskName => "Visit Tool Shop";
-    public bool IsComplete => _isComplete;
+    public string TaskName        => "Visit Tool Shop";
+    public string TaskDescription => "Head to the tool shop and\nbrowse the available equipment.";
+    public int    XpReward        => 50;
+    public bool   IsComplete      => _isComplete;
 
     private void OnDestroy()
     {

@@ -3,6 +3,7 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+
 public class DebugConsole : MonoBehaviour
 {
     public bool skipMainMenu; 
@@ -13,6 +14,8 @@ public class DebugConsole : MonoBehaviour
     [SerializeField] private GameObject mainMenuScreen;
 
     public static DebugConsole Instance;
+
+    private DebugTask _debugTask;
     
     void Awake()
     {
@@ -70,5 +73,45 @@ public class DebugConsole : MonoBehaviour
         {
             ShiftManager.Instance.EndIntroCutscene();
         }
+
+        // F5 — inject a debug task into the guidebook task list.
+        if (Input.GetKeyDown(KeyCode.F5))
+        {
+            AddDebugTask();
+        }
+
+        // F6 — mark the injected debug task as complete.
+        if (Input.GetKeyDown(KeyCode.F6))
+        {
+            CompleteDebugTask();
+        }
+    }
+
+    /// <summary>Adds a one-off DebugTask to GuidebookTaskRegistry for guidebook testing.</summary>
+    private void AddDebugTask()
+    {
+        if (GuidebookTaskRegistry.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] GuidebookTaskRegistry not available.");
+            return;
+        }
+
+        if (_debugTask == null)
+            _debugTask = gameObject.AddComponent<DebugTask>();
+
+        GuidebookTaskRegistry.Instance.AddTask(_debugTask);
+        Debug.Log("[DebugConsole] Debug task added to registry (F6 to complete).");
+    }
+
+    /// <summary>Marks the injected DebugTask as complete.</summary>
+    private void CompleteDebugTask()
+    {
+        if (_debugTask == null)
+        {
+            Debug.LogWarning("[DebugConsole] No debug task to complete — press F5 first.");
+            return;
+        }
+
+        _debugTask.Complete();
     }
 }

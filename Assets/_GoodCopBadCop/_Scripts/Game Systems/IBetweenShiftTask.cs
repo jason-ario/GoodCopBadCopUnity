@@ -4,8 +4,14 @@
 /// </summary>
 public interface IBetweenShiftTask
 {
-    /// <summary>Display name used for debugging and future UI.</summary>
+    /// <summary>Display name shown in the guidebook task list.</summary>
     string TaskName { get; }
+
+    /// <summary>Short description of what the player must do to complete this task.</summary>
+    string TaskDescription { get; }
+
+    /// <summary>XP awarded upon completion. Shown in the guidebook task list.</summary>
+    int XpReward { get; }
 
     /// <summary>True once this task has been completed for the current night phase.</summary>
     bool IsComplete { get; }

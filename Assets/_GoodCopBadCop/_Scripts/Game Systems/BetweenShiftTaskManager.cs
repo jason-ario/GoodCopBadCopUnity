@@ -76,6 +76,7 @@ public class BetweenShiftTaskManager : NetworkBehaviour
 
     /// <summary>
     /// Resets all tasks and begins tracking completion for the new night phase.
+    /// Also pushes the task list into GuidebookTaskRegistry so the guidebook reflects them.
     /// Must be called on the server only.
     /// </summary>
     public void BeginNightPhase()
@@ -87,6 +88,9 @@ public class BetweenShiftTaskManager : NetworkBehaviour
 
         foreach (var task in _tasks)
             task?.ResetTask();
+
+        if (GuidebookTaskRegistry.Instance != null)
+            GuidebookTaskRegistry.Instance.SetTasks(_tasks);
 
         OnTasksAssigned?.Invoke();
     }

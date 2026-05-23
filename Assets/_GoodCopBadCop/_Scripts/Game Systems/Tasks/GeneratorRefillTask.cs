@@ -21,8 +21,10 @@ public class GeneratorRefillTask : Interactable, IBetweenShiftTask
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    public string TaskName => "Refill Generator";
-    public bool IsComplete => _isComplete.Value;
+    public string TaskName        => "Refill Generator";
+    public string TaskDescription => "The generator is running low.\nLocate it and refill the fuel tank.";
+    public int    XpReward        => 75;
+    public bool   IsComplete      => _isComplete.Value;
 
     public override void OnNetworkSpawn()
     {

@@ -1,56 +1,124 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// Page content object for the Tasks tab.
-/// Rebuilds task labels from BetweenShiftTaskManager each time the tab is opened.
-/// Follows the NewspaperContentsController pattern: TextMeshPro (3D) children
-/// positioned in local space, rendered to a RenderTexture by an orthographic camera.
+/// Reads from GuidebookTaskRegistry — tasks can be added by any system at any time.
+/// Rebuilds rows immediately when the registry changes, and refreshes completion
+/// states each time the tab is opened.
 /// </summary>
 public class GuidebookTaskListContents : GuidebookPageContents
 {
-    [Tooltip("Pre-placed TextMeshPro label objects, one per task slot. "
-           + "Extras are hidden if there are fewer active tasks than slots.")]
-    [SerializeField] private TextMeshPro[] _taskLabels;
+    [Tooltip("Prefab containing a GuidebookTaskRow component (may be on a child). Instantiated once per task.")]
+    [SerializeField] private GameObject _taskRowPrefab;
 
-    [Tooltip("Shown when there are no active tasks or BetweenShiftTaskManager is unavailable.")]
-    [SerializeField] private TextMeshPro _fallbackLabel;
+    [Tooltip("RectTransform that acts as the parent for spawned rows. Should have a VerticalLayoutGroup.")]
+    [SerializeField] private RectTransform _rowContainer;
+
+    [Tooltip("Shown when there are no active tasks.")]
+    [SerializeField] private TextMeshProUGUI _fallbackLabel;
+
+    private readonly List<GuidebookTaskRow> _rows = new();
 
     private void Awake()
     {
-        if (_taskLabels == null || _taskLabels.Length == 0)
-            Debug.LogWarning("[GuidebookTaskListContents] No task label slots assigned.");
+        if (_taskRowPrefab == null)
+            Debug.LogWarning("[GuidebookTaskListContents] Task row prefab not assigned.");
+
+        if (_rowContainer == null)
+            Debug.LogWarning("[GuidebookTaskListContents] Row container not assigned.");
+    }
+
+    private void OnEnable()
+    {
+        GuidebookTaskRegistry.OnTaskListChanged += OnTaskListChanged;
+    }
+
+    private void OnDisable()
+    {
+        GuidebookTaskRegistry.OnTaskListChanged -= OnTaskListChanged;
+    }
+
+    /// <summary>Immediately rebuilds rows when the registry changes (task added/removed/replaced).</summary>
+    private void OnTaskListChanged()
+    {
+        BuildRows();
     }
 
     /// <summary>
-    /// Rebuilds all task label text from BetweenShiftTaskManager.Tasks.
-    /// Hides unused label slots and shows the fallback if no tasks are available.
+    /// Refreshes completion states on all rows.
+    /// Called by GuidebookTabController when this tab becomes active.
     /// </summary>
     public override void Refresh()
     {
-        IBetweenShiftTask[] tasks = BetweenShiftTaskManager.Instance != null
-            ? BetweenShiftTaskManager.Instance.Tasks
-            : null;
-
-        bool hasTasks = tasks != null && tasks.Length > 0;
-
-        if (_fallbackLabel != null)
-            _fallbackLabel.gameObject.SetActive(!hasTasks);
-
-        if (_taskLabels == null) return;
-
-        for (int i = 0; i < _taskLabels.Length; i++)
+        if (GuidebookTaskRegistry.Instance == null || GuidebookTaskRegistry.Instance.Tasks.Count == 0)
         {
-            if (_taskLabels[i] == null) continue;
-
-            bool hasTask = hasTasks && i < tasks.Length;
-            _taskLabels[i].gameObject.SetActive(hasTask);
-
-            if (hasTask)
-            {
-                string prefix = tasks[i].IsComplete ? "[x] " : "[ ] ";
-                _taskLabels[i].text = prefix + tasks[i].TaskName;
-            }
+            SetFallbackVisible(true);
+            return;
         }
+
+        // If row count is out of sync (e.g. tab was hidden during a registry change), rebuild first.
+        if (_rows.Count != GuidebookTaskRegistry.Instance.Tasks.Count)
+            BuildRows();
+        else
+            RefreshRows();
+    }
+
+    private void BuildRows()
+    {
+        ClearRows();
+
+        if (GuidebookTaskRegistry.Instance == null) return;
+
+        IReadOnlyList<IBetweenShiftTask> tasks = GuidebookTaskRegistry.Instance.Tasks;
+        bool hasTasks = tasks.Count > 0;
+        SetFallbackVisible(!hasTasks);
+
+        if (!hasTasks || _rowContainer == null || _taskRowPrefab == null) return;
+
+        foreach (IBetweenShiftTask task in tasks)
+        {
+            GameObject instance = Instantiate(_taskRowPrefab, _rowContainer);
+            GuidebookTaskRow row = instance.GetComponentInChildren<GuidebookTaskRow>();
+
+            if (row == null)
+            {
+                Debug.LogWarning("[GuidebookTaskListContents] Row prefab has no GuidebookTaskRow component.", instance);
+                continue;
+            }
+
+            row.Bind(task);
+            _rows.Add(row);
+        }
+    }
+
+    private void RefreshRows()
+    {
+        IReadOnlyList<IBetweenShiftTask> tasks = GuidebookTaskRegistry.Instance.Tasks;
+        SetFallbackVisible(tasks.Count == 0);
+
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            if (_rows[i] != null)
+                _rows[i].Bind(tasks[i]);
+        }
+    }
+
+    private void ClearRows()
+    {
+        foreach (GuidebookTaskRow row in _rows)
+        {
+            if (row != null)
+                Destroy(row.transform.parent == _rowContainer ? row.gameObject : row.transform.parent.gameObject);
+        }
+
+        _rows.Clear();
+    }
+
+    private void SetFallbackVisible(bool visible)
+    {
+        if (_fallbackLabel != null)
+            _fallbackLabel.gameObject.SetActive(visible);
     }
 }
