@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -11,6 +12,8 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerMovementController))]
 public class GuidebookController : MonoBehaviour
 {
+    /// <summary>Raised whenever the local player opens the guidebook.</summary>
+    public static event Action OnGuidebookOpened;
     private static readonly string AnimParam  = "HoldingGuidebook";
     private static readonly string InputButton = "Guidebook";
 
@@ -63,6 +66,7 @@ public class GuidebookController : MonoBehaviour
     {
         if (IsOpen) return;
         IsOpen = true;
+        OnGuidebookOpened?.Invoke();
 
         // Deactivate held object without dropping or despawning it.
         if (_pickupController.HeldObject != null)

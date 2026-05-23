@@ -25,6 +25,7 @@ public class Shovel : PickableObject
     // ── Internal ───────────────────────────────────────────────────────────────
 
     private bool _isAttacking;
+    private MeleeWeaponDurability _durability;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -32,20 +33,28 @@ public class Shovel : PickableObject
     {
         base.Awake();
 
+        _durability = GetComponent<MeleeWeaponDurability>();
+
         if (hitbox != null)
         {
-            hitbox.OnHit += PlayImpactSound;
-            hitbox.OnEnvironmentHit += PlayEnvironmentHitSound;
+            hitbox.OnHit += OnHit;
+            hitbox.OnEnvironmentHit += OnEnvironmentHit;
         }
+
+        if (_durability != null)
+            _durability.OnDepleted += OnDurabilityDepleted;
     }
 
     private void OnDestroy()
     {
         if (hitbox != null)
         {
-            hitbox.OnHit -= PlayImpactSound;
-            hitbox.OnEnvironmentHit -= PlayEnvironmentHitSound;
+            hitbox.OnHit -= OnHit;
+            hitbox.OnEnvironmentHit -= OnEnvironmentHit;
         }
+
+        if (_durability != null)
+            _durability.OnDepleted -= OnDurabilityDepleted;
     }
 
     // ── PickableObject overrides ───────────────────────────────────────────────
@@ -88,13 +97,29 @@ public class Shovel : PickableObject
         _isAttacking = false;
     }
 
-    private void PlayImpactSound()
+    private void OnHit()
     {
         SFXController.Instance.Play(impactSound);
+        _durability?.RegisterHit();
     }
 
-    private void PlayEnvironmentHitSound()
+    private void OnEnvironmentHit()
     {
         SFXController.Instance.Play(environmentHitSound);
+        _durability?.RegisterHit();
+    }
+
+    /// <summary>
+    /// Called on the owning client when durability reaches zero.
+    /// Drops the shovel before despawning so the player's hands are cleared correctly,
+    /// then asks the server to despawn the NetworkObject.
+    /// </summary>
+    private void OnDurabilityDepleted()
+    {
+        // Force the player to drop the shovel first so pickup state is cleaned up.
+        if (playerPickupController != null)
+            playerPickupController.DropObject();
+
+        DespawnServerRpc();
     }
 }

@@ -24,12 +24,14 @@ public class GuidebookIcon : MonoBehaviour
     {
         GuidebookTaskRegistry.OnTasksAdded += ShowNotification;
         GuidebookTabController.OnTasksTabViewed += HideNotification;
+        GuidebookController.OnGuidebookOpened += HideNotification;
     }
 
     private void OnDisable()
     {
         GuidebookTaskRegistry.OnTasksAdded -= ShowNotification;
         GuidebookTabController.OnTasksTabViewed -= HideNotification;
+        GuidebookController.OnGuidebookOpened -= HideNotification;
     }
 
     /// <summary>Activates the notification badge to signal new tasks are available.</summary>

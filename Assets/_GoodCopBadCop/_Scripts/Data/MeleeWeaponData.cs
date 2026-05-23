@@ -21,4 +21,13 @@ public class MeleeWeaponData : ScriptableObject
 
     [Tooltip("Tag used to identify enemy GameObjects. Must match the enemy prefab tag.")]
     public string enemyTag = "Enemy";
+
+    [Header("Durability")]
+    [Tooltip("Total number of hits the weapon can land (on enemies or environment) before breaking.")]
+    [Min(1)]
+    public int maxDurability = 10;
+
+    [Tooltip("How much durability is lost per hit.")]
+    [Min(1)]
+    public int durabilityLossPerHit = 1;
 }
