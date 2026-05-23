@@ -37,6 +37,18 @@ public class SaveDataManager : MonoBehaviour
         }
     }
 
+    /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
+    public int CurrentDay
+    {
+        get => ActiveSlot?.CurrentDay ?? 1;
+        set
+        {
+            if (ActiveSlot == null) return;
+            ActiveSlot.CurrentDay = value;
+            Save();
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Unity Lifecycle
     // ---------------------------------------------------------------------------

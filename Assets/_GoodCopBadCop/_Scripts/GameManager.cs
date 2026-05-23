@@ -250,7 +250,7 @@ public class GameManager : NetworkBehaviour
                 TeleportPlayersToGameplaySpawnPoints();
             }
 
-            StoryProgressionManager.Instance.StartGame();
+            CampaignManager.Instance.StartCampaign();
             yield break;
         }
 

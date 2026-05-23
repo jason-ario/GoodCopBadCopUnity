@@ -4,7 +4,6 @@ using UnityEngine;
 public class StackOfFolders : Interactable
 {
     [SerializeField] private PickableItemData folder;
-    [SerializeField] private string[] alreadyHaveFolderTutorialBarks;
 
     private readonly NetworkVariable<bool> _folderGrabbedAlready = new NetworkVariable<bool>(
         false,
@@ -35,7 +34,6 @@ public class StackOfFolders : Interactable
 
         if (_folderGrabbedAlready.Value)
         {
-            TutorialManager.Instance.ShowTutorialText(alreadyHaveFolderTutorialBarks[UnityEngine.Random.Range(0, alreadyHaveFolderTutorialBarks.Length)]);
             return;
         }
 

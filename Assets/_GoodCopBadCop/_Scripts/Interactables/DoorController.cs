@@ -110,7 +110,7 @@ public class DoorController : Interactable
             _machineShake.isRunning = false;
 
         if (_tryToLeaveTutorialText != null && _tryToLeaveTutorialText.Length > 0)
-            TutorialManager.Instance.ShowTutorialText(_tryToLeaveTutorialText[UnityEngine.Random.Range(0, _tryToLeaveTutorialText.Length)]);
+            MegaphoneDialogueManager.Instance.SayDoorLocked(_tryToLeaveTutorialText);
 
         _beingInteractedWith = false;
     }

@@ -78,6 +78,18 @@ public class ShiftManager : NetworkBehaviour
     public bool IsEarlyDays => CurrentDay < 11;
     public bool IsMidDays => CurrentDay is >= 11 and < 21;
     public bool IsEndDays => CurrentDay >= 21;
+
+    /// <summary>
+    /// Sets the current day directly. Called by CampaignManager on startup and day advance
+    /// so ShiftManager always reflects the save-data day number.
+    /// </summary>
+    public void SetCurrentDay(int day)
+    {
+        _currentDay = day;
+        if (IsServer)
+            _networkCurrentDay.Value = day;
+        Debug.Log($"[ShiftManager] Day set to {_currentDay} ({_startDate.AddDays(_currentDay - 1):dd MMMM yyyy})");
+    }
     #endregion
 
     private void Awake()
@@ -104,7 +116,6 @@ public class ShiftManager : NetworkBehaviour
     private void HandleAllTasksComplete()
     {
         OnShiftReady?.Invoke();
-        TutorialManager.Instance.SayAllTasksComplete();
     }
 
     public override void OnNetworkSpawn()
@@ -131,8 +142,8 @@ public class ShiftManager : NetworkBehaviour
 
     private void InitializeDateSystem()
     {
-        _currentDay = PlayerPrefs.GetInt("dayNumber", 1);
-        Debug.Log($"Game started on {_startDate.AddDays(_currentDay - 1):dd MMMM yyyy} (Day {_currentDay})");
+        _currentDay = 1;
+        Debug.Log($"[ShiftManager] Date system initialised. CampaignManager will push the correct day on StartCampaign.");
     }
 
     /// <summary>
@@ -163,7 +174,7 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void NotifyClockOutReadyClientRpc()
     {
-        TutorialManager.Instance.ShowTutorialText("Your shift is over. Clock out to end the day.");
+        MegaphoneDialogueManager.Instance.SayClockOutReady();
     }
 
     /// <summary>
@@ -238,7 +249,7 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void NotifyNotAllInsideClientRpc(ClientRpcParams rpcParams = default)
     {
-        TutorialManager.Instance.ShowTutorialText("All inspectors must be inside the booth to begin the shift.");
+        MegaphoneDialogueManager.Instance.SayNotAllInside();
     }
 
     [ClientRpc]
@@ -378,13 +389,11 @@ public class ShiftManager : NetworkBehaviour
     public void StartInBetweenShiftSequence()
     {
         StartCoroutine(InBetweenShiftSequence());
-        // BeginNightPhase is deferred — TutorialManager triggers it after the task announcement bark.
     }
 
     /// <summary>
     /// Registers tasks in GuidebookTaskRegistry and notifies all clients.
-    /// Called by TutorialManager after the task-announcement bark so the guidebook
-    /// icon and task list activate in sync with the on-screen text notification.
+    /// Called after the between-shift sequence to activate tasks in the guidebook.
     /// </summary>
     public void TriggerBeginNightPhase()
     {
@@ -454,7 +463,7 @@ public class ShiftManager : NetworkBehaviour
 
         EnablePlayerControl();
 
-        TutorialManager.Instance.SayEndOfShiftDialogue();
+        MegaphoneDialogueManager.Instance.SayEndOfShiftDialogue();
     }
 
     [ClientRpc]

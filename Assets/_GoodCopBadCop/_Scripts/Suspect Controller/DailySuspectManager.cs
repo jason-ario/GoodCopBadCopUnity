@@ -15,6 +15,22 @@ public class DailySuspectManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// Replaces the active suspect pool for the upcoming shift.
+    /// Called by CampaignManager.AdvanceDay before the shift starts.
+    /// </summary>
+    public void SetSuspectSet(SuspectSet suspectSet)
+    {
+        if (suspectSet == null)
+        {
+            Debug.LogWarning("[DailySuspectManager] SetSuspectSet called with null SuspectSet — keeping current pool.");
+            return;
+        }
+
+        allSuspects = suspectSet;
+        Debug.Log($"[DailySuspectManager] Suspect pool updated to '{suspectSet.name}'.");
+    }
+
     private void Start()
     {
         ShiftManager.Instance.OnShiftStart += PopulateShiftCharacters;
