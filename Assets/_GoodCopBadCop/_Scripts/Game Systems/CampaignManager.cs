@@ -4,20 +4,20 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Master campaign orchestrator. Sits above ShiftManager and owns:
-/// - Which day is active and which DayEntry config to apply
-/// - Activating/deactivating the correct per-day scene context (DayContext children)
+/// Master campaign orchestrator. Owns:
+/// - Which day is active (server-authoritative via NetworkVariable)
+/// - Activating / deactivating the correct per-day DayBase child GameObject
 /// - Injecting the day's SuspectSet into DailySuspectManager
-/// - Firing tutorial step events for the new tutorial system to handle
+/// - Firing tutorial step events for MegaphoneDialogueManager to handle
+/// - Surfacing the door-lock flag to ShiftManager at shift start
 /// - Persisting CurrentDay to SaveDataManager
 ///
-/// Day advancement is server-authoritative via NetworkVariable.
+/// Per-day configuration (suspects, door lock, tutorial steps) lives directly on
+/// each day's DayBase subclass component — no ScriptableObject required.
 /// </summary>
 public class CampaignManager : NetworkBehaviour
 {
     public static CampaignManager Instance;
-
-    [SerializeField] private CampaignData _campaignData;
 
     private readonly NetworkVariable<int> _networkCurrentDay = new NetworkVariable<int>(
         1,
@@ -30,33 +30,37 @@ public class CampaignManager : NetworkBehaviour
     /// <summary>The current 1-based day number.</summary>
     public int CurrentDay => _currentDay;
 
-    /// <summary>The DayEntry config resolved for the current day.</summary>
-    public DayEntry CurrentDayEntry { get; private set; }
+    /// <summary>The active day's DayBase component.</summary>
+    public DayBase ActiveDay { get; private set; }
+
+    /// <summary>
+    /// True when the active day has <see cref="DayBase.LockDoorDuringShift"/> set.
+    /// ShiftManager reads this at shift start to decide whether to fire OnDoorLock.
+    /// </summary>
+    public bool IsDoorLockedForShift => ActiveDay != null && ActiveDay.LockDoorDuringShift;
 
     /// <summary>
     /// Fired when CampaignManager needs a tutorial step to run.
-    /// Subscribe here from your tutorial system to handle each step.
+    /// MegaphoneDialogueManager subscribes here.
     /// </summary>
     public static event Action<TutorialStep> OnTutorialStepRequested;
 
-    /// <summary>Fired after AdvanceDay completes on all clients.</summary>
+    /// <summary>Fired after a new day is fully applied on all clients.</summary>
     public static event Action<int> OnDayChanged;
 
-    /// <summary>Fired when the campaign's final day has been completed.</summary>
+    /// <summary>Fired when the final day has been completed.</summary>
     public static event Action OnCampaignComplete;
 
-    // Per-day child GameObjects, keyed by DayNumber.
-    private readonly Dictionary<int, DayContext> _dayContexts = new Dictionary<int, DayContext>();
-    private DayContext _activeDayContext;
+    private readonly Dictionary<int, DayBase> _days = new Dictionary<int, DayBase>();
 
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Unity Lifecycle
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
     private void Awake()
     {
         Instance = this;
-        CollectDayContexts();
+        CollectDays();
     }
 
     private void OnEnable()
@@ -81,50 +85,42 @@ public class CampaignManager : NetworkBehaviour
         _networkCurrentDay.OnValueChanged -= OnNetworkDayChanged;
     }
 
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Initialisation
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
-    private void CollectDayContexts()
+    private void CollectDays()
     {
-        _dayContexts.Clear();
+        _days.Clear();
 
         foreach (Transform child in transform)
         {
-            DayContext ctx = child.GetComponent<DayContext>();
-            if (ctx == null) continue;
+            DayBase day = child.GetComponent<DayBase>();
+            if (day == null) continue;
 
-            if (_dayContexts.ContainsKey(ctx.DayNumber))
+            if (_days.ContainsKey(day.DayNumber))
             {
-                Debug.LogWarning($"[CampaignManager] Duplicate DayNumber {ctx.DayNumber} on '{child.name}' — skipping.");
+                Debug.LogWarning($"[CampaignManager] Duplicate DayNumber {day.DayNumber} on '{child.name}' — skipping.");
                 continue;
             }
 
-            _dayContexts[ctx.DayNumber] = ctx;
-
-            // Ensure all day children start inactive.
+            _days[day.DayNumber] = day;
             child.gameObject.SetActive(false);
         }
 
-        Debug.Log($"[CampaignManager] Collected {_dayContexts.Count} DayContext(s).");
+        Debug.Log($"[CampaignManager] Collected {_days.Count} day(s).");
     }
 
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Public API
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
     /// <summary>
     /// Entry point called by GameManager when the game starts.
-    /// Reads CurrentDay from the active save slot and loads the correct day config.
+    /// Reads CurrentDay from the active save slot and applies the correct day.
     /// </summary>
     public void StartCampaign()
     {
-        if (_campaignData == null)
-        {
-            Debug.LogError("[CampaignManager] CampaignData is not assigned. Campaign cannot start.");
-            return;
-        }
-
         int savedDay = SaveDataManager.Instance.CurrentDay;
         _currentDay = Mathf.Max(1, savedDay);
 
@@ -137,19 +133,8 @@ public class CampaignManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Called when a shift ends. Persists the completed day and deactivates the current DayContext.
-    /// Day advancement happens separately via AdvanceDay (called when the next shift begins).
-    /// </summary>
-    public void OnShiftEnded()
-    {
-        SaveDataManager.Instance.CurrentDay = _currentDay;
-        _activeDayContext?.OnDayDeactivated();
-        Debug.Log($"[CampaignManager] Shift ended — Day {_currentDay} saved.");
-    }
-
-    /// <summary>
-    /// Advances to the next campaign day. Server-only; syncs to all clients via NetworkVariable.
-    /// Call this when the player is ready to begin the next shift (e.g. after night-phase tasks).
+    /// Advances to the next campaign day. Server-only; propagates to clients via NetworkVariable.
+    /// Call this after all night-phase tasks are complete.
     /// </summary>
     public void AdvanceDay()
     {
@@ -161,22 +146,29 @@ public class CampaignManager : NetworkBehaviour
 
         int nextDay = _currentDay + 1;
 
-        if (nextDay > _campaignData.TotalDays)
+        if (!_days.ContainsKey(nextDay))
         {
-            Debug.Log("[CampaignManager] Campaign complete — all days finished.");
+            Debug.Log("[CampaignManager] Campaign complete — no further days configured.");
+            ActiveDay?.DayCompleted();
             OnCampaignComplete?.Invoke();
             return;
         }
 
         _networkCurrentDay.Value = nextDay;
-        // Clients apply the day when OnNetworkDayChanged fires.
-        // Apply on server immediately.
+        // Server applies immediately; clients apply via OnNetworkDayChanged.
         ApplyDay(nextDay);
     }
 
-    // ---------------------------------------------------------------------------
-    // Internal
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Event Handlers
+    // -------------------------------------------------------------------------
+
+    private void OnShiftEnded()
+    {
+        SaveDataManager.Instance.CurrentDay = _currentDay;
+        ActiveDay?.ShiftEnded();
+        Debug.Log($"[CampaignManager] Shift ended — Day {_currentDay} saved.");
+    }
 
     private void OnNetworkDayChanged(int oldDay, int newDay)
     {
@@ -187,47 +179,50 @@ public class CampaignManager : NetworkBehaviour
             ApplyDay(newDay);
     }
 
+    // -------------------------------------------------------------------------
+    // Internal
+    // -------------------------------------------------------------------------
+
     private void ApplyDay(int day)
     {
         _currentDay = day;
-        CurrentDayEntry = _campaignData.GetDayEntry(day);
 
-        // Push day number to ShiftManager so its date helpers stay in sync.
+        // Deactivate the previous day.
+        if (ActiveDay != null)
+        {
+            ActiveDay.DayDeactivated();
+            ActiveDay.gameObject.SetActive(false);
+        }
+
+        if (!_days.TryGetValue(day, out DayBase dayBase))
+        {
+            ActiveDay = null;
+            Debug.LogWarning($"[CampaignManager] No DayBase found for Day {day}.");
+            return;
+        }
+
+        // Activate the new day.
+        dayBase.gameObject.SetActive(true);
+        ActiveDay = dayBase;
+
+        // Push day number to ShiftManager.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.SetCurrentDay(day);
 
         // Inject this day's suspect pool.
-        if (DailySuspectManager.Instance != null && CurrentDayEntry.suspectSet != null)
-            DailySuspectManager.Instance.SetSuspectSet(CurrentDayEntry.suspectSet);
+        if (DailySuspectManager.Instance != null && dayBase.SuspectSet != null)
+            DailySuspectManager.Instance.SetSuspectSet(dayBase.SuspectSet);
 
-        // Swap DayContext children.
-        _activeDayContext?.OnDayDeactivated();
-        _activeDayContext?.gameObject.SetActive(false);
+        // Fire tutorial steps configured on the day.
+        FireTutorialSteps(dayBase.TutorialStepsToFire);
 
-        if (_dayContexts.TryGetValue(day, out DayContext ctx))
-        {
-            ctx.gameObject.SetActive(true);
-            ctx.OnDayActivated();
-            _activeDayContext = ctx;
-        }
-        else
-        {
-            _activeDayContext = null;
-            Debug.LogWarning($"[CampaignManager] No DayContext found for Day {day}.");
-        }
-
-        // Fire tutorial steps for this day.
-        FireTutorialSteps(CurrentDayEntry.tutorialStepsToFire);
-
+        // Notify the day itself, then any external listeners.
+        dayBase.DayActivated();
         OnDayChanged?.Invoke(day);
 
-        Debug.Log($"[CampaignManager] Day {day} applied — '{CurrentDayEntry.dayLabel}'.");
+        Debug.Log($"[CampaignManager] Day {day} applied.");
     }
 
-    /// <summary>
-    /// Fires each tutorial step as an event. The tutorial system subscribes to
-    /// OnTutorialStepRequested to handle the actual presentation logic.
-    /// </summary>
     private void FireTutorialSteps(List<TutorialStep> steps)
     {
         if (steps == null || steps.Count == 0) return;

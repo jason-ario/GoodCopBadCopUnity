@@ -277,6 +277,10 @@ public class ShiftManager : NetworkBehaviour
         PlayBuzzerSound();
         windowLampController.TurnGreen();
 
+        // Lock the exit door for the full shift when the campaign day requires it.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)
+            OnDoorLock?.Invoke();
+
         yield return new WaitForSeconds(3f);
 
         OnShiftStart?.Invoke();
