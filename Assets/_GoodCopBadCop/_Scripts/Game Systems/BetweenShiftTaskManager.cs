@@ -1,34 +1,23 @@
 using System;
-using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Server-authoritative manager for the between-shift night-phase task list.
-/// Tracks task completion and broadcasts readiness to all clients via NetworkVariable.
+/// Local manager for the between-shift night-phase task list.
+/// Tracks task completion and notifies ShiftManager when all tasks are done.
+/// Plain MonoBehaviour — no NetworkObject required. Each client manages its own
+/// registry; ShiftManager handles the networked all-tasks-complete broadcast.
 /// </summary>
-public class BetweenShiftTaskManager : NetworkBehaviour
+public class BetweenShiftTaskManager : MonoBehaviour
 {
     public static BetweenShiftTaskManager Instance;
 
     /// <summary>
-    /// Fired on all clients when every registered task has been completed.
-    /// ShiftManager subscribes to this to trigger the shift-start button flash and announcer line.
+    /// Fired locally when every registered task has been completed.
+    /// ShiftManager subscribes to this to trigger the shift-start button and announcer line.
     /// </summary>
     public static event Action OnAllTasksComplete;
 
-    /// <summary>
-    /// Fired locally when a new set of tasks is assigned at the start of a night phase.
-    /// GuidebookIcon subscribes to this to show the notification badge.
-    /// </summary>
-    public static event Action OnTasksAssigned;
-
-    private readonly NetworkVariable<bool> _allTasksComplete = new(false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
-    public bool AllTasksComplete => _allTasksComplete.Value;
-
-    /// <summary>Read-only view of all registered tasks. Used by GuidebookTaskListContents.</summary>
+    /// <summary>Read-only view of all registered tasks.</summary>
     public IBetweenShiftTask[] Tasks => _tasks;
 
     /// <summary>
@@ -39,22 +28,14 @@ public class BetweenShiftTaskManager : NetworkBehaviour
 
     private IBetweenShiftTask[] _tasks;
     private int _completedTaskCount;
+    private bool _allTasksComplete;
+
+    public bool AllTasksComplete => _allTasksComplete;
 
     private void Awake()
     {
         Instance = this;
-    }
-
-    public override void OnNetworkSpawn()
-    {
-        base.OnNetworkSpawn();
         BuildTaskList();
-        _allTasksComplete.OnValueChanged += OnAllTasksCompleteChanged;
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        _allTasksComplete.OnValueChanged -= OnAllTasksCompleteChanged;
     }
 
     private void BuildTaskList()
@@ -68,23 +49,14 @@ public class BetweenShiftTaskManager : NetworkBehaviour
         }
     }
 
-    private void OnAllTasksCompleteChanged(bool oldValue, bool newValue)
-    {
-        if (newValue)
-            OnAllTasksComplete?.Invoke();
-    }
-
     /// <summary>
-    /// Resets all tasks and begins tracking completion for the new night phase.
-    /// Also pushes the task list into GuidebookTaskRegistry so the guidebook reflects them.
-    /// Must be called on the server only.
+    /// Resets all tasks and populates GuidebookTaskRegistry for the new night phase.
+    /// Call this on every client — typically via ShiftManager.
     /// </summary>
     public void BeginNightPhase()
     {
-        if (!IsServer) return;
-
         _completedTaskCount = 0;
-        _allTasksComplete.Value = false;
+        _allTasksComplete = false;
 
         foreach (var task in _tasks)
             task?.ResetTask();
@@ -92,54 +64,33 @@ public class BetweenShiftTaskManager : NetworkBehaviour
         if (GuidebookTaskRegistry.Instance != null)
             GuidebookTaskRegistry.Instance.SetTasks(_tasks);
 
-        OnTasksAssigned?.Invoke();
+        Debug.Log($"[BetweenShiftTaskManager] Night phase begun. {_tasks.Length} task(s) registered.");
     }
 
     /// <summary>
     /// Called by individual task scripts when their task is completed.
-    /// Safe to call from both server and clients.
+    /// Routes to the server via ShiftManager to keep the completion count authoritative.
     /// </summary>
     public void NotifyTaskComplete(IBetweenShiftTask task)
     {
-        if (IsServer)
-            HandleTaskCompleted();
-        else
-            NotifyTaskCompleteServerRpc();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void NotifyTaskCompleteServerRpc()
-    {
-        HandleTaskCompleted();
-    }
-
-    private void HandleTaskCompleted()
-    {
-        if (!IsServer) return;
-        if (_allTasksComplete.Value) return;
-
-        _completedTaskCount++;
-        Debug.Log($"[BetweenShiftTaskManager] Tasks completed: {_completedTaskCount} / {_tasks.Length}");
-
-        if (_completedTaskCount >= _tasks.Length)
-            _allTasksComplete.Value = true;
+        ShiftManager.Instance.NotifyTaskCompleteServerRpc();
     }
 
     /// <summary>
-    /// Debug helper — immediately marks all tasks as complete regardless of actual task state.
-    /// Routes through the server so the NetworkVariable replicates correctly.
+    /// Called by ShiftManager's ClientRpc when the server confirms all tasks are done.
+    /// </summary>
+    public void HandleAllTasksComplete()
+    {
+        if (_allTasksComplete) return;
+        _allTasksComplete = true;
+        OnAllTasksComplete?.Invoke();
+    }
+
+    /// <summary>
+    /// Debug helper — immediately fires OnAllTasksComplete locally and notifies the server.
     /// </summary>
     public void ForceCompleteAllTasks()
     {
-        if (IsServer)
-            _allTasksComplete.Value = true;
-        else
-            ForceCompleteAllTasksServerRpc();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void ForceCompleteAllTasksServerRpc()
-    {
-        _allTasksComplete.Value = true;
+        ShiftManager.Instance.ForceCompleteAllTasksServerRpc();
     }
 }

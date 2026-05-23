@@ -78,6 +78,31 @@ public class TutorialManager : MonoBehaviour
         yield return new WaitForSeconds(3f);
 
         ShowTutorialText("Complete your tasks to prepare for your next shift.");
+
+        yield return new WaitUntil(() => !isSpeaking);
+
+        yield return new WaitForSeconds(2f);
+
+        AnnounceNewTask();
+    }
+
+    /// <summary>
+    /// Shows the task notification text, then waits 4 seconds before registering the task
+    /// in the guidebook — so the icon badge and task list activate in sync with the bark.
+    /// </summary>
+    private void AnnounceNewTask()
+    {
+        StartCoroutine(AnnounceNewTaskCoroutine());
+    }
+
+    private IEnumerator AnnounceNewTaskCoroutine()
+    {
+        if (PlayerTutorialUI.Instance != null)
+            PlayerTutorialUI.Instance.ShowTextOnly("New task: Take out the trash.");
+
+        yield return new WaitForSeconds(4f);
+
+        ShiftManager.Instance.TriggerBeginNightPhase();
     }
 
     /// <summary>Played at the start of the night phase after the end-of-shift report is dismissed.</summary>

@@ -8,11 +8,11 @@ public class DebugTask : MonoBehaviour, IBetweenShiftTask
 {
     private const string DefaultName = "Debug Task";
     private const string DefaultDescription = "A fake task added at runtime for testing the guidebook task list.";
-    private const int DefaultXpReward = 99;
+    private const int DefaultCouponReward = 10;
 
     public string TaskName => DefaultName;
     public string TaskDescription => DefaultDescription;
-    public int XpReward => DefaultXpReward;
+    public int CouponReward => DefaultCouponReward;
     public bool IsComplete { get; private set; }
 
     /// <summary>Marks the task as complete and notifies the registry and manager.</summary>
@@ -24,7 +24,7 @@ public class DebugTask : MonoBehaviour, IBetweenShiftTask
 
         GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
 
-        if (BetweenShiftTaskManager.Instance != null && BetweenShiftTaskManager.Instance.IsSpawned)
+        if (BetweenShiftTaskManager.Instance != null)
             BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
     }
 

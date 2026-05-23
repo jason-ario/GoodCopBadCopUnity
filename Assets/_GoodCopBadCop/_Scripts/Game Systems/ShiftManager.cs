@@ -39,6 +39,8 @@ public class ShiftManager : NetworkBehaviour
     public int suspectsKilledCorrect = 0;
     public int suspectsKilledWrong = 0;
 
+    private int _taskCompletedCount = 0;
+
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
@@ -109,6 +111,12 @@ public class ShiftManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         _networkCurrentDay.OnValueChanged += OnCurrentDayChanged;
+
+        if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady)
+            SkipToBoothReady();
+
+        if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToAfterShift)
+            StartCoroutine(DebugSkipToAfterShift());
     }
 
     public override void OnNetworkDespawn()
@@ -370,9 +378,69 @@ public class ShiftManager : NetworkBehaviour
     public void StartInBetweenShiftSequence()
     {
         StartCoroutine(InBetweenShiftSequence());
+        // BeginNightPhase is deferred — TutorialManager triggers it after the task announcement bark.
+    }
 
-        if (IsServer && BetweenShiftTaskManager.Instance != null)
+    /// <summary>
+    /// Registers tasks in GuidebookTaskRegistry and notifies all clients.
+    /// Called by TutorialManager after the task-announcement bark so the guidebook
+    /// icon and task list activate in sync with the on-screen text notification.
+    /// </summary>
+    public void TriggerBeginNightPhase()
+    {
+        if (IsServer)
+            BeginNightPhaseOnServer();
+        else
+            BeginNightPhaseServerRpc();
+    }
+
+    private void BeginNightPhaseOnServer()
+    {
+        _taskCompletedCount = 0;
+
+        if (BetweenShiftTaskManager.Instance != null)
             BetweenShiftTaskManager.Instance.BeginNightPhase();
+
+        BeginNightPhaseClientRpc();
+    }
+
+    [ClientRpc]
+    private void BeginNightPhaseClientRpc()
+    {
+        if (IsServer) return; // Host already ran BeginNightPhase above.
+        if (BetweenShiftTaskManager.Instance != null)
+            BetweenShiftTaskManager.Instance.BeginNightPhase();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void BeginNightPhaseServerRpc()
+    {
+        BeginNightPhaseOnServer();
+    }
+
+    /// <summary>Routes a task-complete notification to the server for authoritative counting.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyTaskCompleteServerRpc()
+    {
+        _taskCompletedCount++;
+        Debug.Log($"[ShiftManager] Tasks completed: {_taskCompletedCount} / {BetweenShiftTaskManager.Instance?.Tasks.Length}");
+
+        int total = BetweenShiftTaskManager.Instance?.Tasks.Length ?? 0;
+        if (_taskCompletedCount >= total)
+            AllTasksCompleteClientRpc();
+    }
+
+    [ClientRpc]
+    private void AllTasksCompleteClientRpc()
+    {
+        BetweenShiftTaskManager.Instance?.HandleAllTasksComplete();
+    }
+
+    /// <summary>Forces all tasks to complete, bypassing individual task state. Debug only.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ForceCompleteAllTasksServerRpc()
+    {
+        AllTasksCompleteClientRpc();
     }
 
     private IEnumerator InBetweenShiftSequence()
@@ -559,6 +627,74 @@ public class ShiftManager : NetworkBehaviour
         introCutscene.gameObject.SetActive(true);
         yield return new WaitForSeconds(.5f);
         UIController.Instance.FadeOut();
+    }
+
+    /// <summary>
+    /// Debug shortcut: skips the main menu, lobby, and all cutscenes, then spawns the player
+    /// directly in the booth with the shift switch primed and ready.
+    /// Mirrors <see cref="EndIntroCutsceneSequence"/> but also handles the menu-to-gameplay
+    /// transition since we're entering from the title screen.
+    /// Call this from <see cref="DebugConsole"/> after starting the host and creating the lobby.
+    /// </summary>
+    public void SkipToBoothReady()
+    {
+        if (IsServer)
+            SkipToBoothReadyClientRpc();
+        else
+            StartCoroutine(SkipToBoothReadySequence());
+    }
+
+    [ClientRpc]
+    private void SkipToBoothReadyClientRpc()
+    {
+        StartCoroutine(SkipToBoothReadySequence());
+    }
+
+    private IEnumerator SkipToBoothReadySequence()
+    {
+        MainMenuController.Instance.TransitionToGameplay();
+        AudioManager.Instance.StartAmbientAudio();
+
+        yield return new WaitForEndOfFrame();
+
+        introCutscene.gameObject.SetActive(false);
+
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        ResetEnvironment();
+        SuspectController.Instance.ResetSuspects();
+
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+            PlayerInstance.Instance.SetIsOutside(false);
+        }
+
+        UIController.Instance.ShowPlayerUI();
+        EnablePlayerControl();
+        GameManager.Instance.OnGameStart?.Invoke();
+        OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
+        PlayShiftStartFanfare();
+    }
+
+    /// <summary>
+    /// Debug shortcut: runs the full booth-ready setup then immediately ends the shift
+    /// and auto-dismisses the end-of-shift report, landing directly in the night phase
+    /// with tasks assigned.
+    /// </summary>
+    private IEnumerator DebugSkipToAfterShift()
+    {
+        SkipToBoothReadyClientRpc();
+
+        yield return new WaitForEndOfFrame();
+        yield return null;
+
+        EndShift();
+
+        yield return new WaitForSeconds(1f);
+
+        StartInBetweenShiftSequence();
     }
 
     public void EndIntroCutscene()

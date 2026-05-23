@@ -17,10 +17,10 @@ public class GuidebookTaskRow : MonoBehaviour
     [Tooltip("Displays the short task description.")]
     [SerializeField] private TextMeshProUGUI _descriptionLabel;
 
-    [Tooltip("Displays the XP reward, e.g. '★ 75 XP'.")]
-    [SerializeField] private TextMeshProUGUI _xpLabel;
+    [Tooltip("Displays the coupon reward, e.g. '$10 Coupon'.")]
+    [SerializeField] private TextMeshProUGUI _rewardLabel;
 
-    private const string XpFormat = "★ {0} XP";
+    private const string RewardFormat = "<sprite=0>{0}";
 
     private IBetweenShiftTask _task;
 
@@ -48,8 +48,8 @@ public class GuidebookTaskRow : MonoBehaviour
         if (_descriptionLabel != null)
             _descriptionLabel.text = task.TaskDescription;
 
-        if (_xpLabel != null)
-            _xpLabel.text = string.Format(XpFormat, task.XpReward);
+        if (_rewardLabel != null)
+            _rewardLabel.text = string.Format(RewardFormat, task.CouponReward);
 
         Debug.Log($"[GuidebookTaskRow] Bind called. Task: '{task.TaskName}', IsComplete: {task.IsComplete}, Checkmark ref: {(_checkmark != null ? _checkmark.name : "NULL")}", this);
         SetComplete(task.IsComplete);

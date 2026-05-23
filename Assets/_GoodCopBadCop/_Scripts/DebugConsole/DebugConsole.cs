@@ -10,6 +10,13 @@ public class DebugConsole : MonoBehaviour
     public bool skipLobby;
     public bool skipInitialShiftTransition;
     public bool cutsceneMode;
+
+    [Tooltip("Skips the main menu, all cutscenes, and spawns the player directly in the booth with the shift switch ready. Equivalent to skipping main menu + F10.")]
+    public bool skipToBoothReady;
+
+    [Tooltip("Skips straight to after the shift ends — triggers EndShift and auto-dismisses the report, landing in the night phase with tasks assigned.")]
+    public bool skipToAfterShift;
+
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
 
@@ -29,6 +36,16 @@ public class DebugConsole : MonoBehaviour
     
     private void Start()
     {
+        if (skipToBoothReady || skipToAfterShift)
+        {
+            NetworkManager.Singleton.StartHost();
+            LobbyManager.Instance.CreateLobby();
+            GameManager.Instance.TryStartGame(true);
+            // SkipToBoothReady() / DebugSkipToAfterShift() are deferred to ShiftManager.OnNetworkSpawn
+            // so all NetworkObjects are spawned and ClientRpcs are safe to send.
+            return;
+        }
+
         if (skipMainMenu)
         {
             if (cutsceneMode)

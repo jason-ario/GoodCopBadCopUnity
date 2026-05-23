@@ -10,8 +10,8 @@ public interface IBetweenShiftTask
     /// <summary>Short description of what the player must do to complete this task.</summary>
     string TaskDescription { get; }
 
-    /// <summary>XP awarded upon completion. Shown in the guidebook task list.</summary>
-    int XpReward { get; }
+    /// <summary>Money awarded upon completion. Shown in the guidebook task list.</summary>
+    int CouponReward { get; }
 
     /// <summary>True once this task has been completed for the current night phase.</summary>
     bool IsComplete { get; }

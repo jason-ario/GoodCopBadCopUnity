@@ -11,6 +11,9 @@ public class GuidebookIcon : MonoBehaviour
     [Tooltip("The notification badge GameObject (the ! indicator).")]
     [SerializeField] private GameObject _notificationBadge;
 
+    [Tooltip("Sound played when a new task is added to the guidebook.")]
+    [SerializeField] private AudioClip _taskAddedSound;
+
     private void Awake()
     {
         if (_notificationBadge != null)
@@ -19,14 +22,12 @@ public class GuidebookIcon : MonoBehaviour
 
     private void OnEnable()
     {
-        BetweenShiftTaskManager.OnTasksAssigned += ShowNotification;
         GuidebookTaskRegistry.OnTasksAdded += ShowNotification;
         GuidebookTabController.OnTasksTabViewed += HideNotification;
     }
 
     private void OnDisable()
     {
-        BetweenShiftTaskManager.OnTasksAssigned -= ShowNotification;
         GuidebookTaskRegistry.OnTasksAdded -= ShowNotification;
         GuidebookTabController.OnTasksTabViewed -= HideNotification;
     }
@@ -36,6 +37,9 @@ public class GuidebookIcon : MonoBehaviour
     {
         if (_notificationBadge != null)
             _notificationBadge.SetActive(true);
+
+        if (_taskAddedSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(_taskAddedSound);
     }
 
     /// <summary>Deactivates the notification badge once the player has viewed the Tasks tab.</summary>

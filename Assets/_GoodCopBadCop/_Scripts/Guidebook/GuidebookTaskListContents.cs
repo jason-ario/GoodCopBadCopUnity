@@ -28,21 +28,19 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
         if (_rowContainer == null)
             Debug.LogWarning("[GuidebookTaskListContents] Row container not assigned.");
+
+        // Subscribe persistently so we receive registry changes even while the guidebook is closed.
+        GuidebookTaskRegistry.OnTaskListChanged += BuildRows;
+    }
+
+    private void OnDestroy()
+    {
+        GuidebookTaskRegistry.OnTaskListChanged -= BuildRows;
     }
 
     private void OnEnable()
     {
-        GuidebookTaskRegistry.OnTaskListChanged += OnTaskListChanged;
-    }
-
-    private void OnDisable()
-    {
-        GuidebookTaskRegistry.OnTaskListChanged -= OnTaskListChanged;
-    }
-
-    /// <summary>Immediately rebuilds rows when the registry changes (task added/removed/replaced).</summary>
-    private void OnTaskListChanged()
-    {
+        // Catch up if tasks were added while the guidebook was closed.
         BuildRows();
     }
 
