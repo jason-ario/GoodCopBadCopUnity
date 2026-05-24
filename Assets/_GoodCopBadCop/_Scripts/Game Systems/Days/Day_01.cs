@@ -46,9 +46,6 @@ public class Day_01 : DayBase
     [Tooltip("The red ink stamp station — blocked for the entire Day 1 tutorial.")]
     [SerializeField] private InkStamp _redStampSlot;
 
-    [Tooltip("Tutorial arrow above the green stamp station. Starts inactive.")]
-    [SerializeField] private GameObject _stampArrow;
-
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
     private PickableObject _tutorialAppForm;
@@ -61,7 +58,7 @@ public class Day_01 : DayBase
     private int _documentsFiledCount;
 
     // Cached delegate so subscribe/unsubscribe reference equality is preserved.
-    private System.Action _onFolderDocumentFiled;
+    private System.Action<PickableObject> _onFolderDocumentFiled;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -91,7 +88,6 @@ public class Day_01 : DayBase
         // All tutorial arrows start hidden.
         if (_switchArrow != null) _switchArrow.SetActive(false);
         if (_drawerArrow != null) _drawerArrow.SetActive(false);
-        if (_stampArrow  != null) _stampArrow.SetActive(false);
 
         // All stamp stations are locked until the tutorial reaches the stamping beat.
         _greenStampSlot?.SetSlotInteractable(false);
@@ -104,6 +100,7 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed               += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
         FolderController.OnDocumentAdded     += _onFolderDocumentFiled;
+        FolderController.OnFolderHandedOff   += OnFolderHandedOffHandler;
     }
 
     public override void DayDeactivated()
@@ -117,6 +114,8 @@ public class Day_01 : DayBase
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawnedHandler;
         SwitchButton.OnPressed               -= OnSwitchPressed;
         FolderController.OnDocumentAdded     -= _onFolderDocumentFiled;
+        FolderController.OnFolderEquipped    -= OnFolderPickedUp;
+        FolderController.OnFolderHandedOff   -= OnFolderHandedOffHandler;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -151,13 +150,13 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed               -= OnSwitchPressed;
 
         if (_onFolderDocumentFiled != null)
-            FolderController.OnDocumentAdded -= _onFolderDocumentFiled;
+            FolderController.OnDocumentAdded  -= _onFolderDocumentFiled;
+
+        FolderController.OnFolderEquipped     -= OnFolderPickedUp;
+        FolderController.OnFolderHandedOff    -= OnFolderHandedOffHandler;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
-
-        if (_folder != null)
-            _folder.OnEquip -= OnFolderPickedUp;
 
         if (_tutorialIDCard != null)
         {
@@ -387,14 +386,13 @@ public class Day_01 : DayBase
             _drawer.OnOpened += OnDrawerFirstOpened;
         }
 
-        if (_folder != null)
-            _folder.OnEquip += OnFolderPickedUp;
+        FolderController.OnFolderEquipped += OnFolderPickedUp;
     }
 
     private void OnFolderPickedUp()
     {
         if (this == null) return;
-        _folder.OnEquip -= OnFolderPickedUp;
+        FolderController.OnFolderEquipped -= OnFolderPickedUp;
         StartCoroutine(FolderPlaceBeat());
     }
 
@@ -421,19 +419,29 @@ public class Day_01 : DayBase
 
         _documentsFiledCount = 0;
 
-        yield return ShowAndWait("Pick up a document and interact with the folder to file it.");
+        // First document.
+        yield return ShowAndWait("Now pick up the ID card and drag it onto the folder to file it.");
+        yield return new WaitUntil(() => _documentsFiledCount >= 1);
+
+        yield return new WaitForSeconds(0.5f);
+
+        // Second document — only prompt if the player hasn't already filed it.
+        if (_documentsFiledCount < 2)
+            yield return ShowAndWait("Good. Now do the same with the application form.");
+        yield return new WaitUntil(() => _documentsFiledCount >= 2);
+
+        FolderController.OnDocumentAdded -= _onFolderDocumentFiled;
+        StartCoroutine(StampBeat());
     }
 
-    private void OnFolderDocumentFiled()
+    private void OnFolderDocumentFiled(PickableObject document)
     {
         if (this == null) return;
         _documentsFiledCount++;
 
-        if (_documentsFiledCount >= 2)
-        {
-            FolderController.OnDocumentAdded -= _onFolderDocumentFiled;
-            StartCoroutine(StampBeat());
-        }
+        // Prevent the player from pulling the document back out of the folder.
+        if (document != null)
+            document.SetInteractable(false);
     }
 
     // -------------------------------------------------------------------------
@@ -444,30 +452,63 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Both documents are filed. Now stamp the folder green to approve them.");
+        yield return ShowAndWait("Both documents are filed. This suspect looks clean — stamp the folder green to approve them.");
 
         // Unlock only the green stamp station.
         _greenStampSlot?.SetSlotInteractable(true);
 
-        // Point the stamp arrow at the green station and show it.
-        if (_stampArrow != null && _greenStampSlot != null)
-        {
-            var marker = _stampArrow.GetComponent<TutorialMarker>();
-            marker?.Show(_greenStampSlot.transform);
-            _stampArrow.SetActive(true);
-        }
+        // Spawn a tracking arrow above the green stamp slot.
+        GameObject stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
+        if (stampArrow != null)
+            stampArrow.SetActive(true);
 
-        // Wait until the player picks up the stamp — the slot's collider is disabled on interact.
+        // Wait until the player picks the stamp up out of its slot.
         yield return new WaitUntil(() =>
-            _greenStampSlot == null ||
-            !_greenStampSlot.GetComponent<Collider>().enabled);
+            _greenStampSlot == null || !_greenStampSlot.IsStampInSlot);
 
-        if (_stampArrow != null)
-            _stampArrow.SetActive(false);
+        if (stampArrow != null)
+            Destroy(stampArrow);
 
         yield return new WaitForSeconds(0.5f);
 
-        yield return ShowAndWait("Interact with the folder while holding the stamp to approve it.");
+        yield return ShowAndWait("Now interact with the folder while holding the stamp to approve it.");
+
+        StartCoroutine(HandOffBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Tutorial Sequence — Hand Off Folder at Window
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A persistent flag set as soon as the static event fires.
+    /// Ensures the WaitUntil resolves even if the event fires before the coroutine polls it.
+    /// </summary>
+    private bool _folderHandedOff;
+
+    private void OnFolderHandedOffHandler()
+    {
+        if (this == null) return;
+        _folderHandedOff = true;
+        FolderController.OnFolderHandedOff -= OnFolderHandedOffHandler;
+    }
+
+    private IEnumerator HandOffBeat()
+    {
+        // Wait until the folder has been stamped (isStamped syncs via NetworkVariable).
+        yield return new WaitUntil(() =>
+            _folder == null || _folder.IsStamped);
+
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("Good. Now place the stamped folder in the window slot to send them on their way.");
+
+        // Wait for the player to hand the folder off to the HandOffPoint.
+        yield return new WaitUntil(() => _folderHandedOff);
+
+        yield return new WaitForSeconds(2f);
+
+        yield return ShowAndWait("Well done. That's your first subject processed. Keep it up.");
     }
 
     // -------------------------------------------------------------------------
@@ -481,6 +522,12 @@ public class Day_01 : DayBase
 
         if (_switchArrow != null)
             _switchArrow.SetActive(false);
+
+        // Day 1 hasn't introduced the lever yet — open the window automatically
+        // so the suspect can deliver paperwork once they arrive.
+        // ShiftManager.OpenBoothShutter guards against closing an already-open shutter.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            ShiftManager.Instance.OpenBoothShutter();
     }
 
     private void OnDrawerFirstOpened()

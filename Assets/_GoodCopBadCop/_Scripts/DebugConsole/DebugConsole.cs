@@ -11,6 +11,9 @@ public class DebugConsole : MonoBehaviour
     public bool skipInitialShiftTransition;
     public bool cutsceneMode;
 
+    private const float FastTimescale = 3f;
+    private bool _isFastForwarding;
+
     [Tooltip("Skips the main menu, all cutscenes, and spawns the player directly in the booth with the shift switch ready. Equivalent to skipping main menu + F10.")]
     public bool skipToBoothReady;
 
@@ -101,6 +104,18 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F6))
         {
             CompleteDebugTask();
+        }
+
+        // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
+        if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
+        {
+            _isFastForwarding = true;
+            Time.timeScale = FastTimescale;
+        }
+        else if (!Input.GetKey(KeyCode.Equals) && _isFastForwarding)
+        {
+            _isFastForwarding = false;
+            Time.timeScale = 1f;
         }
     }
 

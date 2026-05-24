@@ -505,6 +505,18 @@ public class ShiftManager : NetworkBehaviour
             _timecardMachine.Reset();
     }
 
+    /// <summary>
+    /// Opens the booth window shutter programmatically (server only).
+    /// Safe to call when the shutter is already open — the lever will not toggle closed.
+    /// Used by tutorial scripts that need to open the window automatically.
+    /// </summary>
+    public void OpenBoothShutter()
+    {
+        if (!IsServer) return;
+        if (lever.IsUp) return;
+        lever.OpenServerSide();
+    }
+
     private void ResetShiftData()
     {
         shiftStarted.Value = false;

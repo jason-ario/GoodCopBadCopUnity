@@ -95,6 +95,9 @@ public class InkStamp : Interactable, IPickupSlot
         if (col != null) col.enabled = value;
     }
 
+    /// <summary>True while the stamp is sitting in its slot; false once the player has picked it up.</summary>
+    public bool IsStampInSlot => stampPlaceObjectSlot != null && stampPlaceObjectSlot.IsPlaced;
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

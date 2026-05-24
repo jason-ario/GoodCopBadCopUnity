@@ -104,10 +104,22 @@ public class FolderController : PickableObject
 
     /// <summary>
     /// Fired on the local client whenever a document is successfully added to this folder.
-    /// Subscribe in tutorial scripts to react once both core documents are filed.
+    /// The argument is the document that was just filed.
     /// Fires for ID card and Application only — not exam pages.
     /// </summary>
-    public static event System.Action OnDocumentAdded;
+    public static event System.Action<PickableObject> OnDocumentAdded;
+
+    /// <summary>
+    /// Fired on the local client the moment any FolderController is picked up by a player.
+    /// Subscribe in tutorial scripts to react when the player grabs the folder from the drawer.
+    /// </summary>
+    public static event System.Action OnFolderEquipped;
+
+    /// <summary>
+    /// Fired on the local client when the folder is handed off to the window slot and
+    /// the verdict is delivered. Subscribe in tutorial scripts to complete the final tutorial beat.
+    /// </summary>
+    public static event System.Action OnFolderHandedOff;
 
     /// <summary>
     /// Server-authoritative list of documents currently inside this folder.
@@ -181,6 +193,7 @@ public class FolderController : PickableObject
     {
         isHandedOff.Value = true;
         SetOpenServerRpc(false);
+        OnFolderHandedOff?.Invoke();
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
@@ -346,7 +359,8 @@ public class FolderController : PickableObject
     public override void OnEquipped(PlayerPickupController player)
     {
         base.OnEquipped(player);
-        
+        OnFolderEquipped?.Invoke();
+
         if (isOpen.Value)
         {
             player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
@@ -639,7 +653,7 @@ public class FolderController : PickableObject
             player.DropObject(idCardSlot);
             idCard = pickableObject.GetComponent<IDCard>();
             idCard.AddToFolder(this);
-            OnDocumentAdded?.Invoke();
+            OnDocumentAdded?.Invoke(pickableObject);
             return;
         }
 
@@ -649,7 +663,7 @@ public class FolderController : PickableObject
             player.DropObject(applicationSlot);
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
-            OnDocumentAdded?.Invoke();
+            OnDocumentAdded?.Invoke(pickableObject);
             return;
         }
 
