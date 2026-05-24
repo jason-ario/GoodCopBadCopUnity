@@ -28,6 +28,32 @@ public class PickableObject : Interactable
     public bool CanPickUpManually { get; set; } = true;
 
     /// <summary>
+    /// When true, colliders are permanently disabled regardless of holder network-variable
+    /// changes. Use <see cref="LockInteractable"/> / <see cref="UnlockInteractable"/> to
+    /// set this — for tutorial-only scenarios where an object must stay non-interactable
+    /// after being filed into a folder.
+    /// </summary>
+    private bool _interactableLocked;
+
+    /// <summary>
+    /// Permanently disables this object's colliders so that no subsequent holder
+    /// network-variable change can re-enable them. Call <see cref="UnlockInteractable"/>
+    /// to restore normal behaviour.
+    /// </summary>
+    public void LockInteractable()
+    {
+        _interactableLocked = true;
+        SetInteractable(false);
+    }
+
+    /// <summary>Clears the permanent interactable lock and re-enables colliders.</summary>
+    public void UnlockInteractable()
+    {
+        _interactableLocked = false;
+        SetInteractable(true);
+    }
+
+    /// <summary>
     /// The client ID of the player currently holding this object.
     /// Set to ulong.MaxValue when no one is holding it.
     /// </summary>
@@ -49,7 +75,8 @@ public class PickableObject : Interactable
         _holdingClientId.OnValueChanged += OnHoldingClientChanged;
 
         // Sync collider state to the current network value on late-joining clients.
-        SetInteractable(_holdingClientId.Value == ulong.MaxValue);
+        if (!_interactableLocked)
+            SetInteractable(_holdingClientId.Value == ulong.MaxValue);
     }
 
     public override void OnNetworkDespawn()
@@ -60,6 +87,7 @@ public class PickableObject : Interactable
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
+        if (_interactableLocked) return;
         SetInteractable(current == ulong.MaxValue);
     }
 
@@ -377,7 +405,8 @@ public class PickableObject : Interactable
     
     public virtual void OnUnequip(PlayerPickupController player)
     {
-        SetInteractable(true);
+        if (!_interactableLocked)
+            SetInteractable(true);
         
         if (isUsing)
         {

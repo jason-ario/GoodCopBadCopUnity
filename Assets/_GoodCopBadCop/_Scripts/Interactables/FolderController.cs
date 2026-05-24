@@ -111,15 +111,23 @@ public class FolderController : PickableObject
 
     /// <summary>
     /// Fired on the local client the moment any FolderController is picked up by a player.
+    /// Passes the picked-up instance so subscribers can track the live network object.
     /// Subscribe in tutorial scripts to react when the player grabs the folder from the drawer.
     /// </summary>
-    public static event System.Action OnFolderEquipped;
+    public static event System.Action<FolderController> OnFolderEquipped;
 
     /// <summary>
     /// Fired on the local client when the folder is handed off to the window slot and
     /// the verdict is delivered. Subscribe in tutorial scripts to complete the final tutorial beat.
     /// </summary>
     public static event System.Action OnFolderHandedOff;
+
+    /// <summary>
+    /// Fired on the local client (on every client via ClientRpc) the moment the stamp
+    /// sequence completes on this specific folder instance.
+    /// Subscribe in tutorial scripts to advance past the stamping beat without polling.
+    /// </summary>
+    public event System.Action OnStamped;
 
     /// <summary>
     /// Server-authoritative list of documents currently inside this folder.
@@ -319,10 +327,12 @@ public class FolderController : PickableObject
     [ServerRpc(RequireOwnership = false)]
     private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
     {
-        if (isStamping) return;
-        if (isOpen.Value) return;
+        Debug.Log($"[FolderController] StartUseStampServerRpc: isStamping={isStamping} isOpen={isOpen.Value} NetworkObjectId={NetworkObjectId}");
+        if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
+        if (isOpen.Value) { Debug.LogWarning("[FolderController] Stamp blocked: folder is open."); return; }
         isStamping = true;
         isStamped.Value = true;
+        Debug.Log($"[FolderController] isStamped set to true on server. NetworkObjectId={NetworkObjectId}");
 
         StartUseStampClientRpc(interactingPlayerId, stampType);
     }
@@ -359,7 +369,7 @@ public class FolderController : PickableObject
     public override void OnEquipped(PlayerPickupController player)
     {
         base.OnEquipped(player);
-        OnFolderEquipped?.Invoke();
+        OnFolderEquipped?.Invoke(this);
 
         if (isOpen.Value)
         {
@@ -532,6 +542,7 @@ public class FolderController : PickableObject
             SetInteractable(true);
 
         onStampedComplete?.Invoke();
+        OnStamped?.Invoke();
     }
 
     public override void OnStartUse()

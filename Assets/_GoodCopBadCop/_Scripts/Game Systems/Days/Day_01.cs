@@ -34,8 +34,9 @@ public class Day_01 : DayBase
     [Tooltip("Tutorial arrow above the drawer. Starts inactive.")]
     [SerializeField] private GameObject _drawerArrow;
 
-    [Tooltip("The folder inside the drawer the player must pick up and place on the desk.")]
-    [SerializeField] private FolderController _folder;
+    /// The live FolderController instance spawned at runtime by StackOfFolders.
+    /// Assigned in OnFolderPickedUp when the player picks up the folder from the drawer.
+    private FolderController _folder;
 
     [Tooltip("The green ink stamp station — made interactable once both documents are filed.")]
     [SerializeField] private InkStamp _greenStampSlot;
@@ -45,6 +46,9 @@ public class Day_01 : DayBase
 
     [Tooltip("The red ink stamp station — blocked for the entire Day 1 tutorial.")]
     [SerializeField] private InkStamp _redStampSlot;
+
+    [Tooltip("The window hand-off point where the player places the stamped folder to finalize the verdict.")]
+    [SerializeField] private HandOffPoint _handOffPoint;
 
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
@@ -120,9 +124,6 @@ public class Day_01 : DayBase
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
 
-        if (_folder != null)
-            _folder.OnEquip -= OnFolderPickedUp;
-
         if (_tutorialIDCard != null)
         {
             _tutorialIDCard.OnEquip   -= OnIDCardPickedUp;
@@ -131,6 +132,9 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
+
+        if (_folder != null)
+            _folder.OnStamped -= OnFolderStamped;
 
         StopAllCoroutines();
     }
@@ -166,6 +170,9 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
+
+        if (_folder != null)
+            _folder.OnStamped -= OnFolderStamped;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -389,9 +396,13 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped += OnFolderPickedUp;
     }
 
-    private void OnFolderPickedUp()
+    private void OnFolderPickedUp(FolderController folder)
     {
         if (this == null) return;
+        _folder = folder;
+        // Subscribe immediately so we never miss the stamp event, even if it fires
+        // before HandOffBeat begins its first coroutine frame.
+        _folder.OnStamped += OnFolderStamped;
         FolderController.OnFolderEquipped -= OnFolderPickedUp;
         StartCoroutine(FolderPlaceBeat());
     }
@@ -439,9 +450,10 @@ public class Day_01 : DayBase
         if (this == null) return;
         _documentsFiledCount++;
 
-        // Prevent the player from pulling the document back out of the folder.
+        // Permanently lock the document so the network-variable release callback
+        // cannot re-enable its colliders after it lands in the folder slot.
         if (document != null)
-            document.SetInteractable(false);
+            document.LockInteractable();
     }
 
     // -------------------------------------------------------------------------
@@ -457,28 +469,60 @@ public class Day_01 : DayBase
         // Unlock only the green stamp station.
         _greenStampSlot?.SetSlotInteractable(true);
 
-        // Spawn a tracking arrow above the green stamp slot.
-        GameObject stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
-        if (stampArrow != null)
-            stampArrow.SetActive(true);
+        // Spawn a tracking arrow above the green stamp slot and hand it off to HandOffBeat
+        // so it can be destroyed the moment the stamp event fires (not on slot removal, which
+        // is unreliable — the stamp returns to the slot immediately after use).
+        _stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
+        if (_stampArrow != null)
+            _stampArrow.SetActive(true);
 
-        // Wait until the player picks the stamp up out of its slot.
-        yield return new WaitUntil(() =>
-            _greenStampSlot == null || !_greenStampSlot.IsStampInSlot);
+        // Hide the arrow the moment the stamp leaves its slot — fire-and-forget, does not
+        // block HandOffBeat. OnFolderStamped will Destroy it if it hasn't been hidden yet.
+        StartCoroutine(HideStampArrowOnPickup());
 
-        if (stampArrow != null)
-            Destroy(stampArrow);
-
-        yield return new WaitForSeconds(0.5f);
-
-        yield return ShowAndWait("Now interact with the folder while holding the stamp to approve it.");
-
+        // HandOffBeat owns everything from here — it waits for the OnStamped event flag.
+        Debug.Log("[Day_01] StampBeat: starting HandOffBeat coroutine.");
         StartCoroutine(HandOffBeat());
+    }
+
+    /// <summary>
+    /// Hides the stamp arrow as soon as the player lifts the stamp out of its slot.
+    /// Runs independently of HandOffBeat so neither blocks the other.
+    /// </summary>
+    private IEnumerator HideStampArrowOnPickup()
+    {
+        yield return new WaitUntil(() => _greenStampSlot == null || !_greenStampSlot.IsStampInSlot);
+        if (_stampArrow != null)
+            _stampArrow.SetActive(false);
     }
 
     // -------------------------------------------------------------------------
     // Tutorial Sequence — Hand Off Folder at Window
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A persistent flag set the moment <see cref="FolderController.OnStamped"/> fires.
+    /// Ensures the WaitUntil in HandOffBeat resolves even if the event fires before the
+    /// coroutine polls it for the first time.
+    /// </summary>
+    private bool _folderStamped;
+
+    // Arrow above the stamp station — kept as a field so OnFolderStamped can destroy it.
+    private GameObject _stampArrow;
+
+    private void OnFolderStamped()
+    {
+        if (this == null) return;
+        _folderStamped = true;
+        if (_folder != null)
+            _folder.OnStamped -= OnFolderStamped;
+        if (_stampArrow != null)
+        {
+            Destroy(_stampArrow);
+            _stampArrow = null;
+        }
+        Debug.Log("[Day_01] OnFolderStamped: stamp event received — advancing HandOffBeat.");
+    }
 
     /// <summary>
     /// A persistent flag set as soon as the static event fires.
@@ -489,22 +533,32 @@ public class Day_01 : DayBase
     private void OnFolderHandedOffHandler()
     {
         if (this == null) return;
+        Debug.Log("[Day_01] OnFolderHandedOffHandler: folder handed off event received.");
         _folderHandedOff = true;
         FolderController.OnFolderHandedOff -= OnFolderHandedOffHandler;
     }
 
     private IEnumerator HandOffBeat()
     {
-        // Wait until the folder has been stamped (isStamped syncs via NetworkVariable).
-        yield return new WaitUntil(() =>
-            _folder == null || _folder.IsStamped);
+        // Wait until OnStamped fires and sets the flag — no polling of a NetworkVariable.
+        Debug.Log("[Day_01] HandOffBeat: waiting for folder stamp via event flag.");
+        yield return new WaitUntil(() => _folderStamped);
 
+        Debug.Log("[Day_01] HandOffBeat: folder stamped, proceeding.");
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("Good. Now place the stamped folder in the window slot to send them on their way.");
 
+        // Spawn a tracking arrow above the hand-off point so the player knows where to go.
+        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
+        if (handOffArrow != null)
+            handOffArrow.SetActive(true);
+
         // Wait for the player to hand the folder off to the HandOffPoint.
         yield return new WaitUntil(() => _folderHandedOff);
+
+        if (handOffArrow != null)
+            Destroy(handOffArrow);
 
         yield return new WaitForSeconds(2f);
 
