@@ -75,6 +75,31 @@ public class AnomalyController : MonoBehaviour
         ActivateAnomalies();
     }
 
+    /// <summary>
+    /// Skips all anomaly assignment and ensures every anomaly visual is disabled.
+    /// Use this to guarantee a suspect spawns completely clean — no random roll.
+    /// </summary>
+    public void InitializeClean()
+    {
+        _allPossibleAnomalies = CollectAllAnomalies();
+
+        foreach (Anomaly anomaly in _allPossibleAnomalies)
+            anomaly.InitializeDisabled();
+
+        Debug.Log("[AnomalyController] Suspect forced clean — all anomalies disabled.");
+    }
+
+    private Anomaly[] CollectAllAnomalies()
+    {
+        var all = new List<Anomaly>();
+        all.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        all.AddRange(_behaviorAnomalies.Cast<Anomaly>());
+        all.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+        all.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        all.AddRange(_environmentalAnomalies.Cast<Anomaly>());
+        return all.ToArray();
+    }
+
     public void ActivateAnomalies()
     {
         // Chance (0–1) that this suspect spawns with no anomalies at all.

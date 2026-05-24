@@ -35,6 +35,13 @@ public class MegaphoneDialogueManager : MonoBehaviour
     private bool _isSpeaking;
     private Coroutine _hideCoroutine;
 
+    /// <summary>True while a bark is playing. Use with WaitUntil in tutorial coroutines.</summary>
+    public bool IsSpeaking => _isSpeaking;
+
+    // Set when the night-phase tasks are all done; consumed by OnShiftReady so the bark
+    // only fires after a real between-shift task cycle, not on the initial day start.
+    private bool _betweenShiftTasksCompleted;
+
     // ---------------------------------------------------------------------------
     // Unity Lifecycle
     // ---------------------------------------------------------------------------
@@ -52,6 +59,7 @@ public class MegaphoneDialogueManager : MonoBehaviour
         ShiftManager.Instance.OnShiftReady += OnShiftReady;
         GameManager.Instance.OnGameStart += OnGameStart;
 
+        BetweenShiftTaskManager.OnAllTasksComplete += OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
     }
 
@@ -66,6 +74,7 @@ public class MegaphoneDialogueManager : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.OnGameStart -= OnGameStart;
 
+        BetweenShiftTaskManager.OnAllTasksComplete -= OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
     }
 
@@ -88,8 +97,8 @@ public class MegaphoneDialogueManager : MonoBehaviour
 
     private void OnShiftStart()
     {
-        if (!SaveDataManager.Instance.HasSeenIntroTutorial)
-            StartCoroutine(Day1WelcomeBarkSequence());
+        // Day_01 owns all Day 1 welcome barks in its own sequenced coroutine — suppress auto-fire.
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
     }
 
     private IEnumerator Day1WelcomeBarkSequence()
@@ -112,7 +121,17 @@ public class MegaphoneDialogueManager : MonoBehaviour
 
     private void OnShiftReady()
     {
+        // Only bark after a real night-phase task cycle, not on the initial day start
+        // where OnShiftReady fires solely to prime the switch button.
+        if (!_betweenShiftTasksCompleted) return;
+
+        _betweenShiftTasksCompleted = false;
         ShowDialogue("All tasks completed, return to the booth for the next shift.");
+    }
+
+    private void OnAllTasksComplete()
+    {
+        _betweenShiftTasksCompleted = true;
     }
 
     // ---------------------------------------------------------------------------

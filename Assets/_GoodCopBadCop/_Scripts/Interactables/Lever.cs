@@ -84,8 +84,23 @@ public class Lever : Interactable
             shutter.CloseShutter();
     }
 
+    /// <summary>
+    /// Raises the lever on the server and broadcasts visuals to all clients,
+    /// opening the shutter. Call this from tutorial scripts that need to open
+    /// the window automatically without player input.
+    /// Must be called on the server.
+    /// </summary>
+    public void OpenServerSide()
+    {
+        if (!IsServer) return;
+        _isUp.Value = true;
+        BroadcastLeverStateClientRpc(true, ulong.MaxValue); // ulong.MaxValue = no exclusion
+    }
+
     public void Reset()
     {
+        if (!IsServer) return;
         _isUp.Value = false;
+        BroadcastLeverStateClientRpc(false, ulong.MaxValue);
     }
 }

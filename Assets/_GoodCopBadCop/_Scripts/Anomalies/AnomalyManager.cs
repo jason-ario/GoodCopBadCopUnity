@@ -41,6 +41,50 @@ public class AnomalyManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// Reads anomaly category unlock flags from the active save slot and writes them
+    /// into the category lock fields. The Inspector booleans remain freely editable
+    /// after this call — this is a one-time populate, not a continuous override.
+    /// Call once per day before suspects are spawned.
+    /// </summary>
+    public void ApplyUnlocksFromSave()
+    {
+        if (SaveDataManager.Instance == null) return;
+
+        mutationAnomaliesLocked      = !SaveDataManager.Instance.MutationAnomaliesUnlocked;
+        behaviorAnomaliesLocked      = !SaveDataManager.Instance.BehaviorAnomaliesUnlocked;
+        biologicalAnomaliesLocked    = !SaveDataManager.Instance.BiologicalAnomaliesUnlocked;
+        documentationAnomaliesLocked = !SaveDataManager.Instance.DocumentationAnomaliesUnlocked;
+        environmentAnomaliesLocked   = !SaveDataManager.Instance.EnvironmentAnomaliesUnlocked;
+    }
+
+    /// <summary>
+    /// Marks only documentation anomalies as unlocked in the save slot, then applies
+    /// the result to the live category lock fields. Used by Day_01. Persists immediately.
+    /// </summary>
+    public void UnlockDocumentationOnly()
+    {
+        if (SaveDataManager.Instance != null)
+            SaveDataManager.Instance.DocumentationAnomaliesUnlocked = true;
+
+        ApplyUnlocksFromSave();
+    }
+
+    /// <summary>Unlocks all anomaly categories in the save slot and applies immediately.</summary>
+    public void UnlockAll()
+    {
+        if (SaveDataManager.Instance != null)
+        {
+            SaveDataManager.Instance.MutationAnomaliesUnlocked      = true;
+            SaveDataManager.Instance.BehaviorAnomaliesUnlocked      = true;
+            SaveDataManager.Instance.BiologicalAnomaliesUnlocked    = true;
+            SaveDataManager.Instance.DocumentationAnomaliesUnlocked = true;
+            SaveDataManager.Instance.EnvironmentAnomaliesUnlocked   = true;
+        }
+
+        ApplyUnlocksFromSave();
+    }
+
     /// <summary>Returns true if the anomaly identified by its script asset reference is locked.</summary>
     public bool IsAnomalyLocked(UnityEngine.Object anomalyType)
     {

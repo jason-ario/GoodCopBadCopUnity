@@ -103,6 +103,13 @@ public class FolderController : PickableObject
     public List<PickableObject> documents;
 
     /// <summary>
+    /// Fired on the local client whenever a document is successfully added to this folder.
+    /// Subscribe in tutorial scripts to react once both core documents are filed.
+    /// Fires for ID card and Application only — not exam pages.
+    /// </summary>
+    public static event System.Action OnDocumentAdded;
+
+    /// <summary>
     /// Server-authoritative list of documents currently inside this folder.
     /// Populated via RegisterDocumentServerRpc so CleanupSpawnedFolder can despawn
     /// them on the server even though InteractWithItem only fires on the local client.
@@ -632,6 +639,7 @@ public class FolderController : PickableObject
             player.DropObject(idCardSlot);
             idCard = pickableObject.GetComponent<IDCard>();
             idCard.AddToFolder(this);
+            OnDocumentAdded?.Invoke();
             return;
         }
 
@@ -641,6 +649,7 @@ public class FolderController : PickableObject
             player.DropObject(applicationSlot);
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
+            OnDocumentAdded?.Invoke();
             return;
         }
 

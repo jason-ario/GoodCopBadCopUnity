@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -12,6 +13,19 @@ public class Drawer : Interactable
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip drawerOpenSound;
     [SerializeField] AudioClip drawerCloseSound;
+
+    private bool _locked = false;
+
+    /// <summary>
+    /// Prevents interaction when true. Local-only — used as a tutorial gate on Day 1.
+    /// </summary>
+    public void SetLocked(bool locked) => _locked = locked;
+
+    /// <summary>
+    /// Fired locally whenever this drawer transitions to open.
+    /// Subscribe to hide tutorial arrows or trigger other one-shot reactions.
+    /// </summary>
+    public event Action OnOpened;
 
     public override void OnNetworkSpawn()
     {
@@ -29,6 +43,8 @@ public class Drawer : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
+        if (_locked) return;
+
         base.Interact(player);
 
         // Apply visuals immediately on the interacting client — no RTT wait.
@@ -66,5 +82,8 @@ public class Drawer : Interactable
     {
         animator.SetBool("Open", open);
         audioSource.PlayOneShot(open ? drawerOpenSound : drawerCloseSound);
+
+        if (open)
+            OnOpened?.Invoke();
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using DG.Tweening;
 using Unity.Cinemachine;
@@ -12,6 +13,9 @@ public class SwitchButton : Interactable
     [SerializeField] private CinemachineCamera _camera;
     public bool buttonReady = false;
     private bool powerOn = true;
+
+    /// <summary>Raised on all clients the moment the switch is successfully pressed.</summary>
+    public static event Action OnPressed;
     
     protected override void Awake()
     {
@@ -21,6 +25,8 @@ public class SwitchButton : Interactable
 
     void OnShiftReady()
     {
+        // Day 1 switch readiness is driven by Day_01's tutorial sequence — skip auto-ready.
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
         SetReady(true);
     }
 
@@ -100,11 +106,19 @@ public class SwitchButton : Interactable
         if (!buttonReady || !powerOn) return;
 
         SetReady(false);
+        NotifyPressedClientRpc();
 
         if (!ShiftManager.Instance.shiftStarted.Value)
         {
             ShiftManager.Instance.TryStartShift();
         }
+    }
+
+    /// <summary>Broadcasts the press event to every client so local listeners can react.</summary>
+    [ClientRpc]
+    private void NotifyPressedClientRpc()
+    {
+        OnPressed?.Invoke();
     }
 
     [ClientRpc]

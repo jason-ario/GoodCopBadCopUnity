@@ -63,6 +63,11 @@ public class CampaignManager : NetworkBehaviour
         CollectDays();
     }
 
+    private void Start()
+    {
+        ShiftManager.Instance.OnShiftEnd += OnShiftEnded;
+    }
+    
     private void OnEnable()
     {
         ShiftManager.Instance.OnShiftEnd += OnShiftEnded;

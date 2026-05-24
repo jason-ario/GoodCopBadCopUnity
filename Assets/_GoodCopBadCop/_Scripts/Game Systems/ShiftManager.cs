@@ -54,6 +54,13 @@ public class ShiftManager : NetworkBehaviour
     [Tooltip("Min and max seconds to wait between subsequent suspects during a shift.")]
     [SerializeField] private Vector2 suspectArrivalInterval = new Vector2(30f, 90f);
 
+    /// <summary>
+    /// When set, overrides <see cref="firstSuspectArrivalInterval"/> for the current shift only.
+    /// Consumed and reset to null automatically after the first suspect is scheduled.
+    /// Set by day-specific classes (e.g. Day_01) before the shift starts.
+    /// </summary>
+    public static Vector2? OverrideFirstArrivalInterval = null;
+
     private Coroutine _suspectSchedulerCoroutine;
 
     #region Events & Date Helpers
@@ -294,7 +301,9 @@ public class ShiftManager : NetworkBehaviour
             if (_suspectSchedulerCoroutine != null)
                 StopCoroutine(_suspectSchedulerCoroutine);
 
-            _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival(firstSuspectArrivalInterval));
+            Vector2 firstInterval = OverrideFirstArrivalInterval ?? firstSuspectArrivalInterval;
+            OverrideFirstArrivalInterval = null;
+            _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival(firstInterval));
         }
     }
 

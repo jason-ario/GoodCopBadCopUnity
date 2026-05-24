@@ -66,6 +66,7 @@ public abstract class DayBase : MonoBehaviour
     public virtual void DayActivated()
     {
         Debug.Log($"[Day {DayNumber}] Day activated.");
+        AnomalyManager.Instance?.ApplyUnlocksFromSave();
         OnDayStart?.Invoke();
     }
 

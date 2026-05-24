@@ -37,6 +37,45 @@ public class SaveDataManager : MonoBehaviour
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Anomaly Category Unlocks
+    // -------------------------------------------------------------------------
+
+    /// <summary>Whether mutation anomalies have been unlocked via tutorial progression.</summary>
+    public bool MutationAnomaliesUnlocked
+    {
+        get => ActiveSlot?.MutationAnomaliesUnlocked ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.MutationAnomaliesUnlocked = value; Save(); }
+    }
+
+    /// <summary>Whether behavior anomalies have been unlocked via tutorial progression.</summary>
+    public bool BehaviorAnomaliesUnlocked
+    {
+        get => ActiveSlot?.BehaviorAnomaliesUnlocked ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.BehaviorAnomaliesUnlocked = value; Save(); }
+    }
+
+    /// <summary>Whether biological anomalies have been unlocked via tutorial progression.</summary>
+    public bool BiologicalAnomaliesUnlocked
+    {
+        get => ActiveSlot?.BiologicalAnomaliesUnlocked ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.BiologicalAnomaliesUnlocked = value; Save(); }
+    }
+
+    /// <summary>Whether documentation anomalies have been unlocked via tutorial progression.</summary>
+    public bool DocumentationAnomaliesUnlocked
+    {
+        get => ActiveSlot?.DocumentationAnomaliesUnlocked ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.DocumentationAnomaliesUnlocked = value; Save(); }
+    }
+
+    /// <summary>Whether environment anomalies have been unlocked via tutorial progression.</summary>
+    public bool EnvironmentAnomaliesUnlocked
+    {
+        get => ActiveSlot?.EnvironmentAnomaliesUnlocked ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.EnvironmentAnomaliesUnlocked = value; Save(); }
+    }
+
     /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
     public int CurrentDay
     {
@@ -238,6 +277,14 @@ public class SaveSlot
     public bool HasSeenTutorial;
     public int CurrentDay;
     public int TotalCashEarned;
+
+    // Anomaly category unlock flags — false = locked, true = available to spawn.
+    // Set to true permanently when the corresponding tutorial milestone is cleared.
+    public bool MutationAnomaliesUnlocked;
+    public bool BehaviorAnomaliesUnlocked;
+    public bool BiologicalAnomaliesUnlocked;
+    public bool DocumentationAnomaliesUnlocked;
+    public bool EnvironmentAnomaliesUnlocked;
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

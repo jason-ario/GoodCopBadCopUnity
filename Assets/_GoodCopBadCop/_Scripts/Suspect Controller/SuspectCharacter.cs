@@ -117,6 +117,25 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Initializes the suspect with no anomalies. Used for tutorial suspects that must
+    /// be clean regardless of the anomaly distribution settings.
+    /// </summary>
+    public void InitializeClean()
+    {
+        anomalyController.InitializeClean();
+        SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+        if (record != null)
+            suspectRecordViewer.SetRecord(record);
+        else
+            Debug.Log("No record found for " + suspectData.name);
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+        // No anomaly indices to sync — suspect is guaranteed clean.
+    }
+
+    /// <summary>
     /// Tells clients which tentacle indices the server activated for a specific
     /// RandomTentacleAnomaly, identified by its sibling index in the hierarchy.
     /// </summary>

@@ -85,6 +85,16 @@ public class InkStamp : Interactable, IPickupSlot
         _spawnedStampRef.Value = inkStamp;
     }
 
+    /// <summary>
+    /// Enables or disables interaction with this stamp slot.
+    /// Toggles the trigger collider so the player's raycast can or cannot hit it.
+    /// </summary>
+    public void SetSlotInteractable(bool value)
+    {
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = value;
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

@@ -184,6 +184,7 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void StartGameClientRpc(bool skipTransition = false)
     {
+        CampaignManager.Instance.StartCampaign();
     }
 
     /// <summary>
@@ -250,7 +251,7 @@ public class GameManager : NetworkBehaviour
                 TeleportPlayersToGameplaySpawnPoints();
             }
 
-            CampaignManager.Instance.StartCampaign();
+            // StartCampaign is called from StartGameClientRpc on all clients — no duplicate call here.
             yield break;
         }
 

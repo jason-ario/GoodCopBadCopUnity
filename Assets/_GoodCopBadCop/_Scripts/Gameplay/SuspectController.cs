@@ -13,6 +13,12 @@ public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
 
+    /// <summary>
+    /// When true, the next suspect to spawn is initialized with no anomalies.
+    /// The flag is consumed and reset automatically after use. Set by Day_01.
+    /// </summary>
+    public static bool ForceNextSuspectClean = false;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -28,6 +34,9 @@ public class SuspectController : NetworkBehaviour
 
     [Header("Paperwork")]
     [SerializeField] private List<PickableObject> spawnedDocuments = new List<PickableObject>();
+
+    /// <summary>Read-only view of all documents currently on the desk for this suspect.</summary>
+    public IReadOnlyList<PickableObject> SpawnedDocuments => spawnedDocuments;
 
     [SerializeField] private NetworkObject idCard;
     [SerializeField] private NetworkObject applicationForm;
@@ -112,7 +121,16 @@ public class SuspectController : NetworkBehaviour
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
-        suspectCharacter.Initialize();
+
+        if (ForceNextSuspectClean)
+        {
+            ForceNextSuspectClean = false;
+            suspectCharacter.InitializeClean();
+        }
+        else
+        {
+            suspectCharacter.Initialize();
+        }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;
@@ -179,6 +197,18 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Fired on all clients after the first suspect's paperwork lands on the desk.
+    /// Carries the spawned IDCard so tutorial systems can reference it directly.
+    /// </summary>
+    public static event Action<IDCard> OnPaperworkSpawned;
+
+    /// <summary>
+    /// Fired on all clients when a suspect finishes walking to the booth window.
+    /// Carries the suspect index so listeners can distinguish first vs. subsequent suspects.
+    /// </summary>
+    public static event Action<int> OnSuspectArrived;
+
+    /// <summary>
     /// Fires on every client when a new suspect begins walking to the window.
     /// Shows the booth-waiting notification only if the local player is away from the booth.
     /// Uses <see cref="PlayerInstance.IsOutsideLocal"/> to avoid a false negative caused
@@ -195,12 +225,21 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
+        // Broadcast arrival to all clients so tutorial systems can react locally.
+        NotifySuspectArrivedClientRpc(suspectIndex.Value);
+
         suspectCharacter.transform
             .DORotateQuaternion(standPos.rotation, 0.5f)
             .OnComplete(OnRotationComplete);
 
         suspectCharacter.animator.SetBool("Walking", false);
         EnableLook();
+    }
+
+    [ClientRpc]
+    private void NotifySuspectArrivedClientRpc(int index)
+    {
+        OnSuspectArrived?.Invoke(index);
     }
 
     private void OnRotationComplete()
@@ -287,6 +326,23 @@ public class SuspectController : NetworkBehaviour
         newApplicationForm.Spawn();
         newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
+
+        NotifyPaperworkSpawnedClientRpc(
+            new NetworkObjectReference(newIDCard),
+            new NetworkObjectReference(newApplicationForm));
+    }
+
+    /// <summary>
+    /// Broadcasts to all clients that paperwork has landed on the desk.
+    /// Passes references to both documents so tutorial systems can lock/unlock them locally.
+    /// </summary>
+    [ClientRpc]
+    private void NotifyPaperworkSpawnedClientRpc(NetworkObjectReference idCardRef, NetworkObjectReference appFormRef)
+    {
+        if (!idCardRef.TryGet(out NetworkObject idCardObj)) return;
+
+        IDCard card = idCardObj.GetComponent<IDCard>();
+        OnPaperworkSpawned?.Invoke(card);
     }
 
     public void RespondToDialogueChoice(int choiceIndex)
