@@ -187,7 +187,6 @@ public class DoorController : Interactable
     private void OnDoorStateChanged(bool oldValue, bool newValue)
     {
         // Only used for late-joining clients that missed the BroadcastDoorStateClientRpc.
-        interactText = newValue ? "Close" : "Open";
     }
 
     private void OnOpenDirectionChanged(bool oldValue, bool newValue)
@@ -204,7 +203,6 @@ public class DoorController : Interactable
     {
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
-        interactText = isOpen ? "Close" : "Open";
 
         if (_navMeshObstacle != null)
             _navMeshObstacle.enabled = !isOpen;

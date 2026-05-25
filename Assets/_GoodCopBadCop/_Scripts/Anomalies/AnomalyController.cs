@@ -6,10 +6,8 @@ using UnityEngine.Rendering;
 public class AnomalyController : MonoBehaviour
 {
     [SerializeField] private List<MutationAnomaly> _mutationAnomalies;
-    [SerializeField] private List<BehaviorAnomaly> _behaviorAnomalies;
     [SerializeField] private List<BiologicalAnomaly> _biologicalAnomalies;
     [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies;
-    [SerializeField] private List<EnvironmentalAnomaly> _environmentalAnomalies;
 
     [Header("Anomaly Distribution")]
     [Tooltip("Probability (0–1) that this suspect spawns with no anomalies.")]
@@ -45,12 +43,7 @@ public class AnomalyController : MonoBehaviour
             Debug.Log("Mutations are enabled");
             anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
         }
-
-        if (!AnomalyManager.Instance.behaviorAnomaliesLocked)
-        {
-            Debug.Log("Behavior is enabled");
-            anomalies.AddRange(_behaviorAnomalies.Cast<Anomaly>());
-        }
+        
 
         if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
         {
@@ -62,12 +55,6 @@ public class AnomalyController : MonoBehaviour
         {
             Debug.Log("Documentation is enabled");
             anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        }
-
-        if (!AnomalyManager.Instance.environmentAnomaliesLocked)
-        {
-            Debug.Log("Environment is enabled");
-            anomalies.AddRange(_environmentalAnomalies.Cast<Anomaly>());
         }
 
         _allPossibleAnomalies = anomalies.ToArray(); 
@@ -87,14 +74,10 @@ public class AnomalyController : MonoBehaviour
 
         if (!AnomalyManager.Instance.mutationAnomaliesLocked)
             anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.behaviorAnomaliesLocked)
-            anomalies.AddRange(_behaviorAnomalies.Cast<Anomaly>());
         if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
             anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
         if (!AnomalyManager.Instance.documentationAnomaliesLocked)
             anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.environmentAnomaliesLocked)
-            anomalies.AddRange(_environmentalAnomalies.Cast<Anomaly>());
 
         _allPossibleAnomalies = anomalies.ToArray();
 
@@ -152,10 +135,8 @@ public class AnomalyController : MonoBehaviour
     {
         var all = new List<Anomaly>();
         all.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        all.AddRange(_behaviorAnomalies.Cast<Anomaly>());
         all.AddRange(_biologicalAnomalies.Cast<Anomaly>());
         all.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        all.AddRange(_environmentalAnomalies.Cast<Anomaly>());
         return all.ToArray();
     }
 
@@ -249,4 +230,10 @@ public class AnomalyController : MonoBehaviour
     }
 
     public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
+
+    /// <summary>
+    /// Returns the number of currently active anomalies of the given category type.
+    /// </summary>
+    public int ActiveCountOfType<T>() where T : Anomaly
+        => activeAnomalies.OfType<T>().Count();
 }

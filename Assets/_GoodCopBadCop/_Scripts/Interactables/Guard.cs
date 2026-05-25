@@ -2,15 +2,12 @@ using UnityEngine;
 
 public class Guard : Interactable
 {
-    private const string InteractLabel = "Talk";
-
     [SerializeField] private string[] dialogueBlurbs;
     [SerializeField] private SpeakingInteraction speaking;
 
     protected override void Awake()
     {
         base.Awake();
-        interactText = InteractLabel;
     }
 
     /// <summary>

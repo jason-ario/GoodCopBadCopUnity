@@ -23,7 +23,6 @@ public class TimecardMachine : Interactable
     protected override void Awake()
     {
         base.Awake();
-        interactText = "Clock Out";
     }
 
     public override void Interact(PlayerInteractionController player)

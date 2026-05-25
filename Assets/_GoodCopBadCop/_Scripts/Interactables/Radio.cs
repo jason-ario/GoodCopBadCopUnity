@@ -14,9 +14,6 @@ public class Radio : Interactable
     [SerializeField] private AudioClip[] songs;
     [SerializeField] private AudioSource audioSource;
 
-    private const string InteractTextOn  = "Turn Off";
-    private const string InteractTextOff = "Turn On";
-
     // Whether the radio is currently muted (off) or audible (on).
     private readonly NetworkVariable<bool> _isOn = new NetworkVariable<bool>(
         false,
@@ -59,8 +56,6 @@ public class Radio : Interactable
 
         _isOn.OnValueChanged             += OnIsOnChanged;
         _currentSongIndex.OnValueChanged += OnSongIndexChanged;
-
-        interactText = _isOn.Value ? InteractTextOn : InteractTextOff;
 
         // Sync late-joining clients: start playing at the correct position, then
         // apply the mute state so off-clients still hear nothing.
@@ -196,8 +191,6 @@ public class Radio : Interactable
 
     private void OnIsOnChanged(bool oldValue, bool newValue)
     {
-        interactText = newValue ? InteractTextOn : InteractTextOff;
-
         if (newValue)
         {
             // The AudioSource keeps running while muted, so only re-sync if the clip

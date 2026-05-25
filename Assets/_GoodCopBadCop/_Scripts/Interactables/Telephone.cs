@@ -43,6 +43,15 @@ public class Telephone : Interactable
         }
     }
 
+    /// <summary>
+    /// Requests the server to hang up the phone on behalf of the given client.
+    /// Only succeeds if that client is the one currently holding the handset.
+    /// </summary>
+    public void HangUp(ulong clientId)
+    {
+        RequestPutDownServerRpc(clientId);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void RequestGrabServerRpc(ulong clientId)
     {
@@ -121,8 +130,8 @@ public class Telephone : Interactable
     /// </summary>
     private IEnumerator ObserverPutDownConstraintSequence()
     {
-        // Match the WaitForSeconds(.5f) in PutPhoneDownSequence before the constraint is cleared.
-        yield return new WaitForSeconds(.5f);
+        // Match the first WaitForSeconds(.25f) in PutPhoneDownSequence before the handset is reset.
+        yield return new WaitForSeconds(.25f);
 
         handSet.enabled = false;
         handSet.transform.position = _handsetPos.position;
@@ -163,30 +172,29 @@ public class Telephone : Interactable
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
         player.playerAnimationController.LeftArmIKTarget = _ikTarget;
 
+        // Mirror grab: swoop camera to the phone position over 0.5 s.
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
+        player.playerAnimationController.DisableLeftArmMask();
+        player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
+        player.playerAnimationController.SetAnimBool("HoldingPhone", false);
+        yield return new WaitForSeconds(.25f);
 
         phoneSound.PlayOneShot(phonePlaceSound);
-
-        // Close the HQ order screen before putting the phone down.
-        UIController.Instance.CloseHQOrderScreen();
-
-        player.playerAnimationController.SetAnimBool("HoldingPhone", false);
-        player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
-
-        yield return new WaitForSeconds(.5f);
-        player.playerAnimationController.DisableLeftArmMask();
         handSet.enabled = false;
         handSet.transform.position = _handsetPos.position;
         handSet.transform.rotation = _handsetPos.rotation;
+        yield return new WaitForSeconds(.25f);
+
+        // Mirror grab: close the screen at the same point the grab sequence opens it —
+        // right as the camera begins its return sweep.
+        UIController.Instance.CloseHQOrderScreen();
         player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
         player.playerAnimationController.LeftArmIKTarget = null;
         player.playerMovementController.SetCanControl(true);
-
-        interactText = "Pick Up";
     }
 
     private IEnumerator GrabPhoneSequence(PlayerInteractionController player)
@@ -220,7 +228,5 @@ public class Telephone : Interactable
 
         // Open the HQ order screen once the grab animation has finished.
         UIController.Instance.OpenHQOrderScreen();
-
-        interactText = "Put Down";
     }
 }

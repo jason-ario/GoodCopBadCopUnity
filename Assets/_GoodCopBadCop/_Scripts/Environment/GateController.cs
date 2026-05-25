@@ -116,7 +116,6 @@ public class GateController : Interactable
     private void OnGateStateChanged(bool oldValue, bool newValue)
     {
         // Used to keep interactText consistent for late-joining clients.
-        interactText = newValue ? "Close" : "Open";
     }
 
     private void OnOpenDirectionChanged(bool oldValue, bool newValue) { }
@@ -125,7 +124,6 @@ public class GateController : Interactable
     {
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
-        interactText = isOpen ? "Close" : "Open";
 
         if (_navMeshObstacle != null)
             _navMeshObstacle.enabled = !isOpen;

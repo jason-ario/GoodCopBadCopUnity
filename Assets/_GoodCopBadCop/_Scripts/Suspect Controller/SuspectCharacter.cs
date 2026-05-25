@@ -333,7 +333,10 @@ public class SuspectCharacter : Interactable
 
     /// <summary>
     /// Returns the response string for the given choice index based on the current day band.
-    /// Returns null if the index is out of range or the response text is empty.
+    /// If StoryMismatchAnomaly is active on this suspect, the mismatch answer for the current
+    /// day band is served instead, provided one has been authored. Falls back to the normal
+    /// answer if the mismatch field is empty.
+    /// Returns null if the index is out of range or the resolved answer text is empty.
     /// </summary>
     public string GetQuestionResponse(int choiceIndex)
     {
@@ -349,6 +352,20 @@ public class SuspectCharacter : Interactable
             answer = set.midDaysAnswer;
         else
             answer = set.finalDaysAnswer;
+
+        if (anomalyController != null && anomalyController.ActiveCountOfType<StoryMismatchAnomaly>() > 0)
+        {
+            string mismatch;
+            if (ShiftManager.Instance.IsEarlyDays)
+                mismatch = set.mismatchEarlyDaysAnswer;
+            else if (ShiftManager.Instance.IsMidDays)
+                mismatch = set.mismatchMidDaysAnswer;
+            else
+                mismatch = set.mismatchFinalDaysAnswer;
+
+            if (!string.IsNullOrEmpty(mismatch))
+                answer = mismatch;
+        }
 
         return string.IsNullOrEmpty(answer) ? null : answer;
     }

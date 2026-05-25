@@ -81,6 +81,11 @@ public class SuspectData : ScriptableObject
         [TextArea(2, 6)] public string earlyDaysAnswer;
         [TextArea(2, 6)] public string midDaysAnswer;
         [TextArea(2, 6)] public string finalDaysAnswer;
+
+        [Header("Story Mismatch — served instead of normal answer when StoryMismatchAnomaly is active")]
+        [TextArea(2, 6)] public string mismatchEarlyDaysAnswer;
+        [TextArea(2, 6)] public string mismatchMidDaysAnswer;
+        [TextArea(2, 6)] public string mismatchFinalDaysAnswer;
     }
 
     public QuestionResponseSet[] questionResponses;

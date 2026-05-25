@@ -18,7 +18,6 @@ public class SwitchCover : Interactable
 
     private void OnSwitchOpenValueChanged(bool previousValue, bool newValue)
     {
-        interactText = newValue ? "Close Switch" : "Open Switch";
     }
 
     public override void Interact(PlayerInteractionController player)

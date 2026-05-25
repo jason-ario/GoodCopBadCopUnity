@@ -40,7 +40,6 @@ public class GateStartShiftController : Interactable
     protected override void Awake()
     {
         base.Awake();
-        interactText = "Start Shift";
     }
 
     public override void OnNetworkSpawn()
@@ -149,7 +148,6 @@ public class GateStartShiftController : Interactable
 
     private void OnGateStateChanged(bool oldValue, bool newValue)
     {
-        interactText = newValue ? "Close" : "Open";
     }
 
     private void OnOpenDirectionChanged(bool oldValue, bool newValue) { }
@@ -158,7 +156,6 @@ public class GateStartShiftController : Interactable
     {
         gateAnimator.SetBool("OpenedIn", isOpen && openedIn);
         gateAnimator.SetBool("OpenedOut", isOpen && !openedIn);
-        interactText = isOpen ? "Close" : "Open";
     }
 
     /// <summary>Opens the gate on all clients. Must be called on the server.</summary>
@@ -185,6 +182,5 @@ public class GateStartShiftController : Interactable
     private void OnIntroComplete()
     {
         _introComplete = true;
-        interactText = "Open";
     }
 }
