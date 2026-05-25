@@ -35,6 +35,13 @@ public class ChecklistItem : MonoBehaviour
     /// </summary>
     public static event Action OnAnyBoxChecked;
 
+    /// <summary>
+    /// Set to true on the local client the moment any checkbox is ticked.
+    /// Reset this to false at the earliest point a tutorial beat could be entered,
+    /// so that early interaction during preceding dialogue is still captured.
+    /// </summary>
+    public static bool AnyBoxChecked;
+
 #if UNITY_EDITOR
     private void OnValidate()
     {
@@ -85,6 +92,7 @@ public class ChecklistItem : MonoBehaviour
     public void OnCheckboxClicked(bool currentValue)
     {
         examPage.SetCheckboxChecked(index, !currentValue);
+        AnyBoxChecked = true;
         OnAnyBoxChecked?.Invoke();
     }
 

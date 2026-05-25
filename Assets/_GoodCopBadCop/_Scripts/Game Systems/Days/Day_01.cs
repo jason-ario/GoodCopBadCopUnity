@@ -128,7 +128,8 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed                   += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
         FolderController.OnDocumentAdded         += _onFolderDocumentFiled;
-        FolderController.OnFolderHandedOff       += OnFolderHandedOffHandler;
+        // OnFolderHandedOff is subscribed inside HandOffBeat / Suspect2HandOffBeat
+        // so the window is scoped exactly to when each beat needs it.
     }
 
     public override void DayDeactivated()
@@ -577,6 +578,11 @@ public class Day_01 : DayBase
 
     private IEnumerator HandOffBeat()
     {
+        // Reset and subscribe before the stamp wait so any hand-off that happens
+        // during StampBeat's dialogue or while stamping is still captured.
+        _folderHandedOff = false;
+        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
+
         // Wait until OnStamped fires and sets the flag — no polling of a NetworkVariable.
         Debug.Log("[Day_01] HandOffBeat: waiting for folder stamp via event flag.");
         yield return new WaitUntil(() => _folderStamped);
@@ -591,11 +597,16 @@ public class Day_01 : DayBase
         if (handOffArrow != null)
             handOffArrow.SetActive(true);
 
-        // Wait for the player to hand the folder off to the HandOffPoint.
-        yield return new WaitUntil(() => _folderHandedOff);
-
-        if (handOffArrow != null)
-            Destroy(handOffArrow);
+        // Guard: player may have placed the folder during the dialogue above.
+        if (_folderHandedOff)
+        {
+            if (handOffArrow != null) Destroy(handOffArrow);
+        }
+        else
+        {
+            yield return new WaitUntil(() => _folderHandedOff);
+            if (handOffArrow != null) Destroy(handOffArrow);
+        }
 
         yield return new WaitForSeconds(2f);
 
@@ -696,6 +707,11 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect2AnomalyRevealBeat()
     {
+        // Reset early-action flags here — the earliest point before any of the
+        // notebook beats run — so interaction during dialogue is always captured.
+        ChecklistItem.AnyBoxChecked = false;
+        ExamNotebook.AnyPageFiled = false;
+
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("You'll notice there's a discrepancy between the two documents. Something doesn't add up.");
@@ -720,18 +736,23 @@ public class Day_01 : DayBase
 
     private IEnumerator NotebookCheckBeat()
     {
+        // Subscribe before dialogue so ticking during the prompt is not missed.
+        bool anyBoxChecked = false;
+        ChecklistItem.OnAnyBoxChecked += OnAnyBoxCheckedLocal;
+
         yield return ShowAndWait("Tick the boxes for every anomaly you can find on the page.");
 
-        bool anyBoxChecked = false;
-        ChecklistItem.OnAnyBoxChecked += OnAnyBoxChecked;
+        // Guard: player may have ticked a box during dialogue or earlier.
+        if (ChecklistItem.AnyBoxChecked)
+            anyBoxChecked = true;
 
         yield return new WaitUntil(() => anyBoxChecked);
 
-        ChecklistItem.OnAnyBoxChecked -= OnAnyBoxChecked;
+        ChecklistItem.OnAnyBoxChecked -= OnAnyBoxCheckedLocal;
 
         StartCoroutine(NotebookFileIntoBeat());
 
-        void OnAnyBoxChecked()
+        void OnAnyBoxCheckedLocal()
         {
             anyBoxChecked = true;
         }
@@ -745,9 +766,7 @@ public class Day_01 : DayBase
 
     private IEnumerator NotebookFileIntoBeat()
     {
-        // Reset the filed flag and subscribe before showing dialogue so filing
-        // that occurs during the prompt is not missed.
-        ExamNotebook.AnyPageFiled = false;
+        // Subscribe before dialogue so filing that happens during the prompt is not missed.
         _notebookPageFiled = false;
         ExamNotebook.OnAnyNotebookPageFiled += OnNotebookPageFiled;
 
@@ -803,7 +822,9 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect2HandOffBeat()
     {
+        // Reset and subscribe before the stamp wait so early hand-off is captured.
         _folderHandedOff = false;
+        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
 
         yield return new WaitUntil(() => _folderStamped);
 
@@ -817,7 +838,9 @@ public class Day_01 : DayBase
         GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
         if (handOffArrow != null) handOffArrow.SetActive(true);
 
-        yield return new WaitUntil(() => _folderHandedOff);
+        // Guard: player may have placed the folder during the preceding dialogue.
+        if (!_folderHandedOff)
+            yield return new WaitUntil(() => _folderHandedOff);
 
         if (handOffArrow != null) Destroy(handOffArrow);
 
