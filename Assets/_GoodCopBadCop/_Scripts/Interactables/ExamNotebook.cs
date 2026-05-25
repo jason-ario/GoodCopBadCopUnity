@@ -46,8 +46,18 @@ public class ExamNotebook : PickableObject
     /// <summary>
     /// Fired on all clients immediately after any exam notebook page is placed into a folder.
     /// Subscribe in tutorial scripts to gate progression on the notebook-filing step.
+    /// Subscribing <i>before</i> showing tutorial dialogue guarantees the event is not missed
+    /// if the player files the page early.
     /// </summary>
     public static event System.Action OnAnyNotebookPageFiled;
+
+    /// <summary>
+    /// Set to true on all clients the moment any page is placed into a folder.
+    /// Reset this to false at the start of any beat that needs to gate on filing,
+    /// then subscribe to <see cref="OnAnyNotebookPageFiled"/> before showing dialogue
+    /// so filing that occurs during the prompt is captured via the flag.
+    /// </summary>
+    public static bool AnyPageFiled;
 
     /// <summary>
     /// Returns true when every visible (unlocked) checklist item on the current page is checked.
@@ -303,7 +313,11 @@ public class ExamNotebook : PickableObject
             pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value);
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
+            {
                 pages[capturedPage].ApplyBitmask(newValue);
+                // Fire after ApplyBitmask so IsChecked reflects the new state.
+                OnAnyCheckboxChecked?.Invoke(this);
+            };
         }
 
         ApplyCurrentPage(_currentPage.Value);
@@ -331,7 +345,8 @@ public class ExamNotebook : PickableObject
     public void SetCheckboxChecked(int pageIndex, int itemIndex, bool value)
     {
         SetCheckboxServerRpc(pageIndex, itemIndex, value);
-        OnAnyCheckboxChecked?.Invoke(this);
+        // OnAnyCheckboxChecked is fired by the NetworkVariable.OnValueChanged callback
+        // (after ApplyBitmask), so IsChecked is authoritative when AllVisibleBoxesChecked is read.
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -603,6 +618,7 @@ public class ExamNotebook : PickableObject
         // Now that it's placed in the folder it should behave like a normal pickable object.
         page.SetInteractable(true);
 
+        AnyPageFiled = true;
         OnAnyNotebookPageFiled?.Invoke();
     }
 

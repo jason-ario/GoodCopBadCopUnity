@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class ChecklistItem : MonoBehaviour
@@ -26,6 +27,13 @@ public class ChecklistItem : MonoBehaviour
     public string AnomalyTypeName => anomalyTypeName;
 
     public bool IsChecked => checkbox.IsChecked;
+
+    /// <summary>
+    /// Fired locally on the client that clicked the checkbox, the moment any checklist item
+    /// is ticked. Use this in tutorial coroutines when you only need to know that the player
+    /// interacted with the notebook — regardless of which box or whether all are complete.
+    /// </summary>
+    public static event Action OnAnyBoxChecked;
 
 #if UNITY_EDITOR
     private void OnValidate()
@@ -77,6 +85,7 @@ public class ChecklistItem : MonoBehaviour
     public void OnCheckboxClicked(bool currentValue)
     {
         examPage.SetCheckboxChecked(index, !currentValue);
+        OnAnyBoxChecked?.Invoke();
     }
 
     /// <summary>Applies the authoritative checked state to the checkbox visual. Called by ExamPage.ApplyBitmask.</summary>

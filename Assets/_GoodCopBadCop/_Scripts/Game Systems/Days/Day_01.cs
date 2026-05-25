@@ -81,8 +81,6 @@ public class Day_01 : DayBase
     private PickableObject _suspect2AppForm;
     private GameObject _s2IDCardArrow;
     private GameObject _s2AppFormArrow;
-    private int _suspect2DocumentsFiledCount;
-    private System.Action<PickableObject> _onSuspect2DocumentFiled;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -148,11 +146,8 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff      -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped     -= OnFolderStamped;
 
-        if (_onSuspect2DocumentFiled != null)
-            FolderController.OnDocumentAdded    -= _onSuspect2DocumentFiled;
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
-        FolderController.OnFolderEquipped       -= OnSuspect2FolderPickedUp;
         ExamNotebook.OnAnyNotebookPageFiled     -= OnNotebookPageFiled;
 
         if (_drawer != null)
@@ -197,11 +192,8 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff        -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped       -= OnFolderStamped;
 
-        if (_onSuspect2DocumentFiled != null)
-            FolderController.OnDocumentAdded      -= _onSuspect2DocumentFiled;
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
-        FolderController.OnFolderEquipped         -= OnSuspect2FolderPickedUp;
         ExamNotebook.OnAnyNotebookPageFiled       -= OnNotebookPageFiled;
 
         if (_drawer != null)
@@ -730,9 +722,19 @@ public class Day_01 : DayBase
     {
         yield return ShowAndWait("Tick the boxes for every anomaly you can find on the page.");
 
-        yield return new WaitUntil(() => _examNotebook != null && _examNotebook.AllVisibleBoxesChecked);
+        bool anyBoxChecked = false;
+        ChecklistItem.OnAnyBoxChecked += OnAnyBoxChecked;
+
+        yield return new WaitUntil(() => anyBoxChecked);
+
+        ChecklistItem.OnAnyBoxChecked -= OnAnyBoxChecked;
 
         StartCoroutine(NotebookFileIntoBeat());
+
+        void OnAnyBoxChecked()
+        {
+            anyBoxChecked = true;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -743,10 +745,17 @@ public class Day_01 : DayBase
 
     private IEnumerator NotebookFileIntoBeat()
     {
-        yield return ShowAndWait("Now interact with the folder while holding the notebook to file your findings.");
-
+        // Reset the filed flag and subscribe before showing dialogue so filing
+        // that occurs during the prompt is not missed.
+        ExamNotebook.AnyPageFiled = false;
         _notebookPageFiled = false;
         ExamNotebook.OnAnyNotebookPageFiled += OnNotebookPageFiled;
+
+        yield return ShowAndWait("Now interact with the folder while holding the notebook to file your findings.");
+
+        // Guard: player may have filed during dialogue — AnyPageFiled captures that.
+        if (ExamNotebook.AnyPageFiled)
+            _notebookPageFiled = true;
 
         yield return new WaitUntil(() => _notebookPageFiled);
 
@@ -755,50 +764,13 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("Based on how accurate your findings are, you'll receive matching compensation. The more thorough you are, the better.");
 
-        StartCoroutine(NotebookFileBeat());
+        StartCoroutine(Suspect2StampBeat());
     }
 
     private void OnNotebookPageFiled()
     {
         if (this == null) return;
         _notebookPageFiled = true;
-    }
-
-    // -------------------------------------------------------------------------
-    // Suspect 2 — File remaining documents into folder
-    // -------------------------------------------------------------------------
-
-    private IEnumerator NotebookFileBeat()
-    {
-        yield return ShowAndWait("Now file the ID card and application form into the folder as well.");
-
-        _suspect2DocumentsFiledCount = 0;
-        _onSuspect2DocumentFiled = OnSuspect2DocumentFiled;
-        FolderController.OnDocumentAdded += _onSuspect2DocumentFiled;
-
-        yield return new WaitUntil(() => _suspect2DocumentsFiledCount >= 2);
-
-        StartCoroutine(Suspect2StampBeat());
-    }
-
-    private void OnSuspect2FolderPickedUp(FolderController folder)
-    {
-        if (this == null) return;
-        FolderController.OnFolderEquipped -= OnSuspect2FolderPickedUp;
-        if (_drawerArrow != null) _drawerArrow.SetActive(false);
-    }
-
-    private void OnSuspect2DocumentFiled(PickableObject doc)
-    {
-        if (this == null) return;
-        _suspect2DocumentsFiledCount++;
-        if (doc != null) doc.LockInteractableNetworked();
-
-        if (_suspect2DocumentsFiledCount >= 3)
-        {
-            FolderController.OnDocumentAdded -= _onSuspect2DocumentFiled;
-            _onSuspect2DocumentFiled = null;
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -811,7 +783,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("All documents filed. This subject has an anomaly — stamp the folder yellow to quarantine them.");
+        yield return ShowAndWait("When you're ready, quarantine this subject — stamp the folder yellow.");
 
         FolderController.OnAnyFolderStamped += OnFolderStamped;
 
