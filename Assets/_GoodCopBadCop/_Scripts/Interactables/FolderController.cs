@@ -123,11 +123,10 @@ public class FolderController : PickableObject
     public static event System.Action OnFolderHandedOff;
 
     /// <summary>
-    /// Fired on the local client (on every client via ClientRpc) the moment the stamp
-    /// sequence completes on this specific folder instance.
-    /// Subscribe in tutorial scripts to advance past the stamping beat without polling.
+    /// Fired on the local client the moment any FolderController completes its stamp sequence.
+    /// Static so subscribers don't need to track a specific instance.
     /// </summary>
-    public event System.Action OnStamped;
+    public static event System.Action OnAnyFolderStamped;
 
     /// <summary>
     /// Server-authoritative list of documents currently inside this folder.
@@ -542,7 +541,8 @@ public class FolderController : PickableObject
             SetInteractable(true);
 
         onStampedComplete?.Invoke();
-        OnStamped?.Invoke();
+        Debug.Log($"[FolderController] UseStampSequence complete — firing OnAnyFolderStamped. NetworkObjectId={NetworkObjectId}");
+        OnAnyFolderStamped?.Invoke();
     }
 
     public override void OnStartUse()

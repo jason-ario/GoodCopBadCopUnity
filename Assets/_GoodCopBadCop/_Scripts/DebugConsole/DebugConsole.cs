@@ -11,7 +11,7 @@ public class DebugConsole : MonoBehaviour
     public bool skipInitialShiftTransition;
     public bool cutsceneMode;
 
-    private const float FastTimescale = 3f;
+    [SerializeField] private float FastTimescale = 5f;
     private bool _isFastForwarding;
 
     [Tooltip("Skips the main menu, all cutscenes, and spawns the player directly in the booth with the shift switch ready. Equivalent to skipping main menu + F10.")]

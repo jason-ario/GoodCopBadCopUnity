@@ -61,6 +61,14 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public static Vector2? OverrideFirstArrivalInterval = null;
 
+    /// <summary>
+    /// When set, overrides <see cref="suspectArrivalInterval"/> for every subsequent suspect
+    /// arrival for the duration of the current shift.
+    /// Reset to null automatically when the shift ends.
+    /// Set by day-specific classes (e.g. Day_01) to compress suspect pacing during tutorials.
+    /// </summary>
+    public static Vector2? OverrideSuspectArrivalInterval = null;
+
     private Coroutine _suspectSchedulerCoroutine;
 
     #region Events & Date Helpers
@@ -186,11 +194,12 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>
     /// Waits a random interval then triggers the next suspect to approach the booth.
-    /// Runs on the server only. Uses <paramref name="interval"/> if provided, otherwise falls back to <see cref="suspectArrivalInterval"/>.
+    /// Runs on the server only. Uses <paramref name="interval"/> if provided, then
+    /// <see cref="OverrideSuspectArrivalInterval"/> if set, otherwise falls back to <see cref="suspectArrivalInterval"/>.
     /// </summary>
     private IEnumerator ScheduledSuspectArrival(Vector2? interval = null)
     {
-        Vector2 range = interval ?? suspectArrivalInterval;
+        Vector2 range = interval ?? OverrideSuspectArrivalInterval ?? suspectArrivalInterval;
         float delay = UnityEngine.Random.Range(range.x, range.y);
         yield return new WaitForSeconds(delay);
         SuspectController.Instance.NextSuspect();
@@ -317,6 +326,10 @@ public class ShiftManager : NetworkBehaviour
             StopCoroutine(_suspectSchedulerCoroutine);
             _suspectSchedulerCoroutine = null;
         }
+
+        // Clear per-shift arrival overrides so they don't bleed into the next shift.
+        OverrideFirstArrivalInterval    = null;
+        OverrideSuspectArrivalInterval  = null;
 
         CompletedShift();
 

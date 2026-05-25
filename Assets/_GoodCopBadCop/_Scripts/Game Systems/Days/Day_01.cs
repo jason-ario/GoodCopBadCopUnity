@@ -85,9 +85,9 @@ public class Day_01 : DayBase
         // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
         SuspectController.ForceNextSuspectClean = true;
 
-        // Spawn the first suspect almost immediately after the switch is pressed (0 s scheduling
-        // delay + the existing 3 s walk-in wait in WaitAndSpawnNextSuspect = ~3 s total).
-        ShiftManager.OverrideFirstArrivalInterval = new UnityEngine.Vector2(0f, 0f);
+        // Compress all suspect arrival gaps to 3 s for the tutorial shift.
+        ShiftManager.OverrideFirstArrivalInterval   = new UnityEngine.Vector2(0f, 0f);
+        ShiftManager.OverrideSuspectArrivalInterval = new UnityEngine.Vector2(3f, 3f);
 
         // All tutorial arrows start hidden.
         if (_switchArrow != null) _switchArrow.SetActive(false);
@@ -98,13 +98,13 @@ public class Day_01 : DayBase
         _yellowStampSlot?.SetSlotInteractable(false);
         _redStampSlot?.SetSlotInteractable(false);
 
-        ShiftManager.Instance.OnDayStart     += OnDayStarted;
-        SuspectController.OnSuspectArrived   += OnSuspectArrivedHandler;
-        SuspectController.OnPaperworkSpawned += OnPaperworkSpawnedHandler;
-        SwitchButton.OnPressed               += OnSwitchPressed;
+        ShiftManager.Instance.OnDayStart        += OnDayStarted;
+        SuspectController.OnSuspectArrived       += OnSuspectArrivedHandler;
+        SuspectController.OnPaperworkSpawned     += OnPaperworkSpawnedHandler;
+        SwitchButton.OnPressed                   += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
-        FolderController.OnDocumentAdded     += _onFolderDocumentFiled;
-        FolderController.OnFolderHandedOff   += OnFolderHandedOffHandler;
+        FolderController.OnDocumentAdded         += _onFolderDocumentFiled;
+        FolderController.OnFolderHandedOff       += OnFolderHandedOffHandler;
     }
 
     public override void DayDeactivated()
@@ -114,12 +114,13 @@ public class Day_01 : DayBase
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
-        SuspectController.OnSuspectArrived   -= OnSuspectArrivedHandler;
-        SuspectController.OnPaperworkSpawned -= OnPaperworkSpawnedHandler;
-        SwitchButton.OnPressed               -= OnSwitchPressed;
-        FolderController.OnDocumentAdded     -= _onFolderDocumentFiled;
-        FolderController.OnFolderEquipped    -= OnFolderPickedUp;
-        FolderController.OnFolderHandedOff   -= OnFolderHandedOffHandler;
+        SuspectController.OnSuspectArrived      -= OnSuspectArrivedHandler;
+        SuspectController.OnPaperworkSpawned    -= OnPaperworkSpawnedHandler;
+        SwitchButton.OnPressed                  -= OnSwitchPressed;
+        FolderController.OnDocumentAdded        -= _onFolderDocumentFiled;
+        FolderController.OnFolderEquipped       -= OnFolderPickedUp;
+        FolderController.OnFolderHandedOff      -= OnFolderHandedOffHandler;
+        FolderController.OnAnyFolderStamped     -= OnFolderStamped;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -132,9 +133,6 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
-
-        if (_folder != null)
-            _folder.OnStamped -= OnFolderStamped;
 
         StopAllCoroutines();
     }
@@ -154,10 +152,11 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed               -= OnSwitchPressed;
 
         if (_onFolderDocumentFiled != null)
-            FolderController.OnDocumentAdded  -= _onFolderDocumentFiled;
+            FolderController.OnDocumentAdded      -= _onFolderDocumentFiled;
 
-        FolderController.OnFolderEquipped     -= OnFolderPickedUp;
-        FolderController.OnFolderHandedOff    -= OnFolderHandedOffHandler;
+        FolderController.OnFolderEquipped         -= OnFolderPickedUp;
+        FolderController.OnFolderHandedOff        -= OnFolderHandedOffHandler;
+        FolderController.OnAnyFolderStamped       -= OnFolderStamped;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -170,9 +169,6 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
-
-        if (_folder != null)
-            _folder.OnStamped -= OnFolderStamped;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -400,9 +396,7 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         _folder = folder;
-        // Subscribe immediately so we never miss the stamp event, even if it fires
-        // before HandOffBeat begins its first coroutine frame.
-        _folder.OnStamped += OnFolderStamped;
+        Debug.Log($"[Day_01] OnFolderPickedUp: captured folder '{folder.name}' NetworkObjectId={folder.NetworkObjectId}");
         FolderController.OnFolderEquipped -= OnFolderPickedUp;
         StartCoroutine(FolderPlaceBeat());
     }
@@ -466,22 +460,21 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Both documents are filed. This suspect looks clean — stamp the folder green to approve them.");
 
+        // Subscribe to the static event now — any folder stamped from this point counts.
+        FolderController.OnAnyFolderStamped += OnFolderStamped;
+
         // Unlock only the green stamp station.
         _greenStampSlot?.SetSlotInteractable(true);
 
-        // Spawn a tracking arrow above the green stamp slot and hand it off to HandOffBeat
-        // so it can be destroyed the moment the stamp event fires (not on slot removal, which
-        // is unreliable — the stamp returns to the slot immediately after use).
+        // Spawn a tracking arrow above the green stamp slot.
         _stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
         if (_stampArrow != null)
             _stampArrow.SetActive(true);
 
-        // Hide the arrow the moment the stamp leaves its slot — fire-and-forget, does not
-        // block HandOffBeat. OnFolderStamped will Destroy it if it hasn't been hidden yet.
+        // Hide the arrow the moment the stamp leaves its slot — fire-and-forget.
         StartCoroutine(HideStampArrowOnPickup());
 
-        // HandOffBeat owns everything from here — it waits for the OnStamped event flag.
-        Debug.Log("[Day_01] StampBeat: starting HandOffBeat coroutine.");
+        // HandOffBeat waits for the static event flag set by OnFolderStamped.
         StartCoroutine(HandOffBeat());
     }
 
@@ -514,8 +507,7 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         _folderStamped = true;
-        if (_folder != null)
-            _folder.OnStamped -= OnFolderStamped;
+        FolderController.OnAnyFolderStamped -= OnFolderStamped;
         if (_stampArrow != null)
         {
             Destroy(_stampArrow);
