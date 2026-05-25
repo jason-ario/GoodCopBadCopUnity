@@ -19,6 +19,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static bool ForceNextSuspectClean = false;
 
+    /// <summary>
+    /// When >= 0, the next suspect to spawn is initialized with exactly this many anomalies,
+    /// bypassing the clean-chance roll. The flag is consumed and reset to -1 after use.
+    /// Ignored when <see cref="ForceNextSuspectClean"/> is true. Set by Day_01.
+    /// </summary>
+    public static int ForceNextSuspectAnomalyCount = -1;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -126,6 +133,12 @@ public class SuspectController : NetworkBehaviour
         {
             ForceNextSuspectClean = false;
             suspectCharacter.InitializeClean();
+        }
+        else if (ForceNextSuspectAnomalyCount >= 0)
+        {
+            int count = ForceNextSuspectAnomalyCount;
+            ForceNextSuspectAnomalyCount = -1;
+            suspectCharacter.InitializeWithExactAnomalyCount(count);
         }
         else
         {

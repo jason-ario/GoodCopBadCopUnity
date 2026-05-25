@@ -153,6 +153,7 @@ public class Day_01 : DayBase
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
         FolderController.OnFolderEquipped       -= OnSuspect2FolderPickedUp;
+        ExamNotebook.OnAnyNotebookPageFiled     -= OnNotebookPageFiled;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -201,6 +202,7 @@ public class Day_01 : DayBase
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
         FolderController.OnFolderEquipped         -= OnSuspect2FolderPickedUp;
+        ExamNotebook.OnAnyNotebookPageFiled       -= OnNotebookPageFiled;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -523,7 +525,7 @@ public class Day_01 : DayBase
             _stampArrow.SetActive(true);
 
         // Hide the arrow the moment the stamp leaves its slot — fire-and-forget.
-        StartCoroutine(HideStampArrowOnPickup());
+        StartCoroutine(HideStampArrowOnPickup(_greenStampSlot));
 
         // HandOffBeat waits for the static event flag set by OnFolderStamped.
         StartCoroutine(HandOffBeat());
@@ -533,9 +535,9 @@ public class Day_01 : DayBase
     /// Hides the stamp arrow as soon as the player lifts the stamp out of its slot.
     /// Runs independently of HandOffBeat so neither blocks the other.
     /// </summary>
-    private IEnumerator HideStampArrowOnPickup()
+    private IEnumerator HideStampArrowOnPickup(InkStamp slot)
     {
-        yield return new WaitUntil(() => _greenStampSlot == null || !_greenStampSlot.IsStampInSlot);
+        yield return new WaitUntil(() => slot == null || !slot.IsStampInSlot);
         if (_stampArrow != null)
             _stampArrow.SetActive(false);
     }
@@ -609,6 +611,10 @@ public class Day_01 : DayBase
 
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
+        // Force exactly 2 documentation anomalies so the notebook tutorial always has material.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            SuspectController.ForceNextSuspectAnomalyCount = 2;
+
         _onSuspect2PaperworkSpawned = OnSuspect2PaperworkSpawned;
         SuspectController.OnPaperworkSpawned += _onSuspect2PaperworkSpawned;
     }
@@ -702,7 +708,9 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("You'll notice there's a discrepancy between the two documents. Something doesn't add up.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("When you spot an anomaly, you mark it using the exam notebook. Pick it up and tick the box for what you found.");
+        yield return ShowAndWait("Multiple documentation anomalies are a warning sign that a subject's mind may be deteriorating — a prompt for medical evaluation.");
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("When you spot an anomaly, mark it using the exam notebook. Pick it up and tick the box for what you found.");
 
         _examNotebook?.SetInteractableNetworked(true);
         if (_notebookArrow != null) _notebookArrow.SetActive(true);
@@ -724,30 +732,51 @@ public class Day_01 : DayBase
 
         yield return new WaitUntil(() => _examNotebook != null && _examNotebook.AllVisibleBoxesChecked);
 
-        yield return ShowAndWait("Good. Now grab a fresh folder from the drawer and file the exam page along with the ID card and application form.");
+        StartCoroutine(NotebookFileIntoBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — File notebook into folder
+    // -------------------------------------------------------------------------
+
+    private bool _notebookPageFiled;
+
+    private IEnumerator NotebookFileIntoBeat()
+    {
+        yield return ShowAndWait("Now interact with the folder while holding the notebook to file your findings.");
+
+        _notebookPageFiled = false;
+        ExamNotebook.OnAnyNotebookPageFiled += OnNotebookPageFiled;
+
+        yield return new WaitUntil(() => _notebookPageFiled);
+
+        ExamNotebook.OnAnyNotebookPageFiled -= OnNotebookPageFiled;
+
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("Based on how accurate your findings are, you'll receive matching compensation. The more thorough you are, the better.");
 
         StartCoroutine(NotebookFileBeat());
     }
 
+    private void OnNotebookPageFiled()
+    {
+        if (this == null) return;
+        _notebookPageFiled = true;
+    }
+
     // -------------------------------------------------------------------------
-    // Suspect 2 — File documents into folder
+    // Suspect 2 — File remaining documents into folder
     // -------------------------------------------------------------------------
 
     private IEnumerator NotebookFileBeat()
     {
-        _drawer?.SetLocked(false);
-        if (_drawerArrow != null)
-        {
-            _drawerArrow.SetActive(true);
-            if (_drawer != null) _drawer.OnOpened += OnDrawerFirstOpened;
-        }
+        yield return ShowAndWait("Now file the ID card and application form into the folder as well.");
 
         _suspect2DocumentsFiledCount = 0;
         _onSuspect2DocumentFiled = OnSuspect2DocumentFiled;
-        FolderController.OnDocumentAdded  += _onSuspect2DocumentFiled;
-        FolderController.OnFolderEquipped += OnSuspect2FolderPickedUp;
+        FolderController.OnDocumentAdded += _onSuspect2DocumentFiled;
 
-        yield return new WaitUntil(() => _suspect2DocumentsFiledCount >= 3);
+        yield return new WaitUntil(() => _suspect2DocumentsFiledCount >= 2);
 
         StartCoroutine(Suspect2StampBeat());
     }
@@ -773,7 +802,7 @@ public class Day_01 : DayBase
     }
 
     // -------------------------------------------------------------------------
-    // Suspect 2 — Stamp beat (mirrors suspect 1's StampBeat)
+    // Suspect 2 — Stamp beat
     // -------------------------------------------------------------------------
 
     private IEnumerator Suspect2StampBeat()
@@ -782,15 +811,17 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("All documents filed. This subject has an anomaly — stamp the folder green to flag them for further inspection.");
+        yield return ShowAndWait("All documents filed. This subject has an anomaly — stamp the folder yellow to quarantine them.");
 
         FolderController.OnAnyFolderStamped += OnFolderStamped;
-        _greenStampSlot?.SetSlotInteractable(true);
 
-        _stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
+        // Only the yellow stamp is available; green and red remain locked for this beat.
+        _yellowStampSlot?.SetSlotInteractable(true);
+
+        _stampArrow = SpawnDocumentArrow(_yellowStampSlot != null ? _yellowStampSlot.transform : null);
         if (_stampArrow != null) _stampArrow.SetActive(true);
 
-        StartCoroutine(HideStampArrowOnPickup());
+        StartCoroutine(HideStampArrowOnPickup(_yellowStampSlot));
         StartCoroutine(Suspect2HandOffBeat());
     }
 
@@ -804,6 +835,9 @@ public class Day_01 : DayBase
 
         yield return new WaitUntil(() => _folderStamped);
 
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("Quarantine isolates the subject and gives them time to recover over the next couple of days. Better safe than sorry.");
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("Place the stamped folder in the window slot to send them on their way.");

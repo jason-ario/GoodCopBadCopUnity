@@ -100,8 +100,8 @@ public class DialogueManager : NetworkBehaviour
     public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null)
     {
         StopDialogueAudio();
-        if (audioClips.Length == 0) return;
-        if (audioSource == null) return;
+        if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
+        if (audioSource == null) { onComplete?.Invoke(); return; }
         
         audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete));
     }

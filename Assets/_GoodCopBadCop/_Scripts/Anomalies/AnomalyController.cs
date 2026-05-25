@@ -76,6 +76,65 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
+    /// Bypasses the clean-chance roll and forces exactly <paramref name="count"/> anomalies
+    /// to be chosen from the currently unlocked pool. Use for tutorial suspects that must
+    /// always have a specific number of anomalies.
+    /// </summary>
+    /// <param name="count">Exact number of anomalies to activate.</param>
+    public void InitializeWithExactAnomalyCount(int count)
+    {
+        var anomalies = new List<Anomaly>();
+
+        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
+            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        if (!AnomalyManager.Instance.behaviorAnomaliesLocked)
+            anomalies.AddRange(_behaviorAnomalies.Cast<Anomaly>());
+        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
+            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
+            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        if (!AnomalyManager.Instance.environmentAnomaliesLocked)
+            anomalies.AddRange(_environmentalAnomalies.Cast<Anomaly>());
+
+        _allPossibleAnomalies = anomalies.ToArray();
+
+        int clamped = Mathf.Min(count, _allPossibleAnomalies.Length);
+        for (int i = 0; i < clamped; i++)
+        {
+            if (_allPossibleAnomalies.Length == 0) break;
+
+            Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
+            if (activeAnomalies.Contains(anomaly)) { i--; continue; }
+
+            activeAnomalies.Add(anomaly);
+            Debug.Log($"[AnomalyController] Forced anomaly: {anomaly.name}");
+
+            if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
+            {
+                int[] indices = tentacleAnomaly.PickActiveIndices();
+                TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+                tentacleAnomaly.ActivateWithIndices(indices);
+            }
+            else if (anomaly is RandomTumorAnomaly tumorAnomaly)
+            {
+                int[] indices = tumorAnomaly.PickActiveIndices();
+                TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+                tumorAnomaly.ActivateWithIndices(indices);
+            }
+            else
+            {
+                anomaly.ActivateAnomaly();
+            }
+        }
+
+        foreach (Anomaly anomaly in _allPossibleAnomalies)
+        {
+            if (!activeAnomalies.Contains(anomaly))
+                anomaly.InitializeDisabled();
+        }
+    }
+
+    /// <summary>
     /// Skips all anomaly assignment and ensures every anomaly visual is disabled.
     /// Use this to guarantee a suspect spawns completely clean — no random roll.
     /// </summary>

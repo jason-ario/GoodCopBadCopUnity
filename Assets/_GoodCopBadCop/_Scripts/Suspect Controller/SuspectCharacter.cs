@@ -117,6 +117,33 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Initializes the suspect with exactly <paramref name="count"/> anomalies chosen from the
+    /// currently unlocked pool. The clean-chance roll is bypassed. Used for tutorial suspects
+    /// that must always exhibit a specific number of anomalies.
+    /// </summary>
+    /// <param name="count">Exact number of anomalies to force.</param>
+    public void InitializeWithExactAnomalyCount(int count)
+    {
+        anomalyController.InitializeWithExactAnomalyCount(count);
+
+        SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+        if (record != null)
+            suspectRecordViewer.SetRecord(record);
+        else
+            Debug.Log("No record found for " + suspectData.name);
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
+            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        foreach (var kvp in anomalyController.TumorAnomalyIndices)
+            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+    }
+
+    /// <summary>
     /// Initializes the suspect with no anomalies. Used for tutorial suspects that must
     /// be clean regardless of the anomaly distribution settings.
     /// </summary>

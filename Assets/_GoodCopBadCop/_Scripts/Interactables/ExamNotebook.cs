@@ -44,6 +44,12 @@ public class ExamNotebook : PickableObject
     public static event System.Action<ExamNotebook> OnAnyCheckboxChecked;
 
     /// <summary>
+    /// Fired on all clients immediately after any exam notebook page is placed into a folder.
+    /// Subscribe in tutorial scripts to gate progression on the notebook-filing step.
+    /// </summary>
+    public static event System.Action OnAnyNotebookPageFiled;
+
+    /// <summary>
     /// Returns true when every visible (unlocked) checklist item on the current page is checked.
     /// Items hidden by <see cref="ExamPage.ApplyAnomalyLocks"/> are skipped.
     /// Use as a <c>WaitUntil</c> condition in tutorial coroutines.
@@ -596,6 +602,8 @@ public class ExamNotebook : PickableObject
         // The page was kept non-interactable while bound to the notebook.
         // Now that it's placed in the folder it should behave like a normal pickable object.
         page.SetInteractable(true);
+
+        OnAnyNotebookPageFiled?.Invoke();
     }
 
     /// <summary>
