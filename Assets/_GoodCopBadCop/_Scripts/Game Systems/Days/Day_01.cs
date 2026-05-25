@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -70,6 +71,8 @@ public class Day_01 : DayBase
 
     // Cached delegate so subscribe/unsubscribe reference equality is preserved.
     private System.Action<PickableObject> _onFolderDocumentFiled;
+    private System.Action<IDCard, PickableObject> _onPaperworkSpawned;
+    private System.Action<IDCard, PickableObject> _onSuspect2PaperworkSpawned;
 
     // -------------------------------------------------------------------------
     // Suspect 2 state
@@ -80,7 +83,6 @@ public class Day_01 : DayBase
     private GameObject _s2AppFormArrow;
     private int _suspect2DocumentsFiledCount;
     private System.Action<PickableObject> _onSuspect2DocumentFiled;
-    private System.Action<IDCard> _onSuspect2PaperworkSpawned;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -123,7 +125,8 @@ public class Day_01 : DayBase
 
         ShiftManager.Instance.OnDayStart        += OnDayStarted;
         SuspectController.OnSuspectArrived       += OnSuspectArrivedHandler;
-        SuspectController.OnPaperworkSpawned     += OnPaperworkSpawnedHandler;
+        _onPaperworkSpawned = OnPaperworkSpawnedHandler;
+        SuspectController.OnPaperworkSpawned     += _onPaperworkSpawned;
         SwitchButton.OnPressed                   += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
         FolderController.OnDocumentAdded         += _onFolderDocumentFiled;
@@ -138,7 +141,7 @@ public class Day_01 : DayBase
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived      -= OnSuspectArrivedHandler;
-        SuspectController.OnPaperworkSpawned    -= OnPaperworkSpawnedHandler;
+        SuspectController.OnPaperworkSpawned    -= _onPaperworkSpawned;
         SwitchButton.OnPressed                  -= OnSwitchPressed;
         FolderController.OnDocumentAdded        -= _onFolderDocumentFiled;
         FolderController.OnFolderEquipped       -= OnFolderPickedUp;
@@ -163,6 +166,12 @@ public class Day_01 : DayBase
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
 
+        if (_suspect2IDCard != null)
+            _suspect2IDCard.OnEquip -= OnSuspect2IDCardPickedUp;
+
+        if (_suspect2AppForm != null)
+            _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
+
         StopAllCoroutines();
     }
 
@@ -177,7 +186,7 @@ public class Day_01 : DayBase
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived   -= OnSuspectArrivedHandler;
-        SuspectController.OnPaperworkSpawned -= OnPaperworkSpawnedHandler;
+        SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
         SwitchButton.OnPressed               -= OnSwitchPressed;
 
         if (_onFolderDocumentFiled != null)
@@ -204,6 +213,12 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
             _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
+
+        if (_suspect2IDCard != null)
+            _suspect2IDCard.OnEquip -= OnSuspect2IDCardPickedUp;
+
+        if (_suspect2AppForm != null)
+            _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -265,23 +280,24 @@ public class Day_01 : DayBase
     /// Fires on all clients once the ID card has been network-spawned and set up.
     /// Locks both documents, attaches tutorial arrows to each, and begins the ID card beat.
     /// </summary>
-    private void OnPaperworkSpawnedHandler(IDCard idCard)
+    private void OnPaperworkSpawnedHandler(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
-        SuspectController.OnPaperworkSpawned -= OnPaperworkSpawnedHandler;
+        SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
+        _onPaperworkSpawned = null;
 
         _tutorialIDCard = idCard;
-
-        var docs = SuspectController.Instance.SpawnedDocuments;
-        if (docs.Count >= 2)
-            _tutorialAppForm = docs[1];
+        _tutorialAppForm = appForm;
 
         if (_documentArrowPrefab != null)
         {
-            _idCardArrow  = SpawnDocumentArrow(_tutorialIDCard != null  ? _tutorialIDCard.transform  : null);
+            _idCardArrow  = SpawnDocumentArrow(_tutorialIDCard  != null ? _tutorialIDCard.transform  : null);
             _appFormArrow = SpawnDocumentArrow(_tutorialAppForm != null ? _tutorialAppForm.transform : null);
         }
 
+        var docs = new System.Collections.Generic.List<PickableObject>();
+        if (_tutorialIDCard  != null) docs.Add(_tutorialIDCard);
+        if (_tutorialAppForm != null) docs.Add(_tutorialAppForm);
         foreach (var doc in docs)
             doc.SetInteractableNetworked(false);
 
@@ -601,19 +617,21 @@ public class Day_01 : DayBase
     // Tutorial Sequence — Suspect 2 (Notebook introduction)
     // =========================================================================
 
-    private void OnSuspect2PaperworkSpawned(IDCard idCard)
+    private void OnSuspect2PaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
         SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
         _onSuspect2PaperworkSpawned = null;
 
-        _suspect2IDCard = idCard;
-        var docs = SuspectController.Instance.SpawnedDocuments;
-        if (docs.Count >= 2) _suspect2AppForm = docs[1];
+        _suspect2IDCard  = idCard;
+        _suspect2AppForm = appForm;
 
         _s2IDCardArrow  = SpawnDocumentArrow(_suspect2IDCard  != null ? _suspect2IDCard.transform  : null);
         _s2AppFormArrow = SpawnDocumentArrow(_suspect2AppForm != null ? _suspect2AppForm.transform : null);
 
+        var docs = new System.Collections.Generic.List<PickableObject>();
+        if (_suspect2IDCard  != null) docs.Add(_suspect2IDCard);
+        if (_suspect2AppForm != null) docs.Add(_suspect2AppForm);
         foreach (var doc in docs)
             doc.SetInteractableNetworked(false);
 
@@ -621,14 +639,22 @@ public class Day_01 : DayBase
     }
 
     // -------------------------------------------------------------------------
-    // Suspect 2 — ID Card beat
+    // Suspect 2 — Inspect both documents beat
     // -------------------------------------------------------------------------
+
+    // Tracks how many of the two suspect 2 documents have been picked up at least once.
+    private bool _s2IDCardInspected;
+    private bool _s2AppFormInspected;
 
     private IEnumerator Suspect2IDCardBeat()
     {
         yield return new WaitForSeconds(3f);
 
-        yield return ShowAndWait("A new subject has arrived. Pick up their ID card. If you look closely, you can see there's an anomaly between the two documents.");
+        yield return ShowAndWait("Another subject has arrived. Inspect their ID card and application form.");
+
+        // Unlock both documents and show both arrows simultaneously.
+        _s2IDCardInspected  = false;
+        _s2AppFormInspected = false;
 
         if (_suspect2IDCard != null)
         {
@@ -636,6 +662,18 @@ public class Day_01 : DayBase
             if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(true);
             _suspect2IDCard.OnEquip += OnSuspect2IDCardPickedUp;
         }
+
+        if (_suspect2AppForm != null)
+        {
+            _suspect2AppForm.SetInteractableNetworked(true);
+            if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(true);
+            _suspect2AppForm.OnEquip += OnSuspect2AppFormPickedUp;
+        }
+
+        // Wait until the player has picked up both documents at least once.
+        yield return new WaitUntil(() => _s2IDCardInspected && _s2AppFormInspected);
+
+        StartCoroutine(Suspect2AnomalyRevealBeat());
     }
 
     private void OnSuspect2IDCardPickedUp()
@@ -643,7 +681,15 @@ public class Day_01 : DayBase
         if (this == null) return;
         if (_suspect2IDCard != null) _suspect2IDCard.OnEquip -= OnSuspect2IDCardPickedUp;
         if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(false);
-        StartCoroutine(Suspect2AnomalyRevealBeat());
+        _s2IDCardInspected = true;
+    }
+
+    private void OnSuspect2AppFormPickedUp()
+    {
+        if (this == null) return;
+        if (_suspect2AppForm != null) _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
+        if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(false);
+        _s2AppFormInspected = true;
     }
 
     // -------------------------------------------------------------------------
@@ -654,18 +700,9 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("This means the person either isn't thinking clearly or is lying. Either way, we should mark this anomaly on the checklist.");
-
+        yield return ShowAndWait("You'll notice there's a discrepancy between the two documents. Something doesn't add up.");
         yield return new WaitForSeconds(1f);
-
-        // Unlock the application form so the player can freely compare both documents.
-        if (_suspect2AppForm != null)
-        {
-            _suspect2AppForm.SetInteractableNetworked(true);
-            if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(true);
-        }
-
-        yield return ShowAndWait("Pick up the exam notebook and tick the anomaly you find.");
+        yield return ShowAndWait("When you spot an anomaly, you mark it using the exam notebook. Pick it up and tick the box for what you found.");
 
         _examNotebook?.SetInteractableNetworked(true);
         if (_notebookArrow != null) _notebookArrow.SetActive(true);
@@ -673,7 +710,6 @@ public class Day_01 : DayBase
         yield return new WaitUntil(() => _examNotebook != null && _examNotebook.IsHeld);
 
         if (_notebookArrow != null) _notebookArrow.SetActive(false);
-        if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(false);
 
         StartCoroutine(NotebookCheckBeat());
     }
@@ -819,6 +855,10 @@ public class Day_01 : DayBase
     /// <summary>Shows a megaphone bark and waits until it finishes speaking.</summary>
     private IEnumerator ShowAndWait(string line)
     {
+        // Wait for any previously running bark to complete before issuing the next one.
+        // MegaphoneDialogueManager.ShowDialogue silently drops the call if IsSpeaking is true,
+        // which would leave the WaitUntil below hanging indefinitely.
+        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
         MegaphoneDialogueManager.Instance.ShowDialogue(line);
         yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
     }

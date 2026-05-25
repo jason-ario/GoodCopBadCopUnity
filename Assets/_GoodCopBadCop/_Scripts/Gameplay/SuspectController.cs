@@ -197,10 +197,11 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Fired on all clients after the first suspect's paperwork lands on the desk.
-    /// Carries the spawned IDCard so tutorial systems can reference it directly.
+    /// Fired on all clients after paperwork lands on the desk.
+    /// Carries the spawned IDCard and the application form PickableObject so tutorial
+    /// systems can reference both documents without reading the server-only SpawnedDocuments list.
     /// </summary>
-    public static event Action<IDCard> OnPaperworkSpawned;
+    public static event Action<IDCard, PickableObject> OnPaperworkSpawned;
 
     /// <summary>
     /// Fired on all clients when a suspect finishes walking to the booth window.
@@ -342,7 +343,12 @@ public class SuspectController : NetworkBehaviour
         if (!idCardRef.TryGet(out NetworkObject idCardObj)) return;
 
         IDCard card = idCardObj.GetComponent<IDCard>();
-        OnPaperworkSpawned?.Invoke(card);
+
+        PickableObject appForm = null;
+        if (appFormRef.TryGet(out NetworkObject appFormObj))
+            appForm = appFormObj.GetComponent<PickableObject>();
+
+        OnPaperworkSpawned?.Invoke(card, appForm);
     }
 
     public void RespondToDialogueChoice(int choiceIndex)
