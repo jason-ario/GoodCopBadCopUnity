@@ -62,6 +62,16 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Authoritative interactable state set by tutorial logic.
+    /// Stored as a NetworkVariable so late-joining clients inherit the correct state.
+    /// -1 = unset (defer to _holdingClientId logic), 0 = forced off, 1 = forced on.
+    /// </summary>
+    private NetworkVariable<int> _networkInteractableOverride = new NetworkVariable<int>(
+        -1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     /// <summary>Returns true if any player is currently holding this object.</summary>
     public bool IsHeld => _holdingClientId.Value != ulong.MaxValue;
 
@@ -72,24 +82,90 @@ public class PickableObject : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _holdingClientId.OnValueChanged += OnHoldingClientChanged;
+        _holdingClientId.OnValueChanged             += OnHoldingClientChanged;
+        _networkInteractableOverride.OnValueChanged += OnNetworkInteractableOverrideChanged;
 
-        // Sync collider state to the current network value on late-joining clients.
-        if (!_interactableLocked)
-            SetInteractable(_holdingClientId.Value == ulong.MaxValue);
+        // Apply tutorial override first; fall back to holder-based logic if unset.
+        ApplyNetworkInteractableState();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _holdingClientId.OnValueChanged -= OnHoldingClientChanged;
+        _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
+        _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
     }
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
         if (_interactableLocked) return;
-        SetInteractable(current == ulong.MaxValue);
+        // Only apply holder-based logic when no tutorial override is active.
+        if (_networkInteractableOverride.Value == -1)
+            SetInteractable(current == ulong.MaxValue);
     }
+
+    private void OnNetworkInteractableOverrideChanged(int previous, int current)
+        => ApplyNetworkInteractableState();
+
+    private void ApplyNetworkInteractableState()
+    {
+        if (_networkInteractableOverride.Value != -1)
+        {
+            _interactableLocked = _networkInteractableOverride.Value == 0;
+            SetInteractable(_networkInteractableOverride.Value == 1);
+        }
+        else if (!_interactableLocked)
+        {
+            SetInteractable(_holdingClientId.Value == ulong.MaxValue);
+        }
+    }
+
+    /// <summary>
+    /// Sets interactability on all clients via the server so the state persists
+    /// for late-joiners. Prefer this over <see cref="SetInteractable"/> for tutorial gates.
+    /// </summary>
+    public void SetInteractableNetworked(bool value)
+    {
+        if (IsServer)
+            _networkInteractableOverride.Value = value ? 1 : 0;
+        else
+            SetInteractableNetworkedServerRpc(value);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetInteractableNetworkedServerRpc(bool value)
+        => _networkInteractableOverride.Value = value ? 1 : 0;
+
+    /// <summary>
+    /// Permanently disables interactability on all clients via the server.
+    /// Use <see cref="UnlockInteractableNetworked"/> to restore normal behaviour.
+    /// </summary>
+    public void LockInteractableNetworked()
+    {
+        if (IsServer)
+            _networkInteractableOverride.Value = 0;
+        else
+            LockInteractableNetworkedServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void LockInteractableNetworkedServerRpc()
+        => _networkInteractableOverride.Value = 0;
+
+    /// <summary>
+    /// Clears the networked interactable lock and restores holder-based logic on all clients.
+    /// </summary>
+    public void UnlockInteractableNetworked()
+    {
+        if (IsServer)
+            _networkInteractableOverride.Value = -1;
+        else
+            UnlockInteractableNetworkedServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void UnlockInteractableNetworkedServerRpc()
+        => _networkInteractableOverride.Value = -1;
 
     protected override void Awake()
     {

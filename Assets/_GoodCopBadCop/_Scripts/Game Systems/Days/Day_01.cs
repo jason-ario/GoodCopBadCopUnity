@@ -83,11 +83,13 @@ public class Day_01 : DayBase
             _drawer.SetLocked(true);
 
         // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
-        SuspectController.ForceNextSuspectClean = true;
-
-        // Compress all suspect arrival gaps to 3 s for the tutorial shift.
-        ShiftManager.OverrideFirstArrivalInterval   = new UnityEngine.Vector2(0f, 0f);
-        ShiftManager.OverrideSuspectArrivalInterval = new UnityEngine.Vector2(3f, 3f);
+        // Server-only: these static flags are consumed exclusively by the server's spawn logic.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
+            SuspectController.ForceNextSuspectClean          = true;
+            ShiftManager.OverrideFirstArrivalInterval        = new UnityEngine.Vector2(0f, 0f);
+            ShiftManager.OverrideSuspectArrivalInterval      = new UnityEngine.Vector2(3f, 3f);
+        }
 
         // All tutorial arrows start hidden.
         if (_switchArrow != null) _switchArrow.SetActive(false);
@@ -248,7 +250,7 @@ public class Day_01 : DayBase
         }
 
         foreach (var doc in docs)
-            doc.SetInteractable(false);
+            doc.SetInteractableNetworked(false);
 
         StartCoroutine(IDCardInspectionBeat());
     }
@@ -281,7 +283,7 @@ public class Day_01 : DayBase
 
         if (_tutorialIDCard != null)
         {
-            _tutorialIDCard.SetInteractable(true);
+            _tutorialIDCard.SetInteractableNetworked(true);
             _tutorialIDCard.OnEquip += OnIDCardPickedUp;
         }
 
@@ -337,7 +339,7 @@ public class Day_01 : DayBase
 
         if (_tutorialAppForm != null)
         {
-            _tutorialAppForm.SetInteractable(true);
+            _tutorialAppForm.SetInteractableNetworked(true);
             _tutorialAppForm.OnEquip += OnAppFormPickedUp;
         }
 
@@ -444,10 +446,10 @@ public class Day_01 : DayBase
         if (this == null) return;
         _documentsFiledCount++;
 
-        // Permanently lock the document so the network-variable release callback
-        // cannot re-enable its colliders after it lands in the folder slot.
+        // Permanently lock the document on all clients so the holder network-variable
+        // release callback cannot re-enable its colliders after it lands in the folder slot.
         if (document != null)
-            document.LockInteractable();
+            document.LockInteractableNetworked();
     }
 
     // -------------------------------------------------------------------------

@@ -19,13 +19,27 @@ public class InkStamp : Interactable, IPickupSlot
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Networked interactability gate for the stamp slot collider.
+    /// Defaults to false so the slot starts locked; Day_01 enables it at the stamp beat.
+    /// Applied on all clients via OnValueChanged and on late-joiners via OnNetworkSpawn.
+    /// </summary>
+    private NetworkVariable<bool> _slotInteractable = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
         stampPlaceObjectSlot.IsPlaced = true;
 
-        _spawnedStampRef.OnValueChanged += OnSpawnedStampRefChanged;
+        _spawnedStampRef.OnValueChanged  += OnSpawnedStampRefChanged;
+        _slotInteractable.OnValueChanged += OnSlotInteractableChanged;
+
+        // Apply current slot-interactable state for late-joiners.
+        ApplySlotInteractable(_slotInteractable.Value);
 
         if (IsServer)
         {
@@ -41,7 +55,16 @@ public class InkStamp : Interactable, IPickupSlot
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _spawnedStampRef.OnValueChanged -= OnSpawnedStampRefChanged;
+        _spawnedStampRef.OnValueChanged  -= OnSpawnedStampRefChanged;
+        _slotInteractable.OnValueChanged -= OnSlotInteractableChanged;
+    }
+
+    private void OnSlotInteractableChanged(bool oldValue, bool newValue) => ApplySlotInteractable(newValue);
+
+    private void ApplySlotInteractable(bool value)
+    {
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = value;
     }
 
     private void OnSpawnedStampRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
@@ -86,14 +109,19 @@ public class InkStamp : Interactable, IPickupSlot
     }
 
     /// <summary>
-    /// Enables or disables interaction with this stamp slot.
-    /// Toggles the trigger collider so the player's raycast can or cannot hit it.
+    /// Enables or disables interaction with this stamp slot on all clients.
+    /// Routes through the server so the state persists for late-joiners via the NetworkVariable.
     /// </summary>
     public void SetSlotInteractable(bool value)
     {
-        Collider col = GetComponent<Collider>();
-        if (col != null) col.enabled = value;
+        if (IsServer)
+            _slotInteractable.Value = value;
+        else
+            SetSlotInteractableServerRpc(value);
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetSlotInteractableServerRpc(bool value) => _slotInteractable.Value = value;
 
     /// <summary>True while the stamp is sitting in its slot; false once the player has picked it up.</summary>
     public bool IsStampInSlot => stampPlaceObjectSlot != null && stampPlaceObjectSlot.IsPlaced;

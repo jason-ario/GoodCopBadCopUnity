@@ -14,12 +14,26 @@ public class Drawer : Interactable
     [SerializeField] AudioClip drawerOpenSound;
     [SerializeField] AudioClip drawerCloseSound;
 
-    private bool _locked = false;
+    private NetworkVariable<bool> _isLocked = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
     /// <summary>
-    /// Prevents interaction when true. Local-only — used as a tutorial gate on Day 1.
+    /// Prevents interaction when true. Networked — propagates to all clients and
+    /// is applied to late-joiners via the NetworkVariable sync on spawn.
     /// </summary>
-    public void SetLocked(bool locked) => _locked = locked;
+    public void SetLocked(bool locked)
+    {
+        if (IsServer)
+            _isLocked.Value = locked;
+        else
+            SetLockedServerRpc(locked);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetLockedServerRpc(bool locked) => _isLocked.Value = locked;
 
     /// <summary>
     /// Fired locally whenever this drawer transitions to open.
@@ -30,7 +44,8 @@ public class Drawer : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        isOpen.OnValueChanged += OnDrawerStateChanged;
+        isOpen.OnValueChanged    += OnDrawerStateChanged;
+        _isLocked.OnValueChanged += OnLockedChanged;
 
         // Sync visual on late join
         animator.SetBool("Open", isOpen.Value);
@@ -38,12 +53,13 @@ public class Drawer : Interactable
 
     public override void OnNetworkDespawn()
     {
-        isOpen.OnValueChanged -= OnDrawerStateChanged;
+        isOpen.OnValueChanged    -= OnDrawerStateChanged;
+        _isLocked.OnValueChanged -= OnLockedChanged;
     }
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (_locked) return;
+        if (_isLocked.Value) return;
 
         base.Interact(player);
 
@@ -76,6 +92,12 @@ public class Drawer : Interactable
     private void OnDrawerStateChanged(bool oldValue, bool newValue)
     {
         // Only used for late-joining clients that missed the BroadcastDrawerStateClientRpc.
+    }
+
+    private void OnLockedChanged(bool oldValue, bool newValue)
+    {
+        // Interactability is checked on each Interact() call via _isLocked.Value —
+        // no visual change needed; this callback exists for late-joiner correctness.
     }
 
     private void ApplyDrawerVisuals(bool open)
