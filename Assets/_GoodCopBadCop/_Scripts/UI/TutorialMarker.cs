@@ -35,11 +35,6 @@ public class TutorialMarker : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (_target == null) return;
-
-        float bob = Mathf.Sin((Time.time + _bobOffset) * bobFrequency * Mathf.PI * 2f) * bobAmplitude;
-        transform.position = _target.position + Vector3.up * (hoverHeight + bob);
-
         if (Camera.main != null)
         {
             Vector3 camPos = Camera.main.transform.position;
@@ -49,6 +44,11 @@ public class TutorialMarker : MonoBehaviour
             if (direction.sqrMagnitude > 0f)
                 transform.rotation = Quaternion.LookRotation(direction);
         }
+        
+        if (_target == null) return;
+
+        float bob = Mathf.Sin((Time.time + _bobOffset) * bobFrequency * Mathf.PI * 2f) * bobAmplitude;
+        transform.position = _target.position + Vector3.up * (hoverHeight + bob);
     }
 
     // ── Public API ───────────────────────────────────────────────────────────

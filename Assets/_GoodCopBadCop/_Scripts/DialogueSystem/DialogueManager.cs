@@ -165,6 +165,16 @@ public class DialogueManager : NetworkBehaviour
         if (clearHistory)
             DestroyPreviousSubtitles();
 
+        // Log to dialogue history
+        if (isPlayer)
+        {
+            DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Player, characterName, text);
+        }
+        else
+        {
+            DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Suspect, characterName, text);
+        }
+
         Subtitles subtitles = Instantiate(isPlayer ? playerSubtitlesPrefab : NPCSubtitlesPrefab, subtitlesContainer);
 
         subtitles.SetText(text, characterName, nameColor);

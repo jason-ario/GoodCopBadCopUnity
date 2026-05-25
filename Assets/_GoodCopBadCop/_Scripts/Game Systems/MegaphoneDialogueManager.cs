@@ -241,6 +241,7 @@ public class MegaphoneDialogueManager : MonoBehaviour
     public void ShowDialogue(string text)
     {
         if (disabled || _isSpeaking) return;
+        DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Megaphone, "Megaphone", text);
         StartCoroutine(ShowBarkSequence(text));
     }
 

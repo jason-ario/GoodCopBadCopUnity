@@ -37,6 +37,35 @@ public class ExamNotebook : PickableObject
     bool addingToFolder = false;
     public bool IsChecking { get; set; }
 
+    /// <summary>
+    /// Fired on the local client whenever any checkbox is toggled on any ExamNotebook.
+    /// Subscribe in tutorial scripts to react to checklist interaction without polling.
+    /// </summary>
+    public static event System.Action<ExamNotebook> OnAnyCheckboxChecked;
+
+    /// <summary>
+    /// Returns true when every visible (unlocked) checklist item on the current page is checked.
+    /// Items hidden by <see cref="ExamPage.ApplyAnomalyLocks"/> are skipped.
+    /// Use as a <c>WaitUntil</c> condition in tutorial coroutines.
+    /// </summary>
+    public bool AllVisibleBoxesChecked
+    {
+        get
+        {
+            if (pages == null || pages.Length == 0 || currentPage >= pages.Length) return false;
+            ExamPage page = pages[currentPage];
+            if (page == null) return false;
+            foreach (ChecklistItem item in page.ChecklistItems)
+            {
+                if (item == null) continue;
+                // Skip items hidden by ApplyAnomalyLocks — their container is inactive.
+                if (!item.gameObject.activeInHierarchy) continue;
+                if (!item.IsChecked) return false;
+            }
+            return true;
+        }
+    }
+
     private int currentPage = 0;
 
     // Synced so any client that picks up the notebook after a page has been ripped out
@@ -296,6 +325,7 @@ public class ExamNotebook : PickableObject
     public void SetCheckboxChecked(int pageIndex, int itemIndex, bool value)
     {
         SetCheckboxServerRpc(pageIndex, itemIndex, value);
+        OnAnyCheckboxChecked?.Invoke(this);
     }
 
     [ServerRpc(RequireOwnership = false)]

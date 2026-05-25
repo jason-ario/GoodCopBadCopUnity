@@ -50,6 +50,13 @@ public class Day_01 : DayBase
     [Tooltip("The window hand-off point where the player places the stamped folder to finalize the verdict.")]
     [SerializeField] private HandOffPoint _handOffPoint;
 
+    [Header("Day 1 Tutorial — Part 2")]
+    [Tooltip("The Documentation Exam Notebook scene object — kept non-interactable until the notebook beat.")]
+    [SerializeField] private ExamNotebook _examNotebook;
+
+    [Tooltip("Tutorial arrow displayed above the exam notebook. Starts inactive.")]
+    [SerializeField] private GameObject _notebookArrow;
+
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
     private PickableObject _tutorialAppForm;
@@ -63,6 +70,17 @@ public class Day_01 : DayBase
 
     // Cached delegate so subscribe/unsubscribe reference equality is preserved.
     private System.Action<PickableObject> _onFolderDocumentFiled;
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 state
+    // -------------------------------------------------------------------------
+    private IDCard _suspect2IDCard;
+    private PickableObject _suspect2AppForm;
+    private GameObject _s2IDCardArrow;
+    private GameObject _s2AppFormArrow;
+    private int _suspect2DocumentsFiledCount;
+    private System.Action<PickableObject> _onSuspect2DocumentFiled;
+    private System.Action<IDCard> _onSuspect2PaperworkSpawned;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -100,6 +118,9 @@ public class Day_01 : DayBase
         _yellowStampSlot?.SetSlotInteractable(false);
         _redStampSlot?.SetSlotInteractable(false);
 
+        // Notebook stays non-interactable until the anomaly reveal beat.
+        _examNotebook?.SetInteractableNetworked(false);
+
         ShiftManager.Instance.OnDayStart        += OnDayStarted;
         SuspectController.OnSuspectArrived       += OnSuspectArrivedHandler;
         SuspectController.OnPaperworkSpawned     += OnPaperworkSpawnedHandler;
@@ -123,6 +144,12 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped       -= OnFolderPickedUp;
         FolderController.OnFolderHandedOff      -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped     -= OnFolderStamped;
+
+        if (_onSuspect2DocumentFiled != null)
+            FolderController.OnDocumentAdded    -= _onSuspect2DocumentFiled;
+        if (_onSuspect2PaperworkSpawned != null)
+            SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
+        FolderController.OnFolderEquipped       -= OnSuspect2FolderPickedUp;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -159,6 +186,12 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped         -= OnFolderPickedUp;
         FolderController.OnFolderHandedOff        -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped       -= OnFolderStamped;
+
+        if (_onSuspect2DocumentFiled != null)
+            FolderController.OnDocumentAdded      -= _onSuspect2DocumentFiled;
+        if (_onSuspect2PaperworkSpawned != null)
+            SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
+        FolderController.OnFolderEquipped         -= OnSuspect2FolderPickedUp;
 
         if (_drawer != null)
             _drawer.OnOpened -= OnDrawerFirstOpened;
@@ -557,6 +590,198 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(2f);
 
         yield return ShowAndWait("Well done. That's your first subject processed. Keep it up.");
+
+        // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
+        // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
+        _onSuspect2PaperworkSpawned = OnSuspect2PaperworkSpawned;
+        SuspectController.OnPaperworkSpawned += _onSuspect2PaperworkSpawned;
+    }
+
+    // =========================================================================
+    // Tutorial Sequence — Suspect 2 (Notebook introduction)
+    // =========================================================================
+
+    private void OnSuspect2PaperworkSpawned(IDCard idCard)
+    {
+        if (this == null) return;
+        SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
+        _onSuspect2PaperworkSpawned = null;
+
+        _suspect2IDCard = idCard;
+        var docs = SuspectController.Instance.SpawnedDocuments;
+        if (docs.Count >= 2) _suspect2AppForm = docs[1];
+
+        _s2IDCardArrow  = SpawnDocumentArrow(_suspect2IDCard  != null ? _suspect2IDCard.transform  : null);
+        _s2AppFormArrow = SpawnDocumentArrow(_suspect2AppForm != null ? _suspect2AppForm.transform : null);
+
+        foreach (var doc in docs)
+            doc.SetInteractableNetworked(false);
+
+        StartCoroutine(Suspect2IDCardBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — ID Card beat
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect2IDCardBeat()
+    {
+        yield return new WaitForSeconds(3f);
+
+        yield return ShowAndWait("A new subject has arrived. Pick up their ID card. If you look closely, you can see there's an anomaly between the two documents.");
+
+        if (_suspect2IDCard != null)
+        {
+            _suspect2IDCard.SetInteractableNetworked(true);
+            if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(true);
+            _suspect2IDCard.OnEquip += OnSuspect2IDCardPickedUp;
+        }
+    }
+
+    private void OnSuspect2IDCardPickedUp()
+    {
+        if (this == null) return;
+        if (_suspect2IDCard != null) _suspect2IDCard.OnEquip -= OnSuspect2IDCardPickedUp;
+        if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(false);
+        StartCoroutine(Suspect2AnomalyRevealBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — Anomaly reveal + notebook unlock
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect2AnomalyRevealBeat()
+    {
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("This means the person either isn't thinking clearly or is lying. Either way, we should mark this anomaly on the checklist.");
+
+        yield return new WaitForSeconds(1f);
+
+        // Unlock the application form so the player can freely compare both documents.
+        if (_suspect2AppForm != null)
+        {
+            _suspect2AppForm.SetInteractableNetworked(true);
+            if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(true);
+        }
+
+        yield return ShowAndWait("Pick up the exam notebook and tick the anomaly you find.");
+
+        _examNotebook?.SetInteractableNetworked(true);
+        if (_notebookArrow != null) _notebookArrow.SetActive(true);
+
+        yield return new WaitUntil(() => _examNotebook != null && _examNotebook.IsHeld);
+
+        if (_notebookArrow != null) _notebookArrow.SetActive(false);
+        if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(false);
+
+        StartCoroutine(NotebookCheckBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — Checkbox completion
+    // -------------------------------------------------------------------------
+
+    private IEnumerator NotebookCheckBeat()
+    {
+        yield return ShowAndWait("Tick the boxes for every anomaly you can find on the page.");
+
+        yield return new WaitUntil(() => _examNotebook != null && _examNotebook.AllVisibleBoxesChecked);
+
+        yield return ShowAndWait("Good. Now grab a fresh folder from the drawer and file the exam page along with the ID card and application form.");
+
+        StartCoroutine(NotebookFileBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — File documents into folder
+    // -------------------------------------------------------------------------
+
+    private IEnumerator NotebookFileBeat()
+    {
+        _drawer?.SetLocked(false);
+        if (_drawerArrow != null)
+        {
+            _drawerArrow.SetActive(true);
+            if (_drawer != null) _drawer.OnOpened += OnDrawerFirstOpened;
+        }
+
+        _suspect2DocumentsFiledCount = 0;
+        _onSuspect2DocumentFiled = OnSuspect2DocumentFiled;
+        FolderController.OnDocumentAdded  += _onSuspect2DocumentFiled;
+        FolderController.OnFolderEquipped += OnSuspect2FolderPickedUp;
+
+        yield return new WaitUntil(() => _suspect2DocumentsFiledCount >= 3);
+
+        StartCoroutine(Suspect2StampBeat());
+    }
+
+    private void OnSuspect2FolderPickedUp(FolderController folder)
+    {
+        if (this == null) return;
+        FolderController.OnFolderEquipped -= OnSuspect2FolderPickedUp;
+        if (_drawerArrow != null) _drawerArrow.SetActive(false);
+    }
+
+    private void OnSuspect2DocumentFiled(PickableObject doc)
+    {
+        if (this == null) return;
+        _suspect2DocumentsFiledCount++;
+        if (doc != null) doc.LockInteractableNetworked();
+
+        if (_suspect2DocumentsFiledCount >= 3)
+        {
+            FolderController.OnDocumentAdded -= _onSuspect2DocumentFiled;
+            _onSuspect2DocumentFiled = null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — Stamp beat (mirrors suspect 1's StampBeat)
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect2StampBeat()
+    {
+        _folderStamped = false;
+
+        yield return new WaitForSeconds(1.5f);
+
+        yield return ShowAndWait("All documents filed. This subject has an anomaly — stamp the folder green to flag them for further inspection.");
+
+        FolderController.OnAnyFolderStamped += OnFolderStamped;
+        _greenStampSlot?.SetSlotInteractable(true);
+
+        _stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
+        if (_stampArrow != null) _stampArrow.SetActive(true);
+
+        StartCoroutine(HideStampArrowOnPickup());
+        StartCoroutine(Suspect2HandOffBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 2 — Hand-off beat (mirrors suspect 1's HandOffBeat)
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect2HandOffBeat()
+    {
+        _folderHandedOff = false;
+
+        yield return new WaitUntil(() => _folderStamped);
+
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("Place the stamped folder in the window slot to send them on their way.");
+
+        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
+        if (handOffArrow != null) handOffArrow.SetActive(true);
+
+        yield return new WaitUntil(() => _folderHandedOff);
+
+        if (handOffArrow != null) Destroy(handOffArrow);
+
+        yield return new WaitForSeconds(2f);
+
+        yield return ShowAndWait("Excellent. You've learned the full inspection workflow. Good luck out there.");
     }
 
     // -------------------------------------------------------------------------

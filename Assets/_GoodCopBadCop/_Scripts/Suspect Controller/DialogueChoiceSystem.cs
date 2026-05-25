@@ -30,7 +30,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
     { 
         CloseDialogueChoices();
         string playerName = GetPlayerName();
-        
+
+        // Log locally for the sending player — other clients log via SpawnSubtitles ClientRpc
+        DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Player, playerName, dialogueChoices[choiceIndex].choiceText);
+
         // Request server to broadcast this choice
         ChooseDialogueChoiceServerRpc(choiceIndex, playerName);
     }
