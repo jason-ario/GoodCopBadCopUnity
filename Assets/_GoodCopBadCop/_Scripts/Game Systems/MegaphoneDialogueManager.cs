@@ -294,7 +294,10 @@ public class MegaphoneDialogueManager : MonoBehaviour
         _barkText.text = text;
         _barkCanvas.SetActive(true);
 
-        DialogueManager.Instance.PlayDialogueAudio(text, _audioClips, _audioSource, OnSpeakingFinished);
+        // Use the dedicated megaphone slot so that SayDialogueClientRpc (which calls
+        // StopDialogueAudio on all clients) cannot cancel this bark mid-speech and
+        // leave _isSpeaking stuck true.
+        DialogueManager.Instance.PlayMegaphoneAudio(text, _audioClips, _audioSource, OnSpeakingFinished);
     }
 
     private void OnSpeakingFinished()

@@ -421,7 +421,7 @@ public class ExamNotebook : PickableObject
             if (container == null) continue;
             foreach (var itemHeld in container.ItemsHeld)
             {
-                if (itemHeld != null && itemHeld.ItemData.name == RedPencilName)
+                if (itemHeld != null && itemHeld.ItemData != null && itemHeld.ItemData.name == RedPencilName)
                     itemHeld.gameObject.SetActive(active);
             }
         }

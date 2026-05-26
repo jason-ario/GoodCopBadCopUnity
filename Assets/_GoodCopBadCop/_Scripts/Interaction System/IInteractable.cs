@@ -36,7 +36,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         highlightEffect.highlighted = true;
         highlightEffect.ProfileLoad(highlightEffect.profile);
 
-        interactText = gameObject.name;
     }
 
     public void Highlight(bool highlight)

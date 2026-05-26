@@ -16,6 +16,14 @@ public class DialogueManager : NetworkBehaviour
     public static DialogueManager Instance;
     [SerializeField] private float secondsPerCharacter = 0.06f;
     Coroutine audioDialogueCoroutine;
+
+    /// <summary>
+    /// Separate coroutine slot for megaphone barks so that character speech
+    /// (SayDialogueClientRpc → StopDialogueAudio) cannot cancel an in-flight
+    /// megaphone bark and leave MegaphoneDialogueManager._isSpeaking stuck true.
+    /// </summary>
+    private Coroutine _megaphoneAudioCoroutine;
+
     [SerializeField] private float minDelayBetweenClips = 0.03f;
     [SerializeField] private float maxDelayBetweenClips = 0.1f;
     [SerializeField] DialogueChoiceSystem dialogueChoiceSystem;
@@ -104,6 +112,30 @@ public class DialogueManager : NetworkBehaviour
         if (audioSource == null) { onComplete?.Invoke(); return; }
         
         audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete));
+    }
+
+    /// <summary>
+    /// Plays audio for a megaphone bark using a dedicated coroutine slot that is
+    /// independent of <see cref="audioDialogueCoroutine"/>. Character speech calls
+    /// (SayDialogue → StopDialogueAudio) will not cancel this playback, ensuring
+    /// <paramref name="onComplete"/> always fires.
+    /// </summary>
+    public void PlayMegaphoneAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null)
+    {
+        if (_megaphoneAudioCoroutine != null)
+        {
+            StopCoroutine(_megaphoneAudioCoroutine);
+            _megaphoneAudioCoroutine = null;
+        }
+
+        if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
+        if (audioSource == null) { onComplete?.Invoke(); return; }
+
+        _megaphoneAudioCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, () =>
+        {
+            _megaphoneAudioCoroutine = null;
+            onComplete?.Invoke();
+        }));
     }
 
     IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null)

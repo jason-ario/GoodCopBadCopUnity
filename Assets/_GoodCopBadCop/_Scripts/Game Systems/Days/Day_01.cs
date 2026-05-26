@@ -149,6 +149,10 @@ public class Day_01 : DayBase
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
+
+        if (_onSuspect3PaperworkSpawned != null)
+            SuspectController.OnPaperworkSpawned -= _onSuspect3PaperworkSpawned;
+
         ExamNotebook.OnAnyNotebookPageFiled     -= OnNotebookPageFiled;
 
         if (_drawer != null)
@@ -168,6 +172,12 @@ public class Day_01 : DayBase
 
         if (_suspect2AppForm != null)
             _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
+
+        if (_suspect3IDCard != null)
+            _suspect3IDCard.OnEquip -= OnSuspect3IDCardPickedUp;
+
+        if (_suspect3AppForm != null)
+            _suspect3AppForm.OnEquip -= OnSuspect3AppFormPickedUp;
 
         StopAllCoroutines();
     }
@@ -195,6 +205,10 @@ public class Day_01 : DayBase
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
+
+        if (_onSuspect3PaperworkSpawned != null)
+            SuspectController.OnPaperworkSpawned  -= _onSuspect3PaperworkSpawned;
+
         ExamNotebook.OnAnyNotebookPageFiled       -= OnNotebookPageFiled;
 
         if (_drawer != null)
@@ -214,6 +228,12 @@ public class Day_01 : DayBase
 
         if (_suspect2AppForm != null)
             _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
+
+        if (_suspect3IDCard != null)
+            _suspect3IDCard.OnEquip -= OnSuspect3IDCardPickedUp;
+
+        if (_suspect3AppForm != null)
+            _suspect3AppForm.OnEquip -= OnSuspect3AppFormPickedUp;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -468,18 +488,26 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1f);
 
-        _documentsFiledCount = 0;
+        // Snapshot documents already filed before resetting — the player may have filed
+        // one or both documents while the folder-place dialogue was still playing.
+        int alreadyFiled = _documentsFiledCount;
+        _documentsFiledCount = alreadyFiled;
 
-        // First document.
-        yield return ShowAndWait("Now pick up the ID card and drag it onto the folder to file it.");
-        yield return new WaitUntil(() => _documentsFiledCount >= 1);
+        // First document — skip prompt if already in the folder.
+        if (_documentsFiledCount < 1)
+        {
+            yield return ShowAndWait("Now pick up the ID card and drag it onto the folder to file it.");
+            yield return new WaitUntil(() => _documentsFiledCount >= 1);
+        }
 
         yield return new WaitForSeconds(0.5f);
 
-        // Second document — only prompt if the player hasn't already filed it.
+        // Second document — only prompt if not already filed.
         if (_documentsFiledCount < 2)
+        {
             yield return ShowAndWait("Good. Now do the same with the application form.");
-        yield return new WaitUntil(() => _documentsFiledCount >= 2);
+            yield return new WaitUntil(() => _documentsFiledCount >= 2);
+        }
 
         FolderController.OnDocumentAdded -= _onFolderDocumentFiled;
         StartCoroutine(StampBeat());
@@ -505,6 +533,11 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1.5f);
 
         yield return ShowAndWait("Both documents are filed. This suspect looks clean — stamp the folder green to approve them.");
+
+        // Arm the hand-off listener now — before the stamp event and before any
+        // dialogue, so a fast player who stamps and hands off immediately is captured.
+        _folderHandedOff = false;
+        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
 
         // Subscribe to the static event now — any folder stamped from this point counts.
         FolderController.OnAnyFolderStamped += OnFolderStamped;
@@ -578,11 +611,6 @@ public class Day_01 : DayBase
 
     private IEnumerator HandOffBeat()
     {
-        // Reset and subscribe before the stamp wait so any hand-off that happens
-        // during StampBeat's dialogue or while stamping is still captured.
-        _folderHandedOff = false;
-        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
-
         // Wait until OnStamped fires and sets the flag — no polling of a NetworkVariable.
         Debug.Log("[Day_01] HandOffBeat: waiting for folder stamp via event flag.");
         yield return new WaitUntil(() => _folderStamped);
@@ -598,15 +626,10 @@ public class Day_01 : DayBase
             handOffArrow.SetActive(true);
 
         // Guard: player may have placed the folder during the dialogue above.
-        if (_folderHandedOff)
-        {
-            if (handOffArrow != null) Destroy(handOffArrow);
-        }
-        else
-        {
+        if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
-            if (handOffArrow != null) Destroy(handOffArrow);
-        }
+
+        if (handOffArrow != null) Destroy(handOffArrow);
 
         yield return new WaitForSeconds(2f);
 
@@ -654,6 +677,18 @@ public class Day_01 : DayBase
     // Tracks how many of the two suspect 2 documents have been picked up at least once.
     private bool _s2IDCardInspected;
     private bool _s2AppFormInspected;
+
+    // =========================================================================
+    // Suspect 3 state
+    // =========================================================================
+    private IDCard _suspect3IDCard;
+    private PickableObject _suspect3AppForm;
+    private GameObject _s3IDCardArrow;
+    private GameObject _s3AppFormArrow;
+    private System.Action<IDCard, PickableObject> _onSuspect3PaperworkSpawned;
+
+    private bool _s3IDCardInspected;
+    private bool _s3AppFormInspected;
 
     private IEnumerator Suspect2IDCardBeat()
     {
@@ -804,6 +839,11 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("When you're ready, quarantine this subject — stamp the folder yellow.");
 
+        // Arm the hand-off listener before the stamp event so a fast player who stamps
+        // and hands off in one motion doesn't race ahead of Suspect2HandOffBeat's subscribe.
+        _folderHandedOff = false;
+        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
+
         FolderController.OnAnyFolderStamped += OnFolderStamped;
 
         // Only the yellow stamp is available; green and red remain locked for this beat.
@@ -822,10 +862,8 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect2HandOffBeat()
     {
-        // Reset and subscribe before the stamp wait so early hand-off is captured.
-        _folderHandedOff = false;
-        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
-
+        // _folderHandedOff reset and OnFolderHandedOff subscription are done in
+        // Suspect2StampBeat before arming the stamp, so no early hand-off is missed.
         yield return new WaitUntil(() => _folderStamped);
 
         yield return new WaitForSeconds(1f);
@@ -839,6 +877,230 @@ public class Day_01 : DayBase
         if (handOffArrow != null) handOffArrow.SetActive(true);
 
         // Guard: player may have placed the folder during the preceding dialogue.
+        if (!_folderHandedOff)
+            yield return new WaitUntil(() => _folderHandedOff);
+
+        if (handOffArrow != null) Destroy(handOffArrow);
+
+        yield return new WaitForSeconds(2f);
+
+        yield return ShowAndWait("Good work. Now, a third subject is on their way. This one is different.");
+
+        // Force suspect 3 to have exactly 5 documentation anomalies.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            SuspectController.ForceNextSuspectAnomalyCount = 5;
+
+        _onSuspect3PaperworkSpawned = OnSuspect3PaperworkSpawned;
+        SuspectController.OnPaperworkSpawned += _onSuspect3PaperworkSpawned;
+    }
+
+    // =========================================================================
+    // Tutorial Sequence — Suspect 3 (Elimination introduction)
+    // =========================================================================
+
+    private void OnSuspect3PaperworkSpawned(IDCard idCard, PickableObject appForm)
+    {
+        if (this == null) return;
+        SuspectController.OnPaperworkSpawned -= _onSuspect3PaperworkSpawned;
+        _onSuspect3PaperworkSpawned = null;
+
+        _suspect3IDCard  = idCard;
+        _suspect3AppForm = appForm;
+
+        _s3IDCardArrow  = SpawnDocumentArrow(_suspect3IDCard  != null ? _suspect3IDCard.transform  : null);
+        _s3AppFormArrow = SpawnDocumentArrow(_suspect3AppForm != null ? _suspect3AppForm.transform : null);
+
+        var docs = new System.Collections.Generic.List<PickableObject>();
+        if (_suspect3IDCard  != null) docs.Add(_suspect3IDCard);
+        if (_suspect3AppForm != null) docs.Add(_suspect3AppForm);
+        foreach (var doc in docs)
+            doc.SetInteractableNetworked(false);
+
+        StartCoroutine(Suspect3IDCardBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — Inspect both documents beat
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect3IDCardBeat()
+    {
+        yield return new WaitForSeconds(3f);
+
+        yield return ShowAndWait("Pick up the documents and review them carefully.");
+
+        _s3IDCardInspected  = false;
+        _s3AppFormInspected = false;
+
+        if (_suspect3IDCard != null)
+        {
+            _suspect3IDCard.SetInteractableNetworked(true);
+            if (_s3IDCardArrow != null) _s3IDCardArrow.SetActive(true);
+            _suspect3IDCard.OnEquip += OnSuspect3IDCardPickedUp;
+        }
+
+        if (_suspect3AppForm != null)
+        {
+            _suspect3AppForm.SetInteractableNetworked(true);
+            if (_s3AppFormArrow != null) _s3AppFormArrow.SetActive(true);
+            _suspect3AppForm.OnEquip += OnSuspect3AppFormPickedUp;
+        }
+
+        yield return new WaitUntil(() => _s3IDCardInspected && _s3AppFormInspected);
+
+        StartCoroutine(Suspect3AnomalyRevealBeat());
+    }
+
+    private void OnSuspect3IDCardPickedUp()
+    {
+        if (this == null) return;
+        if (_suspect3IDCard != null) _suspect3IDCard.OnEquip -= OnSuspect3IDCardPickedUp;
+        if (_s3IDCardArrow != null) _s3IDCardArrow.SetActive(false);
+        _s3IDCardInspected = true;
+    }
+
+    private void OnSuspect3AppFormPickedUp()
+    {
+        if (this == null) return;
+        if (_suspect3AppForm != null) _suspect3AppForm.OnEquip -= OnSuspect3AppFormPickedUp;
+        if (_s3AppFormArrow != null) _s3AppFormArrow.SetActive(false);
+        _s3AppFormInspected = true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — Anomaly reveal + notebook unlock
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect3AnomalyRevealBeat()
+    {
+        ChecklistItem.AnyBoxChecked = false;
+        ExamNotebook.AnyPageFiled = false;
+
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("You'll notice something's very wrong here. There are multiple documentation anomalies — far too many to ignore.");
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("Five documentation anomalies of a single type means their mind is too far gone. They cannot be safely rehabilitated.");
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("At that threshold, they are a threat to everyone around them. They will turn. Open the exam notebook and mark every anomaly you find.");
+
+        _examNotebook?.SetInteractableNetworked(true);
+        if (_notebookArrow != null) _notebookArrow.SetActive(true);
+
+        yield return new WaitUntil(() => _examNotebook != null && _examNotebook.IsHeld);
+
+        if (_notebookArrow != null) _notebookArrow.SetActive(false);
+
+        StartCoroutine(Suspect3NotebookCheckBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — Checkbox completion
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect3NotebookCheckBeat()
+    {
+        bool anyBoxChecked = false;
+        ChecklistItem.OnAnyBoxChecked += OnSuspect3AnyBoxCheckedLocal;
+
+        yield return ShowAndWait("Tick every box that applies. All five anomalies must be accounted for.");
+
+        if (ChecklistItem.AnyBoxChecked)
+            anyBoxChecked = true;
+
+        yield return new WaitUntil(() => anyBoxChecked);
+
+        ChecklistItem.OnAnyBoxChecked -= OnSuspect3AnyBoxCheckedLocal;
+
+        StartCoroutine(Suspect3NotebookFileBeat());
+
+        void OnSuspect3AnyBoxCheckedLocal()
+        {
+            anyBoxChecked = true;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — File notebook into folder
+    // -------------------------------------------------------------------------
+
+    private bool _s3NotebookPageFiled;
+
+    private IEnumerator Suspect3NotebookFileBeat()
+    {
+        _s3NotebookPageFiled = false;
+        ExamNotebook.OnAnyNotebookPageFiled += OnSuspect3NotebookPageFiled;
+
+        yield return ShowAndWait("File your findings into the folder.");
+
+        if (ExamNotebook.AnyPageFiled)
+            _s3NotebookPageFiled = true;
+
+        yield return new WaitUntil(() => _s3NotebookPageFiled);
+
+        ExamNotebook.OnAnyNotebookPageFiled -= OnSuspect3NotebookPageFiled;
+
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("Five anomalies of a single type. Their mind is gone. They must be eliminated before they turn and become a threat to everyone in this facility.");
+
+        StartCoroutine(Suspect3StampBeat());
+    }
+
+    private void OnSuspect3NotebookPageFiled()
+    {
+        if (this == null) return;
+        _s3NotebookPageFiled = true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — Stamp beat (red / Kill)
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect3StampBeat()
+    {
+        _folderStamped = false;
+
+        yield return new WaitForSeconds(1.5f);
+
+        yield return ShowAndWait("Pick up the red stamp and stamp the folder to confirm extermination.");
+
+        // Arm the hand-off listener before the stamp event so a fast player who stamps
+        // and hands off immediately doesn't race ahead of Suspect3HandOffBeat's subscribe.
+        _folderHandedOff = false;
+        FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
+
+        FolderController.OnAnyFolderStamped += OnFolderStamped;
+
+        // Only the red stamp is available for this beat.
+        _redStampSlot?.SetSlotInteractable(true);
+
+        _stampArrow = SpawnDocumentArrow(_redStampSlot != null ? _redStampSlot.transform : null);
+        if (_stampArrow != null) _stampArrow.SetActive(true);
+
+        StartCoroutine(HideStampArrowOnPickup(_redStampSlot));
+        StartCoroutine(Suspect3HandOffBeat());
+    }
+
+    // -------------------------------------------------------------------------
+    // Suspect 3 — Hand-off beat
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Suspect3HandOffBeat()
+    {
+        // _folderHandedOff reset and OnFolderHandedOff subscription are done in
+        // Suspect3StampBeat before arming the stamp, so no early hand-off is missed.
+        yield return new WaitUntil(() => _folderStamped);
+
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("Extermination is permanent. It is reserved for subjects that pose an irreversible threat. Do not use it lightly.");
+        yield return new WaitForSeconds(1f);
+
+        yield return ShowAndWait("Place the stamped folder in the window slot to confirm the order.");
+
+        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
+        if (handOffArrow != null) handOffArrow.SetActive(true);
+
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
