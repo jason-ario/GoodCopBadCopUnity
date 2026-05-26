@@ -99,6 +99,7 @@ public class FolderController : PickableObject
     public bool IsOpen => isOpen.Value;
     public bool IsStamped => isStamped.Value;
     public StampContainer.StampType StampType => stampContainer.Stamp;
+    public bool IsHandedOff => isHandedOff.Value;
     private NetworkVariable<bool> isHandedOff = new NetworkVariable<bool>();
     public List<PickableObject> documents;
 
@@ -176,11 +177,27 @@ public class FolderController : PickableObject
     public override void OnNetworkSpawn()
     {
         // Sync visual state on spawn and when variables change
-        isOpen.OnValueChanged += (oldVal, newVal) => anim.SetBool("Open", newVal);
+        isOpen.OnValueChanged += OnIsOpenChanged;
 
         // Late-joiner sync: apply stamp visual immediately if already stamped.
         if (isStamped.Value)
             stampContainer.PlaceStamp(_syncedStampType.Value);
+
+        // Fire the static stamp event on all clients whenever isStamped becomes true.
+        // This ensures Day_01's OnFolderStamped handler fires on the server regardless
+        // of which client triggered the stamp sequence.
+        isStamped.OnValueChanged += (_, newValue) =>
+        {
+            if (newValue)
+                OnAnyFolderStamped?.Invoke();
+        };
+
+        // Fire the static hand-off event on all clients whenever isHandedOff becomes true.
+        isHandedOff.OnValueChanged += (_, newValue) =>
+        {
+            if (newValue)
+                OnFolderHandedOff?.Invoke();
+        };
 
         // Build the array accessor for the five synced queue slots.
         _queueSlots = new NetworkVariable<Unity.Collections.FixedString64Bytes>[]
@@ -196,11 +213,36 @@ public class FolderController : PickableObject
         base.Interact(player);
     }
 
+    /// <summary>
+    /// Drives the animator and document interactability whenever the folder's open state changes.
+    /// Called on every client via the NetworkVariable callback so all machines stay in sync,
+    /// regardless of which client owns the folder or filed the documents.
+    /// </summary>
+    private void OnIsOpenChanged(bool oldVal, bool newVal)
+    {
+        anim.SetBool("Open", newVal);
+
+        // Only update document interactability when the folder is NOT being held.
+        // While held, OnEquipped / OnDropped manage it; here we handle desk-placed state.
+        if (IsHeld) return;
+
+        // Use the networked path on the server so the NetworkVariable override is cleared.
+        // The local SetInteractable is insufficient here — it is overridden by
+        // ApplyNetworkInteractableState on any client where _networkInteractableOverride != -1
+        // (e.g. a tutorial-locked document that was filed while the folder was closed).
+        // Routing through the server ensures the NetworkVariable update reaches every client.
+        if (IsServer)
+        {
+            if (idCard != null)       idCard.SetInteractableNetworked(newVal);
+            if (application != null)  application.SetInteractableNetworked(newVal);
+        }
+    }
+
     public void OnHandOff()
     {
         isHandedOff.Value = true;
         SetOpenServerRpc(false);
-        OnFolderHandedOff?.Invoke();
+        // OnFolderHandedOff is now fired via isHandedOff.OnValueChanged on all clients.
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
@@ -370,12 +412,121 @@ public class FolderController : PickableObject
         base.OnEquipped(player);
         OnFolderEquipped?.Invoke(this);
 
+        // Notify the server so server-side tutorial coroutines that wait on OnFolderEquipped
+        // receive the event even when a non-host client picks up the folder.
+        NotifyFolderEquippedServerRpc();
+
         if (isOpen.Value)
         {
             player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
             if(idCard != null){ idCard.SetInteractable(false); }
             if(application != null){ application.SetInteractable(false); }
         }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void NotifyFolderEquippedServerRpc()
+    {
+        // On the host/server the local OnFolderEquipped already fired in OnEquipped.
+        // Only re-fire for a dedicated server (IsHost is false) or when the picking
+        // client is not the host.
+        if (!IsHost)
+            OnFolderEquipped?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Called by the client that added an ID card or Application so the server:
+    ///   1. Fires OnDocumentAdded for server-side tutorial coroutines.
+    ///   2. Broadcasts the document association to every other client via ClientRpc so
+    ///      they resolve their local idCard/application references and make the document
+    ///      interactable when the folder is open.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void SyncDocumentAddedServerRpc(NetworkObjectReference documentRef, string itemName, ServerRpcParams rpcParams = default)
+    {
+        // Resolve the document on the server so we can fix its interactable state.
+        // The document was previously locked via SetInteractableNetworked(false) before it was
+        // filed — _networkInteractableOverride is 0 on every client. We must clear that override
+        // so OnIsOpenChanged (which now uses SetInteractableNetworked) drives the state correctly.
+        // Using UnlockInteractableNetworked resets to -1 so normal holder/open-state logic applies.
+        if (documentRef.TryGet(out NetworkObject netObj))
+        {
+            PickableObject doc = netObj.GetComponent<PickableObject>();
+            if (doc != null)
+            {
+                // Clear the tutorial override — OnIsOpenChanged will immediately re-apply the
+                // correct state via SetInteractableNetworked when the folder next opens or closes.
+                // Apply the current open state right now so clients see the correct state immediately.
+                doc.SetInteractableNetworked(isOpen.Value);
+
+                // Only fire OnDocumentAdded for non-host filers — the host already fired it
+                // locally in AddDocument, so re-firing here would double-count in the tutorial.
+                bool senderIsHost = rpcParams.Receive.SenderClientId == 0ul;
+                if (!senderIsHost)
+                    OnDocumentAdded?.Invoke(doc);
+            }
+        }
+
+        // Broadcast to all clients except the sender so they resolve the reference locally.
+        ClientRpcParams clientParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = GetAllClientsExcept(rpcParams.Receive.SenderClientId)
+            }
+        };
+        SyncDocumentAddedClientRpc(documentRef, itemName, clientParams);
+    }
+
+    /// <summary>
+    /// Received on every client except the one that originally filed the document.
+    /// Resolves the local reference and registers the folder association so that
+    /// RemovePromFolder / document-removal logic works on this client too.
+    /// Interactable state is already driven by the server via SetInteractableNetworked in
+    /// SyncDocumentAddedServerRpc — we must NOT call local SetInteractable here because
+    /// it fights with the NetworkVariable override and produces different results per client.
+    /// </summary>
+    [ClientRpc]
+    private void SyncDocumentAddedClientRpc(NetworkObjectReference documentRef, string itemName, ClientRpcParams clientParams = default)
+    {
+        if (!documentRef.TryGet(out NetworkObject netObj)) return;
+        PickableObject doc = netObj.GetComponent<PickableObject>();
+        if (doc == null) return;
+
+        if (itemName == "ID card")
+        {
+            if (idCard != null) return;
+            idCard = doc.GetComponent<IDCard>();
+            if (idCard != null)
+            {
+                idCard.insideThisFolder = this;
+                documents.Add(idCard);
+            }
+            OnDocumentAdded?.Invoke(doc);
+        }
+        else if (itemName == "Application")
+        {
+            if (application != null) return;
+            application = doc.GetComponent<ApplicationLetter>();
+            if (application != null)
+            {
+                application.insideThisFolder = this;
+                documents.Add(application);
+            }
+            OnDocumentAdded?.Invoke(doc);
+        }
+    }
+
+    /// <summary>Returns all currently connected client IDs except the one specified.</summary>
+    private System.Collections.Generic.List<ulong> GetAllClientsExcept(ulong excludedClientId)
+    {
+        var ids = new System.Collections.Generic.List<ulong>();
+        foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+        {
+            if (id != excludedClientId)
+                ids.Add(id);
+        }
+        return ids;
     }
     public override void OnUnequip(PlayerPickupController player)
     {
@@ -541,8 +692,8 @@ public class FolderController : PickableObject
             SetInteractable(true);
 
         onStampedComplete?.Invoke();
-        Debug.Log($"[FolderController] UseStampSequence complete — firing OnAnyFolderStamped. NetworkObjectId={NetworkObjectId}");
-        OnAnyFolderStamped?.Invoke();
+        Debug.Log($"[FolderController] UseStampSequence complete — isStamped NetworkVariable will fire OnAnyFolderStamped on all clients. NetworkObjectId={NetworkObjectId}");
+        // OnAnyFolderStamped is now fired via isStamped.OnValueChanged on all clients.
     }
 
     public override void OnStartUse()
@@ -665,6 +816,8 @@ public class FolderController : PickableObject
             idCard = pickableObject.GetComponent<IDCard>();
             idCard.AddToFolder(this);
             OnDocumentAdded?.Invoke(pickableObject);
+            // Sync the association to all other clients and notify the server for tutorial coroutines.
+            SyncDocumentAddedServerRpc(new NetworkObjectReference(pickableObject.NetworkObject), itemName);
             return;
         }
 
@@ -675,6 +828,8 @@ public class FolderController : PickableObject
             application = pickableObject.GetComponent<ApplicationLetter>();
             application.AddToFolder(this);
             OnDocumentAdded?.Invoke(pickableObject);
+            // Sync the association to all other clients and notify the server for tutorial coroutines.
+            SyncDocumentAddedServerRpc(new NetworkObjectReference(pickableObject.NetworkObject), itemName);
             return;
         }
 
@@ -835,8 +990,14 @@ public class FolderController : PickableObject
         base.OnDropped();
         if (isOpen.Value)
         {
-            if(idCard != null){ idCard.SetInteractable(true); }
-            if(application != null){ application.SetInteractable(true); }
+            // Route through the server so the NetworkVariable override is updated for all clients.
+            // The local SetInteractable alone is overridden by ApplyNetworkInteractableState on any
+            // client where _networkInteractableOverride != -1 (e.g. a tutorial-locked document).
+            if (IsServer)
+            {
+                if (idCard != null)       idCard.SetInteractableNetworked(true);
+                if (application != null)  application.SetInteractableNetworked(true);
+            }
         }
     }
 

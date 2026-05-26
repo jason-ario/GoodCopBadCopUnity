@@ -380,7 +380,20 @@ public class LobbyManager : MonoBehaviour
         if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
         {
             // Spawn relative to where the host currently is.
-            bool hostIsOutside = PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside;
+            // Read IsOutside from the host's networked PlayerObject directly rather than
+            // PlayerInstance.Instance (which is a local-player singleton and can be null
+            // on the host when the client connects, causing a silent false → booth spawn).
+            ulong hostClientId = NetworkManager.Singleton.LocalClientId;
+            bool hostIsOutside = false;
+            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(hostClientId, out var hostClient) &&
+                hostClient.PlayerObject != null)
+            {
+                var hostPlayerInstance = hostClient.PlayerObject.GetComponent<PlayerInstance>();
+                hostIsOutside = hostPlayerInstance != null && hostPlayerInstance.IsOutside;
+            }
+
+            Debug.Log($"[Host] hostClientId={hostClientId} hostIsOutside={hostIsOutside}");
+
             if (hostIsOutside)
             {
                 Debug.Log($"[Host] Game started, host is outside — spawning client at lobby for clientId={clientId}");

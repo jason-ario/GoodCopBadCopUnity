@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -8,31 +10,13 @@ using UnityEngine;
 /// </summary>
 public class GuidebookContentsContainer : MonoBehaviour
 {
-    public static GuidebookContentsContainer Instance { get; private set; }
 
     [SerializeField] private GameObject _contents;
 
-    private void Awake()
+    IEnumerator Start()
     {
-        if (Instance != null && Instance != this)
-        {
-            Debug.LogWarning("[GuidebookContentsContainer] Duplicate instance detected. Destroying this one.", this);
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
+        _contents.SetActive(true);
+        yield return new WaitForEndOfFrame();
+        _contents.SetActive(false);
     }
-
-    private void OnDestroy()
-    {
-        if (Instance == this)
-            Instance = null;
-    }
-
-    /// <summary>Activates the contents child and all guidebook render cameras.</summary>
-    public void Open() => _contents?.SetActive(true);
-
-    /// <summary>Deactivates the contents child and all guidebook render cameras.</summary>
-    public void Close() => _contents?.SetActive(false);
 }

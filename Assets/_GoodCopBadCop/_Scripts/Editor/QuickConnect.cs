@@ -81,8 +81,27 @@ public static class QuickConnect
 
         if (gm.HasGameStarted)
         {
-            Debug.Log($"[QuickConnect] Late join — spawning player at booth for client {clientId}.");
-            PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+            // Mirror the LobbyManager logic: spawn relative to where the host currently is.
+            ulong hostClientId = nm.LocalClientId;
+            bool hostIsOutside = false;
+            if (nm.ConnectedClients.TryGetValue(hostClientId, out var hostClient) &&
+                hostClient.PlayerObject != null)
+            {
+                var hostPlayerInstance = hostClient.PlayerObject.GetComponent<PlayerInstance>();
+                hostIsOutside = hostPlayerInstance != null && hostPlayerInstance.IsOutside;
+            }
+
+            if (hostIsOutside)
+            {
+                Debug.Log($"[QuickConnect] Late join, host is outside — spawning client {clientId} at lobby.");
+                gm.SpawnPlayerAtLobbyServer(clientId);
+            }
+            else
+            {
+                Debug.Log($"[QuickConnect] Late join, host is at booth — spawning client {clientId} at booth.");
+                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+            }
+
             gm.InitializeLateJoinClient(clientId);
         }
         else

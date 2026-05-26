@@ -859,6 +859,12 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // OnHandOff writes isHandedOff (a server-authoritative NetworkVariable) which fires
+        // OnFolderHandedOff on all clients. When a non-host player placed the folder the call
+        // in DeliverVerdict ran on the client and the NV write was silently dropped — do it
+        // here on the server so the event always fires and tutorial coroutines can advance.
+        folder.OnHandOff();
+
         ExecuteVerdict(folder);
     }
 

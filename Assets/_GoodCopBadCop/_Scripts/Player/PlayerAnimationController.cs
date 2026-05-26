@@ -168,6 +168,19 @@ public class PlayerAnimationController : NetworkBehaviour
         new NetworkVariable<bool>(false, writePerm: NetworkVariableWritePermission.Owner);
 
     /// <summary>
+    /// Synced flag indicating the owner currently has the guidebook open.
+    /// Proxy clients read this to show or hide the body-space guidebook mesh.
+    /// </summary>
+    private NetworkVariable<bool> netGuidebookOpen =
+        new NetworkVariable<bool>(false, writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// Raised on every client (including the owner) when <see cref="netGuidebookOpen"/> changes.
+    /// Subscribe to this to drive the body guidebook mesh visibility.
+    /// </summary>
+    public event System.Action<bool> OnGuidebookOpenChanged;
+
+    /// <summary>
     /// Synced world-space position of the right-arm IK target.
     /// Owner writes each frame when <see cref="RightArmIKTarget"/> is assigned;
     /// proxy clients read it to keep <see cref="rightArmRigIKTarget"/> up to date
@@ -332,6 +345,10 @@ public class PlayerAnimationController : NetworkBehaviour
         if (!IsOwner)
             netRightArmRigActive.OnValueChanged += OnProxyRightArmRigActiveChanged;
 
+        // All clients (including the owner) react to guidebook open state changes so the
+        // body-space guidebook mesh can be shown or hidden correctly on every machine.
+        netGuidebookOpen.OnValueChanged += OnNetGuidebookOpenChanged;
+
         // Cache bones used for procedural vertical-look rotation on both owner and proxies.
         _headBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
         _neckBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Neck);
@@ -376,6 +393,8 @@ public class PlayerAnimationController : NetworkBehaviour
 
         if (!IsOwner)
             netRightArmRigActive.OnValueChanged -= OnProxyRightArmRigActiveChanged;
+
+        netGuidebookOpen.OnValueChanged -= OnNetGuidebookOpenChanged;
     }
 
     /// <summary>
@@ -387,6 +406,16 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         const float ProxyRigSmoothTime = 0.2f;
         SetRightArmRigWeightSmooth(current ? 1f : 0f, ProxyRigSmoothTime);
+    }
+
+    /// <summary>
+    /// Called on all clients when <see cref="netGuidebookOpen"/> changes.
+    /// Fires <see cref="OnGuidebookOpenChanged"/> so subscribers (e.g. <see cref="GuidebookController"/>)
+    /// can toggle the body-space guidebook mesh without coupling into this class directly.
+    /// </summary>
+    private void OnNetGuidebookOpenChanged(bool previous, bool current)
+    {
+        OnGuidebookOpenChanged?.Invoke(current);
     }
 
     /// <summary>
@@ -720,6 +749,17 @@ public class PlayerAnimationController : NetworkBehaviour
         if (!IsOwner) return;
         
         SetAnimTriggerServerRpc(animString);
+    }
+
+    /// <summary>
+    /// Syncs the guidebook open state across all clients so body-space guidebook meshes
+    /// can be shown or hidden on proxy clients who observe this player.
+    /// Must be called by the owner; no-op on proxy clients.
+    /// </summary>
+    public void SetGuidebookOpen(bool isOpen)
+    {
+        if (!IsOwner) return;
+        netGuidebookOpen.Value = isOpen;
     }
 
     [ServerRpc]

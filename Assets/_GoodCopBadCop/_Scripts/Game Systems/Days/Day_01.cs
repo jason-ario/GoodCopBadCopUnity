@@ -16,6 +16,10 @@ using UnityEngine;
 ///
 /// All automatic triggers that would normally fire on Day 1 are suppressed in their
 /// respective systems and driven from this class instead.
+///
+/// All tutorial coroutines run server-only. Megaphone barks are broadcast to all
+/// clients via MegaphoneDialogueManager.ShowDialogueSynced. Object-pickup gates use
+/// the synced IsHeld NetworkVariable so either player's action advances the tutorial.
 /// </summary>
 public class Day_01 : DayBase
 {
@@ -28,9 +32,6 @@ public class Day_01 : DayBase
 
     [Tooltip("Tutorial arrow above the switch button. Starts inactive.")]
     [SerializeField] private GameObject _switchArrow;
-
-    [Tooltip("Prefab instantiated as a child of each tutorial document when it spawns.")]
-    [SerializeField] private GameObject _documentArrowPrefab;
 
     [Tooltip("Tutorial arrow above the drawer. Starts inactive.")]
     [SerializeField] private GameObject _drawerArrow;
@@ -55,16 +56,16 @@ public class Day_01 : DayBase
     [Tooltip("The Documentation Exam Notebook scene object — kept non-interactable until the notebook beat.")]
     [SerializeField] private ExamNotebook _examNotebook;
 
-    [Tooltip("Tutorial arrow displayed above the exam notebook. Starts inactive.")]
-    [SerializeField] private GameObject _notebookArrow;
+    [Header("Other Day Notebooks — Hidden During Day 1")]
+    [Tooltip("The Mutation Exam Notebook — hidden for the entirety of Day 1.")]
+    [SerializeField] private ExamNotebook _mutationNotebook;
+
+    [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 1.")]
+    [SerializeField] private ExamNotebook _biologicalNotebook;
 
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
     private PickableObject _tutorialAppForm;
-
-    // Arrows instantiated at runtime above the spawned documents.
-    private GameObject _idCardArrow;
-    private GameObject _appFormArrow;
 
     // Running count of documents successfully filed into the tutorial folder.
     private int _documentsFiledCount;
@@ -79,8 +80,6 @@ public class Day_01 : DayBase
     // -------------------------------------------------------------------------
     private IDCard _suspect2IDCard;
     private PickableObject _suspect2AppForm;
-    private GameObject _s2IDCardArrow;
-    private GameObject _s2AppFormArrow;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -102,7 +101,7 @@ public class Day_01 : DayBase
 
         // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
         // Server-only: these static flags are consumed exclusively by the server's spawn logic.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
         {
             SuspectController.ForceNextSuspectClean          = true;
             ShiftManager.OverrideFirstArrivalInterval        = new UnityEngine.Vector2(0f, 0f);
@@ -121,7 +120,15 @@ public class Day_01 : DayBase
         // Notebook stays non-interactable until the anomaly reveal beat.
         _examNotebook?.SetInteractableNetworked(false);
 
+        // Hide the mutation and biological notebooks — they are not introduced until Day 2 and Day 3.
+        _mutationNotebook?.SetVisible(false);
+        _mutationNotebook?.SetInteractableNetworked(false);
+
+        _biologicalNotebook?.SetVisible(false);
+        _biologicalNotebook?.SetInteractableNetworked(false);
+
         ShiftManager.Instance.OnDayStart        += OnDayStarted;
+        Debug.Log($"[Day_01] DayActivated: subscribed to ShiftManager.OnDayStart. IsServer={NetworkManager.Singleton?.IsServer}, IsHost={NetworkManager.Singleton?.IsHost}.");
         SuspectController.OnSuspectArrived       += OnSuspectArrivedHandler;
         _onPaperworkSpawned = OnPaperworkSpawnedHandler;
         SuspectController.OnPaperworkSpawned     += _onPaperworkSpawned;
@@ -135,6 +142,13 @@ public class Day_01 : DayBase
     public override void DayDeactivated()
     {
         base.DayDeactivated();
+
+        // Restore mutation and biological notebooks so Day 2 / Day 3 can manage them normally.
+        _mutationNotebook?.SetVisible(true);
+        _biologicalNotebook?.SetVisible(true);
+
+        // Clear any tutorial markers that may still be active if the day ended mid-tutorial.
+        TutorialMarkerManager.Instance?.UnmarkAll();
 
         if (ShiftManager.Instance != null)
         {
@@ -251,6 +265,12 @@ public class Day_01 : DayBase
     private void OnDayStarted()
     {
         if (this == null) return;
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[Day_01] OnDayStarted: not server (IsServer={IsServer}, IsHost={IsHost}, IsClient={IsClient}) — tutorial skipped on this machine.");
+            return;
+        }
+        Debug.Log("[Day_01] OnDayStarted: starting Day1TutorialSequence on server.");
         StartCoroutine(Day1TutorialSequence());
     }
 
@@ -266,11 +286,10 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Follow instructions carefully. Your responses will be... noted. Press the button when you're ready to begin.");
 
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
             _switchButton.SetReady(true);
 
-        if (_switchArrow != null)
-            _switchArrow.SetActive(true);
+        SetSwitchArrow(true);
     }
 
     // -------------------------------------------------------------------------
@@ -284,23 +303,18 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Fires on all clients once the ID card has been network-spawned and set up.
+    /// Fires on the server once the ID card has been network-spawned and set up.
     /// Locks both documents, attaches tutorial arrows to each, and begins the ID card beat.
     /// </summary>
     private void OnPaperworkSpawnedHandler(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
+        if (!IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
         _onPaperworkSpawned = null;
 
         _tutorialIDCard = idCard;
         _tutorialAppForm = appForm;
-
-        if (_documentArrowPrefab != null)
-        {
-            _idCardArrow  = SpawnDocumentArrow(_tutorialIDCard  != null ? _tutorialIDCard.transform  : null);
-            _appFormArrow = SpawnDocumentArrow(_tutorialAppForm != null ? _tutorialAppForm.transform : null);
-        }
 
         var docs = new System.Collections.Generic.List<PickableObject>();
         if (_tutorialIDCard  != null) docs.Add(_tutorialIDCard);
@@ -315,17 +329,6 @@ public class Day_01 : DayBase
     /// Instantiates the document arrow prefab in world space 0.2 m above <paramref name="target"/>
     /// using TutorialMarker for per-frame tracking.
     /// </summary>
-    private GameObject SpawnDocumentArrow(Transform target)
-    {
-        if (_documentArrowPrefab == null || target == null) return null;
-
-        GameObject arrow = Instantiate(_documentArrowPrefab);
-        var marker = arrow.GetComponent<TutorialMarker>();
-        marker.SetHoverHeight(0.2f);
-        marker.Show(target);
-        arrow.SetActive(false);
-        return arrow;
-    }
 
     // -------------------------------------------------------------------------
     // Tutorial Sequence — ID Card Pickup
@@ -340,23 +343,20 @@ public class Day_01 : DayBase
         if (_tutorialIDCard != null)
         {
             _tutorialIDCard.SetInteractableNetworked(true);
-            _tutorialIDCard.OnEquip += OnIDCardPickedUp;
+            ShowNetworkedMarker(_tutorialIDCard.GetComponent<NetworkObject>());
         }
 
-        if (_idCardArrow != null)
-            _idCardArrow.SetActive(true);
-    }
+        // Wait until any player picks up the ID card (IsHeld is a synced NetworkVariable).
+        yield return new WaitUntil(() => _tutorialIDCard == null || _tutorialIDCard.IsHeld);
 
-    private void OnIDCardPickedUp()
-    {
-        if (this == null) return;
-        _tutorialIDCard.OnEquip -= OnIDCardPickedUp;
-
-        if (_idCardArrow != null)
-            _idCardArrow.SetActive(false);
+        if (_tutorialIDCard != null)
+            HideNetworkedMarker(_tutorialIDCard.GetComponent<NetworkObject>());
 
         StartCoroutine(PutDownTutorialBeat());
     }
+
+    // Kept for DayDeactivated/OnDestroy unsubscription safety — no longer used as a gate.
+    private void OnIDCardPickedUp() { }
 
     // -------------------------------------------------------------------------
     // Tutorial Sequence — Inspect & Put Down
@@ -370,17 +370,14 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("Hold the right mouse button and position it over the desk to put it down.");
 
+        // IsHeld is driven by _holdingClientId NetworkVariable — synced on all clients.
         if (_tutorialIDCard != null)
-        {
-            _tutorialIDCard.OnUnEquip += OnIDCardPutDown;
             yield return new WaitUntil(() => !_tutorialIDCard.IsHeld);
-            _tutorialIDCard.OnUnEquip -= OnIDCardPutDown;
-        }
 
         StartCoroutine(AppFormInspectionBeat());
     }
 
-    // Stub — WaitUntil on IsHeld drives the flow; this hook exists for future use.
+    // Stub kept for DayDeactivated/OnDestroy unsubscription safety.
     private void OnIDCardPutDown() { }
 
     // -------------------------------------------------------------------------
@@ -396,23 +393,20 @@ public class Day_01 : DayBase
         if (_tutorialAppForm != null)
         {
             _tutorialAppForm.SetInteractableNetworked(true);
-            _tutorialAppForm.OnEquip += OnAppFormPickedUp;
+            ShowNetworkedMarker(_tutorialAppForm.GetComponent<NetworkObject>());
         }
 
-        if (_appFormArrow != null)
-            _appFormArrow.SetActive(true);
-    }
+        // Wait until any player picks up the application form.
+        yield return new WaitUntil(() => _tutorialAppForm == null || _tutorialAppForm.IsHeld);
 
-    private void OnAppFormPickedUp()
-    {
-        if (this == null) return;
-        _tutorialAppForm.OnEquip -= OnAppFormPickedUp;
-
-        if (_appFormArrow != null)
-            _appFormArrow.SetActive(false);
+        if (_tutorialAppForm != null)
+            HideNetworkedMarker(_tutorialAppForm.GetComponent<NetworkObject>());
 
         StartCoroutine(DiscrepancyBeat());
     }
+
+    // Kept for DayDeactivated/OnDestroy unsubscription safety — no longer used as a gate.
+    private void OnAppFormPickedUp() { }
 
     // -------------------------------------------------------------------------
     // Tutorial Sequence — Discrepancy Lesson
@@ -441,11 +435,9 @@ public class Day_01 : DayBase
         if (_drawer != null)
             _drawer.SetLocked(false);
 
-        if (_drawerArrow != null)
-        {
-            _drawerArrow.SetActive(true);
+        SetDrawerArrow(true);
+        if (_drawer != null)
             _drawer.OnOpened += OnDrawerFirstOpened;
-        }
 
         FolderController.OnFolderEquipped += OnFolderPickedUp;
     }
@@ -467,7 +459,12 @@ public class Day_01 : DayBase
     {
         yield return ShowAndWait("Place it on the desk with the right mouse button.");
 
-        yield return new WaitUntil(() => _folder == null || !_folder.IsHeld);
+        // Wait until the folder is placed on any surface that is NOT the HandOffPoint (window slot).
+        // If the player drops it straight on the window slot, the folder would skip the desk-placement
+        // step and land in the wrong position for document filing.
+        yield return new WaitUntil(() =>
+            _folder == null ||
+            (!_folder.IsHeld && !_folder.IsHandedOff));
 
         StartCoroutine(DocumentInsertBeat());
     }
@@ -537,13 +534,11 @@ public class Day_01 : DayBase
         // Unlock only the green stamp station.
         _greenStampSlot?.SetSlotInteractable(true);
 
-        // Spawn a tracking arrow above the green stamp slot.
-        _stampArrow = SpawnDocumentArrow(_greenStampSlot != null ? _greenStampSlot.transform : null);
-        if (_stampArrow != null)
-            _stampArrow.SetActive(true);
+        // Show a synced tracking arrow above the green stamp slot on all clients.
+        ShowStaticMarker(StaticMarkerTarget.GreenStamp);
 
         // Hide the arrow the moment the stamp leaves its slot — fire-and-forget.
-        StartCoroutine(HideStampArrowOnPickup(_greenStampSlot));
+        StartCoroutine(HideStampArrowOnPickup(_greenStampSlot, StaticMarkerTarget.GreenStamp));
 
         // HandOffBeat waits for the static event flag set by OnFolderStamped.
         StartCoroutine(HandOffBeat());
@@ -553,11 +548,10 @@ public class Day_01 : DayBase
     /// Hides the stamp arrow as soon as the player lifts the stamp out of its slot.
     /// Runs independently of HandOffBeat so neither blocks the other.
     /// </summary>
-    private IEnumerator HideStampArrowOnPickup(InkStamp slot)
+    private IEnumerator HideStampArrowOnPickup(InkStamp slot, StaticMarkerTarget target)
     {
         yield return new WaitUntil(() => slot == null || !slot.IsStampInSlot);
-        if (_stampArrow != null)
-            _stampArrow.SetActive(false);
+        HideStaticMarker(target);
     }
 
     // -------------------------------------------------------------------------
@@ -571,19 +565,11 @@ public class Day_01 : DayBase
     /// </summary>
     private bool _folderStamped;
 
-    // Arrow above the stamp station — kept as a field so OnFolderStamped can destroy it.
-    private GameObject _stampArrow;
-
     private void OnFolderStamped()
     {
         if (this == null) return;
         _folderStamped = true;
         FolderController.OnAnyFolderStamped -= OnFolderStamped;
-        if (_stampArrow != null)
-        {
-            Destroy(_stampArrow);
-            _stampArrow = null;
-        }
         Debug.Log("[Day_01] OnFolderStamped: stamp event received — advancing HandOffBeat.");
     }
 
@@ -612,16 +598,13 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Place the stamped folder in the window slot to send them through.");
 
-        // Spawn a tracking arrow above the hand-off point so the player knows where to go.
-        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
-        if (handOffArrow != null)
-            handOffArrow.SetActive(true);
+        ShowStaticMarker(StaticMarkerTarget.HandOff);
 
         // Guard: player may have placed the folder during the dialogue above.
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
-        if (handOffArrow != null) Destroy(handOffArrow);
+        HideStaticMarker(StaticMarkerTarget.HandOff);
 
         yield return new WaitForSeconds(2f);
 
@@ -630,7 +613,7 @@ public class Day_01 : DayBase
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
         // Force exactly 2 documentation anomalies so the notebook tutorial always has material.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 2;
 
         _onSuspect2PaperworkSpawned = OnSuspect2PaperworkSpawned;
@@ -644,14 +627,12 @@ public class Day_01 : DayBase
     private void OnSuspect2PaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
+        if (!IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
         _onSuspect2PaperworkSpawned = null;
 
         _suspect2IDCard  = idCard;
         _suspect2AppForm = appForm;
-
-        _s2IDCardArrow  = SpawnDocumentArrow(_suspect2IDCard  != null ? _suspect2IDCard.transform  : null);
-        _s2AppFormArrow = SpawnDocumentArrow(_suspect2AppForm != null ? _suspect2AppForm.transform : null);
 
         var docs = new System.Collections.Generic.List<PickableObject>();
         if (_suspect2IDCard  != null) docs.Add(_suspect2IDCard);
@@ -675,8 +656,6 @@ public class Day_01 : DayBase
     // =========================================================================
     private IDCard _suspect3IDCard;
     private PickableObject _suspect3AppForm;
-    private GameObject _s3IDCardArrow;
-    private GameObject _s3AppFormArrow;
     private System.Action<IDCard, PickableObject> _onSuspect3PaperworkSpawned;
 
     private bool _s3IDCardInspected;
@@ -688,35 +667,39 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Another subject. Review their documents.");
 
-        // Unlock both documents and show both arrows simultaneously.
+        // Unlock both documents. No arrows — players already know how to pick up documents.
         _s2IDCardInspected  = false;
         _s2AppFormInspected = false;
 
         if (_suspect2IDCard != null)
-        {
             _suspect2IDCard.SetInteractableNetworked(true);
-            if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(true);
-            _suspect2IDCard.OnEquip += OnSuspect2IDCardPickedUp;
-        }
 
         if (_suspect2AppForm != null)
-        {
             _suspect2AppForm.SetInteractableNetworked(true);
-            if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(true);
-            _suspect2AppForm.OnEquip += OnSuspect2AppFormPickedUp;
-        }
 
-        // Wait until the player has picked up both documents at least once.
-        yield return new WaitUntil(() => _s2IDCardInspected && _s2AppFormInspected);
+        // Wait until any player has held each document at least once, in any order.
+        // IsHeld is a synced NetworkVariable — it becomes true on all machines when any player picks it up.
+        yield return WaitForDocumentInspected(_suspect2IDCard);
+        _s2IDCardInspected = true;
+        yield return WaitForDocumentInspected(_suspect2AppForm);
+        _s2AppFormInspected = true;
 
         StartCoroutine(Suspect2AnomalyRevealBeat());
+    }
+
+    /// <summary>Waits until the given document is picked up and then put down at least once.</summary>
+    private IEnumerator WaitForDocumentInspected(PickableObject doc)
+    {
+        if (doc == null) yield break;
+        yield return new WaitUntil(() => doc.IsHeld);
+        HideNetworkedMarker(doc.GetComponent<NetworkObject>());
+        yield return new WaitUntil(() => !doc.IsHeld);
     }
 
     private void OnSuspect2IDCardPickedUp()
     {
         if (this == null) return;
         if (_suspect2IDCard != null) _suspect2IDCard.OnEquip -= OnSuspect2IDCardPickedUp;
-        if (_s2IDCardArrow != null) _s2IDCardArrow.SetActive(false);
         _s2IDCardInspected = true;
     }
 
@@ -724,7 +707,6 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         if (_suspect2AppForm != null) _suspect2AppForm.OnEquip -= OnSuspect2AppFormPickedUp;
-        if (_s2AppFormArrow != null) _s2AppFormArrow.SetActive(false);
         _s2AppFormInspected = true;
     }
 
@@ -748,11 +730,13 @@ public class Day_01 : DayBase
         yield return ShowAndWait("When you spot an anomaly, mark it in the exam notebook. Pick it up and tick the appropriate box.");
 
         _examNotebook?.SetInteractableNetworked(true);
-        if (_notebookArrow != null) _notebookArrow.SetActive(true);
+        if (_examNotebook != null)
+            ShowNetworkedMarker(_examNotebook.GetComponent<NetworkObject>());
 
         yield return new WaitUntil(() => _examNotebook != null && _examNotebook.IsHeld);
 
-        if (_notebookArrow != null) _notebookArrow.SetActive(false);
+        if (_examNotebook != null)
+            HideNetworkedMarker(_examNotebook.GetComponent<NetworkObject>());
 
         StartCoroutine(NotebookCheckBeat());
     }
@@ -764,8 +748,11 @@ public class Day_01 : DayBase
     private IEnumerator NotebookCheckBeat()
     {
         // Subscribe before dialogue so ticking during the prompt is not missed.
+        // OnAnyCheckboxChecked fires on all clients via ExamNotebook's NetworkVariable callback,
+        // so the server-only coroutine receives the event regardless of which player ticked a box.
         bool anyBoxChecked = false;
-        ChecklistItem.OnAnyBoxChecked += OnAnyBoxCheckedLocal;
+        System.Action<ExamNotebook> onChecked = _ => anyBoxChecked = true;
+        ExamNotebook.OnAnyCheckboxChecked += onChecked;
 
         yield return ShowAndWait("Tick the boxes for every anomaly you can find on the page.");
 
@@ -775,14 +762,9 @@ public class Day_01 : DayBase
 
         yield return new WaitUntil(() => anyBoxChecked);
 
-        ChecklistItem.OnAnyBoxChecked -= OnAnyBoxCheckedLocal;
+        ExamNotebook.OnAnyCheckboxChecked -= onChecked;
 
         StartCoroutine(NotebookFileIntoBeat());
-
-        void OnAnyBoxCheckedLocal()
-        {
-            anyBoxChecked = true;
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -841,10 +823,9 @@ public class Day_01 : DayBase
         // Only the yellow stamp is available; green and red remain locked for this beat.
         _yellowStampSlot?.SetSlotInteractable(true);
 
-        _stampArrow = SpawnDocumentArrow(_yellowStampSlot != null ? _yellowStampSlot.transform : null);
-        if (_stampArrow != null) _stampArrow.SetActive(true);
+        ShowStaticMarker(StaticMarkerTarget.YellowStamp);
 
-        StartCoroutine(HideStampArrowOnPickup(_yellowStampSlot));
+        StartCoroutine(HideStampArrowOnPickup(_yellowStampSlot, StaticMarkerTarget.YellowStamp));
         StartCoroutine(Suspect2HandOffBeat());
     }
 
@@ -865,21 +846,20 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Place the stamped folder in the window slot.");
 
-        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
-        if (handOffArrow != null) handOffArrow.SetActive(true);
+        ShowStaticMarker(StaticMarkerTarget.HandOff);
 
         // Guard: player may have placed the folder during the preceding dialogue.
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
-        if (handOffArrow != null) Destroy(handOffArrow);
+        HideStaticMarker(StaticMarkerTarget.HandOff);
 
         yield return new WaitForSeconds(2f);
 
         yield return ShowAndWait("Good work. A third subject is incoming. Pay close attention.");
 
         // Force suspect 3 to have exactly 5 documentation anomalies.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 5;
 
         _onSuspect3PaperworkSpawned = OnSuspect3PaperworkSpawned;
@@ -887,20 +867,18 @@ public class Day_01 : DayBase
     }
 
     // =========================================================================
-    // Tutorial Sequence — Suspect 3 (Elimination introduction)
+    // Tutorial Sequence — Suspect 3 (Elimination introduction) v2
     // =========================================================================
 
     private void OnSuspect3PaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
+        if (!IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onSuspect3PaperworkSpawned;
         _onSuspect3PaperworkSpawned = null;
 
         _suspect3IDCard  = idCard;
         _suspect3AppForm = appForm;
-
-        _s3IDCardArrow  = SpawnDocumentArrow(_suspect3IDCard  != null ? _suspect3IDCard.transform  : null);
-        _s3AppFormArrow = SpawnDocumentArrow(_suspect3AppForm != null ? _suspect3AppForm.transform : null);
 
         var docs = new System.Collections.Generic.List<PickableObject>();
         if (_suspect3IDCard  != null) docs.Add(_suspect3IDCard);
@@ -925,20 +903,15 @@ public class Day_01 : DayBase
         _s3AppFormInspected = false;
 
         if (_suspect3IDCard != null)
-        {
             _suspect3IDCard.SetInteractableNetworked(true);
-            if (_s3IDCardArrow != null) _s3IDCardArrow.SetActive(true);
-            _suspect3IDCard.OnEquip += OnSuspect3IDCardPickedUp;
-        }
 
         if (_suspect3AppForm != null)
-        {
             _suspect3AppForm.SetInteractableNetworked(true);
-            if (_s3AppFormArrow != null) _s3AppFormArrow.SetActive(true);
-            _suspect3AppForm.OnEquip += OnSuspect3AppFormPickedUp;
-        }
 
-        yield return new WaitUntil(() => _s3IDCardInspected && _s3AppFormInspected);
+        yield return WaitForDocumentInspected(_suspect3IDCard);
+        _s3IDCardInspected = true;
+        yield return WaitForDocumentInspected(_suspect3AppForm);
+        _s3AppFormInspected = true;
 
         StartCoroutine(Suspect3AnomalyRevealBeat());
     }
@@ -947,7 +920,6 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         if (_suspect3IDCard != null) _suspect3IDCard.OnEquip -= OnSuspect3IDCardPickedUp;
-        if (_s3IDCardArrow != null) _s3IDCardArrow.SetActive(false);
         _s3IDCardInspected = true;
     }
 
@@ -955,7 +927,6 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         if (_suspect3AppForm != null) _suspect3AppForm.OnEquip -= OnSuspect3AppFormPickedUp;
-        if (_s3AppFormArrow != null) _s3AppFormArrow.SetActive(false);
         _s3AppFormInspected = true;
     }
 
@@ -990,7 +961,8 @@ public class Day_01 : DayBase
     private IEnumerator Suspect3NotebookCheckBeat()
     {
         bool anyBoxChecked = false;
-        ChecklistItem.OnAnyBoxChecked += OnSuspect3AnyBoxCheckedLocal;
+        System.Action<ExamNotebook> s3OnChecked = _ => anyBoxChecked = true;
+        ExamNotebook.OnAnyCheckboxChecked += s3OnChecked;
 
         yield return ShowAndWait("Tick every box that applies. All five anomalies must be on record.");
 
@@ -999,14 +971,9 @@ public class Day_01 : DayBase
 
         yield return new WaitUntil(() => anyBoxChecked);
 
-        ChecklistItem.OnAnyBoxChecked -= OnSuspect3AnyBoxCheckedLocal;
+        ExamNotebook.OnAnyCheckboxChecked -= s3OnChecked;
 
         StartCoroutine(Suspect3NotebookFileBeat());
-
-        void OnSuspect3AnyBoxCheckedLocal()
-        {
-            anyBoxChecked = true;
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -1063,10 +1030,9 @@ public class Day_01 : DayBase
         // Only the red stamp is available for this beat.
         _redStampSlot?.SetSlotInteractable(true);
 
-        _stampArrow = SpawnDocumentArrow(_redStampSlot != null ? _redStampSlot.transform : null);
-        if (_stampArrow != null) _stampArrow.SetActive(true);
+        ShowStaticMarker(StaticMarkerTarget.RedStamp);
 
-        StartCoroutine(HideStampArrowOnPickup(_redStampSlot));
+        StartCoroutine(HideStampArrowOnPickup(_redStampSlot, StaticMarkerTarget.RedStamp));
         StartCoroutine(Suspect3HandOffBeat());
     }
 
@@ -1087,13 +1053,12 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Place the stamped folder in the window slot to confirm the order.");
 
-        GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
-        if (handOffArrow != null) handOffArrow.SetActive(true);
+        ShowStaticMarker(StaticMarkerTarget.HandOff);
 
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
-        if (handOffArrow != null) Destroy(handOffArrow);
+        HideStaticMarker(StaticMarkerTarget.HandOff);
 
         yield return new WaitForSeconds(2f);
 
@@ -1109,12 +1074,11 @@ public class Day_01 : DayBase
         if (this == null) return;
         SwitchButton.OnPressed -= OnSwitchPressed;
 
-        if (_switchArrow != null)
-            _switchArrow.SetActive(false);
+        SetSwitchArrow(false);
 
         // Day 1 hasn't introduced the lever yet — open the window automatically
         // so the suspect can deliver paperwork once they arrive.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
             ShiftManager.Instance.OpenBoothShutter();
     }
 
@@ -1122,23 +1086,86 @@ public class Day_01 : DayBase
     {
         if (this == null) return;
         _drawer.OnOpened -= OnDrawerFirstOpened;
+        SetDrawerArrow(false);
+    }
 
-        if (_drawerArrow != null)
-            _drawerArrow.SetActive(false);
+    // -------------------------------------------------------------------------
+    // Networked Marker RPCs
+    // -------------------------------------------------------------------------
+
+    /// <summary>Identifies scene-static interactables that need a synced tutorial marker.</summary>
+    private enum StaticMarkerTarget { GreenStamp, YellowStamp, RedStamp, HandOff }
+
+    private Transform GetStaticMarkerTransform(StaticMarkerTarget target) => target switch
+    {
+        StaticMarkerTarget.GreenStamp  => _greenStampSlot?.transform,
+        StaticMarkerTarget.YellowStamp => _yellowStampSlot?.transform,
+        StaticMarkerTarget.RedStamp    => _redStampSlot?.transform,
+        StaticMarkerTarget.HandOff     => _handOffPoint?.transform,
+        _                              => null
+    };
+
+    // All marker/arrow helpers route through MegaphoneDialogueManager which is always-active
+    // and fully spawned, avoiding the ActiveSceneSynchronization issue on Day GameObjects
+    // (which start inactive and are never spawned by NGO into the session).
+
+    private void ShowNetworkedMarker(NetworkObject target)
+    {
+        if (target != null) MegaphoneDialogueManager.Instance?.ShowMarkerSynced(target);
+    }
+
+    private void HideNetworkedMarker(NetworkObject target)
+    {
+        if (target != null) MegaphoneDialogueManager.Instance?.HideMarkerSynced(target);
+    }
+
+    private void ShowStaticMarker(StaticMarkerTarget target)
+    {
+        Transform t = GetStaticMarkerTransform(target);
+        if (t != null) MegaphoneDialogueManager.Instance?.ShowStaticMarkerSynced(t);
+    }
+
+    private void HideStaticMarker(StaticMarkerTarget target)
+    {
+        Transform t = GetStaticMarkerTransform(target);
+        if (t != null) MegaphoneDialogueManager.Instance?.HideStaticMarkerSynced(t);
+    }
+
+    private void SetSwitchArrow(bool active)
+    {
+        if (_switchArrow == null) return;
+        // Routes through MegaphoneDialogueManager so the ClientRpc reaches all clients.
+        MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_switchArrow.transform, active);
+    }
+
+    private void SetDrawerArrow(bool active)
+    {
+        if (_drawerArrow == null) return;
+        // Routes through MegaphoneDialogueManager so the ClientRpc reaches all clients.
+        MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_drawerArrow.transform, active);
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    /// <summary>Shows a megaphone bark and waits until it finishes speaking.</summary>
+    /// <summary>
+    /// Shows a megaphone bark on all clients and waits until it finishes speaking.
+    /// Must only be called from server-side coroutines.
+    /// </summary>
     private IEnumerator ShowAndWait(string line)
     {
         // Wait for any previously running bark to complete before issuing the next one.
-        // MegaphoneDialogueManager.ShowDialogue silently drops the call if IsSpeaking is true,
-        // which would leave the WaitUntil below hanging indefinitely.
-        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
-        MegaphoneDialogueManager.Instance.ShowDialogue(line);
-        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
+        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+
+        MegaphoneDialogueManager.Instance.ShowDialogueSynced(line);
+
+        // Yield one frame so the NetworkVariable write and ClientRpc dispatch can be
+        // flushed by the Netcode transport before we start polling IsSpeakingSynced.
+        // Without this the WaitUntil below exits immediately because the flag hasn't
+        // propagated yet and the bark is silently skipped.
+        yield return null;
+
+        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
     }
 }

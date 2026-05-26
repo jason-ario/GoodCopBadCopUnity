@@ -29,20 +29,31 @@ public class InkStamp : Interactable, IPickupSlot
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Whether the stamp is currently sitting in its slot.
+    /// Authoritative on the server; replicated to all clients so every machine
+    /// agrees on the placed state before allowing a pickup interaction.
+    /// </summary>
+    private NetworkVariable<bool> _isPlaced = new NetworkVariable<bool>(
+        true,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        stampPlaceObjectSlot.IsPlaced = true;
-
         _spawnedStampRef.OnValueChanged  += OnSpawnedStampRefChanged;
         _slotInteractable.OnValueChanged += OnSlotInteractableChanged;
+        _isPlaced.OnValueChanged         += OnIsPlacedChanged;
 
-        // Apply current slot-interactable state for late-joiners.
+        // Apply current states for late-joiners.
         ApplySlotInteractable(_slotInteractable.Value);
+        stampPlaceObjectSlot.IsPlaced = _isPlaced.Value;
 
         if (IsServer)
         {
+            _isPlaced.Value = true;
             SpawnInkStamp();
         }
         else
@@ -57,9 +68,12 @@ public class InkStamp : Interactable, IPickupSlot
         base.OnNetworkDespawn();
         _spawnedStampRef.OnValueChanged  -= OnSpawnedStampRefChanged;
         _slotInteractable.OnValueChanged -= OnSlotInteractableChanged;
+        _isPlaced.OnValueChanged         -= OnIsPlacedChanged;
     }
 
     private void OnSlotInteractableChanged(bool oldValue, bool newValue) => ApplySlotInteractable(newValue);
+
+    private void OnIsPlacedChanged(bool oldValue, bool newValue) => stampPlaceObjectSlot.IsPlaced = newValue;
 
     private void ApplySlotInteractable(bool value)
     {
@@ -124,7 +138,7 @@ public class InkStamp : Interactable, IPickupSlot
     private void SetSlotInteractableServerRpc(bool value) => _slotInteractable.Value = value;
 
     /// <summary>True while the stamp is sitting in its slot; false once the player has picked it up.</summary>
-    public bool IsStampInSlot => stampPlaceObjectSlot != null && stampPlaceObjectSlot.IsPlaced;
+    public bool IsStampInSlot => _isPlaced.Value;
 
     public override void Interact(PlayerInteractionController player)
     {
@@ -136,9 +150,14 @@ public class InkStamp : Interactable, IPickupSlot
             return;
         }
 
-        if (player.pickupController.HeldObject == null && stampPlaceObjectSlot.IsPlaced)
+        // Guard against a race where two clients both see IsPlaced=true before the
+        // server's NetworkVariable write propagates. Only the server mutates _isPlaced.
+        if (player.pickupController.HeldObject == null && _isPlaced.Value)
         {
-            stampPlaceObjectSlot.IsPlaced = false;
+            if (IsServer)
+                SetIsPlaced(false);
+            else
+                SetIsPlacedServerRpc(false);
 
             // Re-enable the pickup so PickUpObject can claim it; it will immediately disable
             // interactability again as its optimistic lock before the ownership RPC lands.
@@ -148,17 +167,27 @@ public class InkStamp : Interactable, IPickupSlot
             player.pickupController.PickUpObject(spawnedInkStamp);
         }
     }
-    
 
     public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
     {
-        if(stampPlaceObjectSlot == null) return;
+        if (stampPlaceObjectSlot == null) return;
         if (item.ItemData != stampPlaceObjectSlot.itemThatCanBePlaced.ItemData) return;
-        
+
         base.InteractWithItem(player, item);
         player.pickupController.DropObject(stampPlaceObjectSlot.PlaceObjectPos);
-        stampPlaceObjectSlot.IsPlaced = true;
 
-        return;
+        if (IsServer)
+            SetIsPlaced(true);
+        else
+            SetIsPlacedServerRpc(true);
     }
+
+    private void SetIsPlaced(bool value)
+    {
+        _isPlaced.Value = value;
+        stampPlaceObjectSlot.IsPlaced = value;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetIsPlacedServerRpc(bool value) => SetIsPlaced(value);
 }

@@ -114,6 +114,11 @@ public class SuspectCharacter : Interactable
         // tumors without running independent RNG.
         foreach (var kvp in anomalyController.TumorAnomalyIndices)
             SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        // Relay InitializeDisabled calls to clients for shader-driven anomalies
+        // (e.g. lesions, black eyes, blue veins) that don't carry index data.
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
     }
 
     /// <summary>
@@ -141,6 +146,11 @@ public class SuspectCharacter : Interactable
 
         foreach (var kvp in anomalyController.TumorAnomalyIndices)
             SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        // Relay InitializeDisabled calls to clients for shader-driven anomalies
+        // (e.g. lesions, black eyes, blue veins) that don't carry index data.
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
     }
 
     /// <summary>
@@ -159,7 +169,10 @@ public class SuspectCharacter : Interactable
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
-        // No anomaly indices to sync — suspect is guaranteed clean.
+
+        // Relay InitializeDisabled calls to clients for all anomalies (suspect is clean).
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
     }
 
     /// <summary>
@@ -182,6 +195,18 @@ public class SuspectCharacter : Interactable
     {
         if (IsServer) return;
         anomalyController.ApplyTumorIndicesOnClient(siblingIndex, activeIndices);
+    }
+
+    /// <summary>
+    /// Tells clients to call InitializeDisabled on the anomaly at the given sibling index.
+    /// Used for shader-driven anomalies (e.g. lesions, black eyes, blue veins) that were
+    /// not selected and need their shader state cleared on all clients.
+    /// </summary>
+    [ClientRpc]
+    private void SyncInitializeDisabledClientRpc(int siblingIndex)
+    {
+        if (IsServer) return;
+        anomalyController.ApplyInitializeDisabledOnClient(siblingIndex);
     }
 
     public override void Interact(PlayerInteractionController player)

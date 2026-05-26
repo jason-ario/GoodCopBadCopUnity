@@ -29,6 +29,12 @@ public class ObjectContainer : MonoBehaviour
 
             foreach (var itemHeld in itemsHeld)
             {
+                if (itemHeld == null)
+                {
+                    Debug.LogWarning($"[ObjectContainer] Null entry in itemsHeld on '{gameObject.name}'. Check the Inspector for missing references.", gameObject);
+                    continue;
+                }
+
                 SetLayerRecursively(itemHeld.gameObject, layer);
             }
         }
@@ -40,6 +46,7 @@ public class ObjectContainer : MonoBehaviour
         int layer = LayerMask.NameToLayer(layerName);
         foreach (var itemHeld in itemsHeld)
         {
+            if (itemHeld == null) continue;
             SetLayerRecursively(itemHeld.gameObject, layer);
         }
     }

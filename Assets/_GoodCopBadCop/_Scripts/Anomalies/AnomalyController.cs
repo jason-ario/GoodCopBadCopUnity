@@ -34,8 +34,15 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public Dictionary<int, int[]> TumorAnomalyIndices { get; } = new Dictionary<int, int[]>();
 
+    /// <summary>
+    /// Sibling indices of every anomaly on which InitializeDisabled was called during the
+    /// most recent Initialize* pass. Used by SuspectCharacter to relay the call to clients.
+    /// </summary>
+    public List<int> DisabledAnomalySiblingIndices { get; } = new List<int>();
+
     public void Initialize()
     {
+        DisabledAnomalySiblingIndices.Clear();
         var anomalies = new List<Anomaly>();
 
         if (!AnomalyManager.Instance.mutationAnomaliesLocked)
@@ -43,7 +50,6 @@ public class AnomalyController : MonoBehaviour
             Debug.Log("Mutations are enabled");
             anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
         }
-        
 
         if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
         {
@@ -57,7 +63,7 @@ public class AnomalyController : MonoBehaviour
             anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
         }
 
-        _allPossibleAnomalies = anomalies.ToArray(); 
+        _allPossibleAnomalies = anomalies.ToArray();
         Debug.Log("Activated anomalies");
         ActivateAnomalies();
     }
@@ -70,6 +76,7 @@ public class AnomalyController : MonoBehaviour
     /// <param name="count">Exact number of anomalies to activate.</param>
     public void InitializeWithExactAnomalyCount(int count)
     {
+        DisabledAnomalySiblingIndices.Clear();
         var anomalies = new List<Anomaly>();
 
         if (!AnomalyManager.Instance.mutationAnomaliesLocked)
@@ -113,7 +120,7 @@ public class AnomalyController : MonoBehaviour
         foreach (Anomaly anomaly in _allPossibleAnomalies)
         {
             if (!activeAnomalies.Contains(anomaly))
-                anomaly.InitializeDisabled();
+                InitializeDisabled(anomaly);
         }
     }
 
@@ -123,10 +130,11 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public void InitializeClean()
     {
+        DisabledAnomalySiblingIndices.Clear();
         _allPossibleAnomalies = CollectAllAnomalies();
 
         foreach (Anomaly anomaly in _allPossibleAnomalies)
-            anomaly.InitializeDisabled();
+            InitializeDisabled(anomaly);
 
         Debug.Log("[AnomalyController] Suspect forced clean — all anomalies disabled.");
     }
@@ -148,7 +156,7 @@ public class AnomalyController : MonoBehaviour
             Debug.Log("Suspect is clean — no anomalies activated.");
 
             foreach (Anomaly anomaly in _allPossibleAnomalies)
-                anomaly.InitializeDisabled();
+                InitializeDisabled(anomaly);
 
             return;
         }
@@ -160,14 +168,14 @@ public class AnomalyController : MonoBehaviour
             if (_allPossibleAnomalies.Length == 0) break;
 
             Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
-            
+
             // Skip if this anomaly is already active
             if (activeAnomalies.Contains(anomaly))
             {
                 i--;
                 continue;
             }
-            
+
             Debug.Log("Activated " + anomaly.name);
             activeAnomalies.Add(anomaly);
 
@@ -195,10 +203,10 @@ public class AnomalyController : MonoBehaviour
         foreach (Anomaly anomaly in _allPossibleAnomalies)
         {
             if (!activeAnomalies.Contains(anomaly))
-                anomaly.InitializeDisabled();
+                InitializeDisabled(anomaly);
         }
     }
-    
+
     /// <summary>
     /// Applies tentacle indices that were chosen on the server. Called on clients
     /// after receiving the synced index data from SuspectCharacter.
@@ -229,6 +237,21 @@ public class AnomalyController : MonoBehaviour
             Debug.LogWarning($"[AnomalyController] No RandomTumorAnomaly found at sibling index {siblingIndex}.");
     }
 
+    /// <summary>
+    /// Calls InitializeDisabled on the anomaly identified by <paramref name="siblingIndex"/>.
+    /// Invoked on clients by SuspectCharacter after receiving SyncInitializeDisabledClientRpc.
+    /// </summary>
+    public void ApplyInitializeDisabledOnClient(int siblingIndex)
+    {
+        Anomaly anomaly = GetComponentsInChildren<Anomaly>(true)
+            .FirstOrDefault(a => a.transform.GetSiblingIndex() == siblingIndex);
+
+        if (anomaly != null)
+            anomaly.InitializeDisabled();
+        else
+            Debug.LogWarning($"[AnomalyController] No Anomaly found at sibling index {siblingIndex} for InitializeDisabled.");
+    }
+
     public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
 
     /// <summary>
@@ -236,4 +259,14 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public int ActiveCountOfType<T>() where T : Anomaly
         => activeAnomalies.OfType<T>().Count();
+
+    /// <summary>
+    /// Calls InitializeDisabled on an anomaly and records its sibling index so
+    /// SuspectCharacter can relay the call to clients via ClientRpc.
+    /// </summary>
+    private void InitializeDisabled(Anomaly anomaly)
+    {
+        anomaly.InitializeDisabled();
+        DisabledAnomalySiblingIndices.Add(anomaly.transform.GetSiblingIndex());
+    }
 }

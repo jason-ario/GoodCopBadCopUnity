@@ -127,9 +127,18 @@ public class PickableObject : Interactable
     public void SetInteractableNetworked(bool value)
     {
         if (IsServer)
+        {
             _networkInteractableOverride.Value = value ? 1 : 0;
+        }
         else
+        {
+            // Guard: RPCs require the NetworkObject to be spawned. If called before
+            // NGO has registered this scene object on the client (e.g. during
+            // StartGameClientRpc → StartCampaign), skip silently — the server will
+            // set the authoritative NetworkVariable value regardless.
+            if (!IsSpawned) return;
             SetInteractableNetworkedServerRpc(value);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]

@@ -30,11 +30,14 @@ public class FootstepsAudio : MonoBehaviour
 
     private float _stepTimer;
     private CharacterController _characterController;
+    private FootstepParticles _footstepParticles;
 
     private void Awake()
     {
         if (movementController != null)
             _characterController = movementController.GetComponent<CharacterController>();
+
+        _footstepParticles = GetComponent<FootstepParticles>();
     }
 
     private void Update()
@@ -88,6 +91,9 @@ public class FootstepsAudio : MonoBehaviour
 
         audioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
         audioSource.PlayOneShot(clip);
+
+        if (movementController != null && movementController.IsRunning)
+            _footstepParticles?.EmitRunStep();
     }
 
     private AudioClip[] ResolveClipSet()

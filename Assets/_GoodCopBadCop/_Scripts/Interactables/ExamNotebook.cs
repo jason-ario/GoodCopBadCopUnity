@@ -316,6 +316,9 @@ public class ExamNotebook : PickableObject
             {
                 pages[capturedPage].ApplyBitmask(newValue);
                 // Fire after ApplyBitmask so IsChecked reflects the new state.
+                // Setting AnyBoxChecked here fires on all clients via this NetworkVariable callback
+                // so server-side tutorial gates work regardless of who clicked the checkbox.
+                ChecklistItem.AnyBoxChecked = true;
                 OnAnyCheckboxChecked?.Invoke(this);
             };
         }
@@ -346,9 +349,18 @@ public class ExamNotebook : PickableObject
     public void SetVisible(bool visible)
     {
         if (IsServer)
+        {
             SetVisibleClientRpc(visible);
+        }
         else
+        {
+            // Guard: RPCs require the NetworkObject to be spawned. If called before
+            // NGO has registered this scene object on the client (e.g. during
+            // StartGameClientRpc → StartCampaign), skip silently — the server will
+            // broadcast the authoritative state via ClientRpc regardless.
+            if (!IsSpawned) return;
             SetVisibleServerRpc(visible);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]

@@ -1,5 +1,6 @@
 using System.Collections;
 using TMPro;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -10,9 +11,13 @@ using UnityEngine;
 /// Scripted sequences are exposed as public methods and can be called directly or
 /// triggered by subscribing to CampaignManager.OnTutorialStepRequested.
 ///
+/// Use <see cref="ShowDialogueSynced"/> from server-only tutorial coroutines to broadcast a
+/// bark to all clients simultaneously. <see cref="ShowDialogue"/> remains for local-only barks
+/// that the server triggers from gameplay events visible to all machines.
+///
 /// Set <see cref="disabled"/> to true in the Inspector or via debug tooling to suppress all output.
 /// </summary>
-public class MegaphoneDialogueManager : MonoBehaviour
+public class MegaphoneDialogueManager : NetworkBehaviour
 {
     public static MegaphoneDialogueManager Instance;
 
@@ -35,15 +40,36 @@ public class MegaphoneDialogueManager : MonoBehaviour
     private bool _isSpeaking;
     private Coroutine _hideCoroutine;
 
-    /// <summary>True while a bark is playing. Use with WaitUntil in tutorial coroutines.</summary>
+    /// <summary>
+    /// Authoritative speaking state replicated to all clients so server-side tutorial
+    /// coroutines can WaitUntil(!IsSpeakingSynced) and know when the bark has finished
+    /// on every machine.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isSpeakingNetwork = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// True while a bark is playing. On the server this also drives the synced
+    /// NetworkVariable so tutorial coroutines can await completion on all clients.
+    /// Use this in server-only coroutines; it reflects the server's own speaking state.
+    /// </summary>
     public bool IsSpeaking => _isSpeaking;
+
+    /// <summary>
+    /// Replicated speaking flag. Use in server-side WaitUntil checks so the coroutine
+    /// waits for the bark to finish before advancing to the next tutorial beat.
+    /// This is identical to IsSpeaking on the server but safe to poll from any context.
+    /// </summary>
+    public bool IsSpeakingSynced => _isSpeakingNetwork.Value;
 
     // Set when the night-phase tasks are all done; consumed by OnShiftReady so the bark
     // only fires after a real between-shift task cycle, not on the initial day start.
     private bool _betweenShiftTasksCompleted;
 
     // ---------------------------------------------------------------------------
-    // Unity Lifecycle
+    // Unity / Network Lifecycle
     // ---------------------------------------------------------------------------
 
     private void Awake()
@@ -231,8 +257,179 @@ public class MegaphoneDialogueManager : MonoBehaviour
     }
 
     // ---------------------------------------------------------------------------
+    // Networked Tutorial Marker Helpers
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only: shows a tutorial arrow above <paramref name="target"/> on every client.
+    /// Resolves the target by its <see cref="NetworkObject"/> so the reference is safe
+    /// to send across the network.
+    /// </summary>
+    public void ShowMarkerSynced(NetworkObject target)
+    {
+        if (!IsServer || target == null) return;
+        ShowMarkerClientRpc(target);
+    }
+
+    /// <summary>
+    /// Server-only: hides the tutorial arrow above <paramref name="target"/> on every client.
+    /// </summary>
+    public void HideMarkerSynced(NetworkObject target)
+    {
+        if (!IsServer || target == null) return;
+        HideMarkerClientRpc(target);
+    }
+
+    [ClientRpc]
+    private void ShowMarkerClientRpc(NetworkObjectReference targetRef)
+    {
+        if (!targetRef.TryGet(out NetworkObject netObj)) return;
+        TutorialMarkerManager.Instance?.Mark(netObj.transform);
+    }
+
+    [ClientRpc]
+    private void HideMarkerClientRpc(NetworkObjectReference targetRef)
+    {
+        if (!targetRef.TryGet(out NetworkObject netObj)) return;
+        TutorialMarkerManager.Instance?.Unmark(netObj.transform);
+    }
+
+    /// <summary>Server-only: hides all active tutorial markers on every client.</summary>
+    public void HideAllMarkersSynced()
+    {
+        if (!IsServer) return;
+        HideAllMarkersClientRpc();
+    }
+
+    [ClientRpc]
+    private void HideAllMarkersClientRpc()
+    {
+        TutorialMarkerManager.Instance?.UnmarkAll();
+    }
+
+    /// <summary>
+    /// Server-only: sets a scene GameObject active or inactive on every client, resolved by its
+    /// full scene path. Use for plain (non-networked) scene GameObjects like tutorial arrows.
+    /// </summary>
+    public void SetGameObjectActiveSynced(Transform target, bool active)
+    {
+        if (!IsServer || target == null) return;
+        string path = GetFullPath(target);
+        SetGameObjectActiveClientRpc(path, active);
+    }
+
+    [ClientRpc]
+    private void SetGameObjectActiveClientRpc(string transformPath, bool active)
+    {
+        Transform t = FindByPath(transformPath);
+        if (t != null) t.gameObject.SetActive(active);
+    }
+
+    /// <summary>
+    /// Server-only: shows a tutorial marker above a scene-static transform (e.g. a stamp slot or
+    /// hand-off point) on every client. The transform path relative to scene root is sent so
+    /// the client can resolve it without a NetworkObject reference.
+    /// </summary>
+    public void ShowStaticMarkerSynced(Transform target)
+    {
+        if (!IsServer || target == null) return;
+        // Encode the path so any client can find the same Transform by walking the hierarchy.
+        string path = GetFullPath(target);
+        ShowStaticMarkerClientRpc(path);
+    }
+
+    /// <summary>Server-only: hides the tutorial marker above a scene-static transform on every client.</summary>
+    public void HideStaticMarkerSynced(Transform target)
+    {
+        if (!IsServer || target == null) return;
+        string path = GetFullPath(target);
+        HideStaticMarkerClientRpc(path);
+    }
+
+    [ClientRpc]
+    private void ShowStaticMarkerClientRpc(string transformPath)
+    {
+        Transform t = FindByPath(transformPath);
+        if (t != null) TutorialMarkerManager.Instance?.Mark(t);
+    }
+
+    [ClientRpc]
+    private void HideStaticMarkerClientRpc(string transformPath)
+    {
+        Transform t = FindByPath(transformPath);
+        if (t != null) TutorialMarkerManager.Instance?.Unmark(t);
+    }
+
+    /// <summary>Builds the full scene path of a Transform (e.g. "/Root/Child/Grandchild").</summary>
+    private static string GetFullPath(Transform t)
+    {
+        var sb = new System.Text.StringBuilder(t.name);
+        Transform current = t.parent;
+        while (current != null)
+        {
+            sb.Insert(0, current.name + "/");
+            current = current.parent;
+        }
+        return "/" + sb.ToString();
+    }
+
+    /// <summary>Finds a Transform in the loaded scenes by its full scene path.</summary>
+    private static Transform FindByPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        // Strip leading slash and split into parts.
+        string[] parts = path.TrimStart('/').Split('/');
+        if (parts.Length == 0) return null;
+
+        // Find the root object.
+        GameObject root = null;
+        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+        {
+            foreach (GameObject go in UnityEngine.SceneManagement.SceneManager.GetSceneAt(i).GetRootGameObjects())
+            {
+                if (go.name == parts[0]) { root = go; break; }
+            }
+            if (root != null) break;
+        }
+        if (root == null) return null;
+
+        Transform current = root.transform;
+        for (int i = 1; i < parts.Length; i++)
+        {
+            current = current.Find(parts[i]);
+            if (current == null) return null;
+        }
+        return current;
+    }
+
+    // ---------------------------------------------------------------------------
     // Core Bark Display
     // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only: displays a voiced bark on every client simultaneously.
+    /// Use this from tutorial coroutines running on the server so the megaphone
+    /// dialogue is synced between host and all clients. Ignored if already speaking.
+    /// </summary>
+    public void ShowDialogueSynced(string text)
+    {
+        if (!IsServer) return;
+        if (disabled || _isSpeaking || _isSpeakingNetwork.Value) return;
+        _isSpeakingNetwork.Value = true;
+        ShowDialogueSyncedClientRpc(text);
+    }
+
+    /// <summary>
+    /// Broadcasts the bark to all clients including the host. Each client runs the
+    /// visual/audio sequence independently in sync with the server's timing.
+    /// </summary>
+    [ClientRpc]
+    private void ShowDialogueSyncedClientRpc(string text)
+    {
+        // The server already started its own bark via the NetworkVariable flag write above;
+        // do not double-start. The ClientRpc still reaches the server/host machine, so guard.
+        ShowDialogue(text);
+    }
 
     /// <summary>
     /// Displays a voiced bark on the megaphone canvas. Ignored if already speaking.
@@ -270,6 +467,9 @@ public class MegaphoneDialogueManager : MonoBehaviour
         _barkCanvas.SetActive(false);
         _isSpeaking = false;
 
+        if (IsServer)
+            _isSpeakingNetwork.Value = false;
+
         if (_speakerAnimator != null)
             _speakerAnimator.SetBool(SpeakingParam, false);
     }
@@ -306,6 +506,11 @@ public class MegaphoneDialogueManager : MonoBehaviour
             _speakerAnimator.SetBool(SpeakingParam, false);
 
         _isSpeaking = false;
+
+        // Clear the authoritative flag so remote clients know the bark is done.
+        if (IsServer)
+            _isSpeakingNetwork.Value = false;
+
         _hideCoroutine = StartCoroutine(WaitAndHide());
     }
 

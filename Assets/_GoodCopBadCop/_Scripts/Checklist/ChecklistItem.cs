@@ -37,6 +37,7 @@ public class ChecklistItem : MonoBehaviour
 
     /// <summary>
     /// Set to true on the local client the moment any checkbox is ticked.
+    /// Also set by ExamNotebook's NetworkVariable callback on all clients.
     /// Reset this to false at the earliest point a tutorial beat could be entered,
     /// so that early interaction during preceding dialogue is still captured.
     /// </summary>

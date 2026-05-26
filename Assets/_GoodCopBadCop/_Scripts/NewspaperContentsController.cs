@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 
@@ -11,7 +12,8 @@ public class NewspaperContentsController : MonoBehaviour
     [SerializeField] TextMeshPro footerText;
 
     [SerializeField] private NewspaperContentScriptable[] _newspaperContentScriptables;
-
+    [SerializeField] private GameObject camera;
+    
     private void Start()
     {
         ShiftManager.Instance.OnShiftReady += PopulateNewspaperContents;
@@ -31,5 +33,15 @@ public class NewspaperContentsController : MonoBehaviour
         subheaderText.text = newspaperContentScriptable.subheaderText;
         descriptionText.text = newspaperContentScriptable.descriptionText;
         footerText.text = newspaperContentScriptable.footerText;
+
+        StartCoroutine(CameraSnapshot());
+    }
+
+    IEnumerator CameraSnapshot()
+    {
+        yield return new WaitForEndOfFrame();
+        camera.SetActive(true);
+        yield return new WaitForEndOfFrame();
+        camera.SetActive(true);
     }
 }

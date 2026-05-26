@@ -9,6 +9,10 @@ using UnityEngine;
 /// Waits for the first suspect that has at least one mutation anomaly, then guides
 /// the player through picking up the Mutation Exam notebook, ticking the checklist,
 /// and filing the page into the folder. Remaining suspects are unscripted.
+///
+/// All tutorial coroutines run server-only. Megaphone barks are broadcast to all
+/// clients via MegaphoneDialogueManager.ShowDialogueSynced. Object-pickup gates use
+/// the synced IsHeld NetworkVariable so either player's action advances the tutorial.
 /// </summary>
 public class Day_02 : DayBase
 {
@@ -16,8 +20,9 @@ public class Day_02 : DayBase
     [Tooltip("The Mutation Exam notebook — hidden until the tutorial beat.")]
     [SerializeField] private ExamNotebook _mutationNotebook;
 
-    [Tooltip("Tutorial arrow displayed above the mutation exam notebook. Starts inactive.")]
-    [SerializeField] private GameObject _notebookArrow;
+    [Header("Other Day Notebooks — Hidden During Day 2")]
+    [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 2.")]
+    [SerializeField] private ExamNotebook _biologicalNotebook;
 
     // Whether the mutation notebook tutorial beat has already fired this shift.
     private bool _mutationTutorialFired;
@@ -39,7 +44,10 @@ public class Day_02 : DayBase
         // Hide the mutation notebook until the tutorial beat spawns it in.
         _mutationNotebook?.SetVisible(false);
         _mutationNotebook?.SetInteractableNetworked(false);
-        if (_notebookArrow != null) _notebookArrow.SetActive(false);
+
+        // Hide the biological notebook — it is not introduced until Day 3.
+        _biologicalNotebook?.SetVisible(false);
+        _biologicalNotebook?.SetInteractableNetworked(false);
 
         _mutationTutorialFired = false;
 
@@ -47,13 +55,17 @@ public class Day_02 : DayBase
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
         // Ensure the first suspect has at least one mutation anomaly so the tutorial always has material.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
     }
 
     public override void DayDeactivated()
     {
         base.DayDeactivated();
+        // Restore biological notebook so Day 3 can manage it normally.
+        _biologicalNotebook?.SetVisible(true);
+        // Clear any tutorial markers that may still be active if the day ended mid-tutorial.
+        TutorialMarkerManager.Instance?.UnmarkAll();
         SuspectController.OnPaperworkSpawned  -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled   -= OnNotebookPageFiled;
         StopAllCoroutines();
@@ -76,11 +88,9 @@ public class Day_02 : DayBase
     private void OnPaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (_mutationTutorialFired) return;
+        if (!IsServer) return;
         _mutationTutorialFired = true;
-
-        // Unsubscribe immediately — we only need to trigger the tutorial once.
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
-
         StartCoroutine(MutationExamTutorialSequence());
     }
 
@@ -100,12 +110,14 @@ public class Day_02 : DayBase
 
         _mutationNotebook?.SetVisible(true);
         _mutationNotebook?.SetInteractableNetworked(true);
-        if (_notebookArrow != null) _notebookArrow.SetActive(true);
+        if (_mutationNotebook != null)
+            ShowMutationNotebookMarker(true);
 
         // Wait for the player to pick up the mutation notebook.
         yield return new WaitUntil(() => _mutationNotebook != null && _mutationNotebook.IsHeld);
 
-        if (_notebookArrow != null) _notebookArrow.SetActive(false);
+        if (_mutationNotebook != null)
+            ShowMutationNotebookMarker(false);
 
         yield return MutationCheckBeat();
     }
@@ -120,7 +132,9 @@ public class Day_02 : DayBase
         ChecklistItem.AnyBoxChecked = false;
 
         bool anyBoxChecked = false;
-        ChecklistItem.OnAnyBoxChecked += OnAnyBoxCheckedLocal;
+        // OnAnyCheckboxChecked fires on all clients via ExamNotebook's NetworkVariable callback.
+        System.Action<ExamNotebook> onChecked = _ => anyBoxChecked = true;
+        ExamNotebook.OnAnyCheckboxChecked += onChecked;
 
         yield return ShowAndWait("Tick the boxes for every mutation you can identify.");
 
@@ -130,11 +144,9 @@ public class Day_02 : DayBase
 
         yield return new WaitUntil(() => anyBoxChecked);
 
-        ChecklistItem.OnAnyBoxChecked -= OnAnyBoxCheckedLocal;
+        ExamNotebook.OnAnyCheckboxChecked -= onChecked;
 
         yield return MutationFileIntoBeat();
-
-        void OnAnyBoxCheckedLocal() => anyBoxChecked = true;
     }
 
     // -------------------------------------------------------------------------
@@ -171,14 +183,32 @@ public class Day_02 : DayBase
     }
 
     // -------------------------------------------------------------------------
+    // Networked Marker helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>Shows or hides the tutorial marker above the mutation notebook on all clients.</summary>
+    private void ShowMutationNotebookMarker(bool show)
+    {
+        if (_mutationNotebook == null) return;
+        NetworkObject netObj = _mutationNotebook.GetComponent<NetworkObject>();
+        if (netObj == null) return;
+        if (show) MegaphoneDialogueManager.Instance?.ShowMarkerSynced(netObj);
+        else      MegaphoneDialogueManager.Instance?.HideMarkerSynced(netObj);
+    }
+
+    // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
 
-    /// <summary>Shows a megaphone bark and waits until it finishes speaking.</summary>
+    /// <summary>
+    /// Shows a megaphone bark on all clients and waits until it finishes speaking.
+    /// Must only be called from server-side coroutines.
+    /// </summary>
     private IEnumerator ShowAndWait(string line)
     {
-        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
-        MegaphoneDialogueManager.Instance.ShowDialogue(line);
-        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeaking);
+        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+        MegaphoneDialogueManager.Instance.ShowDialogueSynced(line);
+        yield return null;
+        yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
     }
 }

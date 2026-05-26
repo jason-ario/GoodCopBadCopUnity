@@ -743,6 +743,10 @@ public class ShiftManager : NetworkBehaviour
         StartInBetweenShiftSequence();
     }
 
+    /// <summary>
+    /// Ends the intro cutscene for all connected clients regardless of who calls it.
+    /// Safe to call from any client or the server.
+    /// </summary>
     public void EndIntroCutscene()
     {
         ambientAudio.DOFade(1, 2);
@@ -750,7 +754,14 @@ public class ShiftManager : NetworkBehaviour
         if (IsServer)
             EndIntroCutsceneClientRpc();
         else
-            StartCoroutine(EndIntroCutsceneSequence());
+            EndIntroCutsceneServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void EndIntroCutsceneServerRpc()
+    {
+        ambientAudio.DOFade(1, 2);
+        EndIntroCutsceneClientRpc();
     }
 
     [ClientRpc]

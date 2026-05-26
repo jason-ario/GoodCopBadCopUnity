@@ -6,6 +6,8 @@ using UnityEngine;
 /// On open: deactivates the held object, locks movement and look, and sets both
 /// arm animators to the HoldingGuidebook state via PlayerAnimationController.
 /// On close: reverses all of the above.
+/// The body guidebook mesh (<see cref="_bodyGuidebookObject"/>) is activated on all clients
+/// via <see cref="PlayerAnimationController.SetGuidebookOpen"/> so other players can see it.
 /// </summary>
 [RequireComponent(typeof(PlayerAnimationController))]
 [RequireComponent(typeof(PlayerPickupController))]
@@ -18,6 +20,12 @@ public class GuidebookController : MonoBehaviour
     private static readonly string InputButton = "Guidebook";
 
     [SerializeField] private GameObject _guidebookObject;
+
+    /// <summary>
+    /// Guidebook mesh parented to the body rig, visible to other clients.
+    /// Toggled on all clients via the networked guidebook-open state.
+    /// </summary>
+    [SerializeField] private GameObject _bodyGuidebookObject;
 
     private PlayerAnimationController _animationController;
     private PlayerPickupController    _pickupController;
@@ -35,6 +43,19 @@ public class GuidebookController : MonoBehaviour
 
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
+
+        if (_bodyGuidebookObject != null)
+            _bodyGuidebookObject.SetActive(false);
+    }
+
+    private void OnEnable()
+    {
+        _animationController.OnGuidebookOpenChanged += OnBodyGuidebookOpenChanged;
+    }
+
+    private void OnDisable()
+    {
+        _animationController.OnGuidebookOpenChanged -= OnBodyGuidebookOpenChanged;
     }
 
     private void Update()
@@ -78,7 +99,8 @@ public class GuidebookController : MonoBehaviour
         if (_guidebookObject != null)
             _guidebookObject.SetActive(true);
 
-        GuidebookContentsContainer.Instance?.Open();
+        // Notify all clients to show the body-space guidebook mesh.
+        _animationController.SetGuidebookOpen(true);
     }
 
     /// <summary>
@@ -94,7 +116,9 @@ public class GuidebookController : MonoBehaviour
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
 
-        GuidebookContentsContainer.Instance?.Close();
+        // Notify all clients to hide the body-space guidebook mesh.
+        _animationController.SetGuidebookOpen(false);
+
         if (_deactivatedHeldObject != null)
         {
             _deactivatedHeldObject.SetActive(true);
@@ -117,5 +141,16 @@ public class GuidebookController : MonoBehaviour
         _movementController.SetCanLook(true);
         _movementController.SetCanControl(true);
         _movementController.SetCanMove(true);
+    }
+
+    /// <summary>
+    /// Callback fired on all clients when the networked guidebook-open state changes.
+    /// Toggles the body-space guidebook mesh only for clients observing this player —
+    /// skipped for the owner so the holding player never sees their own body guidebook.
+    /// </summary>
+    private void OnBodyGuidebookOpenChanged(bool isOpen)
+    {
+        if (_bodyGuidebookObject == null || _animationController.IsOwner) return;
+        _bodyGuidebookObject.SetActive(isOpen);
     }
 }
