@@ -1,13 +1,16 @@
 using UnityEngine;
 
 /// <summary>
-/// Singleton that lives on the Guide Book Contents Container scene object.
-/// Allows runtime systems such as GuidebookController to locate and toggle
-/// the container without a cross-prefab serialized reference.
+/// Singleton on the Guide Book Contents Container scene object.
+/// Exposes Open/Close to toggle the contents child, which houses all
+/// guidebook render cameras. The root object stays permanently active
+/// so the singleton is always reachable at runtime.
 /// </summary>
 public class GuidebookContentsContainer : MonoBehaviour
 {
     public static GuidebookContentsContainer Instance { get; private set; }
+
+    [SerializeField] private GameObject _contents;
 
     private void Awake()
     {
@@ -26,4 +29,10 @@ public class GuidebookContentsContainer : MonoBehaviour
         if (Instance == this)
             Instance = null;
     }
+
+    /// <summary>Activates the contents child and all guidebook render cameras.</summary>
+    public void Open() => _contents?.SetActive(true);
+
+    /// <summary>Deactivates the contents child and all guidebook render cameras.</summary>
+    public void Close() => _contents?.SetActive(false);
 }

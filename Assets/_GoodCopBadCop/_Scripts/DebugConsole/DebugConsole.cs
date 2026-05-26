@@ -79,6 +79,11 @@ public class DebugConsole : MonoBehaviour
             GlobalHostVariables.Instance.AddMoney(1000);
         }
 
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            SkipToDay(2);
+        }
+
         if (Input.GetKeyDown(KeyCode.F8))
         {
             ShiftManager.Instance.EndShift();
@@ -117,6 +122,23 @@ public class DebugConsole : MonoBehaviour
             _isFastForwarding = false;
             Time.timeScale = 1f;
         }
+    }
+
+    /// <summary>
+    /// Skips booth-ready setup and immediately jumps CampaignManager to the given day.
+    /// Runs SkipToBoothReady first if the game is not yet in the shift, then applies
+    /// the target day on top. Server-only.
+    /// </summary>
+    private void SkipToDay(int targetDay)
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        ShiftManager.Instance.SkipToBoothReady();
+        CampaignManager.Instance.JumpToDay(targetDay);
     }
 
     /// <summary>Adds a one-off DebugTask to GuidebookTaskRegistry for guidebook testing.</summary>

@@ -138,6 +138,32 @@ public class CampaignManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Jumps directly to the specified day number, bypassing normal progression.
+    /// Server-only; propagates to clients via NetworkVariable.
+    /// Intended for debug use only — sets the save slot's current day and immediately applies the target day.
+    /// </summary>
+    public void JumpToDay(int targetDay)
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning("[CampaignManager] JumpToDay must only be called on the server.");
+            return;
+        }
+
+        if (!_days.ContainsKey(targetDay))
+        {
+            Debug.LogWarning($"[CampaignManager] JumpToDay: no DayBase found for Day {targetDay}.");
+            return;
+        }
+
+        SaveDataManager.Instance.CurrentDay = targetDay;
+        _networkCurrentDay.Value = targetDay;
+        ApplyDay(targetDay);
+
+        Debug.Log($"[CampaignManager] DEBUG — jumped to Day {targetDay}.");
+    }
+
+    /// <summary>
     /// Advances to the next campaign day. Server-only; propagates to clients via NetworkVariable.
     /// Call this after all night-phase tasks are complete.
     /// </summary>

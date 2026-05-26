@@ -19,10 +19,9 @@ public class GuidebookController : MonoBehaviour
 
     [SerializeField] private GameObject _guidebookObject;
 
-    private PlayerAnimationController   _animationController;
-    private PlayerPickupController      _pickupController;
-    private PlayerMovementController    _movementController;
-    private GuidebookContentsContainer  _contentsContainer;
+    private PlayerAnimationController _animationController;
+    private PlayerPickupController    _pickupController;
+    private PlayerMovementController  _movementController;
 
     private GameObject _deactivatedHeldObject;
 
@@ -36,16 +35,6 @@ public class GuidebookController : MonoBehaviour
 
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
-    }
-
-    private void Start()
-    {
-        _contentsContainer = GuidebookContentsContainer.Instance;
-
-        if (_contentsContainer == null)
-            Debug.LogWarning("[GuidebookController] GuidebookContentsContainer instance not found in scene.", this);
-        else
-            _contentsContainer.gameObject.SetActive(false);
     }
 
     private void Update()
@@ -89,8 +78,7 @@ public class GuidebookController : MonoBehaviour
         if (_guidebookObject != null)
             _guidebookObject.SetActive(true);
 
-        if (_contentsContainer != null)
-            _contentsContainer.gameObject.SetActive(true);
+        GuidebookContentsContainer.Instance?.Open();
     }
 
     /// <summary>
@@ -106,10 +94,7 @@ public class GuidebookController : MonoBehaviour
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
 
-        if (_contentsContainer != null)
-            _contentsContainer.gameObject.SetActive(false);
-
-        // Restore held object then re-apply the correct arm mask for it.
+        GuidebookContentsContainer.Instance?.Close();
         if (_deactivatedHeldObject != null)
         {
             _deactivatedHeldObject.SetActive(true);

@@ -339,6 +339,40 @@ public class ExamNotebook : PickableObject
     }
 
     /// <summary>
+    /// Shows or hides this notebook on all clients by toggling its renderers, collider, and highlight.
+    /// Use this to reveal the notebook at a specific tutorial beat. The GameObject stays active
+    /// so NGO scene-object registration is not disrupted.
+    /// </summary>
+    public void SetVisible(bool visible)
+    {
+        if (IsServer)
+            SetVisibleClientRpc(visible);
+        else
+            SetVisibleServerRpc(visible);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetVisibleServerRpc(bool visible) => SetVisibleClientRpc(visible);
+
+    [ClientRpc]
+    private void SetVisibleClientRpc(bool visible)
+    {
+        ApplyVisibility(visible);
+    }
+
+    private void ApplyVisibility(bool visible)
+    {
+        foreach (MeshRenderer mr in GetComponentsInChildren<MeshRenderer>(true))
+            mr.enabled = visible;
+
+        if (TryGetComponent<BoxCollider>(out var col))
+            col.enabled = visible;
+
+        if (TryGetComponent<HighlightEffect>(out var highlight))
+            highlight.enabled = visible;
+    }
+
+    /// <summary>
     /// Called by ExamPage when the local player clicks a checkbox.
     /// Routes through the notebook's ServerRpc since nested NetworkObjects can't send RPCs.
     /// </summary>

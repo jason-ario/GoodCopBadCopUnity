@@ -15,6 +15,8 @@ public enum TutorialStep
     FirstAnomaly,
     UVLightIntro,
     GuidebookIntro,
+    IntroMutationExam,
+    IntroBiologicalExam,
 
     // --- Mid days (11–20) ---
     NightTasksExplained,

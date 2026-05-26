@@ -70,6 +70,37 @@ public class AnomalyManager : MonoBehaviour
         ApplyUnlocksFromSave();
     }
 
+    /// <summary>
+    /// Marks documentation and mutation anomalies as unlocked in the save slot, then applies
+    /// the result to the live category lock fields. Used by Day_02. Persists immediately.
+    /// </summary>
+    public void UnlockMutationAndDocumentation()
+    {
+        if (SaveDataManager.Instance != null)
+        {
+            SaveDataManager.Instance.DocumentationAnomaliesUnlocked = true;
+            SaveDataManager.Instance.MutationAnomaliesUnlocked      = true;
+        }
+
+        ApplyUnlocksFromSave();
+    }
+
+    /// <summary>
+    /// Marks documentation, mutation, and biological anomalies as unlocked in the save slot,
+    /// then applies the result to the live category lock fields. Used by Day_03. Persists immediately.
+    /// </summary>
+    public void UnlockBiologicalMutationAndDocumentation()
+    {
+        if (SaveDataManager.Instance != null)
+        {
+            SaveDataManager.Instance.DocumentationAnomaliesUnlocked  = true;
+            SaveDataManager.Instance.MutationAnomaliesUnlocked       = true;
+            SaveDataManager.Instance.BiologicalAnomaliesUnlocked     = true;
+        }
+
+        ApplyUnlocksFromSave();
+    }
+
     /// <summary>Unlocks all anomaly categories in the save slot and applies immediately.</summary>
     public void UnlockAll()
     {

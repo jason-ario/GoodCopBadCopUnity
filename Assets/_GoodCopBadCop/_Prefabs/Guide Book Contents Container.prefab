@@ -1,5 +1,39 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2442139243458678244
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5729069900863720558}
+  m_Layer: 0
+  m_Name: Contents
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5729069900863720558
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2442139243458678244}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 7991292463100516259}
+  - {fileID: 2204944383086042898}
+  - {fileID: 4930601378531332252}
+  m_Father: {fileID: 512550607921098420}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3909587425028715754
 GameObject:
   m_ObjectHideFlags: 0
@@ -9,6 +43,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 512550607921098420}
+  - component: {fileID: 9040998397840979536}
   m_Layer: 0
   m_Name: Guide Book Contents Container
   m_TagString: Untagged
@@ -29,18 +64,29 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 7991292463100516259}
-  - {fileID: 2204944383086042898}
-  - {fileID: 4930601378531332252}
+  - {fileID: 5729069900863720558}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9040998397840979536
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3909587425028715754}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5b2f16f37f4c8f41a15cd50d93cfeca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GuidebookContentsContainer
+  _contents: {fileID: 2442139243458678244}
 --- !u!1001 &1408167651646479377
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 512550607921098420}
+    m_TransformParent: {fileID: 5729069900863720558}
     m_Modifications:
     - target: {fileID: 155432973606391, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchorMax.y
@@ -91,6 +137,10 @@ PrefabInstance:
       value: TODAY'S TASKS
       objectReference: {fileID: 0}
     - target: {fileID: 2945019341121714504, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_fontSize
+      value: 7.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2945019341121714504, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_fontColor.a
       value: 0.9372549
       objectReference: {fileID: 0}
@@ -105,6 +155,10 @@ PrefabInstance:
     - target: {fileID: 2945019341121714504, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_fontColor.r
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2945019341121714504, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 7.1
       objectReference: {fileID: 0}
     - target: {fileID: 2945019341121714504, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -169,6 +223,10 @@ PrefabInstance:
     - target: {fileID: 4477457162164921600, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_Color.r
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4688572202779404973, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4772667248899145351, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_fontColor.a
@@ -238,6 +296,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8212469571390021800, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.2616
+      objectReference: {fileID: 0}
+    - target: {fileID: 8212469571390021800, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.2616
+      objectReference: {fileID: 0}
+    - target: {fileID: 8212469571390021800, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.2616
+      objectReference: {fileID: 0}
+    - target: {fileID: 8212469571390021800, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -72.3
+      objectReference: {fileID: 0}
     - target: {fileID: 8839102985879729807, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1
@@ -260,19 +334,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9008368669206719963, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9008368669206719963, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9008368669206719963, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 36.71
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9008368669206719963, guid: 059eeed9c8d1efb44a984b8fd5b58e30, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -3.9924376
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -290,7 +364,7 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 512550607921098420}
+    m_TransformParent: {fileID: 5729069900863720558}
     m_Modifications:
     - target: {fileID: 2986932731294918946, guid: 2b63ef62961f85d4a985f4efbdf95144, type: 3}
       propertyPath: m_Name
@@ -336,7 +410,12 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    - target: {fileID: 8753336972676523966, guid: 2b63ef62961f85d4a985f4efbdf95144, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 6872557808836576029, guid: 2b63ef62961f85d4a985f4efbdf95144, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -352,11 +431,15 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 512550607921098420}
+    m_TransformParent: {fileID: 5729069900863720558}
     m_Modifications:
     - target: {fileID: 1688425529877669357, guid: 493144658b2243747860dc75e25be498, type: 3}
       propertyPath: m_Name
       value: Guidebook How To Play Contents Page 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3649989578337843253, guid: 493144658b2243747860dc75e25be498, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5354382670105373444, guid: 493144658b2243747860dc75e25be498, type: 3}
       propertyPath: m_LocalPosition.x

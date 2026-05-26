@@ -11,7 +11,7 @@ using UnityEngine.Events;
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
-    MeshRenderer[] meshRenderers;
+    protected MeshRenderer[] meshRenderers;
     bool setSeeThrough = false;
     protected PlayerPickupController playerPickupController;
     [SerializeField] PickableItemData itemData;

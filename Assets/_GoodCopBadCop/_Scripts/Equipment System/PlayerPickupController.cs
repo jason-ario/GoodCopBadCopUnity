@@ -549,6 +549,11 @@ public class PlayerPickupController : NetworkBehaviour
                     itemInContainer = item;
             }
 
+            // When the picked-up object is a world item (e.g. newspaper) its ItemData is not
+            // pre-registered in ItemsHeld, so the loop above finds nothing. In that case the
+            // object itself is the slot — fall back to using it directly as its own container.
+            itemInContainer ??= pickableObject;
+
             // Use ParentConstraint to track the slot continuously on all clients.
             // AutoObjectParentSync is disabled so NGO does not replicate the local
             // parent change; each client sets its own arm-appropriate constraint independently.
