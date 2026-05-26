@@ -137,7 +137,9 @@ public class Day_01 : DayBase
         base.DayDeactivated();
 
         if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= OnDayStarted;
+        {
+            ShiftManager.Instance.OnDayStart   -= OnDayStarted;
+        }
 
         SuspectController.OnSuspectArrived      -= OnSuspectArrivedHandler;
         SuspectController.OnPaperworkSpawned    -= _onPaperworkSpawned;
@@ -190,7 +192,9 @@ public class Day_01 : DayBase
     private void OnDestroy()
     {
         if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= OnDayStarted;
+        {
+            ShiftManager.Instance.OnDayStart   -= OnDayStarted;
+        }
 
         SuspectController.OnSuspectArrived   -= OnSuspectArrivedHandler;
         SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
@@ -254,25 +258,13 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(7f);
 
-        yield return ShowAndWait("Good morning, sunshine.");
+        yield return ShowAndWait("Good morning. We've been expecting you.");
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Welcome to your first day on the job...");
+        yield return ShowAndWait("Welcome to your post. You'll be screening subjects entering the town. I'll be guiding you through procedure.");
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("We've been waiting for you.");
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("The last guy didn't last very long. We're hoping you can do better.");
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("Judging by the looks of you, I give you a week, tops.");
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("But to give you the best shot, I'll be here to help out.");
-        yield return new WaitForSeconds(3f);
-
-        yield return ShowAndWait("See that button over there? Press it to begin your shift.");
+        yield return ShowAndWait("Follow instructions carefully. Your responses will be... noted. Press the button when you're ready to begin.");
 
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             _switchButton.SetReady(true);
@@ -430,9 +422,9 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Always cross-reference your documents — look for any discrepancies between them.");
+        yield return ShowAndWait("Cross-reference the documents. Note any discrepancies between them.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("This subject looks clean. No anomalies detected. You can let them through.");
+        yield return ShowAndWait("This subject appears clean. No anomalies. You may proceed.");
         yield return new WaitForSeconds(2f);
 
         StartCoroutine(DrawerTutorialBeat());
@@ -532,7 +524,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Both documents are filed. This suspect looks clean — stamp the folder green to approve them.");
+        yield return ShowAndWait("Both documents are filed. This subject appears clean — stamp the folder green to clear them.");
 
         // Arm the hand-off listener now — before the stamp event and before any
         // dialogue, so a fast player who stamps and hands off immediately is captured.
@@ -618,7 +610,7 @@ public class Day_01 : DayBase
         Debug.Log("[Day_01] HandOffBeat: folder stamped, proceeding.");
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Good. Now place the stamped folder in the window slot to send them on their way.");
+        yield return ShowAndWait("Place the stamped folder in the window slot to send them through.");
 
         // Spawn a tracking arrow above the hand-off point so the player knows where to go.
         GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
@@ -633,7 +625,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Well done. That's your first subject processed. Keep it up.");
+        yield return ShowAndWait("Good. First subject processed. Your decisions are being recorded — stay attentive.");
 
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
@@ -694,7 +686,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(3f);
 
-        yield return ShowAndWait("Another subject has arrived. Inspect their ID card and application form.");
+        yield return ShowAndWait("Another subject. Review their documents.");
 
         // Unlock both documents and show both arrows simultaneously.
         _s2IDCardInspected  = false;
@@ -749,11 +741,11 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("You'll notice there's a discrepancy between the two documents. Something doesn't add up.");
+        yield return ShowAndWait("There's a discrepancy in these documents. Something doesn't line up.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Multiple documentation anomalies are a warning sign that a subject's mind may be deteriorating — a prompt for medical evaluation.");
+        yield return ShowAndWait("Documentation anomalies indicate cognitive deterioration. A subject's records are a window into their mind.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("When you spot an anomaly, mark it using the exam notebook. Pick it up and tick the box for what you found.");
+        yield return ShowAndWait("When you spot an anomaly, mark it in the exam notebook. Pick it up and tick the appropriate box.");
 
         _examNotebook?.SetInteractableNetworked(true);
         if (_notebookArrow != null) _notebookArrow.SetActive(true);
@@ -816,7 +808,7 @@ public class Day_01 : DayBase
         ExamNotebook.OnAnyNotebookPageFiled -= OnNotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Based on how accurate your findings are, you'll receive matching compensation. The more thorough you are, the better.");
+        yield return ShowAndWait("Based on the accuracy of your findings, your performance will be evaluated accordingly.");
 
         StartCoroutine(Suspect2StampBeat());
     }
@@ -868,10 +860,10 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Quarantine isolates the subject and gives them time to recover over the next couple of days. Better safe than sorry.");
+        yield return ShowAndWait("Quarantine holds the subject for evaluation. A precaution. We take no chances with the town's safety.");
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Place the stamped folder in the window slot to send them on their way.");
+        yield return ShowAndWait("Place the stamped folder in the window slot.");
 
         GameObject handOffArrow = SpawnDocumentArrow(_handOffPoint != null ? _handOffPoint.transform : null);
         if (handOffArrow != null) handOffArrow.SetActive(true);
@@ -884,7 +876,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Good work. Now, a third subject is on their way. This one is different.");
+        yield return ShowAndWait("Good work. A third subject is incoming. Pay close attention.");
 
         // Force suspect 3 to have exactly 5 documentation anomalies.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
@@ -978,18 +970,15 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("You'll notice something's very wrong here. There are multiple documentation anomalies — far too many to ignore.");
+        yield return ShowAndWait("Something is significantly wrong here. Multiple documentation anomalies — far beyond the acceptable threshold.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Five documentation anomalies of a single type means their mind is too far gone. They cannot be safely rehabilitated.");
+        yield return ShowAndWait("Five anomalies of a single type indicates severe, irreversible deterioration. The protocol is clear.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("At that threshold, they are a threat to everyone around them. They will turn. Open the exam notebook and mark every anomaly you find.");
+        yield return ShowAndWait("Open the exam notebook and mark every anomaly. All five must be documented.");
 
         _examNotebook?.SetInteractableNetworked(true);
-        if (_notebookArrow != null) _notebookArrow.SetActive(true);
 
         yield return new WaitUntil(() => _examNotebook != null && _examNotebook.IsHeld);
-
-        if (_notebookArrow != null) _notebookArrow.SetActive(false);
 
         StartCoroutine(Suspect3NotebookCheckBeat());
     }
@@ -1003,7 +992,7 @@ public class Day_01 : DayBase
         bool anyBoxChecked = false;
         ChecklistItem.OnAnyBoxChecked += OnSuspect3AnyBoxCheckedLocal;
 
-        yield return ShowAndWait("Tick every box that applies. All five anomalies must be accounted for.");
+        yield return ShowAndWait("Tick every box that applies. All five anomalies must be on record.");
 
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;
@@ -1041,7 +1030,7 @@ public class Day_01 : DayBase
         ExamNotebook.OnAnyNotebookPageFiled -= OnSuspect3NotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Five anomalies of a single type. Their mind is gone. They must be eliminated before they turn and become a threat to everyone in this facility.");
+        yield return ShowAndWait("Five anomalies. A single type. The threshold has been reached — they are a threat to the town. Elimination is required.");
 
         StartCoroutine(Suspect3StampBeat());
     }
@@ -1062,7 +1051,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Pick up the red stamp and stamp the folder to confirm extermination.");
+        yield return ShowAndWait("Use the red stamp to confirm the elimination order.");
 
         // Arm the hand-off listener before the stamp event so a fast player who stamps
         // and hands off immediately doesn't race ahead of Suspect3HandOffBeat's subscribe.
@@ -1093,7 +1082,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Extermination is permanent. It is reserved for subjects that pose an irreversible threat. Do not use it lightly.");
+        yield return ShowAndWait("Elimination is final. It is reserved for subjects who pose an irreversible threat. The decision is yours to make.");
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("Place the stamped folder in the window slot to confirm the order.");
@@ -1108,7 +1097,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Excellent. You've learned the full inspection workflow. Good luck out there.");
+        yield return ShowAndWait("Procedure complete. You now know what's expected of you. We'll be watching.");
     }
 
     // -------------------------------------------------------------------------
@@ -1125,7 +1114,6 @@ public class Day_01 : DayBase
 
         // Day 1 hasn't introduced the lever yet — open the window automatically
         // so the suspect can deliver paperwork once they arrive.
-        // ShiftManager.OpenBoothShutter guards against closing an already-open shutter.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.OpenBoothShutter();
     }

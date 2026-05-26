@@ -286,7 +286,6 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator OpenWindowSequence()
     {
-        ResetEnvironment();
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
