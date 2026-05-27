@@ -5,6 +5,7 @@
 // - WEBSITE: https://www.textanimatorforgames.com/
 // =======================================================
 
+using System.Globalization;
 using Febucci.TextAnimatorCore;
 using Febucci.TextAnimatorCore.Text;
 
@@ -44,6 +45,7 @@ namespace Febucci.TextAnimatorForUnity.TextMeshPro
         public string GetFullText() => tmpComponent.text;
         public string GetStrippedTextWithoutAnyTags(string textWithoutTAnimTags) => tmpComponent.GetParsedText();
 
+        static TMP_TextInfo emptyTextInfo = new TMP_TextInfo();
         /// <summary>
         /// Equivalent to setting the text to the TMP component, without parsing it.
         /// Please use <see cref="TextAnimatorComponentBase.SetText(string)"/> or <see cref="TextAnimatorComponentBase.SetText(string, bool)"/> instead.
@@ -58,6 +60,14 @@ namespace Febucci.TextAnimatorForUnity.TextMeshPro
             if (attachedInputField) attachedInputField.text = text; //renders input field
             else tmpComponent.text = text; //<-- sets the text
 
+            // Early return for empty strings to avoid GetTextInfo exceptions
+            if (string.IsNullOrEmpty(text))
+            {
+                textInfo = emptyTextInfo;
+                ForceMeshUpdate();
+                tmpComponent.renderMode = TextRenderFlags.DontRender;
+                return;
+            }
 
             // forces rebuilding the layout for text that is truncated etc., otherwise it keeps the
             // old textInfo
@@ -120,20 +130,24 @@ namespace Febucci.TextAnimatorForUnity.TextMeshPro
                 temp.info.pointSize = currentCharInfo.pointSize;
 
                 //Updates vertices
-                // Use Color32 alias (UnityEngine.Color32) to avoid implicit conversion
-                Color32 color = currentMeshInfo.colors32[currentCharInfo.vertexIndex];
                 for(int j=0;j<CharacterData.VERTICES_PER_CHAR;j++)
                 {
                     temp.source.positions[j] = currentMeshInfo.vertices[currentCharInfo.vertexIndex + j];
-                    temp.source.colors[j] = color;
+                    temp.source.colors[j] = currentMeshInfo.colors32[currentCharInfo.vertexIndex + j];
                 }
             }
         }
 
         public int GetRenderedCharactersCountInsidePage(int charactersCount)
-            => tmpComponent.overflowMode != TextOverflowModes.Overflow
-                ? tmpComponent.firstOverflowCharacterIndex
-                : charactersCount;
+        {
+            if (tmpComponent.overflowMode == TextOverflowModes.Overflow)
+                return charactersCount;
+
+            // firstOverflowCharacterIndex is -1 when no overflow occurs (text fits)
+            // In that case, all characters are visible
+            var overflowIndex = tmpComponent.firstOverflowCharacterIndex;
+            return overflowIndex >= 0 ? overflowIndex : charactersCount;
+        }
 
         public int GetFirstCharacterIndexInsidePage()
         {

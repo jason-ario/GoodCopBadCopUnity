@@ -28,6 +28,26 @@ namespace Febucci.TextAnimatorForUnity
             //Prevents database from not refreshing on
             //different domain reload settings
             built = false;
+            #if UNITY_EDITOR
+            UnityEditor.EditorApplication.playModeStateChanged += EditModeChanged;
+#endif
+
+        }
+
+        #if UNITY_EDITOR
+        void EditModeChanged(UnityEditor.PlayModeStateChange state)
+        {
+            //Prevents database from not refreshing on
+            //different domain reload settings
+            if(state == UnityEditor.PlayModeStateChange.EnteredPlayMode) built = false;
+        }
+        #endif
+
+        void OnDisable()
+        {
+                        #if UNITY_EDITOR
+            UnityEditor.EditorApplication.playModeStateChanged -= EditModeChanged;
+#endif
         }
 
         [SerializeReference] System.Collections.Generic.List<T> data = new List<T>();
@@ -63,8 +83,7 @@ namespace Febucci.TextAnimatorForUnity
             }
         }
 
-        [ContextMenu("Force rebuild")]
-        public void ForceBuildRefresh()
+        public virtual void ForceBuildRefresh()
         {
             built = false;
 

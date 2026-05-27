@@ -21,6 +21,9 @@ public class LobbyManager : MonoBehaviour
     private FacepunchTransport facepunchTransport;
     private bool inviteOverlayWasOpenedByUs;
 
+    // Replace with your actual Steam App ID. 480 is Valve's test app (Spacewar).
+    private const uint SteamAppId = 3262820;
+
     private void Awake()
     {
         if (Instance != null)
@@ -31,6 +34,21 @@ public class LobbyManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        try
+        {
+            // asyncCallbacks: false because we call RunCallbacks() manually in Update.
+            SteamClient.Init(SteamAppId, asyncCallbacks: false);
+
+            if (!SteamClient.IsValid)
+                Debug.LogError("[LobbyManager] SteamClient.Init succeeded but IsValid is false.");
+            else
+                Debug.Log($"[LobbyManager] Steam initialized. Name={SteamClient.Name} AppId={SteamAppId}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[LobbyManager] SteamClient.Init failed — is Steam running? {e.Message}");
+        }
     }
 
     private void Start()
@@ -74,6 +92,9 @@ public class LobbyManager : MonoBehaviour
         SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberLeave;
         SteamFriends.OnGameLobbyJoinRequested -= OnGameLobbyJoinRequested;
         SteamFriends.OnGameOverlayActivated -= OnOverlayToggled;
+
+        if (SteamClient.IsValid)
+            SteamClient.Shutdown();
     }
 
     private void OnOverlayToggled(bool isActive)
@@ -116,7 +137,10 @@ public class LobbyManager : MonoBehaviour
     public async Task<bool> CreateLobby()
     {
         if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[CreateLobby] NetworkManager.Singleton is null.");
             return false;
+        }
 
         // Clean up any previous lobby before creating a new one.
         if (CurrentLobby.Id != 0)
@@ -126,15 +150,35 @@ public class LobbyManager : MonoBehaviour
         }
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+        Debug.Log($"[CreateLobby] Transport type: {(transport != null ? transport.GetType().Name : "null")}");
 
         if (transport is FacepunchTransport facepunch)
         {
+            if (!SteamClient.IsValid)
+            {
+                Debug.LogError("[CreateLobby] Steam is not initialized — cannot create lobby.");
+                return false;
+            }
+
             Debug.Log("[CreateLobby] FacepunchTransport detected — creating Steam lobby...");
-            var createdLobby = await SteamMatchmaking.CreateLobbyAsync(MaxLobbyMembers);
+
+            const int MaxLobbyCreateAttempts = 5;
+            const float LobbyCreateRetryDelaySeconds = 1f;
+            Steamworks.Data.Lobby? createdLobby = null;
+
+            for (int attempt = 1; attempt <= MaxLobbyCreateAttempts; attempt++)
+            {
+                createdLobby = await SteamMatchmaking.CreateLobbyAsync(MaxLobbyMembers);
+                if (createdLobby.HasValue)
+                    break;
+
+                Debug.LogWarning($"[CreateLobby] Attempt {attempt}/{MaxLobbyCreateAttempts} failed — retrying in {LobbyCreateRetryDelaySeconds}s...");
+                await Task.Delay(TimeSpan.FromSeconds(LobbyCreateRetryDelaySeconds));
+            }
 
             if (!createdLobby.HasValue)
             {
-                Debug.LogError("[CreateLobby] Failed to create Steam lobby — CreateLobbyAsync returned null.");
+                Debug.LogError("[CreateLobby] Failed to create Steam lobby after all attempts.");
                 return false;
             }
 
@@ -184,6 +228,7 @@ public class LobbyManager : MonoBehaviour
             return true;
         }
 
+        Debug.LogError($"[CreateLobby] No matching transport path — transport is {(transport != null ? transport.GetType().Name : "null")}.");
         return false;
     }
 

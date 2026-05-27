@@ -29,6 +29,15 @@ namespace Febucci.TextAnimatorForUnity.Actions
             }
         }
 
+
+        // fixes method not available in base class because of generic :C
+        [UnityEngine.ContextMenu("Force rebuild")]
+        public override void ForceBuildRefresh()
+        {
+            base.ForceBuildRefresh();
+        }
+
+
         protected override void OnBuildOnce()
         {
             base.OnBuildOnce();

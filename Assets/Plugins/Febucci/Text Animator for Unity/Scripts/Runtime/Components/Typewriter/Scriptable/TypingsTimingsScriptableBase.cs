@@ -56,6 +56,12 @@ namespace Febucci.TextAnimatorForUnity
     [System.Serializable]
     public abstract class TypingsTimingsScriptableBase : ScriptableObject, ITypingTimingsProvider
     {
+        public float GetWaitAppearanceTimeOf(CharacterData character, ITextAnimatorProvider animator)
+            => GetWaitAppearanceTimeOf(character, animator.TextAnimator);
+
+        public float GetWaitDisappearanceTimeOf(CharacterData character, ITextAnimatorProvider animator)
+            => GetWaitDisappearanceTimeOf(character, animator.TextAnimator);
+
         public abstract float GetWaitAppearanceTimeOf(CharacterData character, TextAnimator animator);
         public virtual float GetWaitDisappearanceTimeOf(CharacterData character, TextAnimator animator)
             => GetWaitAppearanceTimeOf(character, animator);

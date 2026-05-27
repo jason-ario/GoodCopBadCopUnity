@@ -4,43 +4,6 @@
         <name>Febucci.TextAnimatorCore</name>
     </assembly>
     <members>
-        <member name="F:Febucci.TextAnimatorCore.Text.CharacterData.visibleTime">
-            <summary>
-            Time where the character is visible (any of <see cref="F:Febucci.TextAnimatorCore.Text.CharacterData.appearTime" /> or <see cref="F:Febucci.TextAnimatorCore.Text.CharacterData.disappearTime" /> &gt; 0)
-            </summary>
-        </member>
-        <member name="T:Febucci.TextAnimatorCore.Text.CharacterDataExtensions">
-            <summary>
-            Unified extension methods for MeshData operations across all engines.
-            </summary>
-        </member>
-        <member name="M:Febucci.TextAnimatorCore.Text.CharacterDataExtensions.GetCenter(Febucci.TextAnimatorCore.Text.CharacterData)">
-            <summary />
-            <param name="character" />
-            <returns />
-            <remarks>See: <seealso cref="!:CharacterData.scaleDir" /></remarks>
-        </member>
-        <member name="M:Febucci.TextAnimatorCore.Text.ITextGenerator.GetFirstCharacterIndexInsidePage">
-            <summary>
-            Returns the first character index inside the page, in case the text has an overflow mode set up and the text is paginated.
-            </summary>
-            <example>
-            If each page has 5 characters, and we're on page 2, then this method would return 5 as the starting index of the text.
-            </example>
-            <returns />
-        </member>
-        <member name="M:Febucci.TextAnimatorCore.Text.ITextGenerator.GetRenderedCharactersCountInsidePage(System.Int32)">
-            <summary>
-            Returns the number of characters that fit inside the page, in case the text has an overflow mode set up and the text is paginated. (otherwise simply returns the characters count)
-            </summary>
-            <returns />
-        </member>
-        <member name="T:Febucci.TextAnimatorCore.Text.MeshData">
-            <summary>
-            Compact mesh representation for a single character (4 vertices).
-            64 bytes total: 48 (positions) + 16 (colors).
-            </summary>
-        </member>
         <member name="T:Febucci.TextAnimatorCore.TextAnimator">
             <summary>
             Main class that handles animations
@@ -139,6 +102,43 @@
             Refreshes all effect parameters from their region parameters.
             Useful in Editor when preset default values are changed and need to be refreshed.
             Call this after modifying ScriptableObject presets to update the runtime parameters.
+            </summary>
+        </member>
+        <member name="F:Febucci.TextAnimatorCore.Text.CharacterData.visibleTime">
+            <summary>
+            Time where the character is visible (any of <see cref="F:Febucci.TextAnimatorCore.Text.CharacterData.appearTime" /> or <see cref="F:Febucci.TextAnimatorCore.Text.CharacterData.disappearTime" /> &gt; 0)
+            </summary>
+        </member>
+        <member name="T:Febucci.TextAnimatorCore.Text.CharacterDataExtensions">
+            <summary>
+            Unified extension methods for MeshData operations across all engines.
+            </summary>
+        </member>
+        <member name="M:Febucci.TextAnimatorCore.Text.CharacterDataExtensions.GetCenter(Febucci.TextAnimatorCore.Text.CharacterData)">
+            <summary />
+            <param name="character" />
+            <returns />
+            <remarks>See: <seealso cref="!:CharacterData.scaleDir" /></remarks>
+        </member>
+        <member name="M:Febucci.TextAnimatorCore.Text.ITextGenerator.GetFirstCharacterIndexInsidePage">
+            <summary>
+            Returns the first character index inside the page, in case the text has an overflow mode set up and the text is paginated.
+            </summary>
+            <example>
+            If each page has 5 characters, and we're on page 2, then this method would return 5 as the starting index of the text.
+            </example>
+            <returns />
+        </member>
+        <member name="M:Febucci.TextAnimatorCore.Text.ITextGenerator.GetRenderedCharactersCountInsidePage(System.Int32)">
+            <summary>
+            Returns the number of characters that fit inside the page, in case the text has an overflow mode set up and the text is paginated. (otherwise simply returns the characters count)
+            </summary>
+            <returns />
+        </member>
+        <member name="T:Febucci.TextAnimatorCore.Text.MeshData">
+            <summary>
+            Compact mesh representation for a single character (4 vertices).
+            64 bytes total: 48 (positions) + 16 (colors).
             </summary>
         </member>
         <member name="T:Febucci.TextAnimatorCore.AnimationContext">
@@ -563,6 +563,22 @@
             <summary>
             Triggers all messages/events that have not been triggered, but that are in the visible range
             </summary>
+        </member>
+        <member name="M:Febucci.TextAnimatorCore.Typing.TypewriterCore.GetApproximateShowDuration">
+            <summary>
+            Calculates the approximate total duration for the typewriter to show all characters,
+            by summing up the wait time for each character. Does not account for action tags,
+            callbacks, or effect durations.
+            </summary>
+            <returns>Approximate duration in seconds, or 0 if the animator or timings provider is not set.</returns>
+        </member>
+        <member name="M:Febucci.TextAnimatorCore.Typing.TypewriterCore.GetApproximateHideDuration">
+            <summary>
+            Calculates the approximate total duration for the typewriter to hide all characters,
+            by summing up the disappearance wait time for each character. Does not account for
+            callbacks or effect durations.
+            </summary>
+            <returns>Approximate duration in seconds, or 0 if the animator or timings provider is not set.</returns>
         </member>
         <member name="T:Febucci.TextAnimatorCore.Typing.TypingInfo">
             <summary>

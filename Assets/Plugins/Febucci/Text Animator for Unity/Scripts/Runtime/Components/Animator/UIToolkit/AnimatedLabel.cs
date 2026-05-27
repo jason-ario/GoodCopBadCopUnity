@@ -74,6 +74,21 @@ namespace Febucci.TextAnimatorForUnity // direct namespace for the UITK builder
             targetCharacters = charactersCount;
             shouldBeCopied = true;
 
+            // Fill info.character for all positions so that CalculateWords() (called immediately
+            // after this in ParseText) can correctly identify word boundaries.
+            // UIToolkit's CopyGlyphs only runs later in OnPostProcessTextVertices and skips
+            // whitespace characters entirely, leaving info.character == '\0' for spaces.
+            // char.IsWhiteSpace('\0') returns false, causing all chars to get wordIndex >= 0,
+            // which makes TypingDelaysByWord return 0 delay and show all text instantly.
+            string plainText = animator.TextWithoutAnyTag;
+            for (int i = 0; i < charactersCount && i < plainText.Length; i++)
+            {
+                ref var c = ref characters[i];
+                var info = c.info;
+                info.character = plainText[i];
+                c.info = info;
+            }
+
             if(!onSyncedContext) schedule.Execute(AnimateLabelSafe);
         }
 
@@ -381,7 +396,6 @@ namespace Febucci.TextAnimatorForUnity // direct namespace for the UITK builder
             }
 
             onSyncedContext = true;
-            Animate();
 
             bool hasAdvancedTextGeneration = resolvedStyle.unityTextGenerator == TextGeneratorType.Advanced;
             if (shouldBeCopied)

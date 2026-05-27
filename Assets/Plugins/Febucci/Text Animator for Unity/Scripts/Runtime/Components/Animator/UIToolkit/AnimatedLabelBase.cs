@@ -15,6 +15,7 @@ using Febucci.Parsing.Core;
 using Febucci.Parsing.Regions;
 using Febucci.TextAnimatorCore.Settings;
 using Febucci.TextAnimatorCore.Text;
+using Febucci.TextAnimatorCore.Time;
 using Febucci.TextAnimatorForUnity.Actions;
 using Febucci.TextAnimatorForUnity.Parsing;
 using UnityEngine;
@@ -327,7 +328,8 @@ namespace Febucci.TextAnimatorForUnity.UIToolkit
         public void SwapText(string text) => animator.SwapText(text);
 
         /// <inheritdoc cref="ITextAnimatorProvider.AppendText"/>
-        public void AppendText(string appendedText, bool hideText = false) => animator.AppendText(appendedText, hideText);
+        public void AppendText(string appendedText, bool hideText = false, bool skipOldText = true)
+            => animator.AppendText(appendedText, hideText:hideText, skipOldText:skipOldText);
 
         public TextRegion<IEffectPlayer>[] Disappearances { get; }
         /// <inheritdoc cref="ITextAnimatorProvider.SetVisibilityChar"/>
@@ -372,6 +374,9 @@ namespace Febucci.TextAnimatorForUnity.UIToolkit
             if(!Application.isPlaying)
                 return (float)UnityEditor.EditorApplication.timeSinceStartup;
             #endif
+
+            if (animationSettings?.Settings?.timeScale == TimeScale.Unscaled)
+                return UnityEngine.Time.unscaledTime;
 
             return UnityEngine.Time.time;
         }
@@ -419,7 +424,7 @@ namespace Febucci.TextAnimatorForUnity.UIToolkit
         public abstract bool HasChangedMeshRenderingSettings();
 
         public int GetFirstCharacterIndexInsidePage() => 0;
-        public int GetRenderedCharactersCountInsidePage(int charactersCount) => int.MaxValue;
+        public int GetRenderedCharactersCountInsidePage(int charactersCount) => charactersCount;
     }
 
 }

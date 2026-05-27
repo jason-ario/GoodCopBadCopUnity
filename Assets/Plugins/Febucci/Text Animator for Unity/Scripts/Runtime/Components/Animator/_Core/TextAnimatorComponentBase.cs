@@ -72,7 +72,7 @@ namespace Febucci.TextAnimatorForUnity
         /// Chooses which Time Scale to use when automatically animating effects (in other words, when the Update Mode is not set to Script). Set it to <see cref="TimeScale.Unscaled"/> if you want to animate effects even when the game is paused.
         /// </summary>
         [Tooltip("Chooses which Time Scale to use when animating effects.\nSet it to 'Unscaled' if you want to animate effects even when the game is paused.")]
-        public TimeScale timeScale => localSettings.timeScale;
+        public TimeScale timeScale => Settings.timeScale;
 
         #endregion
 
@@ -129,13 +129,13 @@ namespace Febucci.TextAnimatorForUnity
         /// True if you want the animations to be uniform/consistent across different font sizes. Default/Suggested to leave this as true, and change <see cref="referenceFontSize"/>. Otherwise, effects will move more when the text is smaller (requires less space on screen).
         /// </summary>
         [Tooltip("True if you want the animations to be uniform/consistent across different font sizes. Default/Suggested to leave this as true, and change the 'Reference Font Size'.\nOtherwise, effects will move more when the text is smaller (requires less space on screen)")]
-        public bool useDynamicScaling => localSettings.useDynamicScaling;
+        public bool useDynamicScaling => Settings.useDynamicScaling;
 
         /// <summary>
         /// Font size that will be used as reference to keep animations consistent/uniform at different scales. Works only if <see cref="useDynamicScaling"/> is set to true.
         /// </summary>
         [Tooltip("Font size that will be used as reference to keep animations consistent/uniform at different scales.")]
-        public float referenceFontSize => localSettings.referenceFontSize;
+        public float referenceFontSize => Settings.referenceFontSize;
 
 
         //---OTHERS---
@@ -144,7 +144,7 @@ namespace Febucci.TextAnimatorForUnity
         /// True if you want the animator's time to be reset on new text.
         /// </summary>
         [Tooltip("True if you want the animator's time to be reset on new text.")]
-        public bool isResettingTimeOnNewText => localSettings.isResettingTimeOnNewText;
+        public bool isResettingTimeOnNewText => Settings.isResettingTimeOnNewText;
 
         #endregion
 
@@ -270,7 +270,7 @@ namespace Febucci.TextAnimatorForUnity
             "Controls how default tags should be applied.\n\"Fallback\" will apply the effects only to characters that don't have any.\n\"Constant\" will apply the default effects to all the characters, even if they already have other tags via text.")]
         public DefaultEffectsMode defaultTagsMode
         {
-            get => localSettings.defaultEffectsMode;
+            get => Settings.defaultEffectsMode;
             set => localSettings.defaultEffectsMode = value;
         }
 
@@ -297,8 +297,8 @@ namespace Febucci.TextAnimatorForUnity
             => Wrapper.SetText(text, hideText ? ShowTextMode.Hidden : ShowTextMode.Shown);
 
         /// <inheritdoc cref="ITextAnimatorProvider.AppendText"/>
-        public void AppendText(string appendedText, bool hideText = false)
-            => Wrapper.AppendText(appendedText, hideText);
+        public void AppendText(string appendedText, bool hideText = false, bool skipOldText = true)
+            => Wrapper.AppendText(appendedText, hideText, skipOldText);
 
         /// <inheritdoc cref="ITextAnimatorProvider.SetVisibilityChar"/>
         public void SetVisibilityChar(int index, bool isVisible, bool canPlayEffects = true)
@@ -395,7 +395,7 @@ namespace Febucci.TextAnimatorForUnity
         protected virtual void OnEnable() // things might have changed when disabled, e.g. autoSize etc.
         {
             Wrapper.RequiresMeshUpdate = true;
-            Animate(0);
+            Animate(0.0001f); // Small delta to initialize behavior effects correctly on first frame
         }
         #endregion
 
