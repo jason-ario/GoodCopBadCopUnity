@@ -92,8 +92,7 @@ public class FootstepsAudio : MonoBehaviour
         audioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
         audioSource.PlayOneShot(clip);
 
-        if (movementController != null && movementController.IsRunning)
-            _footstepParticles?.EmitRunStep();
+        _footstepParticles?.EmitStep(movementController != null && movementController.IsRunning);
     }
 
     private AudioClip[] ResolveClipSet()

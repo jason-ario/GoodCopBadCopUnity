@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// URP Renderer Feature that applies a full-screen smudge / dreamy-smear effect.
-/// Add this to your URP Renderer asset, then assign the Hidden/Smudge material.
+/// Add this to your URP Renderer asset, then assign the smudge material.
 /// </summary>
 public class SmudgeFeature : ScriptableRendererFeature
 {
@@ -29,27 +30,56 @@ public class SmudgeFeature : ScriptableRendererFeature
     {
         private static readonly int SmudgeOffsetID = Shader.PropertyToID("_SmudgeOffset");
         private static readonly int SmudgeBlendID  = Shader.PropertyToID("_SmudgeBlend");
+        private static readonly Vector4 ScaleBias  = new Vector4(1f, 1f, 0f, 0f);
 
         private readonly Settings settings;
-        private RTHandle tempTex;
+
+        // Persistent RTHandles — allocated once and resized as needed each frame.
+        private RTHandle tempRead;
+        private RTHandle tempWrite;
+
+        private class PassData
+        {
+            public TextureHandle source;
+            public TextureHandle destination;
+            public Material material;
+        }
 
         public SmudgePass(Settings settings)
         {
             this.settings = settings;
+
+            // Ensures URP never resolves activeColorTexture to the raw backbuffer
+            // before this pass runs, which is what triggers the RTHandle assertion
+            // in the legacy Execute path.
+            requiresIntermediateTexture = true;
         }
 
-        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
-        {
-            var desc = renderingData.cameraData.cameraTargetDescriptor;
-            desc.depthBufferBits = 0;
-            RenderingUtils.ReAllocateIfNeeded(ref tempTex, desc, name: "_SmudgeTemp");
-        }
-
-        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             if (settings.material == null) return;
 
-            var cmd = CommandBufferPool.Get("SmudgePass");
+            var cameraData   = frameData.Get<UniversalCameraData>();
+            var resourceData = frameData.Get<UniversalResourceData>();
+
+            var desc = cameraData.cameraTargetDescriptor;
+            desc.msaaSamples        = 1;
+            desc.depthBufferBits    = 0;
+            desc.depthStencilFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.None;
+
+            // Allocate persistent RTHandles and import them into the render graph.
+            // ReAllocateHandleIfNeeded resizes automatically when resolution changes.
+            RenderingUtils.ReAllocateHandleIfNeeded(
+                ref tempRead, desc, FilterMode.Bilinear, TextureWrapMode.Clamp,
+                name: "_SmudgeRead");
+
+            RenderingUtils.ReAllocateHandleIfNeeded(
+                ref tempWrite, desc, FilterMode.Bilinear, TextureWrapMode.Clamp,
+                name: "_SmudgeWrite");
+
+            TextureHandle hRead  = renderGraph.ImportTexture(tempRead);
+            TextureHandle hWrite = renderGraph.ImportTexture(tempWrite);
+            TextureHandle hColor = resourceData.activeColorTexture;
 
             Vector2 normalizedDir = settings.direction.sqrMagnitude > 0f
                 ? settings.direction.normalized
@@ -58,20 +88,45 @@ public class SmudgeFeature : ScriptableRendererFeature
             settings.material.SetVector(SmudgeOffsetID, normalizedDir * settings.offset);
             settings.material.SetFloat(SmudgeBlendID, settings.blend);
 
-            var source = renderingData.cameraData.renderer.cameraColorTargetHandle;
+            // Pass 1 — copy active color into tempRead (no material).
+            RecordBlitPass(renderGraph, "Smudge_CopyToTemp", hColor, hRead, null);
 
-            Blitter.BlitCameraTexture(cmd, source, tempTex, settings.material, 0);
-            Blitter.BlitCameraTexture(cmd, tempTex, source);
+            // Pass 2 — apply smudge from tempRead into tempWrite.
+            RecordBlitPass(renderGraph, "Smudge_Apply", hRead, hWrite, settings.material);
 
-            context.ExecuteCommandBuffer(cmd);
-            CommandBufferPool.Release(cmd);
+            // Pass 3 — copy result back to the camera color target.
+            RecordBlitPass(renderGraph, "Smudge_CopyBack", hWrite, hColor, null);
         }
 
-        public override void OnCameraCleanup(CommandBuffer cmd) { }
+        private static void RecordBlitPass(
+            RenderGraph renderGraph,
+            string passName,
+            TextureHandle source,
+            TextureHandle destination,
+            Material material)
+        {
+            using var builder = renderGraph.AddRasterRenderPass<PassData>(passName, out var passData);
+
+            passData.source      = source;
+            passData.destination = destination;
+            passData.material    = material;
+
+            builder.UseTexture(source);
+            builder.SetRenderAttachment(destination, 0);
+
+            builder.SetRenderFunc((PassData data, RasterGraphContext ctx) =>
+            {
+                if (data.material == null)
+                    Blitter.BlitTexture(ctx.cmd, data.source, ScaleBias, 0, false);
+                else
+                    Blitter.BlitTexture(ctx.cmd, data.source, ScaleBias, data.material, 0);
+            });
+        }
 
         public void Dispose()
         {
-            tempTex?.Release();
+            tempRead?.Release();
+            tempWrite?.Release();
         }
     }
 

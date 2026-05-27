@@ -66,6 +66,12 @@ public class PlayerAnimationController : NetworkBehaviour
     /// <summary>Read-only accessor for the fixed rig constraint target. DOTween this directly for full manual control.</summary>
     public Transform RightArmRigIKTarget => rightArmRigIKTarget;
 
+    /// <summary>
+    /// Returns the world-space Transform for any humanoid bone on the body animator.
+    /// Returns null if the bone is not found or the animator is not humanoid.
+    /// </summary>
+    public Transform GetBoneTransform(HumanBodyBones bone) => bodyAnimator != null ? bodyAnimator.GetBoneTransform(bone) : null;
+
     /// <summary>Read-only accessor for the fixed left-arm rig constraint target.</summary>
     public Transform LeftArmRigIKTarget => leftArmRigIKTarget;
 
