@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -14,6 +15,38 @@ public class PlayerCameraController : MonoBehaviour
     [Header("Hit Impulse")]
     [Tooltip("Impulse source used when the player takes damage.")]
     [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
+
+    /// <summary>
+    /// Enables or disables the Cinemachine virtual camera.
+    /// When enabling, forces an instant cut on the CinemachineBrain so there is
+    /// no lerp from the previously active camera.
+    /// </summary>
+    public void SetCameraActive(bool active)
+    {
+        if (camera == null) return;
+
+        if (active)
+        {
+            var brain = FindFirstObjectByType<CinemachineBrain>();
+            if (brain != null)
+            {
+                var prevBlend = brain.DefaultBlend;
+                brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.Cut, 0f);
+                camera.gameObject.SetActive(true);
+                StartCoroutine(RestoreBlend(brain, prevBlend));
+                return;
+            }
+        }
+
+        camera.gameObject.SetActive(active);
+    }
+
+    private IEnumerator RestoreBlend(CinemachineBrain brain, CinemachineBlendDefinition prevBlend)
+    {
+        yield return null;
+        if (brain != null)
+            brain.DefaultBlend = prevBlend;
+    }
 
     public void TurnOnRumble()
     {

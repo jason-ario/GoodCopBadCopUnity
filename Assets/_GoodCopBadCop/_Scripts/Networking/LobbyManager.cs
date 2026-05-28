@@ -454,6 +454,10 @@ public class LobbyManager : MonoBehaviour
 
         Debug.Log($"[Host] HasGameStarted={GameManager.Instance.HasGameStarted} IsTransitioningToLobby={GameManager.Instance.IsTransitioningToLobby}");
 
+        // Delay spawn by 1 second to allow scene sync to complete on the joining client
+        // before any NetworkObject is spawned for them.
+        await Task.Delay(1000);
+
         if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
         {
             // Spawn relative to where the host currently is.

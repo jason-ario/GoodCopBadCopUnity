@@ -5,10 +5,6 @@ public class PlayerSpawner : NetworkBehaviour
 {
     public static PlayerSpawner Instance;
 
-    [Header("Prefabs")]
-    [SerializeField] private GameObject playerPrefab;
-    [SerializeField] private GameObject player2Prefab;
-
     [Header("Lobby Spawn Points")]
     [SerializeField] private Transform singlePlayerLobbySpawnPoint;
     [SerializeField] private Transform[] multiplayerLobbySpawnPoints;
@@ -29,66 +25,56 @@ public class PlayerSpawner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Spawns a player for the given client at the lobby spawn point.
+    /// Activates the auto-spawned player for the given client at the lobby spawn point.
     /// SERVER ONLY.
     /// </summary>
     public void SpawnPlayerAtLobby(ulong clientId, bool isSinglePlayer)
     {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true);
+        ActivatePlayerAtPoint(clientId, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true);
     }
 
     /// <summary>
-    /// Spawns a player for the given client at the gameplay spawn point.
+    /// Activates the auto-spawned player for the given client at the gameplay spawn point.
     /// SERVER ONLY.
     /// </summary>
     public void SpawnPlayer(ulong clientId, bool isSinglePlayer)
     {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer, GetSpawnPoint(clientId, isSinglePlayer), isOutside: false);
+        ActivatePlayerAtPoint(clientId, GetSpawnPoint(clientId, isSinglePlayer), isOutside: false);
     }
 
-    private void SpawnPlayerAtPoint(ulong clientId, bool isSinglePlayer, Transform spawnPoint, bool isOutside = false)
+    /// <summary>
+    /// Activates the auto-spawned player for the given client at the booth gameplay spawn point.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnPlayerAtBooth(ulong clientId)
+    {
+        ActivatePlayerAtPoint(clientId, GetBoothSpawnPoint(clientId), isOutside: false);
+    }
+
+    private void ActivatePlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside)
     {
         if (!NetworkManager.Singleton.IsServer)
         {
-            Debug.LogWarning("SpawnPlayer called on client. Ignored.");
+            Debug.LogWarning("[PlayerSpawner] ActivatePlayerAtPoint called on client. Ignored.");
             return;
         }
 
-        // Safety: prevent double spawning
-        if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client) &&
-            client.PlayerObject != null)
+        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client) ||
+            client.PlayerObject == null)
         {
-            Debug.LogWarning($"Player already exists for client {clientId}");
+            Debug.LogWarning($"[PlayerSpawner] No PlayerObject found for client {clientId}. Cannot activate.");
             return;
         }
 
-        GameObject prefabToSpawn = playerPrefab;
-        if (!isSinglePlayer && clientId > 0)
+        var playerInstance = client.PlayerObject.GetComponent<PlayerInstance>();
+        if (playerInstance == null)
         {
-            prefabToSpawn = player2Prefab != null ? player2Prefab : playerPrefab;
-        }
-
-        GameObject player = Instantiate(
-            prefabToSpawn,
-            spawnPoint.position,
-            spawnPoint.rotation
-        );
-
-        NetworkObject netObj = player.GetComponent<NetworkObject>();
-        if (netObj == null)
-        {
-            Debug.LogError("Player prefab is missing NetworkObject!");
-            Destroy(player);
+            Debug.LogError($"[PlayerSpawner] PlayerObject for client {clientId} is missing PlayerInstance.");
             return;
         }
 
-        netObj.SpawnAsPlayerObject(clientId, true);
-
-        PlayerInstance playerInstance = player.GetComponent<PlayerInstance>();
-        if (playerInstance != null)
-            playerInstance.SetIsOutside(isOutside);
-
-        Debug.Log($"[PlayerSpawner] Spawned player for client {clientId} at {spawnPoint.name} (isOutside: {isOutside})");
+        playerInstance.ActivateAtPoint(spawnPoint, isOutside);
+        Debug.Log($"[PlayerSpawner] Activated player for client {clientId} at {spawnPoint.name} (isOutside: {isOutside})");
     }
 
     /// <summary>
@@ -122,14 +108,5 @@ public class PlayerSpawner : NetworkBehaviour
     {
         int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
         return multiplayerSpawnPoints[index];
-    }
-
-    /// <summary>
-    /// Spawns a player for the given client directly at the booth gameplay spawn point.
-    /// SERVER ONLY.
-    /// </summary>
-    public void SpawnPlayerAtBooth(ulong clientId)
-    {
-        SpawnPlayerAtPoint(clientId, isSinglePlayer: false, GetBoothSpawnPoint(clientId), isOutside: false);
     }
 }
