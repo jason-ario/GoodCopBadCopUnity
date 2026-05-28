@@ -55,10 +55,17 @@ public class LobbyManager : MonoBehaviour
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        NetworkManager.Singleton.OnServerStarted += OnServerStarted;
     }
 
     private void Update()
     {
+        // LobbyManager is responsible for pumping Steam callbacks throughout the lobby
+        // lifecycle — including during async awaits (e.g. CreateLobbyAsync) that happen
+        // *before* StartHost() enables the FacepunchTransport component. Without this call
+        // here, those awaitable Steam tasks would never complete.
+        // FacepunchTransport.Update() also calls RunCallbacks() once the transport is active;
+        // calling it twice per frame is harmless — Steamworks deduplicates internally.
         SteamClient.RunCallbacks();
     }
 
@@ -67,6 +74,7 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
         }
 
         SteamMatchmaking.OnLobbyEntered -= OnLobbyEntered;
@@ -74,6 +82,47 @@ public class LobbyManager : MonoBehaviour
         SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberLeave;
         SteamFriends.OnGameLobbyJoinRequested -= OnGameLobbyJoinRequested;
         SteamFriends.OnGameOverlayActivated -= OnOverlayToggled;
+    }
+
+    // =========================
+    // SERVER STARTUP
+    // =========================
+
+    /// <summary>
+    /// Defensive sweep that runs once after StartHost() completes.
+    /// Detects any spawned NetworkObject whose IsSceneObject is null — a state that
+    /// should never occur after a clean NGO startup but is known to arise in certain
+    /// NGO 2.x builds when in-scene objects were inactive at host-start time.
+    /// Finding any here means CheckForGlobalObjectIdHashOverride() would crash when the
+    /// next client connects; calling SetSceneObjectStatus(true) fixes that before it happens.
+    /// </summary>
+    private void OnServerStarted()
+    {
+        if (NetworkManager.Singleton == null || NetworkManager.Singleton.SpawnManager == null)
+            return;
+
+        int fixedCount = 0;
+        foreach (NetworkObject netObj in NetworkManager.Singleton.SpawnManager.SpawnedObjectsList)
+        {
+            if (netObj == null || netObj.IsSceneObject.HasValue)
+                continue;
+
+            Debug.LogWarning(
+                $"[LobbyManager] Spawned NetworkObject '{netObj.name}' (id={netObj.NetworkObjectId}) " +
+                $"has IsSceneObject == null after server start. This will crash client synchronization. " +
+                $"Ensure this object is active when StartHost() is called, or ensure Spawn() is called through NGO. " +
+                $"Temporarily fixing as scene object to prevent the exception.");
+
+            netObj.SetSceneObjectStatus(true);
+            fixedCount++;
+        }
+
+        if (fixedCount > 0)
+        {
+            Debug.LogWarning(
+                $"[LobbyManager] Fixed {fixedCount} NetworkObject(s) with null IsSceneObject. " +
+                "See warnings above for the affected objects. Apply the NGO null-guard patch to permanently fix the root cause.");
+        }
     }
 
     private void OnOverlayToggled(bool isActive)
