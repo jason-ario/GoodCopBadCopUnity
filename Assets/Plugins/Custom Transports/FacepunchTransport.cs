@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Steamworks;
@@ -93,6 +93,13 @@ namespace Netcode.Transports.Facepunch
         public override void Initialize(NetworkManager networkManager = null)
         {
             connectedClients = new Dictionary<ulong, Client>();
+
+            if (SteamClient.IsValid)
+            {
+                if (LogLevel <= LogLevel.Developer)
+                    Debug.Log($"[{nameof(FacepunchTransport)}] - SteamClient already initialized, skipping Init.");
+                return;
+            }
 
             try
             {
