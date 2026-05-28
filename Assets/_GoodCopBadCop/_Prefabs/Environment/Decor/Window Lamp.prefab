@@ -48,9 +48,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 2
-  m_Color: {r: 1, g: 0.011764706, b: 0, a: 1}
-  m_Intensity: 0.2
-  m_Range: 0.66
+  m_Color: {r: 1, g: 0.011764707, b: 0, a: 1}
+  m_Intensity: 0.1
+  m_Range: 3.4
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -148,16 +148,16 @@ MonoBehaviour:
   profileSync: 0
   useCustomBounds: 0
   bounds:
-    m_Center: {x: -0.103000045, y: 2.6701472, z: -10.896365}
-    m_Extent: {x: 0.65718454, y: 0.66, z: 0.65718454}
+    m_Center: {x: -2.8476655, y: 3.9201467, z: -15.362201}
+    m_Extent: {x: 3.3855035, y: 3.4, z: 3.3855035}
   boundsInLocalSpace: 0
   profile: {fileID: 11400000, guid: 7b44d0ac88ae97f44ba0da50dcfe75b8, type: 2}
-  customRange: 0.66
+  customRange: 3.4
   targetCamera: {fileID: 0}
   useCustomSize: 0
   areaWidth: 1
   areaHeight: 1
-  generatedRange: 0.66
+  generatedRange: 3.4
   generatedTipRadius: -1
   generatedSpotAngle: -1
   generatedBaseRadius: -1
@@ -194,16 +194,16 @@ MonoBehaviour:
   noiseStrength: 0.99
   noiseScale: 5
   noiseFinalMultiplier: 1
-  density: 1
+  density: 0.73
   mediumAlbedo: {r: 1, g: 1, b: 1, a: 1}
-  brightness: 1.62
-  attenuationMode: 0
-  attenCoefConstant: 1
-  attenCoefLinear: 2
-  attenCoefQuadratic: 1
-  rangeFallOff: 6.77
-  diffusionIntensity: 0.61
-  penumbra: 0.5
+  brightness: 2
+  attenuationMode: 1
+  attenCoefConstant: 0.1
+  attenCoefLinear: 2.51
+  attenCoefQuadratic: 0.31
+  rangeFallOff: 115.33
+  diffusionIntensity: 1.37
+  penumbra: 0.741
   tipRadius: 0
   nearClipDistance: 0
   cookieTexture: {fileID: 0}
@@ -222,7 +222,7 @@ MonoBehaviour:
   dustDistanceDeactivation: 70
   dustPrewarm: 1
   enableShadows: 0
-  shadowIntensity: 0.7
+  shadowIntensity: 106.4
   shadowColor: {r: 0, g: 0, b: 0, a: 1}
   shadowTranslucency: 0
   shadowTranslucencyIntensity: 1
@@ -230,7 +230,7 @@ MonoBehaviour:
   shadowResolution: 256
   shadowCullingMask:
     serializedVersion: 2
-    m_Bits: 4294967293
+    m_Bits: 32765
   shadowBakeInterval: 0
   shadowBakeIgnoreRotationChange: 0
   shadowNearDistance: 0.1
@@ -1263,7 +1263,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.66
+      value: 3.4
       mode: 0
       spread: 0
       speed:
@@ -2007,8 +2007,8 @@ ParticleSystem:
     x:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.13
-      minScalar: -0.07
+      scalar: 0.10000007
+      minScalar: -0.099999934
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -2113,8 +2113,8 @@ ParticleSystem:
     z:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.1
-      minScalar: -0.1
+      scalar: 0.13
+      minScalar: -0.07
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -5382,19 +5382,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1.5622
+      value: -0.849
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.9150007
+      value: 4.165
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -1.6106997
+      value: -6.41
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071076
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalRotation.x
@@ -5402,7 +5402,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0
+      value: 0.707106
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalRotation.z
@@ -5414,7 +5414,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
+      value: 90
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -5460,6 +5460,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6551260003005174353}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8569452433223360100}
   m_SourcePrefab: {fileID: 100100000, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
 --- !u!4 &563362425123432621 stripped
 Transform:
@@ -5478,7 +5481,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 908222479975625239}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2ecb2f611bc3988489003a0d624d4579, type: 3}
   m_Name: 
@@ -5556,6 +5559,31 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &8569452433223360100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 908222479975625239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1317431226
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!23 &6890104498396250751 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -2322344684677018311, guid: cd0751d856afbd64b89385640eeadd49, type: 3}

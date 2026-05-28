@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 
+
 public class WindowLampController : NetworkBehaviour
 {
     [SerializeField] Light lightComponent;
