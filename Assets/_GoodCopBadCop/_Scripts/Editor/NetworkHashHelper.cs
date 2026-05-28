@@ -19,11 +19,19 @@ public class NetworkHashFinder : EditorWindow
     void OnGUI()
     {
         bool wasEnabled = GUI.enabled;
+        bool canFind = VerifyIsInteger(hashInput);
 
         EditorGUILayout.BeginHorizontal();
         {
+            EditorGUI.BeginChangeCheck();
             hashInput = EditorGUILayout.TextField("Hash ID", hashInput);
-            GUI.enabled = VerifyIsInteger(hashInput);
+            if (EditorGUI.EndChangeCheck())
+            {
+                canFind = VerifyIsInteger(hashInput);
+                Repaint();
+            }
+
+            GUI.enabled = canFind;
             if (GUILayout.Button("Find"))
             {
                 output = FindByHash(ParseInput(hashInput));
@@ -38,8 +46,8 @@ public class NetworkHashFinder : EditorWindow
         if (newOutput != output)
         {
             GUI.FocusControl(null);
-            hashInput = newOutput.PrefabIdHash.ToString();
             output = newOutput;
+            hashInput = output != null ? output.PrefabIdHash.ToString() : "";
         }
 
         if (GUILayout.Button("Clear"))
@@ -54,7 +62,7 @@ public class NetworkHashFinder : EditorWindow
 
     private uint ParseInput(string input)
     {
-        return uint.Parse(input);
+        return uint.TryParse(input, out uint value) ? value : 0u;
     }
 
     /// <summary>
@@ -82,15 +90,7 @@ public class NetworkHashFinder : EditorWindow
 
     private bool VerifyIsInteger(string input)
     {
-        try
-        {
-            uint.Parse(input);
-            return true;
-        }
-        catch (System.Exception)
-        {
-            return false;
-        }
+        return uint.TryParse(input, out _);
     }
 }
 #endif
