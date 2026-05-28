@@ -90,8 +90,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
-  m_LocalPosition: {x: -1.9593265, y: 1.8317343, z: 11.315362}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.451, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -129,9 +129,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.1
+  near clip plane: 0.12
   far clip plane: 5000
-  field of view: 60
+  field of view: 65
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -10623,7 +10623,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8000816560836992802}
   - component: {fileID: 5788063810737065446}
-  - component: {fileID: 5699448016634563419}
+  - component: {fileID: 3583545908107148332}
   - component: {fileID: 3041942974558453909}
   - component: {fileID: 6460359851244041616}
   - component: {fileID: 5651200760162566270}
@@ -10702,7 +10702,7 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 1.14, z: 0.02}
---- !u!114 &5699448016634563419
+--- !u!114 &3583545908107148332
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -10714,14 +10714,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1936807553
-  InScenePlacedSourceGlobalObjectIdHash: 4229621594
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 0
+  SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -11115,6 +11115,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OwnerNetworkAnimator
   ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 0
+  m_Animator: {fileID: 5651200760162566270}
   TransitionStateInfoList:
   - IsCrossFadeExit: 0
     Layer: 2
@@ -11144,7 +11147,161 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: 207596745
     TransitionIndex: 0
-  m_Animator: {fileID: 5651200760162566270}
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: Grounded
+      NameHash: 862969536
+      Synchronize: 1
+      ParameterType: 4
+    - name: MoveZ
+      NameHash: -968048806
+      Synchronize: 1
+      ParameterType: 1
+    - name: MoveX
+      NameHash: 675470966
+      Synchronize: 1
+      ParameterType: 1
+    - name: Magnitude
+      NameHash: -1216938078
+      Synchronize: 1
+      ParameterType: 1
+    - name: OpenDoor
+      NameHash: 207596745
+      Synchronize: 1
+      ParameterType: 9
+    - name: Sitting
+      NameHash: 655049087
+      Synchronize: 1
+      ParameterType: 4
+    - name: UsingTool
+      NameHash: 1515455574
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingShotgun
+      NameHash: -1735445899
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingPencil
+      NameHash: 2000771275
+      Synchronize: 1
+      ParameterType: 4
+    - name: Shrug
+      NameHash: -1847043940
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingEnvelope
+      NameHash: 2105609812
+      Synchronize: 1
+      ParameterType: 4
+    - name: UsingRadio
+      NameHash: -1813992778
+      Synchronize: 1
+      ParameterType: 4
+    - name: TuningRadio
+      NameHash: -1051165828
+      Synchronize: 1
+      ParameterType: 1
+    - name: HoldingBox
+      NameHash: 1965896601
+      Synchronize: 1
+      ParameterType: 4
+    - name: Shoot
+      NameHash: -1316629574
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingThermometerGun
+      NameHash: -1299293843
+      Synchronize: 1
+      ParameterType: 4
+    - name: PressButton
+      NameHash: -2075743765
+      Synchronize: 1
+      ParameterType: 9
+    - name: OpenSwitch
+      NameHash: -425885340
+      Synchronize: 1
+      ParameterType: 9
+    - name: CloseSwitch
+      NameHash: 1325039157
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingFolder
+      NameHash: 293735821
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingBeer
+      NameHash: 391385220
+      Synchronize: 1
+      ParameterType: 4
+    - name: OpenFolder
+      NameHash: 1708573617
+      Synchronize: 1
+      ParameterType: 9
+    - name: ThrowFolder
+      NameHash: -984792713
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingFolderOpen
+      NameHash: 1890323220
+      Synchronize: 1
+      ParameterType: 4
+    - name: IsRunning
+      NameHash: -887662580
+      Synchronize: 1
+      ParameterType: 4
+    - name: GrabPhone
+      NameHash: -1713485239
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingPhone
+      NameHash: 112373191
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingIDCard
+      NameHash: 1493757193
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingPaper
+      NameHash: 216488460
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingExamNotebook
+      NameHash: -1860983943
+      Synchronize: 1
+      ParameterType: 4
+    - name: RipOutPage
+      NameHash: 1920565635
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingNewspaper
+      NameHash: -377844105
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingFlashlight
+      NameHash: -940607395
+      Synchronize: 1
+      ParameterType: 4
+    - name: TakingPill
+      NameHash: -1821811238
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingStamp
+      NameHash: 397649170
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingCigarette
+      NameHash: 1157335309
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldShovel
+      NameHash: 1500494758
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingGuidebook
+      NameHash: 589025196
+      Synchronize: 1
+      ParameterType: 4
+  AnimatorParametersExpanded: 0
 --- !u!114 &5788097999620647467
 MonoBehaviour:
   m_ObjectHideFlags: 0
