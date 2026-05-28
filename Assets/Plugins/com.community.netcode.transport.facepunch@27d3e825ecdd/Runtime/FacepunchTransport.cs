@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -44,7 +44,8 @@ namespace Netcode.Transports.Facepunch
         {
             try
             {
-                SteamClient.Init(steamAppId, false);
+                if (!SteamClient.IsValid)
+                    SteamClient.Init(steamAppId, false);
             }
             catch (Exception e)
             {
