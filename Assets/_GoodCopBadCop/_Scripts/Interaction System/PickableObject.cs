@@ -7,7 +7,6 @@ using UnityEngine.Animations;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(ParentConstraint))]
-[RequireComponent(typeof(NetworkTransform))]
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
