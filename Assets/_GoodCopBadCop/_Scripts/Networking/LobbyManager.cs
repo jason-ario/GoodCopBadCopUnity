@@ -73,6 +73,7 @@ public class LobbyManager : MonoBehaviour
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        NetworkManager.Singleton.OnServerStarted += OnServerStarted;
     }
 
     private void Update()
@@ -85,6 +86,7 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
         }
 
         SteamMatchmaking.OnLobbyEntered -= OnLobbyEntered;
@@ -400,6 +402,36 @@ public class LobbyManager : MonoBehaviour
     // =========================
     // NETCODE (SUPPLEMENTAL)
     // =========================
+
+    /// <summary>
+    /// Fires after ServerSpawnSceneObjectsOnStartSweep completes, so all scene-placed
+    /// NetworkObjects are already in SpawnedObjectsList. Dynamically spawned objects always
+    /// have IsSceneObject set to false during spawn — they can never be null. Any spawned
+    /// NetworkObject with a null IsSceneObject is therefore a scene-placed object that was
+    /// not fully initialized, which causes CheckForGlobalObjectIdHashOverride to throw an
+    /// InvalidOperationException when the second client connects and triggers sync.
+    /// </summary>
+    private void OnServerStarted()
+    {
+        var spawnedObjects = NetworkManager.Singleton.SpawnManager.SpawnedObjectsList;
+        int patched = 0;
+
+        foreach (var netObj in spawnedObjects)
+        {
+            if (netObj.IsSceneObject.HasValue)
+                continue;
+
+            netObj.SetSceneObjectStatus(true);
+            patched++;
+            Debug.LogWarning($"[LobbyManager] Patched null IsSceneObject on '{netObj.name}' (NetworkObjectId: {netObj.NetworkObjectId}) — set to scene object.");
+        }
+
+        if (patched > 0)
+            Debug.LogWarning($"[LobbyManager] Fixed {patched} NetworkObject(s) with null IsSceneObject. These would have crashed CheckForGlobalObjectIdHashOverride on client sync.");
+        else
+            Debug.Log("[LobbyManager] OnServerStarted: all spawned NetworkObjects have IsSceneObject set correctly.");
+    }
+
     private async void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
