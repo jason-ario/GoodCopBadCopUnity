@@ -1,33 +1,37 @@
-using System.Collections;
-using Netcode.Transports.Facepunch;
 using Steamworks;
-using Steamworks.Data;
 using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+/// <summary>
+/// Place on the player root. Assign the separate name tag GameObject in the inspector.
+/// </summary>
 public class NameTag : NetworkBehaviour
 {
-    [Tooltip("The transform to follow (e.g. head bone of the character)")]
-    public Transform target;
+    [Tooltip("The name tag GameObject to show above this player (separate from the player root)")]
+    [SerializeField] private GameObject nameTagObject;
 
-    [Tooltip("Optional offset from the target position (e.g. to float above the head)")]
-    public Vector3 offset = new Vector3(0f, 0.2f, 0f);
-
+    [Tooltip("The TMP label on the name tag object")]
     [SerializeField] private TMP_Text label;
 
+    [Tooltip("Transform to position the name tag at (e.g. head bone)")]
+    [SerializeField] private Transform followTarget;
+
+    [Tooltip("Offset above the follow target")]
+    [SerializeField] private Vector3 offset = new Vector3(0f, 0.2f, 0f);
+
     /// <summary>
-    /// Stores the owner's Steam ID so every client can independently resolve
-    /// the display name — avoiding any replication-timing race on FixedString.
-    /// Written by the owner; readable by all.
+    /// The owner writes their Steam display name here; all other clients read it.
     /// </summary>
-    private readonly NetworkVariable<ulong> _ownerSteamId =
-        new NetworkVariable<ulong>(
-            0UL,
+    private readonly NetworkVariable<FixedString64Bytes> _ownerName =
+        new NetworkVariable<FixedString64Bytes>(
+            default,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Owner);
 
     private Camera _camera;
+    private bool _nameResolved;
 
     private void OnEnable()
     {
@@ -38,76 +42,46 @@ public class NameTag : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        _ownerSteamId.OnValueChanged += OnSteamIdChanged;
-
         if (IsOwner)
         {
-            // Publish the local player's Steam ID so every other client can resolve the name.
-            StartCoroutine(PublishSteamIdNextFrame());
+            // Owner reads their own Steam name directly and publishes it for all other clients.
+            if (!SteamClient.IsValid)
+            {
+                Debug.LogWarning("[NameTag] Steam is not initialized.");
+                return;
+            }
+
+            string steamName = SteamClient.Name;
+            Debug.Log($"[NameTag] Publishing Steam name: {steamName}");
+            _ownerName.Value = new FixedString64Bytes(steamName);
+
+            // Hide the local player's own name tag.
+            if (nameTagObject != null)
+                nameTagObject.SetActive(false);
+
             return;
         }
 
-        // Non-owner: if the NetworkVariable snapshot already contains a valid ID
-        // (e.g. late-joiner receiving initial state), resolve immediately.
-        if (_ownerSteamId.Value != 0UL)
-            StartCoroutine(ResolveSteamName(_ownerSteamId.Value));
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        base.OnNetworkDespawn();
-        _ownerSteamId.OnValueChanged -= OnSteamIdChanged;
-    }
-
-    /// <summary>Waits one frame then writes the local SteamId into the NetworkVariable.</summary>
-    private IEnumerator PublishSteamIdNextFrame()
-    {
-        yield return null;
-
-        bool usesSteam = NetworkManager.Singleton != null &&
-                         NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport;
-
-        if (!usesSteam || !SteamClient.IsValid)
-            yield break;
-
-        _ownerSteamId.Value = SteamClient.SteamId.Value;
-    }
-
-    private void OnSteamIdChanged(ulong previous, ulong current)
-    {
-        // Only non-owners need to react; owners never show their own tag.
-        if (IsOwner || current == 0UL)
-            return;
-
-        StartCoroutine(ResolveSteamName(current));
-    }
-
-    /// <summary>
-    /// Resolves the display name for <paramref name="steamId"/> by calling
-    /// <see cref="Friend.RequestInfoAsync"/> so the name is fetched from Steam
-    /// even when the user is not in the local friend list.
-    /// </summary>
-    private IEnumerator ResolveSteamName(ulong steamId)
-    {
-        if (!SteamClient.IsValid)
-            yield break;
-
-        var friend = new Friend(steamId);
-        var task = friend.RequestInfoAsync();
-
-        // Yield until the async request completes.
-        while (!task.IsCompleted)
-            yield return null;
-
-        string resolvedName = friend.Name;
-
-        if (string.IsNullOrEmpty(resolvedName))
+        // Non-owner: apply immediately if the name snapshot already arrived (e.g. late joiner).
+        string existingName = _ownerName.Value.ToString();
+        if (!string.IsNullOrEmpty(existingName))
         {
-            Debug.LogWarning($"[NameTag] Could not resolve Steam name for SteamId={steamId}.");
-            yield break;
+            ApplyName(existingName);
+            _nameResolved = true;
         }
+    }
 
-        ApplyName(resolvedName);
+    /// <summary>Polls each frame until the owner's name arrives over the network.</summary>
+    private void Update()
+    {
+        if (IsOwner || _nameResolved) return;
+
+        string name = _ownerName.Value.ToString();
+        if (!string.IsNullOrEmpty(name))
+        {
+            ApplyName(name);
+            _nameResolved = true;
+        }
     }
 
     private void ApplyName(string playerName)
@@ -118,12 +92,10 @@ public class NameTag : NetworkBehaviour
 
     private void LateUpdate()
     {
-        if (target == null || _camera == null) return;
+        if (IsOwner || nameTagObject == null || followTarget == null || _camera == null) return;
 
-        // Follow the target's position with an optional offset.
-        transform.position = target.position + offset;
-
-        // Face the camera: copy the camera's rotation so the tag always looks at the viewer.
-        transform.rotation = _camera.transform.rotation;
+        // Position and billboard the name tag object each frame.
+        nameTagObject.transform.position = followTarget.position + offset;
+        nameTagObject.transform.rotation = _camera.transform.rotation;
     }
 }
