@@ -13,18 +13,39 @@ public class NewspaperContentsController : MonoBehaviour
 
     [SerializeField] private NewspaperContentScriptable[] _newspaperContentScriptables;
     [SerializeField] private GameObject camera;
-    
+
+    private static readonly DateTime StartDate = new DateTime(1989, 10, 20);
+    private const string DayNumberKey = "dayNumber";
+
+    private void Awake()
+    {
+        int day = PlayerPrefs.GetInt(DayNumberKey, 1);
+        PopulateFromDay(day);
+    }
+
     private void Start()
     {
         ShiftManager.Instance.OnShiftReady += PopulateNewspaperContents;
         ShiftManager.Instance.OnShiftStart += PopulateNewspaperContents;
     }
 
+    /// <summary>
+    /// Refreshes the newspaper using the current day from ShiftManager.
+    /// Subscribed to OnShiftReady and OnShiftStart.
+    /// </summary>
     public void PopulateNewspaperContents()
     {
+        PopulateFromDay(ShiftManager.Instance.CurrentDay);
+    }
+
+    /// <summary>
+    /// Populates all newspaper text fields for the given day number.
+    /// </summary>
+    private void PopulateFromDay(int day)
+    {
         Debug.Log("Populating Newspaper Contents");
-        int index = ShiftManager.Instance.CurrentDay - 1;
-        string date = ShiftManager.Instance.CurrentGameDate.ToString("dd MMM yyyy");
+        int index = day - 1;
+        string date = StartDate.AddDays(index).ToString("dd MMM yyyy");
         Debug.Log(index);
 
         NewspaperContentScriptable newspaperContentScriptable = _newspaperContentScriptables[index];
