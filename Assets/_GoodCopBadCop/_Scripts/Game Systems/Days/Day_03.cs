@@ -47,7 +47,7 @@ public class Day_03 : DayBase
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
         // Ensure the first suspect has at least one biological anomaly so the tutorial always has material.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
     }
 
@@ -78,7 +78,7 @@ public class Day_03 : DayBase
     private void OnPaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (_biologicalTutorialFired) return;
-        if (!IsServer) return;
+        if (!NetworkManager.Singleton.IsServer) return;
         _biologicalTutorialFired = true;
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         StartCoroutine(BiologicalExamTutorialSequence());

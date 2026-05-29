@@ -101,7 +101,7 @@ public class Day_01 : DayBase
 
         // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
         // Server-only: these static flags are consumed exclusively by the server's spawn logic.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
         {
             SuspectController.ForceNextSuspectClean          = true;
             ShiftManager.OverrideFirstArrivalInterval        = new UnityEngine.Vector2(0f, 0f);
@@ -265,9 +265,9 @@ public class Day_01 : DayBase
     private void OnDayStarted()
     {
         if (this == null) return;
-        if (!IsServer)
+        if (!NetworkManager.Singleton.IsServer)
         {
-            Debug.LogWarning($"[Day_01] OnDayStarted: not server (IsServer={IsServer}, IsHost={IsHost}, IsClient={IsClient}) — tutorial skipped on this machine.");
+            Debug.LogWarning($"[Day_01] OnDayStarted: not server (IsServer={NetworkManager.Singleton.IsServer}, IsHost={NetworkManager.Singleton.IsHost}, IsClient={NetworkManager.Singleton.IsClient}) — tutorial skipped on this machine.");
             return;
         }
         Debug.Log("[Day_01] OnDayStarted: starting Day1TutorialSequence on server.");
@@ -286,7 +286,7 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("Follow instructions carefully. Your responses will be... noted. Press the button when you're ready to begin.");
 
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             _switchButton.SetReady(true);
 
         SetSwitchArrow(true);
@@ -309,7 +309,7 @@ public class Day_01 : DayBase
     private void OnPaperworkSpawnedHandler(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
-        if (!IsServer) return;
+        if (!NetworkManager.Singleton.IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
         _onPaperworkSpawned = null;
 
@@ -613,7 +613,7 @@ public class Day_01 : DayBase
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
         // Force exactly 2 documentation anomalies so the notebook tutorial always has material.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 2;
 
         _onSuspect2PaperworkSpawned = OnSuspect2PaperworkSpawned;
@@ -627,7 +627,7 @@ public class Day_01 : DayBase
     private void OnSuspect2PaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
-        if (!IsServer) return;
+        if (!NetworkManager.Singleton.IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
         _onSuspect2PaperworkSpawned = null;
 
@@ -859,7 +859,7 @@ public class Day_01 : DayBase
         yield return ShowAndWait("Good work. A third subject is incoming. Pay close attention.");
 
         // Force suspect 3 to have exactly 5 documentation anomalies.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 5;
 
         _onSuspect3PaperworkSpawned = OnSuspect3PaperworkSpawned;
@@ -873,7 +873,7 @@ public class Day_01 : DayBase
     private void OnSuspect3PaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (this == null) return;
-        if (!IsServer) return;
+        if (!NetworkManager.Singleton.IsServer) return;
         SuspectController.OnPaperworkSpawned -= _onSuspect3PaperworkSpawned;
         _onSuspect3PaperworkSpawned = null;
 
@@ -1078,7 +1078,7 @@ public class Day_01 : DayBase
 
         // Day 1 hasn't introduced the lever yet — open the window automatically
         // so the suspect can deliver paperwork once they arrive.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.OpenBoothShutter();
     }
 

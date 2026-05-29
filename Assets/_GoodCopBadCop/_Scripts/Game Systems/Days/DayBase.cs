@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -11,12 +10,8 @@ using UnityEngine;
 /// CampaignManager activates the correct child GameObject and calls the virtual lifecycle
 /// methods below. Override them in your day-specific subclass to add custom behaviour.
 /// All day GameObjects are kept inactive by default; exactly one is active at a time.
-///
-/// Inherits <see cref="NetworkBehaviour"/> so day subclasses can declare ClientRpcs and
-/// ServerRpcs directly — e.g. for syncing tutorial markers across clients — without
-/// routing through an unrelated manager.
 /// </summary>
-public abstract class DayBase : NetworkBehaviour
+public abstract class DayBase : MonoBehaviour
 {
     // -------------------------------------------------------------------------
     // Inspector Configuration

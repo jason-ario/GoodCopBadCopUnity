@@ -55,7 +55,7 @@ public class Day_02 : DayBase
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
         // Ensure the first suspect has at least one mutation anomaly so the tutorial always has material.
-        if (IsServer)
+        if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
     }
 
@@ -88,7 +88,7 @@ public class Day_02 : DayBase
     private void OnPaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
         if (_mutationTutorialFired) return;
-        if (!IsServer) return;
+        if (!NetworkManager.Singleton.IsServer) return;
         _mutationTutorialFired = true;
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         StartCoroutine(MutationExamTutorialSequence());
