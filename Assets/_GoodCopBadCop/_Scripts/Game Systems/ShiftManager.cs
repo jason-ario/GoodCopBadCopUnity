@@ -488,6 +488,8 @@ public class ShiftManager : NetworkBehaviour
 
         EnablePlayerControl();
 
+        OnDoorUnlock?.Invoke();
+
         MegaphoneDialogueManager.Instance.SayEndOfShiftDialogue();
     }
 
