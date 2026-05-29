@@ -71,11 +71,16 @@ public class SwitchButton : Interactable
 
         // Route the game-state logic through the server so it is authoritative on all clients.
         if (IsServer)
+        {
             HandleButtonPressServer();
+            PlayButtonSoundClientRpc();
+        }
         else
+        {
             RequestButtonPressServerRpc();
-
-        PlayButtonSoundClientRpc();
+            // Sound and animation are triggered server-side via HandleButtonPressServer →
+            // PlayButtonSoundClientRpc so all clients hear it, including the pressing client.
+        }
 
         yield return new WaitForSeconds(1);
 
@@ -107,6 +112,7 @@ public class SwitchButton : Interactable
 
         SetReady(false);
         NotifyPressedClientRpc();
+        PlayButtonSoundClientRpc();
 
         if (!ShiftManager.Instance.shiftStarted.Value)
         {

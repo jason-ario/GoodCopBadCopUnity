@@ -262,6 +262,14 @@ public class Day_01 : DayBase
     // Tutorial Sequence — Switch
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Guards against OnDayStarted firing more than once (e.g. if ShiftManager.OnDayStart
+    /// is broadcast twice due to EndIntroCutscene being called by both host and client UI).
+    /// A second invocation would spawn a second Day1TutorialSequence coroutine that replays
+    /// every bark and re-shows the switch arrow after it has already been hidden.
+    /// </summary>
+    private bool _tutorialSequenceStarted = false;
+
     private void OnDayStarted()
     {
         if (this == null) return;
@@ -270,6 +278,12 @@ public class Day_01 : DayBase
             Debug.LogWarning($"[Day_01] OnDayStarted: not server (IsServer={NetworkManager.Singleton.IsServer}, IsHost={NetworkManager.Singleton.IsHost}, IsClient={NetworkManager.Singleton.IsClient}) — tutorial skipped on this machine.");
             return;
         }
+        if (_tutorialSequenceStarted)
+        {
+            Debug.LogWarning("[Day_01] OnDayStarted: tutorial sequence already started — ignoring duplicate call.");
+            return;
+        }
+        _tutorialSequenceStarted = true;
         Debug.Log("[Day_01] OnDayStarted: starting Day1TutorialSequence on server.");
         StartCoroutine(Day1TutorialSequence());
     }

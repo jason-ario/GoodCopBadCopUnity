@@ -747,12 +747,23 @@ public class ShiftManager : NetworkBehaviour
     /// Ends the intro cutscene for all connected clients regardless of who calls it.
     /// Safe to call from any client or the server.
     /// </summary>
+    /// <summary>
+    /// Guards against <see cref="EndIntroCutscene"/> being called by both host and client UI
+    /// simultaneously, which would dispatch <see cref="EndIntroCutsceneClientRpc"/> twice and
+    /// fire <see cref="OnDayStart"/> twice on the server — starting two tutorial coroutines.
+    /// </summary>
+    private bool _introCutsceneEnded = false;
+
     public void EndIntroCutscene()
     {
         ambientAudio.DOFade(1, 2);
 
         if (IsServer)
+        {
+            if (_introCutsceneEnded) return;
+            _introCutsceneEnded = true;
             EndIntroCutsceneClientRpc();
+        }
         else
             EndIntroCutsceneServerRpc();
     }
@@ -760,6 +771,8 @@ public class ShiftManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void EndIntroCutsceneServerRpc()
     {
+        if (_introCutsceneEnded) return;
+        _introCutsceneEnded = true;
         ambientAudio.DOFade(1, 2);
         EndIntroCutsceneClientRpc();
     }
