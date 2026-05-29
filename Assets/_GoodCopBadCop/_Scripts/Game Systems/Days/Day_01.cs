@@ -70,6 +70,13 @@ public class Day_01 : DayBase
     // Running count of documents successfully filed into the tutorial folder.
     private int _documentsFiledCount;
 
+    // Tracks which specific document objects have already been counted, preventing
+    // the double-count that occurs in host+client games: when a non-host player files
+    // a document, OnDocumentAdded fires once from SyncDocumentAddedServerRpc on the
+    // server and again from SyncDocumentAddedClientRpc arriving on the host-client,
+    // both in the same process.
+    private readonly HashSet<PickableObject> _filedDocuments = new HashSet<PickableObject>();
+
     // Cached delegate so subscribe/unsubscribe reference equality is preserved.
     private System.Action<PickableObject> _onFolderDocumentFiled;
     private System.Action<IDCard, PickableObject> _onPaperworkSpawned;
@@ -519,6 +526,13 @@ public class Day_01 : DayBase
     private void OnFolderDocumentFiled(PickableObject document)
     {
         if (this == null) return;
+
+        // Guard against double-counting: in a host+client game, when a non-host player
+        // files a document, OnDocumentAdded fires both from SyncDocumentAddedServerRpc
+        // (server side) and from SyncDocumentAddedClientRpc received on the host-client —
+        // both in the same process. The HashSet ensures each physical document is counted once.
+        if (document != null && !_filedDocuments.Add(document)) return;
+
         _documentsFiledCount++;
 
         // Permanently lock the document on all clients so the holder network-variable
