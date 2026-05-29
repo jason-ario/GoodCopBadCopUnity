@@ -79,17 +79,18 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
-        // Left click: pick up items and use item-on-item interactions
+        // Left click behaviour depends on whether the player is holding an item:
+        // - Empty hands: acts identically to E (pick up or world interact)
+        // - Holding item: uses the held item (item-on-item or TryUseObject), never triggers world interact
         if (Input.GetMouseButtonDown(0))
         {
-            if (!TryPickupOrItemInteract())
-            {
-                Debug.Log("Can Not Interact");
-                _playerPickupController.TryUseObject();
-            }
+            if (_playerPickupController.HeldObject == null)
+                TryWorldInteract();
+            else
+                TryItemUse();
         }
 
-        // E key: interact with non-pickup interactables (doors, levers, etc.)
+        // E key: always interacts with whatever is targeted (world objects and pickups alike)
         if (Input.GetKeyDown(KeyCode.E))
         {
             TryWorldInteract();
@@ -142,7 +143,10 @@ public class PlayerInteractionController : NetworkBehaviour
             {
                 if (inRange)
                 {
-                    bool isWorldInteract = interactable is not PickableObject;
+                    // When holding an item, only E triggers world interact so show [E].
+                    // When empty-handed, both LMB and E work, so show [E] as the primary hint.
+                    bool isHolding = _playerPickupController.HeldObject != null;
+                    bool isWorldInteract = isHolding ? interactable is not PickableObject : true;
                     reticle.SetInteractState(true, interactable.interactText, isWorldInteract);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
@@ -302,68 +306,43 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Handles left-click: picks up PickableObjects and performs item-on-item interactions.
-    /// Returns true if an interaction was consumed.
+    /// Handles Left Click while holding an item: performs item-on-item interactions or
+    /// falls back to using the held item in the world. Never triggers world interact.
     /// </summary>
-    bool TryPickupOrItemInteract()
+    void TryItemUse()
     {
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
         if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactLayer))
-            return false;
+        {
+            _playerPickupController.TryUseObject();
+            return;
+        }
 
         Interactable interactable = hit.collider.GetComponent<Interactable>();
         InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
-
         if (interactableCollider != null)
             interactable = interactableCollider.Interactable;
 
-        if (IsControlledByOtherPlayer(interactable))
-            return false;
+        if (IsControlledByOtherPlayer(interactable)) return;
+        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
+        if (interactable == null || !interactable.enabled) return;
 
-        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
-            return false;
-
-        if (interactable == null || !interactable.enabled)
-            return false;
-
-        // Item-on-item interaction takes priority regardless of interactable type
-        if (pickupController.HeldObject != null)
+        if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
         {
-            if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
-            {
-                interactable.InteractWithItem(this, pickupController.HeldObject);
-                _playerPickupController.TryUseObject();
-                return true;
-            }
-
-            Debug.Log("Held Object is not compatible with this object");
-            return false;
+            interactable.InteractWithItem(this, pickupController.HeldObject);
+            _playerPickupController.TryUseObject();
         }
-
-        // Only allow picking up PickableObjects on left click
-        if (interactable is PickableObject)
+        else
         {
-            interactable.Interact(this);
-            reticle.SetInteractState(false);
-            reticle.SetTooFarState(false);
-            return true;
+            Debug.Log("Held object is not compatible with this interactable");
+            _playerPickupController.TryUseObject();
         }
-
-        // Pickup slots (e.g. InkStamp) act like PickableObjects on left click with empty hands
-        if (interactable is IPickupSlot && pickupController.HeldObject == null)
-        {
-            interactable.Interact(this);
-            reticle.SetInteractState(false);
-            reticle.SetTooFarState(false);
-            return true;
-        }
-
-        return false;
     }
 
     /// <summary>
-    /// Handles E key: interacts with non-pickup interactables such as doors and levers.
+    /// Handles E key (and Left Click when empty-handed): interacts with any interactable
+    /// in range — pickups, world objects, slots, etc.
     /// </summary>
     void TryWorldInteract()
     {
@@ -374,20 +353,16 @@ public class PlayerInteractionController : NetworkBehaviour
 
         Interactable interactable = hit.collider.GetComponent<Interactable>();
         InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
-
         if (interactableCollider != null)
             interactable = interactableCollider.Interactable;
 
-        if (IsControlledByOtherPlayer(interactable))
-            return;
-
-        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable)
-            return;
-
-        if (interactable == null || !interactable.enabled)
-            return;
+        if (IsControlledByOtherPlayer(interactable)) return;
+        if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
+        if (interactable == null || !interactable.enabled) return;
 
         interactable.Interact(this);
+        reticle.SetInteractState(false);
+        reticle.SetTooFarState(false);
     }
 
     /// <summary>

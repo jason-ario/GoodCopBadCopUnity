@@ -87,6 +87,9 @@ public class SuspectCharacter : Interactable
         {
             _folderGivingAnimationData = folderGivingAnimationDatas[0];
         }
+
+        if (suspectData != null)
+            interactText = $"{suspectData.FirstName}";
     }
 
     public void Initialize()

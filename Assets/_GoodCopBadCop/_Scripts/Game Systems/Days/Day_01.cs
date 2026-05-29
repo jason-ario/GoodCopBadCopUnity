@@ -302,10 +302,7 @@ public class Day_01 : DayBase
         yield return ShowAndWait("Good morning. We've been expecting you.");
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Welcome to your post. You'll be screening subjects entering the town. I'll be guiding you through procedure.");
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("Follow instructions carefully. Your responses will be... noted. Press the button when you're ready to begin.");
+        yield return ShowAndWait("You'll be screening subjects entering the town. Your responses will be noted. Press the button when ready.");
 
         if (NetworkManager.Singleton.IsServer)
             _switchButton.SetReady(true);
@@ -359,7 +356,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(3f);
 
-        yield return ShowAndWait("A suspect has arrived. Pick up their ID card with the left mouse button.");
+        yield return ShowAndWait("A suspect has arrived. Pick up their ID card.");
 
         if (_tutorialIDCard != null)
         {
@@ -387,9 +384,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Hold the left mouse button to inspect it up close.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Hold the right mouse button and position it over the desk to put it down.");
+        yield return ShowAndWait("Hold left-click to inspect. Right-click over the desk to put it down.");
 
         // IsHeld is driven by _holdingClientId NetworkVariable — synced on all clients.
         if (_tutorialIDCard != null)
@@ -409,7 +404,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Good. Now pick up the application form.");
+        yield return ShowAndWait("Now pick up the application form.");
 
         if (_tutorialAppForm != null)
         {
@@ -437,9 +432,9 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Cross-reference the documents. Note any discrepancies between them.");
+        yield return ShowAndWait("Cross-reference the documents. Note any discrepancies.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("This subject appears clean. No anomalies. You may proceed.");
+        yield return ShowAndWait("This subject appears clean. Proceed.");
         yield return new WaitForSeconds(2f);
 
         StartCoroutine(DrawerTutorialBeat());
@@ -451,7 +446,7 @@ public class Day_01 : DayBase
 
     private IEnumerator DrawerTutorialBeat()
     {
-        yield return ShowAndWait("Now assemble the subject's folder. Grab it from the drawer.");
+        yield return ShowAndWait("Grab the subject's folder from the drawer.");
 
         if (_drawer != null)
             _drawer.SetLocked(false);
@@ -478,7 +473,7 @@ public class Day_01 : DayBase
 
     private IEnumerator FolderPlaceBeat()
     {
-        yield return ShowAndWait("Place it on the desk with the right mouse button.");
+        yield return ShowAndWait("Place it on the desk.");
 
         // Wait until the folder is placed on any surface that is NOT the HandOffPoint (window slot).
         // If the player drops it straight on the window slot, the folder would skip the desk-placement
@@ -506,7 +501,7 @@ public class Day_01 : DayBase
         // First document — skip prompt if already in the folder.
         if (_documentsFiledCount < 1)
         {
-            yield return ShowAndWait("Now pick up the ID card and drag it onto the folder to file it.");
+            yield return ShowAndWait("Pick up the ID card and drag it onto the folder to file it.");
             yield return new WaitUntil(() => _documentsFiledCount >= 1);
         }
 
@@ -515,7 +510,7 @@ public class Day_01 : DayBase
         // Second document — only prompt if not already filed.
         if (_documentsFiledCount < 2)
         {
-            yield return ShowAndWait("Good. Now do the same with the application form.");
+            yield return ShowAndWait("Now file the application form.");
             yield return new WaitUntil(() => _documentsFiledCount >= 2);
         }
 
@@ -549,7 +544,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Both documents are filed. This subject appears clean — stamp the folder green to clear them.");
+        yield return ShowAndWait("Both documents filed. This subject is clean — stamp the folder green to clear them.");
 
         // Arm the hand-off listener now — before the stamp event and before any
         // dialogue, so a fast player who stamps and hands off immediately is captured.
@@ -624,7 +619,7 @@ public class Day_01 : DayBase
         Debug.Log("[Day_01] HandOffBeat: folder stamped, proceeding.");
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Place the stamped folder in the window slot to send them through.");
+        yield return ShowAndWait("Place the folder in the window slot.");
 
         ShowStaticMarker(StaticMarkerTarget.HandOff);
 
@@ -636,7 +631,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Good. First subject processed. Your decisions are being recorded — stay attentive.");
+        yield return ShowAndWait("Your decisions are being recorded. Stay attentive.");
 
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
@@ -753,8 +748,6 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("There's a discrepancy in these documents. Something doesn't line up.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Documentation anomalies indicate cognitive deterioration. A subject's records are a window into their mind.");
-        yield return new WaitForSeconds(1f);
         yield return ShowAndWait("When you spot an anomaly, mark it in the exam notebook. Pick it up and tick the appropriate box.");
 
         _examNotebook?.SetInteractableNetworked(true);
@@ -782,7 +775,7 @@ public class Day_01 : DayBase
         System.Action<ExamNotebook> onChecked = _ => anyBoxChecked = true;
         ExamNotebook.OnAnyCheckboxChecked += onChecked;
 
-        yield return ShowAndWait("Tick the boxes for every anomaly you can find on the page.");
+        yield return ShowAndWait("Tick every anomaly on the page.");
 
         // Guard: player may have ticked a box during dialogue or earlier.
         if (ChecklistItem.AnyBoxChecked)
@@ -807,7 +800,7 @@ public class Day_01 : DayBase
         _notebookPageFiled = false;
         ExamNotebook.OnAnyNotebookPageFiled += OnNotebookPageFiled;
 
-        yield return ShowAndWait("Now interact with the folder while holding the notebook to file your findings.");
+        yield return ShowAndWait("Interact with the folder while holding the notebook to file it.");
 
         // Guard: player may have filed during dialogue — AnyPageFiled captures that.
         if (ExamNotebook.AnyPageFiled)
@@ -816,9 +809,6 @@ public class Day_01 : DayBase
         yield return new WaitUntil(() => _notebookPageFiled);
 
         ExamNotebook.OnAnyNotebookPageFiled -= OnNotebookPageFiled;
-
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Based on the accuracy of your findings, your performance will be evaluated accordingly.");
 
         StartCoroutine(Suspect2StampBeat());
     }
@@ -839,7 +829,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("When you're ready, quarantine this subject — stamp the folder yellow.");
+        yield return ShowAndWait("Quarantine this subject — stamp the folder yellow.");
 
         // Arm the hand-off listener before the stamp event so a fast player who stamps
         // and hands off in one motion doesn't race ahead of Suspect2HandOffBeat's subscribe.
@@ -869,9 +859,6 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Quarantine holds the subject for evaluation. A precaution. We take no chances with the town's safety.");
-        yield return new WaitForSeconds(1f);
-
         yield return ShowAndWait("Place the stamped folder in the window slot.");
 
         ShowStaticMarker(StaticMarkerTarget.HandOff);
@@ -884,7 +871,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Good work. A third subject is incoming. Pay close attention.");
+        yield return ShowAndWait("A third subject is incoming.");
 
         // Force suspect 3 to have exactly 5 documentation anomalies.
         if (NetworkManager.Singleton.IsServer)
@@ -925,7 +912,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(3f);
 
-        yield return ShowAndWait("Pick up the documents and review them carefully.");
+        yield return ShowAndWait("Review their documents.");
 
         _s3IDCardInspected  = false;
         _s3AppFormInspected = false;
@@ -969,11 +956,9 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Something is significantly wrong here. Multiple documentation anomalies — far beyond the acceptable threshold.");
+        yield return ShowAndWait("Multiple anomalies — far beyond the threshold.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Five anomalies of a single type indicates severe, irreversible deterioration. The protocol is clear.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Open the exam notebook and mark every anomaly. All five must be documented.");
+        yield return ShowAndWait("Mark all five in the exam notebook.");
 
         _examNotebook?.SetInteractableNetworked(true);
 
@@ -992,7 +977,7 @@ public class Day_01 : DayBase
         System.Action<ExamNotebook> s3OnChecked = _ => anyBoxChecked = true;
         ExamNotebook.OnAnyCheckboxChecked += s3OnChecked;
 
-        yield return ShowAndWait("Tick every box that applies. All five anomalies must be on record.");
+        yield return ShowAndWait("Tick all five boxes.");
 
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;
@@ -1025,7 +1010,7 @@ public class Day_01 : DayBase
         ExamNotebook.OnAnyNotebookPageFiled -= OnSuspect3NotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Five anomalies. A single type. The threshold has been reached — they are a threat to the town. Elimination is required.");
+        yield return ShowAndWait("Five anomalies — the threshold is reached. Elimination is required.");
 
         StartCoroutine(Suspect3StampBeat());
     }
@@ -1046,7 +1031,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Use the red stamp to confirm the elimination order.");
+        yield return ShowAndWait("Stamp the folder red.");
 
         // Arm the hand-off listener before the stamp event so a fast player who stamps
         // and hands off immediately doesn't race ahead of Suspect3HandOffBeat's subscribe.
@@ -1076,10 +1061,10 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Elimination is final. It is reserved for subjects who pose an irreversible threat. The decision is yours to make.");
+        yield return ShowAndWait("Elimination is final. The decision is yours to make.");
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Place the stamped folder in the window slot to confirm the order.");
+        yield return ShowAndWait("Place the folder in the window slot.");
 
         ShowStaticMarker(StaticMarkerTarget.HandOff);
 
@@ -1090,7 +1075,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Procedure complete. You now know what's expected of you. We'll be watching.");
+        yield return ShowAndWait("You know what's expected. We'll be watching.");
     }
 
     // -------------------------------------------------------------------------
