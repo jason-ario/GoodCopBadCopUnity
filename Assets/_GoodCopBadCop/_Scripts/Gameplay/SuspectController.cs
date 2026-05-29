@@ -239,6 +239,10 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
+        // Ensure all non-activated anomalies (including those from locked categories that
+        // were skipped during the initial activation pass) have their shader state cleaned up.
+        suspectCharacter.InitializeDisabledOnArrival();
+
         // Broadcast arrival to all clients so tutorial systems can react locally.
         NotifySuspectArrivedClientRpc(suspectIndex.Value);
 

@@ -212,6 +212,26 @@ public class SuspectCharacter : Interactable
         anomalyController.ApplyInitializeDisabledOnClient(siblingIndex);
     }
 
+    /// <summary>
+    /// Calls InitializeDisabled on all non-active anomalies across every category and
+    /// replicates the call to clients. Invoke this when the suspect arrives at the booth
+    /// to ensure locked-category anomalies (excluded from the initial activation pass)
+    /// also have their shader state cleaned up.
+    /// </summary>
+    public void InitializeDisabledOnArrival()
+    {
+        anomalyController.InitializeDisabledOnArrival();
+        InitializeDisabledOnArrivalClientRpc();
+    }
+
+    /// <summary>Mirrors the server-side InitializeDisabledOnArrival call to all clients.</summary>
+    [ClientRpc]
+    private void InitializeDisabledOnArrivalClientRpc()
+    {
+        if (IsServer) return;
+        anomalyController.InitializeDisabledOnArrival();
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         speaking.InitiateChoices();

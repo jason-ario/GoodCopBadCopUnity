@@ -252,6 +252,21 @@ public class AnomalyController : MonoBehaviour
             Debug.LogWarning($"[AnomalyController] No Anomaly found at sibling index {siblingIndex} for InitializeDisabled.");
     }
 
+    /// <summary>
+    /// Re-applies InitializeDisabled on every non-active anomaly across all categories,
+    /// including those from locked categories that were excluded during the initial activation
+    /// pass. Call this when the suspect arrives at the booth to guarantee all shader states
+    /// are clean regardless of which anomaly categories were locked at spawn time.
+    /// </summary>
+    public void InitializeDisabledOnArrival()
+    {
+        foreach (Anomaly anomaly in CollectAllAnomalies())
+        {
+            if (!activeAnomalies.Contains(anomaly))
+                anomaly.InitializeDisabled();
+        }
+    }
+
     public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
 
     /// <summary>

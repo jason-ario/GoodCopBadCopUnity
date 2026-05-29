@@ -137,6 +137,17 @@ public class InkStamp : Interactable, IPickupSlot
     [ServerRpc(RequireOwnership = false)]
     private void SetSlotInteractableServerRpc(bool value) => _slotInteractable.Value = value;
 
+    /// <summary>
+    /// Permanently disables interaction with both this slot and the spawned stamp pickup on all clients.
+    /// Call this once the player has returned the stamp and it should remain locked for the session.
+    /// </summary>
+    public void LockStampAndSlot()
+    {
+        SetSlotInteractable(false);
+        if (spawnedInkStamp != null)
+            spawnedInkStamp.LockInteractableNetworked();
+    }
+
     /// <summary>True while the stamp is sitting in its slot; false once the player has picked it up.</summary>
     public bool IsStampInSlot => _isPlaced.Value;
 

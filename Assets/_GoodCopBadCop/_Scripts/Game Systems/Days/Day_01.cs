@@ -551,6 +551,9 @@ public class Day_01 : DayBase
         _folderHandedOff = false;
         FolderController.OnFolderHandedOff += OnFolderHandedOffHandler;
 
+        // Reset before subscribing so a stale value from a previous run can't skip the wait.
+        _folderStamped = false;
+
         // Subscribe to the static event now — any folder stamped from this point counts.
         FolderController.OnAnyFolderStamped += OnFolderStamped;
 
@@ -616,7 +619,23 @@ public class Day_01 : DayBase
         Debug.Log("[Day_01] HandOffBeat: waiting for folder stamp via event flag.");
         yield return new WaitUntil(() => _folderStamped);
 
-        Debug.Log("[Day_01] HandOffBeat: folder stamped, proceeding.");
+        Debug.Log("[Day_01] HandOffBeat: folder stamped — guiding player to return green stamp.");
+
+        // Brief pause so the stamp animation settles before the return arrow appears.
+        yield return new WaitForSeconds(2f);
+
+        // Show the return arrow only once the folder is stamped AND the player is
+        // still holding the stamp (not in slot). This prevents a race where _folderStamped
+        // resolves before the player has even picked up the stamp.
+        yield return new WaitUntil(() => _greenStampSlot == null || !_greenStampSlot.IsStampInSlot);
+        ShowStaticMarker(StaticMarkerTarget.GreenStamp);
+        yield return new WaitUntil(() => _greenStampSlot == null || _greenStampSlot.IsStampInSlot);
+        HideStaticMarker(StaticMarkerTarget.GreenStamp);
+
+        // Permanently lock the green stamp slot and pickup for the rest of the tutorial.
+        _greenStampSlot?.LockStampAndSlot();
+        Debug.Log("[Day_01] HandOffBeat: green stamp returned and locked — proceeding to hand-off.");
+
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("Place the folder in the window slot.");
@@ -857,6 +876,11 @@ public class Day_01 : DayBase
         // Suspect2StampBeat before arming the stamp, so no early hand-off is missed.
         yield return new WaitUntil(() => _folderStamped);
 
+        // Wait for the player to return the yellow stamp — no arrow, already taught.
+        yield return new WaitUntil(() => _yellowStampSlot == null || _yellowStampSlot.IsStampInSlot);
+        _yellowStampSlot?.LockStampAndSlot();
+        Debug.Log("[Day_01] Suspect2HandOffBeat: yellow stamp returned and locked.");
+
         yield return new WaitForSeconds(1f);
 
         yield return ShowAndWait("Place the stamped folder in the window slot.");
@@ -1058,6 +1082,11 @@ public class Day_01 : DayBase
         // _folderHandedOff reset and OnFolderHandedOff subscription are done in
         // Suspect3StampBeat before arming the stamp, so no early hand-off is missed.
         yield return new WaitUntil(() => _folderStamped);
+
+        // Wait for the player to return the red stamp — no arrow, already taught.
+        yield return new WaitUntil(() => _redStampSlot == null || _redStampSlot.IsStampInSlot);
+        _redStampSlot?.LockStampAndSlot();
+        Debug.Log("[Day_01] Suspect3HandOffBeat: red stamp returned and locked.");
 
         yield return new WaitForSeconds(1f);
 
