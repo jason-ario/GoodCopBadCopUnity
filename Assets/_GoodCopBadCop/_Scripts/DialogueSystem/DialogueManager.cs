@@ -1,11 +1,7 @@
-using System.Collections;
-using TMPro;
-using Unity.Netcode;
-using UnityEngine;
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Febucci.TextAnimatorForUnity;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -15,7 +11,9 @@ public class DialogueManager : NetworkBehaviour
 {
     public static DialogueManager Instance;
     [SerializeField] private float secondsPerCharacter = 0.06f;
+    [SerializeField] private float subtitleLingerSeconds = 1f;
     Coroutine audioDialogueCoroutine;
+    private Coroutine _subtitleDestroyCoroutine;
 
     /// <summary>
     /// Separate coroutine slot for megaphone barks so that character speech
@@ -220,7 +218,8 @@ public class DialogueManager : NetworkBehaviour
         else
         {
             _waitingSubtitle = null;
-            StartCoroutine(DestroySubtitles(subtitles.gameObject));
+            float duration = text.Length * secondsPerCharacter + subtitleLingerSeconds;
+            _subtitleDestroyCoroutine = StartCoroutine(DestroySubtitles(subtitles.gameObject, duration));
         }
 
         return subtitles.gameObject;
@@ -274,16 +273,37 @@ public class DialogueManager : NetworkBehaviour
 
     void DestroyPreviousSubtitles()
     {
+        CancelSubtitleDestroy();
         foreach (Transform child in subtitlesContainer)
         {
             Destroy(child.gameObject);
         }
     }
 
-    IEnumerator DestroySubtitles(GameObject subtitle)
+    private void CancelSubtitleDestroy()
     {
-        yield return new WaitForSeconds(5);
-        Destroy(subtitle);
+        if (_subtitleDestroyCoroutine != null)
+        {
+            StopCoroutine(_subtitleDestroyCoroutine);
+            _subtitleDestroyCoroutine = null;
+        }
+    }
+
+    IEnumerator DestroySubtitles(GameObject subtitle, float displayDuration)
+    {
+        // Wait for the typewriter animation to complete before starting the display countdown.
+        var typewriter = subtitle.GetComponentInChildren<TextAnimatorComponentBase>();
+        if (typewriter != null)
+            yield return new WaitUntil(() => subtitle == null || typewriter == null || typewriter.allLettersShown);
+
+        if (subtitle == null) yield break;
+
+        yield return new WaitForSeconds(displayDuration);
+
+        if (subtitle != null)
+            Destroy(subtitle);
+
+        _subtitleDestroyCoroutine = null;
     }
 }
 
