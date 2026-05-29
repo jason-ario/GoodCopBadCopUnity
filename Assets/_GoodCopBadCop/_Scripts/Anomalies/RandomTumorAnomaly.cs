@@ -14,6 +14,10 @@ public class RandomTumorAnomaly : MutationAnomaly
 
     void InitializeTumors()
     {
+        if (parentBones.Length == 0)
+        {
+            return;
+        }
         for (var i = 0; i < tumors.Length; i++)
         {
             var tumor = tumors[i];

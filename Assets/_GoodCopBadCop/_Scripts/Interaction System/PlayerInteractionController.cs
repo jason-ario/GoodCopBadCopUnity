@@ -326,7 +326,14 @@ public class PlayerInteractionController : NetworkBehaviour
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
-        if (interactable == null || !interactable.enabled) return;
+
+        // No valid interactable under the cursor (e.g. hovering a placement board) —
+        // fall through to using the held item in place, same as when nothing is hit.
+        if (interactable == null || !interactable.enabled)
+        {
+            _playerPickupController.TryUseObject();
+            return;
+        }
 
         if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
         {

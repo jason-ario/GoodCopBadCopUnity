@@ -1,0 +1,138 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc4902ccea98cf44865aecb61fc1ff4, type: 3}
+  m_Name: Soldier
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectData
+  FirstName: Soldier
+  LastName: 
+  Nickname: 
+  Occupation: State Security Personnel
+  CharacterDescription: "Full uniform, full mask. Doesn't give a name. Doesn't need
+    to. Passes through on rotation like every other one of them \u2014 indistinguishable
+    by design. Treats the checkpoint as an inconvenience and you as a minor obstacle
+    in his day."
+  CharacterArc: "Straight-backed, arms at his sides, head tilted just enough to suggest
+    he's deciding whether you're worth his time. He's not hostile exactly \u2014
+    more like perpetually unimpressed. He follows the process because the state demands
+    it, not because he respects it. If you're efficient and professional, something
+    shifts slightly. He'll never say so. But he'll stop sighing."
+  DateOfBirth: 02/11/1961
+  Sex: Male
+  EntryPermitExpiryDate: 03 OCT
+  IsResident: 1
+  GivesPaperwork: 1
+  handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
+  startingInfectionScore: 0
+  dailyInfectionProgression: 5
+  IDPhoto: {fileID: 2800000, guid: 5f05c29b0bf5ab4418daa49fbc3ad0e2, type: 3}
+  CharacterPrefab: {fileID: 2613975840466510292, guid: 34daa85d9b002634daf0d037a68a022d, type: 3}
+  entryReasons:
+    earlyDaysReasons:
+    - End of rotation. Standard transit through the civilian checkpoint.
+    - Scheduled personnel transfer. You should have the clearance on file.
+    - Shift handover. My relief is already at the post.
+    midDaysReasons:
+    - Extended patrol perimeter. I cross here twice a day now.
+    - Security reassignment following the eastern incident. Transit is routine.
+    - We've been running double rotations. This is the third crossing today.
+    finalDaysReasons:
+    - Lockdown rotation. I go where command sends me.
+    - Sector reassignment under the emergency order. Papers are current.
+    - Standard transit. You'll be seeing a lot of us from now on.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - I'm here to inspect the inspection. Procedure. You wouldn't know it.
+    - Command sent me. The reason is above your clearance level.
+    - Routine. You don't need to know what kind.
+    midDaysReasons:
+    - I came from the other post. The one they closed. I don't know why it's closed.
+    - My relief didn't show. I've been here since before the shift started. I think.
+    - I was told to cross here. I don't remember who told me.
+    finalDaysReasons:
+    - I don't know what sector this is anymore. It looked right from the road.
+    - My orders were very clear. I have forgotten them but they were very clear.
+    - I am returning to a post. I can't remember which one. It doesn't matter.
+  entryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Let's make this quick. I have a post to get back to.
+    - You going to stare, or are you going to check the papers?
+    - Standard transit. You've done this before, I assume.
+    dialoguesMidDays:
+    - Twice today already. You'd think they'd streamline this.
+    - Still running the same process, I see. Fine.
+    - Don't ask unnecessary questions. We'll both be happier.
+    dialoguesFinalDays:
+    - Just do what you're supposed to do.
+    - I've been through a lot of checkpoints today. This one better be fast.
+    - Papers. Stamp. Done. That's all this needs to be.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Good. See, that wasn't so hard.
+    dialoguesMidDays:
+    - Faster than yesterday. You're learning.
+    dialoguesFinalDays:
+    - Adequate. Keep it up.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - You're detaining state personnel. I hope you know what you're doing.
+    dialoguesMidDays:
+    - This will be reviewed. I want that noted.
+    dialoguesFinalDays:
+    - ...Fine. I'll wait. But someone is going to hear about this.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - You just made a very serious mistake.
+    dialoguesMidDays:
+    - "I didn't think a civilian post would actually \u2014 "
+    dialoguesFinalDays:
+    - Hm. Didn't see that coming from you.
+  voiceAudioClips: []
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: Patrol route. Nothing that concerns you.
+    midDaysAnswer: Perimeter sweep. We extended it east after last week. You'd know
+      that if you read the memos.
+    finalDaysAnswer: You don't ask soldiers where they've been. Standard transit,
+      that's all you need.
+    mismatchEarlyDaysAnswer: The other checkpoint. The one further north. They sent
+      me back but I don't remember why. The route was... different.
+    mismatchMidDaysAnswer: The east post. Which is fine. Still operational. Completely
+      operational. I was just there. I think I was just there.
+    mismatchFinalDaysAnswer: I was... walking. The road looked right. Command said
+      the road would look right and it did. That's all I know.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: No. Next question.
+    midDaysAnswer: None that I'm required to disclose to civilian personnel. Move
+      on.
+    finalDaysAnswer: Define strange. Everything is strange now. That's not a symptom,
+      that's just the situation.
+    mismatchEarlyDaysAnswer: No symptoms. I feel very alert. More alert than usual.
+      It's been like this for a few days. Very... focused.
+    mismatchMidDaysAnswer: Nothing. My head is clear. Completely clear. There's just
+      a sound sometimes but that's nothing. That's not a symptom.
+    mismatchFinalDaysAnswer: "I don't feel anything. Is that strange? I used to feel
+      things. It\u2019s very quiet now. Inside. Quiet."
+  - question: Who do you live with?
+    earlyDaysAnswer: That's not relevant to transit documentation. Stick to the forms.
+    midDaysAnswer: Barracks. Fifteen men. Was fifteen.
+    finalDaysAnswer: Nobody asks soldiers that. Are we done?
+    mismatchEarlyDaysAnswer: The others. At the barracks. All of them are still there.
+      Nothing has changed. You don't need to know their names.
+    mismatchMidDaysAnswer: "Just me now. The others were... reassigned. All at once.
+      Very sudden. I don\u2019t know where."
+    mismatchFinalDaysAnswer: I don't know. I go back there and it's dark. It's always
+      dark now. I don't know if anyone else is there. I don't check.
+  IDNumber: 6391819

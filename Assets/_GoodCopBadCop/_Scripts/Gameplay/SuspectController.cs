@@ -306,11 +306,12 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
+        /*
         if (suspectCharacter.attackImmediately)
         {
             suspectCharacter.AimAtPlayer();
             return;
-        }
+        }*/
 
         string entryDialogue = suspectCharacter.GetEntryDialogue();
         DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
