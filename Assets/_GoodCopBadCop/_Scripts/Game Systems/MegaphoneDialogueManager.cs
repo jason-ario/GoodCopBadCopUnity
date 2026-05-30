@@ -269,6 +269,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     {
         if (!IsServer || target == null) return;
         ShowMarkerClientRpc(target);
+        // ClientRpc does not execute on the host; mark locally so the host also sees the arrow.
+        TutorialMarkerManager.Instance?.Mark(target.transform);
     }
 
     /// <summary>
@@ -278,6 +280,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     {
         if (!IsServer || target == null) return;
         HideMarkerClientRpc(target);
+        // Mirror the local unmark so the host stays in sync with clients.
+        TutorialMarkerManager.Instance?.Unmark(target.transform);
     }
 
     [ClientRpc]
@@ -299,6 +303,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     {
         if (!IsServer) return;
         HideAllMarkersClientRpc();
+        // Mirror locally so the host also clears its markers.
+        TutorialMarkerManager.Instance?.UnmarkAll();
     }
 
     [ClientRpc]
@@ -316,6 +322,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         if (!IsServer || target == null) return;
         string path = GetFullPath(target);
         SetGameObjectActiveClientRpc(path, active);
+        // ClientRpc does not execute on the host; apply locally so the host also sees the change.
+        target.gameObject.SetActive(active);
     }
 
     [ClientRpc]
@@ -336,6 +344,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         // Encode the path so any client can find the same Transform by walking the hierarchy.
         string path = GetFullPath(target);
         ShowStaticMarkerClientRpc(path);
+        // ClientRpc does not execute on the host; mark locally so the host also sees the arrow.
+        TutorialMarkerManager.Instance?.Mark(target);
     }
 
     /// <summary>Server-only: hides the tutorial marker above a scene-static transform on every client.</summary>
@@ -344,6 +354,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         if (!IsServer || target == null) return;
         string path = GetFullPath(target);
         HideStaticMarkerClientRpc(path);
+        // Mirror the local unmark so the host stays in sync with clients.
+        TutorialMarkerManager.Instance?.Unmark(target);
     }
 
     [ClientRpc]

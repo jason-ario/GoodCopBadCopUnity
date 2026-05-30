@@ -75,21 +75,21 @@ public class TimecardMachine : Interactable
     public void Reset()
     {
         _clockOutReady = false;
-        Highlight(false);
+        TutorialMarkerManager.Instance?.Unmark(transform);
     }
 
     [ClientRpc]
     private void EnableClockOutClientRpc()
     {
         _clockOutReady = true;
-        Highlight(true);
+        TutorialMarkerManager.Instance?.Mark(transform);
     }
 
     [ClientRpc]
     private void PunchCardClientRpc()
     {
         _clockOutReady = false;
-        Highlight(false);
+        TutorialMarkerManager.Instance?.Unmark(transform);
 
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
