@@ -136,17 +136,10 @@ public class PlayerMovementController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        // Disable the camera for all instances on spawn. Non-local players keep it
-        // disabled permanently. The local player's camera is re-enabled by PlayerInstance
-        // via SetCameraActive(true) when the player is activated.
-        cameraTransform.gameObject.SetActive(false);
-    }
-
-    /// <summary>Enables or disables the player camera and everything parented to it.</summary>
-    public void SetCameraActive(bool active)
-    {
-        if (cameraTransform != null)
-            cameraTransform.gameObject.SetActive(active);
+        if (!IsLocalPlayer)
+        {
+            cameraTransform.gameObject.SetActive(false);
+        }
     }
     
 

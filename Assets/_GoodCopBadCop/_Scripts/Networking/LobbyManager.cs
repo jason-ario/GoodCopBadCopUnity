@@ -73,8 +73,6 @@ public class LobbyManager : MonoBehaviour
         }
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-        NetworkManager.Singleton.OnServerStarted += OnServerStarted;
-        NetworkManager.Singleton.OnClientStarted += OnClientStarted;
     }
 
     private void Update()
@@ -87,11 +85,6 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
-            NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
-            NetworkManager.Singleton.OnClientStarted -= OnClientStarted;
-
-            if (NetworkManager.Singleton.SceneManager != null)
-                NetworkManager.Singleton.SceneManager.OnSceneEvent -= OnServerSceneEvent;
         }
 
         SteamMatchmaking.OnLobbyEntered -= OnLobbyEntered;
@@ -404,107 +397,6 @@ public class LobbyManager : MonoBehaviour
         OnLobbyUpdated?.Invoke();
     }
 
-    // =========================
-    // NETCODE (SUPPLEMENTAL)
-    // =========================
-
-    /// <summary>
-    /// Fires after ServerSpawnSceneObjectsOnStartSweep completes, so all scene-placed
-    /// NetworkObjects are already in SpawnedObjectsList. Dynamically spawned objects always
-    /// have IsSceneObject set to false during spawn — they can never be null. Any spawned
-    /// NetworkObject with a null IsSceneObject is therefore a scene-placed object that was
-    /// not fully initialized, which causes CheckForGlobalObjectIdHashOverride to throw an
-    /// InvalidOperationException when the second client connects and triggers sync.
-    /// </summary>
-    private void OnServerStarted()
-    {
-        PatchNullIsSceneObjects("[LobbyManager] OnServerStarted");
-
-        if (NetworkManager.Singleton.SceneManager != null)
-            NetworkManager.Singleton.SceneManager.OnSceneEvent += OnServerSceneEvent;
-    }
-
-    private void OnServerSceneEvent(SceneEvent sceneEvent)
-    {
-        // Re-patch after any server-side scene operation that could reset IsSceneObject.
-        // LoadEventCompleted and UnloadEventCompleted fire after all clients have finished,
-        // but we also patch on the server-local Load/Unload complete to cover the window
-        // between the scene finishing and clients being notified.
-        if (sceneEvent.ClientId != NetworkManager.ServerClientId)
-            return;
-
-        switch (sceneEvent.SceneEventType)
-        {
-            case SceneEventType.LoadComplete:
-            case SceneEventType.UnloadComplete:
-            case SceneEventType.LoadEventCompleted:
-            case SceneEventType.UnloadEventCompleted:
-                PatchNullIsSceneObjects($"[LobbyManager] OnServerSceneEvent({sceneEvent.SceneEventType})");
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Iterates all spawned NetworkObjects and sets IsSceneObject to true for any that have
-    /// a null value. This is a server-side workaround for an NGO 2.x regression where
-    /// CheckForGlobalObjectIdHashOverride() accesses IsSceneObject.Value without a HasValue
-    /// guard, crashing when a client connects and scene synchronization is serialized.
-    /// </summary>
-    private void PatchNullIsSceneObjects(string context)
-    {
-        if (NetworkManager.Singleton?.SpawnManager == null)
-            return;
-
-        var spawnedObjects = NetworkManager.Singleton.SpawnManager.SpawnedObjectsList;
-        int patched = 0;
-
-        foreach (var netObj in spawnedObjects)
-        {
-            if (netObj == null || netObj.IsSceneObject.HasValue)
-                continue;
-
-            netObj.SetSceneObjectStatus(true);
-            patched++;
-            Debug.LogWarning($"{context}: patched null IsSceneObject on '{netObj.name}' (NetworkObjectId: {netObj.NetworkObjectId}).");
-        }
-
-        if (patched > 0)
-            Debug.LogWarning($"{context}: fixed {patched} NetworkObject(s) with null IsSceneObject.");
-    }
-
-    /// <summary>
-    /// Fires when the local client starts (joining as a non-host client).
-    /// NGO 2.7.0 introduced a regression in SynchronizeNetworkObjectScene() where it accesses
-    /// IsSceneObject.Value without a HasValue guard. Any NetworkObject in SpawnedObjectsList
-    /// with a null IsSceneObject — which can occur after a previous session's shutdown reset — 
-    /// will throw InvalidOperationException with Steam transport due to relay latency widening
-    /// the timing window. This patch pre-empts that crash by ensuring all stale objects are
-    /// resolved before the scene sync runs.
-    /// </summary>
-    private void OnClientStarted()
-    {
-        if (NetworkManager.Singleton?.SpawnManager == null)
-            return;
-
-        var spawnedObjects = NetworkManager.Singleton.SpawnManager.SpawnedObjectsList;
-        int patched = 0;
-
-        foreach (var netObj in spawnedObjects)
-        {
-            if (netObj == null || netObj.IsSceneObject.HasValue)
-                continue;
-
-            netObj.SetSceneObjectStatus(true);
-            patched++;
-            Debug.LogWarning($"[LobbyManager] OnClientStarted: patched null IsSceneObject on '{netObj.name}' (NetworkObjectId: {netObj.NetworkObjectId}).");
-        }
-
-        if (patched > 0)
-            Debug.LogWarning($"[LobbyManager] OnClientStarted: fixed {patched} NetworkObject(s) with null IsSceneObject.");
-        else
-            Debug.Log("[LobbyManager] OnClientStarted: all spawned NetworkObjects have IsSceneObject set correctly.");
-    }
-
     private async void OnClientConnected(ulong clientId)
     {
         if (!NetworkManager.Singleton.IsHost)
@@ -526,10 +418,6 @@ public class LobbyManager : MonoBehaviour
         }
 
         Debug.Log($"[Host] HasGameStarted={GameManager.Instance.HasGameStarted} IsTransitioningToLobby={GameManager.Instance.IsTransitioningToLobby}");
-
-        // Delay spawn by 1 second to allow scene sync to complete on the joining client
-        // before any NetworkObject is spawned for them.
-        await Task.Delay(1000);
 
         if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
         {
