@@ -22,7 +22,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 6.407
+      value: 6.343
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
       propertyPath: m_LocalPosition.y
@@ -60,6 +60,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -5332803659455181317, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f3453230bd2da7d4f952254b13e08055, type: 2}
     - target: {fileID: -4921394823224469334, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -84,6 +88,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5576539215482694420}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6367034628201023039}
+    - targetCorrespondingSourceObject: {fileID: 7803982531624680425, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6906462564160292946}
     - targetCorrespondingSourceObject: {fileID: 5425614916576268900, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
       insertIndex: -1
       addedObject: {fileID: 915850567545868684}
@@ -108,14 +118,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1136161169
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 1416581666
+  InScenePlacedSourceGlobalObjectIdHash: 1558363153
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -138,6 +148,7 @@ MonoBehaviour:
   interactText: Toilet
   _audioSource: {fileID: 7495502956124496735}
   _flushSound: {fileID: 8300000, guid: 688093f7e8f40bc4993e8b40a1ca1a6b, type: 3}
+  _animator: {fileID: 6906462564160292946}
 --- !u!82 &7495502956124496735
 AudioSource:
   m_ObjectHideFlags: 0
@@ -429,12 +440,27 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 1
+  rmsCount: 2
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
+--- !u!114 &6367034628201023039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 717347727166838638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  TransitionStateInfoList: []
+  m_Animator: {fileID: 6906462564160292946}
 --- !u!1 &5656035293072816219 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5425614916576268900, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
@@ -475,3 +501,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
   Interactable: {fileID: 3077625832688380837}
+--- !u!1 &7600034270684123606 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7803982531624680425, guid: 3cb3e21da269b754c8dab4491e3588e5, type: 3}
+  m_PrefabInstance: {fileID: 375467986338425407}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &6906462564160292946
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7600034270684123606}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 48d4fcc4c97fefc40b07d0a5dd0f0381, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0

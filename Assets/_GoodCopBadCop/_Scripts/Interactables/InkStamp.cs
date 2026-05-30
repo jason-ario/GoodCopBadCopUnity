@@ -9,6 +9,9 @@ public class InkStamp : Interactable, IPickupSlot
     [SerializeField] private PickableObject inkStampPickup;
     private PickableObject spawnedInkStamp;
 
+    [Header("Ink Label")]
+    [SerializeField] private StampInkLabel inkLabel;
+
     /// <summary>
     /// Tracks the spawned stamp NetworkObject across all clients so that non-host
     /// clients can resolve <see cref="spawnedInkStamp"/> as soon as the value is set,
@@ -71,6 +74,20 @@ public class InkStamp : Interactable, IPickupSlot
         _isPlaced.OnValueChanged         -= OnIsPlacedChanged;
     }
 
+    /// <summary>Shows the ink count label when the player's reticle hovers over this stamp slot.</summary>
+    protected override void OnHighlight()
+    {
+        base.OnHighlight();
+        inkLabel?.Show(StampType);
+    }
+
+    /// <summary>Hides the ink count label when the reticle leaves this stamp slot.</summary>
+    protected override void OnStopHighlight()
+    {
+        base.OnStopHighlight();
+        inkLabel?.Hide();
+    }
+
     private void OnSlotInteractableChanged(bool oldValue, bool newValue) => ApplySlotInteractable(newValue);
 
     private void OnIsPlacedChanged(bool oldValue, bool newValue) => stampPlaceObjectSlot.IsPlaced = newValue;
@@ -93,8 +110,11 @@ public class InkStamp : Interactable, IPickupSlot
         if (stamp == null) return;
 
         spawnedInkStamp = stamp;
+        // CanPickUpManually must be false so the player cannot grab the pickup directly —
+        // only InkStamp.Interact (slot interaction) sets it to true before a pickup.
+        // Collider state is authoritative via _networkInteractableOverride (set by
+        // LockInteractableNetworked in SpawnInkStamp), so no local SetInteractable call needed.
         stamp.CanPickUpManually = false;
-        stamp.SetInteractable(false);
     }
 
     private void SpawnInkStamp()
@@ -115,7 +135,11 @@ public class InkStamp : Interactable, IPickupSlot
 
         spawnedInkStamp = inkStamp.GetComponent<PickableObject>();
         spawnedInkStamp.CanPickUpManually = false;
-        spawnedInkStamp.SetInteractable(false);
+        // LockInteractableNetworked writes _networkInteractableOverride = 0 as a NetworkVariable
+        // so every client receives the locked state reliably via OnValueChanged, regardless of
+        // OnNetworkSpawn ordering. It also sets _interactableLocked = true on all clients,
+        // which blocks OnHoldingClientChanged from re-enabling colliders on stamp release.
+        spawnedInkStamp.LockInteractableNetworked();
 
         // Publishing to the NetworkVariable replicates the reference to all clients,
         // triggering OnSpawnedStampRefChanged which resolves spawnedInkStamp there too.
@@ -186,6 +210,17 @@ public class InkStamp : Interactable, IPickupSlot
 
         base.InteractWithItem(player, item);
         player.pickupController.DropObject(stampPlaceObjectSlot.PlaceObjectPos);
+
+        // Re-lock the pickup immediately after it is returned to the slot.
+        // InkStamp.Interact enabled colliders and set CanPickUpManually = true locally;
+        // we must undo that here because LockStampAndSlot's LockInteractableNetworked call
+        // will not fire OnValueChanged (the NV is already 0), so the colliders would otherwise
+        // remain enabled on the machine that last interacted with the stamp.
+        if (spawnedInkStamp != null)
+        {
+            spawnedInkStamp.CanPickUpManually = false;
+            spawnedInkStamp.SetInteractable(false);
+        }
 
         if (IsServer)
             SetIsPlaced(true);

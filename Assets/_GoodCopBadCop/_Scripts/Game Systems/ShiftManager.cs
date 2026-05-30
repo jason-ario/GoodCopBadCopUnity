@@ -69,6 +69,16 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public static Vector2? OverrideSuspectArrivalInterval = null;
 
+    /// <summary>
+    /// When true, <see cref="SetNextSuspectReady"/> queues the next suspect instead of scheduling
+    /// it immediately. Call <see cref="ResumeScheduledSuspect"/> on the server to release the
+    /// held suspect. Set by day-specific classes (e.g. Day_01) for tutorial gates.
+    /// </summary>
+    public static bool PauseSuspectScheduling = false;
+
+    /// <summary>True when a suspect arrival is queued and waiting for <see cref="PauseSuspectScheduling"/> to clear.</summary>
+    private bool _pendingNextSuspect = false;
+
     private Coroutine _suspectSchedulerCoroutine;
 
     #region Events & Date Helpers
@@ -180,9 +190,34 @@ public class ShiftManager : NetworkBehaviour
             return;
         }
 
+        if (PauseSuspectScheduling)
+        {
+            _pendingNextSuspect = true;
+            Debug.Log("[ShiftManager] SetNextSuspectReady: scheduling paused — next suspect queued.");
+            return;
+        }
+
         if (_suspectSchedulerCoroutine != null)
             StopCoroutine(_suspectSchedulerCoroutine);
 
+        _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival());
+    }
+
+    /// <summary>
+    /// Releases a suspect arrival that was held by <see cref="PauseSuspectScheduling"/>.
+    /// Clears the pause flag and immediately starts the arrival scheduler if a suspect was queued.
+    /// Must only be called on the server.
+    /// </summary>
+    public void ResumeScheduledSuspect()
+    {
+        if (!IsServer) return;
+        PauseSuspectScheduling = false;
+        if (!_pendingNextSuspect) return;
+
+        _pendingNextSuspect = false;
+        Debug.Log("[ShiftManager] ResumeScheduledSuspect: releasing held suspect arrival.");
+        if (_suspectSchedulerCoroutine != null)
+            StopCoroutine(_suspectSchedulerCoroutine);
         _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival());
     }
 
@@ -329,6 +364,8 @@ public class ShiftManager : NetworkBehaviour
         // Clear per-shift arrival overrides so they don't bleed into the next shift.
         OverrideFirstArrivalInterval    = null;
         OverrideSuspectArrivalInterval  = null;
+        PauseSuspectScheduling          = false;
+        _pendingNextSuspect             = false;
 
         CompletedShift();
 

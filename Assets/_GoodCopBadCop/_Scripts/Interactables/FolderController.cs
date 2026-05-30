@@ -152,6 +152,20 @@ public class FolderController : PickableObject
     public void UnregisterDocumentServerRpc(NetworkObjectReference documentRef)
     {
         _serverDocuments.Remove(documentRef);
+
+        // Clear the document from the authoritative exam-page queue so it can be re-placed later.
+        // RemoveDocument only works correctly on the server (where _examPageQueue is populated and
+        // _queueSlots writes are authoritative), so this is the right place to call it.
+        if (documentRef.TryGet(out NetworkObject netObj))
+        {
+            PickableObject doc = netObj.GetComponent<PickableObject>();
+            if (doc != null)
+            {
+                RemoveDocument(doc, null);
+                documents.Remove(doc);
+            }
+        }
+
         UnregisterDocumentClientRpc(documentRef);
     }
 
@@ -366,16 +380,34 @@ public class FolderController : PickableObject
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType)
+    private void StartUseStampServerRpc(ulong interactingPlayerId, StampContainer.StampType stampType, ServerRpcParams rpcParams = default)
     {
         Debug.Log($"[FolderController] StartUseStampServerRpc: isStamping={isStamping} isOpen={isOpen.Value} NetworkObjectId={NetworkObjectId}");
         if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
         if (isOpen.Value) { Debug.LogWarning("[FolderController] Stamp blocked: folder is open."); return; }
+
+        // Consume one ink use for limited stamp types; block and notify the requesting client if none remain.
+        if (StampInkManager.Instance != null && !StampInkManager.Instance.ConsumeInk(stampType))
+        {
+            Debug.LogWarning($"[FolderController] Stamp blocked: no ink remaining for {stampType}.");
+            NotEnoughInkClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
         isStamping = true;
         isStamped.Value = true;
         Debug.Log($"[FolderController] isStamped set to true on server. NetworkObjectId={NetworkObjectId}");
 
         StartUseStampClientRpc(interactingPlayerId, stampType);
+    }
+
+    [ClientRpc]
+    private void NotEnoughInkClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.ShowShopNotification("<color=red>NOT ENOUGH INK</color>");
     }
 
     [ClientRpc]
@@ -572,11 +604,13 @@ public class FolderController : PickableObject
 
         yield return new WaitForSeconds(.25f);
 
-        // Freeze the body lean for the duration of the stamp so the spine/shoulder
-        // don't shift and fight the IK targets that were baked at sequence start.
+        // Drive a full forward lean on all clients for the duration of the stamp so the
+        // character visibly hunches toward the folder from a third-person perspective.
+        // The local player's lean is suppressed via SuppressLocalBodyLean so it cannot
+        // fight the IK targets; the networked netLeanFactor still broadcasts to proxies.
         if (isStampingLocalPlayer)
         {
-            ppc.PlayerAnimationController.SetBodyLeanDirect(0f);
+            ppc.PlayerAnimationController.SetBodyLeanDirect(1f, 1f);
             ppc.PlayerAnimationController.SuppressLocalBodyLean = true;
         }
 

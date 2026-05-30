@@ -1,9 +1,15 @@
+using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 public class ToolsLocker : Interactable
 {
+    /// <summary>
+    /// Fired on all clients (including server) whenever any tool locker transitions to open.
+    /// Used by tutorial systems to detect when a player opens the locker.
+    /// </summary>
+    public static event Action OnAnyLockerOpened;
     [SerializeField] private Animator anim;
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<int> viewerCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -23,6 +29,7 @@ public class ToolsLocker : Interactable
 
             if (newValue)
             {
+                OnAnyLockerOpened?.Invoke();
                 audioSource.PlayOneShot(lockerOpenSound);
 
                 foreach (var decoration in decor)

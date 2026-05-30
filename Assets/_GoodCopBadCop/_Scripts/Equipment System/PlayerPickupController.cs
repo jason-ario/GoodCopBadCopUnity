@@ -493,6 +493,45 @@ public class PlayerPickupController : NetworkBehaviour
         UIController.Instance.ShowShopNotification("Not enough coupons!");
     }
 
+    /// <summary>
+    /// Initiates a shop purchase that refills ink for the given stamp type instead of spawning a prefab.
+    /// Validates ownership and available funds before sending the request to the server.
+    /// </summary>
+    public void PurchaseRefillInk(StampContainer.StampType stampType, int amount, int price)
+    {
+        if (!IsOwner) return;
+        PurchaseRefillInkServerRpc((int)stampType, amount, price);
+    }
+
+    [ServerRpc]
+    private void PurchaseRefillInkServerRpc(int stampTypeIndex, int amount, int price, ServerRpcParams rpcParams = default)
+    {
+        if (GlobalHostVariables.Instance == null)
+        {
+            Debug.LogError("PurchaseRefillInkServerRpc: GlobalHostVariables not found.");
+            return;
+        }
+
+        bool spent = GlobalHostVariables.Instance.SubtractMoney(price);
+        if (!spent)
+        {
+            PurchaseFailedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
+        if (StampInkManager.Instance == null)
+        {
+            Debug.LogError("PurchaseRefillInkServerRpc: StampInkManager not found. Refunding purchase.");
+            GlobalHostVariables.Instance.AddMoney(price);
+            return;
+        }
+
+        StampInkManager.Instance.AddInk((StampContainer.StampType)stampTypeIndex, amount);
+    }
+
     public void PickUpObject(PickableObject pickableObject)
     {
         if (HeldObject != null)

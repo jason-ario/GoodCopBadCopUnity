@@ -56,6 +56,16 @@ public class Day_01 : DayBase
     [Tooltip("The Documentation Exam Notebook scene object — kept non-interactable until the notebook beat.")]
     [SerializeField] private ExamNotebook _examNotebook;
 
+    [Header("Day 1 Tutorial — Tool Locker Refill")]
+    [Tooltip("Transform used as the marker target for the tool locker tutorial arrow. Assign the tool locker's own Transform or its Look Target child.")]
+    [SerializeField] private Transform _toolLockerTarget;
+
+    [Tooltip("The quarantine ink refill ShopItem — its price is temporarily set to 0 during the tutorial.")]
+    [SerializeField] private ShopItem _quarantineRefillItem;
+
+    [Tooltip("The kill ink refill ShopItem — its price is temporarily set to 0 during the tutorial.")]
+    [SerializeField] private ShopItem _killRefillItem;
+
     [Header("Other Day Notebooks — Hidden During Day 1")]
     [Tooltip("The Mutation Exam Notebook — hidden for the entirety of Day 1.")]
     [SerializeField] private ExamNotebook _mutationNotebook;
@@ -156,6 +166,9 @@ public class Day_01 : DayBase
 
         // Clear any tutorial markers that may still be active if the day ended mid-tutorial.
         TutorialMarkerManager.Instance?.UnmarkAll();
+
+        // Clean up tool locker tutorial state in case the day ended mid-beat.
+        CleanupToolLockerTutorial();
 
         if (ShiftManager.Instance != null)
         {
@@ -259,6 +272,8 @@ public class Day_01 : DayBase
 
         if (_suspect3AppForm != null)
             _suspect3AppForm.OnEquip -= OnSuspect3AppFormPickedUp;
+
+        CleanupToolLockerTutorial();
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -703,6 +718,13 @@ public class Day_01 : DayBase
     private bool _s3IDCardInspected;
     private bool _s3AppFormInspected;
 
+    // =========================================================================
+    // Tool locker refill tutorial state
+    // =========================================================================
+    private bool _quarantineRefilled;
+    private bool _killRefilled;
+    private System.Action _onToolLockerOpenedDelegate;
+
     private IEnumerator Suspect2IDCardBeat()
     {
         yield return new WaitForSeconds(3f);
@@ -1100,11 +1122,111 @@ public class Day_01 : DayBase
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
+        // Pause the next suspect immediately — the kill sequence takes ~11 s from this point,
+        // but we want PauseSuspectScheduling set before SetNextSuspectReady() fires.
+        if (NetworkManager.Singleton.IsServer)
+            ShiftManager.PauseSuspectScheduling = true;
+
         HideStaticMarker(StaticMarkerTarget.HandOff);
+
+        StartCoroutine(ToolLockerRefillTutorialBeat());
+    }
+
+    // =========================================================================
+    // Tutorial Sequence — Tool Locker Refill (after kill tutorial)
+    // =========================================================================
+
+    /// <summary>
+    /// Guides the player to the tool locker to refill their quarantine and kill stamps.
+    /// Both refill items are set to free just for this beat. The 4th suspect is held until
+    /// both refills have been purchased, then released via <see cref="ShiftManager.ResumeScheduledSuspect"/>.
+    /// </summary>
+    private IEnumerator ToolLockerRefillTutorialBeat()
+    {
+        // Make both refill items free before the locker is opened so the price is
+        // already 0 when the ToolShopController reads it in Start().
+        _quarantineRefillItem?.SetPriceOverride(0);
+        _killRefillItem?.SetPriceOverride(0);
+
+        // All stamps are now unlocked — the player can freely use them going forward.
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+        _redStampSlot?.SetSlotInteractable(true);
 
         yield return new WaitForSeconds(2f);
 
+        yield return ShowAndWait("Your stamps are running low. Head to the tool locker and restock.");
+
+        ShowStaticMarker(StaticMarkerTarget.ToolLocker);
+
+        // Wait until any player opens a tool locker (fires on all machines via NetworkVariable callback).
+        bool lockerOpened = false;
+        _onToolLockerOpenedDelegate = () => lockerOpened = true;
+        ToolsLocker.OnAnyLockerOpened += _onToolLockerOpenedDelegate;
+
+        yield return new WaitUntil(() => lockerOpened);
+
+        ToolsLocker.OnAnyLockerOpened -= _onToolLockerOpenedDelegate;
+        _onToolLockerOpenedDelegate = null;
+        HideStaticMarker(StaticMarkerTarget.ToolLocker);
+
+        yield return ShowAndWait("Purchase the stamp refills for quarantine and kills — they're on us this time.");
+
+        // Subscribe before waiting so a purchase made during the bark is not missed.
+        _quarantineRefilled = false;
+        _killRefilled = false;
+        StampInkManager.OnInkChanged += OnInkRefilled;
+
+        yield return new WaitUntil(() => _quarantineRefilled && _killRefilled);
+
+        StampInkManager.OnInkChanged -= OnInkRefilled;
+
+        // Restore prices now that both refills have been purchased.
+        _quarantineRefillItem?.ClearPriceOverride();
+        _killRefillItem?.ClearPriceOverride();
+
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("Stay stocked up.");
+
+        yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
+
+        // Release the 4th suspect.
+        if (NetworkManager.Singleton.IsServer)
+            ShiftManager.Instance.ResumeScheduledSuspect();
+    }
+
+    /// <summary>Tracks which stamp types have been refilled during the tool locker tutorial beat.</summary>
+    private void OnInkRefilled(StampContainer.StampType type, int newCount)
+    {
+        if (this == null) return;
+        if (type == StampContainer.StampType.Quarantine) _quarantineRefilled = true;
+        if (type == StampContainer.StampType.Kill)       _killRefilled       = true;
+    }
+
+    /// <summary>
+    /// Unsubscribes all tool locker tutorial events, restores item prices, hides any active
+    /// marker, and clears the suspect scheduling pause. Safe to call from <see cref="DayDeactivated"/>
+    /// and <see cref="OnDestroy"/>.
+    /// </summary>
+    private void CleanupToolLockerTutorial()
+    {
+        StampInkManager.OnInkChanged -= OnInkRefilled;
+
+        if (_onToolLockerOpenedDelegate != null)
+        {
+            ToolsLocker.OnAnyLockerOpened -= _onToolLockerOpenedDelegate;
+            _onToolLockerOpenedDelegate = null;
+        }
+
+        // Dismiss the marker if it is still visible (e.g. day ended mid-beat).
+        HideStaticMarker(StaticMarkerTarget.ToolLocker);
+
+        _quarantineRefillItem?.ClearPriceOverride();
+        _killRefillItem?.ClearPriceOverride();
+
+        // Ensure the pause flag is never left set if the day ends mid-tutorial.
+        ShiftManager.PauseSuspectScheduling = false;
     }
 
     // -------------------------------------------------------------------------
@@ -1136,7 +1258,7 @@ public class Day_01 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>Identifies scene-static interactables that need a synced tutorial marker.</summary>
-    private enum StaticMarkerTarget { GreenStamp, YellowStamp, RedStamp, HandOff }
+    private enum StaticMarkerTarget { GreenStamp, YellowStamp, RedStamp, HandOff, ToolLocker }
 
     private Transform GetStaticMarkerTransform(StaticMarkerTarget target) => target switch
     {
@@ -1144,6 +1266,7 @@ public class Day_01 : DayBase
         StaticMarkerTarget.YellowStamp => _yellowStampSlot?.transform,
         StaticMarkerTarget.RedStamp    => _redStampSlot?.transform,
         StaticMarkerTarget.HandOff     => _handOffPoint?.transform,
+        StaticMarkerTarget.ToolLocker  => _toolLockerTarget,
         _                              => null
     };
 

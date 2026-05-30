@@ -93,20 +93,43 @@ public class ToolShopController : MonoBehaviour
             return;
         }
 
-        if (pickup.IsHoldingObject)
-        {
-            UIController.Instance.ShowShopNotification(HoldingObjectMessage);
-            return;
-        }
+        ShopPurchaseAction customAction = _selectedShopItem.CustomPurchaseAction;
 
-        if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
+        if (customAction != null)
         {
-            UIController.Instance.ShowShopNotification("Not enough coupons!");
-            return;
-        }
+            // Custom action path — no prefab spawned.
+            if (customAction.RequiresEmptyHands && pickup.IsHoldingObject)
+            {
+                UIController.Instance.ShowShopNotification(HoldingObjectMessage);
+                return;
+            }
 
-        Transform spawnPoint = _itemSpawnPoint != null ? _itemSpawnPoint : pickup.transform;
-        pickup.PurchaseAndPickUp(_selectedShopItem.pickableItemData, _selectedShopItem.Price, spawnPoint);
+            if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
+            {
+                UIController.Instance.ShowShopNotification("Not enough coupons!");
+                return;
+            }
+
+            customAction.Execute(pickup, _selectedShopItem.Price);
+        }
+        else
+        {
+            // Default path — spawn and pick up a pickable prefab.
+            if (pickup.IsHoldingObject)
+            {
+                UIController.Instance.ShowShopNotification(HoldingObjectMessage);
+                return;
+            }
+
+            if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
+            {
+                UIController.Instance.ShowShopNotification("Not enough coupons!");
+                return;
+            }
+
+            Transform spawnPoint = _itemSpawnPoint != null ? _itemSpawnPoint : pickup.transform;
+            pickup.PurchaseAndPickUp(_selectedShopItem.pickableItemData, _selectedShopItem.Price, spawnPoint);
+        }
 
         UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
         UIController.Instance.CloseToolShopUI();

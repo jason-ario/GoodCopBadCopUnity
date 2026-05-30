@@ -249,13 +249,28 @@ public class DoorController : Interactable
     }
 
     /// <summary>
-    /// Unlocks the door on all clients and plays the unlock sound. Only callable from the server.
+    /// Unlocks the door on all clients, plays the unlock sound, and forces the door open.
+    /// Only callable from the server.
     /// </summary>
     public void Unlock()
     {
         if (!IsServer) return;
         _isLocked.Value = false;
         PlayUnlockSoundClientRpc();
+        ForceOpen();
+    }
+
+    /// <summary>
+    /// Forces the door open on all clients without requiring player interaction.
+    /// Defaults to opening outward. Only callable from the server.
+    /// </summary>
+    public void ForceOpen(bool openedIn = false)
+    {
+        if (!IsServer) return;
+        _openedIn.Value = openedIn;
+        _doorOpen.Value = true;
+        BroadcastDoorStateClientRpc(true, openedIn, ulong.MaxValue);
+        PlayDoorSoundClientRpc(true);
     }
 
     [ClientRpc]
