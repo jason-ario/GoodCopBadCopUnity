@@ -132,6 +132,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3268482912163897897}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5232604761152191521}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6613276751134763203}
   m_SourcePrefab: {fileID: 100100000, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
 --- !u!1 &8610616473533010578 stripped
 GameObject:
@@ -406,16 +412,16 @@ MonoBehaviour:
   putDownSound: {fileID: 0}
   _hitbox: {fileID: 2950890886079734997}
   _damagePerHit: 25
-  _hitDelay: 0.35
-  _swingCooldown: 0.9
+  _hitDelay: 0.3
+  _swingCooldown: 0.5
   _fenceHitRadius: 1.5
   _fenceLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
   _swingAnimBool: UsingTool
-  _swingSound: {fileID: 0}
-  _impactSound: {fileID: 0}
-  _environmentHitSound: {fileID: 0}
+  _swingSound: {fileID: 8300000, guid: 180a44b6c710017439f9fec523c48644, type: 3}
+  _impactSound: {fileID: 8300000, guid: 9d343d5ad8bd3d141b2542af2d93c414, type: 3}
+  _environmentHitSound: {fileID: 8300000, guid: d9a447bb5317fe648b6c52fbe7045408, type: 3}
 --- !u!114 &3268482912163897897
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -462,6 +468,42 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!65 &5232604761152191521
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8610616473533010578}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.0081532, y: 21.18948, z: 8.819784}
+  m_Center: {x: -0.004276201, y: -2.9700675, z: -0.4820134}
+--- !u!114 &6613276751134763203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8610616473533010578}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49e64c2e5076be549aebc84739dd1dc9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponDurability
+  ShowTopMostFoldoutHeaderGroup: 1
+  weaponData: {fileID: 11400000, guid: 7f11f13807441774e914b4d5d684f019, type: 2}
+  breakSound: {fileID: 8300000, guid: 5941a53f3dd529143b1346937c127440, type: 3}
 --- !u!4 &8950023152507783208 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
