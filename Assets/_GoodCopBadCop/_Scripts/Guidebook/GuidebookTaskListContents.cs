@@ -47,6 +47,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
     {
         // Catch up if tasks were added while the guidebook was closed.
         BuildRows();
+        TriggerRenderTextureRefresh();
     }
 
     /// <summary>
@@ -63,10 +64,18 @@ public class GuidebookTaskListContents : GuidebookPageContents
     /// Toggles <see cref="_renderTextureContainer"/> off for one frame then back on,
     /// forcing the render texture to update with the latest UI state.
     /// Any in-flight refresh is cancelled before starting a new one.
+    /// When this object is inactive, sets the container active directly so the
+    /// render texture picks up the change when the guidebook opens.
     /// </summary>
     private void TriggerRenderTextureRefresh()
     {
         if (_renderTextureContainer == null) return;
+
+        if (!isActiveAndEnabled)
+        {
+            _renderTextureContainer.SetActive(true);
+            return;
+        }
 
         if (_renderRefreshCoroutine != null)
             StopCoroutine(_renderRefreshCoroutine);

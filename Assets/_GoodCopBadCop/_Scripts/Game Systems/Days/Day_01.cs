@@ -66,6 +66,12 @@ public class Day_01 : DayBase
     [Tooltip("The kill ink refill ShopItem — its price is temporarily set to 0 during the tutorial.")]
     [SerializeField] private ShopItem _killRefillItem;
 
+    [Tooltip("The full suspect pool used after the tool locker tutorial ends. Assign the 'All Suspects' SuspectSet asset.")]
+    [SerializeField] private SuspectSet _allSuspectsSet;
+
+    [Tooltip("Number of additional suspects drawn from the all-suspects pool after the tool locker tutorial.")]
+    [SerializeField] private int _postTutorialSuspectCount = 2;
+
     [Header("Other Day Notebooks — Hidden During Day 1")]
     [Tooltip("The Mutation Exam Notebook — hidden for the entirety of Day 1.")]
     [SerializeField] private ExamNotebook _mutationNotebook;
@@ -1202,6 +1208,11 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
 
+        // Append a few suspects from the full pool so the shift continues naturally
+        // past the tutorial section.
+        if (NetworkManager.Singleton.IsServer)
+            AppendPostTutorialSuspects();
+
         // Release the 4th suspect.
         if (NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.ResumeScheduledSuspect();
@@ -1297,6 +1308,46 @@ public class Day_01 : DayBase
 
         // Ensure the pause flag is never left set if the day ends mid-tutorial.
         ShiftManager.PauseSuspectScheduling = false;
+    }
+
+    /// <summary>
+    /// Appends <see cref="_postTutorialSuspectCount"/> randomly selected suspects from
+    /// <see cref="_allSuspectsSet"/> to the live shift queue so the shift continues past
+    /// the Day 1 tutorial section. Suspects already in the queue are excluded to avoid
+    /// immediate duplicates. Must only be called on the server.
+    /// </summary>
+    private void AppendPostTutorialSuspects()
+    {
+        if (_allSuspectsSet == null || _allSuspectsSet.suspects == null || _allSuspectsSet.suspects.Count == 0)
+        {
+            Debug.LogWarning("[Day_01] AppendPostTutorialSuspects: _allSuspectsSet is not assigned or empty — skipping.");
+            return;
+        }
+
+        var queue = DailySuspectManager.Instance.shiftSuspects;
+
+        // Build a pool that excludes suspects already queued to avoid immediate repeats.
+        var existingSet = new HashSet<SuspectData>(queue);
+        var pool = new List<SuspectData>();
+        foreach (SuspectData s in _allSuspectsSet.suspects)
+        {
+            if (!existingSet.Contains(s))
+                pool.Add(s);
+        }
+
+        // Fall back to the full set if there aren't enough unique suspects available.
+        if (pool.Count == 0)
+            pool = new List<SuspectData>(_allSuspectsSet.suspects);
+
+        int count = Mathf.Min(_postTutorialSuspectCount, pool.Count);
+        for (int i = 0; i < count; i++)
+        {
+            int idx = UnityEngine.Random.Range(0, pool.Count);
+            queue.Add(pool[idx]);
+            pool.RemoveAt(idx);
+        }
+
+        Debug.Log($"[Day_01] Appended {count} post-tutorial suspect(s) from '{_allSuspectsSet.name}'. Shift queue now has {queue.Count} suspect(s).");
     }
 
     // -------------------------------------------------------------------------

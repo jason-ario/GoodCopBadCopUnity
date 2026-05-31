@@ -68,6 +68,12 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // only fires after a real between-shift task cycle, not on the initial day start.
     private bool _betweenShiftTasksCompleted;
 
+    // Guards the one-time trash task hint so it only fires the first time the task is introduced.
+    private bool _trashTaskHintShown;
+
+    // Guards the one-time guidebook hint so it only fires the first time the guidebook is opened.
+    private bool _guidebookHintShown;
+
     // ---------------------------------------------------------------------------
     // Unity / Network Lifecycle
     // ---------------------------------------------------------------------------
@@ -87,6 +93,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
         BetweenShiftTaskManager.OnAllTasksComplete += OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
+        GuidebookController.OnGuidebookOpened += OnGuidebookOpened;
     }
 
     private void OnDestroy()
@@ -102,6 +109,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
         BetweenShiftTaskManager.OnAllTasksComplete -= OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
+        GuidebookController.OnGuidebookOpened -= OnGuidebookOpened;
     }
 
     // ---------------------------------------------------------------------------
@@ -160,6 +168,20 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         _betweenShiftTasksCompleted = true;
     }
 
+    private void OnGuidebookOpened()
+    {
+        if (_guidebookHintShown) return;
+        _guidebookHintShown = true;
+        StartCoroutine(GuidebookOpenedHintCoroutine());
+    }
+
+    private IEnumerator GuidebookOpenedHintCoroutine()
+    {
+        yield return new WaitUntil(() => !_isSpeaking);
+        yield return new WaitForSeconds(1f);
+        ShowDialogue("Use Q and E to flip through the pages. It covers everything you need to know to do your job.");
+    }
+
     // ---------------------------------------------------------------------------
     // Scripted Sequences (called by ShiftManager or CampaignManager)
     // ---------------------------------------------------------------------------
@@ -204,6 +226,16 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         yield return new WaitForSeconds(4f);
 
         ShiftManager.Instance.TriggerBeginNightPhase();
+
+        if (!_trashTaskHintShown)
+        {
+            _trashTaskHintShown = true;
+            yield return new WaitForSeconds(3f);
+            ShowDialogue("Bring the trash bags to the dumpster. They are scattered throughout the yard.");
+            yield return new WaitUntil(() => !_isSpeaking);
+            yield return new WaitForSeconds(3f);
+            ShowDialogue("Press Tab to open your guidebook. Your tasks and everything you need to do your job are inside.");
+        }
     }
 
     /// <summary>Played when between-shift tasks are all done and the booth is ready.</summary>
