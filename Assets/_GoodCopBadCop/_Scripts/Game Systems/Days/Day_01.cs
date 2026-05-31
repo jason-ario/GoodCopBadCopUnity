@@ -399,7 +399,11 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Hold left-click to inspect. Right-click over the desk to put it down.");
+        yield return ShowAndWait("Hold left-click to inspect.");
+        
+        yield return new WaitForSeconds(.5f);
+        
+        yield return ShowAndWait("Right-click over the desk to put it down.");
 
         // IsHeld is driven by _holdingClientId NetworkVariable — synced on all clients.
         if (_tutorialIDCard != null)

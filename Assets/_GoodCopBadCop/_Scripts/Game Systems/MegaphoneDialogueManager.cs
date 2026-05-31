@@ -467,6 +467,10 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
         _barkText.text = text;
         _barkCanvas.SetActive(true);
+
+        // Dismiss any in-progress character dialogue subtitles so they don't overlap.
+        DialogueManager.Instance?.ClearHistory();
+
         _hideCoroutine = StartCoroutine(WaitAndHide());
     }
 
@@ -505,6 +509,9 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
         _barkText.text = text;
         _barkCanvas.SetActive(true);
+
+        // Dismiss any in-progress character dialogue subtitles so they don't overlap.
+        DialogueManager.Instance?.ClearHistory();
 
         // Use the dedicated megaphone slot so that SayDialogueClientRpc (which calls
         // StopDialogueAudio on all clients) cannot cancel this bark mid-speech and
