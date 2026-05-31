@@ -5,6 +5,15 @@ using UnityEngine;
 
 public class ToolShopController : MonoBehaviour
 {
+    /// <summary>The currently active <see cref="ToolShopController"/> instance.</summary>
+    public static ToolShopController Instance { get; private set; }
+
+    /// <summary>
+    /// Fired after the shop item views are ready (each time the shop screen becomes active).
+    /// Subscribe to this to apply tutorial state such as showing arrows or locking the back button.
+    /// </summary>
+    public static event System.Action OnShopOpened;
+
     [SerializeField] private CanvasGroup _canvasGroup;
     [SerializeField] private ItemPreviewSpawner _itemPreviewSpawner;
     [SerializeField] private ShopItem[] shopItems;
@@ -17,10 +26,33 @@ public class ToolShopController : MonoBehaviour
     /// <summary>Transform used as the world spawn point when purchasing an item.</summary>
     [SerializeField] private Transform _itemSpawnPoint;
 
+    /// <summary>The back button in the shop screen. Toggle with <see cref="SetBackButtonActive"/>.</summary>
+    public GameObject backButton;
+
     private ShopItem _selectedShopItem;
+    private bool _initialized;
 
     private static readonly string HoldingObjectMessage = "Put down what you're holding first!";
     private static readonly string PurchaseSuccessMessage = "Item purchased!";
+
+    private void OnEnable()
+    {
+        Instance = this;
+
+        // Fire on every subsequent activation (Start already fired once).
+        if (_initialized)
+        {
+            FadeIn();
+            OnShopOpened?.Invoke();
+        }
+    }
+
+    private void OnDisable()
+    {
+        _canvasGroup.DOKill();
+        if (Instance == this)
+            Instance = null;
+    }
 
     private void Start()
     {
@@ -42,11 +74,9 @@ public class ToolShopController : MonoBehaviour
         }
 
         shopItemViews[0].SelectShopItem();
-    }
 
-    private void OnDisable()
-    {
-        _canvasGroup.DOKill();
+        _initialized = true;
+        OnShopOpened?.Invoke();
     }
 
     private void FadeIn()
@@ -132,7 +162,29 @@ public class ToolShopController : MonoBehaviour
         }
 
         UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
-        UIController.Instance.CloseToolShopUI();
+
+        bool shouldClose = customAction == null || customAction.CloseShopOnPurchase;
+        if (shouldClose)
+            UIController.Instance.CloseToolShopUI();
+    }
+
+    /// <summary>Shows or hides the shop's back button.</summary>
+    public void SetBackButtonActive(bool active)
+    {
+        if (backButton != null)
+            backButton.SetActive(active);
+    }
+
+    /// <summary>Returns the <see cref="ShopItemView"/> that was created for <paramref name="item"/>, or null if not found.</summary>
+    public ShopItemView GetViewForItem(ShopItem item)
+    {
+        if (item == null) return null;
+        foreach (var view in shopItemViews)
+        {
+            if (view.ShopItem == item)
+                return view;
+        }
+        return null;
     }
 
     private PlayerPickupController GetLocalPlayerPickup()

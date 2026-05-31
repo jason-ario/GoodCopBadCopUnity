@@ -11,6 +11,14 @@ public abstract class ShopPurchaseAction : ScriptableObject
     public abstract bool RequiresEmptyHands { get; }
 
     /// <summary>
+    /// Whether the tool locker UI should close after a successful purchase.
+    /// Override and return <c>false</c> for actions that don't remove the player from the locker context,
+    /// such as ink refills or consumable top-ups.
+    /// Defaults to <c>true</c>.
+    /// </summary>
+    public virtual bool CloseShopOnPurchase => true;
+
+    /// <summary>
     /// Executes the purchase action on the purchasing client.
     /// Implementations are responsible for routing server-side work via ServerRpcs on <paramref name="pickup"/>.
     /// </summary>

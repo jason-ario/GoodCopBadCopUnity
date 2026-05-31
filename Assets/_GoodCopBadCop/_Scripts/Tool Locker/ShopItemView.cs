@@ -9,6 +9,10 @@ public class ShopItemView : MonoBehaviour
     ToolShopController _toolShopController;
     private ShopItem _shopItem;
     [SerializeField] private Animator _anim;
+    public GameObject arrow;
+
+    /// <summary>The <see cref="ShopItem"/> this view was initialized with.</summary>
+    public ShopItem ShopItem => _shopItem;
 
     public void Initialize(ShopItem shopItem, ToolShopController toolShopController)
     {
@@ -27,5 +31,12 @@ public class ShopItemView : MonoBehaviour
     public void Deselect()
     {
         _anim.SetBool("Selected", false);
+    }
+
+    /// <summary>Shows or hides the tutorial arrow on this shop item row.</summary>
+    public void SetArrowVisible(bool visible)
+    {
+        if (arrow != null)
+            arrow.SetActive(visible);
     }
 }

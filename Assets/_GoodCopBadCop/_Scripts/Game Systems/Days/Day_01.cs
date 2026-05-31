@@ -724,6 +724,9 @@ public class Day_01 : DayBase
     private bool _quarantineRefilled;
     private bool _killRefilled;
     private System.Action _onToolLockerOpenedDelegate;
+    private System.Action _onShopOpenedForTutorialDelegate;
+    private ShopItemView _quarantineRefillView;
+    private ShopItemView _killRefillView;
 
     private IEnumerator Suspect2IDCardBeat()
     {
@@ -1170,12 +1173,16 @@ public class Day_01 : DayBase
         _onToolLockerOpenedDelegate = null;
         HideStaticMarker(StaticMarkerTarget.ToolLocker);
 
-        yield return ShowAndWait("Purchase the stamp refills for quarantine and kills — they're on us this time.");
-
-        // Subscribe before waiting so a purchase made during the bark is not missed.
+        // Subscribe to OnShopOpened NOW — before the bark — so we never miss the shop
+        // UI becoming active, even if the player enters the shop during the dialogue.
         _quarantineRefilled = false;
         _killRefilled = false;
         StampInkManager.OnInkChanged += OnInkRefilled;
+
+        _onShopOpenedForTutorialDelegate = OnToolLockerShopOpened;
+        ToolShopController.OnShopOpened += _onShopOpenedForTutorialDelegate;
+
+        yield return ShowAndWait("Purchase the stamp refills for quarantine and kills — they're on us this time.");
 
         yield return new WaitUntil(() => _quarantineRefilled && _killRefilled);
 
@@ -1200,8 +1207,52 @@ public class Day_01 : DayBase
     private void OnInkRefilled(StampContainer.StampType type, int newCount)
     {
         if (this == null) return;
-        if (type == StampContainer.StampType.Quarantine) _quarantineRefilled = true;
-        if (type == StampContainer.StampType.Kill)       _killRefilled       = true;
+
+        if (type == StampContainer.StampType.Quarantine && !_quarantineRefilled)
+        {
+            _quarantineRefilled = true;
+            _quarantineRefillView?.SetArrowVisible(false);
+            _quarantineRefillView = null;
+        }
+
+        if (type == StampContainer.StampType.Kill && !_killRefilled)
+        {
+            _killRefilled = true;
+            _killRefillView?.SetArrowVisible(false);
+            _killRefillView = null;
+        }
+
+        // Both purchased — re-enable the back button so the player can leave.
+        if (_quarantineRefilled && _killRefilled)
+            ToolShopController.Instance?.SetBackButtonActive(true);
+    }
+
+    /// <summary>
+    /// Called when the shop screen opens during the tool locker tutorial beat.
+    /// Hides the back button and shows tutorial arrows on the two refill items.
+    /// </summary>
+    private void OnToolLockerShopOpened()
+    {
+        // Only act once per beat — unsubscribe immediately.
+        ToolShopController.OnShopOpened -= _onShopOpenedForTutorialDelegate;
+        _onShopOpenedForTutorialDelegate = null;
+
+        var controller = ToolShopController.Instance;
+        if (controller == null) return;
+
+        controller.SetBackButtonActive(false);
+
+        if (!_quarantineRefilled && _quarantineRefillItem != null)
+        {
+            _quarantineRefillView = controller.GetViewForItem(_quarantineRefillItem);
+            _quarantineRefillView?.SetArrowVisible(true);
+        }
+
+        if (!_killRefilled && _killRefillItem != null)
+        {
+            _killRefillView = controller.GetViewForItem(_killRefillItem);
+            _killRefillView?.SetArrowVisible(true);
+        }
     }
 
     /// <summary>
@@ -1218,6 +1269,21 @@ public class Day_01 : DayBase
             ToolsLocker.OnAnyLockerOpened -= _onToolLockerOpenedDelegate;
             _onToolLockerOpenedDelegate = null;
         }
+
+        if (_onShopOpenedForTutorialDelegate != null)
+        {
+            ToolShopController.OnShopOpened -= _onShopOpenedForTutorialDelegate;
+            _onShopOpenedForTutorialDelegate = null;
+        }
+
+        // Hide any tutorial arrows that may still be active.
+        _quarantineRefillView?.SetArrowVisible(false);
+        _quarantineRefillView = null;
+        _killRefillView?.SetArrowVisible(false);
+        _killRefillView = null;
+
+        // Restore the back button in case the day ends mid-tutorial.
+        ToolShopController.Instance?.SetBackButtonActive(true);
 
         // Dismiss the marker if it is still visible (e.g. day ended mid-beat).
         HideStaticMarker(StaticMarkerTarget.ToolLocker);

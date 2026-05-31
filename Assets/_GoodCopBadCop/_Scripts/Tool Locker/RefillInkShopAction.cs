@@ -18,6 +18,9 @@ public class RefillInkShopAction : ShopPurchaseAction
     /// <summary>Ink refills do not require the player to have empty hands.</summary>
     public override bool RequiresEmptyHands => false;
 
+    /// <summary>Ink refills keep the locker open so the player can purchase additional refills.</summary>
+    public override bool CloseShopOnPurchase => false;
+
     /// <summary>Routes the refill request through the networked pickup controller.</summary>
     public override void Execute(PlayerPickupController pickup, int price)
         => pickup.PurchaseRefillInk(stampType, amount, price);
