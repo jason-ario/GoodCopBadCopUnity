@@ -115,8 +115,8 @@ public class Day_01 : DayBase
         // Persist documentation-only unlock for Day 1 and apply to live category locks.
         AnomalyManager.Instance.UnlockDocumentationOnly();
 
-        // Lock the exit door immediately — it stays locked for the entire tutorial shift.
-        ShiftManager.Instance.OnDoorLock?.Invoke();
+        // Door lock is deferred to OnDayStarted (ShiftManager.OnDayStart) so the sound
+        // plays after the intro cutscene ends, not while it is playing.
 
         // Gate the drawer — unlocked later when the tutorial prompts the player.
         if (_drawer != null)
@@ -301,6 +301,10 @@ public class Day_01 : DayBase
     private void OnDayStarted()
     {
         if (this == null) return;
+
+        // Lock the exit door now that the intro cutscene has finished and the day is live.
+        ShiftManager.Instance.OnDoorLock?.Invoke();
+
         if (!NetworkManager.Singleton.IsServer)
         {
             Debug.LogWarning($"[Day_01] OnDayStarted: not server (IsServer={NetworkManager.Singleton.IsServer}, IsHost={NetworkManager.Singleton.IsHost}, IsClient={NetworkManager.Singleton.IsClient}) — tutorial skipped on this machine.");

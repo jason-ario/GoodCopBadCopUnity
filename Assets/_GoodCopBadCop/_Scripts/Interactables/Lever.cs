@@ -100,6 +100,13 @@ public class Lever : Interactable
     public void Reset()
     {
         if (!IsServer) return;
+
+        // Only broadcast (and play the lever-off sound) when the lever was actually up.
+        // If it is already down, the visual state is already correct on all clients and
+        // firing the RPC would play a spurious sound — notably during the intro cutscene
+        // when ResetEverything() runs before the lever has ever been touched.
+        if (!_isUp.Value) return;
+
         _isUp.Value = false;
         BroadcastLeverStateClientRpc(false, ulong.MaxValue);
     }
