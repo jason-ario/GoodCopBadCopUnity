@@ -2,13 +2,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Marks a GameObject as an active UV light source for the blue veins anomaly system.
+/// Marks a GameObject as an active UV light source that projects a cone-shaped reveal volume.
 /// Registers itself into a shared static list on OnEnable and removes itself on OnDisable,
 /// so the flashlight script only needs to enable/disable this component to participate
-/// in the reveal effect — no direct references to BlueVeinsAnomaly are required.
+/// in the reveal effect — no direct references are required.
 ///
-/// The reveal radius is read from a SphereCollider on the same GameObject if present,
-/// otherwise it uses the serialized fallbackRadius field.
+/// The cone is defined by a full cone angle (degrees) and a range (world-space distance).
+/// The light direction is always transform.forward.
 /// </summary>
 [ExecuteAlways]
 public class UVLight : MonoBehaviour
@@ -16,14 +16,29 @@ public class UVLight : MonoBehaviour
     /// <summary>All currently active UV light sources across the scene.</summary>
     public static readonly List<UVLight> ActiveLights = new();
 
-    [Tooltip("Radius of the reveal sphere. Auto-read from a SphereCollider on this GameObject if one is present.")]
-    [SerializeField] private float fallbackRadius = 1f;
+    [Tooltip("Full cone angle in degrees (the total spread, not half-angle).")]
+    [SerializeField] private float coneAngleDegrees = 30f;
+
+    [Tooltip("How far the cone extends in world units.")]
+    [SerializeField] private float range = 3f;
 
     /// <summary>World-space position of this UV light this frame.</summary>
     public Vector3 Position => transform.position;
 
-    /// <summary>World-space reveal radius, accounting for lossy scale.</summary>
-    public float Radius => GetRadius();
+    /// <summary>World-space normalized forward direction of the cone.</summary>
+    public Vector3 Direction => transform.forward;
+
+    /// <summary>Half of the full cone angle, in degrees.</summary>
+    public float ConeHalfAngleDeg => coneAngleDegrees * 0.5f;
+
+    /// <summary>Maximum world-space reach of the cone along its forward axis.</summary>
+    public float Range => range;
+
+    /// <summary>
+    /// Backward-compatible alias for Range. Used by BlueVeinsAnomaly which still operates
+    /// on a sphere model. Returns the cone's range as the effective sphere radius.
+    /// </summary>
+    public float Radius => range;
 
     private void OnEnable()
     {
@@ -36,20 +51,43 @@ public class UVLight : MonoBehaviour
         ActiveLights.Remove(this);
     }
 
-    private float GetRadius()
-    {
-        if (TryGetComponent(out SphereCollider sphere))
-            return sphere.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
-
-        return fallbackRadius;
-    }
-
 #if UNITY_EDITOR
-    // Draw a wire sphere in the Scene view so the radius is easy to tune.
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = new Color(0.4f, 0.4f, 1f, 0.4f);
-        Gizmos.DrawWireSphere(transform.position, GetRadius());
+        Gizmos.color = new Color(0.4f, 0.4f, 1f, 0.5f);
+        DrawConeGizmo();
+    }
+
+    /// <summary>Draws a cone wireframe using the light's current transform and settings.</summary>
+    private void DrawConeGizmo()
+    {
+        Vector3 origin    = transform.position;
+        Vector3 forward   = transform.forward;
+        Vector3 right     = transform.right;
+        Vector3 up        = transform.up;
+        float   halfRad   = ConeHalfAngleDeg * Mathf.Deg2Rad;
+        float   tipRadius = range * Mathf.Tan(halfRad);
+        Vector3 tip       = origin + forward * range;
+
+        // Four edge lines from the apex to the rim.
+        const int EdgeCount = 8;
+        for (int i = 0; i < EdgeCount; i++)
+        {
+            float angle    = i * (Mathf.PI * 2f / EdgeCount);
+            Vector3 rimPt  = tip + (right * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * tipRadius;
+            Gizmos.DrawLine(origin, rimPt);
+        }
+
+        // Circle at the rim.
+        const int CircleSegments = 32;
+        for (int s = 0; s < CircleSegments; s++)
+        {
+            float a0 = s       * (Mathf.PI * 2f / CircleSegments);
+            float a1 = (s + 1) * (Mathf.PI * 2f / CircleSegments);
+            Vector3 p0 = tip + (right * Mathf.Cos(a0) + up * Mathf.Sin(a0)) * tipRadius;
+            Vector3 p1 = tip + (right * Mathf.Cos(a1) + up * Mathf.Sin(a1)) * tipRadius;
+            Gizmos.DrawLine(p0, p1);
+        }
     }
 #endif
 }

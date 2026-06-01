@@ -217,51 +217,6 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!1 &1649482803383397167
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2889671229332704194}
-  - component: {fileID: 8162750197569123866}
-  m_Layer: 1
-  m_Name: UV Light
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2889671229332704194
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1649482803383397167}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 1.3000002}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1854038241826900937}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8162750197569123866
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1649482803383397167}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90836e53cb8749f4591abbf80579140a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UVLight
-  fallbackRadius: 1.31
 --- !u!1 &1909808520722316102
 GameObject:
   m_ObjectHideFlags: 0
@@ -277,6 +232,7 @@ GameObject:
   - component: {fileID: 2499128307837510546}
   - component: {fileID: 3047195879944146235}
   - component: {fileID: 5386040929782865894}
+  - component: {fileID: 5287449420545158374}
   m_Layer: 1
   m_Name: UV light
   m_TagString: Untagged
@@ -299,7 +255,6 @@ Transform:
   m_Children:
   - {fileID: 7470200968095667944}
   - {fileID: 3248617151770577291}
-  - {fileID: 2889671229332704194}
   m_Father: {fileID: 2553534684014711447}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!108 &2739122234152386149
@@ -412,8 +367,8 @@ MonoBehaviour:
   profileSync: 0
   useCustomBounds: 0
   bounds:
-    m_Center: {x: 6.448633, y: 1.4007351, z: -16.181923}
-    m_Extent: {x: 13.295441, y: 12.28295, z: 13.491165}
+    m_Center: {x: -37.24451, y: -0.009509396, z: -9.403753}
+    m_Extent: {x: 13.491169, y: 12.28295, z: 13.295437}
   boundsInLocalSpace: 0
   profile: {fileID: 11400000, guid: 2e9b0ae9b9a5a274ba5294aacc74f48e, type: 2}
   customRange: 13.327568
@@ -581,6 +536,20 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 0}
+--- !u!114 &5287449420545158374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1909808520722316102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90836e53cb8749f4591abbf80579140a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UVLight
+  coneAngleDegrees: 86.2
+  range: 7.63
 --- !u!1 &2632996769980919482
 GameObject:
   m_ObjectHideFlags: 0
@@ -10894,7 +10863,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4203312976
+  GlobalObjectIdHash: 750372728
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
