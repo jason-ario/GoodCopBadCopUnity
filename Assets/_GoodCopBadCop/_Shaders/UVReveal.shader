@@ -10,7 +10,7 @@ Shader "GoodCopBadCop/UVReveal"
         [Header(UV Reveal)]
         _RevealColor        ("Reveal Color Tint",  Color)       = (1, 1, 1, 1)
         _RevealMap          ("Reveal Texture",     2D)          = "white" {}
-        _RevealEdgeSoftness ("Edge Softness",      Range(0, 1)) = 0.15
+        _RevealEdgeSoftness ("Edge Softness",      Range(0, 1)) = 0.5
         _RevealFalloff      ("Reveal Falloff",     Range(0, 4)) = 1.0
 
         [Header(Alpha)]
@@ -114,41 +114,53 @@ Shader "GoodCopBadCop/UVReveal"
 
                 // ── UV light cone mask ─────────────────────────────────────
                 //
-                // For each cone light, nd is the normalized lateral distance from
-                // the cone axis at each depth slice (0 = centre, 1 = rim), matching
-                // the sphere version's radial nd so the gradient is smooth across
-                // the full width of the beam rather than just front-to-back.
+                // The gradient is computed in cone-normalised 2D space so the
+                // mask always fades smoothly from the apex outward — both toward
+                // the rim (lateral) and toward the range end (depth).  This
+                // replicates the sphere version's behaviour where moving the
+                // light further from the surface visibly dims the reveal.
+                //
+                // nd_lat   : 0 at the cone axis → 1 at the rim (same depth slice)
+                // nd_depth : 0 at the apex      → 1 at the range end
+                // nd       : hypotenuse in that 2D space, normalised to [0,1]
                 //
                 float combinedMask = 0.0;
                 for (int i = 0; i < _UVLightCount; i++)
                 {
                     float3 lightPos   = _UVLightPositions[i].xyz;
                     float  lightRange = _UVLightPositions[i].w;
-                    float3 lightDir   = _UVLightDirections[i].xyz; // normalized forward
+                    float3 lightDir   = _UVLightDirections[i].xyz; // normalised forward
                     float  cosOuter   = _UVLightParams[i].x;       // cos(halfAngle)
 
                     float3 toFrag     = IN.positionWS - lightPos;
-                    float  depthAlong = dot(toFrag, lightDir); // signed depth along cone axis
+                    float  depthAlong = dot(toFrag, lightDir);
 
-                    // Only affect surfaces in front of the apex and within range.
+                    // Reject fragments behind the apex or beyond the range.
                     float validMask = step(0.001, depthAlong) * step(depthAlong, lightRange);
 
-                    // Perpendicular distance from the cone axis at this depth slice.
-                    float perpDist = length(toFrag - depthAlong * lightDir);
-
-                    // Cone rim radius at this depth (tan = sin/cos, no acos needed).
-                    float tanHalfAngle = sqrt(1.0 - cosOuter * cosOuter) / max(cosOuter, 0.001);
+                    // Perpendicular distance from the cone axis.
+                    float perpDist     = length(toFrag - depthAlong * lightDir);
+                    float tanHalfAngle = sqrt(max(1.0 - cosOuter * cosOuter, 0.0)) / max(cosOuter, 0.001);
                     float coneRadius   = depthAlong * tanHalfAngle;
 
-                    // Normalized lateral position: 0 at the axis, 1 at the rim.
-                    float nd = saturate(perpDist / max(coneRadius, 0.001));
+                    // Two independent normalised distances (both 0-1).
+                    float nd_lat   = saturate(perpDist   / max(coneRadius,  0.001));
+                    float nd_depth = saturate(depthAlong / max(lightRange,  0.001));
 
-                    // Soft fade at the outer rim.
-                    float softBand  = max(_RevealEdgeSoftness, 0.001);
-                    float edgeMask  = 1.0 - smoothstep(1.0 - softBand, 1.0, nd);
+                    // Combined nd: hypotenuse in cone-normalised 2D space.
+                    // Multiplying by 1/sqrt(2) keeps the maximum at 1.
+                    float nd = saturate(length(float2(nd_lat, nd_depth)) * 0.7071);
 
-                    // Power-curve falloff: bright at the beam centre, dims toward the rim.
-                    float falloffMask = pow(1.0 - nd, max(_RevealFalloff, 0.001));
+                    // Smooth angular edge based purely on lateral position so the
+                    // cone boundary shape stays clean.
+                    float softBand = max(_RevealEdgeSoftness, 0.001);
+                    float edgeMask = 1.0 - smoothstep(1.0 - softBand, 1.0, nd_lat);
+
+                    // Smooth gradient in combined space — always produces visible
+                    // alpha falloff regardless of _RevealFalloff value.
+                    // _RevealFalloff: 1 = natural gradient, 4 = sharp peak at apex.
+                    float baseGrad    = 1.0 - smoothstep(0.0, 1.0, nd);
+                    float falloffMask = pow(baseGrad, max(_RevealFalloff, 0.5));
 
                     combinedMask = max(combinedMask, edgeMask * falloffMask * validMask);
                 }
