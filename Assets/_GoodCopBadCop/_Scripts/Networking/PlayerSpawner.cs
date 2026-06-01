@@ -62,6 +62,15 @@ public class PlayerSpawner : NetworkBehaviour
             return;
         }
 
+        // Guard against race conditions where two code paths both attempt to spawn the same client
+        // (e.g. SpawnAllPlayersAtLobby and OnClientConnected overlapping during LobbyTransitionSequence).
+        if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var existingClient) &&
+            existingClient.PlayerObject != null)
+        {
+            Debug.LogWarning($"[PlayerSpawner] Client {clientId} already has a player object — skipping duplicate spawn.");
+            return;
+        }
+
         if (playerPrefab == null)
         {
             Debug.LogError("[PlayerSpawner] playerPrefab is not assigned.");

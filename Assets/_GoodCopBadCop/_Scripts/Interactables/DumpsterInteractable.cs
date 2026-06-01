@@ -31,6 +31,10 @@ public class DumpsterInteractable : Interactable
     [Tooltip("Three positions inside the dumpster opening. One is chosen at random per throw.")]
     [SerializeField] private Transform[] _throwTargets = new Transform[3];
 
+    [Header("Throw Proxy")]
+    [Tooltip("Visual-only prefab instantiated on remote clients to show the bag arc. Assign the TrashBag visual (non-networked) prefab.")]
+    [SerializeField] private GameObject _throwProxyPrefab;
+
     [Header("Throw Settings")]
     [Tooltip("Seconds after the animation trigger fires before the bag visually leaves the hand.")]
     [SerializeField] private float _throwWindupDelay = 0.15f;
@@ -191,6 +195,12 @@ public class DumpsterInteractable : Interactable
         Vector3    bagWorldPos = bag.transform.position;
         Quaternion bagWorldRot = bag.transform.rotation;
 
+        // ── 3b. Pick throw target now so remotes use the same destination ─────
+        Transform target = PickThrowTarget();
+
+        // ── 3c. Tell all remote clients to animate a proxy arc ────────────────
+        ShowThrowProxyServerRpc(NetworkManager.Singleton.LocalClientId, bagWorldPos, bagWorldRot, target.position);
+
         // ── 4. Release and despawn the networked bag ──────────────────────────
         // Cache reference before DropObject() nulls the pickup controller's held ref.
         TrashBag depositedBag = bag;
@@ -204,9 +214,8 @@ public class DumpsterInteractable : Interactable
         // ── 6. Windup delay before the bag visually moves ─────────────────────
         yield return new WaitForSeconds(_throwWindupDelay);
 
-        // ── 7. Pick a random throw target and DOJump the proxy ───────────────
-        Transform target  = PickThrowTarget();
-        bool      jumpDone = false;
+        // ── 7. DOJump the proxy to the pre-selected target ────────────────────
+        bool jumpDone = false;
 
         proxy.transform
             .DOJump(target.position, _jumpHeight, numJumps: 1, _jumpDuration)
@@ -240,6 +249,50 @@ public class DumpsterInteractable : Interactable
         }
 
         return valid[Random.Range(0, valid.Length)];
+    }
+
+    // ── Remote proxy arc ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Relays throw proxy parameters through the server so every remote client can
+    /// animate a local bag arc without a networked object.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ShowThrowProxyServerRpc(ulong throwingClientId, Vector3 startPos, Quaternion startRot, Vector3 targetPos)
+    {
+        ShowThrowProxyClientRpc(throwingClientId, startPos, startRot, targetPos);
+    }
+
+    [ClientRpc]
+    private void ShowThrowProxyClientRpc(ulong throwingClientId, Vector3 startPos, Quaternion startRot, Vector3 targetPos)
+    {
+        // The throwing client already runs a proxy locally inside ThrowSequence.
+        if (NetworkManager.Singleton.LocalClientId == throwingClientId) return;
+
+        if (_throwProxyPrefab == null)
+        {
+            Debug.LogWarning("[DumpsterInteractable] _throwProxyPrefab is not assigned — remote clients won't see the bag arc.");
+            return;
+        }
+
+        StartCoroutine(RemoteProxyThrowCoroutine(startPos, startRot, targetPos));
+    }
+
+    private IEnumerator RemoteProxyThrowCoroutine(Vector3 startPos, Quaternion startRot, Vector3 targetPos)
+    {
+        GameObject proxy = Instantiate(_throwProxyPrefab, startPos, startRot);
+
+        yield return new WaitForSeconds(_throwWindupDelay);
+
+        bool jumpDone = false;
+        proxy.transform
+            .DOJump(targetPos, _jumpHeight, numJumps: 1, _jumpDuration)
+            .SetEase(_jumpEase)
+            .OnComplete(() => jumpDone = true);
+
+        yield return new WaitUntil(() => jumpDone);
+
+        Destroy(proxy);
     }
 
     // ── NetworkVariable callback ──────────────────────────────────────────────

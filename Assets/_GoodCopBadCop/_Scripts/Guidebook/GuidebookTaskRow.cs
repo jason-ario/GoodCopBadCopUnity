@@ -28,6 +28,10 @@ public class GuidebookTaskRow : MonoBehaviour
     {
         GuidebookTaskRegistry.OnTaskStateChanged += OnTaskStateChanged;
         Debug.Log($"[GuidebookTaskRow] Subscribed to OnTaskStateChanged. Task: {_task?.TaskName ?? "none"}", this);
+
+        // Re-sync checkmark in case the task completed while the panel was closed.
+        if (_task != null)
+            SetComplete(_task.IsComplete);
     }
 
     private void OnDisable()

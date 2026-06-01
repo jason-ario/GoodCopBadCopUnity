@@ -5,26 +5,42 @@ public class Shovel : PickableObject
 {
     // ── Configuration ─────────────────────────────────────────────────────────
 
-    [SerializeField] private MeleeWeaponHitbox hitbox;
-
-    [Tooltip("Seconds after the swing starts until the hitbox sweep fires.")]
-    [SerializeField] private float hitDelay = 0.5f;
+    [Header("Enemy Hit")]
+    [Tooltip("MeleeWeaponHitbox on the 'AttackPoint' child. Performs the server-authoritative enemy scan.")]
+    [SerializeField] private MeleeWeaponHitbox _hitbox;
 
     [Tooltip("Damage dealt to an enemy per successful hit.")]
-    [SerializeField] private float damagePerHit = 25f;
+    [SerializeField] private float _damagePerHit = 25f;
 
+    [Header("Swing Settings")]
+    [Tooltip("Seconds after the swing starts before hit-detection fires. Match to your animation.")]
+    [SerializeField] private float _hitDelay = 0.5f;
+
+    [Tooltip("Minimum total seconds per swing (cooldown resets after this window elapses from swing start).")]
+    [SerializeField] private float _swingCooldown = 0.9f;
+
+    [Tooltip("If the player attacks within this many seconds before the cooldown ends, the attack is buffered and fires immediately when the cooldown expires.")]
+    [SerializeField] private float _inputBuffer = 0.2f;
+
+    [Header("Animation")]
+    [Tooltip("Animator bool that drives the swing animation.")]
+    [SerializeField] private string _swingAnimBool = "UsingTool";
+
+    [Header("Audio")]
     [Tooltip("Played when the swing animation starts.")]
-    [SerializeField] private AudioClip swingSound;
+    [SerializeField] private AudioClip _swingSound;
 
     [Tooltip("Played when the hit scan connects with an enemy.")]
-    [SerializeField] private AudioClip impactSound;
+    [SerializeField] private AudioClip _impactSound;
 
     [Tooltip("Played when the swing connects with geometry but not an enemy.")]
-    [SerializeField] private AudioClip environmentHitSound;
+    [SerializeField] private AudioClip _environmentHitSound;
 
     // ── Internal ───────────────────────────────────────────────────────────────
 
     private bool _isAttacking;
+    private bool _bufferedAttack;
+    private float _attackEndTime;
     private MeleeWeaponDurability _durability;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -35,10 +51,14 @@ public class Shovel : PickableObject
 
         _durability = GetComponent<MeleeWeaponDurability>();
 
-        if (hitbox != null)
+        if (_hitbox != null)
         {
-            hitbox.OnHit += OnHit;
-            hitbox.OnEnvironmentHit += OnEnvironmentHit;
+            _hitbox.OnHit            += OnEnemyHit;
+            _hitbox.OnEnvironmentHit += OnEnvironmentHit;
+        }
+        else
+        {
+            Debug.LogWarning("[Shovel] No MeleeWeaponHitbox assigned — enemy damage will not work.", this);
         }
 
         if (_durability != null)
@@ -47,10 +67,10 @@ public class Shovel : PickableObject
 
     private void OnDestroy()
     {
-        if (hitbox != null)
+        if (_hitbox != null)
         {
-            hitbox.OnHit -= OnHit;
-            hitbox.OnEnvironmentHit -= OnEnvironmentHit;
+            _hitbox.OnHit            -= OnEnemyHit;
+            _hitbox.OnEnvironmentHit -= OnEnvironmentHit;
         }
 
         if (_durability != null)
@@ -65,11 +85,11 @@ public class Shovel : PickableObject
         base.OnStartUse();
 
         if (_isAttacking)
-            return;
-
-        if (hitbox == null)
         {
-            Debug.LogWarning("[Shovel] No MeleeWeaponHitbox assigned.", this);
+            // Buffer the input if we're within the buffer window of the cooldown ending.
+            if (_attackEndTime - Time.time <= _inputBuffer)
+                _bufferedAttack = true;
+
             return;
         }
 
@@ -79,35 +99,60 @@ public class Shovel : PickableObject
     // ── Private ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Plays the swing animation, fires the swing sound, waits for the hit frame,
-    /// then triggers the authoritative hit scan on the server.
+    /// Plays the swing animation and sound, waits for the hit frame, then triggers
+    /// the authoritative hit scan on the server. Respects the full swing cooldown
+    /// before allowing another attack.
     /// </summary>
     private IEnumerator AttackRoutine()
     {
         _isAttacking = true;
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
-        SFXController.Instance.Play(swingSound);
+        _bufferedAttack = false;
+        _attackEndTime = Time.time + _swingCooldown;
 
-        yield return new WaitForSeconds(hitDelay);
+        if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
+            playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, true);
 
-        hitbox.PerformHitScan(damagePerHit);
+        if (_swingSound != null)
+            SFXController.Instance.Play(_swingSound);
 
-        yield return new WaitForSeconds(0.5f);
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+        yield return new WaitForSeconds(_hitDelay);
+
+        // Bail if the player dropped the shovel during the windup.
+        if (playerPickupController != null && IsHeld)
+            _hitbox?.PerformHitScan(_damagePerHit);
+
+        float remainingCooldown = Mathf.Max(0f, _swingCooldown - _hitDelay);
+        yield return new WaitForSeconds(remainingCooldown);
+
+        if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
+            playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
+
         _isAttacking = false;
+
+        if (_bufferedAttack)
+        {
+            _bufferedAttack = false;
+            StartCoroutine(AttackRoutine());
+        }
     }
 
-    private void OnHit()
+    private void OnEnemyHit()
     {
-        SFXController.Instance.Play(impactSound);
+        if (_impactSound != null)
+            SFXController.Instance.Play(_impactSound);
+
         _durability?.RegisterHit();
     }
 
     private void OnEnvironmentHit()
     {
-        SFXController.Instance.Play(environmentHitSound);
+        if (_environmentHitSound != null)
+            SFXController.Instance.Play(_environmentHitSound);
+
         _durability?.RegisterHit();
     }
+
+    // ── Durability ─────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Called on the owning client when durability reaches zero.
@@ -116,10 +161,7 @@ public class Shovel : PickableObject
     /// </summary>
     private void OnDurabilityDepleted()
     {
-        // Force the player to drop the shovel first so pickup state is cleaned up.
-        if (playerPickupController != null)
-            playerPickupController.DropObject();
-
+        playerPickupController?.DropObject();
         DespawnServerRpc();
     }
 }

@@ -327,7 +327,7 @@ public class Day_01 : DayBase
         yield return ShowAndWait("Good morning. We've been expecting you.");
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("You'll be screening subjects entering the town. Your responses will be noted. Press the button when ready.");
+        yield return ShowAndWait("You'll be screening subjects. Press the button when ready.");
 
         if (NetworkManager.Singleton.IsServer)
             _switchButton.SetReady(true);
@@ -381,7 +381,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(3f);
 
-        yield return ShowAndWait("A suspect has arrived. Pick up their ID card.");
+        yield return ShowAndWait("A suspect has arrived.");
 
         if (_tutorialIDCard != null)
         {
@@ -409,11 +409,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Hold left-click to inspect.");
-        
-        yield return new WaitForSeconds(.5f);
-        
-        yield return ShowAndWait("Right-click over the desk to put it down.");
+        yield return ShowAndWait("Hold to inspect. Right-click to put down.");
 
         // IsHeld is driven by _holdingClientId NetworkVariable — synced on all clients.
         if (_tutorialIDCard != null)
@@ -431,9 +427,7 @@ public class Day_01 : DayBase
 
     private IEnumerator AppFormInspectionBeat()
     {
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("Now pick up the application form.");
+        yield return new WaitForSeconds(0.5f);
 
         if (_tutorialAppForm != null)
         {
@@ -461,10 +455,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Cross-reference the documents. Note any discrepancies.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("This subject appears clean. Proceed.");
-        yield return new WaitForSeconds(2f);
+        yield return ShowAndWait("Cross-reference the documents.");
 
         StartCoroutine(DrawerTutorialBeat());
     }
@@ -502,8 +493,6 @@ public class Day_01 : DayBase
 
     private IEnumerator FolderPlaceBeat()
     {
-        yield return ShowAndWait("Place it on the desk.");
-
         // Wait until the folder is placed on any surface that is NOT the HandOffPoint (window slot).
         // If the player drops it straight on the window slot, the folder would skip the desk-placement
         // step and land in the wrong position for document filing.
@@ -530,16 +519,15 @@ public class Day_01 : DayBase
         // First document — skip prompt if already in the folder.
         if (_documentsFiledCount < 1)
         {
-            yield return ShowAndWait("Pick up the ID card and drag it onto the folder to file it.");
+            yield return ShowAndWait("File the documents into the folder.");
             yield return new WaitUntil(() => _documentsFiledCount >= 1);
         }
 
         yield return new WaitForSeconds(0.5f);
 
-        // Second document — only prompt if not already filed.
+        // Second document — wait silently; player already knows the gesture.
         if (_documentsFiledCount < 2)
         {
-            yield return ShowAndWait("Now file the application form.");
             yield return new WaitUntil(() => _documentsFiledCount >= 2);
         }
 
@@ -573,7 +561,7 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Both documents filed. This subject is clean — stamp the folder green to clear them.");
+        yield return ShowAndWait("Stamp the folder green.");
 
         // Arm the hand-off listener now — before the stamp event and before any
         // dialogue, so a fast player who stamps and hands off immediately is captured.
@@ -679,7 +667,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(2f);
 
-        yield return ShowAndWait("Your decisions are being recorded. Stay attentive.");
+        yield return ShowAndWait("Your decisions are being recorded.");
 
         // Subscribe for the second suspect's paperwork — the beat begins on actual arrival,
         // not on a fixed timer, so we don't race ahead of the suspect's walk-in.
@@ -744,11 +732,9 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect2IDCardBeat()
     {
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Another subject. Review their documents.");
-
-        // Unlock both documents. No arrows — players already know how to pick up documents.
+        // Unlock both documents. No bark — players already know how to pick up documents.
         _s2IDCardInspected  = false;
         _s2AppFormInspected = false;
 
@@ -806,7 +792,7 @@ public class Day_01 : DayBase
 
         yield return ShowAndWait("There's a discrepancy in these documents. Something doesn't line up.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("When you spot an anomaly, mark it in the exam notebook. Pick it up and tick the appropriate box.");
+        yield return ShowAndWait("Mark anomalies in the exam notebook.");
 
         _examNotebook?.SetInteractableNetworked(true);
         if (_examNotebook != null)
@@ -826,16 +812,12 @@ public class Day_01 : DayBase
 
     private IEnumerator NotebookCheckBeat()
     {
-        // Subscribe before dialogue so ticking during the prompt is not missed.
-        // OnAnyCheckboxChecked fires on all clients via ExamNotebook's NetworkVariable callback,
-        // so the server-only coroutine receives the event regardless of which player ticked a box.
+        // Subscribe before the guard check so any box ticked before or during is captured.
         bool anyBoxChecked = false;
         System.Action<ExamNotebook> onChecked = _ => anyBoxChecked = true;
         ExamNotebook.OnAnyCheckboxChecked += onChecked;
 
-        yield return ShowAndWait("Tick every anomaly on the page.");
-
-        // Guard: player may have ticked a box during dialogue or earlier.
+        // Guard: player may have already ticked a box.
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;
 
@@ -858,7 +840,7 @@ public class Day_01 : DayBase
         _notebookPageFiled = false;
         ExamNotebook.OnAnyNotebookPageFiled += OnNotebookPageFiled;
 
-        yield return ShowAndWait("Interact with the folder while holding the notebook to file it.");
+        yield return ShowAndWait("File your findings.");
 
         // Guard: player may have filed during dialogue — AnyPageFiled captures that.
         if (ExamNotebook.AnyPageFiled)
@@ -922,19 +904,13 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Place the stamped folder in the window slot.");
-
         ShowStaticMarker(StaticMarkerTarget.HandOff);
 
-        // Guard: player may have placed the folder during the preceding dialogue.
+        // Guard: player may have placed the folder while stamp was being returned.
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
 
         HideStaticMarker(StaticMarkerTarget.HandOff);
-
-        yield return new WaitForSeconds(2f);
-
-        yield return ShowAndWait("A third subject is incoming.");
 
         // Force suspect 3 to have exactly 5 documentation anomalies.
         if (NetworkManager.Singleton.IsServer)
@@ -973,9 +949,7 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect3IDCardBeat()
     {
-        yield return new WaitForSeconds(3f);
-
-        yield return ShowAndWait("Review their documents.");
+        yield return new WaitForSeconds(1f);
 
         _s3IDCardInspected  = false;
         _s3AppFormInspected = false;
@@ -1019,9 +993,9 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Multiple anomalies — far beyond the threshold.");
+        yield return ShowAndWait("Multiple anomalies. This one was never going to walk out of here.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Mark all five in the exam notebook.");
+        yield return ShowAndWait("Note every deviation. Leave nothing out.");
 
         _examNotebook?.SetInteractableNetworked(true);
 
@@ -1040,8 +1014,7 @@ public class Day_01 : DayBase
         System.Action<ExamNotebook> s3OnChecked = _ => anyBoxChecked = true;
         ExamNotebook.OnAnyCheckboxChecked += s3OnChecked;
 
-        yield return ShowAndWait("Tick all five boxes.");
-
+        // Guard: player may have already ticked a box.
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;
 
@@ -1063,8 +1036,7 @@ public class Day_01 : DayBase
         _s3NotebookPageFiled = false;
         ExamNotebook.OnAnyNotebookPageFiled += OnSuspect3NotebookPageFiled;
 
-        yield return ShowAndWait("File your findings into the folder.");
-
+        // Guard: player may have already filed.
         if (ExamNotebook.AnyPageFiled)
             _s3NotebookPageFiled = true;
 
@@ -1073,7 +1045,7 @@ public class Day_01 : DayBase
         ExamNotebook.OnAnyNotebookPageFiled -= OnSuspect3NotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Five anomalies — the threshold is reached. Elimination is required.");
+        yield return ShowAndWait("There's only one outcome for someone this compromised.");
 
         StartCoroutine(Suspect3StampBeat());
     }
@@ -1094,7 +1066,7 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1.5f);
 
-        yield return ShowAndWait("Stamp the folder red.");
+        yield return ShowAndWait("Red. It suits them perfectly.");
 
         // Arm the hand-off listener before the stamp event so a fast player who stamps
         // and hands off immediately doesn't race ahead of Suspect3HandOffBeat's subscribe.
@@ -1129,11 +1101,6 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(1f);
 
-        yield return ShowAndWait("Elimination is final. The decision is yours to make.");
-        yield return new WaitForSeconds(1f);
-
-        yield return ShowAndWait("Place the folder in the window slot.");
-
         ShowStaticMarker(StaticMarkerTarget.HandOff);
 
         if (!_folderHandedOff)
@@ -1160,10 +1127,12 @@ public class Day_01 : DayBase
     /// </summary>
     private IEnumerator ToolLockerRefillTutorialBeat()
     {
-        // Make both refill items free before the locker is opened so the price is
-        // already 0 when the ToolShopController reads it in Start().
-        _quarantineRefillItem?.SetPriceOverride(0);
-        _killRefillItem?.SetPriceOverride(0);
+        // Broadcast the free-price override to all clients before the locker is opened so the
+        // price is already 0 on every machine when ToolShopController initialises the views.
+        if (_quarantineRefillItem != null)
+            MegaphoneDialogueManager.Instance.SetShopItemPriceOverrideSynced(_quarantineRefillItem.Name, 0);
+        if (_killRefillItem != null)
+            MegaphoneDialogueManager.Instance.SetShopItemPriceOverrideSynced(_killRefillItem.Name, 0);
 
         // All stamps are now unlocked — the player can freely use them going forward.
         _greenStampSlot?.SetSlotInteractable(true);
@@ -1196,28 +1165,49 @@ public class Day_01 : DayBase
         _onShopOpenedForTutorialDelegate = OnToolLockerShopOpened;
         ToolShopController.OnShopOpened += _onShopOpenedForTutorialDelegate;
 
-        yield return ShowAndWait("Purchase the stamp refills for quarantine and kills — they're on us this time.");
+        yield return ShowAndWait("Pick up the refills — they're on us.");
 
         yield return new WaitUntil(() => _quarantineRefilled && _killRefilled);
 
         StampInkManager.OnInkChanged -= OnInkRefilled;
 
-        // Restore prices now that both refills have been purchased.
-        _quarantineRefillItem?.ClearPriceOverride();
-        _killRefillItem?.ClearPriceOverride();
-
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Stay stocked up.");
+        // Restore prices on all clients now that both refills have been purchased.
+        if (_quarantineRefillItem != null)
+            MegaphoneDialogueManager.Instance.ClearShopItemPriceOverrideSynced(_quarantineRefillItem.Name);
+        if (_killRefillItem != null)
+            MegaphoneDialogueManager.Instance.ClearShopItemPriceOverrideSynced(_killRefillItem.Name);
 
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
+
+        // Introduce the between-shift task system immediately after the tool shop sequence.
+        // Show the new-task notification on all clients, then unlock the door so the shift
+        // continues uninterrupted while the hint barks play.
+        MegaphoneDialogueManager.Instance.ShowPlayerTutorialTextSynced("New task: Take out the trash.");
+
+        // Unlock the exit door — the tutorial gating is over.
+        ShiftManager.Instance.OnDoorUnlock?.Invoke();
+
+        yield return new WaitForSeconds(4f);
+
+        yield return ShowAndWait("Bring the trash bags to the dumpster. They are scattered throughout the yard.");
+        yield return new WaitForSeconds(2f);
+        yield return ShowAndWait("Press Tab to open your guidebook. Your tasks and everything you need to do your job are inside.");
+
+        // Mark the hint as shown so it is not repeated when the shift eventually ends.
+        MegaphoneDialogueManager.Instance.MarkTrashTaskHintShown();
+
+        // Remove the tutorial interval override so subsequent suspects arrive at the
+        // normal paced intervals configured in ShiftManager rather than the compressed
+        // 3-second tutorial cadence.
+        ShiftManager.OverrideSuspectArrivalInterval = null;
 
         // Append a few suspects from the full pool so the shift continues naturally
         // past the tutorial section.
         if (NetworkManager.Singleton.IsServer)
             AppendPostTutorialSuspects();
 
-        // Release the 4th suspect.
+        // Release the queued 4th suspect.
         if (NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.ResumeScheduledSuspect();
     }

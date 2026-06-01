@@ -42,6 +42,10 @@ public class ToolShopController : MonoBehaviour
         // Fire on every subsequent activation (Start already fired once).
         if (_initialized)
         {
+            // Re-read prices in case a price override was applied since the last open.
+            foreach (ShopItemView view in shopItemViews)
+                view.RefreshPrice();
+
             FadeIn();
             OnShopOpened?.Invoke();
         }

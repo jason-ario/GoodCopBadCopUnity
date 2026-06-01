@@ -7,6 +7,10 @@ public class PlayerInteractionController : NetworkBehaviour
 {
     public Camera cam;
     public float interactDistance = 3f;
+
+    [Tooltip("Max distance at which the player can drop a held object using right-click. Independent of interact distance.")]
+    public float placementDistance = 5f;
+
     public LayerMask interactLayer;
 
     [Tooltip("Layers that count as valid free-placement surfaces (floors, desks, world geometry, etc.)")]
@@ -177,7 +181,8 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             
             // Handle non-interactable placement surfaces (like PlacementBoard) and free placement
-            if (inRange)
+            bool placerInRange = hit.distance <= placementDistance;
+            if (placerInRange)
             {
                 if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
                 {
@@ -197,7 +202,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             else
             {
-                // Out of range — keep the placer visible but tint it red so the player knows they can't drop here
+                // Out of placement range — keep the placer visible but tint it red so the player knows they can't drop here
                 if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
                 {
                     CheckActivatePlacer(placementBoard, hit, false);
@@ -212,7 +217,7 @@ public class PlayerInteractionController : NetworkBehaviour
             
             lastInteractable = null;
         }
-        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, interactDistance, placementLayer))
+        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer))
         {
             // No interactable hit but we did hit a placement surface — handle free placement
             if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))

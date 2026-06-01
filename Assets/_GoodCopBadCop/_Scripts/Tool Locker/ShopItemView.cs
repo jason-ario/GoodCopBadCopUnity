@@ -22,6 +22,16 @@ public class ShopItemView : MonoBehaviour
         _shopItem = shopItem;
     }
 
+    /// <summary>
+    /// Re-reads the price from the bound <see cref="ShopItem"/> and updates the displayed text.
+    /// Call this after a price override is applied so the UI stays in sync.
+    /// </summary>
+    public void RefreshPrice()
+    {
+        if (_shopItem != null)
+            shopItemPrice.text = "<sprite=0>" + _shopItem.Price;
+    }
+
     public void SelectShopItem()
     {
         _toolShopController.Select(_shopItem);

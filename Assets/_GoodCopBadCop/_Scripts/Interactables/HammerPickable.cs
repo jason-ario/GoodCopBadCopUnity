@@ -33,6 +33,9 @@ public class HammerPickable : PickableObject
     [Tooltip("Minimum total seconds per swing (cooldown resets after this window elapses from swing start).")]
     [SerializeField] private float _swingCooldown = 0.9f;
 
+    [Tooltip("If the player attacks within this many seconds before the cooldown ends, the attack is buffered and fires immediately when the cooldown expires.")]
+    [SerializeField] private float _inputBuffer = 0.2f;
+
     [Tooltip("Radius of the owner-side OverlapSphere used to detect nearby fence segments.")]
     [SerializeField] private float _fenceHitRadius = 1.5f;
 
@@ -51,6 +54,8 @@ public class HammerPickable : PickableObject
     // ── Internal ───────────────────────────────────────────────────────────────
 
     private bool _isAttacking;
+    private bool _bufferedAttack;
+    private float _attackEndTime;
     private MeleeWeaponDurability _durability;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -91,14 +96,22 @@ public class HammerPickable : PickableObject
 
     /// <summary>
     /// Fires when the player left-clicks while holding the hammer.
-    /// Starts the attack coroutine if not already mid-swing.
+    /// Starts the attack coroutine if not already mid-swing, or buffers the
+    /// input if pressed within the buffer window before the cooldown ends.
     /// Only runs on the owning client.
     /// </summary>
     public override void OnStartUse()
     {
         base.OnStartUse();
 
-        if (_isAttacking) return;
+        if (_isAttacking)
+        {
+            // Buffer the input if we're within the buffer window of the cooldown ending.
+            if (_attackEndTime - Time.time <= _inputBuffer)
+                _bufferedAttack = true;
+
+            return;
+        }
 
         StartCoroutine(AttackRoutine());
     }
@@ -113,6 +126,8 @@ public class HammerPickable : PickableObject
     private IEnumerator AttackRoutine()
     {
         _isAttacking = true;
+        _bufferedAttack = false;
+        _attackEndTime = Time.time + _swingCooldown;
 
         if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
             playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, true);
@@ -136,12 +151,19 @@ public class HammerPickable : PickableObject
             _hitbox?.PerformHitScan(_damagePerHit);
         }
 
-        yield return new WaitForSeconds(0.5f);
+        float remainingCooldown = Mathf.Max(0f, _swingCooldown - _hitDelay);
+        yield return new WaitForSeconds(remainingCooldown);
 
         if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
             playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
 
         _isAttacking = false;
+
+        if (_bufferedAttack)
+        {
+            _bufferedAttack = false;
+            StartCoroutine(AttackRoutine());
+        }
     }
 
     /// <summary>

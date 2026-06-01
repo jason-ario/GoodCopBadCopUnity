@@ -98,7 +98,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
     /// <summary>
     /// Replaces the entire task list and fires <see cref="OnTaskListChanged"/>.
     /// Also fires <see cref="OnTasksAdded"/> if the new list is non-empty.
-    /// Null entries in the source are silently skipped.
+    /// Null entries and duplicate references in the source are silently skipped.
     /// </summary>
     public void SetTasks(IEnumerable<IBetweenShiftTask> tasks)
     {
@@ -106,7 +106,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
         if (tasks != null)
         {
             foreach (var t in tasks)
-                if (t != null) _tasks.Add(t);
+                if (t != null && !_tasks.Contains(t)) _tasks.Add(t);
         }
 
         OnTaskListChanged?.Invoke();

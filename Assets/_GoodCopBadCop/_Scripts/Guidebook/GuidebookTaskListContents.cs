@@ -64,18 +64,16 @@ public class GuidebookTaskListContents : GuidebookPageContents
     /// Toggles <see cref="_renderTextureContainer"/> off for one frame then back on,
     /// forcing the render texture to update with the latest UI state.
     /// Any in-flight refresh is cancelled before starting a new one.
-    /// When this object is inactive, sets the container active directly so the
-    /// render texture picks up the change when the guidebook opens.
+    /// When this object is inactive the refresh is deferred — <see cref="OnEnable"/>
+    /// will call this again once the guidebook opens and the component is active.
     /// </summary>
     private void TriggerRenderTextureRefresh()
     {
         if (_renderTextureContainer == null) return;
 
-        if (!isActiveAndEnabled)
-        {
-            _renderTextureContainer.SetActive(true);
-            return;
-        }
+        // Cannot start a coroutine while inactive. OnEnable calls TriggerRenderTextureRefresh
+        // when the guidebook opens, so the refresh will run at the correct time.
+        if (!isActiveAndEnabled) return;
 
         if (_renderRefreshCoroutine != null)
             StopCoroutine(_renderRefreshCoroutine);
@@ -85,6 +83,9 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
     private IEnumerator RenderTextureRefreshCoroutine()
     {
+        // Wait for the end of the current frame so VerticalLayoutGroup has time to
+        // position newly instantiated rows before the render texture camera captures them.
+        yield return new WaitForEndOfFrame();
         _renderTextureContainer.SetActive(false);
         yield return null;
         _renderTextureContainer.SetActive(true);
@@ -100,6 +101,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
         if (GuidebookTaskRegistry.Instance == null || GuidebookTaskRegistry.Instance.Tasks.Count == 0)
         {
             SetFallbackVisible(true);
+            TriggerRenderTextureRefresh();
             return;
         }
 
@@ -108,6 +110,9 @@ public class GuidebookTaskListContents : GuidebookPageContents
             BuildRows();
         else
             RefreshRows();
+
+        // Always refresh the render texture after rows change so the render camera recaptures.
+        TriggerRenderTextureRefresh();
     }
 
     private void BuildRows()

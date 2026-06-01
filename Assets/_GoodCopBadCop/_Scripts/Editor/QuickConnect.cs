@@ -20,22 +20,6 @@ public static class QuickConnect
 
     static QuickConnect()
     {
-        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
-    }
-
-    private static void OnPlayModeStateChanged(PlayModeStateChange state)
-    {
-        if (state == PlayModeStateChange.EnteredPlayMode)
-            EditorApplication.update += WaitForNetworkManager;
-        else if (state == PlayModeStateChange.ExitingPlayMode)
-            EditorApplication.update -= WaitForNetworkManager;
-    }
-
-    private static void WaitForNetworkManager()
-    {
-        if (NetworkManager.Singleton == null) return;
-        EditorApplication.update -= WaitForNetworkManager;
-        NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnectedToHost;
     }
 
     // =========================
@@ -62,6 +46,9 @@ public static class QuickConnect
         SwapToUnityTransport(nm);
         nm.StartHost();
 
+        // Only subscribe when QuickConnect itself is used to host, not on every play mode entry.
+        nm.OnClientConnectedCallback += OnClientConnectedToHost;
+
         Debug.Log($"[QuickConnect] Host listening on {Host}:{Port} — waiting for client...");
     }
 
@@ -81,35 +68,17 @@ public static class QuickConnect
 
         if (gm.HasGameStarted)
         {
-            // Mirror the LobbyManager logic: spawn relative to where the host currently is.
-            ulong hostClientId = nm.LocalClientId;
-            bool hostIsOutside = false;
-            if (nm.ConnectedClients.TryGetValue(hostClientId, out var hostClient) &&
-                hostClient.PlayerObject != null)
-            {
-                var hostPlayerInstance = hostClient.PlayerObject.GetComponent<PlayerInstance>();
-                hostIsOutside = hostPlayerInstance != null && hostPlayerInstance.IsOutside;
-            }
-
-            if (hostIsOutside)
-            {
-                Debug.Log($"[QuickConnect] Late join, host is outside — spawning client {clientId} at lobby.");
-                gm.SpawnPlayerAtLobbyServer(clientId);
-            }
-            else
-            {
-                Debug.Log($"[QuickConnect] Late join, host is at booth — spawning client {clientId} at booth.");
-                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
-            }
-
-            gm.InitializeLateJoinClient(clientId);
+            // LobbyManager.OnClientConnected handles spawning and initialization for late joiners.
+            // Doing it here too would produce a duplicate player object.
+            Debug.Log($"[QuickConnect] Game already started — LobbyManager will handle client {clientId}.");
+            return;
         }
-        else
-        {
-            nm.OnClientConnectedCallback -= OnClientConnectedToHost;
-            Debug.Log($"[QuickConnect] Client {clientId} connected — starting game.");
-            gm.TryStartGame(skipTransition: true);
-        }
+
+        // Game not yet started: auto-start for LAN testing convenience.
+        // LobbyManager.OnClientConnected will handle spawning once HasGameStarted is true.
+        nm.OnClientConnectedCallback -= OnClientConnectedToHost;
+        Debug.Log($"[QuickConnect] Client {clientId} connected — starting game.");
+        gm.TryStartGame(skipTransition: true);
     }
 
     // =========================

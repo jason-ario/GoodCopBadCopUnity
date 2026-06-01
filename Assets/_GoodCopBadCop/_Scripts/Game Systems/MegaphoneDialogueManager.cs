@@ -464,6 +464,82 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server-only: shows the PlayerTutorialUI text notification on every client simultaneously.
+    /// Use from server-side tutorial coroutines (e.g. Day_01) when the UI needs to appear
+    /// in sync on all machines without interrupting the bark system.
+    /// </summary>
+    public void ShowPlayerTutorialTextSynced(string text)
+    {
+        if (!IsServer) return;
+        ShowPlayerTutorialTextClientRpc(text);
+    }
+
+    [ClientRpc]
+    private void ShowPlayerTutorialTextClientRpc(string text)
+    {
+        PlayerTutorialUI.Instance?.ShowTextOnly(text);
+    }
+
+    /// <summary>
+    /// Marks the one-time trash task hint as already shown so it is not repeated
+    /// when the end-of-shift dialogue runs (e.g. because Day_01 showed it during the shift).
+    /// </summary>
+    public void MarkTrashTaskHintShown()
+    {
+        _trashTaskHintShown = true;
+    }
+
+    /// <summary>
+    /// Server-only: sets a temporary price override on the named <see cref="ShopItem"/> on every client.
+    /// The item is located by its configured <see cref="ShopItem.Name"/>. Used by tutorial coroutines
+    /// (e.g. Day_01) to make refill items free for all players simultaneously.
+    /// </summary>
+    public void SetShopItemPriceOverrideSynced(string itemName, int price)
+    {
+        if (!IsServer) return;
+        SetShopItemPriceOverrideClientRpc(itemName, price);
+    }
+
+    [ClientRpc]
+    private void SetShopItemPriceOverrideClientRpc(string itemName, int price)
+    {
+        // Resources.FindObjectsOfTypeAll includes loaded prefab assets, which is necessary
+        // because ToolShopController.shopItems holds direct prefab asset references rather
+        // than scene instances, so FindObjectsByType would never find the right ShopItem.
+        foreach (ShopItem item in Resources.FindObjectsOfTypeAll<ShopItem>())
+        {
+            if (item.Name == itemName)
+            {
+                item.SetPriceOverride(price);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Server-only: clears the price override on the named <see cref="ShopItem"/> on every client,
+    /// restoring its configured price. Paired with <see cref="SetShopItemPriceOverrideSynced"/>.
+    /// </summary>
+    public void ClearShopItemPriceOverrideSynced(string itemName)
+    {
+        if (!IsServer) return;
+        ClearShopItemPriceOverrideClientRpc(itemName);
+    }
+
+    [ClientRpc]
+    private void ClearShopItemPriceOverrideClientRpc(string itemName)
+    {
+        foreach (ShopItem item in Resources.FindObjectsOfTypeAll<ShopItem>())
+        {
+            if (item.Name == itemName)
+            {
+                item.ClearPriceOverride();
+                break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Broadcasts the bark to all clients including the host. Each client runs the
     /// visual/audio sequence independently in sync with the server's timing.
     /// </summary>

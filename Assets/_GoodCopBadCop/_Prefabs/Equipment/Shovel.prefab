@@ -194,12 +194,15 @@ MonoBehaviour:
   itemData: {fileID: 11400000, guid: 9702efa9c91aa7e4da5d898cc5f7fa61, type: 2}
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
-  hitbox: {fileID: 2344984552695841255}
-  hitDelay: 0.5
-  damagePerHit: 10
-  swingSound: {fileID: 8300000, guid: f4c1a64f2e736154c8898d25ab413cbc, type: 3}
-  impactSound: {fileID: 8300000, guid: 86e73908818788443aa1712feff1ecb5, type: 3}
-  environmentHitSound: {fileID: 8300000, guid: c3ff52586c2e6774893696a1b5c847f1, type: 3}
+  _hitbox: {fileID: 2344984552695841255}
+  _damagePerHit: 25
+  _hitDelay: 0.5
+  _swingCooldown: 0.9
+  _inputBuffer: 0.35
+  _swingAnimBool: UsingTool
+  _swingSound: {fileID: 8300000, guid: f4c1a64f2e736154c8898d25ab413cbc, type: 3}
+  _impactSound: {fileID: 8300000, guid: 86e73908818788443aa1712feff1ecb5, type: 3}
+  _environmentHitSound: {fileID: 8300000, guid: c3ff52586c2e6774893696a1b5c847f1, type: 3}
 --- !u!1773428102 &7759325571883448781
 ParentConstraint:
   m_ObjectHideFlags: 0
