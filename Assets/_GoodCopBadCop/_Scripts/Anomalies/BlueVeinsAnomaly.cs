@@ -22,9 +22,10 @@ public class BlueVeinsAnomaly : MutationAnomaly
     private const string BlueVeinsKeyword  = "TCP2_BLUE_VEINS";
     private const int    MaxLights         = 4; // Must match UV_LIGHT_MAX_COUNT in the shader.
 
-    private static readonly int UVLightPositionsId = Shader.PropertyToID("_UVLightPositions");
-    private static readonly int UVLightRadiiId     = Shader.PropertyToID("_UVLightRadii");
-    private static readonly int UVLightCountId     = Shader.PropertyToID("_UVLightCount");
+    private static readonly int UVLightPositionsId  = Shader.PropertyToID("_UVLightPositions");
+    private static readonly int UVLightDirectionsId = Shader.PropertyToID("_UVLightDirections");
+    private static readonly int UVLightParamsId     = Shader.PropertyToID("_UVLightParams");
+    private static readonly int UVLightCountId      = Shader.PropertyToID("_UVLightCount");
 
     [Header("Renderers")]
     [SerializeField] private Renderer[] renderers;
@@ -34,8 +35,9 @@ public class BlueVeinsAnomaly : MutationAnomaly
     [SerializeField] private bool _previewInEditor;
 
     // Reusable arrays — allocated once to avoid per-frame GC pressure.
-    private readonly Vector4[] _positionBuffer = new Vector4[MaxLights];
-    private readonly float[]   _radiusBuffer   = new float[MaxLights];
+    private readonly Vector4[] _positionBuffer  = new Vector4[MaxLights];
+    private readonly Vector4[] _directionBuffer = new Vector4[MaxLights];
+    private readonly Vector4[] _paramsBuffer    = new Vector4[MaxLights];
 
     // Runtime-only: per-instance materials for keyword isolation between characters.
     private Material[]         _materialInstances;
@@ -88,12 +90,14 @@ public class BlueVeinsAnomaly : MutationAnomaly
         // Push zeroed light data so no veins bleed through.
         for (int i = 0; i < MaxLights; i++)
         {
-            _positionBuffer[i] = Vector4.zero;
-            _radiusBuffer[i]   = 0f;
+            _positionBuffer[i]  = Vector4.zero;
+            _directionBuffer[i] = Vector4.zero;
+            _paramsBuffer[i]    = Vector4.zero;
         }
 
-        _propertyBlock.SetVectorArray(UVLightPositionsId, _positionBuffer);
-        _propertyBlock.SetFloatArray(UVLightRadiiId, _radiusBuffer);
+        _propertyBlock.SetVectorArray(UVLightPositionsId,  _positionBuffer);
+        _propertyBlock.SetVectorArray(UVLightDirectionsId, _directionBuffer);
+        _propertyBlock.SetVectorArray(UVLightParamsId,     _paramsBuffer);
         _propertyBlock.SetInteger(UVLightCountId, 0);
 
         foreach (Renderer r in renderers)
@@ -169,8 +173,8 @@ public class BlueVeinsAnomaly : MutationAnomaly
     }
 
     /// <summary>
-    /// Reads all active UVLights (capped at MaxLights), fills the position and radius
-    /// buffers, and pushes them to every renderer via a shared MaterialPropertyBlock.
+    /// Reads all active UVLights (capped at MaxLights), fills the position, direction, and
+    /// params buffers, and pushes them to every renderer via a shared MaterialPropertyBlock.
     /// </summary>
     private void PushActiveLights()
     {
@@ -179,19 +183,26 @@ public class BlueVeinsAnomaly : MutationAnomaly
 
         for (int i = 0; i < count; i++)
         {
-            _positionBuffer[i] = lights[i].Position;
-            _radiusBuffer[i]   = lights[i].Radius;
+            UVLight light = lights[i];
+            Vector3 pos   = light.Position;
+            Vector3 dir   = light.Direction;
+
+            _positionBuffer[i]  = new Vector4(pos.x, pos.y, pos.z, light.Range);
+            _directionBuffer[i] = new Vector4(dir.x, dir.y, dir.z, 0f);
+            _paramsBuffer[i]    = new Vector4(Mathf.Cos(light.ConeHalfAngleDeg * Mathf.Deg2Rad), 0f, 0f, 0f);
         }
 
         // Zero out any unused slots so stale data doesn't bleed through.
         for (int i = count; i < MaxLights; i++)
         {
-            _positionBuffer[i] = Vector4.zero;
-            _radiusBuffer[i]   = 0f;
+            _positionBuffer[i]  = Vector4.zero;
+            _directionBuffer[i] = Vector4.zero;
+            _paramsBuffer[i]    = Vector4.zero;
         }
 
-        _propertyBlock.SetVectorArray(UVLightPositionsId, _positionBuffer);
-        _propertyBlock.SetFloatArray(UVLightRadiiId, _radiusBuffer);
+        _propertyBlock.SetVectorArray(UVLightPositionsId,  _positionBuffer);
+        _propertyBlock.SetVectorArray(UVLightDirectionsId, _directionBuffer);
+        _propertyBlock.SetVectorArray(UVLightParamsId,     _paramsBuffer);
         _propertyBlock.SetInteger(UVLightCountId, count);
 
         foreach (Renderer r in renderers)

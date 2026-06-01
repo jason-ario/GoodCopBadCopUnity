@@ -57,6 +57,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		[TCP2HeaderHelp(Blue Veins)]
 		[Toggle(TCP2_BLUE_VEINS)] _UseBlueVeins ("Enable Blue Veins", Float) = 0
 		_VeinMap ("Vein Texture", 2D) = "black" {}
+		_VeinEdgeSoftness ("Edge Softness", Range(0,1)) = 0.5
+		_VeinFalloff ("Reveal Falloff", Range(0,4)) = 1.0
 		[TCP2Separator]
 		
 		[TCP2HeaderHelp(Outline)]
@@ -142,6 +144,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			float4 _LesionMaskMap_ST;
 			half _LesionStrength;
 			float4 _VeinMap_ST;
+			float _VeinEdgeSoftness;
+			float _VeinFalloff;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			float _WobbleAmplitude;
@@ -154,9 +158,14 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		// UV light arrays — declared outside UnityPerMaterial so they can be set
 		// per-renderer via MaterialPropertyBlock (arrays cannot live inside a CBuffer
 		// and still be overridden per-renderer in URP).
+		//
+		// _UVLightPositions  : xyz = world position, w = range
+		// _UVLightDirections : xyz = normalized forward direction of the cone
+		// _UVLightParams     : x   = cos(halfAngle)
 		#define UV_LIGHT_MAX_COUNT 4
 		float4 _UVLightPositions[UV_LIGHT_MAX_COUNT];
-		float  _UVLightRadii[UV_LIGHT_MAX_COUNT];
+		float4 _UVLightDirections[UV_LIGHT_MAX_COUNT];
+		float4 _UVLightParams[UV_LIGHT_MAX_COUNT];
 		int    _UVLightCount;
 
 		// Hash without sin and uniform across platforms
@@ -751,16 +760,42 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 				}
 				#endif
 
-				// Blue veins effect — reveals a vein texture within each active UV light's world-space sphere.
-				// Positions and radii are pushed per-renderer from C# via MaterialPropertyBlock.
-				// Multiple lights are combined by taking the maximum contribution per fragment.
+				// Blue veins effect — reveals a vein texture within each active UV light's cone.
+				// Positions/directions/params are pushed per-renderer from C# via MaterialPropertyBlock.
+				// The gradient mirrors UVReveal.shader: nd combines lateral and depth distances in
+				// cone-normalised 2D space so the mask fades smoothly from the apex outward.
 				#if defined(TCP2_BLUE_VEINS)
 				{
 					float combinedMask = 0.0;
 					for (int uvIdx = 0; uvIdx < _UVLightCount; uvIdx++)
 					{
-						float dist  = distance(positionWS, _UVLightPositions[uvIdx].xyz);
-						combinedMask = max(combinedMask, step(dist, _UVLightRadii[uvIdx]));
+						float3 lightPos   = _UVLightPositions[uvIdx].xyz;
+						float  lightRange = _UVLightPositions[uvIdx].w;
+						float3 lightDir   = _UVLightDirections[uvIdx].xyz;
+						float  cosOuter   = _UVLightParams[uvIdx].x;
+
+						float3 toFrag     = positionWS - lightPos;
+						float  depthAlong = dot(toFrag, lightDir);
+
+						float validMask = step(0.001, depthAlong) * step(depthAlong, lightRange);
+
+						float perpDist     = length(toFrag - depthAlong * lightDir);
+						float tanHalfAngle = sqrt(max(1.0 - cosOuter * cosOuter, 0.0)) / max(cosOuter, 0.001);
+						float coneRadius   = depthAlong * tanHalfAngle;
+
+						float nd_lat   = saturate(perpDist   / max(coneRadius,  0.001));
+						float nd_depth = saturate(depthAlong / max(lightRange,  0.001));
+
+						// Combined nd in cone-normalised 2D space (hypotenuse, max = 1).
+						float nd = saturate(length(float2(nd_lat, nd_depth)) * 0.7071);
+
+						float softBand = max(_VeinEdgeSoftness, 0.001);
+						float edgeMask = 1.0 - smoothstep(1.0 - softBand, 1.0, nd_lat);
+
+						float baseGrad    = 1.0 - smoothstep(0.0, 1.0, nd);
+						float falloffMask = pow(baseGrad, max(_VeinFalloff, 0.5));
+
+						combinedMask = max(combinedMask, edgeMask * falloffMask * validMask);
 					}
 					half4 veinSample = TCP2_TEX2D_SAMPLE(_VeinMap, _VeinMap, input.pack1.xy * _VeinMap_ST.xy + _VeinMap_ST.zw);
 					color.rgb = lerp(color.rgb, veinSample.rgb, veinSample.a * combinedMask);
