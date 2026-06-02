@@ -606,12 +606,13 @@ public class FolderController : PickableObject
 
         // Drive a full forward lean on all clients for the duration of the stamp so the
         // character visibly hunches toward the folder from a third-person perspective.
-        // The local player's lean is suppressed via SuppressLocalBodyLean so it cannot
-        // fight the IK targets; the networked netLeanFactor still broadcasts to proxies.
+        // LockBodyLeanFactor prevents PlayerMovementController from overriding the scripted
+        // lean each frame. The lean still applies to bones so the body tilts forward and
+        // ApplyLocalBodyLean + SolveTwoBoneIK bend the arm naturally from the closer shoulder.
         if (isStampingLocalPlayer)
         {
             ppc.PlayerAnimationController.SetBodyLeanDirect(1f, 1f);
-            ppc.PlayerAnimationController.SuppressLocalBodyLean = true;
+            ppc.PlayerAnimationController.LockBodyLeanFactor = true;
         }
 
         ppc.GetComponent<PlayerMovementController>().LookAtTarget(transform);
@@ -710,9 +711,10 @@ public class FolderController : PickableObject
         if (isStampingLocalPlayer)
         {
             cinemachineVirtualCamera.SetActive(false);
-            // Restore lean to zero — PlayerMovementController will resume driving it naturally.
+            // Release the lean lock before zeroing so PlayerMovementController can resume
+            // driving the lean factor naturally through SetLocalBodyLeanFactor.
+            ppc.PlayerAnimationController.LockBodyLeanFactor = false;
             ppc.PlayerAnimationController.SetBodyLeanDirect(0f);
-            ppc.PlayerAnimationController.SuppressLocalBodyLean = false;
             PlayerInstance.Instance.CanControl = true;
             ppc.PlayerMovementController.ResetCameraPos(false, .5f);
         }

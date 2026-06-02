@@ -89,6 +89,14 @@ public class PlayerAnimationController : NetworkBehaviour
     public bool SuppressLocalBodyLean { get; set; }
 
     /// <summary>
+    /// When true, <see cref="SetLocalBodyLeanFactor"/> becomes a no-op so the camera-offset
+    /// system cannot override a scripted lean set via <see cref="SetBodyLeanDirect"/>.
+    /// Unlike <see cref="SuppressLocalBodyLean"/>, the lean still applies to bones so the
+    /// body visibly tilts and the arm IK re-solve can produce a natural elbow bend.
+    /// </summary>
+    public bool LockBodyLeanFactor { get; set; }
+
+    /// <summary>
     /// When true, <see cref="rightArmRigIKTarget"/> is being driven directly by a local sequence
     /// (e.g. the stamp DOTween) and the network-position proxy passthrough must not overwrite it.
     /// Set to true before DOTweening <see cref="RightArmRigIKTarget"/> directly, and back to false
@@ -251,6 +259,8 @@ public class PlayerAnimationController : NetworkBehaviour
     private Transform _leftUpperArmBone;
     private Transform _rightForeArmBone;
     private Transform _rightHandBone;
+    private Transform _leftForeArmBone;
+    private Transform _leftHandBone;
 
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
@@ -327,7 +337,26 @@ public class PlayerAnimationController : NetworkBehaviour
             ShrugEmote();
         }
 
+        // Snapshot the IK-solved elbow world position before any lean modifies spine bones.
+        // After ApplyLocalBodyLean shifts the shoulder forward, SolveTwoBoneIK re-aims the arm
+        // from the new (closer) shoulder position, producing a naturally bent elbow.
+        bool rightIKActiveOwner = rightArmRig.weight > 0.01f;
+        Vector3 rightElbowHintOwner = rightIKActiveOwner && _rightForeArmBone != null
+            ? _rightForeArmBone.position
+            : Vector3.zero;
+
         ApplyLocalBodyLean();
+
+        // Re-solve only when the lean has actually moved the spine (avoids subtle deviations
+        // from the Animation Rigging solver on frames where the body is upright).
+        if (rightIKActiveOwner && _currentLeanFactor > 0.001f
+            && _rightUpperArmBone != null && _rightForeArmBone != null
+            && _rightHandBone != null && rightArmRigIKTarget != null)
+        {
+            SolveTwoBoneIK(
+                _rightUpperArmBone, _rightForeArmBone, _rightHandBone,
+                rightArmRigIKTarget.position, rightElbowHintOwner, rightArmRig.weight);
+        }
     }
 
     void ShrugEmote()
@@ -363,6 +392,8 @@ public class PlayerAnimationController : NetworkBehaviour
         _leftUpperArmBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
         _rightForeArmBone  = bodyAnimator.GetBoneTransform(HumanBodyBones.RightLowerArm);
         _rightHandBone     = bodyAnimator.GetBoneTransform(HumanBodyBones.RightHand);
+        _leftForeArmBone   = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
+        _leftHandBone      = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftHand);
 
         // Measure the arm reach after one frame so the Animator has evaluated
         // and bone positions are valid in world space.
@@ -516,10 +547,28 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         float pitch = Mathf.Clamp(netPitch.Value, -pitchClampUp, pitchClampDown);
 
+        // --- Elbow hint snapshot (BEFORE any bone manipulation) ---
+        // Snapshot the IK-solved elbow world position before lean or pitch rotate any bones.
+        // After all modifications the arm is re-solved analytically using this hint so the
+        // elbow plane is preserved. Because the leaned shoulder is closer to the target the
+        // solver produces a natural bend instead of the stiff full extension from the old
+        // save/restore approach.
+        bool rightIKActive = netRightArmRigActive.Value || rightArmRig.weight > 0.01f;
+        bool leftIKActive  = netLeftArmRigActive.Value  || leftArmRig.weight  > 0.01f;
+
+        Vector3 rightElbowHint = Vector3.zero;
+        Vector3 leftElbowHint  = Vector3.zero;
+
+        if (rightIKActive && _rightForeArmBone != null)
+            rightElbowHint = _rightForeArmBone.position;
+
+        if (leftIKActive && _leftForeArmBone != null)
+            leftElbowHint = _leftForeArmBone.position;
+
         // --- IK Reach Lean ---
         // When the right arm IK rig is active and the target is beyond comfortable arm reach,
-        // lean the spine toward the IK target to sell the stretch. Runs before the arm snapshot
-        // below so the body lean contributes naturally to the arm's world position.
+        // lean the spine toward the IK target to sell the stretch. Runs after the arm rotation
+        // snapshot so the lean does not pollute the saved IK-solved rotation.
         if (_rightArmReach > 0f && _rightUpperArmBone != null && _spineBone != null && rightArmRigIKTarget != null)
         {
             float targetIKLeanAngle = 0f;
@@ -540,32 +589,6 @@ public class PlayerAnimationController : NetworkBehaviour
                 if (leanAxis.sqrMagnitude > 0.001f)
                     _spineBone.rotation = Quaternion.AngleAxis(_currentIKLeanAngle, leanAxis) * _spineBone.rotation;
             }
-        }
-
-        // --- Arm world-transform snapshot ---
-        // Spine pitch and body lean run after Animation Rigging has already solved the arm chain.
-        // Rotating the spine drags the shoulder with it and breaks the IK result in world space.
-        // Solution: snapshot the upper arm world position+rotation after the reach lean (which is
-        // intentional), apply all pitch/lean to the spine normally, then restore the arm so it
-        // stays exactly where the IK solver placed it. Head and neck can follow freely.
-        bool rightIKActive = netRightArmRigActive.Value || rightArmRig.weight > 0.01f;
-        bool leftIKActive  = netLeftArmRigActive.Value  || leftArmRig.weight  > 0.01f;
-
-        Vector3    savedRightArmPos = Vector3.zero;
-        Quaternion savedRightArmRot = Quaternion.identity;
-        Vector3    savedLeftArmPos  = Vector3.zero;
-        Quaternion savedLeftArmRot  = Quaternion.identity;
-
-        if (rightIKActive && _rightUpperArmBone != null)
-        {
-            savedRightArmPos = _rightUpperArmBone.position;
-            savedRightArmRot = _rightUpperArmBone.rotation;
-        }
-
-        if (leftIKActive && _leftUpperArmBone != null)
-        {
-            savedLeftArmPos = _leftUpperArmBone.position;
-            savedLeftArmRot = _leftUpperArmBone.rotation;
         }
 
         // --- Pitch and lean ---
@@ -593,13 +616,51 @@ public class PlayerAnimationController : NetworkBehaviour
                 _neckBone.localRotation *= Quaternion.Euler(dir * leanFactor * leanNeckMax, 0f, 0f);
         }
 
-        // --- Restore arm world transforms ---
-        // Forearm and hand are children of the upper arm, so they follow automatically.
-        if (rightIKActive && _rightUpperArmBone != null)
-            _rightUpperArmBone.SetPositionAndRotation(savedRightArmPos, savedRightArmRot);
+        // --- Re-solve arm IK from new shoulder positions after all bone modifications ---
+        // Analytical 2-bone solve from the leaned shoulder. The shorter shoulder-to-target
+        // distance (body leaned forward) causes the solver to produce a naturally bent elbow.
+        // Only runs when spine bones were actually modified so non-lean frames stay identical
+        // to the Animation Rigging solver's result.
+        float leanAndIKAngle = _currentLeanFactor + _currentIKLeanAngle;
 
-        if (leftIKActive && _leftUpperArmBone != null)
-            _leftUpperArmBone.SetPositionAndRotation(savedLeftArmPos, savedLeftArmRot);
+        if (rightIKActive && leanAndIKAngle > 0.001f
+            && _rightUpperArmBone != null && _rightForeArmBone != null
+            && _rightHandBone != null && rightArmRigIKTarget != null)
+        {
+            SolveTwoBoneIK(_rightUpperArmBone, _rightForeArmBone, _rightHandBone,
+                           rightArmRigIKTarget.position, rightElbowHint, rightArmRig.weight);
+        }
+
+        if (leftIKActive && _currentLeanFactor > 0.001f
+            && _leftUpperArmBone != null && _leftForeArmBone != null
+            && _leftHandBone != null && leftArmRigIKTarget != null)
+        {
+            SolveTwoBoneIK(_leftUpperArmBone, _leftForeArmBone, _leftHandBone,
+                           leftArmRigIKTarget.position, leftElbowHint, leftArmRig.weight);
+        }
+
+        // --- Head look-at IK target ---
+        // The body lean pitches the head downward as the spine/neck rotate forward.
+        // Blend the head's world rotation toward the active IK target position so the
+        // character appears to look at what it is reaching for rather than at the floor.
+        // The rig weight is used as the blend factor so the look-at fades in and out
+        // in sync with the arm IK activation.
+        if (_headBone != null)
+        {
+            bool rightValid = rightIKActive && rightArmRigIKTarget != null;
+            bool leftValid  = leftIKActive  && leftArmRigIKTarget  != null;
+
+            Transform ikHeadTarget = rightValid ? rightArmRigIKTarget : (leftValid ? leftArmRigIKTarget : null);
+            float     ikHeadWeight = rightValid ? rightArmRig.weight  : (leftValid ? leftArmRig.weight  : 0f);
+
+            if (ikHeadTarget != null && ikHeadWeight > 0.001f)
+            {
+                Vector3 toTarget = (ikHeadTarget.position - _headBone.position).normalized;
+                if (toTarget.sqrMagnitude > 0.001f)
+                    _headBone.rotation = Quaternion.Slerp(_headBone.rotation,
+                        Quaternion.LookRotation(toTarget, transform.up), ikHeadWeight);
+            }
+        }
 
         // Swing the upper arm bones up/down when the owner's camera arm has something equipped.
         // Skip while IK is active — the world-transform restore above already locked the arm.
@@ -636,6 +697,8 @@ public class PlayerAnimationController : NetworkBehaviour
     /// </summary>
     public void SetLocalBodyLeanFactor(float factor)
     {
+        if (LockBodyLeanFactor) return;
+
         _targetLeanFactor = Mathf.Clamp01(factor);
         // Direction is derived live from camera pitch in the camera-offset driven path.
         _leanDirection = _playerMovementController.CameraPitch >= 0f ? 1f : -1f;
@@ -689,8 +752,72 @@ public class PlayerAnimationController : NetworkBehaviour
         }
     }
 
-    public void EnableRightArmMask()
+    /// <summary>
+    /// Analytically solves a 2-bone IK chain (root → mid → tip) to place the tip at
+    /// <paramref name="targetPos"/>. <paramref name="hintPos"/> is a world-space point that
+    /// biases the elbow/knee into the desired bending plane (typically the pre-lean elbow
+    /// position). <paramref name="weight"/> blends between the original pose (0) and the
+    /// IK solution (1), matching the active rig weight for smooth fade-in/out.
+    /// </summary>
+    private static void SolveTwoBoneIK(
+        Transform root, Transform mid, Transform tip,
+        Vector3 targetPos, Vector3 hintPos, float weight)
     {
+        if (weight < 0.001f) return;
+
+        Vector3 a = root.position;  // shoulder / upper-arm root
+        Vector3 b = mid.position;   // elbow
+        Vector3 c = tip.position;   // hand
+
+        float la = Vector3.Distance(a, b);                                            // upper arm length
+        float lb = Vector3.Distance(b, c);                                            // forearm length
+        float lt = Mathf.Clamp(Vector3.Distance(a, targetPos), 0.0001f, la + lb - 0.001f);
+
+        // Law of cosines: angle at the shoulder between (shoulder→elbow) and (shoulder→target)
+        float cosA = Mathf.Clamp((la * la + lt * lt - lb * lb) / (2f * la * lt), -1f, 1f);
+        float angA  = Mathf.Acos(cosA) * Mathf.Rad2Deg;
+
+        // Direction from shoulder to target
+        Vector3 toTarget = (targetPos - a).normalized;
+
+        // Pole direction: project hint vector onto the plane perpendicular to toTarget so
+        // the hint only influences the bending plane, not the reach direction.
+        Vector3 poleDir = Vector3.ProjectOnPlane(hintPos - a, toTarget);
+        if (poleDir.sqrMagnitude < 0.001f)
+            poleDir = Vector3.ProjectOnPlane(b - a, toTarget);   // fallback: current elbow dir
+        if (poleDir.sqrMagnitude < 0.001f)
+            poleDir = Vector3.ProjectOnPlane(Vector3.up, toTarget);
+        poleDir.Normalize();
+
+        // Bend axis is perpendicular to both the reach direction and the pole direction.
+        Vector3 bendAxis = Vector3.Cross(toTarget, poleDir);
+        if (bendAxis.sqrMagnitude < 0.001f) return;  // degenerate: skip rather than corrupt pose
+        bendAxis.Normalize();
+
+        // IK-computed direction from shoulder to elbow: rotate toTarget by angA around bendAxis.
+        Vector3 ikElbowDir  = Quaternion.AngleAxis(angA, bendAxis) * toTarget;
+        Vector3 curElbowDir = (b - a).normalized;
+
+        // --- Rotate upper arm ---
+        Quaternion rootDelta = Quaternion.FromToRotation(curElbowDir, ikElbowDir);
+        root.rotation = Quaternion.Slerp(root.rotation, rootDelta * root.rotation, weight);
+
+        // After rotating root, mid and tip have moved (they are children in the bone chain).
+        // Rotate mid (forearm) so the hand reaches the target from the new elbow position.
+        Vector3 newB = mid.position;
+        Vector3 newC = tip.position;
+
+        Vector3 curForearmDir = (newC - newB).normalized;
+        Vector3 tgtForearmDir = (targetPos - newB).normalized;
+
+        if (curForearmDir.sqrMagnitude > 0.001f && tgtForearmDir.sqrMagnitude > 0.001f)
+        {
+            Quaternion midDelta = Quaternion.FromToRotation(curForearmDir, tgtForearmDir);
+            mid.rotation = Quaternion.Slerp(mid.rotation, midDelta * mid.rotation, weight);
+        }
+    }
+
+    public void EnableRightArmMask()    {
         Debug.Log("Enable Right Arm Mask");
         targetLayer1Weight = 1f;
         targetLayer2Weight = 0f;
