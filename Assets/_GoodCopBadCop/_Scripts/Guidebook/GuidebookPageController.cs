@@ -24,6 +24,12 @@ public class GuidebookPageController : MonoBehaviour
     /// <summary>Index of the current (rightmost visible) page spread. Starts at 0.</summary>
     private int _currentPageIndex;
 
+    /// <summary>Returns true when there is at least one more page spread ahead.</summary>
+    public bool HasNextPage => _pages != null && _currentPageIndex < _pages.Length;
+
+    /// <summary>Returns true when there is at least one page spread behind the current one.</summary>
+    public bool HasPreviousPage => _pages != null && _currentPageIndex > 0;
+
     private void OnEnable()
     {
         ResetPages();

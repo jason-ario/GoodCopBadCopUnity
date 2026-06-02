@@ -16,6 +16,9 @@ public class GuidebookController : MonoBehaviour
 {
     /// <summary>Raised whenever the local player opens the guidebook.</summary>
     public static event Action OnGuidebookOpened;
+
+    /// <summary>Raised whenever the local player closes the guidebook.</summary>
+    public static event Action OnGuidebookClosed;
     private static readonly string AnimParam  = "HoldingGuidebook";
     private static readonly string InputButton = "Guidebook";
 
@@ -110,6 +113,7 @@ public class GuidebookController : MonoBehaviour
     {
         if (!IsOpen) return;
         IsOpen = false;
+        OnGuidebookClosed?.Invoke();
 
         _animationController.SetAnimBool(AnimParam, false);
 
