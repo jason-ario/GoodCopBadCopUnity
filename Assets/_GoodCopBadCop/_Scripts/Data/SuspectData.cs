@@ -72,6 +72,12 @@ public class SuspectData : ScriptableObject
     public DialogueByVerdict exitDialoguesKilled = 
         new DialogueByVerdict(Verdict.Killed, new string[3], new string[3], new string[3]);    
 
+    [Header("Exit Lines — Random Pool")]
+    [TextArea(1, 3)]
+    public string[] quarantineExitLines;
+    [TextArea(1, 3)]
+    public string[] killExitLines;
+
     public AudioClip[] voiceAudioClips;
 
     [System.Serializable]

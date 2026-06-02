@@ -392,45 +392,61 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(PassSequence());
     }
 
+    /// <summary>
+    /// Picks and speaks a randomised exit line for the given verdict.
+    /// For Quarantined and Killed, pulls from the flat random-pool fields on SuspectData
+    /// when they are populated, falling back to the day-range arrays otherwise.
+    /// </summary>
     void SayExitDialogue(SuspectCharacter suspectCharacter, SuspectData.Verdict verdict)
     {
         string exitDialogue = "";
         string[] exitDialogues;
 
-        switch (verdict)
+        if (verdict == SuspectData.Verdict.Quarantined && suspectCharacter.Data.quarantineExitLines?.Length > 0)
         {
-            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEarlyDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
-                break;
-            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsMidDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesMidDays;
-                break;
-            case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEndDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesFinalDays;
-                break;
-            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEarlyDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesEarlyDays;
-                break;
-            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsMidDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesMidDays;
-                break;
-            case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEndDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesFinalDays;
-                break;
-            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEarlyDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesEarlyDays;
-                break;
-            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsMidDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesMidDays;
-                break;
-            case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEndDays:
-                exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesFinalDays;
-                break;
-            default:
-                exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
-                break;
+            exitDialogues = suspectCharacter.Data.quarantineExitLines;
         }
-        
+        else if (verdict == SuspectData.Verdict.Killed && suspectCharacter.Data.killExitLines?.Length > 0)
+        {
+            exitDialogues = suspectCharacter.Data.killExitLines;
+        }
+        else
+        {
+            switch (verdict)
+            {
+                case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEarlyDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
+                    break;
+                case SuspectData.Verdict.Passed when ShiftManager.Instance.IsMidDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesMidDays;
+                    break;
+                case SuspectData.Verdict.Passed when ShiftManager.Instance.IsEndDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesFinalDays;
+                    break;
+                case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEarlyDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesEarlyDays;
+                    break;
+                case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsMidDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesMidDays;
+                    break;
+                case SuspectData.Verdict.Quarantined when ShiftManager.Instance.IsEndDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesQuarantined.dialoguesFinalDays;
+                    break;
+                case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEarlyDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesEarlyDays;
+                    break;
+                case SuspectData.Verdict.Killed when ShiftManager.Instance.IsMidDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesMidDays;
+                    break;
+                case SuspectData.Verdict.Killed when ShiftManager.Instance.IsEndDays:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesKilled.dialoguesFinalDays;
+                    break;
+                default:
+                    exitDialogues = suspectCharacter.Data.exitDialoguesPassed.dialoguesEarlyDays;
+                    break;
+            }
+        }
+
         exitDialogue = exitDialogues[UnityEngine.Random.Range(0, exitDialogues.Length)];
         DialogueManager.Instance.SayDialogue(suspectCharacter, exitDialogue);
     }
