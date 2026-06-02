@@ -28,6 +28,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject hqOrderScreenUI;
     [SerializeField] private Animator screenFade;
     [SerializeField] private Animator newspaper;
+    [SerializeField] private GameObject backButtonUI;
     [SerializeField] private Button backButton;
     [SerializeField] private ScreenDamage _screenDamage;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
@@ -68,7 +69,7 @@ public class UIController : MonoBehaviour
             return;
         }
 
-        if (backButton.gameObject.activeSelf == true)
+        if (backButtonUI.activeSelf == true)
         {
             if(Input.GetButtonDown("Back"))
             {
@@ -200,13 +201,13 @@ public class UIController : MonoBehaviour
     public void ShowBackButton(UnityAction onClickCallback)
     {
         backButton.onClick.AddListener(onClickCallback);
-        backButton.gameObject.SetActive(true);
+        backButtonUI.SetActive(true);
     }
 
     public void HideBackButton()
     {
         backButton.onClick.RemoveAllListeners();
-        backButton.gameObject.SetActive(false);
+        backButtonUI.SetActive(false);
     }
 
 
