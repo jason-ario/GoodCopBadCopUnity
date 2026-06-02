@@ -99,6 +99,7 @@ public class ExamNotebook : PickableObject
     private NetworkVariable<int> _pageBitmask4 = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private NetworkVariable<int>[] _pageBitmasks;
+    [SerializeField] private AudioClip ripOutSound;
 
     protected override void Awake()
     {
@@ -505,6 +506,7 @@ public class ExamNotebook : PickableObject
         pages[currentPage].SetChecklistInteractable(false);
 
         playerPickupController.PlayerAnimationController.SetAnimTrigger("RipOutPage");
+        SFXController.Instance.PlayAtPosition(ripOutSound, transform.position);
         StartCoroutine(WaitAndParent(pages[currentPage], folder));
         Debug.Log("Rip out and add to folder");
     }

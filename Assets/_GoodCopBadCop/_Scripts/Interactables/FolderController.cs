@@ -19,10 +19,7 @@ public class FolderController : PickableObject
         StampContainer.StampType.Pass,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
-
-    [Header("Documents")] 
-    [SerializeField] private MeshRenderer photoID;
-    [SerializeField] EntryPermit entryPermit;
+    
     
     [Header("Set Up")]
     [SerializeField] private AudioClip folderPlaceClip;
@@ -32,22 +29,7 @@ public class FolderController : PickableObject
     public Transform stampUpTarget;
     /// <summary>IK target position for the camera (first-person) arm at the bottom of the stamp arc.</summary>
     public Transform stampDownTarget;
-
-    /// <summary>
-    /// IK target position for the body (third-person) arm at the top of the stamp arc.
-    /// Calibrated to the body skeleton's shoulder origin so the arm reaches the folder correctly
-    /// from an observer's perspective. Falls back to stampUpTarget when left unassigned.
-    /// </summary>
-    [Tooltip("Body-arm IK target for the top of the stamp arc. Needs separate calibration from the camera-arm target. Falls back to stampUpTarget if unassigned.")]
-    public Transform bodyStampUpTarget;
-
-    /// <summary>
-    /// IK target position for the body (third-person) arm at the bottom of the stamp arc.
-    /// Falls back to stampDownTarget when left unassigned.
-    /// </summary>
-    [Tooltip("Body-arm IK target for the bottom of the stamp arc. Falls back to stampDownTarget if unassigned.")]
-    public Transform bodyStampDownTarget;
-
+    
     [SerializeField] StampContainer stampContainer;
     [SerializeField] private AudioClip stampSound;
     private StampContainer.StampType _stampType;
@@ -618,8 +600,8 @@ public class FolderController : PickableObject
         ppc.GetComponent<PlayerMovementController>().LookAtTarget(transform);
 
         // Resolve body-arm targets, falling back to the camera-arm targets when unassigned.
-        Transform bodyUp   = bodyStampUpTarget   != null ? bodyStampUpTarget   : stampUpTarget;
-        Transform bodyDown = bodyStampDownTarget != null ? bodyStampDownTarget : stampDownTarget;
+        Transform bodyUp   = stampUpTarget;
+        Transform bodyDown = stampDownTarget;
 
         // Diagnostic: log the IK target state on every client so we can verify what's null.
         Debug.Log($"[FolderController] UseStampSequence — client={NetworkManager.Singleton.LocalClientId} " +

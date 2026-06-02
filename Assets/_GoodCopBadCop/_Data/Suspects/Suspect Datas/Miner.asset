@@ -1,0 +1,145 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc4902ccea98cf44865aecb61fc1ff4, type: 3}
+  m_Name: Miner
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectData
+  FirstName: Gennady
+  LastName: Kozlov
+  Nickname: 
+  Occupation: Coal Miner
+  CharacterDescription: Stocky and broad-shouldered, with coal dust worked so deep
+    into his skin that no amount of scrubbing removes it entirely. He speaks in short
+    sentences, makes eye contact without aggression, and expects nothing from a conversation
+    except to get through it quickly. He is not suspicious. He is simply tired.
+  CharacterArc: His arc is about endurance without purpose. He is a man defined entirely
+    by his work. As long as the mine runs, he runs with it, steady and unreadable,
+    a fixture at the face. As the infrastructure collapses and the mine is sealed,
+    something slowly detaches. He does not panic. He does not spiral. He simply becomes
+    slightly less present each day, like a lamp running down with no one turning
+    the switch.
+  DateOfBirth: 05/03/1938
+  Sex: Male
+  EntryPermitExpiryDate: 12 MAR
+  IsResident: 1
+  GivesPaperwork: 1
+  handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
+  startingInfectionScore: 0
+  dailyInfectionProgression: 5
+  IDPhoto: {fileID: 2800000, guid: 0324aea82b799e44dafa8cc37b5de944, type: 3}
+  CharacterPrefab: {fileID: 8357816086755924206, guid: c8d8a7a2ab2cf2044beab16196c35a18, type: 3}
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to the residential block after the morning shift at the mine.
+    - Collecting the weekly coal allocation for the eastern apartments.
+    - End of shift at Coal Face B. Nothing to report.
+    midDaysReasons:
+    - The east shaft was sealed this morning. I'm going home.
+    - Picking up protective gear from the equipment depot before the next rotation.
+    - Double shift at C shaft. I need to sleep.
+    finalDaysReasons:
+    - The mine is closed. All of them. I'm just going home.
+    - Nowhere else to go. The mine is shut.
+    - Returning to my bunk. That is all.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Visiting a beach resort that was buried in a rockfall in 1971.
+    - Buying flowers at the market that closed when I was thirty.
+    - Going to see my brother who moved away before I was born.
+    midDaysReasons:
+    - Meeting the mine supervisor at an office that no longer exists.
+    - I need to start a shift at a shaft that was sealed last Tuesday.
+    - Going to the recreation hall that is now a field hospital.
+    finalDaysReasons:
+    - The mine is running fine. I need to get back underground immediately.
+    - Someone is still tapping from below. I need to answer.
+    - I heard the foreman call my name. He needs me back down there.
+  entryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Long shift. Papers are in order.
+    - Just off the morning rotation. Coal Face B.
+    - I know I'm dirty. The showers at the shaft were out again.
+    dialoguesMidDays:
+    - They moved us to C shaft. Longer walk.
+    - Eleven hours today. I don't complain.
+    - The ventilation has been bad this week. We manage.
+    dialoguesFinalDays:
+    - They closed the mine. I don't know what I'm supposed to do now.
+    - Just going home.
+    - I used to know what my day was.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Good. Thank you.
+    dialoguesMidDays:
+    - Right. Thank you.
+    dialoguesFinalDays:
+    - Alright.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - I haven't done anything wrong. I just want to sleep.
+    dialoguesMidDays:
+    - You're keeping me from my bunk, officer.
+    dialoguesFinalDays:
+    - Fine. I've been in smaller places.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - I... didn't think... it would end like this.
+    dialoguesMidDays:
+    - I've survived worse... collapses...
+    dialoguesFinalDays:
+    - ...I should have stayed... underground...
+  quarantineExitLines:
+  - I've slept in mine shafts tighter than this. I'll manage.
+  - No need to explain. I'll wait. I know how to wait.
+  - The walls are concrete, not rock. But it's the same in the dark.
+  killExitLines:
+  - Twenty years underground... gas pockets... collapses... and this...
+  - Tell my wife... she knows... she always knew...
+  - I thought... it would be the mine... that got me...
+  voiceAudioClips: []
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The mine. B shaft. Finished at six.
+    midDaysAnswer: C shaft now. Longer walk. Finished at six.
+    finalDaysAnswer: Nowhere. The mine is closed. I walked for a while.
+    mismatchEarlyDaysAnswer: Home. I wasn't at the mine today. My back. I stayed
+      in and rested.
+    mismatchMidDaysAnswer: Home. I haven't been to the mine in several days. My back
+      has been bad. Nothing unusual.
+    mismatchFinalDaysAnswer: The mine! B shaft. Running perfectly. Full crew. Everyone
+      is there. No problems at all.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: Coal dust. Always coal dust. My lungs are fine. The doctor says
+      fine.
+    midDaysAnswer: Some dizziness. The ventilation in C shaft has been poor. It happens.
+    finalDaysAnswer: I'm tired. More than usual. But I'm always tired.
+    mismatchEarlyDaysAnswer: Nothing. I feel very well. Better than I have in years.
+      Very clear-headed.
+    mismatchMidDaysAnswer: No dizziness at all. Lungs are clear. I haven't been near
+      the mine, so no dust. Everything is fine.
+    mismatchFinalDaysAnswer: Perfect health. Strong lungs. Clear head. I feel like
+      it's my first year on the coal face.
+  - question: Who do you live with?
+    earlyDaysAnswer: My wife. Two sons. Top floor, east block.
+    midDaysAnswer: My wife. The boys left for the west district last month. Just
+      the two of us now.
+    finalDaysAnswer: My wife. Just us. She doesn't say much either.
+    mismatchEarlyDaysAnswer: Just me. My wife left some time ago. I don't talk about
+      it.
+    mismatchMidDaysAnswer: All four of us still. Wife and both boys. East block.
+      Nothing has changed.
+    mismatchFinalDaysAnswer: My wife and both sons. We all eat together every night.
+      Every night without fail.
+  IDNumber: 3871204

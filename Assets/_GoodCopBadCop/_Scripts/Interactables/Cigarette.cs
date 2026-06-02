@@ -9,11 +9,14 @@ public class Cigarette : PickableObject
    [SerializeField] float reductionAmountPerFrame = .01f;
    [SerializeField] private Transform particlePos1;
    [SerializeField] private Transform particlePos2;
-   
+   [SerializeField] private AudioSource smokingAudioSource;
+   [SerializeField] private AudioClip smokingSound;
+
    public override void OnStartUse()
    {
       base.OnStartUse();
       playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
+      PlaySmokingSound();
    }
 
    public override void OnEquipped(PlayerPickupController player)
@@ -25,8 +28,8 @@ public class Cigarette : PickableObject
    public override void OnUnequip(PlayerPickupController player)
    {
       base.OnUnequip(player);
-      
       particles.SetActive(false);
+      StopSmokingSound();
    }
 
    void Update()
@@ -39,6 +42,7 @@ public class Cigarette : PickableObject
          
       if (blendShapeWeight >= 100)
       {
+         StopSmokingSound();
          playerPickupController.DestroyEquippedItem();
          return;
       }
@@ -52,5 +56,24 @@ public class Cigarette : PickableObject
    {
       base.OnStopUse();
       playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+      StopSmokingSound();
+   }
+
+   /// <summary>Starts looping the smoking sound effect.</summary>
+   private void PlaySmokingSound()
+   {
+      if (smokingAudioSource == null || smokingSound == null) return;
+
+      smokingAudioSource.clip = smokingSound;
+      smokingAudioSource.loop = true;
+      smokingAudioSource.Play();
+   }
+
+   /// <summary>Stops the looping smoking sound effect.</summary>
+   private void StopSmokingSound()
+   {
+      if (smokingAudioSource == null || !smokingAudioSource.isPlaying) return;
+
+      smokingAudioSource.Stop();
    }
 }

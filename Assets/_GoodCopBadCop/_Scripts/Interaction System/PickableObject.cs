@@ -15,8 +15,6 @@ public class PickableObject : Interactable
     protected PlayerPickupController playerPickupController;
     [SerializeField] PickableItemData itemData;
     public PickableItemData ItemData => itemData;
-    [SerializeField] AudioClip pickupSound;
-    [SerializeField] AudioClip putDownSound;
     private ParentConstraint _parentConstraint;
     private SocketFollow _socketFollow;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
@@ -385,21 +383,18 @@ public class PickableObject : Interactable
 
     public virtual void OnPickedUp()
     {
-        if (pickupSound != null)
+        if (itemData != null && itemData.PickupSound != null)
         {
-            SFXController.Instance.Play(pickupSound);
+            SFXController.Instance.PlayAtPosition(itemData.PickupSound, transform.position);
         }
         // Do NOT despawn — reparenting is handled by PlayerPickupController
     }
 
     public virtual void OnDropped()
     {
-        if (putDownSound != null)
+        if (itemData != null && itemData.PickupSound != null)
         {
-            SFXController.Instance.Play(putDownSound);
-        } else if (pickupSound != null)
-        {
-            SFXController.Instance.Play(pickupSound);
+            SFXController.Instance.PlayAtPosition(itemData.PickupSound, transform.position);
         }
     }
 

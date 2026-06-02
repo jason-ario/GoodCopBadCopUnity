@@ -520,7 +520,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90836e53cb8749f4591abbf80579140a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UVLight
-  fallbackRadius: 2.43
+  coneAngleDegrees: 30
+  range: 3
 --- !u!1 &3868534579613957341
 GameObject:
   m_ObjectHideFlags: 0
@@ -864,7 +865,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3615840691
+  GlobalObjectIdHash: 4132653483
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -899,14 +900,17 @@ MonoBehaviour:
   lookAnimator: {fileID: 253971976340002767}
   animator: {fileID: 3144101779491009765}
   audioSource: {fileID: 1751970679333441786}
-  speaking: {fileID: 0}
+  speaking: {fileID: 7888620099599006139}
   idPhoto: {fileID: 0}
   interactionCollider: {fileID: 7460938723757500394}
   bloodExplosion: {fileID: 8015446583675946598}
   lookPos: {fileID: 5330771091470271895}
   standPosOffset: {x: 0, y: 0, z: 0}
   attackImmediately: 0
-  vomitParticles: []
+  vomitParticles:
+  - {fileID: 2031675808670487376}
+  - {fileID: 575687434216882416}
+  - {fileID: 7585665105151639777}
   folderGivingAnimationDatas:
   - animation: 0
     animationTriggerName: Give
@@ -1649,7 +1653,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c863de4edf364d40aa1e12cda9a56ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  suspect: {fileID: 0}
 --- !u!1 &7812797876559283808
 GameObject:
   m_ObjectHideFlags: 0
@@ -2401,6 +2404,16 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
+--- !u!198 &575687434216882416 stripped
+ParticleSystem:
+  m_CorrespondingSourceObject: {fileID: 2995851485703272883, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
+  m_PrefabInstance: {fileID: 3345655168963983683}
+  m_PrefabAsset: {fileID: 0}
+--- !u!198 &2031675808670487376 stripped
+ParticleSystem:
+  m_CorrespondingSourceObject: {fileID: 3629850465862363667, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
+  m_PrefabInstance: {fileID: 3345655168963983683}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &4928382710320344539 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7641208137505969304, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
@@ -2409,6 +2422,11 @@ GameObject:
 --- !u!4 &6028995761909442642 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9062768665757126929, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
+  m_PrefabInstance: {fileID: 3345655168963983683}
+  m_PrefabAsset: {fileID: 0}
+--- !u!198 &7585665105151639777 stripped
+ParticleSystem:
+  m_CorrespondingSourceObject: {fileID: 5128357109056928162, guid: a4a75ab27839fdf4e9db6276151358b8, type: 3}
   m_PrefabInstance: {fileID: 3345655168963983683}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &3475286930214945922

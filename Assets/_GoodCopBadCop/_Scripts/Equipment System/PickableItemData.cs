@@ -15,6 +15,10 @@ public class PickableItemData : ScriptableObject
 
     public Hand hand;
     
+    [Header("Audio")]
+    [SerializeField] private AudioClip pickupSound;
+    public AudioClip PickupSound => pickupSound;
+
     [Header("Animation Data")]
     public bool usesTwoArms;
     public string pickupAnimBool;

@@ -94,7 +94,7 @@ public class DebugConsole : MonoBehaviour
             BetweenShiftTaskManager.Instance.ForceCompleteAllTasks();
         }
 
-        if (Input.GetKeyDown(KeyCode.F10))
+        if (Input.GetKeyDown(KeyCode.F7))
         {
             ShiftManager.Instance.EndIntroCutscene();
         }
