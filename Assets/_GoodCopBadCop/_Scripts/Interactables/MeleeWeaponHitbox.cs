@@ -4,8 +4,8 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Performs an OverlapSphere at the attack point and damages any enemy found within range.
-/// Attach to an AttackPoint child of the melee weapon prefab.
+/// Performs an OverlapSphere at the attack point and damages any enemy or fellow player found
+/// within range (friendly fire enabled). Attach to an AttackPoint child of the melee weapon prefab.
 /// Call <see cref="PerformHitScan"/> from the weapon owner's client; the server validates
 /// and applies damage, then notifies the owner via <see cref="OnHit"/> or
 /// <see cref="OnEnvironmentHit"/> depending on what was struck.
@@ -117,9 +117,24 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             Transform root = col.transform.root;
 
-            // Skip all player colliders.
+            // Check for a fellow player hit (friendly fire).
             if (root.CompareTag(PlayerTag))
-                continue;
+            {
+                // Skip the player who is swinging this weapon.
+                NetworkObject playerNetObj = col.GetComponentInParent<NetworkObject>();
+                if (playerNetObj != null && playerNetObj.OwnerClientId == senderClientId)
+                    continue;
+
+                PlayerHealth playerHealth = col.GetComponentInParent<PlayerHealth>();
+                if (playerHealth == null)
+                    continue;
+
+                anyNonSelfHit = true;
+                playerHealth.TakeDamage(damage);
+                Debug.Log($"[MeleeWeaponHitbox] Friendly fire: hit player '{root.name}' for {damage} damage.", this);
+                NotifyHitClientRpc(ownerParams);
+                return;
+            }
 
             anyNonSelfHit = true;
 

@@ -66,6 +66,13 @@ public class Day_01 : DayBase
     [Tooltip("The kill ink refill ShopItem — its price is temporarily set to 0 during the tutorial.")]
     [SerializeField] private ShopItem _killRefillItem;
 
+    [Header("Day 1 Suspects — Guards")]
+    [Tooltip("Suspect pool to draw from for the first three suspects on Day 1. Assign the 'Guards' SuspectSet asset.")]
+    [SerializeField] private SuspectSet _guardSuspectsSet;
+
+    [Tooltip("Number of guard suspects to place at the front of the Day 1 shift queue.")]
+    [SerializeField] private int _guardCount = 3;
+
     [Tooltip("The full suspect pool used after the tool locker tutorial ends. Assign the 'All Suspects' SuspectSet asset.")]
     [SerializeField] private SuspectSet _allSuspectsSet;
 
@@ -162,6 +169,11 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed                   += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
         FolderController.OnDocumentAdded         += _onFolderDocumentFiled;
+
+        // Override the default random population so the first suspects are always guards.
+        if (DailySuspectManager.Instance != null)
+            DailySuspectManager.Instance.PopulateSuspectOverride = PopulateDay1Suspects;
+
         // OnFolderHandedOff is subscribed inside HandOffBeat / Suspect2HandOffBeat
         // so the window is scoped exactly to when each beat needs it.
     }
@@ -179,6 +191,10 @@ public class Day_01 : DayBase
 
         // Clean up tool locker tutorial state in case the day ended mid-beat.
         CleanupToolLockerTutorial();
+
+        // Release the Day 1 suspect population override so subsequent days use the default logic.
+        if (DailySuspectManager.Instance != null)
+            DailySuspectManager.Instance.PopulateSuspectOverride = null;
 
         if (ShiftManager.Instance != null)
         {
@@ -239,6 +255,10 @@ public class Day_01 : DayBase
         {
             ShiftManager.Instance.OnDayStart   -= OnDayStarted;
         }
+
+        // Clear the population override in case OnDestroy fires before DayDeactivated.
+        if (DailySuspectManager.Instance != null)
+            DailySuspectManager.Instance.PopulateSuspectOverride = null;
 
         SuspectController.OnSuspectArrived   -= OnSuspectArrivedHandler;
         SuspectController.OnPaperworkSpawned -= _onPaperworkSpawned;
@@ -1306,6 +1326,35 @@ public class Day_01 : DayBase
 
         // Ensure the pause flag is never left set if the day ends mid-tutorial.
         ShiftManager.PauseSuspectScheduling = false;
+    }
+
+    /// <summary>
+    /// Populates the shift suspect list for Day 1: up to <see cref="_guardCount"/> randomly
+    /// selected guards from <see cref="_guardSuspectsSet"/>, with no duplicates.
+    /// Assigned to <see cref="DailySuspectManager.PopulateSuspectOverride"/> so it replaces
+    /// the default random population for this day only.
+    /// Must only be called on the server (via <see cref="DailySuspectManager.PopulateShiftCharacters"/>).
+    /// </summary>
+    private void PopulateDay1Suspects()
+    {
+        if (_guardSuspectsSet == null || _guardSuspectsSet.suspects == null || _guardSuspectsSet.suspects.Count == 0)
+        {
+            Debug.LogWarning("[Day_01] PopulateDay1Suspects: _guardSuspectsSet is not assigned or empty — shift will have no suspects.");
+            return;
+        }
+
+        var queue = DailySuspectManager.Instance.shiftSuspects;
+        var pool = new List<SuspectData>(_guardSuspectsSet.suspects);
+
+        int count = Mathf.Min(_guardCount, pool.Count);
+        for (int i = 0; i < count; i++)
+        {
+            int idx = UnityEngine.Random.Range(0, pool.Count);
+            queue.Add(pool[idx]);
+            pool.RemoveAt(idx);
+        }
+
+        Debug.Log($"[Day_01] Populated {count} guard suspect(s) for the start of the Day 1 shift.");
     }
 
     /// <summary>

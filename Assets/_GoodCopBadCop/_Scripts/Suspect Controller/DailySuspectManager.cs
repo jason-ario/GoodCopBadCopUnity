@@ -10,6 +10,13 @@ public class DailySuspectManager : MonoBehaviour
     
     public static DailySuspectManager Instance;
 
+    /// <summary>
+    /// When assigned, replaces the default random population logic entirely.
+    /// The delegate is responsible for populating <see cref="shiftSuspects"/> directly.
+    /// Set by a day subclass (e.g. Day_01) and cleared when that day deactivates.
+    /// </summary>
+    public Action PopulateSuspectOverride;
+
     private void Awake()
     {
         Instance = this;
@@ -38,11 +45,18 @@ public class DailySuspectManager : MonoBehaviour
 
     private void PopulateShiftCharacters()
     {
+        shiftSuspects.Clear();
+
+        if (PopulateSuspectOverride != null)
+        {
+            PopulateSuspectOverride.Invoke();
+            Debug.Log($"[DailySuspectManager] Shift populated via override — {shiftSuspects.Count} suspect(s).");
+            return;
+        }
+
         int suspectAmount = (int)UnityEngine.Random.Range(suspectsPerShift.x, suspectsPerShift.y);
         
         //Get random suspects and populate the shift characters
-        shiftSuspects.Clear();
-        
         List<SuspectData> randomSuspects = GetRandomSuspects(suspectAmount);
         foreach (SuspectData suspectData in randomSuspects)
         {

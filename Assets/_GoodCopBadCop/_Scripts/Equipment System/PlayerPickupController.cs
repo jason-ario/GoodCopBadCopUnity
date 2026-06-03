@@ -645,7 +645,56 @@ public class PlayerPickupController : NetworkBehaviour
         yield return new WaitForSeconds(pickUpUseCooldownTimer);
         pickUpCooldownComplete = true;
     }
-    
+
+    /// <summary>
+    /// Releases the held object from the player's hand for a throw animation without
+    /// broadcasting a drop position over the network. Unlike <see cref="DropObject"/>,
+    /// this skips <c>DropServerRpc</c> so <c>NetworkTransform</c> is never re-enabled
+    /// and DOTween retains full control of the object for the duration of the arc.
+    /// Returns the released <see cref="PickableObject"/>, or null if nothing is held.
+    /// </summary>
+    public PickableObject ReleaseHeldObjectForThrow()
+    {
+        if (_heldObject == null) return null;
+
+        PickableObject released = _heldObject;
+
+        OnPlaceObject?.Invoke();
+        pickUpCooldownComplete = false;
+
+        DisableArmIKs();
+
+        // Detach the local parent constraint so the object is free in world space.
+        released.RemoveParent();
+        released.NetworkObject.AutoObjectParentSync = true;
+
+        // Release server-side holder and ownership without calling DropServerRpc.
+        // DropServerRpc would re-enable NT and send DropBroadcastClientRpc, both of
+        // which would fight the DOTween throw arc running on the local client.
+        released.ReleaseHolderServerRpc();
+        released.ReleaseOwnershipServerRpc();
+        released.OnDropped();
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.UnequipItem(this);
+        }
+
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        _heldObjectRef.Value = default;
+        itemEquippedIndex.Value = -1;
+        _playerAnimationController.DisableRightArmMask();
+
+        ObjectPlacer.Instance.DeactivatePlacer();
+
+        return released;
+    }
+
     public void DropObject(Transform dropPoint = null)
     {
         OnPlaceObject?.Invoke();
