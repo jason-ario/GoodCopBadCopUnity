@@ -1168,7 +1168,7 @@ public class Day_01 : DayBase
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);
 
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(6f);
 
         yield return ShowAndWait("Your stamps are running low. Head to the tool locker and restock.");
 
@@ -1209,22 +1209,16 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
 
-        // Ring the telephone to deliver the trash task.
+        // Ring the telephone to deliver the trash task via the phone call system.
         // The player must pick up the phone to receive it; the call times out after 20 s if ignored.
         // TriggerCall is server-only and this coroutine is already guarded to run on the server.
         if (Telephone.Instance != null)
             Telephone.Instance.TriggerCall(_trashTaskCallIndex);
         else
-            Debug.LogWarning("[Day_01] Telephone.Instance is null — falling back to TriggerAddShiftTasks.");
+            Debug.LogWarning("[Day_01] Telephone.Instance is null — trash task call skipped.");
 
         // Unlock the exit door — the tutorial gating is over.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
-
-        yield return new WaitForSeconds(4f);
-
-        yield return ShowAndWait("Bring the trash bags to the dumpster. They are scattered throughout the yard.");
-        yield return new WaitForSeconds(2f);
-        yield return ShowAndWait("Press Tab to open your guidebook. Your tasks and everything you need to do your job are inside.");
 
         // Remove the tutorial interval override so subsequent suspects arrive at the
         // normal paced intervals configured in ShiftManager rather than the compressed

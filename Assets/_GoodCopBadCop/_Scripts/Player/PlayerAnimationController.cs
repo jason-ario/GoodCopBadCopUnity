@@ -390,7 +390,7 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         SetAnimBool("Waving", true);
         yield return new WaitForSeconds(1);
-        SetAnimBool("Wavings", false);
+        SetAnimBool("Waving", false);
     }
 
     public override void OnNetworkSpawn()

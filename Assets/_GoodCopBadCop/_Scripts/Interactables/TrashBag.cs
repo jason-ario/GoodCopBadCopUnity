@@ -1,3 +1,5 @@
+using DG.Tweening;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -16,4 +18,22 @@ public class TrashBag : PickableObject
 {
     // All pickup / drop / networking behaviour is inherited from PickableObject.
     // DumpsterInteractable identifies this type to accept bag deposits.
+
+    /// <summary>
+    /// Broadcasts a DOTween throw arc to all clients so onlooker clients also see
+    /// the bag fly into the dumpster rather than disappearing from mid-air.
+    /// Called by DumpsterInteractable after ReleaseHeldObjectForThrow() on the
+    /// throwing client; runs on every client including the thrower.
+    /// </summary>
+    /// <param name="targetPosition">World-space landing point inside the dumpster.</param>
+    /// <param name="jumpHeight">Peak height of the arc above the straight-line path.</param>
+    /// <param name="jumpDuration">Total arc duration in seconds.</param>
+    /// <param name="ease">DOTween Ease cast to int for RPC serialization.</param>
+    [ClientRpc]
+    public void PlayThrowArcClientRpc(Vector3 targetPosition, float jumpHeight, float jumpDuration, int ease)
+    {
+        transform.DOKill();
+        transform.DOJump(targetPosition, jumpHeight, numJumps: 1, jumpDuration)
+                 .SetEase((Ease)ease);
+    }
 }

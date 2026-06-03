@@ -199,15 +199,12 @@ public class DumpsterInteractable : Interactable
         // ── 5. Windup delay before the bag visually moves ─────────────────────
         yield return new WaitForSeconds(_throwWindupDelay);
 
-        // ── 6. DOJump the bag to the target ───────────────────────────────────
-        bool jumpDone = false;
+        // ── 6. Broadcast the throw arc to ALL clients ─────────────────────────
+        // PlayThrowArcClientRpc runs DOJump on every client (including the
+        // local one) so onlookers see the arc instead of the bag disappearing.
+        depositedBag.PlayThrowArcClientRpc(target.position, _jumpHeight, _jumpDuration, (int)_jumpEase);
 
-        depositedBag.transform
-            .DOJump(target.position, _jumpHeight, numJumps: 1, _jumpDuration)
-            .SetEase(_jumpEase)
-            .OnComplete(() => jumpDone = true);
-
-        yield return new WaitUntil(() => jumpDone);
+        yield return new WaitForSeconds(_jumpDuration);
 
         // ── 7. Deposit feedback ───────────────────────────────────────────────
         PlayDepositAudio();
