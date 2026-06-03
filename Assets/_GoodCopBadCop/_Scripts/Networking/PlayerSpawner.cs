@@ -120,4 +120,15 @@ public class PlayerSpawner : NetworkBehaviour
         int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
         return multiplayerSpawnPoints[index];
     }
+
+    /// <summary>
+    /// Returns the outside (lobby) spawn point used when transitioning between days.
+    /// Players are placed here after the end-of-shift report so they re-enter the booth
+    /// themselves to begin the next shift.
+    /// </summary>
+    public Transform GetOutsideSpawnPoint(ulong clientId)
+    {
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        return GetLobbySpawnPoint(clientId, isSinglePlayer);
+    }
 }

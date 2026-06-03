@@ -444,9 +444,9 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>
     /// Called when the player presses Continue on the end-of-shift report.
-    /// Fades the screen, re-enables player movement, and begins the between-shift
-    /// night phase. The shift-start button becomes pressable only after all tasks
-    /// are completed and <see cref="BetweenShiftTaskManager.OnAllTasksComplete"/> fires.
+    /// Fades the screen, resets all shift state, advances to the next campaign day,
+    /// and places the player back at their outside spawn so they walk into the booth
+    /// to start the next shift.
     /// </summary>
     public void StartInBetweenShiftSequence()
     {
@@ -455,38 +455,38 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>
     /// Registers tasks in GuidebookTaskRegistry and notifies all clients.
-    /// Called after the between-shift sequence to activate tasks in the guidebook.
+    /// Called mid-shift to activate tasks in the guidebook and HUD.
     /// </summary>
-    public void TriggerBeginNightPhase()
+    public void TriggerAddShiftTasks()
     {
         if (IsServer)
-            BeginNightPhaseOnServer();
+            AddShiftTasksOnServer();
         else
-            BeginNightPhaseServerRpc();
+            AddShiftTasksServerRpc();
     }
 
-    private void BeginNightPhaseOnServer()
+    private void AddShiftTasksOnServer()
     {
         _taskCompletedCount = 0;
 
         if (BetweenShiftTaskManager.Instance != null)
-            BetweenShiftTaskManager.Instance.BeginNightPhase();
+            BetweenShiftTaskManager.Instance.ActivateTasks();
 
-        BeginNightPhaseClientRpc();
+        AddShiftTasksClientRpc();
     }
 
     [ClientRpc]
-    private void BeginNightPhaseClientRpc()
+    private void AddShiftTasksClientRpc()
     {
-        if (IsServer) return; // Host already ran BeginNightPhase above.
+        if (IsServer) return; // Host already ran ActivateTasks above.
         if (BetweenShiftTaskManager.Instance != null)
-            BetweenShiftTaskManager.Instance.BeginNightPhase();
+            BetweenShiftTaskManager.Instance.ActivateTasks();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void BeginNightPhaseServerRpc()
+    private void AddShiftTasksServerRpc()
     {
-        BeginNightPhaseOnServer();
+        AddShiftTasksOnServer();
     }
 
     /// <summary>Routes a task-complete notification to the server for authoritative counting.</summary>
@@ -519,15 +519,33 @@ public class ShiftManager : NetworkBehaviour
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(1.5f);
         UIController.Instance.HideEndOfShiftReport();
+
+        // Reset all shift state for the new day.
+        ResetShiftData();
+        ResetEnvironment();
+        ResetSuspectsProcessed();
+        SuspectController.Instance.ResetSuspects();
+
+        // Advance to the next campaign day — server-only; propagates to clients via NetworkVariable.
+        if (IsServer)
+            CampaignManager.Instance.AdvanceDay();
+
+        // Teleport the local player to their outside spawn while the screen is dark.
+        if (PlayerInstance.Instance != null)
+        {
+            Transform outsideSpawn = PlayerSpawner.Instance.GetOutsideSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+            PlayerInstance.Instance.SetPosition(outsideSpawn);
+            PlayerInstance.Instance.SetIsOutside(true);
+        }
+
         yield return new WaitForSeconds(0.5f);
         UIController.Instance.FadeOut();
         yield return new WaitForSeconds(1f);
 
         EnablePlayerControl();
-
         OnDoorUnlock?.Invoke();
-
-        MegaphoneDialogueManager.Instance.SayEndOfShiftDialogue();
+        OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
     }
 
     [ClientRpc]
@@ -589,7 +607,7 @@ public class ShiftManager : NetworkBehaviour
     {
         PlayerPrefs.SetInt("dayNumber", _currentDay);
 
-        if (DebugConsole.Instance.skipInitialShiftTransition)
+        if (DebugConsole.Instance.skipInitialShiftTransition || DebugConsole.Instance.autoStart)
         {
             introCutscene.gameObject.SetActive(false);
             UIController.Instance.HideEndOfShiftReport();

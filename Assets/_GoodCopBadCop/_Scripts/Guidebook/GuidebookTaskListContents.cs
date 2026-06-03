@@ -20,11 +20,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
     [Tooltip("Shown when there are no active tasks.")]
     [SerializeField] private TextMeshProUGUI _fallbackLabel;
 
-    [Tooltip("Root container to toggle off/on after a task change to force the render texture to refresh.")]
-    [SerializeField] private GameObject _renderTextureContainer;
-
     private readonly List<GuidebookTaskRow> _rows = new();
-    private Coroutine _renderRefreshCoroutine;
 
     private void Awake()
     {
@@ -51,8 +47,8 @@ public class GuidebookTaskListContents : GuidebookPageContents
     }
 
     /// <summary>
-    /// Rebuilds rows then toggles the render texture container off and back on so the
-    /// render texture picks up the new content.
+    /// Rebuilds rows then triggers a render texture refresh so the
+    /// render camera recaptures the new content.
     /// </summary>
     private void OnTaskListChangedHandler()
     {
@@ -61,35 +57,13 @@ public class GuidebookTaskListContents : GuidebookPageContents
     }
 
     /// <summary>
-    /// Toggles <see cref="_renderTextureContainer"/> off for one frame then back on,
-    /// forcing the render texture to update with the latest UI state.
-    /// Any in-flight refresh is cancelled before starting a new one.
-    /// When this object is inactive the refresh is deferred — <see cref="OnEnable"/>
-    /// will call this again once the guidebook opens and the component is active.
+    /// Delegates to <see cref="GuidebookContentsContainer.TriggerRender"/> so the
+    /// render texture cameras recapture the latest UI state. Safe to call while
+    /// this component is inactive — the container MonoBehaviour is always active.
     /// </summary>
     private void TriggerRenderTextureRefresh()
     {
-        if (_renderTextureContainer == null) return;
-
-        // Cannot start a coroutine while inactive. OnEnable calls TriggerRenderTextureRefresh
-        // when the guidebook opens, so the refresh will run at the correct time.
-        if (!isActiveAndEnabled) return;
-
-        if (_renderRefreshCoroutine != null)
-            StopCoroutine(_renderRefreshCoroutine);
-
-        _renderRefreshCoroutine = StartCoroutine(RenderTextureRefreshCoroutine());
-    }
-
-    private IEnumerator RenderTextureRefreshCoroutine()
-    {
-        // Wait for the end of the current frame so VerticalLayoutGroup has time to
-        // position newly instantiated rows before the render texture camera captures them.
-        yield return new WaitForEndOfFrame();
-        _renderTextureContainer.SetActive(false);
-        yield return null;
-        _renderTextureContainer.SetActive(true);
-        _renderRefreshCoroutine = null;
+        GuidebookContentsContainer.Instance?.TriggerRender();
     }
 
     /// <summary>

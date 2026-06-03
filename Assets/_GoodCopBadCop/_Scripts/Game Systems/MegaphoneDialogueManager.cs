@@ -64,13 +64,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// </summary>
     public bool IsSpeakingSynced => _isSpeakingNetwork.Value;
 
-    // Set when the night-phase tasks are all done; consumed by OnShiftReady so the bark
-    // only fires after a real between-shift task cycle, not on the initial day start.
-    private bool _betweenShiftTasksCompleted;
-
-    // Guards the one-time trash task hint so it only fires the first time the task is introduced.
-    private bool _trashTaskHintShown;
-
     // Guards the one-time guidebook hint so it only fires the first time the guidebook is opened.
     private bool _guidebookHintShown;
 
@@ -88,10 +81,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         _barkCanvas.SetActive(false);
 
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
-        ShiftManager.Instance.OnShiftReady += OnShiftReady;
         GameManager.Instance.OnGameStart += OnGameStart;
 
-        BetweenShiftTaskManager.OnAllTasksComplete += OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
         GuidebookController.OnGuidebookOpened += OnGuidebookOpened;
     }
@@ -101,13 +92,11 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         if (ShiftManager.Instance != null)
         {
             ShiftManager.Instance.OnShiftStart -= OnShiftStart;
-            ShiftManager.Instance.OnShiftReady -= OnShiftReady;
         }
 
         if (GameManager.Instance != null)
             GameManager.Instance.OnGameStart -= OnGameStart;
 
-        BetweenShiftTaskManager.OnAllTasksComplete -= OnAllTasksComplete;
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
         GuidebookController.OnGuidebookOpened -= OnGuidebookOpened;
     }
@@ -153,21 +142,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         ShowDialogue("But to give you the best shot, I'll be here to help out.");
     }
 
-    private void OnShiftReady()
-    {
-        // Only bark after a real night-phase task cycle, not on the initial day start
-        // where OnShiftReady fires solely to prime the switch button.
-        if (!_betweenShiftTasksCompleted) return;
-
-        _betweenShiftTasksCompleted = false;
-        ShowDialogue("All tasks completed, return to the booth for the next shift.");
-    }
-
-    private void OnAllTasksComplete()
-    {
-        _betweenShiftTasksCompleted = true;
-    }
-
     private void OnGuidebookOpened()
     {
         if (_guidebookHintShown) return;
@@ -186,77 +160,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // Scripted Sequences (called by ShiftManager or CampaignManager)
     // ---------------------------------------------------------------------------
 
-    /// <summary>
-    /// Plays when the end-of-shift report is dismissed.
-    /// Delivers the end-of-shift barks and then triggers the night phase on ShiftManager
-    /// after the task announcement, preserving the original deferred timing.
-    /// </summary>
-    public void SayEndOfShiftDialogue()
-    {
-        StartCoroutine(EndOfShiftDialogueSequence());
-    }
-
-    private IEnumerator EndOfShiftDialogueSequence()
-    {
-        ShowDialogue("Your shift is over.");
-        yield return new WaitUntil(() => !_isSpeaking);
-        yield return new WaitForSeconds(3f);
-
-        ShowDialogue("Complete your tasks to prepare for your next shift.");
-        yield return new WaitUntil(() => !_isSpeaking);
-        yield return new WaitForSeconds(2f);
-
-        AnnounceNewTask();
-    }
-
-    /// <summary>
-    /// Shows the new task notification via PlayerTutorialUI, then triggers the night phase
-    /// after a short delay so the guidebook badge activates in sync with the bark.
-    /// </summary>
-    private void AnnounceNewTask()
-    {
-        StartCoroutine(AnnounceNewTaskCoroutine());
-    }
-
-    private IEnumerator AnnounceNewTaskCoroutine()
-    {
-        if (PlayerTutorialUI.Instance != null)
-            PlayerTutorialUI.Instance.ShowTextOnly("New task: Take out the trash.");
-
-        yield return new WaitForSeconds(4f);
-
-        ShiftManager.Instance.TriggerBeginNightPhase();
-
-        if (!_trashTaskHintShown)
-        {
-            _trashTaskHintShown = true;
-            yield return new WaitForSeconds(3f);
-            ShowDialogue("Bring the trash bags to the dumpster. They are scattered throughout the yard.");
-            yield return new WaitUntil(() => !_isSpeaking);
-            yield return new WaitForSeconds(3f);
-            ShowDialogue("Press Tab to open your guidebook. Your tasks and everything you need to do your job are inside.");
-        }
-    }
-
-    /// <summary>Played when between-shift tasks are all done and the booth is ready.</summary>
-    public void SayBetweenShiftReady()
-    {
-        ShowDialogue("You may now prepare for your next shift.");
-    }
-
-    /// <summary>Played as an immediate prompt to start the next shift.</summary>
-    public void SayBeginShiftNow()
-    {
-        ShowDialogue("Begin your next shift immediately.");
-    }
-
-    /// <summary>Shown when a player tries to leave the booth during a locked shift.</summary>
-    public void SayDoorLocked(string[] lines)
-    {
-        if (lines == null || lines.Length == 0) return;
-        ShowDialogue(lines[UnityEngine.Random.Range(0, lines.Length)]);
-    }
-
     /// <summary>Shown when the shift clock-out is ready.</summary>
     public void SayClockOutReady()
     {
@@ -267,6 +170,13 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     public void SayNotAllInside()
     {
         ShowDialogue("All inspectors must be inside the booth to begin the shift.");
+    }
+
+    /// <summary>Shown when a player tries to leave the booth during a locked shift.</summary>
+    public void SayDoorLocked(string[] lines)
+    {
+        if (lines == null || lines.Length == 0) return;
+        ShowDialogue(lines[UnityEngine.Random.Range(0, lines.Length)]);
     }
 
     // ---------------------------------------------------------------------------
@@ -283,7 +193,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
                 // Handled via OnShiftStart → Day1WelcomeBarkSequence on the first day.
                 break;
             case TutorialStep.NightTasksExplained:
-                SayBetweenShiftReady();
                 break;
         }
     }
@@ -478,15 +387,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     private void ShowPlayerTutorialTextClientRpc(string text)
     {
         PlayerTutorialUI.Instance?.ShowTextOnly(text);
-    }
-
-    /// <summary>
-    /// Marks the one-time trash task hint as already shown so it is not repeated
-    /// when the end-of-shift dialogue runs (e.g. because Day_01 showed it during the shift).
-    /// </summary>
-    public void MarkTrashTaskHintShown()
-    {
-        _trashTaskHintShown = true;
     }
 
     /// <summary>

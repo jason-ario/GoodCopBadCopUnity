@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// Local manager for the between-shift night-phase task list.
+/// Local manager for the shift task list.
 /// Tracks task completion and notifies ShiftManager when all tasks are done.
 /// Plain MonoBehaviour — no NetworkObject required. Each client manages its own
 /// registry; ShiftManager handles the networked all-tasks-complete broadcast.
@@ -50,10 +50,10 @@ public class BetweenShiftTaskManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Resets all tasks and populates GuidebookTaskRegistry for the new night phase.
+    /// Resets all tasks and populates GuidebookTaskRegistry for the new task set.
     /// Call this on every client — typically via ShiftManager.
     /// </summary>
-    public void BeginNightPhase()
+    public void ActivateTasks()
     {
         _completedTaskCount = 0;
         _allTasksComplete = false;
@@ -64,15 +64,36 @@ public class BetweenShiftTaskManager : MonoBehaviour
         if (GuidebookTaskRegistry.Instance != null)
             GuidebookTaskRegistry.Instance.SetTasks(_tasks);
 
-        Debug.Log($"[BetweenShiftTaskManager] Night phase begun. {_tasks.Length} task(s) registered.");
+        Debug.Log($"[BetweenShiftTaskManager] Tasks activated. {_tasks.Length} task(s) registered.");
+    }
+
+    /// <summary>
+    /// Resets task counters and calls <see cref="IBetweenShiftTask.ResetTask"/> on every registered
+    /// task without touching <see cref="GuidebookTaskRegistry"/>.
+    /// Use this when tasks are delivered via the telephone — the registry is populated separately
+    /// by <see cref="Telephone"/> when the player answers the call.
+    /// </summary>
+    public void ResetTaskPhysics()
+    {
+        _completedTaskCount = 0;
+        _allTasksComplete = false;
+
+        foreach (var task in _tasks)
+            task?.ResetTask();
+
+        Debug.Log($"[BetweenShiftTaskManager] Task physics reset. {_tasks.Length} task(s) prepared.");
     }
 
     /// <summary>
     /// Called by individual task scripts when their task is completed.
-    /// Routes to the server via ShiftManager to keep the completion count authoritative.
+    /// Awards the task's coupon reward to the shared money pool (server-only),
+    /// then routes the completion count to the server via ShiftManager.
     /// </summary>
     public void NotifyTaskComplete(IBetweenShiftTask task)
     {
+        if (task.CouponReward > 0 && GlobalHostVariables.Instance != null)
+            GlobalHostVariables.Instance.AddMoney(task.CouponReward);
+
         ShiftManager.Instance.NotifyTaskCompleteServerRpc();
     }
 

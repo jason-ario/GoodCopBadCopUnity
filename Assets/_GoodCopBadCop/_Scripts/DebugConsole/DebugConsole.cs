@@ -20,6 +20,13 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Skips straight to after the shift ends — triggers EndShift and auto-dismisses the report, landing in the night phase with tasks assigned.")]
     public bool skipToAfterShift;
 
+    [Tooltip("Starts as host, creates a lobby, and begins a new shift automatically. Skips the entire main menu and lobby flow and lands you in the game with the player spawned.")]
+    public bool autoStart;
+
+    [Header("Telephone Debug")]
+    [Tooltip("Index into Telephone._availableTasks to deliver when pressing F4.")]
+    [SerializeField] private int _debugPhoneTaskIndex = 0;
+
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
 
@@ -39,13 +46,16 @@ public class DebugConsole : MonoBehaviour
     
     private void Start()
     {
-        if (skipToBoothReady || skipToAfterShift)
+        if (skipToBoothReady || skipToAfterShift || autoStart)
         {
             NetworkManager.Singleton.StartHost();
             LobbyManager.Instance.CreateLobby();
             GameManager.Instance.TryStartGame(true);
-            // SkipToBoothReady() / DebugSkipToAfterShift() are deferred to ShiftManager.OnNetworkSpawn
-            // so all NetworkObjects are spawned and ClientRpcs are safe to send.
+
+            if (autoStart)
+                GameManager.Instance.OnGameStart += OnGameStartAutoStart;
+
+            // Deferred skip logic runs in ShiftManager.OnNetworkSpawn once all NetworkObjects are ready.
             return;
         }
 
@@ -82,6 +92,12 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F2))
         {
             SkipToDay(2);
+        }
+
+        // F4 — trigger an incoming telephone call with the configured task index.
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            TriggerDebugPhoneCall();
         }
 
         if (Input.GetKeyDown(KeyCode.F8))
@@ -122,6 +138,34 @@ public class DebugConsole : MonoBehaviour
             _isFastForwarding = false;
             Time.timeScale = 1f;
         }
+    }
+
+    /// <summary>
+    /// Called once by <see cref="GameManager.OnGameStart"/> after the lobby join sequence
+    /// completes and the player is fully spawned. Starts the shift and unsubscribes immediately.
+    /// </summary>
+    private void OnGameStartAutoStart()
+    {
+        GameManager.Instance.OnGameStart -= OnGameStartAutoStart;
+        ShiftManager.Instance.StartNewShift();
+    }
+
+    /// <summary>
+    /// Triggers the telephone ring for testing. If tasks are configured, delivers the task at
+    /// <see cref="_debugPhoneTaskIndex"/> via the full call flow. Otherwise falls back to
+    /// <see cref="Telephone.DebugStartRing"/> so the audio and animation can be tested without
+    /// any <see cref="PhoneTaskData"/> assets assigned.
+    /// </summary>
+    private void TriggerDebugPhoneCall()
+    {
+        if (Telephone.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] Telephone.Instance not found — is the phone spawned in the scene?");
+            return;
+        }
+
+        Telephone.Instance.DebugStartRing();
+        Debug.Log("[DebugConsole] Phone ring triggered (audio + animation test). Assign PhoneTaskData to _availableTasks for the full call flow).");
     }
 
     /// <summary>

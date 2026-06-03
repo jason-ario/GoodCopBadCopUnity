@@ -79,6 +79,10 @@ public class Day_01 : DayBase
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 1.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
+    [Header("Day 1 — Phone Task Delivery")]
+    [Tooltip("Index into Telephone._availableTasks that maps to the 'Take Out the Trash' PhoneTaskData.")]
+    [SerializeField] private int _trashTaskCallIndex = 0;
+
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
     private PickableObject _tutorialAppForm;
@@ -1180,10 +1184,13 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
 
-        // Introduce the between-shift task system immediately after the tool shop sequence.
-        // Show the new-task notification on all clients, then unlock the door so the shift
-        // continues uninterrupted while the hint barks play.
-        MegaphoneDialogueManager.Instance.ShowPlayerTutorialTextSynced("New task: Take out the trash.");
+        // Ring the telephone to deliver the trash task.
+        // The player must pick up the phone to receive it; the call times out after 20 s if ignored.
+        // TriggerCall is server-only and this coroutine is already guarded to run on the server.
+        if (Telephone.Instance != null)
+            Telephone.Instance.TriggerCall(_trashTaskCallIndex);
+        else
+            Debug.LogWarning("[Day_01] Telephone.Instance is null — falling back to TriggerAddShiftTasks.");
 
         // Unlock the exit door — the tutorial gating is over.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
@@ -1193,9 +1200,6 @@ public class Day_01 : DayBase
         yield return ShowAndWait("Bring the trash bags to the dumpster. They are scattered throughout the yard.");
         yield return new WaitForSeconds(2f);
         yield return ShowAndWait("Press Tab to open your guidebook. Your tasks and everything you need to do your job are inside.");
-
-        // Mark the hint as shown so it is not repeated when the shift eventually ends.
-        MegaphoneDialogueManager.Instance.MarkTrashTaskHintShown();
 
         // Remove the tutorial interval override so subsequent suspects arrive at the
         // normal paced intervals configured in ShiftManager rather than the compressed

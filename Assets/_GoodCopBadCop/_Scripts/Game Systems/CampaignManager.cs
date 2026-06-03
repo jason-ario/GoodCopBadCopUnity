@@ -165,7 +165,7 @@ public class CampaignManager : NetworkBehaviour
 
     /// <summary>
     /// Advances to the next campaign day. Server-only; propagates to clients via NetworkVariable.
-    /// Call this after all night-phase tasks are complete.
+    /// Call this after all shift tasks are complete or when transitioning between days.
     /// </summary>
     public void AdvanceDay()
     {
@@ -185,6 +185,7 @@ public class CampaignManager : NetworkBehaviour
             return;
         }
 
+        SaveDataManager.Instance.CurrentDay = nextDay;
         _networkCurrentDay.Value = nextDay;
         // Server applies immediately; clients apply via OnNetworkDayChanged.
         ApplyDay(nextDay);
