@@ -320,6 +320,8 @@ public class SuspectController : NetworkBehaviour
         string entryDialogue = suspectCharacter.GetEntryDialogue();
         DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
 
+        suspectCharacter.GetComponent<SuspectBarkController>()?.BeginBarkSchedule();
+
         if (suspectCharacter.Data.GivesPaperwork)
         {
             suspectCharacter.GivePaperwork();
@@ -896,6 +898,8 @@ public class SuspectController : NetworkBehaviour
     private void ExecuteVerdict(FolderController folder)
     {
         if (!IsServer) return;
+
+        suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();
 
         spawnedFolder = folder;
         accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);

@@ -341,6 +341,11 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             ShrugEmote();
         }
+        
+        if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            WaveEmote();
+        }
 
         // Snapshot the IK-solved elbow world position before any lean modifies spine bones.
         // After ApplyLocalBodyLean shifts the shoulder forward, SolveTwoBoneIK re-aims the arm
@@ -375,6 +380,18 @@ public class PlayerAnimationController : NetworkBehaviour
         yield return new WaitForSeconds(1);
         SetAnimBool("Shrug", false);
     }
+    
+    void WaveEmote()
+    {
+        StartCoroutine(WaveEmoteCoroutine());
+    }
+
+    IEnumerator WaveEmoteCoroutine()
+    {
+        SetAnimBool("Waving", true);
+        yield return new WaitForSeconds(1);
+        SetAnimBool("Wavings", false);
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -388,6 +405,9 @@ public class PlayerAnimationController : NetworkBehaviour
         // All clients (including the owner) react to guidebook open state changes so the
         // body-space guidebook mesh can be shown or hidden correctly on every machine.
         netGuidebookOpen.OnValueChanged += OnNetGuidebookOpenChanged;
+
+        // Subscribe to the local player spoke event so talking animations fire on dialogue choices.
+        DialogueChoiceSystem.OnLocalPlayerSpoke += OnLocalPlayerSpoke;
 
         // Cache bones used for procedural vertical-look rotation on both owner and proxies.
         _headBone          = bodyAnimator.GetBoneTransform(HumanBodyBones.Head);
@@ -437,6 +457,8 @@ public class PlayerAnimationController : NetworkBehaviour
             netRightArmRigActive.OnValueChanged -= OnProxyRightArmRigActiveChanged;
 
         netGuidebookOpen.OnValueChanged -= OnNetGuidebookOpenChanged;
+
+        DialogueChoiceSystem.OnLocalPlayerSpoke -= OnLocalPlayerSpoke;
     }
 
     /// <summary>
@@ -1070,4 +1092,27 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         targetLayer4Weight = 0;
     }
+
+    #region Talking Animations
+
+    private static readonly string[] TalkTriggers = { "Talk1", "Talk2", "Talk3" };
+
+    /// <summary>
+    /// Fires a random talking animation trigger on both body and arms animators.
+    /// Called automatically when the local player selects a dialogue choice.
+    /// </summary>
+    public void TriggerTalkAnimation()
+    {
+        string trigger = TalkTriggers[Random.Range(0, TalkTriggers.Length)];
+        bodyAnimator.SetTrigger(trigger);
+        armsAnimator.SetTrigger(trigger);
+    }
+
+    private void OnLocalPlayerSpoke()
+    {
+        if (!IsLocalPlayer) return;
+        TriggerTalkAnimation();
+    }
+
+    #endregion
 }

@@ -96,6 +96,17 @@ public class SuspectData : ScriptableObject
 
     public QuestionResponseSet[] questionResponses;
 
+    [System.Serializable]
+    public struct BarkSet
+    {
+        [TextArea(1, 3)] public string[] earlyDays;
+        [TextArea(1, 3)] public string[] midDays;
+        [TextArea(1, 3)] public string[] finalDays;
+    }
+
+    [Header("Idle Barks — Random ambient lines while at the booth")]
+    public BarkSet idleBarks;
+
     public string IDNumber;
 
     [ContextMenu("Set Random ID Number")]

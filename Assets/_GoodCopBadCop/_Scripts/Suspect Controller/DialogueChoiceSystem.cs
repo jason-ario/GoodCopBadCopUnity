@@ -1,9 +1,16 @@
+using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 public class DialogueChoiceSystem : NetworkBehaviour
 {
+    /// <summary>
+    /// Fired on the local client immediately when the local player selects a dialogue choice.
+    /// Subscribe in <see cref="PlayerTalkingAnimationController"/> to trigger talking animations.
+    /// </summary>
+    public static event Action OnLocalPlayerSpoke;
+
     [SerializeField] DialogueChoice[] dialogueChoices;
     [SerializeField] private GameObject dialogueChoiceContainer;
     [SerializeField] private Subtitles subtitlesPrefab;
@@ -29,6 +36,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void ChooseDialogueChoice(int choiceIndex)
     { 
         CloseDialogueChoices();
+        OnLocalPlayerSpoke?.Invoke();
         string playerName = GetPlayerName();
 
         // Log locally for the sending player — other clients log via SpawnSubtitles ClientRpc
