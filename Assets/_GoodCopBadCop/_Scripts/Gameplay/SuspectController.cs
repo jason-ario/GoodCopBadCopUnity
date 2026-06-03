@@ -72,6 +72,8 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] int couponPerCorrectAnomaly = 3;
     [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
+    /// <summary>Base reward scaled by accuracy percentage. Guarantees a payout at 100% even with 0 anomalies.</summary>
+    [SerializeField] int couponBaseReward = 5;
     
     private void Awake()
     {
@@ -556,7 +558,7 @@ public class SuspectController : NetworkBehaviour
 
 
     /// <summary>
-    /// Calculates payout values based solely on anomaly identification, credits the shared
+    /// Calculates payout values based on percentage accuracy and anomaly count, credits the shared
     /// cash pool on the server, and broadcasts popup notifications to every connected client.
     /// Must only be called on the server.
     /// </summary>
@@ -564,31 +566,43 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        int correctAnomalyBonus = correctlyMarkedAnomalies * couponPerCorrectAnomaly;
+        // Accuracy: 0/0 is treated as 100%. False positives widen the denominator, reducing the score.
+        int totalPossible = totalAnomaliesInLastSuspect + incorrectlyMarkedAnomalies;
+        int accuracyPercent = totalPossible > 0
+            ? Mathf.Max(0, (correctlyMarkedAnomalies * 100) / totalPossible)
+            : 100;
+
+        // Base reward scaled linearly by accuracy — ensures a positive payout at 100% even when
+        // there are 0 anomalies (e.g. clean suspect correctly passed through).
+        int percentageReward = Mathf.RoundToInt(accuracyPercent / 100f * couponBaseReward);
+
+        // Anomaly booster — each correctly identified anomaly contributes extra coupons,
+        // so suspects with many anomalies yield a higher potential reward ceiling.
+        int anomalyBooster = correctlyMarkedAnomalies * couponPerCorrectAnomaly;
+
+        // Penalties for missed anomalies and false positives.
         int missedAnomalyPenalty = (totalAnomaliesInLastSuspect - correctlyMarkedAnomalies) * couponPenaltyPerMissedAnomaly;
         int falsePositivePenalty = incorrectlyMarkedAnomalies * couponPenaltyPerFalsePositiveAnomaly;
+
+        // Combined anomaly payout shown in the first popup: percentage base + booster – penalties.
+        int anomalyPayout = percentageReward + anomalyBooster - missedAnomalyPenalty - falsePositivePenalty;
+
+        // Perfect identification bonus — only awarded when every anomaly is found and no false positives exist.
         int perfectBonusAmount = (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
             ? couponPerfectAnomaliesBonus
             : 0;
 
-        int totalCoupons = correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty + perfectBonusAmount;
-
-        int accuracyPercent = 100;
-        if (totalAnomaliesInLastSuspect > 0 || incorrectlyMarkedAnomalies > 0)
-        {
-            int totalToIdentify = totalAnomaliesInLastSuspect + incorrectlyMarkedAnomalies;
-            accuracyPercent = totalToIdentify > 0 ? (correctlyMarkedAnomalies * 100) / totalToIdentify : 100;
-        }
+        int totalCoupons = anomalyPayout + perfectBonusAmount;
 
         // Credit the shared pool — server-authoritative write.
         GlobalHostVariables.Instance.AddMoney(totalCoupons);
 
         Debug.Log(
-            $"Payout — Correct: +{correctAnomalyBonus}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total: {totalCoupons}");
+            $"Payout — Accuracy: {accuracyPercent}%, Base%: +{percentageReward}, Anomaly Booster: +{anomalyBooster}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total: {totalCoupons}");
 
         // Broadcast popup sequence to all clients.
         ShowCashPopUpSequenceClientRpc(
-            correctAnomalyBonus - missedAnomalyPenalty - falsePositivePenalty,
+            anomalyPayout,
             accuracyPercent,
             correctlyMarkedAnomalies,
             totalAnomaliesInLastSuspect,

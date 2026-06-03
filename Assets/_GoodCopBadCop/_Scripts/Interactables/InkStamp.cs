@@ -61,8 +61,12 @@ public class InkStamp : Interactable, IPickupSlot
         }
         else
         {
-            // On clients, the NetworkVariable may already be populated if we joined late.
-            TryResolveSpawnedStamp(_spawnedStampRef.Value);
+            // On clients, the NetworkVariable may already be populated if we joined late —
+            // but the referenced NetworkObject may not yet be registered on this client if it
+            // arrives later in the same spawn snapshot. Start a coroutine to retry every frame
+            // until the reference resolves so client interactions never silently fail.
+            if (!TryResolveSpawnedStamp(_spawnedStampRef.Value))
+                StartCoroutine(RetryResolveSpawnedStamp());
         }
     }
 
@@ -100,14 +104,20 @@ public class InkStamp : Interactable, IPickupSlot
 
     private void OnSpawnedStampRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
     {
-        TryResolveSpawnedStamp(current);
+        if (!TryResolveSpawnedStamp(current))
+            StartCoroutine(RetryResolveSpawnedStamp());
     }
 
-    private void TryResolveSpawnedStamp(NetworkObjectReference stampRef)
+    /// <summary>
+    /// Attempts to resolve the spawned stamp pickup from a <see cref="NetworkObjectReference"/>.
+    /// Returns true when the reference is successfully resolved.
+    /// Returns false when the NetworkObject is not yet registered on this client (may retry later).
+    /// </summary>
+    private bool TryResolveSpawnedStamp(NetworkObjectReference stampRef)
     {
-        if (!stampRef.TryGet(out NetworkObject stampNetObj)) return;
+        if (!stampRef.TryGet(out NetworkObject stampNetObj)) return false;
         PickableObject stamp = stampNetObj.GetComponent<PickableObject>();
-        if (stamp == null) return;
+        if (stamp == null) return false;
 
         spawnedInkStamp = stamp;
         // CanPickUpManually must be false so the player cannot grab the pickup directly —
@@ -115,6 +125,26 @@ public class InkStamp : Interactable, IPickupSlot
         // Collider state is authoritative via _networkInteractableOverride (set by
         // LockInteractableNetworked in SpawnInkStamp), so no local SetInteractable call needed.
         stamp.CanPickUpManually = false;
+        return true;
+    }
+
+    /// <summary>
+    /// Retries stamp resolution once per frame until it succeeds.
+    /// This handles the NGO race where <see cref="_spawnedStampRef"/> already holds its final
+    /// value when the client's <see cref="OnNetworkSpawn"/> fires, but the referenced
+    /// <see cref="NetworkObject"/> has not yet been registered on this client (it arrives
+    /// later in the same snapshot). Because the NetworkVariable does not change after this
+    /// point, <see cref="OnSpawnedStampRefChanged"/> never fires — without this retry,
+    /// <see cref="spawnedInkStamp"/> would remain null and client interactions with the
+    /// stamp slot would silently fail.
+    /// </summary>
+    private System.Collections.IEnumerator RetryResolveSpawnedStamp()
+    {
+        while (spawnedInkStamp == null)
+        {
+            yield return null;
+            TryResolveSpawnedStamp(_spawnedStampRef.Value);
+        }
     }
 
     private void SpawnInkStamp()
@@ -178,6 +208,11 @@ public class InkStamp : Interactable, IPickupSlot
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+
+        // Lazy-resolve the stamp reference as a safety net: if the per-frame retry coroutine
+        // hasn't completed yet (e.g. extreme network latency on first frame), attempt it now.
+        if (spawnedInkStamp == null)
+            TryResolveSpawnedStamp(_spawnedStampRef.Value);
 
         if (spawnedInkStamp == null)
         {

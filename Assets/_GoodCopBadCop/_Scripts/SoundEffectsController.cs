@@ -11,6 +11,9 @@ public class SFXController : MonoBehaviour
     [Header("Audio Source")]
     [SerializeField] private AudioSource sfxSource;
 
+    [Header("Spatial Emitter")]
+    [SerializeField] private GameObject spatialAudioEmitterPrefab;
+
     void Awake()
     {
         Instance = this;
@@ -29,29 +32,36 @@ public class SFXController : MonoBehaviour
     }
 
     /// <summary>
-    /// Spawns a temporary GameObject at the given world position, plays a spatialised
-    /// AudioClip, and destroys the object when playback finishes.
+    /// Instantiates the <see cref="spatialAudioEmitterPrefab"/> at the given world position,
+    /// plays a spatialised AudioClip through its pre-configured AudioSource, then destroys
+    /// the instance when playback finishes. The prefab must have an AudioSource component.
     /// </summary>
     /// <param name="clip">The clip to play.</param>
     /// <param name="position">World-space position to spawn the sound emitter.</param>
     /// <param name="volume">Playback volume (0–1).</param>
     /// <param name="pitch">Playback pitch multiplier.</param>
-    /// <param name="maxDistance">Maximum audible range in metres. Defaults to <see cref="DefaultSpatialMaxDistance"/>.</param>
+    /// <param name="maxDistance">Maximum audible range in metres. Overrides the prefab's maxDistance when greater than zero.</param>
     public void PlayAtPosition(AudioClip clip, Vector3 position, float volume = 1f, float pitch = 1f, float maxDistance = DefaultSpatialMaxDistance)
     {
         if (!clip) return;
 
-        GameObject emitter = new GameObject($"SFX_{clip.name}");
-        emitter.transform.position = position;
+        if (!spatialAudioEmitterPrefab)
+        {
+            Debug.LogWarning("[SFXController] spatialAudioEmitterPrefab is not assigned. Assign it in the Inspector.");
+            return;
+        }
 
-        AudioSource source = emitter.AddComponent<AudioSource>();
+        GameObject emitter = Instantiate(spatialAudioEmitterPrefab, position, Quaternion.identity);
+        emitter.name = $"SFX_{clip.name}";
+
+        AudioSource source = emitter.GetComponent<AudioSource>();
         source.clip = clip;
         source.volume = volume;
         source.pitch = pitch;
-        source.spatialBlend = 1f;           // Full 3-D spatialisation
-        source.rolloffMode = AudioRolloffMode.Linear;
-        source.minDistance = 1f;
-        source.maxDistance = maxDistance;
+
+        if (maxDistance > 0f)
+            source.maxDistance = maxDistance;
+
         source.Play();
 
         StartCoroutine(DestroyAfterClip(emitter, clip.length / Mathf.Abs(pitch)));
