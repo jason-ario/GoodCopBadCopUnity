@@ -132,6 +132,15 @@ public class PlayerInteractionController : NetworkBehaviour
                 interactable = interactableCollider.Interactable;
             }
 
+            // The local player's held object keeps its colliders active during the server
+            // round-trip after pickup. Treat it as non-interactable immediately so the
+            // tooltip doesn't re-appear on the very next frame after picking something up.
+            if (interactable != null && interactable == _playerPickupController.HeldObject)
+            {
+                interactable = null;
+                lastInteractable = null;
+            }
+
             if (IsControlledByOtherPlayer(interactable))
                 return;
 
@@ -198,7 +207,12 @@ public class PlayerInteractionController : NetworkBehaviour
                     if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
                 }
                 
-                if (_playerPickupController.IsHoldingObject) return;
+                if (_playerPickupController.IsHoldingObject)
+                {
+                    reticle.SetInteractState(false);
+                    reticle.SetTooFarState(false);
+                    return;
+                }
             }
             else
             {
@@ -212,7 +226,12 @@ public class PlayerInteractionController : NetworkBehaviour
                     ObjectPlacer.Instance.DeactivatePlacer();
                 }
 
-                if (_playerPickupController.IsHoldingObject) return;
+                if (_playerPickupController.IsHoldingObject)
+                {
+                    reticle.SetInteractState(false);
+                    reticle.SetTooFarState(false);
+                    return;
+                }
             }
             
             lastInteractable = null;
@@ -234,7 +253,12 @@ public class PlayerInteractionController : NetworkBehaviour
                 if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
             }
 
-            if (_playerPickupController.IsHoldingObject) return;
+            if (_playerPickupController.IsHoldingObject)
+            {
+                reticle.SetInteractState(false);
+                reticle.SetTooFarState(false);
+                return;
+            }
         }
         else
         {
