@@ -77,7 +77,7 @@ public class Day_01 : DayBase
     [SerializeField] private SuspectSet _allSuspectsSet;
 
     [Tooltip("Number of additional suspects drawn from the all-suspects pool after the tool locker tutorial.")]
-    [SerializeField] private int _postTutorialSuspectCount = 2;
+    [SerializeField] private int _postTutorialSuspectCount = 3;
 
     [Header("Other Day Notebooks — Hidden During Day 1")]
     [Tooltip("The Mutation Exam Notebook — hidden for the entirety of Day 1.")]
@@ -1114,6 +1114,16 @@ public class Day_01 : DayBase
 
     private IEnumerator Suspect3HandOffBeat()
     {
+        // Append post-tutorial suspects and pause scheduling synchronously before any yield.
+        // This ensures SetNextSuspectReady() — which fires when the folder is handed off —
+        // sees a non-empty remaining queue (shiftSuspects.Count > 3) and queues the 4th
+        // arrival instead of triggering the end-of-shift clock-out.
+        if (NetworkManager.Singleton.IsServer)
+        {
+            AppendPostTutorialSuspects();
+            ShiftManager.PauseSuspectScheduling = true;
+        }
+
         // _folderHandedOff reset and OnFolderHandedOff subscription are done in
         // Suspect3StampBeat before arming the stamp, so no early hand-off is missed.
         yield return new WaitUntil(() => _folderStamped);
@@ -1129,11 +1139,6 @@ public class Day_01 : DayBase
 
         if (!_folderHandedOff)
             yield return new WaitUntil(() => _folderHandedOff);
-
-        // Pause the next suspect immediately — the kill sequence takes ~11 s from this point,
-        // but we want PauseSuspectScheduling set before SetNextSuspectReady() fires.
-        if (NetworkManager.Singleton.IsServer)
-            ShiftManager.PauseSuspectScheduling = true;
 
         HideStaticMarker(StaticMarkerTarget.HandOff);
 
@@ -1226,12 +1231,8 @@ public class Day_01 : DayBase
         // 3-second tutorial cadence.
         ShiftManager.OverrideSuspectArrivalInterval = null;
 
-        // Append a few suspects from the full pool so the shift continues naturally
-        // past the tutorial section.
-        if (NetworkManager.Singleton.IsServer)
-            AppendPostTutorialSuspects();
-
-        // Release the queued 4th suspect.
+        // Release the queued 4th suspect — suspects from the all-suspects pool were
+        // already appended at the start of Suspect3HandOffBeat, before the hand-off.
         if (NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.ResumeScheduledSuspect();
     }
