@@ -23,6 +23,8 @@ public class FolderController : PickableObject
     
     [Header("Set Up")]
     [SerializeField] private AudioClip folderPlaceClip;
+    [SerializeField] private AudioClip folderOpenClip;
+    [SerializeField] private AudioClip folderCloseClip;
     [SerializeField] Animator anim;
 
     /// <summary>IK target position for the camera (first-person) arm at the top of the stamp arc.</summary>
@@ -217,6 +219,9 @@ public class FolderController : PickableObject
     private void OnIsOpenChanged(bool oldVal, bool newVal)
     {
         anim.SetBool("Open", newVal);
+
+        AudioClip clip = newVal ? folderOpenClip : folderCloseClip;
+        SFXController.Instance.PlayAtPosition(clip, transform.position);
 
         // Only update document interactability when the folder is NOT being held.
         // While held, OnEquipped / OnDropped manage it; here we handle desk-placed state.
@@ -741,7 +746,7 @@ public class FolderController : PickableObject
     IEnumerator WaitAndOpen()
     {
         isOpeningOrClosing = true;
-        yield return new WaitForSeconds(.4f);
+        yield return new WaitForSeconds(.1f);
         SetOpenServerRpc(true);
         isOpeningOrClosing = false;
     }

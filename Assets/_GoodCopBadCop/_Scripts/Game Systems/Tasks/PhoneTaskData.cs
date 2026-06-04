@@ -1,11 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// Defines a task that can be delivered to the player via a phone call from HQ.
-/// Assign instances to Telephone._availableTasks via the Inspector.
+/// Defines a task delivered to the player via a phone call from HQ.
+/// Stored inline on the <see cref="Telephone"/> MonoBehaviour so that
+/// <c>_linkedTaskBehaviour</c> can reference other scene objects directly.
+/// Add entries to <c>Telephone._availableTasks</c> via the Inspector.
 /// </summary>
-[CreateAssetMenu(menuName = "Good Cop Bad Cop/Phone Task Data", fileName = "NewPhoneTaskData")]
-public class PhoneTaskData : ScriptableObject
+[System.Serializable]
+public class PhoneTaskData
 {
     [Header("Task Info")]
     [SerializeField] private string _taskName = "New Task";
