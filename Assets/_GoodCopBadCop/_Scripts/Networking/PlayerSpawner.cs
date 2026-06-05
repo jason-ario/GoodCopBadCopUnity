@@ -1,9 +1,13 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
 public class PlayerSpawner : NetworkBehaviour
 {
     public static PlayerSpawner Instance;
+
+    /// <summary>Fired on the server the first time a player is spawned at a lobby spawn point.</summary>
+    public static event Action<ulong> OnPlayerSpawnedAtLobby;
 
     [Header("Player Prefab")]
     [SerializeField] private GameObject playerPrefab;
@@ -34,6 +38,7 @@ public class PlayerSpawner : NetworkBehaviour
     public void SpawnPlayerAtLobby(ulong clientId, bool isSinglePlayer)
     {
         SpawnPlayerAtPoint(clientId, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true);
+        OnPlayerSpawnedAtLobby?.Invoke(clientId);
     }
 
     /// <summary>

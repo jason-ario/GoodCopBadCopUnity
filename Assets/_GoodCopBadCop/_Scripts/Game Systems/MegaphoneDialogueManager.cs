@@ -411,6 +411,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             if (item.Name == itemName)
             {
                 item.SetPriceOverride(price);
+                // Refresh the matching shop view immediately in case the shop is already open.
+                ToolShopController.Instance?.RefreshPriceForItem(item);
                 break;
             }
         }
@@ -434,6 +436,10 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             if (item.Name == itemName)
             {
                 item.ClearPriceOverride();
+                // Refresh the matching shop view immediately — the locker stays open after
+                // refill purchases (CloseShopOnPurchase = false), so OnEnable never re-fires
+                // and without this the displayed price remains stale at 0.
+                ToolShopController.Instance?.RefreshPriceForItem(item);
                 break;
             }
         }

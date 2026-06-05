@@ -251,11 +251,6 @@ public class PlayerAnimationController : NetworkBehaviour
     // Smoothed spine tilt angle driven by the IK reach lean system.
     private float _currentIKLeanAngle;
 
-    // Independently smoothed weight for the head look-at blend so it can lead the arm IK.
-    [Header("Head Look-At")]
-    [SerializeField] [Range(1f, 20f)] private float headLookLerpSpeed = 8f;
-    private float _headLookWeight;
-
     // Cached bone transforms resolved once after spawn.
     private Transform _headBone;
     private Transform _neckBone;
@@ -664,31 +659,6 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             SolveTwoBoneIK(_leftUpperArmBone, _leftForeArmBone, _leftHandBone,
                            leftArmRigIKTarget.position, leftElbowHint, leftArmRig.weight);
-        }
-
-        // --- Head look-at IK target ---
-        // The body lean pitches the head downward as the spine/neck rotate forward.
-        // Blend the head's world rotation toward the active IK target position so the
-        // character appears to look at what it is reaching for rather than at the floor.
-        // _headLookWeight is smoothed at headLookLerpSpeed — faster than the arm rig
-        // weight — so the head turns to face the target ahead of the arm arriving there.
-        if (_headBone != null)
-        {
-            bool rightValid = rightIKActive && rightArmRigIKTarget != null;
-            bool leftValid  = leftIKActive  && leftArmRigIKTarget  != null;
-
-            Transform ikHeadTarget = rightValid ? rightArmRigIKTarget : (leftValid ? leftArmRigIKTarget : null);
-            float     targetWeight = ikHeadTarget != null ? 1f : 0f;
-
-            _headLookWeight = Mathf.Lerp(_headLookWeight, targetWeight, Time.deltaTime * headLookLerpSpeed);
-
-            if (ikHeadTarget != null && _headLookWeight > 0.001f)
-            {
-                Vector3 toTarget = (ikHeadTarget.position - _headBone.position).normalized;
-                if (toTarget.sqrMagnitude > 0.001f)
-                    _headBone.rotation = Quaternion.Slerp(_headBone.rotation,
-                        Quaternion.LookRotation(toTarget, transform.up), _headLookWeight);
-            }
         }
 
         // Swing the upper arm bones up/down when the owner's camera arm has something equipped.
