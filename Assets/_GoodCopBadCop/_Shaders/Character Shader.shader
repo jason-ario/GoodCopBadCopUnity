@@ -15,7 +15,6 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 
 		//================================
 		// Injected Code for 'Properties/Start'
-		_SnapResolution ("Vertex Snap Resolution", Float) = 1024
 		//================================
 
 		[TCP2HeaderHelp(Base)]
@@ -146,10 +145,11 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			float _VeinFalloff;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
-			float _SnapResolution;
 			//================================
 
 		CBUFFER_END
+
+		#define _SnapResolution 512
 
 		// UV light arrays — declared outside UnityPerMaterial so they can be set
 		// per-renderer via MaterialPropertyBlock (arrays cannot live inside a CBuffer

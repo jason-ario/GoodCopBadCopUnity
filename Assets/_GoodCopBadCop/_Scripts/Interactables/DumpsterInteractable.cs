@@ -54,7 +54,7 @@ public class DumpsterInteractable : Interactable
 
     [Header("Audio")]
     [SerializeField] private AudioClip _depositSound;
-    [SerializeField] private AudioSource _audioSource;
+    [SerializeField] private float _depositSoundVolume = 1f;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -188,7 +188,8 @@ public class DumpsterInteractable : Interactable
         anim.SetAnimBool("HoldingTrashBag", false);
 
         // ── 3. Pick throw target ──────────────────────────────────────────────
-        Transform target = PickThrowTarget();
+        Transform target     = PickThrowTarget();
+        Vector3 landPosition = target.position;
 
         // ── 4. Release the bag from the player's hand ─────────────────────────
         // ReleaseHeldObjectForThrow skips DropServerRpc so NetworkTransform is
@@ -202,12 +203,12 @@ public class DumpsterInteractable : Interactable
         // ── 6. Broadcast the throw arc to ALL clients ─────────────────────────
         // PlayThrowArcClientRpc runs DOJump on every client (including the
         // local one) so onlookers see the arc instead of the bag disappearing.
-        depositedBag.PlayThrowArcClientRpc(target.position, _jumpHeight, _jumpDuration, (int)_jumpEase);
+        depositedBag.PlayThrowArcClientRpc(landPosition, _jumpHeight, _jumpDuration, (int)_jumpEase);
 
         yield return new WaitForSeconds(_jumpDuration);
 
-        // ── 7. Deposit feedback ───────────────────────────────────────────────
-        PlayDepositAudio();
+        // ── 7. Deposit feedback — networked so all clients hear the land sound ──
+        PlayLandSoundServerRpc(landPosition);
 
         // ── 8. Despawn the bag ────────────────────────────────────────────────
         depositedBag.DespawnServerRpc();
@@ -268,9 +269,18 @@ public class DumpsterInteractable : Interactable
 
     // ── Audio ─────────────────────────────────────────────────────────────────
 
-    private void PlayDepositAudio()
+    /// <summary>Routes the land-sound broadcast through the server so all clients receive it.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void PlayLandSoundServerRpc(Vector3 position)
     {
-        if (_audioSource != null && _depositSound != null)
-            _audioSource.PlayOneShot(_depositSound);
+        PlayLandSoundClientRpc(position);
+    }
+
+    /// <summary>Plays the deposit sound spatially at the bag's landing position on every client.</summary>
+    [ClientRpc]
+    private void PlayLandSoundClientRpc(Vector3 position)
+    {
+        if (SFXController.Instance != null && _depositSound != null)
+            SFXController.Instance.PlayAtPosition(_depositSound, position, _depositSoundVolume);
     }
 }

@@ -14,7 +14,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 
 		//================================
 		// Injected Code for 'Properties/Start'
-		_SnapResolution ("Vertex Snap Resolution", Float) = 1024
 		//================================
 
 		[TCP2HeaderHelp(Base)]
@@ -131,10 +130,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 			fixed4 _HColor;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
-			float _SnapResolution;
 			//================================
 
 		CBUFFER_END
+
+		#define _SnapResolution 512
 
 		// Hash without sin and uniform across platforms
 		// Adapted from: https://www.shadertoy.com/view/4djSRW (c) 2014 - Dave Hoskins - CC BY-SA 4.0 License

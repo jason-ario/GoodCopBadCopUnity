@@ -507,6 +507,7 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetFloat("MoveX", netMoveX.Value);
             armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
             bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
+            armsAnimator.SetBool("IsRunning", netIsRunning.Value);
 
             // Apply layer weights from the owner.
             bodyAnimator.SetLayerWeight(1, netLayer1Weight.Value);
@@ -535,6 +536,7 @@ public class PlayerAnimationController : NetworkBehaviour
         netIsRunning.Value = isRunning;
 
         bodyAnimator.SetBool("IsRunning", isRunning);
+        armsAnimator.SetBool("IsRunning", isRunning);
         
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);
