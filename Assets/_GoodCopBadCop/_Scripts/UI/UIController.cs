@@ -55,6 +55,7 @@ public class UIController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        backButtonUI.SetActive(false);
     }
 
     private void Update()

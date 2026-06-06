@@ -51,6 +51,24 @@ public class PlayerTutorialUI : MonoBehaviour
         Show(message);
     }
 
+    /// <summary>Shows the cinematic black bars without any text. Holds for the specified duration then dismisses. Interrupts any running sequence.</summary>
+    public void ShowBarsOnly(float holdDuration = -1f)
+    {
+        float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
+        StopSequence();
+        _sequenceCoroutine = StartCoroutine(BarsOnlySequenceCoroutine(duration));
+    }
+
+    private IEnumerator BarsOnlySequenceCoroutine(float holdDuration)
+    {
+        SetPlayerUIActive(false);
+        _animator.SetBool(BlackBarsOn, true);
+
+        yield return new WaitForSeconds(holdDuration);
+
+        Dismiss();
+    }
+
     /// <summary>Shows the tutorial bars with the given message, holds for the specified duration, then hides. Interrupts any running sequence.</summary>
     public void Show(string message, float holdDuration = -1f)
     {

@@ -392,17 +392,30 @@ public class SuspectController : NetworkBehaviour
     [ClientRpc]
     private void ToggleSuspectCamClientRpc(bool active)
     {
-        if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
-            return;
-
         // Don't deactivate the cam if dialogue mode is currently holding it open.
         if (!active && DialogueChoiceSystem.IsInDialogueMode)
             return;
 
-        if (suspectCam != null)
-            suspectCam.SetActive(active);
+        if (active)
+        {
+            // Only show the suspect cam sequence for players currently in the booth.
+            if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
+                return;
 
-        PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(active);
+            suspectCam?.SetActive(true);
+            PlayerTutorialUI.Instance?.ShowBarsOnly(SuspectCamDuration);
+            PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
+        }
+        else
+        {
+            // Always clean up cam and bars — player may have moved outside during the sequence.
+            suspectCam?.SetActive(false);
+            PlayerTutorialUI.Instance?.Dismiss();
+
+            // Restore player-specific state only if still a valid local in-booth player.
+            if (PlayerInstance.Instance != null && !PlayerInstance.Instance.IsOutsideLocal)
+                PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
+        }
     }
 
     /// <summary>
@@ -413,6 +426,9 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCam != null)
             suspectCam.SetActive(active);
+
+        if (!active)
+            PlayerTutorialUI.Instance?.Dismiss();
     }
 
     public void SpawnPaperwork()
