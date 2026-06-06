@@ -31,7 +31,7 @@ Transform:
   m_GameObject: {fileID: 5355260148204141533}
   serializedVersion: 2
   m_LocalRotation: {x: -0.78547245, y: 0.61664325, z: -0.03724948, w: -0.037371848}
-  m_LocalPosition: {x: -0.0385, y: 0.0012, z: 0.0859}
+  m_LocalPosition: {x: -0.0385, y: 0.0015, z: 0.0887}
   m_LocalScale: {x: 0.010000002, y: 0.009999998, z: 0.009999998}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -47,7 +47,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 0
-  m_Color: {r: 1, g: 0.77254903, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.95686275, b: 0.78431374, a: 1}
   m_Intensity: 11.3
   m_Range: 29.96
   m_SpotAngle: 47.161777
@@ -147,8 +147,8 @@ MonoBehaviour:
   profileSync: 1
   useCustomBounds: 0
   bounds:
-    m_Center: {x: -17.427954, y: -6.376585, z: -13.497142}
-    m_Extent: {x: 17.294916, y: 16.431555, z: 15.986498}
+    m_Center: {x: -17.437933, y: -6.125469, z: -13.617154}
+    m_Extent: {x: 17.294859, y: 16.431562, z: 15.986421}
   boundsInLocalSpace: 0
   profile: {fileID: 11400000, guid: 2898e30fb4318fd47ae317b29f6b8339, type: 2}
   customRange: 29.96
@@ -157,7 +157,7 @@ MonoBehaviour:
   areaWidth: 1
   areaHeight: 1
   generatedRange: 29.96
-  generatedTipRadius: 0
+  generatedTipRadius: 1
   generatedSpotAngle: 47.161777
   generatedBaseRadius: 13.077303
   generatedAreaWidth: 0
@@ -193,17 +193,17 @@ MonoBehaviour:
   noiseStrength: 1.064
   noiseScale: 5
   noiseFinalMultiplier: 1
-  density: 0.51
+  density: 0.05
   mediumAlbedo: {r: 1, g: 1, b: 1, a: 1}
-  brightness: 0.31
-  attenuationMode: 0
+  brightness: 0.04
+  attenuationMode: 1
   attenCoefConstant: 1
   attenCoefLinear: 2
   attenCoefQuadratic: 1
-  rangeFallOff: 2.63
-  diffusionIntensity: 0.97
+  rangeFallOff: 7.42
+  diffusionIntensity: 5
   penumbra: 1
-  tipRadius: 0
+  tipRadius: 1
   nearClipDistance: 0
   cookieTexture: {fileID: 0}
   cookieScale: {x: 1, y: 1}
@@ -306,6 +306,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72ef5bbff8922d944a590970646176bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  minDistance: 10
+  maxDistance: 100
+  minBrightnessMultiplier: 0
+  falloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  cameraPollInterval: 1
 --- !u!1001 &5777211084724310117
 PrefabInstance:
   m_ObjectHideFlags: 0

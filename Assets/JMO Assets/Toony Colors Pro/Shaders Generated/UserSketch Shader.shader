@@ -21,6 +21,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
 		[TCP2ColorNoAlpha] _SColor ("Shadow Color", Color) = (0.2,0.2,0.2,1)
 		[MainTexture] _BaseMap ("Albedo", 2D) = "white" {}
+		[Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clipping", Float) = 0
+		_Cutoff ("Alpha Cutoff", Range(0,1)) = 0.5
 		[TCP2Separator]
 
 		[TCP2Header(Ramp Shading)]
@@ -114,6 +116,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			fixed4 _OutlineColorVertex;
 			float4 _BaseMap_ST;
 			fixed4 _BaseColor;
+			float _Cutoff;
 			float4 _StylizedThreshold_ST;
 			float _RampThreshold;
 			float _RampSmoothing;
@@ -365,6 +368,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			//--------------------------------------
 			// Toony Colors Pro 2 keywords
 		#pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 			#pragma shader_feature_local_fragment TCP2_SKETCH
 
 			// vertex input
@@ -487,6 +491,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// main texture
 				half3 albedo = __albedo.rgb;
 				half alpha = __alpha;
+
+				#if defined(_ALPHATEST_ON)
+					clip(alpha - _Cutoff);
+				#endif
 
 				// URP Decals
 				#if defined(_DBUFFER)
@@ -848,6 +856,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				half alpha = __alpha;
 				half3 emission = half3(0,0,0);
 
+				#if defined(_ALPHATEST_ON)
+					clip(alpha - _Cutoff);
+				#endif
+
 				// Injection Point: 'Depth + Shadow Caster Pass/Fragment Shader/End'
 
 				#if defined(DEPTH_NORMALS_PASS)
@@ -900,6 +912,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			// GPU Instancing
 			#pragma multi_compile_instancing
 			#pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment
@@ -938,6 +951,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			// using simple #define doesn't work, we have to use this instead
 			#pragma multi_compile DEPTH_ONLY_PASS
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment
@@ -968,6 +982,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			// using simple #define doesn't work, we have to use this instead
 			#pragma multi_compile DEPTH_ONLY_PASS
 			#pragma multi_compile DEPTH_NORMALS_PASS
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment

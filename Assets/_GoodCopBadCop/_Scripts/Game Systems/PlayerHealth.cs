@@ -43,6 +43,9 @@ public class PlayerHealth : NetworkBehaviour
     /// <summary>Whether this player is dead, readable on all clients.</summary>
     public bool IsDead => _networkIsDead.Value;
 
+    /// <summary>When true, all incoming damage is ignored. Server-side only.</summary>
+    public bool IsInvincible { get; set; }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
@@ -121,6 +124,9 @@ public class PlayerHealth : NetworkBehaviour
     private void ApplyDamageServer(float damage)
     {
         if (_networkIsDead.Value)
+            return;
+
+        if (IsInvincible)
             return;
 
         _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value - damage, 0f, DefaultMaxHealth);
