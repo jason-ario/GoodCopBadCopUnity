@@ -13,14 +13,21 @@ MonoBehaviour:
   m_Name: Nona
   m_EditorClassIdentifier: Assembly-CSharp::SuspectData
   FirstName: Nona
-  LastName: 
+  LastName: Beridze
   Nickname: 
-  Occupation: 
-  CharacterDescription: 
-  CharacterArc: 
-  DateOfBirth: 
-  Sex: 
-  EntryPermitExpiryDate: 
+  Occupation: Census Recorder
+  CharacterDescription: Still, unblinking, smiles at the wrong moments, always knows
+    too much
+  CharacterArc: Late 30s, probably. It is difficult to be certain. Nona has worked
+    as a census recorder for eleven years, quietly cataloguing who lives where, who
+    has moved, who has died. She always knows exactly where to look. She holds eye
+    contact for slightly too long and smiles when people do not finish their sentences,
+    as if she already knows what they were going to say. Nothing she says is technically
+    wrong. Nothing she does is technically alarming. But everyone who passes through
+    leaves with a faint, unexplainable discomfort they cannot put into words.
+  DateOfBirth: 07/07/1987
+  Sex: Female
+  EntryPermitExpiryDate: 07 JUL
   IsResident: 1
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
@@ -29,75 +36,123 @@ MonoBehaviour:
   IDPhoto: {fileID: 0}
   CharacterPrefab: {fileID: 0}
   entryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Returning to my registered residence.
+    - Completing the evening census route.
+    - Resident returning home before sunset.
+    midDaysReasons:
+    - Updating the local registry. Some records need correcting.
+    - Delivering documentation to the district office.
+    - Returning to my apartment. I do not stay out long.
+    finalDaysReasons:
+    - All remaining residents must be accounted for. I am one of them.
+    - The records need to be current. I make sure of that.
+    - Going home. The door is always unlocked for me.
   invalidEntryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - I need to see the names on this checkpoint's registry.
+    - Someone at this post is not in my records.
+    - I was waiting outside until the right person came on shift.
+    midDaysReasons:
+    - There are names in the registry that should not be here.
+    - I am collecting the last known addresses of the recently departed.
+    - I need access to the eastern ward's mortality files.
+    finalDaysReasons:
+    - Some residents have not been recorded correctly. I will fix that.
+    - I am here to close certain files.
+    - One of the names on the list is already gone. I wanted to confirm it in person.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Good evening. Here are my documents. Everything is in order, as always.
+    - I have all the correct papers. I filed them myself.
+    - You are new here. I know the names of everyone who has worked this post.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - The registry has some gaps now. That happens in situations like this. I fill them.
+    - I keep very careful records. It helps to know who is left.
+    - Do not worry. I have been through this checkpoint thirty-one times. I know the
+      procedure.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - I counted every checkpoint visit from the beginning. You will want to record that.
+    - I always know when something is ending. It is a useful skill.
+    - Everything in my file is accurate. I double-check.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Wonderful. Goodbye. I will remember your face.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - Of course. I knew you would let me through.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - Thank you. The records appreciate your cooperation.
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - That is fine. I will update my own file accordingly.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - May I have a pencil? I keep notes.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - I expected this. I noted the date and time already.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - I see. I will need a moment to update my records.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - I had already written this down. I hope that does not trouble you.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
-  quarantineExitLines: []
-  killExitLines: []
+    - It is only a name. Names go into the registry. Everything does, eventually.
+  quarantineExitLines:
+  - I will need writing materials. I have twelve entries still pending.
+  - I always behave. It is the people around me who change.
+  - I knew a woman who was quarantined here once. She is not in the records anymore.
+  killExitLines:
+  - I updated my own entry this morning. Just in case. It was accurate.
+  - The record outlasts the person. That is the point of a record.
+  - I knew the name of the last person who stood here. Now I will know yours.
   voiceAudioClips: []
-  questionResponses: []
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The census office on the third block. I file at the same time
+      each evening.
+    midDaysAnswer: The district archive. Some mortality records needed updating.
+    finalDaysAnswer: I walk certain routes. I have them memorized.
+    mismatchEarlyDaysAnswer: Home. I have been home since morning. I do not leave
+      without a reason. Today there was no reason.
+    mismatchMidDaysAnswer: Work. Everything normal. No unusual files. A completely
+      routine day.
+    mismatchFinalDaysAnswer: Visiting a friend. She is very well. I was with her until
+      just now.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: No. I track my health carefully. Nothing unusual.
+    midDaysAnswer: Some difficulty sleeping. But I use the time well. I review old
+      entries.
+    finalDaysAnswer: I have been remembering things more clearly than usual. It is
+      not always comfortable.
+    mismatchEarlyDaysAnswer: I feel completely fine. I always feel completely fine.
+      Nothing changes in me.
+    mismatchMidDaysAnswer: No sleep issues. I sleep exactly eight hours. I track it.
+    mismatchFinalDaysAnswer: Nothing. My memory is normal. I do not remember more
+      than I should.
+  - question: Who do you live with?
+    earlyDaysAnswer: Alone. I prefer it. Shared spaces complicate the records.
+    midDaysAnswer: Just myself. It has been that way for a long time.
+    finalDaysAnswer: I live alone. I have always lived alone.
+    mismatchEarlyDaysAnswer: My husband. He is home right now. He does not like to
+      go out.
+    mismatchMidDaysAnswer: A roommate. She stays in her room mostly. We do not talk
+      much. It is fine.
+    mismatchFinalDaysAnswer: Someone. They have been with me for years. You would
+      know them if you saw them. Probably.
   idleBarks:
-    earlyDays: []
-    midDays: []
-    finalDays: []
-  IDNumber: 
+    earlyDays:
+    - I have recorded every resident in this district. Some of them do not know that.
+    - You are the fourth officer to work this post. The third one was quieter.
+    - I keep a column for people who look right through me. It is longer than you would think.
+    midDays:
+    - The list is shorter than it was. That is normal in an emergency. I have read about this.
+    - A lot of people are getting very honest lately. It makes my job easier.
+    - I wrote your name down. Do not worry. It is only for the registry.
+    finalDays:
+    - Almost everyone I have recorded in this district is still here. Almost everyone.
+    - The numbers do not lie. People do, but numbers do not.
+    - I never forget a face. It is not a skill I chose. It just happens.
+  IDNumber: 7070787

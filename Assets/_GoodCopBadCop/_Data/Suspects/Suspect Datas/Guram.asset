@@ -1,0 +1,150 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc4902ccea98cf44865aecb61fc1ff4, type: 3}
+  m_Name: Guram
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectData
+  FirstName: Guram
+  LastName: Kopaliani
+  Nickname: Gura
+  Occupation: Parking Lot Attendant
+  CharacterDescription: Old, weathered, callused hands, speaks plainly and directly
+  CharacterArc: Late 60s. Guram has worked the same parking lot for twenty-two years
+    and treats the crisis the same way he treats every inconvenience — with mild irritation
+    and the expectation that it will eventually pass. His wife died four years ago.
+    He does not talk about it. He does not talk about much. He shows up, does the job,
+    and goes home. In the final days, with the lot shut down and nothing left to keep
+    his hands busy, he has no strategy except to keep showing up — to the checkpoint,
+    to whatever comes next.
+  DateOfBirth: 08/04/1958
+  Sex: Male
+  EntryPermitExpiryDate: 15 MAR
+  IsResident: 1
+  GivesPaperwork: 1
+  handwritingFont: {fileID: 0}
+  startingInfectionScore: 0
+  dailyInfectionProgression: 5
+  IDPhoto: {fileID: 0}
+  CharacterPrefab: {fileID: 0}
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home after my shift ended.
+    - Resident returning. Papers are in my left pocket.
+    - Done for the night. Just going home.
+    midDaysReasons:
+    - The lot has been closed. I have nowhere else to be.
+    - Returning from sorting out my registration at the district office.
+    - Going back to the block. Nothing else to do.
+    finalDaysReasons:
+    - Going home. Same as always.
+    - Returning to my residence before the evening deadline.
+    - They shut the lot. I walk home. That is the whole story.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - My brother lives past the checkpoint. He needs help.
+    - Going to meet someone in the restricted east block.
+    - I left something in a car. I need to get it back.
+    midDaysReasons:
+    - The lot is still open. I need to get back to work.
+    - I have to collect something past the last post.
+    - Someone owes me money out there.
+    finalDaysReasons:
+    - I just need five minutes outside the perimeter.
+    - I left my jacket in the lot. I need to get it.
+    - My dog got out. I need to find him before curfew.
+  entryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Papers. Here. Long shift.
+    - I have been coming through this checkpoint for three months. You can look it up.
+    - Twenty-two years at that lot. Not once have I been late to check in.
+    dialoguesMidDays:
+    - The lot is closed now. Just going home.
+    - I do not know what is happening out there. I keep my head down.
+    - My joints are bad in this kind of weather. Or whatever this is.
+    dialoguesFinalDays:
+    - Still here. Still checking in. Some things do not change.
+    - Just let me through. I have nowhere to be and I would like to get there.
+    - I am not afraid of you. I am just tired.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Good.
+    dialoguesMidDays:
+    - Right.
+    dialoguesFinalDays:
+    - Finally.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - A room? Fine. Better than the booth.
+    dialoguesMidDays:
+    - Whatever you say.
+    dialoguesFinalDays:
+    - Not surprised. Alright.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - Hm. Did not expect that.
+    dialoguesMidDays:
+    - "..."
+    dialoguesFinalDays:
+    - Twenty-two years... and this is how it ends.
+  quarantineExitLines:
+  - Four walls. At least it is warm.
+  - You have a chair in there? My knee does not do well standing for long.
+  - Fine. I have spent worse nights in smaller spaces.
+  killExitLines:
+  - Hm.
+  - Twenty-two years...
+  - Not how I thought it would go. But. Alright.
+  voiceAudioClips: []
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The parking lot on Rustaveli. Same place I have been for twenty-two
+      years.
+    midDaysAnswer: Nowhere. The lot is shut down. I walked around for a while.
+    finalDaysAnswer: I do not know. I have been walking. It is a habit.
+    mismatchEarlyDaysAnswer: Home. I have not been to the lot in weeks. My back was
+      giving me trouble. It still is.
+    mismatchMidDaysAnswer: Work. The lot is open. Everything fine there. Very busy,
+      actually. No problems at all.
+    mismatchFinalDaysAnswer: My daughter's place. She lives close by. Normal visit.
+      Nothing unusual.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: My knee acts up this time of year. Nothing serious.
+    midDaysAnswer: Cannot sleep well. But I never sleep well.
+    finalDaysAnswer: Some pressure in my chest. Probably nothing.
+    mismatchEarlyDaysAnswer: Nothing. I feel fine. Better than I have in years, honestly.
+    mismatchMidDaysAnswer: No. Knee is perfect. Everything is fine. No issues at all.
+    mismatchFinalDaysAnswer: Nothing. Sleeping fine. Clear head. No complaints.
+  - question: Who do you live with?
+    earlyDaysAnswer: Myself. My wife passed four years ago.
+    midDaysAnswer: Just me. Got used to it.
+    finalDaysAnswer: Nobody. Me and the four walls.
+    mismatchEarlyDaysAnswer: My wife. She is home right now. Keeps the place in order.
+    mismatchMidDaysAnswer: My daughter moved back in. Crowded, but it is fine. Better
+      than being alone.
+    mismatchFinalDaysAnswer: Some of the boys from the lot. We share the rent. Practical.
+  idleBarks:
+    earlyDays:
+    - Twenty-two years at that lot and not one car was stolen. Think about that.
+    - This line moves slower than the lot on New Year's Eve.
+    - You want to see my parking authority badge? I still carry it. Force of habit.
+    midDays:
+    - The lot is empty now. Strangest thing I have ever seen. Stranger than all of this, even.
+    - I used to hate quiet shifts. Now I miss them.
+    - My wife would have hated all of this. Too much commotion.
+    finalDays:
+    - Twenty-two years and they close the lot without even telling me.
+    - I have a routine. It helps when nothing makes sense anymore.
+    - I just stand here. It is what I do.
+  IDNumber: 4827361
