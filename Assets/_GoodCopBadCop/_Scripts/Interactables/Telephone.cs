@@ -302,10 +302,15 @@ public class Telephone : Interactable
             }
         }
 
-        PlayerInteractionController player = FindPlayerByClientId(clientId);
-        if (player == null) return;
-
+        // Determine ownership before lookup. For the answering client, use LocalClient.PlayerObject
+        // directly — ConnectedClientsList is only fully populated on the server/host, so iterating
+        // it on a non-host client can return null even for the client's own entry.
         bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
+        PlayerInteractionController player = isLocalPlayer
+            ? NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>()
+            : FindPlayerByClientId(clientId);
+
+        if (player == null) return;
 
         if (isLocalPlayer)
         {
@@ -433,10 +438,12 @@ public class Telephone : Interactable
     [ClientRpc]
     private void ExecuteGrabSequenceClientRpc(ulong clientId)
     {
-        PlayerInteractionController player = FindPlayerByClientId(clientId);
-        if (player == null) return;
-
         bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
+        PlayerInteractionController player = isLocalPlayer
+            ? NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>()
+            : FindPlayerByClientId(clientId);
+
+        if (player == null) return;
 
         if (isLocalPlayer)
             StartCoroutine(GrabPhoneSequence(player));
@@ -447,10 +454,12 @@ public class Telephone : Interactable
     [ClientRpc]
     private void ExecutePutDownSequenceClientRpc(ulong clientId)
     {
-        PlayerInteractionController player = FindPlayerByClientId(clientId);
-        if (player == null) return;
-
         bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
+        PlayerInteractionController player = isLocalPlayer
+            ? NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>()
+            : FindPlayerByClientId(clientId);
+
+        if (player == null) return;
 
         if (isLocalPlayer)
             StartCoroutine(PutPhoneDownSequence(player));

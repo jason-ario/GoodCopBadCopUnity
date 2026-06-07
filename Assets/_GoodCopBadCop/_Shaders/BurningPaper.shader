@@ -237,8 +237,8 @@ Shader "GoodCopBadCop/BurningPaper"
                 waveUV.y += sin(uv.x * _WaveFrequency * 0.7 + t * _WaveSpeed * 1.3) * _WaveAmplitude * 0.6;
 
                 // --- Glitch: horizontal scanline block shift ---
-                // Divide UV-Y into coarse bands; each band independently shifts in X.
-                float  bandSize   = lerp(0.15, 0.04, GlitchRand(gSeed1));
+                // Divide UV-Y into fine bands; each band independently shifts in X.
+                float  bandSize   = lerp(0.05, 0.012, GlitchRand(gSeed1));
                 float  bandIndex  = floor(uv.y / bandSize);
                 float  bandShift  = (GlitchRand(bandIndex + gSeed1 * 7.3) * 2.0 - 1.0) * 0.08;
                 // Only a subset of bands actually shift (threshold > 0.6 → ~40% of bands)

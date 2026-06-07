@@ -16,6 +16,9 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private GameObject armsOnBody;
     
     [SerializeField] private float animLerpSpeed = 5f;
+
+    /// <summary>Playback speed multiplier applied to the arms animator while the player is running.</summary>
+    [SerializeField] private float runningArmsSpeedMultiplier = 1.5f;
     
     private float currentMoveX = 0f;
     private float currentMoveZ = 0f;
@@ -250,11 +253,6 @@ public class PlayerAnimationController : NetworkBehaviour
     private float _rightArmReach;
     // Smoothed spine tilt angle driven by the IK reach lean system.
     private float _currentIKLeanAngle;
-
-    // Independently smoothed weight for the head look-at blend so it can lead the arm IK.
-    [Header("Head Look-At")]
-    [SerializeField] [Range(1f, 20f)] private float headLookLerpSpeed = 8f;
-    private float _headLookWeight;
 
     // Cached bone transforms resolved once after spawn.
     private Transform _headBone;
@@ -512,6 +510,7 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetFloat("MoveX", netMoveX.Value);
             armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
             bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
+            armsAnimator.speed = netIsRunning.Value ? runningArmsSpeedMultiplier : 1f;
 
             // Apply layer weights from the owner.
             bodyAnimator.SetLayerWeight(1, netLayer1Weight.Value);
@@ -540,6 +539,7 @@ public class PlayerAnimationController : NetworkBehaviour
         netIsRunning.Value = isRunning;
 
         bodyAnimator.SetBool("IsRunning", isRunning);
+        armsAnimator.speed = isRunning ? runningArmsSpeedMultiplier : 1f;
         
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);
@@ -664,31 +664,6 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             SolveTwoBoneIK(_leftUpperArmBone, _leftForeArmBone, _leftHandBone,
                            leftArmRigIKTarget.position, leftElbowHint, leftArmRig.weight);
-        }
-
-        // --- Head look-at IK target ---
-        // The body lean pitches the head downward as the spine/neck rotate forward.
-        // Blend the head's world rotation toward the active IK target position so the
-        // character appears to look at what it is reaching for rather than at the floor.
-        // _headLookWeight is smoothed at headLookLerpSpeed — faster than the arm rig
-        // weight — so the head turns to face the target ahead of the arm arriving there.
-        if (_headBone != null)
-        {
-            bool rightValid = rightIKActive && rightArmRigIKTarget != null;
-            bool leftValid  = leftIKActive  && leftArmRigIKTarget  != null;
-
-            Transform ikHeadTarget = rightValid ? rightArmRigIKTarget : (leftValid ? leftArmRigIKTarget : null);
-            float     targetWeight = ikHeadTarget != null ? 1f : 0f;
-
-            _headLookWeight = Mathf.Lerp(_headLookWeight, targetWeight, Time.deltaTime * headLookLerpSpeed);
-
-            if (ikHeadTarget != null && _headLookWeight > 0.001f)
-            {
-                Vector3 toTarget = (ikHeadTarget.position - _headBone.position).normalized;
-                if (toTarget.sqrMagnitude > 0.001f)
-                    _headBone.rotation = Quaternion.Slerp(_headBone.rotation,
-                        Quaternion.LookRotation(toTarget, transform.up), _headLookWeight);
-            }
         }
 
         // Swing the upper arm bones up/down when the owner's camera arm has something equipped.

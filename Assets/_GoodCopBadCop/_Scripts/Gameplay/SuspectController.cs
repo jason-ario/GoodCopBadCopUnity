@@ -54,6 +54,10 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private PlayableDirector quarantineTimeline;
     [SerializeField] private Transform suspectQuarantineFollowPos;
 
+    [Header("Suspect Arrival Cam")]
+    [SerializeField] private GameObject suspectCam;
+    private const float SuspectCamDuration = 3f;
+
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
 
@@ -78,6 +82,9 @@ public class SuspectController : NetworkBehaviour
     private void Awake()
     {
         Instance = this;
+
+        if (suspectCam != null)
+            suspectCam.SetActive(false);
     }
 
     public void EnableLook()
@@ -324,10 +331,104 @@ public class SuspectController : NetworkBehaviour
 
         suspectCharacter.GetComponent<SuspectBarkController>()?.BeginBarkSchedule();
 
+        StartCoroutine(SuspectCamSequence());
+
         if (suspectCharacter.Data.GivesPaperwork)
         {
             suspectCharacter.GivePaperwork();
         }
+    }
+
+    /// <summary>
+    /// Activates the suspect arrival cam for <see cref="SuspectCamDuration"/> seconds on any client
+    /// whose local player is currently inside the booth. Booth-inside players are also made
+    /// invincible on the server for the duration so neither health nor radiation can change.
+    /// Only runs on the server.
+    /// </summary>
+    private IEnumerator SuspectCamSequence()
+    {
+        var boothPlayers = GetBoothInsidePlayers();
+
+        foreach (var player in boothPlayers)
+        {
+            if (player.PlayerHealth != null) player.PlayerHealth.IsInvincible = true;
+            if (player.PlayerRadiation != null) player.PlayerRadiation.IsInvincible = true;
+        }
+
+        ToggleSuspectCamClientRpc(true);
+
+        yield return new WaitForSeconds(SuspectCamDuration);
+
+        ToggleSuspectCamClientRpc(false);
+
+        foreach (var player in boothPlayers)
+        {
+            if (player.PlayerHealth != null) player.PlayerHealth.IsInvincible = false;
+            if (player.PlayerRadiation != null) player.PlayerRadiation.IsInvincible = false;
+        }
+    }
+
+    /// <summary>Returns all connected players currently inside the booth.</summary>
+    private List<PlayerInstance> GetBoothInsidePlayers()
+    {
+        var result = new List<PlayerInstance>();
+
+        if (NetworkManager.Singleton == null)
+            return result;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            var player = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (player != null && !player.IsOutside)
+                result.Add(player);
+        }
+
+        return result;
+    }
+
+    /// <summary>Toggles the suspect arrival cam on clients where the local player is in the booth.</summary>
+    [ClientRpc]
+    private void ToggleSuspectCamClientRpc(bool active)
+    {
+        // Don't deactivate the cam if dialogue mode is currently holding it open.
+        if (!active && DialogueChoiceSystem.IsInDialogueMode)
+            return;
+
+        if (active)
+        {
+            // Only show the suspect cam sequence for players currently in the booth.
+            if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
+                return;
+
+            suspectCam?.SetActive(true);
+            PlayerTutorialUI.Instance?.ShowBarsOnly(SuspectCamDuration);
+            PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
+        }
+        else
+        {
+            // Always clean up cam and bars — player may have moved outside during the sequence.
+            suspectCam?.SetActive(false);
+            PlayerTutorialUI.Instance?.Dismiss();
+
+            // Restore player-specific state only if still a valid local in-booth player.
+            if (PlayerInstance.Instance != null && !PlayerInstance.Instance.IsOutsideLocal)
+                PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
+        }
+    }
+
+    /// <summary>
+    /// Activates or deactivates the suspect cam for the local client.
+    /// Called by <see cref="DialogueChoiceSystem"/> when entering or exiting dialogue mode.
+    /// </summary>
+    public void SetSuspectCamActive(bool active)
+    {
+        if (suspectCam != null)
+            suspectCam.SetActive(active);
+
+        if (!active)
+            PlayerTutorialUI.Instance?.Dismiss();
     }
 
     public void SpawnPaperwork()

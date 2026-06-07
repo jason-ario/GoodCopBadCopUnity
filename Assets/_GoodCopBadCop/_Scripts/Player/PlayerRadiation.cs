@@ -38,6 +38,9 @@ public class PlayerRadiation : NetworkBehaviour
     public float Normalized => currentRadiation / maxRadiation;
     [SerializeField] private GameObject hurtVignette;
 
+    /// <summary>When true, passive radiation gain and radiation damage are paused. Server-side only.</summary>
+    public bool IsInvincible { get; set; }
+
     private void Awake()
     {
         playerHealth = GetComponent<PlayerHealth>();
@@ -49,6 +52,9 @@ public class PlayerRadiation : NetworkBehaviour
         // Cosmetic radiation state (vignette, UI) should subscribe to a networked variable
         // if you want it to display on all clients in the future.
         if (!IsServer)
+            return;
+
+        if (IsInvincible)
             return;
 
         AddRadiation(passiveRadiationPerSecond * Time.deltaTime);

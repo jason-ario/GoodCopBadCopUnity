@@ -29,6 +29,26 @@ public class PlayerInteractionController : NetworkBehaviour
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
     public bool ReticleActive => reticleActive;
+
+    private bool _suspectCamActive = false;
+
+    /// <summary>
+    /// Suppresses all interaction and hides the reticle while the suspect cam is active.
+    /// Safe to call before the reticle reference is assigned — the guard in HandleReticle
+    /// will enforce the hidden state as soon as the reference is populated.
+    /// </summary>
+    public void SetSuspectCamMode(bool active)
+    {
+        _suspectCamActive = active;
+        _canInteract = !active;
+        if (reticle != null)
+        {
+            if (active)
+                reticle.DisableReticle();
+            else
+                reticle.EnableReticle();
+        }
+    }
     
     private void Awake()
     {
@@ -103,6 +123,13 @@ public class PlayerInteractionController : NetworkBehaviour
     
     void HandleReticle()
     {
+        if (_suspectCamActive)
+        {
+            // Reticle ref may be null on first entry (early game) — hide it as soon as it's available.
+            reticle?.DisableReticle();
+            return;
+        }
+
         if (_playerPickupController.CanPickUpAndPlace == false && CanInteract == false)
         {
             return;

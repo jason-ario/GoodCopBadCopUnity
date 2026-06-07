@@ -191,6 +191,19 @@ public class ToolShopController : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// Refreshes the displayed price for a specific shop item while the shop is open.
+    /// Also updates the buy button text when the given item is currently selected.
+    /// Call this after a price override is applied or cleared so the open UI stays in sync.
+    /// </summary>
+    public void RefreshPriceForItem(ShopItem item)
+    {
+        GetViewForItem(item)?.RefreshPrice();
+
+        if (_selectedShopItem == item)
+            _buyText.text = "Buy " + "<sprite=0>" + item.Price;
+    }
+
     private PlayerPickupController GetLocalPlayerPickup()
     {
         if (PlayerInstance.Instance == null) return null;

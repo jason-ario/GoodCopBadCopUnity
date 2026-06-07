@@ -1,4 +1,4 @@
-﻿// Toony Colors Pro+Mobile 2
+// Toony Colors Pro+Mobile 2
 // (c) 2014-2025 Jean Moreno
 
 Shader "Toony Colors Pro 2/User/Sketch Shader"
@@ -14,9 +14,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 		//================================
 		// Injected Code for 'Properties/Start'
-		_WobbleAmplitude ("Wobble Amplitude", Float) = 0.001
-		_WobbleFrequency ("Wobble Frequency", Float) = 15.0
-		_WobbleSpeed ("Wobble Speed", Float) = 15.0
 		//================================
 
 		[TCP2HeaderHelp(Base)]
@@ -24,6 +21,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
 		[TCP2ColorNoAlpha] _SColor ("Shadow Color", Color) = (0.2,0.2,0.2,1)
 		[MainTexture] _BaseMap ("Albedo", 2D) = "white" {}
+		[Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clipping", Float) = 0
+		_Cutoff ("Alpha Cutoff", Range(0,1)) = 0.5
 		[TCP2Separator]
 
 		[TCP2Header(Ramp Shading)]
@@ -117,6 +116,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			fixed4 _OutlineColorVertex;
 			float4 _BaseMap_ST;
 			fixed4 _BaseColor;
+			float _Cutoff;
 			float4 _StylizedThreshold_ST;
 			float _RampThreshold;
 			float _RampSmoothing;
@@ -126,12 +126,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			fixed4 _HColor;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
-			float _WobbleAmplitude;
-			float _WobbleFrequency;
-			float _WobbleSpeed;
 			//================================
 
 		CBUFFER_END
+
+		#define _SnapResolution 512
 
 		// Hash without sin and uniform across platforms
 		// Adapted from: https://www.shadertoy.com/view/4djSRW (c) 2014 - Dave Hoskins - CC BY-SA 4.0 License
@@ -217,23 +216,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			//================================
 			// Injected Code for 'Outline Pass/Vertex Shader/Start'
-			
-			float wobbleTime_outline = _Time.y * _WobbleSpeed;
-			float steppedTime_outline = floor(wobbleTime_outline);
-			float t_outline = steppedTime_outline / max(_WobbleSpeed, 0.0001);
-			
-			float3 worldPos_outline = mul(unity_ObjectToWorld, v.vertex).xyz;
-			float phase_outline = dot(worldPos_outline, float3(1.37, 2.11, 0.73));
-			
-			float3 objectScale_outline;
-			objectScale_outline.x = length(unity_ObjectToWorld._m00_m10_m20);
-			objectScale_outline.y = length(unity_ObjectToWorld._m01_m11_m21);
-			objectScale_outline.z = length(unity_ObjectToWorld._m02_m12_m22);
-			
-			float scaleCompensation_outline = max(max(objectScale_outline.x, objectScale_outline.y), max(objectScale_outline.z, 0.0001));
-			float wobble_outline = sin(t_outline * _WobbleFrequency + phase_outline) * (_WobbleAmplitude / scaleCompensation_outline);
-			
-			v.vertex.xyz += v.normal * wobble_outline;
 			//================================
 
 			// Shader Properties Sampling
@@ -308,6 +290,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			// Injection Point: 'Outline Pass/Vertex Shader/End'
 
+			// PS1-style vertex snapping
+			#if !defined(SHADOWCASTER_PASS)
+			output.vertex.xy = floor(output.vertex.xy / output.vertex.w * _SnapResolution + 0.5) / _SnapResolution * output.vertex.w;
+			#endif
+
 			return output;
 		}
 
@@ -381,6 +368,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			//--------------------------------------
 			// Toony Colors Pro 2 keywords
 		#pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 			#pragma shader_feature_local_fragment TCP2_SKETCH
 
 			// vertex input
@@ -432,23 +420,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 				//================================
 				// Injected Code for 'Main Pass/Vertex Shader/Start'
-				
-				float wobbleTime = _Time.y * _WobbleSpeed;
-				float steppedTime = floor(wobbleTime);
-				float t = steppedTime / max(_WobbleSpeed, 0.0001);
-				
-				float3 worldPos_main = mul(unity_ObjectToWorld, input.vertex).xyz;
-				float phase = dot(worldPos_main, float3(1.37, 2.11, 0.73));
-				
-				float3 objectScale_main;
-				objectScale_main.x = length(unity_ObjectToWorld._m00_m10_m20);
-				objectScale_main.y = length(unity_ObjectToWorld._m01_m11_m21);
-				objectScale_main.z = length(unity_ObjectToWorld._m02_m12_m22);
-				
-				float scaleCompensation_main = max(max(objectScale_main.x, objectScale_main.y), max(objectScale_main.z, 0.0001));
-				float wobble = sin(t * _WobbleFrequency + phase) * (_WobbleAmplitude / scaleCompensation_main);
-				
-				input.vertex.xyz += input.normal * wobble;
 				//================================
 
 				// Texture Coordinates
@@ -459,6 +430,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				output.shadowCoord = GetShadowCoord(vertexInput);
 			#endif
 				float4 clipPos = vertexInput.positionCS;
+				// PS1-style vertex snapping
+				clipPos.xy = floor(clipPos.xy / clipPos.w * _SnapResolution + 0.5) / _SnapResolution * clipPos.w;
 
 				float4 screenPos = ComputeScreenPos(clipPos);
 				output.screenPosition.xyzw = screenPos;
@@ -479,7 +452,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				output.normal = normalize(vertexNormalInput.normalWS);
 
 				// clip position
-				output.positionCS = vertexInput.positionCS;
+				output.positionCS = clipPos;
 
 				// Injection Point: 'Main Pass/Vertex Shader/End'
 
@@ -518,6 +491,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// main texture
 				half3 albedo = __albedo.rgb;
 				half alpha = __alpha;
+
+				#if defined(_ALPHATEST_ON)
+					clip(alpha - _Cutoff);
+				#endif
 
 				// URP Decals
 				#if defined(_DBUFFER)
@@ -831,23 +808,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 				//================================
 				// Injected Code for 'Depth + Shadow Caster Pass/Vertex Shader/Start'
-				
-				float wobbleTime_ds = _Time.y * _WobbleSpeed;
-				float steppedTime_ds = floor(wobbleTime_ds);
-				float t_ds = steppedTime_ds / max(_WobbleSpeed, 0.0001);
-				
-				float3 worldPos_ds = mul(unity_ObjectToWorld, input.vertex).xyz;
-				float phase_ds = dot(worldPos_ds, float3(1.37, 2.11, 0.73));
-				
-				float3 objectScale_ds;
-				objectScale_ds.x = length(unity_ObjectToWorld._m00_m10_m20);
-				objectScale_ds.y = length(unity_ObjectToWorld._m01_m11_m21);
-				objectScale_ds.z = length(unity_ObjectToWorld._m02_m12_m22);
-				
-				float scaleCompensation_ds = max(max(objectScale_ds.x, objectScale_ds.y), max(objectScale_ds.z, 0.0001));
-				float wobble_ds = sin(t_ds * _WobbleFrequency + phase_ds) * (_WobbleAmplitude / scaleCompensation_ds);
-				
-				input.vertex.xyz += input.normal * wobble_ds;
 				//================================
 
 				// Texture Coordinates
@@ -895,6 +855,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				half3 albedo = half3(1,1,1);
 				half alpha = __alpha;
 				half3 emission = half3(0,0,0);
+
+				#if defined(_ALPHATEST_ON)
+					clip(alpha - _Cutoff);
+				#endif
 
 				// Injection Point: 'Depth + Shadow Caster Pass/Fragment Shader/End'
 
@@ -948,6 +912,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			// GPU Instancing
 			#pragma multi_compile_instancing
 			#pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment
@@ -986,6 +951,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 			// using simple #define doesn't work, we have to use this instead
 			#pragma multi_compile DEPTH_ONLY_PASS
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment
@@ -1016,6 +982,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			// using simple #define doesn't work, we have to use this instead
 			#pragma multi_compile DEPTH_ONLY_PASS
 			#pragma multi_compile DEPTH_NORMALS_PASS
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment

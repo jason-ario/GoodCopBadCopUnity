@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Rendering.RenderGraphModule.Util;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
@@ -53,26 +55,35 @@ public class DitherFeature : ScriptableRendererFeature
         private const string KwBayer4 = "DITHER_BAYER4";
         private const string KwBayer8 = "DITHER_BAYER8";
 
+        private static readonly Vector4 ScaleBias = new Vector4(1f, 1f, 0f, 0f);
+
         private readonly Settings settings;
-        private RTHandle tempTex;
 
         public DitherPass(Settings settings)
         {
             this.settings = settings;
+            requiresIntermediateTexture = true;
         }
 
-        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
-        {
-            var desc = renderingData.cameraData.cameraTargetDescriptor;
-            desc.depthBufferBits = 0;
-            RenderingUtils.ReAllocateIfNeeded(ref tempTex, desc, name: "_DitherTemp");
-        }
-
-        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             if (settings.material == null) return;
 
-            var cmd = CommandBufferPool.Get("DitherPass");
+            var resourceData = frameData.Get<UniversalResourceData>();
+
+            if (resourceData.isActiveTargetBackBuffer)
+            {
+                Debug.LogError("DitherFeature requires an intermediate color texture. Set the pass event before AfterRendering.");
+                return;
+            }
+
+            var source = resourceData.activeColorTexture;
+
+            var destDesc = renderGraph.GetTextureDesc(source);
+            destDesc.name        = "_DitherResult";
+            destDesc.clearBuffer = false;
+
+            TextureHandle destination = renderGraph.CreateTexture(destDesc);
 
             settings.material.DisableKeyword(KwBayer2);
             settings.material.DisableKeyword(KwBayer4);
@@ -90,21 +101,14 @@ public class DitherFeature : ScriptableRendererFeature
             settings.material.SetInt(DepthID,      settings.colorDepth);
             settings.material.SetFloat(LumaOnlyID, settings.lumaOnly ? 1f : 0f);
 
-            var source = renderingData.cameraData.renderer.cameraColorTargetHandle;
+            var para = new RenderGraphUtils.BlitMaterialParameters(source, destination, settings.material, 0);
+            renderGraph.AddBlitPass(para, passName: "DitherPass");
 
-            Blitter.BlitCameraTexture(cmd, source, tempTex, settings.material, 0);
-            Blitter.BlitCameraTexture(cmd, tempTex, source);
-
-            context.ExecuteCommandBuffer(cmd);
-            CommandBufferPool.Release(cmd);
+            // Swap camera color to our result — no copy-back blit needed.
+            resourceData.cameraColor = destination;
         }
 
-        public override void OnCameraCleanup(CommandBuffer cmd) { }
-
-        public void Dispose()
-        {
-            tempTex?.Release();
-        }
+        public void Dispose() { }
     }
 
     // -------------------------------------------------------------------------
