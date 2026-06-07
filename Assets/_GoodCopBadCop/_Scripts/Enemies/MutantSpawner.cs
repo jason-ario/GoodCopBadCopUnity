@@ -46,6 +46,9 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Maximum number of active enemies this spawner will maintain. Individual burst spawns are skipped once at or above this cap.")]
     [SerializeField] private int maxActiveEnemies = 10;
 
+    /// <summary>The first day on which this spawner becomes active. Day 1 is excluded by default.</summary>
+    private const int FirstActiveDay = 2;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _activeEnemies = new List<NetworkObject>();
@@ -66,14 +69,39 @@ public class MutantSpawner : NetworkBehaviour
             return;
         }
 
-        _isRunning = true;
-        StartCoroutine(SpawnLoop());
+        CampaignManager.OnDayChanged += OnDayChanged;
+
+        // Only start immediately if we are already on day 2 or later (e.g. loaded from save).
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        if (currentDay >= FirstActiveDay)
+            BeginSpawning();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+
+        CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
+    }
+
+    /// <summary>
+    /// Responds to day transitions. Starts spawning from <see cref="FirstActiveDay"/> onwards.
+    /// SERVER ONLY (subscribed only on the server in <see cref="OnNetworkSpawn"/>).
+    /// </summary>
+    private void OnDayChanged(int newDay)
+    {
+        if (newDay >= FirstActiveDay && !_isRunning)
+            BeginSpawning();
+        else if (newDay < FirstActiveDay && _isRunning)
+            StopSpawning();
+    }
+
+    private void BeginSpawning()
+    {
+        _isRunning = true;
+        StartCoroutine(SpawnLoop());
+        Debug.Log($"[MutantSpawner] Spawner activated on Day {CampaignManager.Instance?.CurrentDay}.");
     }
 
     // ── Spawn Loop ─────────────────────────────────────────────────────────────

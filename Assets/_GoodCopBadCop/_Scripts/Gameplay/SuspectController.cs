@@ -26,6 +26,12 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static int ForceNextSuspectAnomalyCount = -1;
 
+    /// <summary>
+    /// When true, the next suspect slot spawns as a mutant intruder regardless of spawn chance.
+    /// The flag is consumed and reset automatically after use. Set by DebugConsole (F3).
+    /// </summary>
+    public static bool ForceNextSuspectMutant = false;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -57,6 +63,10 @@ public class SuspectController : NetworkBehaviour
     [Header("Suspect Arrival Cam")]
     [SerializeField] private GameObject suspectCam;
     private const float SuspectCamDuration = 3f;
+
+    [Header("Mutant Intruder")]
+    [Tooltip("Position on the player's side of the booth window. The mutant DOTweens here after a successful breakthrough.")]
+    [SerializeField] private Transform climbThroughTargetPos;
 
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
@@ -107,8 +117,22 @@ public class SuspectController : NetworkBehaviour
     {
         yield return new WaitForSeconds(3f);
         suspectIndex.Value += 1;
-        
-        SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
+
+        if (ForceNextSuspectMutant)
+        {
+            ForceNextSuspectMutant = false;
+            if (dailySuspectManager.TryGetRandomMutant(out MutantSuspectBehaviour forcedPrefab, out MutantIntruderData forcedData))
+            {
+                SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, forcedPrefab, forcedData);
+                yield break;
+            }
+            Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: no mutant available in pool — falling back to normal suspect.");
+        }
+
+        if (dailySuspectManager.IsMutantSlot(suspectIndex.Value, out MutantSuspectBehaviour mutantPrefab, out MutantIntruderData mutantData))
+            SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, mutantPrefab, mutantData);
+        else
+            SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
     }
 
     [SerializeField] private DailySuspectManager dailySuspectManager;
@@ -116,7 +140,14 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        SuspectCharacter suspectPrefab = dailySuspectManager.shiftSuspects[lineupIndex].CharacterPrefab;
+        SuspectData suspectData = dailySuspectManager.shiftSuspects[lineupIndex];
+        if (suspectData == null)
+        {
+            Debug.LogError($"[SuspectController] Null SuspectData at lineup index {lineupIndex} — expected a mutant slot branch.");
+            return;
+        }
+
+        SuspectCharacter suspectPrefab = suspectData.CharacterPrefab;
         
         if (suspectPrefab == null)
         {
@@ -960,6 +991,66 @@ public class SuspectController : NetworkBehaviour
         _currentSuspectNetworkObjectId = ulong.MaxValue;
         suspectCharacter = null;
         spawnedFolder = null;
+    }
+
+    // ── Mutant Intruder ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Spawns a mutant from the lineup pool and starts its booth-approach sequence.
+    /// Called on the server when the current lineup slot is a mutant slot.
+    /// </summary>
+    private void SpawnMutantIntruderServer(Vector3 position, Quaternion rotation, MutantSuspectBehaviour prefab, MutantIntruderData data)
+    {
+        if (!IsServer) return;
+
+        // Clear any leftover suspect reference so verdict/interact code sees null for this slot.
+        suspectCharacter = null;
+
+        GameObject mutantObj = Instantiate(prefab.gameObject, position, rotation);
+        NetworkObject netObj = mutantObj.GetComponent<NetworkObject>();
+
+        if (netObj == null)
+        {
+            Debug.LogError("[SuspectController] Mutant intruder prefab is missing a NetworkObject — aborting spawn.");
+            Destroy(mutantObj);
+            return;
+        }
+
+        netObj.Spawn();
+
+        MutantSuspectBehaviour behaviour = mutantObj.GetComponent<MutantSuspectBehaviour>();
+        if (behaviour == null)
+        {
+            Debug.LogError("[SuspectController] Mutant intruder prefab is missing MutantSuspectBehaviour — aborting.");
+            netObj.Despawn();
+            return;
+        }
+
+        if (climbThroughTargetPos == null)
+            Debug.LogWarning("[SuspectController] climbThroughTargetPos is not assigned — mutant breakthrough destination will be Vector3.zero.", this);
+
+        behaviour.BeginLineup(data, standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+
+        // Reuse the existing booth-waiting notification so players are alerted.
+        NotifySuspectArrivingClientRpc();
+    }
+
+    /// <summary>
+    /// Called by MutantSuspectBehaviour when its lineup sequence ends.
+    /// Despawns the mutant if it retreated, then advances the lineup.
+    /// </summary>
+    public void OnMutantIntruderComplete(MutantSuspectBehaviour mutant, bool brokeThrough)
+    {
+        if (!IsServer) return;
+
+        if (!brokeThrough && mutant != null)
+        {
+            NetworkObject netObj = mutant.GetComponent<NetworkObject>();
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn();
+        }
+
+        ShiftManager.Instance.SetNextSuspectReady();
     }
 
     /// <summary>

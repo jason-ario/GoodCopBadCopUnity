@@ -94,6 +94,12 @@ public class DebugConsole : MonoBehaviour
             SkipToDay(2);
         }
 
+        // F3 — force the next suspect to spawn as a mutant intruder.
+        if (Input.GetKeyDown(KeyCode.F3))
+        {
+            ForceNextMutantIntruder();
+        }
+
         // F4 — trigger an incoming telephone call with the configured task index.
         if (Input.GetKeyDown(KeyCode.F4))
         {
@@ -108,6 +114,12 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F9))
         {
             BetweenShiftTaskManager.Instance.ForceCompleteAllTasks();
+        }
+
+        // Insert — queue the test day (Day_Test) as the destination of the next AdvanceDay call.
+        if (Input.GetKeyDown(KeyCode.Insert))
+        {
+            ForceTestDay();
         }
 
         if (Input.GetKeyDown(KeyCode.F7))
@@ -148,6 +160,26 @@ public class DebugConsole : MonoBehaviour
     {
         GameManager.Instance.OnGameStart -= OnGameStartAutoStart;
         ShiftManager.Instance.StartNewShift();
+    }
+
+    /// <summary>
+    /// Queues <see cref="Day_Test"/> as the destination of the next <see cref="CampaignManager.AdvanceDay"/> call.
+    /// The current shift is unaffected; the override takes effect when the shift ends and the day advances.
+    /// </summary>
+    private void ForceTestDay()
+    {
+        CampaignManager.DebugNextDayOverride = Day_Test.TestDayNumber;
+        Debug.Log($"[DebugConsole] Next day advance will load Day_Test (Day {Day_Test.TestDayNumber}) — Insert.");
+    }
+
+    /// <summary>
+    /// Forces the next suspect slot to spawn as a mutant intruder regardless of configured spawn chance.
+    /// Takes effect when the current suspect is dismissed and the next one is queued.
+    /// </summary>
+    private void ForceNextMutantIntruder()
+    {
+        SuspectController.ForceNextSuspectMutant = true;
+        Debug.Log("[DebugConsole] Next suspect will be a mutant intruder (F3).");
     }
 
     /// <summary>

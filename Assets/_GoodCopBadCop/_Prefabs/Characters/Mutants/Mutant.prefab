@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 382862180593633284}
   - component: {fileID: 7127085182576174026}
   - component: {fileID: 4700978623447278918}
+  - component: {fileID: -1946918825076805320}
   m_Layer: 0
   m_Name: Mutant
   m_TagString: Enemy
@@ -50,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3893325772
+  GlobalObjectIdHash: 3107953825
   InScenePlacedSourceGlobalObjectIdHash: 3107953825
   DeferredDespawnTick: 0
   Ownership: 1
@@ -176,6 +177,19 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 2.6
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-1946918825076805320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7307716854411765365}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0109ada33de6edf45a2c2a86f0b253f2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MutantSuspectBehaviour
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &7932345873243114423
 GameObject:
   m_ObjectHideFlags: 0

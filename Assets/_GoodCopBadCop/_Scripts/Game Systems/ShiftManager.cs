@@ -10,6 +10,9 @@ public class ShiftManager : NetworkBehaviour
 {
     public static ShiftManager Instance;
 
+    /// <summary>Fired on the server whenever a suspect is killed.</summary>
+    public static event System.Action OnSuspectKilled;
+
     [Header("Network Variables")]
     public NetworkVariable<bool> shiftStarted = new NetworkVariable<bool>(false);
     private NetworkVariable<int> _networkCurrentDay = new NetworkVariable<int>(1,
@@ -433,6 +436,8 @@ public class ShiftManager : NetworkBehaviour
             suspectsKilledCorrect += 1;
         else
             suspectsKilledWrong += 1;
+
+        OnSuspectKilled?.Invoke();
     }
 
     /// <summary>Records a quarantined suspect and updates the correct/wrong tally.</summary>

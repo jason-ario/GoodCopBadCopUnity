@@ -78,7 +78,12 @@ public class MutantEnemy : NetworkBehaviour
         base.OnNetworkSpawn();
 
         if (IsServer)
-            InitialiseServer();
+        {
+            // Skip auto-initialization when MutantSuspectBehaviour is present.
+            // It will call InitialiseServer() manually after the lineup sequence completes.
+            if (GetComponent<MutantSuspectBehaviour>() == null)
+                InitialiseServer();
+        }
 
         // All clients track the synced speed for animation
         _networkSpeed.OnValueChanged += OnNetworkSpeedChanged;
@@ -91,7 +96,12 @@ public class MutantEnemy : NetworkBehaviour
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
     }
 
-    private void InitialiseServer()
+    /// <summary>
+    /// Sets up health, NavMeshAgent settings, and starts the chase loop.
+    /// Called automatically from OnNetworkSpawn on the server, unless a MutantSuspectBehaviour
+    /// component is present — in that case it is called manually after lineup breakthrough.
+    /// </summary>
+    public void InitialiseServer()
     {
         if (data == null)
         {

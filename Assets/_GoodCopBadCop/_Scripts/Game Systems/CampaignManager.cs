@@ -53,6 +53,13 @@ public class CampaignManager : NetworkBehaviour
 
     private readonly Dictionary<int, DayBase> _days = new Dictionary<int, DayBase>();
 
+    /// <summary>
+    /// When >= 0, overrides the destination day number in the next <see cref="AdvanceDay"/> call.
+    /// Consumed and reset to -1 after a single use.
+    /// Set by DebugConsole (F10) to queue the test day without interrupting the current shift.
+    /// </summary>
+    public static int DebugNextDayOverride = -1;
+
     // -------------------------------------------------------------------------
     // Unity Lifecycle
     // -------------------------------------------------------------------------
@@ -176,6 +183,13 @@ public class CampaignManager : NetworkBehaviour
         }
 
         int nextDay = _currentDay + 1;
+
+        if (DebugNextDayOverride >= 0)
+        {
+            nextDay = DebugNextDayOverride;
+            DebugNextDayOverride = -1;
+            Debug.Log($"[CampaignManager] DEBUG — AdvanceDay redirected to Day {nextDay} via DebugNextDayOverride.");
+        }
 
         if (!_days.ContainsKey(nextDay))
         {
