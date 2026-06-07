@@ -187,7 +187,13 @@ public class PlayerInteractionController : NetworkBehaviour
                     // When empty-handed, both LMB and E work, so show [E] as the primary hint.
                     bool isHolding = _playerPickupController.HeldObject != null;
                     bool isWorldInteract = isHolding ? interactable is not PickableObject : true;
-                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract);
+
+                    // Hide the button tooltip if the interactable requires a specific item
+                    // but the player isn't holding a matching one.
+                    bool showButtonTooltip = interactable.itemsThatCanInteractWith.Length == 0
+                        || (isHolding && interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData));
+
+                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract, showButtonTooltip);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }

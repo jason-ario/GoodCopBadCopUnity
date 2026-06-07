@@ -93,9 +93,16 @@ public class DailySuspectManager : MonoBehaviour
     /// <summary>
     /// Inserts null sentinel entries into shiftSuspects at random positions.
     /// The count is derived from mutantSpawnChance as a percentage of the normal suspect count.
+    /// Only runs from Day 2 onwards.
     /// </summary>
     private void InjectMutantSlots()
     {
+        if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay < 2)
+        {
+            Debug.Log("[DailySuspectManager] Day 1 — mutant lineup injection skipped.");
+            return;
+        }
+
         if (lineupMutants == null || mutantIntruderData == null)
         {
             if (lineupMutants != null && mutantIntruderData == null)

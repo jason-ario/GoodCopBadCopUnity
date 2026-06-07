@@ -16,8 +16,11 @@ public class ReticleController : MonoBehaviour
     private bool canInteract = false;
     private bool isTooFar = false;
 
-    [SerializeField] private TextMeshProUGUI doText; 
+    [SerializeField] private TextMeshProUGUI doText;
     [SerializeField] private Image line;
+    [SerializeField] private Image buttonTooltip;
+    [SerializeField] private Sprite mouseButtonSprite;
+    [SerializeField] private Sprite eKeySprite;
 
     void Update()
     {
@@ -59,8 +62,9 @@ public class ReticleController : MonoBehaviour
     /// </summary>
     /// <param name="state">Whether the reticle is in interact mode.</param>
     /// <param name="text">Label to display next to the input hint.</param>
-    /// <param name="useKeyPrompt">When true, shows the E-key prompt instead of the mouse-click sprite.</param>
-    public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false)
+    /// <param name="useKeyPrompt">When true, shows the E-key sprite instead of the mouse-click sprite.</param>
+    /// <param name="showButtonTooltip">When false, hides the button icon even if the label is shown.</param>
+    public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false, bool showButtonTooltip = true)
     {
         canInteract = state;
         if (state) isTooFar = false;
@@ -68,11 +72,22 @@ public class ReticleController : MonoBehaviour
         if (state == true && text != "")
         {
             doText.gameObject.SetActive(true);
-            doText.text = useKeyPrompt ? $"[E] {text}" : $"{text} <sprite=0>";
+            doText.text = text;
+
+            if (buttonTooltip != null)
+            {
+                bool tooltipVisible = showButtonTooltip && (useKeyPrompt ? eKeySprite != null : mouseButtonSprite != null);
+                buttonTooltip.gameObject.SetActive(tooltipVisible);
+                if (tooltipVisible)
+                    buttonTooltip.sprite = useKeyPrompt ? eKeySprite : mouseButtonSprite;
+            }
         }
         else
         {
             doText.gameObject.SetActive(false);
+
+            if (buttonTooltip != null)
+                buttonTooltip.gameObject.SetActive(false);
         }
     }
 
@@ -80,6 +95,8 @@ public class ReticleController : MonoBehaviour
     {
         reticle.enabled = false;
         doText.gameObject.SetActive(false);
+        if (buttonTooltip != null)
+            buttonTooltip.gameObject.SetActive(false);
     }
     
     public void EnableReticle()
