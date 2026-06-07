@@ -74,6 +74,9 @@ public class KillMachineController : MonoBehaviour
     [ContextMenu("Spawn Blood Decals")]
     public void SpawnBloodDecals()
     {
+        if (SuspectController.Instance != null && !SuspectController.Instance.HasEntityAtWindow)
+            return;
+
         StartCoroutine(SpawnRandomBloodDecals());
         StartCoroutine(SpawnBloodParticles());
     }

@@ -45,6 +45,11 @@ public class SuspectController : NetworkBehaviour
     private SuspectCharacter suspectCharacter;
     public SuspectCharacter CurrentSuspect => suspectCharacter;
 
+    private MutantSuspectBehaviour _currentMutant;
+
+    /// <summary>True when a regular suspect or a mutant intruder is currently at the booth window.</summary>
+    public bool HasEntityAtWindow => suspectCharacter != null || _currentMutant != null;
+
     [Header("Paperwork")]
     [SerializeField] private List<PickableObject> spawnedDocuments = new List<PickableObject>();
 
@@ -1030,6 +1035,7 @@ public class SuspectController : NetworkBehaviour
             Debug.LogWarning("[SuspectController] climbThroughTargetPos is not assigned — mutant breakthrough destination will be Vector3.zero.", this);
 
         behaviour.BeginLineup(data, standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+        _currentMutant = behaviour;
 
         // Reuse the existing booth-waiting notification so players are alerted.
         NotifySuspectArrivingClientRpc();
@@ -1042,6 +1048,8 @@ public class SuspectController : NetworkBehaviour
     public void OnMutantIntruderComplete(MutantSuspectBehaviour mutant, bool brokeThrough)
     {
         if (!IsServer) return;
+
+        _currentMutant = null;
 
         if (!brokeThrough && mutant != null)
         {
