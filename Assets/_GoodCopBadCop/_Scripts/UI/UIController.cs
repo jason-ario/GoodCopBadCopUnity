@@ -33,6 +33,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private ScreenDamage _screenDamage;
     [SerializeField] private EndOfShiftReportUI endOfShiftReportUI;
     [SerializeField] private GameObject startShiftScreen;
+    [SerializeField] private GameObject guardPurchaseScreen;
+    [SerializeField] private GuardPurchaseScreenUI guardPurchaseScreenUI;
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
@@ -45,6 +47,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private AudioClip transitionToGameplayStinger;
     [SerializeField] private GameObject pauseMenu;
     private bool pauseMenuOpened = false;
+
+    private Action _onGuardPurchaseConfirmed;
     
     bool showedCursorBeforePaused = false;
     bool couldControlBeforePaused = false;
@@ -244,6 +248,45 @@ public class UIController : MonoBehaviour
         CloseStartShiftScreen();
         SFXController.Instance.Play(transitionToGameplayStinger);
         ShiftManager.Instance.InitiateIntroCutscene();
+    }
+
+    /// <summary>
+    /// Opens the Guard Purchase Screen. Disables player movement and interaction until the screen is closed.
+    /// </summary>
+    /// <param name="price">The coupon price to display.</param>
+    /// <param name="onConfirmed">Callback invoked when the player confirms the purchase.</param>
+    public void OpenGuardPurchaseScreen(int price, Action onConfirmed)
+    {
+        _onGuardPurchaseConfirmed = onConfirmed;
+        guardPurchaseScreenUI.SetPurchaseMode(price);
+        ShowCursor();
+        guardPurchaseScreen.SetActive(true);
+        PlayerInstance.Instance.OpenedUIPanel();
+    }
+
+    /// <summary>Opens the Guard Purchase Screen in hired mode — shows confirmation message and Okay button only.</summary>
+    public void OpenGuardPurchaseScreenHired()
+    {
+        guardPurchaseScreenUI.SetHiredMode();
+        ShowCursor();
+        guardPurchaseScreen.SetActive(true);
+        PlayerInstance.Instance.OpenedUIPanel();
+    }
+
+    /// <summary>Closes the Guard Purchase Screen and restores player movement and interaction.</summary>
+    public void CloseGuardPurchaseScreen()
+    {
+        HideCursor();
+        guardPurchaseScreen.SetActive(false);
+        PlayerInstance.Instance.ClosedUIPanel();
+        _onGuardPurchaseConfirmed = null;
+    }
+
+    /// <summary>Confirms the guard purchase. Invokes the stored callback then closes the screen.</summary>
+    public void ConfirmGuardPurchase()
+    {
+        _onGuardPurchaseConfirmed?.Invoke();
+        CloseGuardPurchaseScreen();
     }
 
     public void OpenInvitePanel()

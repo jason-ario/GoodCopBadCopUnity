@@ -24,6 +24,13 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public UnityAction OnInteractWithItem;
     public string interactText;
 
+    /// <summary>
+    /// Only highlight children whose names contain this string.
+    /// Leave empty to disable highlighting entirely.
+    /// </summary>
+    [Tooltip("Only highlight children whose names contain this string. Leave empty to disable highlighting entirely.")]
+    [SerializeField] private string highlightNameFilter;
+
     public virtual void Interact(PlayerInteractionController player)
     {
         OnInteract?.Invoke();
@@ -36,6 +43,8 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         highlightEffect.highlighted = true;
         highlightEffect.ProfileLoad(highlightEffect.profile);
 
+        if (!string.IsNullOrEmpty(highlightNameFilter))
+            highlightEffect.effectNameFilter = highlightNameFilter;
     }
 
     public void Highlight(bool highlight)

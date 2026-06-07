@@ -27,6 +27,12 @@ public class SuspectController : NetworkBehaviour
     public static int ForceNextSuspectAnomalyCount = -1;
 
     /// <summary>
+    /// When true, the next suspect to spawn is forced drunk regardless of their drunkChance.
+    /// The flag is consumed and reset automatically by DrunkBehaviour.TryActivate().
+    /// </summary>
+    public static bool ForceNextSuspectDrunk = false;
+
+    /// <summary>
     /// When true, the next suspect slot spawns as a mutant intruder regardless of spawn chance.
     /// The flag is consumed and reset automatically after use. Set by DebugConsole (F3).
     /// </summary>

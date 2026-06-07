@@ -97,7 +97,7 @@ Animator:
   m_GameObject: {fileID: 4022875449541247037}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 86ce969b62959554e8d353566b9c5748, type: 3}
-  m_Controller: {fileID: 9100000, guid: b4ee72cb2e8347f4395efd6610638ace, type: 2}
+  m_Controller: {fileID: 22100000, guid: bccb8bf54e0cb664aa3b06368643210c, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -579,6 +579,10 @@ PrefabInstance:
       value: Fuck you lookin at
       objectReference: {fileID: 0}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: drunkBehaviour
+      value: 
+      objectReference: {fileID: 6773563899430806513}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: expirationDate
       value: 02 MAY
       objectReference: {fileID: 0}
@@ -606,6 +610,10 @@ PrefabInstance:
       propertyPath: m_Animator
       value: 
       objectReference: {fileID: 8475456024140496146}
+    - target: {fileID: 6280671352970633788, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: TransitionStateInfoList.Array.size
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 3199120372
@@ -833,7 +841,10 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4368438058215512711}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4331289234258202243, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6773563899430806513}
   m_SourcePrefab: {fileID: 100100000, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
 --- !u!4 &3094824335572338628 stripped
 Transform:
@@ -845,9 +856,48 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
   m_PrefabInstance: {fileID: 6179155919295601261}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 7627709144336880878}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 575e05368b178804798fd9ed9b284ea5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
+--- !u!1 &7627709144336880878 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4331289234258202243, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 6179155919295601261}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6773563899430806513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7627709144336880878}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1949ab6f68bfe1543878180def30c3a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DrunkBehaviour
+  ShowTopMostFoldoutHeaderGroup: 1
+  _drunkChance: 0.25
+  _animator: {fileID: 8475456024140496146}
+  _drunkAnimatorController: {fileID: 22100000, guid: bccb8bf54e0cb664aa3b06368643210c, type: 2}
+  _drunkDialogues:
+    earlyDays:
+    - Good morning, officer. I just... had a little breakfast. Very liquid breakfast.
+      Very early.
+    - Papers? Of course. Right here. ...Ah. Right pocket. The right pocket.
+    - "I am perfectly fine. The cold air \u2014 it makes my eyes water like this."
+    midDays:
+    - "You know what I always say \u2014 regulations are like fences. Nobody puts
+      up a fence without a reason. ...What were we talking about?"
+    - My friend Otar came through here last week. Big man. Smells like cabbage. Did
+      you see Otar?
+    - I am not drunk. I am just... pre-celebrating. The day has potential.
+    finalDays:
+    - Do you ever wonder... who checks the people who check the people? I think about
+      this a lot now.
+    - I have stood in queues my whole life. Queues for bread. Queues for papers.
+      Queues for more papers. Today I stand in your queue.
+    - Just stamp it. Whatever stamp you use. Any stamp. I am so tired, officer.

@@ -60,6 +60,8 @@ public class SuspectCharacter : Interactable
     [Header("Anomalies")] [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
 
+    [Header("Drunk Behaviour")] [SerializeField] private DrunkBehaviour drunkBehaviour;
+
     /// <summary>Returns true if this suspect has at least one active anomaly.</summary>
     public bool IsInfected => anomalyController != null && anomalyController.activeAnomalies.Count > 0;
 
@@ -122,6 +124,8 @@ public class SuspectCharacter : Interactable
         // (e.g. lesions, black eyes, blue veins) that don't carry index data.
         foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
             SyncInitializeDisabledClientRpc(siblingIndex);
+
+        drunkBehaviour?.TryActivate();
     }
 
     /// <summary>
@@ -154,6 +158,8 @@ public class SuspectCharacter : Interactable
         // (e.g. lesions, black eyes, blue veins) that don't carry index data.
         foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
             SyncInitializeDisabledClientRpc(siblingIndex);
+
+        drunkBehaviour?.TryActivate();
     }
 
     /// <summary>
@@ -176,6 +182,8 @@ public class SuspectCharacter : Interactable
         // Relay InitializeDisabled calls to clients for all anomalies (suspect is clean).
         foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
             SyncInitializeDisabledClientRpc(siblingIndex);
+
+        drunkBehaviour?.TryActivate();
     }
 
     /// <summary>
@@ -355,6 +363,12 @@ public class SuspectCharacter : Interactable
     
     public string GetEntryDialogue()
     {
+        if (drunkBehaviour != null && drunkBehaviour.IsDrunk)
+        {
+            string drunkLine = drunkBehaviour.GetDrunkEntryDialogue();
+            if (drunkLine != null) return drunkLine;
+        }
+
         string entryDialogue = "";
         
         // Get entry dialogues
