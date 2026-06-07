@@ -6,6 +6,9 @@ using Random = System.Random;
 public class KillMachineController : MonoBehaviour
 {
     public static KillMachineController Instance;
+
+    /// <summary>Raised on the server when the kill sequence finishes and the shield lowers.</summary>
+    public event Action OnKillComplete;
     
     [SerializeField] private GameObject guns;
     [SerializeField] private GameObject killShield;
@@ -65,6 +68,7 @@ public class KillMachineController : MonoBehaviour
         windowSound.PlayOneShot(windowOpenSound);
         yield return new WaitForSeconds(2f);
         killShield.SetActive(false);
+        OnKillComplete?.Invoke();
     }
 
     [ContextMenu("Spawn Blood Decals")]

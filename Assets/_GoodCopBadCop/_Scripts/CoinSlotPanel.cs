@@ -271,6 +271,7 @@ public class CoinSlotPanel : Interactable
     /// <summary>
     /// Marks the slot as activated and triggers the Kill Machine.
     /// Idempotent — the _isActivated guard prevents double-firing.
+    /// Resets the panel once the kill sequence completes.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     private void ActivateKillMachineServerRpc()
@@ -280,7 +281,16 @@ public class CoinSlotPanel : Interactable
         _isActivated.Value = true;
 
         if (KillMachineController.Instance != null)
+        {
+            void OnKillComplete()
+            {
+                KillMachineController.Instance.OnKillComplete -= OnKillComplete;
+                ResetPanel();
+            }
+
+            KillMachineController.Instance.OnKillComplete += OnKillComplete;
             KillMachineController.Instance.Kill();
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
