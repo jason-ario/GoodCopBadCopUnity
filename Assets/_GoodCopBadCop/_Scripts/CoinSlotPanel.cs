@@ -150,26 +150,31 @@ public class CoinSlotPanel : Interactable
         anim.EnableRightArmMask();
 
         if (_rightArmIKTarget != null)
-            anim.RightArmIKTarget = _rightArmIKTarget;
+        {
+            anim.RightArmIKTarget    = _rightArmIKTarget;
+            anim.CamRightArmIKTarget = _rightArmIKTarget;
+        }
 
-        // Blend the right-arm rig on. Kill Coin has useRightIK = false, so the
-        // ReleaseHeldObjectForThrow → DisableArmIKs call below will NOT clear this.
-        anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+        // Blend the right-arm rig on. Kill Coin has useRightIK = false, so
+        // DisableArmIKs (inside ReleaseHeldObjectForThrow) will NOT clear this.
+        anim.SetRightArmRigWeightSmooth(1f, 0.5f);
 
         anim.SetAnimTrigger(InsertCoinTrigger);
         anim.SetAnimBool(HoldingCoinBool, false);
 
-        // Detach the coin from the player's hand. NT stays disabled, so we retain
-        // full local control over the coin transform until despawn.
-        player.pickupController.ReleaseHeldObjectForThrow();
-
+        // Coin stays in the player's hand until the insert animation finishes.
         yield return new WaitForSeconds(_insertDelay);
 
-        // ── Phase 3: IK off + camera return + start coin slide ───────────────
-        anim.SetRightArmRigWeightSmooth(0f, 0.2f);
-        anim.RightArmIKTarget = null;
+        // ── Phase 3: IK off + camera return + release coin into slot ─────────
+        anim.SetRightArmRigWeightSmooth(0f, 0.5f);
+        anim.RightArmIKTarget    = null;
+        anim.CamRightArmIKTarget = null;
         anim.SetBodyLeanDirect(0f);
         movement.ResetCameraPos(false, _cameraReturnDuration);
+
+        // Detach the coin from the player's hand now that the animation is done.
+        // NT stays disabled, giving us full control over the transform until despawn.
+        player.pickupController.ReleaseHeldObjectForThrow();
 
         PlayInsertSoundServerRpc(transform.position);
 
@@ -243,6 +248,9 @@ public class CoinSlotPanel : Interactable
         float elapsed = 0f;
         while (elapsed < _coinTravelDuration)
         {
+            // Guard: despawn may arrive before the slide finishes on remote clients.
+            if (coin == null) yield break;
+
             float t      = Mathf.Clamp01(elapsed / _coinTravelDuration);
             float smooth = Mathf.SmoothStep(0f, 1f, t);
             coin.transform.position = Vector3.Lerp(startPos, endPos, smooth);
@@ -251,8 +259,11 @@ public class CoinSlotPanel : Interactable
             yield return null;
         }
 
-        coin.transform.position = endPos;
-        coin.transform.rotation = endRot;
+        if (coin != null)
+        {
+            coin.transform.position = endPos;
+            coin.transform.rotation = endRot;
+        }
     }
 
     // ── Server RPCs ───────────────────────────────────────────────────────────
