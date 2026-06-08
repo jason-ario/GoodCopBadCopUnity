@@ -1,129 +1,262 @@
 using System;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
-/// A single perimeter fence segment that can be damaged and repaired.
+/// A single perimeter fence segment that can be damaged by mutants and repaired by players.
+///
+/// Health drives four visual states via <see cref="_damageStateMeshRoots"/>:
+///   Index 0: Healthy  (≥ 75 % health)
+///   Index 1: Slightly damaged  (≥ 50 %)
+///   Index 2: Mostly damaged  (≥ 25 %)
+///   Index 3: Critical — NavMeshObstacle disabled, mutants can pass through  (&lt; 25 %)
 ///
 /// Prefab setup:
-///   - Add a NetworkObject component to this GameObject.
-///   - Add child GameObjects — one per damage level — and assign them to DamageStateMeshRoots:
-///       Index 0: Healthy (normal fence mesh with LOD group)
-///       Index 1: Slightly damaged mesh with LOD group
-///       Index 2: Mostly damaged mesh with LOD group
-///       Index 3: Destroyed / most broken mesh with LOD group
-///   - Ensure the fence has a Collider so HammerPickable's OverlapSphere can detect it.
-///
-/// The task (FenceRepairTask) calls SetDamageLevelServer() to break a fence.
-/// Players hit it with HammerPickable, which calls HitWithHammerServerRpc() once per swing.
-/// Each hit decrements the damage level by one; reaching 0 means the fence is repaired.
+///   - NetworkObject on this GameObject.
+///   - NavMeshObstacle on this GameObject (carving enabled).
+///   - Four child GameObjects (one per visual state) assigned to DamageStateMeshRoots.
+///   - AudioSource on this GameObject.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class PerimiterFence : NetworkBehaviour
 {
+    // ── Configuration ─────────────────────────────────────────────────────────
+
     [Header("Damage State Meshes")]
-    [Tooltip("One root GameObject per damage level. Index 0 = healthy, higher indices = more broken.\n" +
-             "Each root should have its own LOD Group component for mesh detail.")]
+    [Tooltip("One root GameObject per visual damage state. Index 0 = healthy, higher indices = more broken. " +
+             "Each root should have its own LOD Group component.")]
     [SerializeField] private GameObject[] _damageStateMeshRoots;
+
+    [Header("Health")]
+    [Tooltip("Maximum health of this fence segment.")]
+    [SerializeField] private float _maxHealth = 100f;
+
+    [Tooltip("Health restored per hammer hit during player repair.")]
+    [SerializeField] private float _hammerRepairAmount = 34f;
+
+    [Tooltip("Health-percentage thresholds (descending) at which the visual damage state advances. " +
+             "Must contain one fewer entry than DamageStateMeshRoots. " +
+             "Default {75, 50, 25}: state 1 below 75 %, state 2 below 50 %, passable below 25 %.")]
+    [SerializeField] private float[] _damageThresholds = { 75f, 50f, 25f };
 
     [Header("Audio")]
     [SerializeField] private AudioClip _hammerHitSound;
     [SerializeField] private AudioClip _repairCompleteSound;
+    [SerializeField] private AudioClip _mutantHitSound;
     [SerializeField] private AudioSource _audioSource;
 
+    // ── Networked state ────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Current damage level. 0 = healthy/fully repaired; higher = more broken.
-    /// Authoritative on server, replicated to all clients via NetworkVariable.
+    /// Current health. Authoritative on server, replicated to all clients.
+    /// Starts at 0 and is set to <see cref="_maxHealth"/> in <see cref="OnNetworkSpawn"/>.
     /// </summary>
-    private NetworkVariable<int> _damageLevel = new NetworkVariable<int>(
-        0,
+    private NetworkVariable<float> _health = new NetworkVariable<float>(
+        0f,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    /// <summary>True when this fence segment requires repair.</summary>
-    public bool IsBroken => _damageLevel.Value > 0;
+    // ── Local state ────────────────────────────────────────────────────────────
 
-    /// <summary>True when this fence is in its default undamaged state.</summary>
-    public bool IsRepaired => _damageLevel.Value == 0;
+    private NavMeshObstacle _navMeshObstacle;
+    private Collider[] _colliders;
+
+    /// <summary>Prevents audio from playing during initial spawn synchronisation.</summary>
+    private bool _initialized;
+
+    // ── Properties ─────────────────────────────────────────────────────────────
+
+    /// <summary>True when this fence segment has taken any damage.</summary>
+    public bool IsBroken => _health.Value < _maxHealth;
+
+    /// <summary>True when this fence is at full health.</summary>
+    public bool IsRepaired => _health.Value >= _maxHealth;
 
     /// <summary>
-    /// The highest valid damage index, derived from the number of mesh root entries.
-    /// A fence with four mesh roots supports damage levels 0–3.
+    /// True when this fence is in its most-damaged state and mutants can walk through it.
+    /// Health-based so this works whether or not a NavMeshObstacle is present on the prefab.
+    /// </summary>
+    public bool IsPassableByMutant => _health.Value <= 0f;
+
+    /// <summary>
+    /// The highest valid integer damage level, derived from the number of mesh root entries.
+    /// A fence with four mesh roots supports levels 0–3.
+    /// Kept for backward-compatibility with <see cref="FenceRepairTask"/>.
     /// </summary>
     public int MaxDamageLevel => _damageStateMeshRoots != null
         ? Mathf.Max(0, _damageStateMeshRoots.Length - 1)
         : 0;
 
+    // ── Events ─────────────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Raised on the server when a player's hammer hit reduces this fence's damage to 0.
-    /// FenceRepairTask subscribes to this to track overall task progress.
+    /// Raised on the server when a player's hammer hits restore this fence to full health.
+    /// <see cref="FenceRepairTask"/> subscribes to this to track task progress.
     /// </summary>
     public event Action<PerimiterFence> OnFullyRepaired;
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    private void Awake()
+    {
+        _navMeshObstacle = GetComponent<NavMeshObstacle>();
+        _colliders = GetComponentsInChildren<Collider>(true);
+    }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _damageLevel.OnValueChanged += OnDamageLevelChanged;
-        ApplyDamageVisuals(_damageLevel.Value);
+
+        _health.OnValueChanged += OnHealthChanged;
+
+        // Server initialises health to full on first spawn.
+        // Subsequent SetDamageLevelServer calls (from FenceRepairTask) override this.
+        if (IsServer && _health.Value == 0f)
+            _health.Value = _maxHealth;
+
+        // Apply the current state immediately. OnValueChanged does not fire for initial values
+        // on clients that join after the fence has already been synchronised.
+        ApplyHealthState(_health.Value);
+
+        _initialized = true;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _damageLevel.OnValueChanged -= OnDamageLevelChanged;
+        _health.OnValueChanged -= OnHealthChanged;
+        _initialized = false;
     }
 
-    private void OnDamageLevelChanged(int previous, int current)
+    // ── Health state ───────────────────────────────────────────────────────────
+
+    private void OnHealthChanged(float previous, float current)
     {
-        ApplyDamageVisuals(current);
+        ApplyHealthState(current);
 
-        if (_audioSource == null) return;
+        if (!_initialized || _audioSource == null) return;
 
-        if (current == 0 && previous > 0 && _repairCompleteSound != null)
+        if (current >= _maxHealth && _repairCompleteSound != null)
             _audioSource.PlayOneShot(_repairCompleteSound);
-        else if (_hammerHitSound != null)
+        else if (current > previous && _hammerHitSound != null)
             _audioSource.PlayOneShot(_hammerHitSound);
+        // Mutant hit sound is broadcast separately via PlayMutantHitSoundClientRpc.
     }
 
     /// <summary>
-    /// Activates only the child mesh root that matches the given damage level,
-    /// hiding all others. Runs on every client via the NetworkVariable callback.
+    /// Derives the visual damage state from the current health value, then applies mesh visuals,
+    /// NavMeshObstacle (if present), and collider enabled state accordingly.
     /// </summary>
-    private void ApplyDamageVisuals(int level)
+    private void ApplyHealthState(float health)
+    {
+        int state    = GetDamageState(health);
+        bool passable = IsPassableByMutant;
+
+        ApplyDamageVisuals(state);
+
+        // Disable non-trigger colliders when broken so mutants can walk through.
+        // We no longer manage NavMeshObstacles here; the fence is always "walkable" 
+        // on the NavMesh and is physically blocked only by these colliders.
+        if (_colliders != null)
+        {
+            foreach (Collider col in _colliders)
+            {
+                if (!col.isTrigger)
+                    col.enabled = !passable;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maps a health value to a visual damage state index.
+    /// State 0 = healthy; each higher index corresponds to a lower health band.
+    /// The last state (index == <see cref="MaxDamageLevel"/>) is entered when health falls
+    /// below the lowest <see cref="_damageThresholds"/> entry and disables the NavMeshObstacle.
+    /// </summary>
+    private int GetDamageState(float health)
+    {
+        if (_maxHealth <= 0f || _damageThresholds == null || _damageThresholds.Length == 0)
+            return 0;
+
+        float pct = (health / _maxHealth) * 100f;
+
+        for (int i = 0; i < _damageThresholds.Length; i++)
+        {
+            if (pct >= _damageThresholds[i])
+                return i;
+        }
+
+        // Below all thresholds → worst (passable) state.
+        return _damageThresholds.Length;
+    }
+
+    private void ApplyDamageVisuals(int state)
     {
         if (_damageStateMeshRoots == null) return;
 
         for (int i = 0; i < _damageStateMeshRoots.Length; i++)
         {
             if (_damageStateMeshRoots[i] != null)
-                _damageStateMeshRoots[i].SetActive(i == level);
+                _damageStateMeshRoots[i].SetActive(i == state);
         }
     }
 
+    // ── Public server API ──────────────────────────────────────────────────────
+
     /// <summary>
-    /// Sets this fence to a specific damage level. Server-only.
-    /// Called by FenceRepairTask.ResetTask() at the start of each night phase.
+    /// Sets this fence to a specific integer damage level. 0 = fully repaired; higher = more broken.
+    /// Called by <see cref="FenceRepairTask"/> at the start of each night phase. Server-only.
+    /// Maps level 0 → full health and <see cref="MaxDamageLevel"/> → 0 health linearly.
     /// </summary>
-    /// <param name="level">Target damage level. Clamped to 0–MaxDamageLevel.</param>
+    /// <param name="level">Target damage level. Clamped to 0–<see cref="MaxDamageLevel"/>.</param>
     public void SetDamageLevelServer(int level)
     {
         Debug.Assert(IsServer, "[PerimiterFence] SetDamageLevelServer must be called on the server.");
-        _damageLevel.Value = Mathf.Clamp(level, 0, MaxDamageLevel);
+
+        int clamped = Mathf.Clamp(level, 0, MaxDamageLevel);
+        float t = MaxDamageLevel > 0 ? 1f - (float)clamped / MaxDamageLevel : 1f;
+        _health.Value = Mathf.Clamp(t * _maxHealth, 0f, _maxHealth);
     }
 
     /// <summary>
-    /// Registers a single hammer hit on this fence.
-    /// Decrements the damage level by one. When it reaches 0, OnFullyRepaired is raised.
+    /// Registers a single hammer hit, restoring health by <see cref="_hammerRepairAmount"/>.
+    /// Raises <see cref="OnFullyRepaired"/> when health returns to maximum.
     /// Safe to call from any client — ownership is not required.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void HitWithHammerServerRpc()
     {
-        if (!IsBroken) return;
+        if (IsRepaired) return;
 
-        _damageLevel.Value = Mathf.Max(0, _damageLevel.Value - 1);
+        _health.Value = Mathf.Min(_maxHealth, _health.Value + _hammerRepairAmount);
 
-        if (_damageLevel.Value == 0)
+        if (_health.Value >= _maxHealth)
             OnFullyRepaired?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Applies mutant melee damage, reducing health by <paramref name="damage"/>.
+    /// Always plays the mutant-hit sound on all clients regardless of state changes.
+    /// Must be called on the server.
+    /// </summary>
+    public void TakeMutantHitServer(float damage)
+    {
+        Debug.Assert(IsServer, "[PerimiterFence] TakeMutantHitServer must be called on the server.");
+
+        PlayMutantHitSoundClientRpc();
+
+        if (_health.Value <= 0f) return;
+
+        _health.Value = Mathf.Max(0f, _health.Value - damage);
+    }
+
+    [ClientRpc]
+    private void PlayMutantHitSoundClientRpc()
+    {
+        if (_audioSource == null || _mutantHitSound == null)
+            return;
+
+        _audioSource.PlayOneShot(_mutantHitSound);
     }
 }

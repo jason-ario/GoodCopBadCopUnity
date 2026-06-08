@@ -27,6 +27,10 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Index into Telephone._availableTasks to deliver when pressing F4.")]
     [SerializeField] private int _debugPhoneTaskIndex = 0;
 
+    [Header("Mutant Debug")]
+    [Tooltip("Spawner used by F10 to force-spawn a guaranteed aggroed mutant.")]
+    [SerializeField] private MutantSpawner _debugMutantSpawner;
+
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
 
@@ -139,6 +143,12 @@ public class DebugConsole : MonoBehaviour
             CompleteDebugTask();
         }
 
+        // O — force-spawn a guaranteed aggroed mutant from the debug spawner.
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            SpawnDebugAggroedMutant();
+        }
+
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
         if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
         {
@@ -244,4 +254,21 @@ public class DebugConsole : MonoBehaviour
 
         _debugTask.Complete();
     }
+
+    /// <summary>
+    /// Forces a single aggroed mutant to spawn from <see cref="_debugMutantSpawner"/>,
+    /// bypassing the <see cref="MutantEnemyData.aggroChance"/> roll.
+    /// </summary>
+    private void SpawnDebugAggroedMutant()
+    {
+        if (_debugMutantSpawner == null)
+        {
+            Debug.LogWarning("[DebugConsole] _debugMutantSpawner not assigned — assign it in the Inspector (O).");
+            return;
+        }
+
+        _debugMutantSpawner.ForceSpawnAggroed();
+        Debug.Log("[DebugConsole] Aggroed mutant spawn triggered (O).");
 }
+
+    }

@@ -69,8 +69,17 @@ public class MutantEnemy : NetworkBehaviour
     // Patrol & aggro state (server only)
     private Vector3 _spawnPosition;
     private bool _isAggroed;
+    private bool _forceAggro;
     private bool _patrolWaiting;
     private float _patrolWaitTimer;
+    private PerimiterFence _fenceTarget;
+    private DoorController _doorTarget;
+
+    // Destination deduplication — prevents redundant SetDestination calls for stationary
+    // targets, which cause a 1-frame path-recalculation stutter every retarget tick.
+    private Vector3 _lastSetDestination = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+    private object _lastDestinationTarget;
+    private const float DestinationChangeSqrThreshold = 0.25f; // skip re-set if target moved < 0.5 m
 
     /// <summary>
     /// True once this enemy has died, regardless of whether it has been despawned yet.
@@ -97,10 +106,7 @@ public class MutantEnemy : NetworkBehaviour
 
         if (IsServer)
         {
-            // Skip auto-initialization when MutantSuspectBehaviour is present.
-            // It will call InitialiseServer() manually after the lineup sequence completes.
-            if (GetComponent<MutantSuspectBehaviour>() == null)
-                InitialiseServer();
+            InitialiseServer();
         }
 
         // All clients track the synced speed for animation
@@ -130,13 +136,17 @@ public class MutantEnemy : NetworkBehaviour
 
         _health = data.maxHealth;
 
+        // Ensure the component is active so Update() and ChaseLoop() run correctly
+        // even if the prefab has the script disabled by default.
+        enabled = true;
+
         _agent.speed = data.moveSpeed;
         _agent.angularSpeed = data.angularSpeed;
         _agent.acceleration = data.acceleration;
         _agent.stoppingDistance = data.stoppingDistance;
 
         _spawnPosition = transform.position;
-        _isAggroed = aggroTarget != null && UnityEngine.Random.value < data.aggroChance;
+        _isAggroed = aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
         StartCoroutine(ChaseLoop());
     }
@@ -171,7 +181,7 @@ public class MutantEnemy : NetworkBehaviour
             if (_currentTarget != null)
             {
                 // ── Chase ──────────────────────────────────────────────────────
-                _agent.SetDestination(_currentTarget.position);
+                SetAgentDestination(_currentTarget.position, _currentTarget);
 
                 float distanceToTarget = Vector3.Distance(transform.position, _currentTarget.position);
 
@@ -180,10 +190,9 @@ public class MutantEnemy : NetworkBehaviour
                     TryAttack();
                 }
                 else if (!_agent.pathPending
-                         && _agent.pathStatus != NavMeshPathStatus.PathComplete
-                         && Time.time >= _doorOpenCooldownTimer)
+                         && _agent.pathStatus != NavMeshPathStatus.PathComplete)
                 {
-                    TryOpenBlockingDoor();
+                    TryBangBlockingDoorTowardTarget(_currentTarget);
                 }
             }
             else
@@ -196,7 +205,50 @@ public class MutantEnemy : NetworkBehaviour
                 if (_isAggroed && aggroTarget != null)
                 {
                     // ── Aggro ──────────────────────────────────────────────────
-                    _agent.SetDestination(aggroTarget.position);
+
+                    // Drop stale door target.
+                    if (_doorTarget != null && (!_doorTarget.IsSpawned || !_doorTarget.IsDoorClosed))
+                    {
+                        _doorTarget = null;
+                        InvalidateDestination();
+                    }
+
+                    if (_fenceTarget != null)
+                    {
+                        // Navigate toward the fence — the NavMeshObstacle carved boundary
+                        // is the natural stopping point; no manual stop position needed.
+                        _agent.isStopped = false;
+                        _agent.stoppingDistance = data.stoppingDistance;
+                        SetAgentDestination(_fenceTarget.transform.position, _fenceTarget);
+
+                        if (IsFenceTargetInRange())
+                            TryAttackFence();
+                    }
+                    else if (_doorTarget != null)
+                    {
+                        _agent.isStopped = false;
+                        _agent.stoppingDistance = data.stoppingDistance;
+                        SetAgentDestination(_doorTarget.transform.position, _doorTarget);
+
+                        float distToDoor = Vector3.Distance(transform.position, _doorTarget.transform.position);
+                        if (distToDoor <= data.attackRange)
+                            TryBangDoor(_doorTarget);
+                    }
+                    else
+                    {
+                        _agent.isStopped = false;
+                        _agent.stoppingDistance = data.stoppingDistance;
+                        SetAgentDestination(aggroTarget.position, aggroTarget);
+
+                        // Once the agent reaches the booth wall (partial path), find the door.
+                        bool agentSettled = _agent.hasPath
+                                         && !_agent.pathPending
+                                         && _agent.pathStatus != NavMeshPathStatus.PathComplete
+                                         && _agent.remainingDistance <= _agent.stoppingDistance + 0.5f;
+
+                        if (agentSettled)
+                            _doorTarget = FindNearestBlockingDoor();
+                    }
                 }
                 else if (data.enablePatrol)
                 {
@@ -255,13 +307,160 @@ public class MutantEnemy : NetworkBehaviour
             _agent.SetDestination(hit.position);
     }
 
+    // ── Fence Assault ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets the NavMesh agent's destination, skipping the call entirely when the target
+    /// identity and position have not meaningfully changed since the last call.
+    /// Switching to a different target always forces a new <see cref="NavMeshAgent.SetDestination"/> call.
+    /// </summary>
+    private void SetAgentDestination(Vector3 destination, object targetIdentity = null)
+    {
+        bool sameTarget = targetIdentity != null && targetIdentity == _lastDestinationTarget;
+        if (sameTarget && (destination - _lastSetDestination).sqrMagnitude <= DestinationChangeSqrThreshold)
+            return;
+
+        _lastDestinationTarget = targetIdentity;
+        _lastSetDestination = destination;
+        _agent.SetDestination(destination);
+    }
+
+    /// <summary>
+    /// Resets destination-deduplication state so the very next <see cref="SetAgentDestination"/>
+    /// call always triggers a real <see cref="NavMeshAgent.SetDestination"/>, forcing the agent
+    /// to replan its path. Call this whenever a blocking obstacle is removed.
+    /// </summary>
+    private void InvalidateDestination()
+    {
+        _lastDestinationTarget = null;
+        _lastSetDestination    = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+    }
+
+    /// <summary>
+    /// Returns true when any collider belonging to <see cref="_fenceTarget"/> overlaps the
+    /// attack-range sphere around the mutant. Uses collider overlap so it works correctly
+    /// for long fence segments whose transform center may be several metres away.
+    /// </summary>
+    private bool IsFenceTargetInRange()
+    {
+        if (_fenceTarget == null) return false;
+
+        Collider[] cols = Physics.OverlapSphere(transform.position, data.attackRange);
+        foreach (Collider col in cols)
+        {
+            if (col.GetComponentInParent<PerimiterFence>() == _fenceTarget)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// SphereCasts directly in front of the mutant's movement direction and returns
+    /// the first non-passable <see cref="PerimiterFence"/> found within a short distance.
+    /// This ensures the mutant only attacks fences that are physically blocking its path.
+    /// </summary>
+    private PerimiterFence FindBlockingFenceInFront()
+    {
+        // Cast from chest height forward.
+        Vector3 origin = transform.position + Vector3.up * 1f;
+        Vector3 direction = transform.forward;
+        float distance = 1.5f; // Short range check
+        float radius = 0.75f;
+
+        if (Physics.SphereCast(origin, radius, direction, out RaycastHit hit, distance))
+        {
+            PerimiterFence fence = hit.collider.GetComponentInParent<PerimiterFence>();
+            if (fence != null && fence.IsSpawned && !fence.IsPassableByMutant)
+                return fence;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Triggers an attack against the cached fence target if the cooldown has elapsed.
+    /// Plays the standard attack animation and schedules the impact hit via <see cref="DelayedFenceHit"/>.
+    /// </summary>
+    private void TryAttackFence()
+    {
+        if (Time.time < _attackCooldownTimer || _fenceTarget == null)
+            return;
+
+        _attackCooldownTimer = Time.time + data.attackCooldown;
+
+        // Capture the target NOW so DelayedFenceHit doesn't accidentally hit whichever
+        // fence happens to be cached when the coroutine executes.
+        PerimiterFence target = _fenceTarget;
+
+        TriggerAttackAnimationClientRpc();
+        StartCoroutine(DelayedFenceHit(target));
+    }
+
+    /// <summary>
+    /// Waits for the melee impact frame then fires the hitbox's fence scan — the same OverlapSphere
+    /// that the player attack uses, so the hit only registers when the animation reaches the mutant's
+    /// arm. Falls back to a centre-distance check when no hitbox is assigned.
+    /// </summary>
+    private IEnumerator DelayedFenceHit(PerimiterFence fence)
+    {
+        yield return new WaitForSeconds(attackHitDelay);
+
+        if (_isDead || fence == null || !fence.IsSpawned)
+            yield break;
+
+        if (attackHitbox != null)
+        {
+            attackHitbox.PerformFenceHitScan(data.fenceDamagePerHit, fence);
+        }
+        else
+        {
+            // Fallback: centre-distance check when no hitbox component is configured.
+            if (Vector3.Distance(transform.position, fence.transform.position) <= data.attackRange)
+                fence.TakeMutantHitServer(data.fenceDamagePerHit);
+        }
+    }
+
     private void Update()
     {
-        // Smooth speed sync from server every frame on the server
-        if (IsServer && !_isDead && _agent.isActiveAndEnabled)
+        if (!IsServer || _isDead || !_agent.isActiveAndEnabled) return;
+
+        if (_isAggroed && aggroTarget != null)
         {
-            _networkSpeed.Value = _agent.velocity.magnitude;
+            if (_fenceTarget == null)
+            {
+                // Only look for a fence if we are currently moving or trying to move.
+                if (_agent.velocity.sqrMagnitude > 0.01f || _agent.hasPath)
+                    _fenceTarget = FindBlockingFenceInFront();
+            }
+            else if (!_fenceTarget.IsSpawned || _fenceTarget.IsPassableByMutant)
+            {
+                // Fence broken — resume navigation toward the aggro target immediately.
+                _fenceTarget = null;
+                _agent.isStopped = false;
+                _agent.stoppingDistance = data.stoppingDistance;
+                InvalidateDestination();
+                _agent.SetDestination(aggroTarget.position);
+            }
+            else if (IsFenceTargetInRange())
+            {
+                // Stop the agent so it doesn't try to push through the obstacle while attacking.
+                _agent.isStopped = true;
+
+                // Rotate toward the fence while attacking (agent may be stopped by physical collider).
+                Vector3 toFence = _fenceTarget.transform.position - transform.position;
+                toFence.y = 0f;
+                if (toFence.sqrMagnitude > 0.01f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(toFence);
+                    transform.rotation = Quaternion.RotateTowards(
+                        transform.rotation, targetRot, data.angularSpeed * Time.deltaTime);
+                }
+
+                TryAttackFence();
+            }
         }
+
+        _networkSpeed.Value = _agent.velocity.magnitude;
     }
 
     // ── Targeting ──────────────────────────────────────────────────────────────
@@ -274,6 +473,27 @@ public class MutantEnemy : NetworkBehaviour
     public void SetAggroTarget(Transform target)
     {
         aggroTarget = target;
+    }
+
+    /// <summary>
+    /// Forces this mutant into aggro mode on spawn, bypassing the <see cref="MutantEnemyData.aggroChance"/> roll.
+    /// Must be called before <see cref="NetworkObject.Spawn"/> so <see cref="InitialiseServer"/> reads it.
+    /// Requires a valid aggro target — pair with <see cref="SetAggroTarget"/>.
+    /// </summary>
+    public void SetForceAggro(bool forceAggro)
+    {
+        _forceAggro = forceAggro;
+    }
+
+    /// <summary>
+    /// Disables this component and stops all running coroutines so that
+    /// <see cref="MutantSuspectBehaviour"/> can take exclusive control during a lineup sequence.
+    /// Called by <see cref="MutantSuspectBehaviour.BeginLineup"/> before the lineup coroutine starts.
+    /// </summary>
+    public void SuspendForLineup()
+    {
+        StopAllCoroutines();
+        enabled = false;
     }
 
     /// <summary>
@@ -310,11 +530,12 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Searches for an <see cref="IMutantPassable"/> obstacle within <see cref="doorDetectionRadius"/>
     /// that lies roughly between the mutant and its current target, and forces it open.
-    /// Only opens one obstacle per call; applies a cooldown to prevent spam.
+    /// Returns true when an unlocked door was found and opened; false otherwise.
+    /// Applies a cooldown to prevent spam.
     /// </summary>
-    private void TryOpenBlockingDoor()
+    private bool TryOpenBlockingDoor()
     {
-        if (_currentTarget == null) return;
+        if (_currentTarget == null) return false;
 
         Vector3 toTarget = (_currentTarget.position - transform.position).normalized;
         Collider[] nearby = Physics.OverlapSphere(transform.position, doorDetectionRadius);
@@ -333,8 +554,98 @@ public class MutantEnemy : NetworkBehaviour
 
             passable.OpenForMutant();
             _doorOpenCooldownTimer = Time.time + doorOpenCooldownDuration;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Searches within <see cref="doorDetectionRadius"/> for any physically-closed
+    /// <see cref="DoorController"/> (locked or not) in the direction of <paramref name="target"/>,
+    /// and bangs on it at the standard attack rate. Used when the chase path is blocked by a
+    /// door that cannot be forced open.
+    /// </summary>
+    private void TryBangBlockingDoorTowardTarget(Transform target)
+    {
+        if (target == null) return;
+
+        Vector3 toTarget = (target.position - transform.position).normalized;
+        Collider[] nearby = Physics.OverlapSphere(transform.position, doorDetectionRadius);
+
+        foreach (Collider col in nearby)
+        {
+            DoorController door = col.GetComponentInParent<DoorController>();
+            if (door == null || !door.IsSpawned || !door.IsDoorClosed)
+                continue;
+
+            Vector3 toObstacle = (col.transform.position - transform.position).normalized;
+            if (Vector3.Dot(toTarget, toObstacle) <= 0f)
+                continue;
+
+            TryBangDoor(door);
             return;
         }
+    }
+
+    /// <summary>
+    /// Returns the nearest spawned <see cref="DoorController"/> that is physically closed,
+    /// regardless of lock state. Used as a fallback when the aggro path is blocked and no
+    /// non-passable perimeter fence remains.
+    /// </summary>
+    private DoorController FindNearestBlockingDoor()
+    {
+        DoorController[] allDoors = UnityEngine.Object.FindObjectsByType<DoorController>(FindObjectsSortMode.None);
+
+        DoorController nearest = null;
+        float nearestSqrDist = float.MaxValue;
+
+        foreach (DoorController door in allDoors)
+        {
+            if (door == null || !door.IsSpawned || !door.IsDoorClosed)
+                continue;
+
+            float sqrDist = (door.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist < nearestSqrDist)
+            {
+                nearestSqrDist = sqrDist;
+                nearest = door;
+            }
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Triggers an attack animation against <paramref name="door"/> and schedules the bang
+    /// sound at the melee impact frame. Uses the same attack-cooldown timer as player attacks
+    /// so the mutant cannot simultaneously pummel both.
+    /// </summary>
+    private void TryBangDoor(DoorController door)
+    {
+        if (Time.time < _attackCooldownTimer || door == null)
+            return;
+
+        _attackCooldownTimer = Time.time + data.attackCooldown;
+
+        TriggerAttackAnimationClientRpc();
+        StartCoroutine(DelayedDoorBang(door));
+    }
+
+    /// <summary>
+    /// Waits for the melee impact frame, then plays the door-bang sound on all clients.
+    /// Validates proximity at impact time so a stale coroutine does not trigger remotely.
+    /// </summary>
+    private IEnumerator DelayedDoorBang(DoorController door)
+    {
+        yield return new WaitForSeconds(attackHitDelay);
+
+        if (_isDead || door == null || !door.IsSpawned)
+            yield break;
+
+        float distToDoor = Vector3.Distance(transform.position, door.transform.position);
+        if (distToDoor <= data.attackRange * 1.5f)
+            door.PlayMutantBangClientRpc();
     }
 
     // ── Attack ─────────────────────────────────────────────────────────────────
@@ -357,9 +668,6 @@ public class MutantEnemy : NetworkBehaviour
 
         // Schedule the sphere-cast to fire at the melee impact frame on the server.
         StartCoroutine(DelayedHitScan(data.damagePerHit));
-
-        // Reset the Attack bool after the attack cooldown so the animator returns to locomotion.
-        StartCoroutine(ResetAttackBoolAfterDelay(data.attackCooldown));
     }
 
     /// <summary>
@@ -395,8 +703,12 @@ public class MutantEnemy : NetworkBehaviour
     [ClientRpc]
     private void TriggerAttackAnimationClientRpc()
     {
-        if (animator != null && !string.IsNullOrEmpty(attackBoolName))
-            animator.SetBool(attackBoolName, true);
+        if (animator != null)
+        {
+            // Use CrossFade to authoritatively force the animator into the attack state.
+            // This is more robust for networked one-shots than boolean parameters.
+            animator.CrossFade("Mutant Attack", 0.2f, 0, 0f);
+        }
     }
 
     // ── Damage / Death ─────────────────────────────────────────────────────────

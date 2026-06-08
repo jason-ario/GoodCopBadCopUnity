@@ -45,6 +45,10 @@ public class DoorController : Interactable, IMutantPassable
     [Tooltip("Optional visual toggled when the door unlocks (e.g. a green indicator light).")]
     [SerializeField] private GameObject _unlockedIndicator;
 
+    [Header("Mutant Interaction")]
+    [Tooltip("Sound played when a mutant bangs on this door. Falls back to the locked-door shake clip if unassigned.")]
+    [SerializeField] private AudioClip _mutantBangClip;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -286,11 +290,41 @@ public class DoorController : Interactable, IMutantPassable
     /// Locked doors are treated as impassable — mutants cannot force them open.
     public bool IsBlockingMutant => !_doorOpen.Value && !_isLocked.Value;
 
+    /// <summary>
+    /// True when the door is physically closed (NavMeshObstacle active),
+    /// regardless of whether it is locked or unlocked.
+    /// </summary>
+    public bool IsDoorClosed => !_doorOpen.Value;
+
     /// <inheritdoc/>
     public void OpenForMutant()
     {
         if (!IsServer || _isLocked.Value) return;
         ForceOpen();
         Debug.Log($"[DoorController] Door '{gameObject.name}' forced open by mutant.");
+    }
+
+    /// <summary>
+    /// Plays the mutant-bang impact sound and briefly shakes the door on all clients.
+    /// Called server-side from <see cref="MutantEnemy"/> when a mutant hits this door.
+    /// </summary>
+    [ClientRpc]
+    public void PlayMutantBangClientRpc()
+    {
+        AudioClip clip = _mutantBangClip != null ? _mutantBangClip : _doorShakeClip;
+        AudioSource source = _lockedDoorAudio != null ? _lockedDoorAudio : audioSource;
+
+        if (clip != null && source != null)
+            source.PlayOneShot(clip);
+
+        if (_machineShake != null)
+            StartCoroutine(MutantBangShakeCoroutine());
+    }
+
+    private IEnumerator MutantBangShakeCoroutine()
+    {
+        _machineShake.isRunning = true;
+        yield return new WaitForSeconds(0.3f);
+        _machineShake.isRunning = false;
     }
 }

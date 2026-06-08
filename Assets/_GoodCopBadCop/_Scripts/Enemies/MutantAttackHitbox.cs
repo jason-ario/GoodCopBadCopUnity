@@ -79,6 +79,36 @@ public class MutantAttackHitbox : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Performs an OverlapSphere from this transform (identical sphere to <see cref="PerformHitScan"/>)
+    /// and applies <paramref name="damage"/> to <paramref name="fenceTarget"/> if any of its
+    /// colliders fall inside the sphere. Must only be called on the server.
+    /// </summary>
+    /// <returns>True when the fence was hit.</returns>
+    public bool PerformFenceHitScan(float damage, PerimiterFence fenceTarget)
+    {
+        if (fenceTarget == null) return false;
+
+        int hitCount = Physics.OverlapSphereNonAlloc(
+            transform.position,
+            sphereRadius,
+            OverlapBuffer,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            if (OverlapBuffer[i].GetComponentInParent<PerimiterFence>() == fenceTarget)
+            {
+                fenceTarget.TakeMutantHitServer(damage);
+                Debug.Log($"[MutantAttackHitbox] PerformFenceHitScan hit fence '{fenceTarget.name}' for {damage} damage.", this);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()
     {

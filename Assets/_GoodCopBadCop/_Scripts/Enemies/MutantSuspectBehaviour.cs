@@ -47,10 +47,6 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _agent = GetComponent<NavMeshAgent>();
         _animator = GetComponent<Animator>();
         _mutantEnemy = GetComponent<MutantEnemy>();
-
-        // Keep MutantEnemy dormant until the lineup phase completes.
-        if (_mutantEnemy != null)
-            _mutantEnemy.enabled = false;
     }
 
     public override void OnNetworkDespawn()
@@ -82,6 +78,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _climbThroughTargetPos = climbThroughTargetPos;
         _shutterController = shutterController;
         _controller = controller;
+
+        // Suspend the chase loop before it gets a chance to run (it defers one frame),
+        // so MutantSuspectBehaviour has exclusive control during the lineup sequence.
+        _mutantEnemy?.SuspendForLineup();
 
         StartCoroutine(LineupSequence());
     }
@@ -162,6 +162,11 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_mutantEnemy != null)
         {
+            // Aggro on the booth itself once inside.
+            if (_controller != null)
+                _mutantEnemy.SetAggroTarget(_controller.transform);
+            
+            _mutantEnemy.SetForceAggro(true);
             _mutantEnemy.enabled = true;
             _mutantEnemy.InitialiseServer();
         }

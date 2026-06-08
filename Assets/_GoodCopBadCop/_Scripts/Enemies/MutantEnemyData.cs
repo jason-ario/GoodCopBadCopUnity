@@ -52,6 +52,15 @@ public class MutantEnemyData : ScriptableObject
     [Range(0f, 1f)]
     public float aggroChance = 0.25f;
 
+    [Header("Fence Combat")]
+    [Tooltip("Damage dealt to a PerimiterFence per melee hit. Tune alongside the fence's Max Health.")]
+    public float fenceDamagePerHit = 15f;
+
+    [Tooltip("Distance from the fence surface at which the mutant stops moving and begins swinging. " +
+             "Should be less than attackRange — the OverlapSphere detects the fence first, then the " +
+             "mutant closes in until this surface distance is reached.")]
+    public float fenceStopDistance = 1f;
+
     [Header("Health")]
     [Tooltip("Starting health points for this enemy.")]
     public float maxHealth = 60f;

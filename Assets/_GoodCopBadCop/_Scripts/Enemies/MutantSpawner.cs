@@ -149,7 +149,7 @@ public class MutantSpawner : NetworkBehaviour
         }
     }
 
-    private void SpawnSingleEnemy()
+    private void SpawnSingleEnemy(bool forceAggro = false)
     {
         Vector3 localOffset = new Vector3(
             Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
@@ -172,11 +172,11 @@ public class MutantSpawner : NetworkBehaviour
         }
 
         // Assign the aggro target before Spawn() so InitialiseServer can read it.
+        MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
         if (aggroTarget != null)
-        {
-            MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
             enemy?.SetAggroTarget(aggroTarget);
-        }
+        if (forceAggro)
+            enemy?.SetForceAggro(true);
 
         netObj.Spawn(true);
         _activeEnemies.Add(netObj);
@@ -209,6 +209,28 @@ public class MutantSpawner : NetworkBehaviour
             return;
 
         StartCoroutine(SpawnBurst());
+    }
+
+    /// <summary>
+    /// Spawns a single enemy that is guaranteed to be in aggro mode, heading straight
+    /// for the assigned <see cref="aggroTarget"/> regardless of <see cref="MutantEnemyData.aggroChance"/>.
+    /// Respects the active-enemy cap. SERVER ONLY.
+    /// </summary>
+    public void ForceSpawnAggroed()
+    {
+        if (!IsServer)
+            return;
+
+        PruneDeadEnemies();
+
+        if (_activeEnemies.Count >= maxActiveEnemies)
+        {
+            Debug.LogWarning("[MutantSpawner] ForceSpawnAggroed skipped — active enemy cap reached.", this);
+            return;
+        }
+
+        SpawnSingleEnemy(forceAggro: true);
+        Debug.Log("[MutantSpawner] Forced aggroed mutant spawn.");
     }
 
     /// <summary>
