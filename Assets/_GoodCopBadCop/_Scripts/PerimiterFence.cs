@@ -2,6 +2,7 @@ using System;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
+using DG.Tweening;
 
 /// <summary>
 /// A single perimeter fence segment that can be damaged by mutants and repaired by players.
@@ -76,8 +77,9 @@ public class PerimiterFence : NetworkBehaviour
     /// <summary>
     /// True when this fence is in its most-damaged state and mutants can walk through it.
     /// Health-based so this works whether or not a NavMeshObstacle is present on the prefab.
+    /// By default, mutants can pass through once health drops below 25 %.
     /// </summary>
-    public bool IsPassableByMutant => _health.Value <= 0f;
+    public bool IsPassableByMutant => _health.Value < (_maxHealth * 0.25f);
 
     /// <summary>
     /// The highest valid integer damage level, derived from the number of mesh root entries.
@@ -237,14 +239,14 @@ public class PerimiterFence : NetworkBehaviour
 
     /// <summary>
     /// Applies mutant melee damage, reducing health by <paramref name="damage"/>.
-    /// Always plays the mutant-hit sound on all clients regardless of state changes.
+    /// Always triggers the mutant-hit feedback (sound + shake) on all clients.
     /// Must be called on the server.
     /// </summary>
     public void TakeMutantHitServer(float damage)
     {
         Debug.Assert(IsServer, "[PerimiterFence] TakeMutantHitServer must be called on the server.");
 
-        PlayMutantHitSoundClientRpc();
+        PlayMutantHitFeedbackClientRpc();
 
         if (_health.Value <= 0f) return;
 
@@ -252,11 +254,14 @@ public class PerimiterFence : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void PlayMutantHitSoundClientRpc()
+    private void PlayMutantHitFeedbackClientRpc()
     {
-        if (_audioSource == null || _mutantHitSound == null)
-            return;
+        // Sound
+        if (_audioSource != null && _mutantHitSound != null)
+            _audioSource.PlayOneShot(_mutantHitSound);
 
-        _audioSource.PlayOneShot(_mutantHitSound);
+        // Shake
+        transform.DOComplete();
+        transform.DOShakePosition(0.5f, strength: 0.10f, vibrato: 30, randomness: 90f, snapping: false, fadeOut: true);
     }
 }
