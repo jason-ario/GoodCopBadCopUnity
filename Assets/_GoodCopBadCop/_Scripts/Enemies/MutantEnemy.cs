@@ -43,6 +43,9 @@ public class MutantEnemy : NetworkBehaviour
     [SerializeField] private GameObject hitParticlePrefab;
 
     [Header("Aggro Target")]
+    [Tooltip("If false, this mutant will never head for the booth on its own, regardless of the aggro chance roll.")]
+    [SerializeField] private bool canAggro = true;
+
     [Tooltip("Transform the mutant will move toward when aggroed (e.g. the booth). Can also be assigned at runtime via SetAggroTarget().")]
     [SerializeField] private Transform aggroTarget;
 
@@ -146,7 +149,7 @@ public class MutantEnemy : NetworkBehaviour
         _agent.stoppingDistance = data.stoppingDistance;
 
         _spawnPosition = transform.position;
-        _isAggroed = aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
+        _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
         StartCoroutine(ChaseLoop());
     }
@@ -424,6 +427,36 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (!IsServer || _isDead || !_agent.isActiveAndEnabled) return;
 
+        // ── Rotation Tracking ──────────────────────────────────────────────────
+        // If we are in range to attack something, ensure we rotate to face it 
+        // regardless of whether the NavMeshAgent is currently "moving".
+        Transform faceTarget = null;
+        if (_currentTarget != null && Vector3.Distance(transform.position, _currentTarget.position) <= data.attackRange)
+        {
+            faceTarget = _currentTarget;
+        }
+        else if (_fenceTarget != null && IsFenceTargetInRange())
+        {
+            faceTarget = _fenceTarget.transform;
+        }
+        else if (_doorTarget != null && Vector3.Distance(transform.position, _doorTarget.transform.position) <= data.attackRange * 1.5f)
+        {
+            faceTarget = _doorTarget.transform;
+        }
+
+        if (faceTarget != null)
+        {
+            Vector3 toTarget = faceTarget.position - transform.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.01f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(toTarget);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, targetRot, data.angularSpeed * Time.deltaTime);
+            }
+        }
+
+        // ── Aggro / Fence Logic ────────────────────────────────────────────────
         if (_isAggroed && aggroTarget != null)
         {
             if (_fenceTarget == null)
@@ -445,17 +478,6 @@ public class MutantEnemy : NetworkBehaviour
             {
                 // Stop the agent so it doesn't try to push through the obstacle while attacking.
                 _agent.isStopped = true;
-
-                // Rotate toward the fence while attacking (agent may be stopped by physical collider).
-                Vector3 toFence = _fenceTarget.transform.position - transform.position;
-                toFence.y = 0f;
-                if (toFence.sqrMagnitude > 0.01f)
-                {
-                    Quaternion targetRot = Quaternion.LookRotation(toFence);
-                    transform.rotation = Quaternion.RotateTowards(
-                        transform.rotation, targetRot, data.angularSpeed * Time.deltaTime);
-                }
-
                 TryAttackFence();
             }
         }
