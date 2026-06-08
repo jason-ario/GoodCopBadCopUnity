@@ -27,8 +27,11 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Index into Telephone._availableTasks to deliver when pressing F4.")]
     [SerializeField] private int _debugPhoneTaskIndex = 0;
 
+    [Tooltip("Index into Telephone._availableTasks for the Go Hunting task. Triggered with F10.")]
+    [SerializeField] private int _goHuntingPhoneTaskIndex = 1;
+
     [Header("Mutant Debug")]
-    [Tooltip("Spawner used by F10 to force-spawn a guaranteed aggroed mutant.")]
+    [Tooltip("Spawner used by O to force-spawn a guaranteed aggroed mutant.")]
     [SerializeField] private MutantSpawner _debugMutantSpawner;
 
     [SerializeField] private MainMenuController _mainMenuController;
@@ -108,6 +111,12 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F4))
         {
             TriggerDebugPhoneCall();
+        }
+
+        // F10 — trigger an incoming telephone call for the Go Hunting task.
+        if (Input.GetKeyDown(KeyCode.F10))
+        {
+            TriggerGoHuntingCall();
         }
 
         if (Input.GetKeyDown(KeyCode.F8))
@@ -193,10 +202,8 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Triggers the telephone ring for testing. If tasks are configured, delivers the task at
-    /// <see cref="_debugPhoneTaskIndex"/> via the full call flow. Otherwise falls back to
-    /// <see cref="Telephone.DebugStartRing"/> so the audio and animation can be tested without
-    /// any <see cref="PhoneTaskData"/> assets assigned.
+    /// Triggers the telephone ring for the task at <see cref="_debugPhoneTaskIndex"/>.
+    /// Uses the full call flow so the task is registered in the guidebook when answered.
     /// </summary>
     private void TriggerDebugPhoneCall()
     {
@@ -206,8 +213,24 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        Telephone.Instance.DebugStartRing();
-        Debug.Log("[DebugConsole] Phone ring triggered (audio + animation test). Assign PhoneTaskData to _availableTasks for the full call flow).");
+        Telephone.Instance.TriggerCallSynced(_debugPhoneTaskIndex);
+        Debug.Log($"[DebugConsole] Phone call triggered for task index {_debugPhoneTaskIndex} (F4).");
+    }
+
+    /// <summary>
+    /// Triggers the telephone ring that delivers the Go Hunting task when answered.
+    /// Task index is configured via <see cref="_goHuntingPhoneTaskIndex"/> in the Inspector.
+    /// </summary>
+    private void TriggerGoHuntingCall()
+    {
+        if (Telephone.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] Telephone.Instance not found — is the phone spawned in the scene?");
+            return;
+        }
+
+        Telephone.Instance.TriggerCallSynced(_goHuntingPhoneTaskIndex);
+        Debug.Log($"[DebugConsole] Go Hunting phone call triggered (F10).");
     }
 
     /// <summary>
