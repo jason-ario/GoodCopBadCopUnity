@@ -18,6 +18,10 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Networked prefabs to choose from at random. Each must contain a MutantEnemy component and be registered in NetworkManager's prefab list.")]
     [SerializeField] private GameObject[] mutantPrefabs;
 
+    [Header("Aggro Target")]
+    [Tooltip("Optional target (e.g. the booth) that aggroed mutants will head toward on spawn. Each mutant's aggroChance (from its MutantEnemyData) determines whether it actually aggros.")]
+    [SerializeField] private Transform aggroTarget;
+
     [Header("Spawn Area")]
     [Tooltip("Half-extents of the axis-aligned box (in local space) within which enemies can spawn. The box is centred on this GameObject's position.")]
     [SerializeField] private Vector3 spawnBoxHalfExtents = new Vector3(20f, 0f, 20f);
@@ -165,6 +169,13 @@ public class MutantSpawner : NetworkBehaviour
             Debug.LogError("[MutantSpawner] A prefab in mutantPrefabs is missing a NetworkObject component.", this);
             Destroy(instance);
             return;
+        }
+
+        // Assign the aggro target before Spawn() so InitialiseServer can read it.
+        if (aggroTarget != null)
+        {
+            MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
+            enemy?.SetAggroTarget(aggroTarget);
         }
 
         netObj.Spawn(true);

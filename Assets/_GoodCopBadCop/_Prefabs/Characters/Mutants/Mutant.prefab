@@ -51,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3107953825
+  GlobalObjectIdHash: 1693306660
   InScenePlacedSourceGlobalObjectIdHash: 3107953825
   DeferredDespawnTick: 0
   Ownership: 1
@@ -106,6 +106,8 @@ MonoBehaviour:
   deathBoolName: Death
   attackHitbox: {fileID: 291297765939751491}
   attackHitDelay: 0.4
+  doorDetectionRadius: 3
+  doorOpenCooldownDuration: 3
   hitParticlePrefab: {fileID: 893913727056456344, guid: 57847ba3edbb34f4e9d1ea10ad1289a6, type: 3}
   deathBehaviour: 0
   deathAnimationDuration: 2
@@ -190,6 +192,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MutantSuspectBehaviour
   ShowTopMostFoldoutHeaderGroup: 1
+  canClimb: 1
 --- !u!1 &7932345873243114423
 GameObject:
   m_ObjectHideFlags: 0

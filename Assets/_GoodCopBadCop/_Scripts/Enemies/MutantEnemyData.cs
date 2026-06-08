@@ -34,6 +34,24 @@ public class MutantEnemyData : ScriptableObject
     [Tooltip("Radius used to locate the nearest player when picking a chase target.")]
     public float detectionRadius = 30f;
 
+    [Header("Patrol")]
+    [Tooltip("When no player is in detection range, the mutant wanders randomly instead of standing still.")]
+    public bool enablePatrol = true;
+
+    [Tooltip("Maximum distance from the spawn position the mutant will wander while patrolling.")]
+    public float patrolRadius = 12f;
+
+    [Tooltip("Minimum seconds the mutant idles at a patrol waypoint before choosing the next one.")]
+    public float patrolWaitMin = 2f;
+
+    [Tooltip("Maximum seconds the mutant idles at a patrol waypoint before choosing the next one.")]
+    public float patrolWaitMax = 5f;
+
+    [Header("Aggro")]
+    [Tooltip("Probability (0–1) that this mutant spawns in aggro mode and heads straight toward the aggro target, ignoring detection radius.")]
+    [Range(0f, 1f)]
+    public float aggroChance = 0.25f;
+
     [Header("Health")]
     [Tooltip("Starting health points for this enemy.")]
     public float maxHealth = 60f;

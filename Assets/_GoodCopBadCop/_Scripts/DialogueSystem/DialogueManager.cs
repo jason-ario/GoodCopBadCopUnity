@@ -192,8 +192,7 @@ public class DialogueManager : NetworkBehaviour
     public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,
         bool isPlayer = false, bool clearHistory = false, bool waitForInput = false)
     {
-        if (clearHistory)
-            DestroyPreviousSubtitles();
+        DestroyPreviousSubtitles();
 
         // Log to dialogue history
         if (isPlayer)

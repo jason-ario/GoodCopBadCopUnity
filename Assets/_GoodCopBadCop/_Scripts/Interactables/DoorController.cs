@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class DoorController : Interactable
+public class DoorController : Interactable, IMutantPassable
 {
     private NetworkVariable<bool> _doorOpen = new NetworkVariable<bool>(
         false,
@@ -278,5 +278,19 @@ public class DoorController : Interactable
     {
         if (_unlockSound != null)
             SFXController.Instance.Play(_unlockSound);
+    }
+
+    // ── IMutantPassable ────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    /// Locked doors are treated as impassable — mutants cannot force them open.
+    public bool IsBlockingMutant => !_doorOpen.Value && !_isLocked.Value;
+
+    /// <inheritdoc/>
+    public void OpenForMutant()
+    {
+        if (!IsServer || _isLocked.Value) return;
+        ForceOpen();
+        Debug.Log($"[DoorController] Door '{gameObject.name}' forced open by mutant.");
     }
 }

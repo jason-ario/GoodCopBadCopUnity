@@ -15,6 +15,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 {
     // ── Config ─────────────────────────────────────────────────────────────────
 
+    [Tooltip("If false, this mutant will never climb through the booth window even when the shutter is open. It will bang on the window frame and retreat instead.")]
+    [SerializeField] private bool canClimb = true;
+
     private MutantIntruderData _data;
     private Transform _standPos;
     private Transform _despawnPos;
@@ -35,7 +38,6 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
-    private const float RetreatDuration = 6f;
     private const float GiveUpPauseDuration = 1f;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -90,25 +92,23 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (!IsServer || _isDone) yield break;
 
-        // Wait one frame for the NavMeshAgent to link onto the baked mesh surface.
-        yield return null;
+        // Disable the NavMeshAgent during the DOMove walk-in phase so it doesn't
+        // steer or override position — mirrors exactly how SuspectController.InitiateSuspect works.
+        _agent.enabled = false;
 
-        if (!_agent.isOnNavMesh)
-        {
-            Debug.LogWarning("[MutantSuspectBehaviour] Not on NavMesh at lineup start — aborting.", this);
-            yield break;
-        }
-
-        // Walk to the booth stand position.
-        _agent.SetDestination(_standPos.position);
+        // Walk to the booth stand position using DOTween (position only, rotation unchanged).
         SetWalkingClientRpc(true);
 
-        while (_agent.pathPending || _agent.remainingDistance > _agent.stoppingDistance + ArrivalTolerance)
-            yield return new WaitForSeconds(ArrivalPollInterval);
+        bool walkDone = false;
+        _activeTween = transform
+            .DOMove(_standPos.position, _data.walkInDurationSeconds)
+            .OnComplete(() => walkDone = true);
 
-        _agent.ResetPath();
+        yield return new WaitUntil(() => walkDone);
 
-        // Rotate to face the booth window.
+        if (_isDone) yield break;
+
+        // Arrived — stop walking, then rotate to face the booth window.
         SetWalkingClientRpc(false);
 
         bool rotationDone = false;
@@ -123,7 +123,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_isDone) yield break;
 
-        if (_shutterController != null && _shutterController.IsOpen)
+        if (canClimb && _shutterController != null && _shutterController.IsOpen)
             yield return StartCoroutine(ClimbThroughSequence());
         else
             yield return StartCoroutine(ShutterBangSequence());
@@ -148,10 +148,18 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_isDone) yield break;
 
-        SetWalkingClientRpc(true);
+        // Stop the walking animation — MutantEnemy drives its own Speed parameter from here on.
+        SetWalkingClientRpc(false);
+
+        // Re-enable the NavMeshAgent so ChaseLoop can place the agent on the mesh.
+        // One frame is required for the agent to link onto the NavMesh surface after
+        // being re-enabled at the new position; without it isOnNavMesh returns false.
+        _agent.enabled = true;
+        yield return null;
+
+        // Enable MutantEnemy on all clients (animation sync) and hand off server control.
         EnableMutantEnemyClientRpc();
 
-        // Initialise chase loop on the server manually, since OnNetworkSpawn skipped it.
         if (_mutantEnemy != null)
         {
             _mutantEnemy.enabled = true;
@@ -162,11 +170,41 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
     }
 
-    /// <summary>Bangs on the closed shutter, then retreats if the shutter stays closed.</summary>
+    /// <summary>
+    /// Attacks the closed shutter window.
+    /// Climbing mutants bang a fixed number of times, climb through opportunistically if the shutter opens, then retreat.
+    /// Non-climbing mutants attack for a fixed duration, then lose interest and retreat.
+    /// </summary>
     private IEnumerator ShutterBangSequence()
     {
         if (!IsServer || _isDone) yield break;
 
+        if (!canClimb)
+        {
+            // Release the lineup slot right away — this mutant stays at the window as a persistent threat
+            // while the rest of the shift continues normally.
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: false, staysAtWindow: true);
+
+            // Attack the window until the loses-interest timer expires.
+            float endTime = Time.time + _data.losesInterestAfterSeconds;
+            while (!_isDone && Time.time < endTime)
+            {
+                SetAttackClientRpc(true);
+                HitShutterClientRpc();
+                yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+                SetAttackClientRpc(false);
+                yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
+            }
+
+            if (_isDone) yield break;
+
+            // Lost interest — clear the attack state and retreat.
+            SetAttackClientRpc(false);
+            yield return StartCoroutine(RetreatingSequence(notifyController: false));
+            yield break;
+        }
+
+        // Climbing mutant: bang a fixed number of times, checking each cycle for an opened shutter.
         for (int i = 0; i < _data.shutterBangCount; i++)
         {
             if (_isDone) yield break;
@@ -178,18 +216,51 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 yield break;
             }
 
-            TriggerAnimClientRpc(_data.bangAnimationTrigger);
-            yield return new WaitForSeconds(_data.bangIntervalSeconds);
+            SetAttackClientRpc(true);
+            HitShutterClientRpc();
+            yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+            SetAttackClientRpc(false);
+            yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
         }
 
         if (_isDone) yield break;
 
-        // Give up: pause, then walk back to the despawn point.
+        // Give up: brief pause, then retreat.
         yield return new WaitForSeconds(GiveUpPauseDuration);
 
         if (_isDone) yield break;
 
+        yield return StartCoroutine(RetreatingSequence(notifyController: true));
+    }
+
+    /// <summary>
+    /// Rotates to face the despawn point, walks back to it, then either calls
+    /// <see cref="SuspectController.OnMutantIntruderComplete"/> (climbing mutants that gave up)
+    /// or despawns directly (non-climbing mutants whose lineup slot was already released).
+    /// </summary>
+    private IEnumerator RetreatingSequence(bool notifyController)
+    {
+        if (_isDone) yield break;
+
+        // Rotate to face the despawn direction before walking.
+        Vector3 toSpawn = _despawnPos.position - transform.position;
+        toSpawn.y = 0f;
+        if (toSpawn.sqrMagnitude > 0.001f)
+        {
+            bool rotDone = false;
+            _activeTween = transform
+                .DORotateQuaternion(Quaternion.LookRotation(toSpawn.normalized), 0.5f)
+                .OnComplete(() => rotDone = true);
+            yield return new WaitUntil(() => rotDone);
+        }
+
+        if (_isDone) yield break;
+
         SetWalkingClientRpc(true);
+
+        // Re-enable the NavMeshAgent for retreat pathfinding (was disabled during walk-in).
+        _agent.enabled = true;
+        yield return null; // One frame for the agent to link onto the NavMesh.
 
         if (_agent.isOnNavMesh)
         {
@@ -202,9 +273,19 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         }
 
         SetWalkingClientRpc(false);
-
         _isDone = true;
-        _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+
+        if (notifyController)
+        {
+            // Climbing mutant gave up — let the controller clean up and queue the next suspect.
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+        }
+        else
+        {
+            // Non-climbing mutant — controller was already notified; just despawn.
+            if (NetworkObject.IsSpawned)
+                NetworkObject.Despawn();
+        }
     }
 
     // ── ClientRpcs ─────────────────────────────────────────────────────────────
@@ -215,6 +296,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_animator != null)
             _animator.SetBool("Walking", walking);
+    }
+
+    /// <summary>Sets the Attack animator bool on all clients. Used to drive the shutter-attack animation.</summary>
+    [ClientRpc]
+    private void SetAttackClientRpc(bool attacking)
+    {
+        if (_animator != null)
+            _animator.SetBool("Attack", attacking);
     }
 
     /// <summary>Fires an animator trigger on all clients.</summary>
@@ -231,5 +320,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_mutantEnemy != null)
             _mutantEnemy.enabled = true;
+    }
+
+    /// <summary>Triggers hit feedback (sound + shake) on the shutter for all clients.</summary>
+    [ClientRpc]
+    private void HitShutterClientRpc()
+    {
+        ShutterController.Instance?.OnHitByMutant();
     }
 }

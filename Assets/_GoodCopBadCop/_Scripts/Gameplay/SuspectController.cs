@@ -1051,13 +1051,14 @@ public class SuspectController : NetworkBehaviour
     /// Called by MutantSuspectBehaviour when its lineup sequence ends.
     /// Despawns the mutant if it retreated, then advances the lineup.
     /// </summary>
-    public void OnMutantIntruderComplete(MutantSuspectBehaviour mutant, bool brokeThrough)
+    public void OnMutantIntruderComplete(MutantSuspectBehaviour mutant, bool brokeThrough, bool staysAtWindow = false)
     {
         if (!IsServer) return;
 
         _currentMutant = null;
 
-        if (!brokeThrough && mutant != null)
+        // Despawn only if the mutant retreated and isn't staying at the window as a persistent threat.
+        if (!brokeThrough && !staysAtWindow && mutant != null)
         {
             NetworkObject netObj = mutant.GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)

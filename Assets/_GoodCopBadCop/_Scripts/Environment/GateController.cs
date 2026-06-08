@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class GateController : Interactable
+public class GateController : Interactable, IMutantPassable
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
         false,
@@ -158,5 +158,18 @@ public class GateController : Interactable
     public void CloseGate()
     {
         Reset();
+    }
+
+    // ── IMutantPassable ────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public bool IsBlockingMutant => !_gateOpen.Value;
+
+    /// <inheritdoc/>
+    public void OpenForMutant()
+    {
+        if (!IsServer) return;
+        OpenGate();
+        Debug.Log($"[GateController] Gate '{gameObject.name}' forced open by mutant.");
     }
 }

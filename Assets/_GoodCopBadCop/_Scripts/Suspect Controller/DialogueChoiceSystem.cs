@@ -22,6 +22,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     [SerializeField] private GameObject dialogueChoiceContainer;
     [SerializeField] private Subtitles subtitlesPrefab;
     [SerializeField] private RectTransform subtitlesContainer;
+    [SerializeField] private GameObject backButton;
 
     /// <summary>
     /// Matches the delay in <see cref="NPCRespondToDialogueChoice"/> so the choice panel
@@ -43,6 +44,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
         InitializeChoices(choices);
         dialogueChoiceContainer.SetActive(true);
+        backButton.SetActive(true);
     }
 
     private void EnterDialogueMode()
