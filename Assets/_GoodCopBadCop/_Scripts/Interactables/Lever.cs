@@ -11,6 +11,8 @@ public class Lever : Interactable
     [SerializeField] AudioClip leverOffSound;
     [SerializeField] private ShutterController shutter;
 
+    private const string GrabLeverBool = "GrabLever";
+
     [Header("Camera & IK")]
     [Tooltip("Child Transform the player camera DOTweens to during the pull sequence.")]
     [SerializeField] private Transform _camPos;
@@ -79,27 +81,35 @@ public class Lever : Interactable
 
         anim.SetBodyLeanDirect(1f, 1f);
 
-        yield return new WaitForSeconds(_cameraMoveDuration);
-
-        // ── Phase 2: IK on + perform lever action ─────────────────────────────
+        // Start reaching and enable the grab boolean slightly after the camera starts moving,
+        // rather than waiting for it to finish.
+        yield return new WaitForSeconds(0.1f);
         anim.EnableRightArmMask();
-        anim.TurnRightArmRigOnAndOff(0.2f, 0.5f);
+        anim.SetAnimBool(GrabLeverBool, true);
+        anim.TurnRightArmRigOnAndOff(0.2f, 0.7f);
 
+        yield return new WaitForSeconds(_cameraMoveDuration - 0.1f);
+
+        // ── Phase 2: Perform lever action ─────────────────────────────────────
         // Apply visuals immediately on the interacting client — no RTT wait.
         bool predicted = !_isUp.Value;
         ApplyLeverVisuals(predicted);
 
         ToggleLeverServerRpc(NetworkManager.Singleton.LocalClientId);
 
-        yield return new WaitForSeconds(1f);
+        // Wait for the pull animation to progress, then release the grab boolean
+        // and IK later.
+        yield return new WaitForSeconds(0.6f);
+        anim.SetAnimBool(GrabLeverBool, false);
 
-        // ── Phase 3: Camera return + IK off ───────────────────────────────────
+        yield return new WaitForSeconds(0.3f);
+
+        // ── Phase 3: Camera return + Restore ──────────────────────────────────
         anim.SetBodyLeanDirect(0f);
         movement.ResetCameraPos(false, _cameraReturnDuration);
 
         yield return new WaitForSeconds(_cameraReturnDuration);
 
-        // ── Phase 4: Restore ──────────────────────────────────────────────────
         anim.DisableRightArmMask();
         movement.SetCanControl(true);
     }

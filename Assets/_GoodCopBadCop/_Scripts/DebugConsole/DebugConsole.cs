@@ -152,6 +152,12 @@ public class DebugConsole : MonoBehaviour
             CompleteDebugTask();
         }
 
+        // K — kill the local player.
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            KillLocalPlayer();
+        }
+
         // O — force-spawn a guaranteed aggroed mutant from the debug spawner.
         if (Input.GetKeyDown(KeyCode.O))
         {
@@ -276,6 +282,25 @@ public class DebugConsole : MonoBehaviour
         }
 
         _debugTask.Complete();
+    }
+
+    /// <summary>Kills the local player for testing death and spectating.</summary>
+    private void KillLocalPlayer()
+    {
+        if (PlayerInstance.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] PlayerInstance.Instance not found.");
+            return;
+        }
+
+        if (PlayerInstance.Instance.PlayerHealth == null)
+        {
+            Debug.LogWarning("[DebugConsole] Local player does not have a PlayerHealth component.");
+            return;
+        }
+
+        PlayerInstance.Instance.PlayerHealth.TakeDamage(999f);
+        Debug.Log("[DebugConsole] Local player killed (K).");
     }
 
     /// <summary>

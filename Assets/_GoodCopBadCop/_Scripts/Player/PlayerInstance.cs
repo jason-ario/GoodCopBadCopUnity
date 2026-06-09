@@ -7,7 +7,11 @@ public class PlayerInstance : NetworkBehaviour
 
     [SerializeField] private GameObject playerLight;
     [SerializeField] private GameObject nameTag;
-    [SerializeField] private RagdollController ragdollController;
+
+    [Header("Death and Spectating")]
+    [SerializeField] private Unity.Cinemachine.CinemachineCamera deathCamera;
+    [SerializeField] private Unity.Cinemachine.CinemachineCamera spectateCamera;
+    [SerializeField] private float deathUIDelay = 2f;
 
     private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
         false,
@@ -37,6 +41,7 @@ public class PlayerInstance : NetworkBehaviour
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     public PlayerRadiation PlayerRadiation { get; set; }
     public PlayerHealth PlayerHealth { get; set; }
+    public Transform CameraTransform => _playerCameraController != null ? _playerCameraController.transform : null;
 
     private void Awake()
     {
@@ -56,13 +61,25 @@ public class PlayerInstance : NetworkBehaviour
         {
             _playerMovementController.CanControl = true;
             Instance = this;
+
+            if (deathCamera != null) deathCamera.gameObject.SetActive(false);
+            if (spectateCamera != null) spectateCamera.gameObject.SetActive(false);
+
+            if (PlayerHealth != null)
+            {
+                PlayerHealth.OnDeath += Die;
+            }
         }
     }
 
-    private void OnDestroy()
+    public override void OnNetworkDespawn()
     {
-        //if (PlayerHealth != null)
-        //    PlayerHealth.OnDeath -= Die;
+        base.OnNetworkDespawn();
+
+        if (IsLocalPlayer && PlayerHealth != null)
+        {
+            PlayerHealth.OnDeath -= Die;
+        }
     }
 
     public void SetIsOutside(bool value)
@@ -117,19 +134,61 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
-    /// Kills the local player: disables movement and interaction, then activates the ragdoll.
+    /// Kills the local player: disables movement and interaction, then activates the death camera.
+    /// Ragdoll activation is handled automatically by <see cref="RagdollController"/> via OnDeath.
     /// </summary>
     public void Die()
     {
-        return;
-
         CanControl = false;
         SetCanInteract(false);
         SetCanMove(false);
         DisableReticle();
 
-        if (ragdollController != null)
-            ragdollController.SetRagdollActive(true);
+        if (deathCamera != null)
+        {
+            deathCamera.gameObject.SetActive(true);
+            deathCamera.Priority = 100;
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerInstance] Death Camera reference is null!");
+        }
+
+        // Notify UI to show death screen after delay
+        if (IsLocalPlayer)
+        {
+            DeathScreenUI.Instance?.Show(deathUIDelay);
+        }
+    }
+
+    public void StartSpectating()
+    {
+        if (spectateCamera != null)
+        {
+            if (deathCamera != null)
+            {
+                deathCamera.Priority = 0;
+                deathCamera.gameObject.SetActive(false);
+            }
+
+            spectateCamera.gameObject.SetActive(true);
+            spectateCamera.Priority = 100;
+            SpectateManager.Instance?.StartSpectating();
+            Debug.Log($"[PlayerInstance] Spectate Camera Activated. Priority set to {spectateCamera.Priority}.");
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerInstance] Spectate Camera reference is null!");
+        }
+    }
+
+    public void SetSpectateTarget(Transform target)
+    {
+        if (spectateCamera != null)
+        {
+            spectateCamera.Follow = target;
+            spectateCamera.LookAt = target;
+        }
     }
 
     public void SetPosition(Transform position)
