@@ -157,7 +157,7 @@ public class PlayerInstance : NetworkBehaviour
         // Notify UI to show death screen after delay
         if (IsLocalPlayer)
         {
-            DeathScreenUI.Instance?.Show(deathUIDelay);
+            UIController.Instance?.ShowDeathScreen(deathUIDelay);
         }
     }
 

@@ -39,6 +39,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
+    [SerializeField] private DeathScreenUI deathScreenUI;
 
     /// <summary>The <see cref="ScreenDamage"/> component driving the screen hurt overlay.</summary>
     public ScreenDamage ScreenDamage => _screenDamage;
@@ -387,5 +388,26 @@ public class UIController : MonoBehaviour
     {
         if (boothWaitingNotification != null)
             boothWaitingNotification.Hide();
+    }
+
+    /// <summary>Shows the death screen after the given delay in seconds.</summary>
+    public void ShowDeathScreen(float delay)
+    {
+        if (deathScreenUI == null) return;
+        StartCoroutine(ShowDeathScreenDelayed(delay));
+    }
+
+    private IEnumerator ShowDeathScreenDelayed(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        deathScreenUI.gameObject.SetActive(true);
+    }
+
+    /// <summary>Hides the death screen immediately.</summary>
+    public void HideDeathScreen()
+    {
+        if (deathScreenUI == null) return;
+        StopCoroutine(nameof(ShowDeathScreenDelayed));
+        deathScreenUI.gameObject.SetActive(false);
     }
 }
