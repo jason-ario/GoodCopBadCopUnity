@@ -1,3 +1,5 @@
+using System.Collections;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -8,6 +10,19 @@ public class Lever : Interactable
     [SerializeField] AudioClip leverOnSound;
     [SerializeField] AudioClip leverOffSound;
     [SerializeField] private ShutterController shutter;
+
+    [Header("Camera & IK")]
+    [Tooltip("Child Transform the player camera DOTweens to during the pull sequence.")]
+    [SerializeField] private Transform _camPos;
+
+    [Tooltip("World Transform the right-arm IK anchors to while the pull animation plays.")]
+    [SerializeField] private Transform _ikTarget;
+
+    [Tooltip("Seconds the camera takes to reach _camPos.")]
+    [SerializeField] private float _cameraMoveDuration = 0.5f;
+
+    [Tooltip("Seconds the camera takes to return to the normal position after the lever is pulled.")]
+    [SerializeField] private float _cameraReturnDuration = 0.25f;
     
     private static readonly int IsUpParam = Animator.StringToHash("IsUp");
 
@@ -41,12 +56,52 @@ public class Lever : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+        StartCoroutine(PullLeverSequence(player));
+    }
+
+    private IEnumerator PullLeverSequence(PlayerInteractionController player)
+    {
+        PlayerMovementController  movement = player.playerMovementController;
+        PlayerAnimationController anim     = player.playerAnimationController;
+
+        // ── Phase 1: Lock controls + orient player + move camera ──────────────
+        movement.SetCanControl(false);
+        movement.LookAtTarget(transform);
+
+        if (_ikTarget != null)
+            anim.RightArmIKTarget = _ikTarget;
+
+        if (_camPos != null)
+        {
+            movement.CameraTransform.DOMove(_camPos.position, _cameraMoveDuration);
+            movement.CameraTransform.DORotate(_camPos.rotation.eulerAngles, _cameraMoveDuration);
+        }
+
+        anim.SetBodyLeanDirect(1f, 1f);
+
+        yield return new WaitForSeconds(_cameraMoveDuration);
+
+        // ── Phase 2: IK on + perform lever action ─────────────────────────────
+        anim.EnableRightArmMask();
+        anim.TurnRightArmRigOnAndOff(0.2f, 0.5f);
 
         // Apply visuals immediately on the interacting client — no RTT wait.
         bool predicted = !_isUp.Value;
         ApplyLeverVisuals(predicted);
 
         ToggleLeverServerRpc(NetworkManager.Singleton.LocalClientId);
+
+        yield return new WaitForSeconds(1f);
+
+        // ── Phase 3: Camera return + IK off ───────────────────────────────────
+        anim.SetBodyLeanDirect(0f);
+        movement.ResetCameraPos(false, _cameraReturnDuration);
+
+        yield return new WaitForSeconds(_cameraReturnDuration);
+
+        // ── Phase 4: Restore ──────────────────────────────────────────────────
+        anim.DisableRightArmMask();
+        movement.SetCanControl(true);
     }
 
     [ServerRpc(RequireOwnership = false)]

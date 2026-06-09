@@ -39,13 +39,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
     private const float GiveUpPauseDuration = 1f;
+    private const string ClimbingAnimBool = "climbing";
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
     {
         _agent = GetComponent<NavMeshAgent>();
-        _animator = GetComponent<Animator>();
+        _animator = GetComponentInChildren<Animator>();
         _mutantEnemy = GetComponent<MutantEnemy>();
     }
 
@@ -134,7 +135,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (!IsServer || _isDone) yield break;
 
-        TriggerAnimClientRpc(_data.climbAnimationTrigger);
+        SetClimbingClientRpc(true);
 
         // Disable agent so DOTween can move freely across the counter (off-mesh).
         _agent.enabled = false;
@@ -143,6 +144,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _activeTween = transform
             .DOMove(_climbThroughTargetPos.position, _data.climbDurationSeconds)
             .OnComplete(() => moveDone = true);
+
+        // Keep the climbing bool true for exactly one second as requested.
+        yield return new WaitForSeconds(1f);
+        SetClimbingClientRpc(false);
 
         yield return new WaitUntil(() => moveDone);
 
@@ -301,6 +306,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_animator != null)
             _animator.SetBool("Walking", walking);
+    }
+
+    /// <summary>Sets the climbing animator bool on all clients for the breakthrough sequence.</summary>
+    [ClientRpc]
+    private void SetClimbingClientRpc(bool climbing)
+    {
+        if (_animator != null)
+            _animator.SetBool(ClimbingAnimBool, climbing);
     }
 
     /// <summary>Sets the Attack animator bool on all clients. Used to drive the shutter-attack animation.</summary>

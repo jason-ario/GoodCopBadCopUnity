@@ -133,6 +133,7 @@ Transform:
   - {fileID: 4224436627612048494}
   - {fileID: 4884431051948469229}
   - {fileID: 3390971905302461236}
+  - {fileID: 8043800236130683272}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7688639020693793064
@@ -186,6 +187,7 @@ MonoBehaviour:
   quarantineTimeline: {fileID: 7627075282601385360}
   suspectQuarantineFollowPos: {fileID: 8806315025284105420}
   suspectCam: {fileID: 7517704889252903642}
+  climbThroughTargetPos: {fileID: 8043800236130683272}
   suspectIndex:
     m_InternalValue: -1
   couponPerfectAnomaliesBonus: 5
@@ -209,6 +211,9 @@ MonoBehaviour:
   allSuspects: {fileID: 11400000, guid: 99ffb1a8abc9764469e0220edc0ec058, type: 2}
   shiftSuspects: []
   suspectsPerShift: {x: 5, y: 8}
+  lineupMutants: {fileID: 11400000, guid: f600e1c401f2d664983430ee1450134e, type: 2}
+  mutantIntruderData: {fileID: 11400000, guid: c4c02e4ee1dcc594888335cc8c4b68c5, type: 2}
+  mutantSpawnChance: 0.2
 --- !u!114 &1659329089007804956
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -344,6 +349,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4884431051948469229}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6421944917272989104
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8043800236130683272}
+  m_Layer: 0
+  m_Name: Climb Through Target Pos
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8043800236130683272
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6421944917272989104}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: -0.00000004371139}
+  m_LocalPosition: {x: 0.4, y: -0.009, z: -7.87}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5336311336844689108}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6924810591735226930
 GameObject:
   m_ObjectHideFlags: 0
@@ -401,7 +437,7 @@ Transform:
   m_GameObject: {fileID: 7517704889252903642}
   serializedVersion: 2
   m_LocalRotation: {x: 0.008029954, y: 0.008808639, z: 0.0023922587, w: -0.99992615}
-  m_LocalPosition: {x: 1.0922303, y: 2.1850386, z: -7.8136477}
+  m_LocalPosition: {x: 1.08, y: 2.197, z: -7.101}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
