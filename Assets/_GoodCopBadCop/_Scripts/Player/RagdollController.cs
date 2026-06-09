@@ -1,3 +1,4 @@
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -12,9 +13,12 @@ public class RagdollController : MonoBehaviour
     [Header("Death Visuals")]
     [SerializeField] private Transform headTransform;
     [SerializeField] private GameObject bodyArmsMesh;
+    [SerializeField] private GameObject firstPersonArms;
 
     private PlayerHealth _playerHealth;
     private CharacterController _characterController;
+    private NetworkTransform _networkTransform;
+    private PlayerAnimationController _playerAnimationController;
 
     private const int DefaultLayer = 0;
 
@@ -27,6 +31,8 @@ public class RagdollController : MonoBehaviour
             ragdollColliders = GetComponentsInChildren<Collider>();
 
         _characterController = GetComponent<CharacterController>();
+        _networkTransform = GetComponent<NetworkTransform>();
+        _playerAnimationController = GetComponent<PlayerAnimationController>();
         _playerHealth = GetComponent<PlayerHealth>();
         if (_playerHealth != null)
             _playerHealth.OnDeath += OnDeath;
@@ -42,16 +48,7 @@ public class RagdollController : MonoBehaviour
 
     private void OnDeath()
     {
-        if (_characterController != null)
-            _characterController.enabled = false;
-
-        foreach (var rb in ragdollRigidbodies)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-        }
-
-        SetRagdollActive(true);
+        ActivateRagdoll();
 
         if (headTransform != null)
             headTransform.localScale = Vector3.one;
@@ -63,12 +60,37 @@ public class RagdollController : MonoBehaviour
             if (bodyArmsMesh.TryGetComponent<SkinnedMeshRenderer>(out var smr))
                 smr.shadowCastingMode = ShadowCastingMode.On;
         }
+
+        if (firstPersonArms != null)
+            firstPersonArms.SetActive(false);
     }
 
     [ContextMenu("Activate")]
     public void ActivateRagdoll()
     {
+        if (_characterController != null)
+            _characterController.enabled = false;
+
+        // Stop NetworkTransform from overwriting the root position with
+        // stale server updates, which would drag the ragdoll across the ground.
+        if (_networkTransform != null)
+            _networkTransform.enabled = false;
+
+        // Stop PlayerAnimationController from writing bone transforms in LateUpdate,
+        // which would fight ragdoll physics every frame and cause violent shaking.
+        if (_playerAnimationController != null)
+            _playerAnimationController.enabled = false;
+
         SetRagdollActive(true);
+
+        // Zero velocity after going non-kinematic so PhysX doesn't inherit
+        // movement from the CharacterController's positional delta.
+        foreach (var rb in ragdollRigidbodies)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.Sleep();
+        }
     }
 
     /// <summary>Enables or disables ragdoll physics, toggling the animator and rigidbody/collider states.</summary>
