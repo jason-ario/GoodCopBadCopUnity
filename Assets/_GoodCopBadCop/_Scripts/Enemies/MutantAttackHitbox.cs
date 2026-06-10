@@ -100,7 +100,8 @@ public class MutantAttackHitbox : MonoBehaviour
         {
             if (OverlapBuffer[i].GetComponentInParent<PerimiterFence>() == fenceTarget)
             {
-                fenceTarget.TakeMutantHitServer(damage);
+                Vector3 hitPosition = OverlapBuffer[i].ClosestPoint(transform.position);
+                fenceTarget.TakeMutantHitServer(damage, hitPosition);
                 Debug.Log($"[MutantAttackHitbox] PerformFenceHitScan hit fence '{fenceTarget.name}' for {damage} damage.", this);
                 return true;
             }

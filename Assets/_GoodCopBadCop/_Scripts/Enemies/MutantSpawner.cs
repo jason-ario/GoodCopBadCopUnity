@@ -50,8 +50,34 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Maximum number of active enemies this spawner will maintain. Individual burst spawns are skipped once at or above this cap.")]
     [SerializeField] private int maxActiveEnemies = 10;
 
-    /// <summary>The first day on which this spawner becomes active. Day 1 is excluded by default.</summary>
-    private const int FirstActiveDay = 2;
+    [Header("Activation")]
+    [Tooltip("The first campaign day on which this spawner becomes active.")]
+    [SerializeField] private int firstActiveDay = 2;
+
+    [Header("Day Scaling")]
+    [Tooltip("When enabled, spawn parameters scale up with the current campaign day, starting sparse and growing toward the values above.")]
+    [SerializeField] private bool scaledByDay = false;
+
+    [Tooltip("Campaign day at which the spawner reaches its full (peak) intensity. Days beyond this are clamped to full intensity.")]
+    [SerializeField] private int peakScalingDay = 7;
+
+    [Tooltip("Intensity curve: X is normalised day progress (0 = firstActiveDay, 1 = peakScalingDay), Y is intensity (0 = sparse baseline, 1 = full values above). Defaults to ease-in-out.")]
+    [SerializeField] private AnimationCurve dayIntensityCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Tooltip("Minimum seconds between bursts at sparse intensity (first active day).")]
+    [SerializeField] private float sparseIntervalMin = 120f;
+
+    [Tooltip("Maximum seconds between bursts at sparse intensity (first active day).")]
+    [SerializeField] private float sparseIntervalMax = 240f;
+
+    [Tooltip("Minimum enemies per burst at sparse intensity.")]
+    [SerializeField] private int sparseBurstCountMin = 1;
+
+    [Tooltip("Maximum enemies per burst at sparse intensity.")]
+    [SerializeField] private int sparseBurstCountMax = 1;
+
+    [Tooltip("Maximum active enemy cap at sparse intensity.")]
+    [SerializeField] private int sparseMaxActiveEnemies = 1;
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -75,9 +101,9 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged += OnDayChanged;
 
-        // Only start immediately if we are already on day 2 or later (e.g. loaded from save).
+        // Only start immediately if we are already on the first active day or later (e.g. loaded from save).
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
-        if (currentDay >= FirstActiveDay)
+        if (currentDay >= firstActiveDay)
             BeginSpawning();
     }
 
@@ -90,14 +116,14 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Responds to day transitions. Starts spawning from <see cref="FirstActiveDay"/> onwards.
+    /// Responds to day transitions. Starts spawning from <see cref="firstActiveDay"/> onwards.
     /// SERVER ONLY (subscribed only on the server in <see cref="OnNetworkSpawn"/>).
     /// </summary>
     private void OnDayChanged(int newDay)
     {
-        if (newDay >= FirstActiveDay && !_isRunning)
+        if (newDay >= firstActiveDay && !_isRunning)
             BeginSpawning();
-        else if (newDay < FirstActiveDay && _isRunning)
+        else if (newDay < firstActiveDay && _isRunning)
             StopSpawning();
     }
 
@@ -106,6 +132,27 @@ public class MutantSpawner : NetworkBehaviour
         _isRunning = true;
         StartCoroutine(SpawnLoop());
         Debug.Log($"[MutantSpawner] Spawner activated on Day {CampaignManager.Instance?.CurrentDay}.");
+    }
+
+    // ── Day Scaling ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a 0..1 intensity value based on the current campaign day.
+    /// Returns 1 when <see cref="scaledByDay"/> is disabled.
+    /// </summary>
+    private float GetDayIntensity()
+    {
+        if (!scaledByDay || CampaignManager.Instance == null)
+            return 1f;
+
+        int day = CampaignManager.Instance.CurrentDay;
+        int range = peakScalingDay - firstActiveDay;
+
+        if (range <= 0)
+            return 1f;
+
+        float t = Mathf.Clamp01((float)(day - firstActiveDay) / range);
+        return dayIntensityCurve.Evaluate(t);
     }
 
     // ── Spawn Loop ─────────────────────────────────────────────────────────────
@@ -118,7 +165,10 @@ public class MutantSpawner : NetworkBehaviour
         {
             yield return StartCoroutine(SpawnBurst());
 
-            float interval = Random.Range(spawnIntervalMin, spawnIntervalMax);
+            float intensity = GetDayIntensity();
+            float effectiveMin = Mathf.Lerp(sparseIntervalMin, spawnIntervalMin, intensity);
+            float effectiveMax = Mathf.Lerp(sparseIntervalMax, spawnIntervalMax, intensity);
+            float interval = Random.Range(effectiveMin, effectiveMax);
             yield return new WaitForSeconds(interval);
         }
     }
@@ -127,12 +177,16 @@ public class MutantSpawner : NetworkBehaviour
 
     /// <summary>
     /// Spawns a rapid sequence of enemies, one at a time, with <see cref="burstSpawnDelay"/> between each.
-    /// The burst count is randomised between <see cref="burstCountMin"/> and <see cref="burstCountMax"/>.
-    /// Individual spawns are skipped (but the delay still elapses) when the active cap is reached.
+    /// The burst count is randomised between the effective min and max values (scaled by day when enabled).
+    /// Individual spawns are skipped (but the delay still elapses) when the effective active cap is reached.
     /// </summary>
     private IEnumerator SpawnBurst()
     {
-        int count = Random.Range(burstCountMin, burstCountMax + 1);
+        float intensity = GetDayIntensity();
+        int effectiveBurstMin = Mathf.RoundToInt(Mathf.Lerp(sparseBurstCountMin, burstCountMin, intensity));
+        int effectiveBurstMax = Mathf.RoundToInt(Mathf.Lerp(sparseBurstCountMax, burstCountMax, intensity));
+        int effectiveCap = Mathf.RoundToInt(Mathf.Lerp(sparseMaxActiveEnemies, maxActiveEnemies, intensity));
+        int count = Random.Range(effectiveBurstMin, effectiveBurstMax + 1);
 
         for (int i = 0; i < count; i++)
         {
@@ -141,7 +195,7 @@ public class MutantSpawner : NetworkBehaviour
 
             PruneDeadEnemies();
 
-            if (_activeEnemies.Count < maxActiveEnemies)
+            if (_activeEnemies.Count < effectiveCap)
                 SpawnSingleEnemy();
 
             if (i < count - 1)
@@ -214,7 +268,7 @@ public class MutantSpawner : NetworkBehaviour
     /// <summary>
     /// Spawns a single enemy that is guaranteed to be in aggro mode, heading straight
     /// for the assigned <see cref="aggroTarget"/> regardless of <see cref="MutantEnemyData.aggroChance"/>.
-    /// Respects the active-enemy cap. SERVER ONLY.
+    /// Respects the active-enemy cap (day-scaled when enabled). SERVER ONLY.
     /// </summary>
     public void ForceSpawnAggroed()
     {
@@ -223,7 +277,8 @@ public class MutantSpawner : NetworkBehaviour
 
         PruneDeadEnemies();
 
-        if (_activeEnemies.Count >= maxActiveEnemies)
+        int effectiveCap = Mathf.RoundToInt(Mathf.Lerp(sparseMaxActiveEnemies, maxActiveEnemies, GetDayIntensity()));
+        if (_activeEnemies.Count >= effectiveCap)
         {
             Debug.LogWarning("[MutantSpawner] ForceSpawnAggroed skipped — active enemy cap reached.", this);
             return;

@@ -17,8 +17,6 @@ public class PlayerAnimationController : NetworkBehaviour
     
     [SerializeField] private float animLerpSpeed = 5f;
 
-    /// <summary>Playback speed multiplier applied to the arms animator while the player is running.</summary>
-    [SerializeField] private float runningArmsSpeedMultiplier = 1.5f;
     
     private float currentMoveX = 0f;
     private float currentMoveZ = 0f;
@@ -510,7 +508,6 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetFloat("MoveX", netMoveX.Value);
             armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
             bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
-            armsAnimator.speed = netIsRunning.Value ? runningArmsSpeedMultiplier : 1f;
 
             // Apply layer weights from the owner.
             bodyAnimator.SetLayerWeight(1, netLayer1Weight.Value);
@@ -539,7 +536,6 @@ public class PlayerAnimationController : NetworkBehaviour
         netIsRunning.Value = isRunning;
 
         bodyAnimator.SetBool("IsRunning", isRunning);
-        armsAnimator.speed = isRunning ? runningArmsSpeedMultiplier : 1f;
         
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);

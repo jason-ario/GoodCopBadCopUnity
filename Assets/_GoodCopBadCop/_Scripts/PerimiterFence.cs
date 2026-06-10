@@ -47,6 +47,10 @@ public class PerimiterFence : NetworkBehaviour
     [SerializeField] private AudioClip _mutantHitSound;
     [SerializeField] private AudioSource _audioSource;
 
+    [Header("VFX")]
+    [Tooltip("Particle system prefab spawned at the contact point when a mutant hits this fence.")]
+    [SerializeField] private ParticleSystem _mutantHitParticlePrefab;
+
     // ── Networked state ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -239,14 +243,16 @@ public class PerimiterFence : NetworkBehaviour
 
     /// <summary>
     /// Applies mutant melee damage, reducing health by <paramref name="damage"/>.
-    /// Always triggers the mutant-hit feedback (sound + shake) on all clients.
+    /// Always triggers the mutant-hit feedback (sound + shake + particle) on all clients.
     /// Must be called on the server.
     /// </summary>
-    public void TakeMutantHitServer(float damage)
+    /// <param name="damage">Damage amount to apply.</param>
+    /// <param name="hitPosition">World-space contact point used to place the hit particle.</param>
+    public void TakeMutantHitServer(float damage, Vector3 hitPosition)
     {
         Debug.Assert(IsServer, "[PerimiterFence] TakeMutantHitServer must be called on the server.");
 
-        PlayMutantHitFeedbackClientRpc();
+        PlayMutantHitFeedbackClientRpc(hitPosition);
 
         if (_health.Value <= 0f) return;
 
@@ -254,11 +260,18 @@ public class PerimiterFence : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void PlayMutantHitFeedbackClientRpc()
+    private void PlayMutantHitFeedbackClientRpc(Vector3 hitPosition)
     {
         // Sound
         if (_audioSource != null && _mutantHitSound != null)
             _audioSource.PlayOneShot(_mutantHitSound);
+
+        // Particle
+        if (_mutantHitParticlePrefab != null)
+        {
+            ParticleSystem instance = Instantiate(_mutantHitParticlePrefab, hitPosition, Quaternion.identity);
+            Destroy(instance.gameObject, instance.main.duration + instance.main.startLifetime.constantMax);
+        }
 
         // Shake
         transform.DOComplete();

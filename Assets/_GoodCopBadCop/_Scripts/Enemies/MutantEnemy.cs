@@ -419,7 +419,14 @@ public class MutantEnemy : NetworkBehaviour
         {
             // Fallback: centre-distance check when no hitbox component is configured.
             if (Vector3.Distance(transform.position, fence.transform.position) <= data.attackRange)
-                fence.TakeMutantHitServer(data.fenceDamagePerHit);
+            {
+                // Approximate hit position as the point on the fence closest to this mutant.
+                Collider fenceCollider = fence.GetComponentInChildren<Collider>();
+                Vector3 hitPosition = fenceCollider != null
+                    ? fenceCollider.ClosestPoint(transform.position)
+                    : fence.transform.position;
+                fence.TakeMutantHitServer(data.fenceDamagePerHit, hitPosition);
+            }
         }
     }
 

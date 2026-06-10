@@ -9,6 +9,8 @@ using UnityEngine;
 /// Call <see cref="PerformHitScan"/> from the weapon owner's client; the server validates
 /// and applies damage, then notifies the owner via <see cref="OnHit"/> or
 /// <see cref="OnEnvironmentHit"/> depending on what was struck.
+/// Optionally assign <see cref="_hitEffectPrefab"/> and <see cref="_environmentHitEffectPrefab"/>
+/// to spawn a particle effect at the exact world-space hit position on the owning client.
 /// </summary>
 public class MeleeWeaponHitbox : NetworkBehaviour
 {
@@ -16,6 +18,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
     [Tooltip("Radius of the OverlapSphere centered on this transform.")]
     [SerializeField] private float hitRadius = 0.8f;
+
+    [Header("Hit Effects")]
+    [Tooltip("Particle prefab instantiated at the hit position when an enemy or player is struck.")]
+    [SerializeField] private ParticleSystem _hitEffectPrefab;
+
+    [Tooltip("Particle prefab instantiated at the hit position when geometry (non-enemy) is struck.")]
+    [SerializeField] private ParticleSystem _environmentHitEffectPrefab;
 
     private const string PlayerTag = "Player";
 
@@ -104,6 +113,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         };
 
         bool anyNonSelfHit = false;
+        Vector3 firstNonSelfHitPosition = attackOrigin;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -132,40 +142,67 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 anyNonSelfHit = true;
                 playerHealth.TakeDamage(damage);
                 Debug.Log($"[MeleeWeaponHitbox] Friendly fire: hit player '{root.name}' for {damage} damage.", this);
-                NotifyHitClientRpc(ownerParams);
+                NotifyHitClientRpc(col.ClosestPoint(attackOrigin), ownerParams);
                 return;
             }
 
-            anyNonSelfHit = true;
+            // Track the closest surface point of the first non-self, non-weapon collider
+            // so environment hits have a meaningful spawn position.
+            if (!anyNonSelfHit)
+            {
+                anyNonSelfHit = true;
+                firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
+            }
 
             // Walk up from the hit collider to find a MutantEnemy — no tag dependency.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             if (enemy == null)
                 continue;
 
-            enemy.TakeDamage(damage, col.ClosestPoint(attackOrigin));
+            Vector3 enemyHitPosition = col.ClosestPoint(attackOrigin);
+            enemy.TakeDamage(damage, enemyHitPosition);
             Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
 
-            NotifyHitClientRpc(ownerParams);
+            NotifyHitClientRpc(enemyHitPosition, ownerParams);
             return;
         }
 
         if (anyNonSelfHit)
-            NotifyEnvironmentHitClientRpc(ownerParams);
+            NotifyEnvironmentHitClientRpc(firstNonSelfHitPosition, ownerParams);
     }
 
     // ── Client ─────────────────────────────────────────────────────────────────
 
     [ClientRpc]
-    private void NotifyHitClientRpc(ClientRpcParams clientRpcParams = default)
+    private void NotifyHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
     {
+        SpawnHitEffect(_hitEffectPrefab, hitPosition);
         OnHit?.Invoke();
     }
 
     [ClientRpc]
-    private void NotifyEnvironmentHitClientRpc(ClientRpcParams clientRpcParams = default)
+    private void NotifyEnvironmentHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
     {
+        SpawnHitEffect(_environmentHitEffectPrefab, hitPosition);
         OnEnvironmentHit?.Invoke();
+    }
+
+    // ── Effects ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Instantiates <paramref name="prefab"/> at <paramref name="position"/> and destroys it
+    /// automatically once the particle system has finished playing.
+    /// </summary>
+    private static void SpawnHitEffect(ParticleSystem prefab, Vector3 position)
+    {
+        if (prefab == null) return;
+
+        ParticleSystem instance = Instantiate(prefab, position, Quaternion.identity);
+
+        // Determine lifetime from the main module so we never leak instances.
+        ParticleSystem.MainModule main = instance.main;
+        float lifetime = main.duration + main.startLifetime.constantMax;
+        Destroy(instance.gameObject, Mathf.Max(lifetime, 0.1f));
     }
 
 #if UNITY_EDITOR

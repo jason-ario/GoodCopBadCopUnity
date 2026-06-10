@@ -8,6 +8,9 @@ public class SupplyBox : PickableObject
     public bool canPickUp = false;
     [SerializeField] private Animator _animator;
     [SerializeField] private GameObject contents;
+    [SerializeField] private AudioSource _audioSource;
+    [SerializeField] private AudioClip _openClip;
+    [SerializeField] private AudioClip _closeClip;
     bool isOpen = false;
 
     private static readonly int BoxOpenHash = Animator.StringToHash("BoxOpen");
@@ -33,6 +36,15 @@ public class SupplyBox : PickableObject
 
     /// <summary>Returns true when at least one item was delivered and all of them have since been picked up.</summary>
     public bool IsEmpty => _hasHadItems && _registeredItems.Count == 0;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        
+    }
 
     // ── Network Lifecycle ─────────────────────────────────────────────────────
 
@@ -256,9 +268,6 @@ public class SupplyBox : PickableObject
         if (TryGetComponent(out BoxCollider boxCollider))
             boxCollider.enabled = value;
 
-        if (TryGetComponent(out HighlightEffect highlight))
-            highlight.enabled = value;
-
         UpdateInteractText();
     }
 
@@ -271,6 +280,8 @@ public class SupplyBox : PickableObject
             contents.SetActive(true);
         if (_animator != null)
             _animator.SetBool(BoxOpenHash, true);
+        if (_audioSource != null && _openClip != null)
+            _audioSource.PlayOneShot(_openClip);
     }
 
     void CloseBox()
@@ -280,6 +291,8 @@ public class SupplyBox : PickableObject
             contents.SetActive(false);
         if (_animator != null)
             _animator.SetBool(BoxOpenHash, false);
+        if (_audioSource != null && _closeClip != null)
+            _audioSource.PlayOneShot(_closeClip);
     }
 
     // ── Box Pickup / Drop ─────────────────────────────────────────────────────

@@ -34,12 +34,18 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     [SerializeField] private Transform[] _waypoints;
 
     [Header("Audio")]
-    [Tooltip("Sound played at the spawn point when the delivery sequence begins.")]
-    [SerializeField] private AudioClip _deliverySound;
+    [Tooltip("AudioSource on the Delivery Door that plays the knocking sound before the door opens.")]
+    [SerializeField] private AudioSource _knockingAudioSource;
+
+    [Tooltip("AudioSource on the Delivery Door that plays when the box is delivered.")]
+    [SerializeField] private AudioSource _deliveryAudioSource;
 
     [Header("Timing")]
     [Tooltip("Seconds to wait after the day officially starts before beginning the delivery sequence.")]
     [SerializeField] private float _startDelay = 3f;
+
+    [Tooltip("Seconds to wait after the knocking sound before spawning the box and opening the door.")]
+    [SerializeField] private float _knockingDelay = 2f;
 
     [Tooltip("Seconds to wait after triggering openDoor before the box starts moving.")]
     [SerializeField] private float _doorOpenDelay = 1.5f;
@@ -116,12 +122,16 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             yield break;
         }
 
-        // Play spatialized delivery sound using SFXController
-        if (_deliverySound != null && SFXController.Instance != null)
-        {
-            Vector3 soundPos = _spawnPoint != null ? _spawnPoint.position : transform.position;
-            SFXController.Instance.PlayAtPosition(_deliverySound, soundPos);
-        }
+        // Play the knocking sound on all clients, then wait before the door opens.
+        if (_knockingAudioSource != null)
+            PlayKnockingAudioClientRpc();
+
+        if (_knockingDelay > 0)
+            yield return new WaitForSeconds(_knockingDelay);
+
+        // Play delivery sound on the door's AudioSource across all clients.
+        if (_deliveryAudioSource != null)
+            PlayDeliveryAudioClientRpc();
 
         SpawnSupplyBox();
         SpawnItems(day.SupplyBoxItemPrefabs);
@@ -284,6 +294,22 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     }
 
     // ── ClientRpcs ────────────────────────────────────────────────────────────
+
+    /// <summary>Plays the knocking AudioSource on every client before the door opens.</summary>
+    [ClientRpc]
+    private void PlayKnockingAudioClientRpc()
+    {
+        if (_knockingAudioSource != null)
+            _knockingAudioSource.Play();
+    }
+
+    /// <summary>Plays the delivery AudioSource on the door on every client.</summary>
+    [ClientRpc]
+    private void PlayDeliveryAudioClientRpc()
+    {
+        if (_deliveryAudioSource != null)
+            _deliveryAudioSource.Play();
+    }
 
     /// <summary>Fires the "openDoor" trigger on the delivery door animator on every client.</summary>
     [ClientRpc]
