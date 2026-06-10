@@ -25,6 +25,7 @@ public class SupplyBox : PickableObject
         base.OnNetworkSpawn();
         _networkCanPickUp.OnValueChanged += OnNetworkCanPickUpChanged;
         canPickUp = _networkCanPickUp.Value;
+        UpdateInteractText();
     }
 
     public override void OnNetworkDespawn()
@@ -33,7 +34,19 @@ public class SupplyBox : PickableObject
         _networkCanPickUp.OnValueChanged -= OnNetworkCanPickUpChanged;
     }
 
-    private void OnNetworkCanPickUpChanged(bool previous, bool current) => canPickUp = current;
+    private void OnNetworkCanPickUpChanged(bool previous, bool current)
+    {
+        canPickUp = current;
+        UpdateInteractText();
+    }
+
+    private void UpdateInteractText()
+    {
+        if (!isOpen)
+            interactText = "Open Box [E]";
+        else if (canPickUp)
+            interactText = "Pick Up [LMB]";
+    }
 
     // ── Networked API ─────────────────────────────────────────────────────────
 
@@ -56,6 +69,7 @@ public class SupplyBox : PickableObject
         isOpen = false;
         if (contents != null)
             contents.SetActive(false);
+        UpdateInteractText();
     }
 
     /// <summary>Immediately enables interaction components on all clients, bypassing NetworkVariable latency.</summary>
@@ -64,22 +78,50 @@ public class SupplyBox : PickableObject
     {
         SetInteractable(true);
         canPickUp = true;
+        UpdateInteractText();
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (canPickUp)
-        {
-            base.Interact(player);
-        }
-        else
+        // E Key -> Open the box (runs the opening animation and reveals contents)
+        if (Input.GetKeyDown(KeyCode.E))
         {
             if (!isOpen)
             {
-                OpenBox();
+                OpenBoxNetworked();
             }
+        }
+        // Left Click -> Pick up the box
+        else if (Input.GetMouseButtonDown(0))
+        {
+            if (canPickUp)
+            {
+                base.Interact(player);
+            }
+        }
+    }
+
+    /// <summary>Triggers the box opening sequence on all clients.</summary>
+    public void OpenBoxNetworked()
+    {
+        if (IsServer)
+            OpenBoxClientRpc();
+        else
+            OpenBoxServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void OpenBoxServerRpc() => OpenBoxClientRpc();
+
+    [ClientRpc]
+    private void OpenBoxClientRpc()
+    {
+        if (!isOpen)
+        {
+            OpenBox();
+            UpdateInteractText();
         }
     }
 
@@ -98,7 +140,10 @@ public class SupplyBox : PickableObject
         {
             highlight.enabled = value;
         }
+
+        UpdateInteractText();
     }
+
 
     void OpenBox()
     {
