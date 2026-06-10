@@ -173,7 +173,62 @@ public class ObjectPlacer : MonoBehaviour
         ParentConstraint parentConstraint = _clonedItem.GetComponent<ParentConstraint>();
         if (parentConstraint != null)
             parentConstraint.constraintActive = false;
-        
+
+        DisableAllColliders(_clonedItem.gameObject);
+        SetupGhostMaterials(_clonedItem.gameObject);
+    }
+
+    /// <summary>
+    /// Disables every Collider on the ghost clone and all of its children.
+    /// </summary>
+    private void DisableAllColliders(GameObject root)
+    {
+        foreach (Collider col in root.GetComponentsInChildren<Collider>(true))
+            col.enabled = false;
+    }
+
+    private static readonly int SurfaceProperty = Shader.PropertyToID("_Surface");
+    private static readonly int BlendProperty = Shader.PropertyToID("_Blend");
+    private static readonly int BaseColorProperty = Shader.PropertyToID("_BaseColor");
+    private static readonly int SrcBlendProperty = Shader.PropertyToID("_SrcBlend");
+    private static readonly int DstBlendProperty = Shader.PropertyToID("_DstBlend");
+    private static readonly int ZWriteProperty = Shader.PropertyToID("_ZWrite");
+    private const float GhostAlpha = 0.5f;
+
+    /// <summary>
+    /// Replaces every renderer's materials on the ghost clone with transparent
+    /// material instances at <see cref="GhostAlpha"/> opacity.
+    /// </summary>
+    private void SetupGhostMaterials(GameObject root)
+    {
+        foreach (Renderer rend in root.GetComponentsInChildren<Renderer>(true))
+        {
+            Material[] instanceMats = rend.materials;
+            for (int i = 0; i < instanceMats.Length; i++)
+            {
+                Material mat = new Material(instanceMats[i]);
+
+                // Switch URP surface type to Transparent
+                mat.SetFloat(SurfaceProperty, 1f);   // 1 = Transparent
+                mat.SetFloat(BlendProperty, 0f);     // 0 = Alpha blend
+                mat.SetFloat(ZWriteProperty, 0f);
+                mat.SetInt(SrcBlendProperty, (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetInt(DstBlendProperty, (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+
+                // Preserve existing base colour, override alpha only
+                Color baseColor = mat.HasProperty(BaseColorProperty)
+                    ? mat.GetColor(BaseColorProperty)
+                    : Color.white;
+                baseColor.a = GhostAlpha;
+                mat.SetColor(BaseColorProperty, baseColor);
+
+                mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+                instanceMats[i] = mat;
+            }
+            rend.materials = instanceMats;
+        }
     }
 
     /// <summary>

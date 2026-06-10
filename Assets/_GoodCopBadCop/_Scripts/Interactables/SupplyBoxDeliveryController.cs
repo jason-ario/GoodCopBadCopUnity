@@ -190,11 +190,27 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
             netObj.Spawn(destroyWithScene: true);
 
-            if (!netObj.TrySetParent(contentsParent, worldPositionStays: true))
-                Debug.LogWarning($"[SupplyBoxDeliveryController] Could not parent '{prefab.name}' to supply box contents.", this);
+            // Dynamically spawned ExamNotebooks require explicit page spawning — OnNetworkSpawn
+            // only auto-spawns pages for scene objects. This mirrors the shop's purchase flow in
+            // PlayerPickupController.PurchaseAndPickUpServerRpc.
+            if (instance.TryGetComponent(out ExamNotebook notebook))
+            {
+                var spawnedPages = notebook.SpawnAndWirePages();
+                if (spawnedPages.Count > 0)
+                {
+                    var pageRefs = new NetworkObjectReference[spawnedPages.Count];
+                    for (int i = 0; i < spawnedPages.Count; i++)
+                        pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
+                    notebook.SetPageReferencesClientRpc(pageRefs);
+                }
+            }
 
             if (instance.TryGetComponent(out PickableObject pickable))
+            {
+                pickable.SetParent(contentsParent);
                 pickable.LockInteractableNetworked();
+                _activeBox.RegisterItem(pickable);
+            }
 
             _spawnedItems.Add(netObj);
         }
@@ -210,6 +226,9 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
                 item.Despawn();
         }
         _spawnedItems.Clear();
+
+        if (_activeBox != null)
+            _activeBox.ClearRegisteredItems();
 
         if (_activeBoxNetObj != null && _activeBoxNetObj.IsSpawned)
             _activeBoxNetObj.Despawn();
