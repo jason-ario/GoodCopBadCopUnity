@@ -27,6 +27,13 @@ public class SupplyBox : PickableObject
     /// <summary>Parent transform used to attach per-day items during delivery. Falls back to this transform if contents is unassigned.</summary>
     public Transform ContentsParent => contents != null ? contents.transform : transform;
 
+    /// <summary>Set to true the first time an item is registered so <see cref="IsEmpty"/> can
+    /// distinguish "nothing was ever added" from "everything has been taken".</summary>
+    private bool _hasHadItems;
+
+    /// <summary>Returns true when at least one item was delivered and all of them have since been picked up.</summary>
+    public bool IsEmpty => _hasHadItems && _registeredItems.Count == 0;
+
     // ── Network Lifecycle ─────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
@@ -68,6 +75,7 @@ public class SupplyBox : PickableObject
     {
         if (item == null || _registeredItems.Contains(item)) return;
         _registeredItems.Add(item);
+        _hasHadItems = true;
 
         // Once the item is equipped by a player, release it from box management.
         item.OnEquip += () =>
@@ -87,7 +95,11 @@ public class SupplyBox : PickableObject
     }
 
     /// <summary>Clears all registered items, e.g. when the box is despawned for a new delivery.</summary>
-    public void ClearRegisteredItems() => _registeredItems.Clear();
+    public void ClearRegisteredItems()
+    {
+        _registeredItems.Clear();
+        _hasHadItems = false;
+    }
 
     // ── Server-Side Item Lock Helpers ─────────────────────────────────────────
 
