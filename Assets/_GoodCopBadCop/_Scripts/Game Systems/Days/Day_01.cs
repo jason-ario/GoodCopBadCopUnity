@@ -90,6 +90,10 @@ public class Day_01 : DayBase
     [Tooltip("Index into Telephone._availableTasks that maps to the 'Take Out the Trash' PhoneTaskData.")]
     [SerializeField] private int _trashTaskCallIndex = 0;
 
+    [Header("Day 1 — Alexei Event (6th Suspect)")]
+    [Tooltip("The AlexeiController placed in the scene (all renderers start disabled; RevealAlexeiClientRpc enables them).")]
+    [SerializeField] private AlexeiController _alexeiController;
+
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
     private PickableObject _tutorialAppForm;
@@ -129,30 +133,45 @@ public class Day_01 : DayBase
         // Door lock is deferred to OnDayStarted (ShiftManager.OnDayStart) so the sound
         // plays after the intro cutscene ends, not while it is playing.
 
-        // Gate the drawer — unlocked later when the tutorial prompts the player.
-        if (_drawer != null)
-            _drawer.SetLocked(true);
+        bool tutorialDone = SaveDataManager.Instance != null && SaveDataManager.Instance.Day1TutorialComplete;
 
-        // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
-        // Server-only: these static flags are consumed exclusively by the server's spawn logic.
-        if (NetworkManager.Singleton.IsServer)
+        if (tutorialDone)
         {
-            SuspectController.ForceNextSuspectClean          = true;
-            ShiftManager.OverrideFirstArrivalInterval        = new UnityEngine.Vector2(0f, 0f);
-            ShiftManager.OverrideSuspectArrivalInterval      = new UnityEngine.Vector2(3f, 3f);
+            // Tutorial already completed on a previous run — open everything immediately,
+            // no tutorial gating needed.
+            if (_drawer != null) _drawer.SetLocked(false);
+            _greenStampSlot?.SetSlotInteractable(true);
+            _yellowStampSlot?.SetSlotInteractable(true);
+            _redStampSlot?.SetSlotInteractable(true);
+            _examNotebook?.SetInteractableNetworked(true);
+        }
+        else
+        {
+            // First-time tutorial path: gate the drawer and all stamp stations.
+            if (_drawer != null)
+                _drawer.SetLocked(true);
+
+            // Guarantee the first suspect has no anomalies — the tutorial intro must be clean.
+            // Server-only: these static flags are consumed exclusively by the server's spawn logic.
+            if (NetworkManager.Singleton.IsServer)
+            {
+                SuspectController.ForceNextSuspectClean          = true;
+                ShiftManager.OverrideFirstArrivalInterval        = new UnityEngine.Vector2(0f, 0f);
+                ShiftManager.OverrideSuspectArrivalInterval      = new UnityEngine.Vector2(3f, 3f);
+            }
+
+            // All stamp stations are locked until the tutorial reaches the stamping beat.
+            _greenStampSlot?.SetSlotInteractable(false);
+            _yellowStampSlot?.SetSlotInteractable(false);
+            _redStampSlot?.SetSlotInteractable(false);
+
+            // Notebook stays non-interactable until the anomaly reveal beat.
+            _examNotebook?.SetInteractableNetworked(false);
         }
 
         // All tutorial arrows start hidden.
         if (_switchArrow != null) _switchArrow.SetActive(false);
         if (_drawerArrow != null) _drawerArrow.SetActive(false);
-
-        // All stamp stations are locked until the tutorial reaches the stamping beat.
-        _greenStampSlot?.SetSlotInteractable(false);
-        _yellowStampSlot?.SetSlotInteractable(false);
-        _redStampSlot?.SetSlotInteractable(false);
-
-        // Notebook stays non-interactable until the anomaly reveal beat.
-        _examNotebook?.SetInteractableNetworked(false);
 
         // Hide the mutation and biological notebooks — they are not introduced until Day 2 and Day 3.
         _mutationNotebook?.SetVisible(false);
@@ -164,15 +183,25 @@ public class Day_01 : DayBase
         ShiftManager.Instance.OnDayStart        += OnDayStarted;
         Debug.Log($"[Day_01] DayActivated: subscribed to ShiftManager.OnDayStart. IsServer={NetworkManager.Singleton?.IsServer}, IsHost={NetworkManager.Singleton?.IsHost}.");
         SuspectController.OnSuspectArrived       += OnSuspectArrivedHandler;
-        _onPaperworkSpawned = OnPaperworkSpawnedHandler;
-        SuspectController.OnPaperworkSpawned     += _onPaperworkSpawned;
         SwitchButton.OnPressed                   += OnSwitchPressed;
         _onFolderDocumentFiled = OnFolderDocumentFiled;
         FolderController.OnDocumentAdded         += _onFolderDocumentFiled;
 
+        // Paperwork-spawn tutorial beats only run on the first playthrough.
+        if (!tutorialDone)
+        {
+            _onPaperworkSpawned = OnPaperworkSpawnedHandler;
+            SuspectController.OnPaperworkSpawned += _onPaperworkSpawned;
+        }
+
         // Override the default random population so the first suspects are always guards.
         if (DailySuspectManager.Instance != null)
             DailySuspectManager.Instance.PopulateSuspectOverride = PopulateDay1Suspects;
+
+        // Alexei scripted-event callbacks — always subscribed regardless of tutorial state.
+        AlexeiController.OnMurderComplete     += OnAlexeiMurderCompleteHandler;
+        AlexeiController.OnAlexeiRetreated    += OnAlexeiRetreatedHandler;
+        AlexeiController.OnAlexeiBrokeThrough += OnAlexeiBroughThroughHandler;
 
         // OnFolderHandedOff is subscribed inside HandOffBeat / Suspect2HandOffBeat
         // so the window is scoped exactly to when each beat needs it.
@@ -208,6 +237,10 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped       -= OnFolderPickedUp;
         FolderController.OnFolderHandedOff      -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped     -= OnFolderStamped;
+
+        AlexeiController.OnMurderComplete     -= OnAlexeiMurderCompleteHandler;
+        AlexeiController.OnAlexeiRetreated    -= OnAlexeiRetreatedHandler;
+        AlexeiController.OnAlexeiBrokeThrough -= OnAlexeiBroughThroughHandler;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
@@ -270,6 +303,10 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped         -= OnFolderPickedUp;
         FolderController.OnFolderHandedOff        -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped       -= OnFolderStamped;
+
+        AlexeiController.OnMurderComplete     -= OnAlexeiMurderCompleteHandler;
+        AlexeiController.OnAlexeiRetreated    -= OnAlexeiRetreatedHandler;
+        AlexeiController.OnAlexeiBrokeThrough -= OnAlexeiBroughThroughHandler;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
@@ -340,8 +377,17 @@ public class Day_01 : DayBase
             return;
         }
         _tutorialSequenceStarted = true;
-        Debug.Log("[Day_01] OnDayStarted: starting Day1TutorialSequence on server.");
-        StartCoroutine(Day1TutorialSequence());
+
+        if (SaveDataManager.Instance != null && SaveDataManager.Instance.Day1TutorialComplete)
+        {
+            Debug.Log("[Day_01] OnDayStarted: tutorial complete — running Day1FreeshiftSequence.");
+            StartCoroutine(Day1FreeshiftSequence());
+        }
+        else
+        {
+            Debug.Log("[Day_01] OnDayStarted: starting Day1TutorialSequence on server.");
+            StartCoroutine(Day1TutorialSequence());
+        }
     }
 
     private IEnumerator Day1TutorialSequence()
@@ -359,14 +405,49 @@ public class Day_01 : DayBase
         SetSwitchArrow(true);
     }
 
+    /// <summary>
+    /// Runs on the server in place of <see cref="Day1TutorialSequence"/> when
+    /// <see cref="SaveDataManager.Day1TutorialComplete"/> is true (i.e. the player has already
+    /// finished Day 1 and is replaying after a game-over). Skips all tutorial gating: opens
+    /// stamps/drawer immediately, delivers a short bark, then enables the switch and lets the
+    /// shift run freely. The Alexei scripted event still fires on the 6th suspect.
+    /// </summary>
+    private IEnumerator Day1FreeshiftSequence()
+    {
+        yield return new WaitForSeconds(3f);
+
+        yield return ShowAndWait("Back again. You know what to do.");
+
+        // Enable the switch so the player can start the shift.
+        _switchButton?.SetReady(true);
+        SetSwitchArrow(true);
+
+        // Deliver the trash task immediately — no refill tutorial to wait for on retry runs.
+        if (Telephone.Instance != null)
+            Telephone.Instance.TriggerCall(_trashTaskCallIndex);
+        else
+            Debug.LogWarning("[Day_01] Day1FreeshiftSequence: Telephone.Instance is null — trash task call skipped.");
+
+        // Unlock the exit door — no tutorial gating on retry runs.
+        ShiftManager.Instance.OnDoorUnlock?.Invoke();
+    }
+
     // -------------------------------------------------------------------------
     // Tutorial Sequence — Paperwork Arrives
     // -------------------------------------------------------------------------
 
     private void OnSuspectArrivedHandler(int suspectIndex)
     {
-        if (suspectIndex != 0) return;
+        // Arm the Alexei cutscene intercept after the 5th regular suspect (index 4) arrives.
+        if (suspectIndex != 4) return;
+
+        // Unsubscribe — we only need to arm once.
         SuspectController.OnSuspectArrived -= OnSuspectArrivedHandler;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        SuspectController.InterceptNextSuspectSpawn = () => _alexeiController?.BeginSequence();
+        Debug.Log("[Day_01] Alexei cutscene intercept armed — next suspect spawn slot will launch the cutscene.");
     }
 
     /// <summary>
@@ -1229,6 +1310,14 @@ public class Day_01 : DayBase
         // already appended at the start of Suspect3HandOffBeat, before the hand-off.
         if (NetworkManager.Singleton.IsServer)
             ShiftManager.Instance.ResumeScheduledSuspect();
+
+        // Mark the tutorial as fully complete so subsequent Day 1 runs (after a game-over)
+        // skip all tutorial gating and run the free-shift path instead.
+        if (SaveDataManager.Instance != null)
+        {
+            SaveDataManager.Instance.Day1TutorialComplete = true;
+            Debug.Log("[Day_01] Tutorial complete flag saved — future Day 1 runs will skip the tutorial.");
+        }
     }
 
     /// <summary>Tracks which stamp types have been refilled during the tool locker tutorial beat.</summary>
@@ -1350,6 +1439,12 @@ public class Day_01 : DayBase
         }
 
         Debug.Log($"[Day_01] Populated {count} guard suspect(s) for the start of the Day 1 shift.");
+
+        // On tutorial-skip (retry) runs, Suspect3HandOffBeat never fires so
+        // AppendPostTutorialSuspects() is never called from there. Append them here instead
+        // so the shift still has all 6 suspects, including the 6th for the Alexei event.
+        if (SaveDataManager.Instance != null && SaveDataManager.Instance.Day1TutorialComplete)
+            AppendPostTutorialSuspects();
     }
 
     /// <summary>
@@ -1495,5 +1590,58 @@ public class Day_01 : DayBase
         yield return null;
 
         yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+    }
+
+    // =========================================================================
+    // Alexei Scripted Event — Handlers
+    // =========================================================================
+
+    /// <summary>
+    /// Fires on the server when AlexeiController finishes the murder cutscene, just before
+    /// MutantSuspectBehaviour.BeginLineup() is called. Shows the lever prompt so the player
+    /// knows they can close the shutter to stop Alexei.
+    /// </summary>
+    private void OnAlexeiMurderCompleteHandler()
+    {
+        if (this == null) return;
+        StartCoroutine(AlexeiMurderCompleteSequence());
+    }
+
+    private IEnumerator AlexeiMurderCompleteSequence()
+    {
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("Close the window. Now.");
+    }
+
+    /// <summary>
+    /// Fires on the server when Alexei retreats (the player closed the shutter in time).
+    /// Plays a survival confirmation bark. The shift ends naturally — Alexei is the last
+    /// suspect, so ShiftManager will detect an empty queue and begin clock-out.
+    /// </summary>
+    private void OnAlexeiRetreatedHandler()
+    {
+        if (this == null) return;
+        StartCoroutine(AlexeiRetreatedSequence());
+    }
+
+    private IEnumerator AlexeiRetreatedSequence()
+    {
+        yield return new WaitForSeconds(2f);
+        yield return ShowAndWait("Smart. Keep working.");
+
+        // Alexei is the last suspect slot — signal the shift manager to start clock-out.
+        ShiftManager.Instance?.SetNextSuspectReady();
+    }
+
+    /// <summary>
+    /// Fires on the server when Alexei breaks through (player did not close the shutter in time).
+    /// MutantEnemy takes over from here and handles player death via the existing attack system.
+    /// PlayerHealth → DeathScreenUI → CampaignManager restarts Day 1 on game-over.
+    /// </summary>
+    private void OnAlexeiBroughThroughHandler()
+    {
+        if (this == null) return;
+        Debug.Log("[Day_01] Alexei broke through — MutantEnemy now active. Awaiting player death.");
+        // No megaphone bark — let the horror speak for itself.
     }
 }

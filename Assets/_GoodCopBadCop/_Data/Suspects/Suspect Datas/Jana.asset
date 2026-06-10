@@ -1,0 +1,181 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc4902ccea98cf44865aecb61fc1ff4, type: 3}
+  m_Name: Jana
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectData
+  FirstName: Jana
+  LastName: Sokolova
+  Nickname: Janka
+  Occupation: Florist
+  CharacterDescription: Jana is thirty years old and wears a white wedding dress
+    every day. The dress has been mended in several places and smells faintly of
+    dried flowers. She never acknowledges that her outfit is unusual, but if asked
+    about it directly she will give a different reason each time. She was at a fitting.
+    She is the maid of honour. She simply likes it. There is a ceremony later. None
+    of the explanations are consistent and she does not seem to notice. She makes
+    extended eye contact and then looks away very suddenly. She does not like being
+    asked questions and will sometimes answer a different question than the one posed
+    to her. She is not hostile. She smiles often. Something is not right.
+  CharacterArc: Jana worked as a florist in the residential district for six years,
+    arranging bouquets for funerals, birthdays, and one wedding that did not happen.
+    The details of that wedding change depending on who is asking, and Jana herself
+    gives a different account each time she is prompted. By the early days of the
+    crisis she had already been wearing the dress for some time. She moves through
+    the checkpoint routine with a strange fluency, producing documents at the right
+    moment and signing her name in clear letters, as if the procedural world still
+    makes complete sense to her even when nothing else does. As the crisis deepens
+    she becomes harder to read. Her explanations grow stranger and more elaborate.
+    By the final days she no longer attempts explanations at all. She simply smooths
+    the skirt of the dress and waits, very patiently, for something that is not coming.
+  DateOfBirth: 22/06/1993
+  Sex: Female
+  EntryPermitExpiryDate: 22 JUN
+  IsResident: 1
+  GivesPaperwork: 1
+  handwritingFont: {fileID: 0}
+  startingInfectionScore: 0
+  dailyInfectionProgression: 5
+  IDPhoto: {fileID: 2800000, guid: 818bfa774dbdf4740b77f7dbbba112e1, type: 3}
+  CharacterPrefab: {fileID: 0}
+  entryReasons:
+    earlyDaysReasons:
+    - Returning to my apartment on the residential block.
+    - I live here. I am going home.
+    - A resident returning before the evening bell.
+    midDaysReasons:
+    - Returning home. I have been out since morning.
+    - Going back to my flat. I have everything I need.
+    - I live in the building at the end of the street. That is all.
+    finalDaysReasons:
+    - Going home for the lockdown period. As instructed.
+    - I am a registered resident. This is my address.
+    - Returning to my registered residence. I have my papers.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - I am going to meet my florist. She has my bouquet ready.
+    - There is a ceremony on the eastern side. I am expected.
+    - I need to pick up the centrepieces from the hall.
+    midDaysReasons:
+    - The venue is past the checkpoint. I will not be long.
+    - Someone is waiting for me on the other side. It is important.
+    - I have to check the flowers before the ceremony. They need water.
+    finalDaysReasons:
+    - The church is just past the wire. It will not take a moment.
+    - I made a promise. It is beyond the checkpoint. I need to keep it.
+    - Someone left something behind the perimeter. I am the only one who knows where
+      it is.
+  entryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Here. My documents. Could we be quick? I have somewhere to be.
+    - Good morning. I keep my papers in the flowers. I forgot, I do not have flowers
+      today.
+    - I am a resident. I have been a resident for four years. The dress is for later.
+    dialoguesMidDays:
+    - My documents. Here. The dress is for a fitting. They asked me to wear it in.
+    - I know how this works. I come through every day. You can check your list.
+    - Here. Thank you. I am going home. I am not sure when the ceremony is. Soon,
+      I think.
+    dialoguesFinalDays:
+    - I have my papers. I have always had my papers. The dress is for the wedding.
+      It is soon.
+    - I know you. You have been here before. We have met. You waved at me once.
+    - I do not need much time. I know the questions. I will answer the ones I can.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thank you. You are very kind. There is a ceremony later. You should come.
+    dialoguesMidDays:
+    - Thank you. I will remember your face. I remember every face.
+    dialoguesFinalDays:
+    - Good. Good. I knew you would understand. Not everyone does.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Oh. All right. Could someone call, no, never mind. I will wait. I am good at
+      waiting.
+    dialoguesMidDays:
+    - I do not understand. I have my papers. I always have my papers. I have my papers.
+    dialoguesFinalDays:
+    - Please. I have somewhere to be. Please. It will not take long.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "But the\u2026 I was supposed to\u2026 the flowers are\u2026"
+    dialoguesMidDays:
+    - I only needed to get home. That is all. I only needed to get home.
+    dialoguesFinalDays:
+    - "Oh\u2026 I see\u2026 that is\u2026 that is all right then\u2026 it is fine\u2026"
+  quarantineExitLines:
+  - I am not sick. I am just wearing a dress. People wear dresses.
+  - Could someone water my plants? I have plants at home. They need water every second
+    day.
+  - Is there a window? I would like to see outside. I like to see if it is raining.
+  killExitLines:
+  - "I thought\u2026 I was sure there was still time\u2026"
+  - I did not understand. I had my papers. I had everything right.
+  - "Is the ceremony\u2026 will someone tell them I\u2026 tell them I tried to\u2026"
+  voiceAudioClips: []
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: Home. I was home all morning. I had to air out the dress.
+    midDaysAnswer: The dry cleaner. They said they could not help with the stain.
+      I am not sure what stain. I did not see one.
+    finalDaysAnswer: I do not remember exactly. I walked for a while. I ended up
+      here.
+    mismatchEarlyDaysAnswer: The ceremony hall. East side, past the transit stop.
+      Very nice hall. Big windows.
+    mismatchMidDaysAnswer: The florist. She had everything ready. Beautiful arrangements.
+      White and ivory.
+    mismatchFinalDaysAnswer: I was at the venue. Confirming details. The ceremony
+      is very soon now.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: No. I feel completely fine. I have felt fine for a long time.
+    midDaysAnswer: I lose track of things sometimes. Days. Not days. Smaller things.
+      I do not think that is a symptom.
+    finalDaysAnswer: I cannot always remember what I came to do. But I remember where
+      I am going. Usually.
+    mismatchEarlyDaysAnswer: No symptoms at all. Very clear head. Perfect memory.
+      I remember everything in order.
+    mismatchMidDaysAnswer: Nothing unusual. Very steady. I have been sleeping very
+      well. No confusion at all.
+    mismatchFinalDaysAnswer: I am completely fine. Very sharp. I know exactly where
+      I have been and why.
+  - question: Who do you live with?
+    earlyDaysAnswer: Alone. For now. That will change soon.
+    midDaysAnswer: Just me. I used to have a cat. She is gone now.
+    finalDaysAnswer: Alone. I have lived alone for a while. It is fine. I prefer
+      it.
+    mismatchEarlyDaysAnswer: "My fianc\xE9. He is at home right now. He is getting
+      ready. We are both getting ready."
+    mismatchMidDaysAnswer: We live together. He and I. He is very good. He does not
+      go out much anymore.
+    mismatchFinalDaysAnswer: We are both there. In the apartment. He is waiting for
+      me right now. I should not be long.
+  idleBarks:
+    earlyDays:
+    - I know you are not supposed to ask about the dress. Most people do not ask.
+    - There is a ceremony soon. I am told to stay ready. So I stay ready.
+    - I have been through this checkpoint many times. You get used to the smell.
+    midDays:
+    - The dress holds its shape well. Considering. I have had it a long time.
+    - I once asked someone here what day it was. He told me. It was not the day I
+      thought it was.
+    - I do not mind waiting. I have been waiting for quite a while now. A little
+      longer is nothing.
+    finalDays:
+    - Do you think it will rain? I cannot get the dress very wet. I have already
+      had it cleaned once.
+    - Everyone always looks at the dress first. I understand. It is a very white
+      dress.
+    - I have been counting the days. I stopped when I lost count. It was a high number.
+  IDNumber: 9307225

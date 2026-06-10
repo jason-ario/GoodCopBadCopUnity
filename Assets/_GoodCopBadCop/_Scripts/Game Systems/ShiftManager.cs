@@ -340,6 +340,10 @@ public class ShiftManager : NetworkBehaviour
         PlayBuzzerSound();
         windowLampController.TurnGreen();
 
+        // Unlock the pre-shift door lock on days 2+ now that the shift is starting.
+        if (_currentDay > 1)
+            OnDoorUnlock?.Invoke();
+
         // Lock the exit door for the full shift when the campaign day requires it.
         if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)
             OnDoorLock?.Invoke();

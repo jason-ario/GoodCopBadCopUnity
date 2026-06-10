@@ -266,6 +266,11 @@ public class CampaignManager : NetworkBehaviour
         dayBase.DayActivated();
         OnDayChanged?.Invoke(day);
 
+        // Lock the door before the shift starts on days 2+ so pre-shift content can play
+        // while the room is secured. The door unlocks when the switch button starts the shift.
+        if (IsServer && day > 1 && ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDoorLock?.Invoke();
+
         Debug.Log($"[CampaignManager] Day {day} applied.");
     }
 

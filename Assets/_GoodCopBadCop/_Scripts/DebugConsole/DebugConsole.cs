@@ -164,6 +164,12 @@ public class DebugConsole : MonoBehaviour
             SpawnDebugAggroedMutant();
         }
 
+        // F11 — force the Alexei scripted event on the next suspect arrival.
+        if (Input.GetKeyDown(KeyCode.F11))
+        {
+            ForceAlexeiSequenceOnNextSuspect();
+        }
+
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
         if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
         {
@@ -301,6 +307,23 @@ public class DebugConsole : MonoBehaviour
 
         PlayerInstance.Instance.PlayerHealth.TakeDamage(999f);
         Debug.Log("[DebugConsole] Local player killed (K).");
+    }
+
+    /// <summary>
+    /// Forces the Alexei scripted event to intercept the next suspect spawn slot,
+    /// bypassing normal character spawning and playing the murder cutscene directly.
+    /// Useful for testing the Alexei event without running through all preceding suspects.
+    /// </summary>
+    private void ForceAlexeiSequenceOnNextSuspect()
+    {
+        if (AlexeiController.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] AlexeiController.Instance not found — is the Alexei event object in the scene?");
+            return;
+        }
+
+        SuspectController.InterceptNextSuspectSpawn = () => AlexeiController.Instance.BeginSequence();
+        Debug.Log("[DebugConsole] Alexei cutscene will intercept the next suspect spawn slot (F11).");
     }
 
     /// <summary>

@@ -76,6 +76,16 @@ public class SaveDataManager : MonoBehaviour
         set { if (ActiveSlot == null) return; ActiveSlot.EnvironmentAnomaliesUnlocked = value; Save(); }
     }
 
+    /// <summary>
+    /// True once the player has completed the full Day 1 tutorial sequence (including tool locker refill).
+    /// When true, DayActivated() on Day 1 skips all tutorial gating and runs a free-play shift.
+    /// </summary>
+    public bool Day1TutorialComplete
+    {
+        get => ActiveSlot?.Day1TutorialComplete ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.Day1TutorialComplete = value; Save(); }
+    }
+
     /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
     public int CurrentDay
     {
@@ -285,6 +295,12 @@ public class SaveSlot
     public bool BiologicalAnomaliesUnlocked;
     public bool DocumentationAnomaliesUnlocked;
     public bool EnvironmentAnomaliesUnlocked;
+
+    /// <summary>
+    /// Set to true once the player completes the Day 1 tutorial sequence (tool locker refill).
+    /// Causes Day 1 to skip all tutorial gating on subsequent runs.
+    /// </summary>
+    public bool Day1TutorialComplete;
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

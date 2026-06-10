@@ -236,7 +236,7 @@ Transform:
   m_Children:
   - {fileID: 2034319503263324220}
   m_Father: {fileID: 7387933146562101292}
-  m_LocalEulerAnglesHint: {x: 47.95368, y: -90, z: -155.636}
+  m_LocalEulerAnglesHint: {x: 47.95368, y: -90, z: 90}
 --- !u!1 &3539939510235449708
 GameObject:
   m_ObjectHideFlags: 0
@@ -282,9 +282,7 @@ GameObject:
   - component: {fileID: 2494313638465813251}
   - component: {fileID: 8877326637700217870}
   - component: {fileID: 3837079789081742517}
-  - component: {fileID: 7614189083517799674}
   - component: {fileID: 4522728938567934597}
-  - component: {fileID: 4014643062881620039}
   - component: {fileID: 7061879707959008607}
   m_Layer: 0
   m_Name: Supply Box
@@ -303,12 +301,13 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 1.7611401, y: 1.39, z: -11.33}
-  m_LocalScale: {x: 2, y: 2, z: 2}
+  m_LocalScale: {x: 4.39895, y: 4.39895, z: 4.39895}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3938363317082524660}
   - {fileID: 7387933146562101292}
   - {fileID: 772386136962686836}
+  - {fileID: 1194090767891976184}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
 --- !u!111 &42784548713879923
@@ -341,8 +340,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2108182946
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 1662472220
+  InScenePlacedSourceGlobalObjectIdHash: 2108182946
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
@@ -369,12 +368,11 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Supply Box
+  highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 2b45930ea8962dc41a79a318bd8dd7c2, type: 2}
-  pickupSound: {fileID: 0}
-  putDownSound: {fileID: 0}
   canPickUp: 0
   boxAnimation: {fileID: 42784548713879923}
-  contents: {fileID: 828340394288558776}
+  contents: {fileID: 6112527752988186107}
 --- !u!65 &8877326637700217870
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -408,7 +406,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HighlightPlus.HighlightEffect
-  profile: {fileID: 0}
+  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
   camerasLayerMask:
     serializedVersion: 2
@@ -417,12 +415,12 @@ MonoBehaviour:
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
   combineMeshes: 0
-  alphaCutOff: 0
-  cullBackFaces: 1
+  alphaCutOff: 0.5
+  cullBackFaces: 0
   padding: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
@@ -455,7 +453,7 @@ MonoBehaviour:
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
   outline: 1
-  outlineColor: {r: 0, g: 0, b: 0, a: 1}
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -488,22 +486,22 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.45
-  outlineBlurPasses: 2
-  outlineQuality: 3
+  outlineWidth: 0.1
+  outlineBlurPasses: 1
+  outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
   outlineSharpness: 1
   outlineDownsampling: 1
-  outlineVisibility: 0
+  outlineVisibility: 1
   glowBlendMode: 0
   outlineBlitDebug: 0
   outlineIndependent: 0
   outlineContourStyle: 0
   outlineMaskMode: 0
   glow: 0
-  glowWidth: 0.4
-  glowQuality: 3
+  glowWidth: 0.5
+  glowQuality: 2
   glowBlurMethod: 0
   glowDownsampling: 2
   glowHQColor: {r: 0.64, g: 1, b: 0, a: 1}
@@ -512,7 +510,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 0
+  glowVisibility: 1
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:
@@ -541,12 +539,12 @@ MonoBehaviour:
   targetFXRotationSpeed: 50
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
-  targetFXScaleToRenderBounds: 1
+  targetFXScaleToRenderBounds: 0
   targetFXUseEnclosingBounds: 0
   targetFXAlignToGround: 0
   targetFXOffset: {x: 0, y: 0, z: 0}
   targetFXFadePower: 32
-  targetFXGroundMaxDistance: 10
+  targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -571,7 +569,7 @@ MonoBehaviour:
   seeThroughOccluderMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  seeThroughOccluderThreshold: 0.3
+  seeThroughOccluderThreshold: 0.4
   seeThroughOccluderMaskAccurate: 0
   seeThroughOccluderCheckInterval: 1
   seeThroughOccluderCheckIndividualObjects: 0
@@ -590,39 +588,12 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 32
+  rmsCount: 34
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
---- !u!54 &7614189083517799674
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3779783083214245127}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!114 &4522728938567934597
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -669,23 +640,6 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!114 &4014643062881620039
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3779783083214245127}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkRigidbody
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkRigidbodyBaseExpanded: 0
-  UseRigidBodyForMotion: 0
-  AutoUpdateKinematicState: 1
-  AutoSetKinematicOnDespawn: 1
 --- !u!1773428102 &7061879707959008607
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -740,7 +694,7 @@ Transform:
   m_Children:
   - {fileID: 7008776636701218377}
   m_Father: {fileID: 7387933146562101292}
-  m_LocalEulerAnglesHint: {x: -2.2918987, y: 90, z: 180}
+  m_LocalEulerAnglesHint: {x: -42.046333, y: -90, z: 0}
 --- !u!1 &5613651943793978704
 GameObject:
   m_ObjectHideFlags: 0
@@ -776,6 +730,37 @@ Transform:
   - {fileID: 6902865421992163674}
   m_Father: {fileID: 1990969130246631421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6112527752988186107
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1194090767891976184}
+  m_Layer: 0
+  m_Name: Contents
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1194090767891976184
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6112527752988186107}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1990969130246631421}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6544333354888434286
 GameObject:
   m_ObjectHideFlags: 0
@@ -807,7 +792,7 @@ Transform:
   m_Children:
   - {fileID: 2922320803719968427}
   m_Father: {fileID: 7387933146562101292}
-  m_LocalEulerAnglesHint: {x: 47.95367, y: -90, z: 153.48509}
+  m_LocalEulerAnglesHint: {x: 47.95368, y: -90, z: -90}
 --- !u!1 &7285530380846755233
 GameObject:
   m_ObjectHideFlags: 0
@@ -839,7 +824,7 @@ Transform:
   m_Children:
   - {fileID: 2288295534948718812}
   m_Father: {fileID: 7387933146562101292}
-  m_LocalEulerAnglesHint: {x: -81.18033, y: -0.00009918213, z: 89.9999}
+  m_LocalEulerAnglesHint: {x: 42.046333, y: 90, z: 180}
 --- !u!1 &9059722267124010445
 GameObject:
   m_ObjectHideFlags: 0

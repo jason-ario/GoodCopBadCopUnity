@@ -33,6 +33,13 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("Tutorial steps fired by CampaignManager when this day activates.")]
     public List<TutorialStep> TutorialStepsToFire;
 
+    [Header("Supply Box Delivery")]
+    [Tooltip("When true, a supply box delivery sequence plays at the start of this day.")]
+    public bool HasSupplyBoxDelivery;
+
+    [Tooltip("Item prefabs to spawn inside the supply box. Each prefab must have a NetworkObject component and be registered in the NetworkManager prefab list.")]
+    public List<GameObject> SupplyBoxItemPrefabs = new List<GameObject>();
+
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses
     // -------------------------------------------------------------------------

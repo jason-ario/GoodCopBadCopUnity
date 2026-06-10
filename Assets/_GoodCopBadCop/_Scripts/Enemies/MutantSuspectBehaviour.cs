@@ -36,6 +36,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private Tween _activeTween;
     private bool _isDone;
 
+    /// <summary>
+    /// Optional callback fired on the server when the lineup sequence completes.
+    /// Receives true if the mutant broke through, false if it retreated or despawned.
+    /// Set this before calling BeginLineup() when bypassing SuspectController (e.g. AlexeiController).
+    /// </summary>
+    public System.Action<bool> OnSequenceComplete;
+
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
     private const float GiveUpPauseDuration = 1f;
@@ -178,6 +185,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         _isDone = true;
         _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+        OnSequenceComplete?.Invoke(true);
     }
 
     /// <summary>
@@ -289,12 +297,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         {
             // Climbing mutant gave up — let the controller clean up and queue the next suspect.
             _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+            OnSequenceComplete?.Invoke(false);
         }
         else
         {
             // Non-climbing mutant — controller was already notified; just despawn.
             if (NetworkObject.IsSpawned)
                 NetworkObject.Despawn();
+            OnSequenceComplete?.Invoke(false);
         }
     }
 

@@ -38,6 +38,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static bool ForceNextSuspectMutant = false;
 
+    /// <summary>
+    /// Optional server-side intercept for the next suspect spawn. When set, this is invoked
+    /// instead of spawning a normal or mutant suspect for that slot. Consumed and reset to null
+    /// after one use. Set by day-specific controllers (e.g. Day_01 for the Alexei scripted event).
+    /// </summary>
+    public static System.Action InterceptNextSuspectSpawn;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -138,6 +145,17 @@ public class SuspectController : NetworkBehaviour
                 yield break;
             }
             Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: no mutant available in pool — falling back to normal suspect.");
+        }
+
+        // Check for a scripted event intercept (e.g. Alexei on Day 1).
+        // Consumed before the mutant/regular spawn so no character spawns for this slot.
+        if (InterceptNextSuspectSpawn != null)
+        {
+            var intercept = InterceptNextSuspectSpawn;
+            InterceptNextSuspectSpawn = null;
+            Debug.Log($"[SuspectController] Intercepting suspect spawn at index {suspectIndex.Value} — scripted event.");
+            intercept.Invoke();
+            yield break;
         }
 
         if (dailySuspectManager.IsMutantSlot(suspectIndex.Value, out MutantSuspectBehaviour mutantPrefab, out MutantIntruderData mutantData))

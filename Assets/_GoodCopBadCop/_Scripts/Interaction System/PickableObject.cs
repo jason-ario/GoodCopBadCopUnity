@@ -111,8 +111,9 @@ public class PickableObject : Interactable
             _interactableLocked = _networkInteractableOverride.Value == 0;
             SetInteractable(_networkInteractableOverride.Value == 1);
         }
-        else if (!_interactableLocked)
+        else
         {
+            _interactableLocked = false;
             SetInteractable(_holdingClientId.Value == ulong.MaxValue);
         }
     }
