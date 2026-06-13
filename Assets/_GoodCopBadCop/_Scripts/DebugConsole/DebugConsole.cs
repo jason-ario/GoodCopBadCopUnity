@@ -310,20 +310,20 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Forces the Alexei scripted event to intercept the next suspect spawn slot,
-    /// bypassing normal character spawning and playing the murder cutscene directly.
-    /// Useful for testing the Alexei event without running through all preceding suspects.
+    /// Forces the soldier scripted event to intercept the next suspect spawn slot,
+    /// bypassing normal character spawning and playing the mocking sequence directly.
+    /// Useful for testing the soldier event without running through all preceding suspects.
     /// </summary>
     private void ForceAlexeiSequenceOnNextSuspect()
     {
-        if (AlexeiController.Instance == null)
+        if (SoldierMockingController.Instance == null)
         {
-            Debug.LogWarning("[DebugConsole] AlexeiController.Instance not found — is the Alexei event object in the scene?");
+            Debug.LogWarning("[DebugConsole] SoldierMockingController.Instance not found — is the soldier event object in the scene?");
             return;
         }
 
-        SuspectController.InterceptNextSuspectSpawn = () => AlexeiController.Instance.BeginSequence();
-        Debug.Log("[DebugConsole] Alexei cutscene will intercept the next suspect spawn slot (F11).");
+        SuspectController.InterceptNextSuspectSpawn = () => SoldierMockingController.Instance.BeginSequence();
+        Debug.Log("[DebugConsole] Soldier mocking event will intercept the next suspect spawn slot (F11).");
     }
 
     /// <summary>

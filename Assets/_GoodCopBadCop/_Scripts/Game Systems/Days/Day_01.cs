@@ -90,9 +90,13 @@ public class Day_01 : DayBase
     [Tooltip("Index into Telephone._availableTasks that maps to the 'Take Out the Trash' PhoneTaskData.")]
     [SerializeField] private int _trashTaskCallIndex = 0;
 
-    [Header("Day 1 — Alexei Event (6th Suspect)")]
-    [Tooltip("The AlexeiController placed in the scene (all renderers start disabled; RevealAlexeiClientRpc enables them).")]
-    [SerializeField] private AlexeiController _alexeiController;
+    [Header("Day 1 — Soldier Event (6th Suspect)")]
+    [Tooltip("The SoldierMockingController placed in the scene — handles the scripted soldier arrival on the 6th suspect slot.")]
+    [SerializeField] private SoldierMockingController _soldierMockingController;
+
+    [Tooltip("When true, the soldier scripted event intercepts the 6th suspect slot on Day 1. " +
+             "When false, the 6th slot draws from the all-suspects pool like any other post-tutorial suspect.")]
+    [SerializeField] private bool _enableSoldierEvent = false;
 
     // Cached document references received via OnPaperworkSpawned.
     private IDCard _tutorialIDCard;
@@ -198,10 +202,8 @@ public class Day_01 : DayBase
         if (DailySuspectManager.Instance != null)
             DailySuspectManager.Instance.PopulateSuspectOverride = PopulateDay1Suspects;
 
-        // Alexei scripted-event callbacks — always subscribed regardless of tutorial state.
-        AlexeiController.OnMurderComplete     += OnAlexeiMurderCompleteHandler;
-        AlexeiController.OnAlexeiRetreated    += OnAlexeiRetreatedHandler;
-        AlexeiController.OnAlexeiBrokeThrough += OnAlexeiBroughThroughHandler;
+        // Soldier scripted-event callback — always subscribed regardless of tutorial state.
+        SoldierMockingController.OnSoldierSequenceComplete += OnSoldierSequenceCompleteHandler;
 
         // OnFolderHandedOff is subscribed inside HandOffBeat / Suspect2HandOffBeat
         // so the window is scoped exactly to when each beat needs it.
@@ -238,9 +240,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff      -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped     -= OnFolderStamped;
 
-        AlexeiController.OnMurderComplete     -= OnAlexeiMurderCompleteHandler;
-        AlexeiController.OnAlexeiRetreated    -= OnAlexeiRetreatedHandler;
-        AlexeiController.OnAlexeiBrokeThrough -= OnAlexeiBroughThroughHandler;
+        SoldierMockingController.OnSoldierSequenceComplete -= OnSoldierSequenceCompleteHandler;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
@@ -304,9 +304,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff        -= OnFolderHandedOffHandler;
         FolderController.OnAnyFolderStamped       -= OnFolderStamped;
 
-        AlexeiController.OnMurderComplete     -= OnAlexeiMurderCompleteHandler;
-        AlexeiController.OnAlexeiRetreated    -= OnAlexeiRetreatedHandler;
-        AlexeiController.OnAlexeiBrokeThrough -= OnAlexeiBroughThroughHandler;
+        SoldierMockingController.OnSoldierSequenceComplete -= OnSoldierSequenceCompleteHandler;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
@@ -410,7 +408,8 @@ public class Day_01 : DayBase
     /// <see cref="SaveDataManager.Day1TutorialComplete"/> is true (i.e. the player has already
     /// finished Day 1 and is replaying after a game-over). Skips all tutorial gating: opens
     /// stamps/drawer immediately, delivers a short bark, then enables the switch and lets the
-    /// shift run freely. The Alexei scripted event still fires on the 6th suspect.
+    /// shift run freely. The soldier scripted event fires on the 6th suspect only when
+    /// <see cref="_enableSoldierEvent"/> is true.
     /// </summary>
     private IEnumerator Day1FreeshiftSequence()
     {
@@ -438,16 +437,23 @@ public class Day_01 : DayBase
 
     private void OnSuspectArrivedHandler(int suspectIndex)
     {
-        // Arm the Alexei cutscene intercept after the 5th regular suspect (index 4) arrives.
+        // Arm the soldier event intercept after the 5th regular suspect (index 4) arrives,
+        // but only when _enableSoldierEvent is true. When disabled, the 6th slot draws from
+        // the all-suspects pool like any other post-tutorial suspect.
         if (suspectIndex != 4) return;
 
         // Unsubscribe — we only need to arm once.
         SuspectController.OnSuspectArrived -= OnSuspectArrivedHandler;
 
         if (!NetworkManager.Singleton.IsServer) return;
+        if (!_enableSoldierEvent)
+        {
+            Debug.Log("[Day_01] Soldier event disabled (_enableSoldierEvent = false) — 6th suspect will draw from all-suspects pool.");
+            return;
+        }
 
-        SuspectController.InterceptNextSuspectSpawn = () => _alexeiController?.BeginSequence();
-        Debug.Log("[Day_01] Alexei cutscene intercept armed — next suspect spawn slot will launch the cutscene.");
+        SuspectController.InterceptNextSuspectSpawn = () => _soldierMockingController?.BeginSequence();
+        Debug.Log("[Day_01] Soldier mocking intercept armed — next suspect spawn slot will trigger the soldier event.");
     }
 
     /// <summary>
@@ -1593,55 +1599,18 @@ public class Day_01 : DayBase
     }
 
     // =========================================================================
-    // Alexei Scripted Event — Handlers
+    // Soldier Scripted Event — Handlers
     // =========================================================================
 
     /// <summary>
-    /// Fires on the server when AlexeiController finishes the murder cutscene, just before
-    /// MutantSuspectBehaviour.BeginLineup() is called. Shows the lever prompt so the player
-    /// knows they can close the shutter to stop Alexei.
+    /// Fires on the server when the soldier finishes mocking the player and begins walking away.
+    /// The soldier occupies the last Day 1 suspect slot, so <see cref="ShiftManager"/> moves
+    /// to clock-out automatically once <see cref="SoldierMockingController"/> calls
+    /// <see cref="ShiftManager.SetNextSuspectReady"/>.
     /// </summary>
-    private void OnAlexeiMurderCompleteHandler()
+    private void OnSoldierSequenceCompleteHandler()
     {
         if (this == null) return;
-        StartCoroutine(AlexeiMurderCompleteSequence());
-    }
-
-    private IEnumerator AlexeiMurderCompleteSequence()
-    {
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Close the window. Now.");
-    }
-
-    /// <summary>
-    /// Fires on the server when Alexei retreats (the player closed the shutter in time).
-    /// Plays a survival confirmation bark. The shift ends naturally — Alexei is the last
-    /// suspect, so ShiftManager will detect an empty queue and begin clock-out.
-    /// </summary>
-    private void OnAlexeiRetreatedHandler()
-    {
-        if (this == null) return;
-        StartCoroutine(AlexeiRetreatedSequence());
-    }
-
-    private IEnumerator AlexeiRetreatedSequence()
-    {
-        yield return new WaitForSeconds(2f);
-        yield return ShowAndWait("Smart. Keep working.");
-
-        // Alexei is the last suspect slot — signal the shift manager to start clock-out.
-        ShiftManager.Instance?.SetNextSuspectReady();
-    }
-
-    /// <summary>
-    /// Fires on the server when Alexei breaks through (player did not close the shutter in time).
-    /// MutantEnemy takes over from here and handles player death via the existing attack system.
-    /// PlayerHealth → DeathScreenUI → CampaignManager restarts Day 1 on game-over.
-    /// </summary>
-    private void OnAlexeiBroughThroughHandler()
-    {
-        if (this == null) return;
-        Debug.Log("[Day_01] Alexei broke through — MutantEnemy now active. Awaiting player death.");
-        // No megaphone bark — let the horror speak for itself.
+        Debug.Log("[Day_01] Soldier mocking sequence complete — shift clock-out incoming.");
     }
 }
