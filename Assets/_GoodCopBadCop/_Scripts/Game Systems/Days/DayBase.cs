@@ -40,6 +40,10 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("Item prefabs to spawn inside the supply box. Each prefab must have a NetworkObject component and be registered in the NetworkManager prefab list.")]
     public List<GameObject> SupplyBoxItemPrefabs = new List<GameObject>();
 
+    [Header("Events")]
+    [Tooltip("When true, the 'Follow the Trail' event can trigger on this day.")]
+    public bool CanFollowTrailEvent;
+
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses
     // -------------------------------------------------------------------------

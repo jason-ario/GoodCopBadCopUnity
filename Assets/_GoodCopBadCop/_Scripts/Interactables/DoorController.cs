@@ -253,7 +253,7 @@ public class DoorController : Interactable, IMutantPassable
     }
 
     /// <summary>
-    /// Unlocks the door on all clients, plays the unlock sound, and forces the door open.
+    /// Unlocks the door on all clients and plays the unlock sound.
     /// Only callable from the server.
     /// </summary>
     public void Unlock()
@@ -261,7 +261,6 @@ public class DoorController : Interactable, IMutantPassable
         if (!IsServer) return;
         _isLocked.Value = false;
         PlayUnlockSoundClientRpc();
-        ForceOpen();
     }
 
     /// <summary>

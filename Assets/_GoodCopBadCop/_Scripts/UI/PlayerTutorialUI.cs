@@ -31,6 +31,7 @@ public class PlayerTutorialUI : MonoBehaviour
     private void Start()
     {
         GameManager.Instance.OnGameStart += OnGameStart;
+        gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -42,6 +43,7 @@ public class PlayerTutorialUI : MonoBehaviour
     private void OnGameStart()
     {
         if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
+        gameObject.SetActive(true);
         StartCoroutine(DelayedShow("Go to the booth to start your shift.", 3f));
     }
 
@@ -54,6 +56,7 @@ public class PlayerTutorialUI : MonoBehaviour
     /// <summary>Shows the cinematic black bars without any text. Holds for the specified duration then dismisses. Interrupts any running sequence.</summary>
     public void ShowBarsOnly(float holdDuration = -1f)
     {
+        gameObject.SetActive(true);
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
         StopSequence();
         _sequenceCoroutine = StartCoroutine(BarsOnlySequenceCoroutine(duration));
@@ -78,6 +81,7 @@ public class PlayerTutorialUI : MonoBehaviour
             return;
         }
 
+        gameObject.SetActive(true);
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
 
         StopSequence();
@@ -96,6 +100,7 @@ public class PlayerTutorialUI : MonoBehaviour
             return;
         }
 
+        gameObject.SetActive(true);
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
 
         StopSequence();
@@ -110,6 +115,7 @@ public class PlayerTutorialUI : MonoBehaviour
         textReveal.gameObject.SetActive(false);
         _animator.SetBool(BlackBarsOn, false);
         SetPlayerUIActive(true);
+        gameObject.SetActive(false);
     }
 
     private void SetPlayerUIActive(bool active)
@@ -143,6 +149,7 @@ public class PlayerTutorialUI : MonoBehaviour
         textReveal.Clear();
         textReveal.gameObject.SetActive(false);
         _sequenceCoroutine = null;
+        gameObject.SetActive(false);
     }
 
     private void StopSequence()

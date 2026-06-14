@@ -65,10 +65,13 @@ public class GuidebookController : MonoBehaviour
     {
         if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsLocalPlayer) return;
 
+        // Disabling guidebook opening via Tab for now as requested.
+        /*
         if (!IsOpen && Input.GetButtonDown(InputButton))
             OpenGuidebook();
         else if (IsOpen && Input.GetButtonDown(InputButton))
             CloseGuidebook();
+        */
     }
 
     /// <summary>

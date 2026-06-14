@@ -1,36 +1,33 @@
 using UnityEngine;
 
 /// <summary>
-/// PostBox interactable for the Go Hunting task.
-/// Players deposit MutantBits here to progress toward the task goal.
+/// PostBox interactable for the Mutant Activity threat.
+/// Players deposit MutantBits here to fill the box, then call HQ for pickup and a coupon reward.
 ///
 /// Setup requirements:
 ///   - NetworkObject on the PostBox GameObject (already present in scene).
 ///   - HighlightEffect (required by Interactable).
 ///   - Collider set to the Interactable layer.
 ///   - The MutantBit PickableItemData asset added to itemsThatCanInteractWith in the Inspector.
+///   - Set _capacity to the desired max bits per collection (default 10).
+///   - Set _couponRewardPerCollection to the desired coupon payout.
 /// </summary>
-public class PostBox : Interactable
+public class PostBox : CollectableContainer
 {
-    private const string InteractTextDefault  = "Post Box";
-    private const string InteractTextComplete = "Post Box (Task Complete)";
-
     protected override void Awake()
     {
         base.Awake();
-        interactText = InteractTextDefault;
     }
 
     /// <summary>
     /// Called by PlayerInteractionController when the player left-clicks the PostBox
-    /// while holding a MutantBit. Despawns the bit and forwards the deposit to GoHuntingTask.
+    /// while holding a MutantBit. Despawns the bit and deposits it into the container.
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
     {
         MutantBit bit = item as MutantBit;
 
-        if (bit == null) return;
-        if (GoHuntingTask.Instance == null || GoHuntingTask.Instance.IsComplete) return;
+        if (IsFull || IsAwaitingPickup || bit == null) return;
 
         base.InteractWithItem(player, item);
 
@@ -41,15 +38,10 @@ public class PostBox : Interactable
         // Despawn the bit network-wide.
         bit.DespawnServerRpc();
 
-        // Increment the task counter on the server.
-        GoHuntingTask.Instance.DepositBitServerRpc();
-
-        RefreshInteractText();
+        // Increment the fill counter on the server.
+        DepositServerRpc();
     }
 
-    private void RefreshInteractText()
-    {
-        bool complete = GoHuntingTask.Instance != null && GoHuntingTask.Instance.IsComplete;
-        interactText = complete ? InteractTextComplete : InteractTextDefault;
-    }
+    protected override string GetDefaultInteractText() => $"Post Box ({FillCount}/{Capacity})";
+    protected override string GetFullInteractText()    => "Call HQ for Pickup";
 }

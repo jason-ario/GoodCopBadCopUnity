@@ -73,6 +73,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
 
         dialogueChoiceContainer.SetActive(false);
+        backButton.SetActive(false);
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
 

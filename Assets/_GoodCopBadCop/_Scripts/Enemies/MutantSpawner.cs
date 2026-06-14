@@ -297,6 +297,18 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Current tracked active enemy count. Prunes dead entries before returning. SERVER ONLY.
+    /// </summary>
+    public int ActiveEnemyCount
+    {
+        get
+        {
+            PruneDeadEnemies();
+            return _activeEnemies.Count;
+        }
+    }
+
+    /// <summary>
     /// Restarts the spawner loop after it has been stopped. SERVER ONLY.
     /// </summary>
     public void ResumeSpawning()

@@ -1,37 +1,37 @@
 using UnityEngine;
 
 /// <summary>
-/// Lightweight debug-only task. Does not require a NetworkObject or server authority.
+/// Lightweight debug-only systemic threat. Does not require a NetworkObject or server authority.
 /// Toggle completion via DebugConsole (F5 by default).
 /// </summary>
-public class DebugTask : MonoBehaviour, IBetweenShiftTask
+public class DebugTask : MonoBehaviour, ISystemicThreat
 {
-    private const string DefaultName = "Debug Task";
-    private const string DefaultDescription = "A fake task added at runtime for testing the guidebook task list.";
-    private const int DefaultCouponReward = 10;
+    private const string DefaultName        = "Debug Threat";
+    private const string DefaultDescription = "A fake systemic threat for testing the guidebook task list.";
 
-    public string TaskName => DefaultName;
-    public string TaskDescription => DefaultDescription;
-    public int CouponReward => DefaultCouponReward;
-    public bool IsComplete { get; private set; }
+    public string ThreatName        => DefaultName;
+    public string ThreatDescription => DefaultDescription;
+    public float  ThreatLevel       { get; private set; }
+    public float  ScoreWeight       => 0f;
 
-    /// <summary>Marks the task as complete and notifies the registry and manager.</summary>
+    /// <summary>Simulates a high-threat state and notifies the registry.</summary>
     public void Complete()
     {
-        if (IsComplete) return;
-        IsComplete = true;
-        Debug.Log("[DebugTask] Marked complete.");
-
+        ThreatLevel = 1f;
+        Debug.Log("[DebugTask] Threat level set to max.");
         GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
-
-        if (BetweenShiftTaskManager.Instance != null)
-            BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
     }
 
+    /// <summary>Resets the threat level to zero and notifies the registry.</summary>
     public void ResetTask()
     {
-        IsComplete = false;
+        ThreatLevel = 0f;
+        Debug.Log("[DebugTask] Threat level reset.");
         GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
-        Debug.Log("[DebugTask] Reset.");
     }
+
+    // ── ISystemicThreat ──────────────────────────────────────────────────────
+
+    public void BeginNightPhase() { }
+    public void EndNightPhase()   { }
 }

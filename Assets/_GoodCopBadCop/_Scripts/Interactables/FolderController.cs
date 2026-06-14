@@ -236,6 +236,14 @@ public class FolderController : PickableObject
         {
             if (idCard != null)       idCard.SetInteractableNetworked(newVal);
             if (application != null)  application.SetInteractableNetworked(newVal);
+
+            // Exam pages are tracked separately in _examPageQueue — apply the same open-state
+            // change so they become interactable when the folder opens and non-interactable
+            // when it closes, matching the behaviour of idCard and application.
+            foreach (ExamPage examPage in _examPageQueue)
+            {
+                if (examPage != null) examPage.SetInteractableNetworked(newVal);
+            }
         }
     }
 
@@ -911,6 +919,13 @@ public class FolderController : PickableObject
 
         _examPageQueue[slotIndex] = examPage;
         _queueSlots[slotIndex].Value = examPage.ItemData.name;
+
+        // Apply the folder's current open state so a page added to a closed folder is
+        // immediately non-interactable on all clients, and one added to an open folder
+        // remains interactable — matching the SyncDocumentAddedServerRpc behaviour for
+        // idCard and application.
+        examPage.SetInteractableNetworked(isOpen.Value);
+
         Debug.Log($"[FolderController] RegisterExamPageInQueueServerRpc: registered {examPage.ItemData.name} at queue slot {slotIndex}");
     }
 
@@ -1020,6 +1035,11 @@ public class FolderController : PickableObject
             {
                 if (idCard != null)       idCard.SetInteractableNetworked(true);
                 if (application != null)  application.SetInteractableNetworked(true);
+
+                foreach (ExamPage examPage in _examPageQueue)
+                {
+                    if (examPage != null) examPage.SetInteractableNetworked(true);
+                }
             }
         }
     }

@@ -1,23 +1,22 @@
-using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// Page content object for the Tasks tab.
-/// Reads from GuidebookTaskRegistry — tasks can be added by any system at any time.
-/// Rebuilds rows immediately when the registry changes, and refreshes completion
-/// states each time the tab is opened.
+/// Reads from GuidebookTaskRegistry — threats can be registered by any system at any time.
+/// Rebuilds rows immediately when the registry changes, and refreshes threat levels
+/// each time the tab is opened.
 /// </summary>
 public class GuidebookTaskListContents : GuidebookPageContents
 {
-    [Tooltip("Prefab containing a GuidebookTaskRow component (may be on a child). Instantiated once per task.")]
+    [Tooltip("Prefab containing a GuidebookTaskRow component (may be on a child). Instantiated once per threat.")]
     [SerializeField] private GameObject _taskRowPrefab;
 
     [Tooltip("RectTransform that acts as the parent for spawned rows. Should have a VerticalLayoutGroup.")]
     [SerializeField] private RectTransform _rowContainer;
 
-    [Tooltip("Shown when there are no active tasks.")]
+    [Tooltip("Shown when there are no active threats.")]
     [SerializeField] private TextMeshProUGUI _fallbackLabel;
 
     private readonly List<GuidebookTaskRow> _rows = new();
@@ -41,7 +40,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
     private void OnEnable()
     {
-        // Catch up if tasks were added while the guidebook was closed.
+        // Catch up if threats were added while the guidebook was closed.
         BuildRows();
         TriggerRenderTextureRefresh();
     }
@@ -56,23 +55,18 @@ public class GuidebookTaskListContents : GuidebookPageContents
         TriggerRenderTextureRefresh();
     }
 
-    /// <summary>
-    /// Delegates to <see cref="GuidebookContentsContainer.TriggerRender"/> so the
-    /// render texture cameras recapture the latest UI state. Safe to call while
-    /// this component is inactive — the container MonoBehaviour is always active.
-    /// </summary>
     private void TriggerRenderTextureRefresh()
     {
         GuidebookContentsContainer.Instance?.TriggerRender();
     }
 
     /// <summary>
-    /// Refreshes completion states on all rows.
+    /// Refreshes threat levels on all rows.
     /// Called by GuidebookTabController when this tab becomes active.
     /// </summary>
     public override void Refresh()
     {
-        if (GuidebookTaskRegistry.Instance == null || GuidebookTaskRegistry.Instance.Tasks.Count == 0)
+        if (GuidebookTaskRegistry.Instance == null || GuidebookTaskRegistry.Instance.Threats.Count == 0)
         {
             SetFallbackVisible(true);
             TriggerRenderTextureRefresh();
@@ -80,12 +74,11 @@ public class GuidebookTaskListContents : GuidebookPageContents
         }
 
         // If row count is out of sync (e.g. tab was hidden during a registry change), rebuild first.
-        if (_rows.Count != GuidebookTaskRegistry.Instance.Tasks.Count)
+        if (_rows.Count != GuidebookTaskRegistry.Instance.Threats.Count)
             BuildRows();
         else
             RefreshRows();
 
-        // Always refresh the render texture after rows change so the render camera recaptures.
         TriggerRenderTextureRefresh();
     }
 
@@ -95,13 +88,13 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
         if (GuidebookTaskRegistry.Instance == null) return;
 
-        IReadOnlyList<IBetweenShiftTask> tasks = GuidebookTaskRegistry.Instance.Tasks;
-        bool hasTasks = tasks.Count > 0;
-        SetFallbackVisible(!hasTasks);
+        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance.Threats;
+        bool hasThreats = threats.Count > 0;
+        SetFallbackVisible(!hasThreats);
 
-        if (!hasTasks || _rowContainer == null || _taskRowPrefab == null) return;
+        if (!hasThreats || _rowContainer == null || _taskRowPrefab == null) return;
 
-        foreach (IBetweenShiftTask task in tasks)
+        foreach (ISystemicThreat threat in threats)
         {
             GameObject instance = Instantiate(_taskRowPrefab, _rowContainer);
             GuidebookTaskRow row = instance.GetComponentInChildren<GuidebookTaskRow>();
@@ -112,20 +105,20 @@ public class GuidebookTaskListContents : GuidebookPageContents
                 continue;
             }
 
-            row.Bind(task);
+            row.Bind(threat);
             _rows.Add(row);
         }
     }
 
     private void RefreshRows()
     {
-        IReadOnlyList<IBetweenShiftTask> tasks = GuidebookTaskRegistry.Instance.Tasks;
-        SetFallbackVisible(tasks.Count == 0);
+        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance.Threats;
+        SetFallbackVisible(threats.Count == 0);
 
         for (int i = 0; i < _rows.Count; i++)
         {
             if (_rows[i] != null)
-                _rows[i].Bind(tasks[i]);
+                _rows[i].Bind(threats[i]);
         }
     }
 

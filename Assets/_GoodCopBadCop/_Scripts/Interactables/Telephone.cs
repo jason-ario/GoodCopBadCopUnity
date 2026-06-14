@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using DG.Tweening;
 using Unity.Netcode;
@@ -7,6 +8,9 @@ using UnityEngine.Animations;
 public class Telephone : Interactable
 {
     public static Telephone Instance { get; private set; }
+
+    /// <summary>Fired on all clients when the phone begins ringing.</summary>
+    public static event Action OnRingStarted;
 
     [SerializeField] private SocketFollow handSet;
     [SerializeField] private Transform _ikTarget;
@@ -159,7 +163,7 @@ public class Telephone : Interactable
             Debug.LogWarning("[Telephone] TriggerRandomCall: no tasks assigned.");
             return;
         }
-        TriggerCall(Random.Range(0, _availableTasks.Length));
+        TriggerCall(UnityEngine.Random.Range(0, _availableTasks.Length));
     }
 
     /// <summary>
@@ -238,6 +242,7 @@ public class Telephone : Interactable
             StopCoroutine(_ringCycleCoroutine);
 
         _ringCycleCoroutine = StartCoroutine(RingCycleRoutine());
+        OnRingStarted?.Invoke();
     }
 
     [ClientRpc]

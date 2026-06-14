@@ -2,6 +2,7 @@
 /// Implemented by every MonoBehaviour that represents a between-shift night-phase task.
 /// Register instances on BetweenShiftTaskManager via the Inspector.
 /// </summary>
+[System.Obsolete("Use ISystemicThreat instead. The between-shift task system has been replaced by the systemic threat model.")]
 public interface IBetweenShiftTask
 {
     /// <summary>Display name shown in the guidebook task list.</summary>

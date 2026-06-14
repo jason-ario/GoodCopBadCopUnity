@@ -138,20 +138,19 @@ public class ShiftManager : NetworkBehaviour
 
     private void OnEnable()
     {
-        BetweenShiftTaskManager.OnAllTasksComplete += HandleAllTasksComplete;
+        BetweenShiftTaskManager.OnMinimumNightDurationElapsed += HandleNightPhaseReady;
     }
 
     private void OnDisable()
     {
-        BetweenShiftTaskManager.OnAllTasksComplete -= HandleAllTasksComplete;
+        BetweenShiftTaskManager.OnMinimumNightDurationElapsed -= HandleNightPhaseReady;
     }
 
     /// <summary>
-    /// Called on all clients when every between-shift task has been completed.
-    /// Fires <see cref="OnShiftReady"/> so the switch button becomes pressable,
-    /// and prompts the player to return to the booth.
+    /// Called on all clients when the minimum night duration has elapsed.
+    /// Fires OnShiftReady so the switch button becomes pressable.
     /// </summary>
-    private void HandleAllTasksComplete()
+    private void HandleNightPhaseReady()
     {
         OnShiftReady?.Invoke();
     }
@@ -508,22 +507,18 @@ public class ShiftManager : NetworkBehaviour
         AddShiftTasksOnServer();
     }
 
-    /// <summary>Routes a task-complete notification to the server for authoritative counting.</summary>
+    /// <summary>Routes a task-complete notification to the server. Obsolete — no-op in the new system.</summary>
+    [System.Obsolete("NotifyTaskCompleteServerRpc is obsolete. The night phase is now gated by a minimum duration timer.")]
     [ServerRpc(RequireOwnership = false)]
     public void NotifyTaskCompleteServerRpc()
     {
-        _taskCompletedCount++;
-        Debug.Log($"[ShiftManager] Tasks completed: {_taskCompletedCount} / {BetweenShiftTaskManager.Instance?.Tasks.Length}");
-
-        int total = BetweenShiftTaskManager.Instance?.Tasks.Length ?? 0;
-        if (_taskCompletedCount >= total)
-            AllTasksCompleteClientRpc();
+        Debug.LogWarning("[ShiftManager] NotifyTaskCompleteServerRpc is obsolete and should not be called.");
     }
 
     [ClientRpc]
     private void AllTasksCompleteClientRpc()
     {
-        BetweenShiftTaskManager.Instance?.HandleAllTasksComplete();
+        BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
     }
 
     /// <summary>Forces all tasks to complete, bypassing individual task state. Debug only.</summary>
@@ -535,6 +530,9 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator InBetweenShiftSequence()
     {
+        // End the previous night phase and score it before resetting the world.
+        BetweenShiftTaskManager.Instance?.EndNightPhase();
+
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(1.5f);
         UIController.Instance.HideEndOfShiftReport();
@@ -563,8 +561,21 @@ public class ShiftManager : NetworkBehaviour
 
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
-        OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
+
+        // Start the new night phase and minimum timer on server + all clients.
+        if (IsServer)
+        {
+            BetweenShiftTaskManager.Instance?.BeginNightPhase();
+            BeginNightPhaseClientRpc();
+        }
+    }
+
+    [ClientRpc]
+    private void BeginNightPhaseClientRpc()
+    {
+        if (IsServer) return; // Host already called BeginNightPhase above.
+        BetweenShiftTaskManager.Instance?.BeginNightPhase();
     }
 
     [ClientRpc]
@@ -588,6 +599,7 @@ public class ShiftManager : NetworkBehaviour
     {
         windowLampController.TurnRed();
         lever.Reset();
+        _doorController?.Reset();
 
         if (_timecardMachine != null)
             _timecardMachine.Reset();
@@ -654,8 +666,8 @@ public class ShiftManager : NetworkBehaviour
 
         EnablePlayerControl();
 
-        // OnShiftReady is deferred until all between-shift tasks are complete.
-        // BetweenShiftTaskManager.OnAllTasksComplete → HandleAllTasksComplete will fire it.
+        // On Day 1 there is no prior night phase, so the shift button is immediately ready.
+        OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
     }
 

@@ -48,21 +48,21 @@ public class HUDTaskList : MonoBehaviour
         if (_rowContainer == null)
             return;
 
-        IReadOnlyList<IBetweenShiftTask> tasks = GuidebookTaskRegistry.Instance != null
-            ? GuidebookTaskRegistry.Instance.Tasks
-            : System.Array.Empty<IBetweenShiftTask>();
+        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance != null
+            ? GuidebookTaskRegistry.Instance.Threats
+            : System.Array.Empty<ISystemicThreat>();
 
-        bool hasTasks = tasks.Count > 0;
+        bool hasThreats = threats.Count > 0;
 
         // Show/hide the row container rather than this MonoBehaviour so that
         // registry events are still received when the list is empty.
-        _rowContainer.gameObject.SetActive(hasTasks);
+        _rowContainer.gameObject.SetActive(hasThreats);
 
-        if (!hasTasks || _taskRowPrefab == null)
+        if (!hasThreats || _taskRowPrefab == null)
             return;
 
-        foreach (IBetweenShiftTask task in tasks)
-            SpawnRow(task.TaskName);
+        foreach (ISystemicThreat threat in threats)
+            SpawnRow(threat.ThreatName);
     }
 
     /// <summary>Instantiates the task row prefab and populates its TMP label.</summary>

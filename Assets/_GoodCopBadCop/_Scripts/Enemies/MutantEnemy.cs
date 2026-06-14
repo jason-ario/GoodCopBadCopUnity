@@ -779,8 +779,8 @@ public class MutantEnemy : NetworkBehaviour
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
 
-        // Attempt to drop a MutantBit if the Go Hunting task is active.
-        GoHuntingTask.Instance?.TryDropBitAt(transform.position);
+        // Attempt to drop a MutantBit if the night phase is active.
+        MutantThreat.Instance?.TryDropBitAt(transform.position);
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {

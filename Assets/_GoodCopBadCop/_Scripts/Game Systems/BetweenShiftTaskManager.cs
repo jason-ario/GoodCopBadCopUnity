@@ -1,117 +1,202 @@
 using System;
+using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Local manager for the shift task list.
-/// Tracks task completion and notifies ShiftManager when all tasks are done.
+/// Local manager for the systemic threat list.
+/// Starts and ends the night phase, drives the minimum night duration timer,
+/// manages the ShiftPerformanceEvaluator, and keeps GuidebookTaskRegistry in sync.
+///
 /// Plain MonoBehaviour — no NetworkObject required. Each client manages its own
-/// registry; ShiftManager handles the networked all-tasks-complete broadcast.
+/// timer independently; the timer fires OnMinimumNightDurationElapsed locally
+/// so all clients enable the shift-start button at approximately the same time.
 /// </summary>
 public class BetweenShiftTaskManager : MonoBehaviour
 {
     public static BetweenShiftTaskManager Instance;
 
     /// <summary>
-    /// Fired locally when every registered task has been completed.
-    /// ShiftManager subscribes to this to trigger the shift-start button and announcer line.
+    /// Fired locally when the minimum night duration has elapsed.
+    /// ShiftManager subscribes to this to trigger the shift-start button.
     /// </summary>
-    public static event Action OnAllTasksComplete;
+    public static event Action OnMinimumNightDurationElapsed;
 
-    /// <summary>Read-only view of all registered tasks.</summary>
-    public IBetweenShiftTask[] Tasks => _tasks;
+    /// <summary>Read-only view of all registered threats.</summary>
+    public ISystemicThreat[] Threats => _threats;
+
+    // ── Inspector ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Assign all IBetweenShiftTask MonoBehaviours here via the Inspector.
-    /// Each entry must implement IBetweenShiftTask.
+    /// Assign all ISystemicThreat MonoBehaviours here via the Inspector.
+    /// Each entry must implement ISystemicThreat.
     /// </summary>
-    [SerializeField] private MonoBehaviour[] _taskBehaviours;
+    [SerializeField] private MonoBehaviour[] _threatBehaviours;
 
-    private IBetweenShiftTask[] _tasks;
-    private int _completedTaskCount;
-    private bool _allTasksComplete;
+    [Tooltip("Evaluates threat samples at shift end and awards performance coupons.")]
+    [SerializeField] private ShiftPerformanceEvaluator _performanceEvaluator;
 
-    public bool AllTasksComplete => _allTasksComplete;
+    [Tooltip("Minimum seconds the player must spend in the night phase before the shift button lights up.")]
+    [SerializeField] private float _minimumNightDuration = 180f;
+
+    // ── State ────────────────────────────────────────────────────────────────
+
+    private ISystemicThreat[] _threats;
+    private Coroutine _nightTimerCoroutine;
+    private bool _nightPhaseActive;
+    private float _uiRefreshTimer;
+
+    private const float UIRefreshInterval = 2f;
+
+    private bool IsServer => NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
     {
         Instance = this;
-        BuildTaskList();
+        BuildThreatList();
     }
 
-    private void BuildTaskList()
+    private void Update()
     {
-        _tasks = new IBetweenShiftTask[_taskBehaviours.Length];
-        for (int i = 0; i < _taskBehaviours.Length; i++)
+        _uiRefreshTimer += Time.deltaTime;
+        if (_uiRefreshTimer < UIRefreshInterval) return;
+
+        _uiRefreshTimer = 0f;
+        GuidebookTaskRegistry.Instance?.NotifyTaskStateChanged();
+    }
+
+    // ── Build ─────────────────────────────────────────────────────────────────
+
+    private void BuildThreatList()
+    {
+        _threats = new ISystemicThreat[_threatBehaviours.Length];
+
+        for (int i = 0; i < _threatBehaviours.Length; i++)
         {
-            _tasks[i] = _taskBehaviours[i] as IBetweenShiftTask;
-            if (_tasks[i] == null)
-                Debug.LogWarning($"[BetweenShiftTaskManager] Entry {i} ({_taskBehaviours[i]?.name}) does not implement IBetweenShiftTask.");
+            _threats[i] = _threatBehaviours[i] as ISystemicThreat;
+
+            if (_threats[i] == null)
+                Debug.LogWarning($"[BetweenShiftTaskManager] Entry {i} ({_threatBehaviours[i]?.name}) does not implement ISystemicThreat.");
         }
     }
 
+    // ── Public API ────────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Resets all tasks and populates GuidebookTaskRegistry for the new task set.
-    /// Call this on every client — typically via ShiftManager.
+    /// Starts the night phase: activates threats (server only), begins performance sampling
+    /// (server only), registers threats in the guidebook (all clients), and starts the
+    /// minimum duration timer.
+    /// Called on all clients — server-only work is guarded internally.
+    /// </summary>
+    public void BeginNightPhase()
+    {
+        if (_nightPhaseActive) return;
+        _nightPhaseActive = true;
+
+        // Start the minimum night timer on all clients so the shift button lights up locally.
+        if (_nightTimerCoroutine != null) StopCoroutine(_nightTimerCoroutine);
+        _nightTimerCoroutine = StartCoroutine(NightDurationTimer());
+
+        if (IsServer)
+        {
+            foreach (ISystemicThreat threat in _threats) threat?.BeginNightPhase();
+            _performanceEvaluator?.BeginSampling(_threats);
+        }
+
+        GuidebookTaskRegistry.Instance?.SetThreats(_threats);
+
+        Debug.Log($"[BetweenShiftTaskManager] Night phase begun. {_threats.Length} threat(s) active.");
+    }
+
+    /// <summary>
+    /// Ends the night phase: stops threats (server only), evaluates performance (server only),
+    /// and stops the timer. SERVER ONLY for the scoring side; safe to call on all clients.
+    /// </summary>
+    public void EndNightPhase()
+    {
+        _nightPhaseActive = false;
+
+        if (_nightTimerCoroutine != null)
+        {
+            StopCoroutine(_nightTimerCoroutine);
+            _nightTimerCoroutine = null;
+        }
+
+        if (!IsServer) return;
+
+        foreach (ISystemicThreat threat in _threats) threat?.EndNightPhase();
+        _performanceEvaluator?.EvaluateAndAward();
+
+        Debug.Log("[BetweenShiftTaskManager] Night phase ended. Performance evaluated.");
+    }
+
+    /// <summary>
+    /// Alias for BeginNightPhase(). Kept for compatibility with the existing
+    /// ShiftManager.TriggerAddShiftTasks() → AddShiftTasksOnServer() code path.
     /// </summary>
     public void ActivateTasks()
     {
-        _completedTaskCount = 0;
-        _allTasksComplete = false;
-
-        foreach (var task in _tasks)
-            task?.ResetTask();
-
-        if (GuidebookTaskRegistry.Instance != null)
-            GuidebookTaskRegistry.Instance.SetTasks(_tasks);
-
-        Debug.Log($"[BetweenShiftTaskManager] Tasks activated. {_tasks.Length} task(s) registered.");
+        BeginNightPhase();
     }
 
     /// <summary>
-    /// Resets task counters and calls <see cref="IBetweenShiftTask.ResetTask"/> on every registered
-    /// task without touching <see cref="GuidebookTaskRegistry"/>.
-    /// Use this when tasks are delivered via the telephone — the registry is populated separately
-    /// by <see cref="Telephone"/> when the player answers the call.
+    /// Fires OnMinimumNightDurationElapsed immediately, bypassing the timer.
+    /// Debug helper — also used by ShiftManager.ForceCompleteAllTasksServerRpc.
     /// </summary>
-    public void ResetTaskPhysics()
+    public void HandleNightPhaseReady()
     {
-        _completedTaskCount = 0;
-        _allTasksComplete = false;
-
-        foreach (var task in _tasks)
-            task?.ResetTask();
-
-        Debug.Log($"[BetweenShiftTaskManager] Task physics reset. {_tasks.Length} task(s) prepared.");
+        OnMinimumNightDurationElapsed?.Invoke();
     }
 
     /// <summary>
-    /// Called by individual task scripts when their task is completed.
-    /// Awards the task's coupon reward to the shared money pool (server-only),
-    /// then routes the completion count to the server via ShiftManager.
+    /// Returns the weighted average threat level across all registered threats (0–1).
     /// </summary>
-    public void NotifyTaskComplete(IBetweenShiftTask task)
+    public float GetAggregateThreatLevel()
     {
-        if (task.CouponReward > 0 && GlobalHostVariables.Instance != null)
-            GlobalHostVariables.Instance.AddMoney(task.CouponReward);
+        if (_threats == null || _threats.Length == 0) return 0f;
 
-        ShiftManager.Instance.NotifyTaskCompleteServerRpc();
+        float total       = 0f;
+        float totalWeight = 0f;
+
+        foreach (ISystemicThreat t in _threats)
+        {
+            if (t == null) continue;
+            total       += t.ThreatLevel * t.ScoreWeight;
+            totalWeight += t.ScoreWeight;
+        }
+
+        return totalWeight > 0f ? total / totalWeight : 0f;
     }
 
-    /// <summary>
-    /// Called by ShiftManager's ClientRpc when the server confirms all tasks are done.
-    /// </summary>
-    public void HandleAllTasksComplete()
-    {
-        if (_allTasksComplete) return;
-        _allTasksComplete = true;
-        OnAllTasksComplete?.Invoke();
-    }
-
-    /// <summary>
-    /// Debug helper — immediately fires OnAllTasksComplete locally and notifies the server.
-    /// </summary>
+    /// <summary>Debug helper — immediately fires OnMinimumNightDurationElapsed.</summary>
     public void ForceCompleteAllTasks()
     {
-        ShiftManager.Instance.ForceCompleteAllTasksServerRpc();
+        HandleNightPhaseReady();
+    }
+
+    // ── Backward-compatibility stubs ─────────────────────────────────────────
+
+    /// <summary>Obsolete. No-op — the night phase no longer uses discrete task completion.</summary>
+    [System.Obsolete("NotifyTaskComplete is obsolete. The night phase is gated by a minimum duration timer.")]
+    public void NotifyTaskComplete(IBetweenShiftTask task)
+    {
+        Debug.LogWarning("[BetweenShiftTaskManager] NotifyTaskComplete is obsolete and has no effect.");
+    }
+
+    /// <summary>Obsolete. No-op — task physics reset is handled by individual threat scripts.</summary>
+    [System.Obsolete("ResetTaskPhysics is obsolete. Threat state is managed by BeginNightPhase().")]
+    public void ResetTaskPhysics()
+    {
+        Debug.LogWarning("[BetweenShiftTaskManager] ResetTaskPhysics is obsolete and has no effect.");
+    }
+
+    // ── Timer ─────────────────────────────────────────────────────────────────
+
+    private IEnumerator NightDurationTimer()
+    {
+        yield return new WaitForSeconds(_minimumNightDuration);
+        OnMinimumNightDurationElapsed?.Invoke();
     }
 }

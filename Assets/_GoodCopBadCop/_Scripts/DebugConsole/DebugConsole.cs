@@ -274,7 +274,7 @@ public class DebugConsole : MonoBehaviour
         if (_debugTask == null)
             _debugTask = gameObject.AddComponent<DebugTask>();
 
-        GuidebookTaskRegistry.Instance.AddTask(_debugTask);
+        GuidebookTaskRegistry.Instance.AddThreat(_debugTask);
         Debug.Log("[DebugConsole] Debug task added to registry (F6 to complete).");
     }
 

@@ -3,30 +3,11 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// A rectangular horizontal zone in which trash bags can be spawned.
-/// </summary>
-[System.Serializable]
-public struct SpawnZone
-{
-    [Tooltip("Centre pivot of this zone.")]
-    public Transform Center;
-    [Tooltip("Half-extents on X and Z. Y is ignored for horizontal placement.")]
-    public Vector3 HalfExtents;
-}
-
-/// <summary>
 /// Between-shift task: pick up all trash bags and deposit them in the dumpster.
 ///
-/// This is a NetworkBehaviour so it can authoritatively spawn trash bags and sync
-/// deposit progress across all clients. Assign it to BetweenShiftTaskManager via
-/// the Inspector's task list like any other IBetweenShiftTask.
-///
-/// Scene setup:
-///   - Add a NetworkObject component to this GameObject.
-///   - Assign _trashBagPrefab (must be registered as a Network Prefab).
-///   - Add one or more SpawnZones, each with a centre Transform and half-extents.
-///   - Set _groundLayer to match your environment.
+/// This class is obsolete. Use TrashThreat instead.
 /// </summary>
+[System.Obsolete("Use TrashThreat instead. The between-shift task system has been replaced by the systemic threat model.")]
 [RequireComponent(typeof(NetworkObject))]
 public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
 {
@@ -194,13 +175,9 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
 
     private void ResetDumpsters()
     {
-        if (_dumpsters == null) return;
-
-        foreach (DumpsterInteractable dumpster in _dumpsters)
-        {
-            if (dumpster != null)
-                dumpster.ResetServerRpc();
-        }
+        // ResetServerRpc has been removed from DumpsterInteractable.
+        // Dumpster resets are now handled automatically by HQPickupDispatcher.
+        Debug.LogWarning("[TakeOutTrashTask] ResetDumpsters is obsolete — dumpsters no longer support ResetServerRpc.");
     }
 
     private void DespawnExistingBags()

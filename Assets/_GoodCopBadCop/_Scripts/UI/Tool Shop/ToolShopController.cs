@@ -179,6 +179,24 @@ public class ToolShopController : MonoBehaviour
             backButton.SetActive(active);
     }
 
+    /// <summary>
+    /// Locks all shop item views except those whose <see cref="ShopItem"/> is in
+    /// <paramref name="allowedItems"/>, greying them out and making them non-interactable.
+    /// </summary>
+    public void SetItemsLockedExcept(params ShopItem[] allowedItems)
+    {
+        var allowed = new System.Collections.Generic.HashSet<ShopItem>(allowedItems);
+        foreach (var view in shopItemViews)
+            view.SetLocked(!allowed.Contains(view.ShopItem));
+    }
+
+    /// <summary>Removes the locked state from all shop item views.</summary>
+    public void UnlockAllItems()
+    {
+        foreach (var view in shopItemViews)
+            view.SetLocked(false);
+    }
+
     /// <summary>Returns the <see cref="ShopItemView"/> that was created for <paramref name="item"/>, or null if not found.</summary>
     public ShopItemView GetViewForItem(ShopItem item)
     {

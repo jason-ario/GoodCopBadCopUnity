@@ -54,6 +54,7 @@ public class ElectricityController : NetworkBehaviour
 
     [SerializeField, ReadOnly] private float _countdownRemaining = 0f;
     private bool _isCountdownPaused = false;
+    private Coroutine _powerOffCoroutine;
 
     private void PauseCountdown() => _isCountdownPaused = true;
     private void ResumeCountdown() => _isCountdownPaused = false;
@@ -107,12 +108,23 @@ public class ElectricityController : NetworkBehaviour
     [ClientRpc]
     private void PowerOffClientRpc()
     {
-        StartCoroutine(PowerOffCoroutine());
+        if (_powerOffCoroutine != null)
+            StopCoroutine(_powerOffCoroutine);
+
+        _powerOffCoroutine = StartCoroutine(PowerOffCoroutine());
     }
 
     [ClientRpc]
     private void PowerOnClientRpc()
     {
+        // Cancel any pending power-off coroutine so its delayed OnElectricityTurnOff
+        // does not fire after the power has already been restored.
+        if (_powerOffCoroutine != null)
+        {
+            StopCoroutine(_powerOffCoroutine);
+            _powerOffCoroutine = null;
+        }
+
         foreach (var electricObject in electricObjects)
         {
             electricObject.OnElectricityTurnOn?.Invoke();
@@ -131,6 +143,8 @@ public class ElectricityController : NetworkBehaviour
         {
             electricObject.OnElectricityTurnOff?.Invoke();
         }
+
+        _powerOffCoroutine = null;
     }
 
     // ------------------------------------------------------------------

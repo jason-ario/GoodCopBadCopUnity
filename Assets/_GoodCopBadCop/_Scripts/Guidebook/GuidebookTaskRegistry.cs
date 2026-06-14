@@ -3,37 +3,35 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Central registry for all tasks shown in the guidebook task list.
-/// Tasks can be added or removed at any time by any system — no dependency
-/// on BetweenShiftTaskManager or network state required.
+/// Central registry for all systemic threats shown in the guidebook task list.
+/// Threats can be registered or updated at any time by any system.
 /// Self-instantiates on first access so no manual scene placement is needed.
 /// </summary>
 public class GuidebookTaskRegistry : MonoBehaviour
 {
     public static GuidebookTaskRegistry Instance => GetOrCreate();
 
-    /// <summary>Fired whenever the task list changes (task added, removed, replaced, or cleared).</summary>
+    /// <summary>Fired whenever the threat list changes (added, removed, replaced, or cleared).</summary>
     public static event Action OnTaskListChanged;
 
     /// <summary>
-    /// Fired only when one or more tasks are added to the registry.
+    /// Fired only when one or more threats are added to the registry.
     /// GuidebookIcon subscribes to this to show the notification badge.
     /// </summary>
     public static event Action OnTasksAdded;
 
     /// <summary>
-    /// Fired when a task's completion state changes without the list itself changing.
-    /// GuidebookTaskRow subscribes to refresh its checkmark without rebuilding rows.
+    /// Fired when a threat's state changes without the list itself changing.
+    /// GuidebookTaskRow subscribes to refresh its labels without rebuilding rows.
     /// </summary>
     public static event Action OnTaskStateChanged;
 
-    private readonly List<IBetweenShiftTask> _tasks = new();
+    private readonly List<ISystemicThreat> _threats = new();
 
-    /// <summary>Read-only snapshot of the current task list.</summary>
-    public IReadOnlyList<IBetweenShiftTask> Tasks => _tasks;
+    /// <summary>Read-only snapshot of the current threat list.</summary>
+    public IReadOnlyList<ISystemicThreat> Threats => _threats;
 
     private static GuidebookTaskRegistry _instance;
-    private bool _subscribedToShiftManager;
 
     private static GuidebookTaskRegistry GetOrCreate()
     {
@@ -60,76 +58,91 @@ public class GuidebookTaskRegistry : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    private void Update()
-    {
-        if (_subscribedToShiftManager) return;
-        if (ShiftManager.Instance == null) return;
-
-        ShiftManager.Instance.OnDayStart += ClearTasks;
-        _subscribedToShiftManager = true;
-        Debug.Log("[GuidebookTaskRegistry] Subscribed to ShiftManager.OnDayStart.");
-    }
-
     private void OnDestroy()
     {
-        if (_subscribedToShiftManager && ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= ClearTasks;
+        if (_instance == this) _instance = null;
     }
 
-    /// <summary>Adds a task to the registry and fires <see cref="OnTaskListChanged"/> and <see cref="OnTasksAdded"/>.</summary>
-    public void AddTask(IBetweenShiftTask task)
+    // ── Threat management ─────────────────────────────────────────────────────
+
+    /// <summary>Adds a threat to the registry and fires OnTaskListChanged and OnTasksAdded.</summary>
+    public void AddThreat(ISystemicThreat threat)
     {
-        if (task == null || _tasks.Contains(task)) return;
-        _tasks.Add(task);
+        if (threat == null || _threats.Contains(threat)) return;
+        _threats.Add(threat);
         OnTaskListChanged?.Invoke();
         OnTasksAdded?.Invoke();
-        Debug.Log($"[GuidebookTaskRegistry] Task added: '{task.TaskName}'. Total: {_tasks.Count}");
+        Debug.Log($"[GuidebookTaskRegistry] Threat added: '{threat.ThreatName}'. Total: {_threats.Count}");
     }
 
-    /// <summary>Removes a task from the registry and fires <see cref="OnTaskListChanged"/>.</summary>
-    public void RemoveTask(IBetweenShiftTask task)
+    /// <summary>Removes a threat from the registry and fires OnTaskListChanged.</summary>
+    public void RemoveThreat(ISystemicThreat threat)
     {
-        if (task == null || !_tasks.Contains(task)) return;
-        _tasks.Remove(task);
+        if (threat == null || !_threats.Contains(threat)) return;
+        _threats.Remove(threat);
         OnTaskListChanged?.Invoke();
-        Debug.Log($"[GuidebookTaskRegistry] Task removed: '{task.TaskName}'. Total: {_tasks.Count}");
+        Debug.Log($"[GuidebookTaskRegistry] Threat removed: '{threat.ThreatName}'. Total: {_threats.Count}");
     }
 
     /// <summary>
-    /// Replaces the entire task list and fires <see cref="OnTaskListChanged"/>.
-    /// Also fires <see cref="OnTasksAdded"/> if the new list is non-empty.
-    /// Null entries and duplicate references in the source are silently skipped.
+    /// Replaces the entire threat list and fires OnTaskListChanged.
+    /// Also fires OnTasksAdded if the new list is non-empty.
+    /// Null entries and duplicate references are silently skipped.
     /// </summary>
-    public void SetTasks(IEnumerable<IBetweenShiftTask> tasks)
+    public void SetThreats(IEnumerable<ISystemicThreat> threats)
     {
-        _tasks.Clear();
-        if (tasks != null)
+        _threats.Clear();
+
+        if (threats != null)
         {
-            foreach (var t in tasks)
-                if (t != null && !_tasks.Contains(t)) _tasks.Add(t);
+            foreach (ISystemicThreat t in threats)
+                if (t != null && !_threats.Contains(t)) _threats.Add(t);
         }
 
         OnTaskListChanged?.Invoke();
-        if (_tasks.Count > 0)
+
+        if (_threats.Count > 0)
             OnTasksAdded?.Invoke();
-        Debug.Log($"[GuidebookTaskRegistry] Task list set. Total: {_tasks.Count}");
+
+        Debug.Log($"[GuidebookTaskRegistry] Threat list set. Total: {_threats.Count}");
     }
 
-    /// <summary>Clears all tasks and fires <see cref="OnTaskListChanged"/>.</summary>
-    public void ClearTasks()
+    /// <summary>Clears all threats and fires OnTaskListChanged.</summary>
+    public void ClearThreats()
     {
-        _tasks.Clear();
+        _threats.Clear();
         OnTaskListChanged?.Invoke();
-        Debug.Log("[GuidebookTaskRegistry] Task list cleared.");
+        Debug.Log("[GuidebookTaskRegistry] Threat list cleared.");
     }
 
     /// <summary>
-    /// Call this when a task's IsComplete state changes so the guidebook can
-    /// refresh checkmarks without rebuilding the row list.
+    /// Call this when a threat's state changes so the guidebook can refresh
+    /// labels without rebuilding the row list.
     /// </summary>
     public void NotifyTaskStateChanged()
     {
         Debug.Log($"[GuidebookTaskRegistry] NotifyTaskStateChanged fired. Subscriber count: {OnTaskStateChanged?.GetInvocationList().Length ?? 0}");
         OnTaskStateChanged?.Invoke();
     }
+
+    // ── Backward-compatibility stubs ──────────────────────────────────────────
+
+    /// <summary>Obsolete. No-op — task-based registry is replaced by SetThreats/AddThreat.</summary>
+    [System.Obsolete("Use AddThreat(ISystemicThreat) instead.")]
+    public void AddTask(IBetweenShiftTask task)
+    {
+        Debug.LogWarning("[GuidebookTaskRegistry] AddTask is obsolete and has no effect. Use AddThreat() with ISystemicThreat.");
+    }
+
+    /// <summary>Obsolete. No-op stub.</summary>
+    [System.Obsolete("Use RemoveThreat(ISystemicThreat) instead.")]
+    public void RemoveTask(IBetweenShiftTask task) { }
+
+    /// <summary>Obsolete. No-op stub.</summary>
+    [System.Obsolete("Use SetThreats(IEnumerable<ISystemicThreat>) instead.")]
+    public void SetTasks(IEnumerable<IBetweenShiftTask> tasks) { }
+
+    /// <summary>Obsolete. No-op stub.</summary>
+    [System.Obsolete("Use ClearThreats() instead.")]
+    public void ClearTasks() { }
 }

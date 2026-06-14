@@ -90,6 +90,12 @@ public class Day_01 : DayBase
     [Tooltip("Index into Telephone._availableTasks that maps to the 'Take Out the Trash' PhoneTaskData.")]
     [SerializeField] private int _trashTaskCallIndex = 0;
 
+    [Tooltip("Index into Telephone._availableTasks that maps to the 'Go Hunting' PhoneTaskData.")]
+    [SerializeField] private int _huntingTaskCallIndex = 1;
+
+    [Tooltip("Seconds after the trash task call before the hunting task call is triggered.")]
+    [SerializeField] private float _huntingCallDelaySeconds = 60f;
+
     [Header("Day 1 — Soldier Event (6th Suspect)")]
     [Tooltip("The SoldierMockingController placed in the scene — handles the scripted soldier arrival on the 6th suspect slot.")]
     [SerializeField] private SoldierMockingController _soldierMockingController;
@@ -116,6 +122,9 @@ public class Day_01 : DayBase
     private System.Action<PickableObject> _onFolderDocumentFiled;
     private System.Action<IDCard, PickableObject> _onPaperworkSpawned;
     private System.Action<IDCard, PickableObject> _onSuspect2PaperworkSpawned;
+
+    // Guards the phone-ring tutorial so it fires exactly once per day activation.
+    private bool _phoneRingTutorialShown;
 
     // -------------------------------------------------------------------------
     // Suspect 2 state
@@ -205,6 +214,10 @@ public class Day_01 : DayBase
         // Soldier scripted-event callback — always subscribed regardless of tutorial state.
         SoldierMockingController.OnSoldierSequenceComplete += OnSoldierSequenceCompleteHandler;
 
+        // Phone-ring tutorial: show black bars on the first ring of Day 1.
+        _phoneRingTutorialShown = false;
+        Telephone.OnRingStarted += OnPhoneRingStarted;
+
         // OnFolderHandedOff is subscribed inside HandOffBeat / Suspect2HandOffBeat
         // so the window is scoped exactly to when each beat needs it.
     }
@@ -241,6 +254,8 @@ public class Day_01 : DayBase
         FolderController.OnAnyFolderStamped     -= OnFolderStamped;
 
         SoldierMockingController.OnSoldierSequenceComplete -= OnSoldierSequenceCompleteHandler;
+
+        Telephone.OnRingStarted -= OnPhoneRingStarted;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned -= _onSuspect2PaperworkSpawned;
@@ -305,6 +320,8 @@ public class Day_01 : DayBase
         FolderController.OnAnyFolderStamped       -= OnFolderStamped;
 
         SoldierMockingController.OnSoldierSequenceComplete -= OnSoldierSequenceCompleteHandler;
+
+        Telephone.OnRingStarted -= OnPhoneRingStarted;
 
         if (_onSuspect2PaperworkSpawned != null)
             SuspectController.OnPaperworkSpawned  -= _onSuspect2PaperworkSpawned;
@@ -423,9 +440,14 @@ public class Day_01 : DayBase
 
         // Deliver the trash task immediately — no refill tutorial to wait for on retry runs.
         if (Telephone.Instance != null)
+        {
             Telephone.Instance.TriggerCall(_trashTaskCallIndex);
+            StartCoroutine(TriggerHuntingCallAfterDelay());
+        }
         else
+        {
             Debug.LogWarning("[Day_01] Day1FreeshiftSequence: Telephone.Instance is null — trash task call skipped.");
+        }
 
         // Unlock the exit door — no tutorial gating on retry runs.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
@@ -1300,9 +1322,14 @@ public class Day_01 : DayBase
         // The player must pick up the phone to receive it; the call times out after 20 s if ignored.
         // TriggerCall is server-only and this coroutine is already guarded to run on the server.
         if (Telephone.Instance != null)
+        {
             Telephone.Instance.TriggerCall(_trashTaskCallIndex);
+            StartCoroutine(TriggerHuntingCallAfterDelay());
+        }
         else
+        {
             Debug.LogWarning("[Day_01] Telephone.Instance is null — trash task call skipped.");
+        }
 
         // Unlock the exit door — the tutorial gating is over.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
@@ -1326,6 +1353,21 @@ public class Day_01 : DayBase
         }
     }
 
+    /// <summary>
+    /// Waits <see cref="_huntingCallDelaySeconds"/> seconds after the trash task call,
+    /// then triggers the hunting task phone call. Server-only — called from
+    /// <see cref="Day1FreeshiftSequence"/> and the main tutorial sequence.
+    /// </summary>
+    private IEnumerator TriggerHuntingCallAfterDelay()
+    {
+        yield return new WaitForSeconds(_huntingCallDelaySeconds);
+
+        if (Telephone.Instance != null)
+            Telephone.Instance.TriggerCall(_huntingTaskCallIndex);
+        else
+            Debug.LogWarning("[Day_01] TriggerHuntingCallAfterDelay: Telephone.Instance is null — hunting task call skipped.");
+    }
+
     /// <summary>Tracks which stamp types have been refilled during the tool locker tutorial beat.</summary>
     private void OnInkRefilled(StampContainer.StampType type, int newCount)
     {
@@ -1345,9 +1387,12 @@ public class Day_01 : DayBase
             _killRefillView = null;
         }
 
-        // Both purchased — re-enable the back button so the player can leave.
+        // Both purchased — re-enable the back button and unlock the shop so the player can leave.
         if (_quarantineRefilled && _killRefilled)
+        {
             ToolShopController.Instance?.SetBackButtonActive(true);
+            ToolShopController.Instance?.UnlockAllItems();
+        }
     }
 
     /// <summary>
@@ -1364,6 +1409,7 @@ public class Day_01 : DayBase
         if (controller == null) return;
 
         controller.SetBackButtonActive(false);
+        controller.SetItemsLockedExcept(_quarantineRefillItem, _killRefillItem);
 
         if (!_quarantineRefilled && _quarantineRefillItem != null)
         {
@@ -1405,8 +1451,9 @@ public class Day_01 : DayBase
         _killRefillView?.SetArrowVisible(false);
         _killRefillView = null;
 
-        // Restore the back button in case the day ends mid-tutorial.
+        // Restore the back button and unlock all shop items in case the day ends mid-tutorial.
         ToolShopController.Instance?.SetBackButtonActive(true);
+        ToolShopController.Instance?.UnlockAllItems();
 
         // Dismiss the marker if it is still visible (e.g. day ended mid-beat).
         HideStaticMarker(StaticMarkerTarget.ToolLocker);
@@ -1596,6 +1643,23 @@ public class Day_01 : DayBase
         yield return null;
 
         yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phone Ring Tutorial Handlers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Shows the "Answer the telephone" tutorial bar the first time the phone rings on Day 1.
+    /// Fires on all clients via <see cref="Telephone.OnRingStarted"/>.
+    /// The bars auto-dismiss after the default hold duration — this is a brief notification only.
+    /// </summary>
+    private void OnPhoneRingStarted()
+    {
+        if (_phoneRingTutorialShown) return;
+        _phoneRingTutorialShown = true;
+
+        PlayerTutorialUI.Instance?.Show("Answer the telephone");
     }
 
     // =========================================================================

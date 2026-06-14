@@ -8,6 +8,7 @@ public class PillBottle : PickableObject
     [SerializeField] Animator _animator;
     private bool isUsing;
     private int _usesRemaining = MaxUses;
+    [SerializeField] private AudioClip drinkSound;
 
     /// <summary>
     /// Initiates a pill use if the bottle still has doses and is not already in use.
@@ -24,6 +25,7 @@ public class PillBottle : PickableObject
 
     IEnumerator UsePillBottle()
     {
+        SFXController.Instance.Play(drinkSound);
         playerPickupController.PlayerAnimationController.EnableHoldObjectTwoArmsMask();
         playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", true);
         _animator.SetBool("TakePill", true);

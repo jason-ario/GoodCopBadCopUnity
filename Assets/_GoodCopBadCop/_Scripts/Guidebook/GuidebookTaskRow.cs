@@ -2,36 +2,34 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Represents a single task row in the guidebook task list canvas.
-/// Call Bind() to populate the row from an IBetweenShiftTask.
-/// The row self-manages its checkmark by subscribing to GuidebookTaskRegistry.OnTaskStateChanged.
+/// Represents a single threat row in the guidebook task list canvas.
+/// Call Bind() to populate the row from an ISystemicThreat.
+/// The row self-manages its high-threat indicator by subscribing to GuidebookTaskRegistry.OnTaskStateChanged.
 /// </summary>
 public class GuidebookTaskRow : MonoBehaviour
 {
-    [Tooltip("Child GameObject shown when the task is complete, hidden otherwise.")]
+    [Tooltip("Child GameObject shown when threat level is at or above 50%, hidden otherwise.")]
     [SerializeField] private GameObject _checkmark;
 
-    [Tooltip("Displays the task name in uppercase bold.")]
+    [Tooltip("Displays the threat name in uppercase bold.")]
     [SerializeField] private TextMeshProUGUI _nameLabel;
 
-    [Tooltip("Displays the short task description.")]
+    [Tooltip("Displays the short threat description (e.g. 'Active mutants: 3/10').")]
     [SerializeField] private TextMeshProUGUI _descriptionLabel;
 
-    [Tooltip("Displays the coupon reward, e.g. '$10 Coupon'.")]
+    [Tooltip("Displays the current threat level as a percentage.")]
     [SerializeField] private TextMeshProUGUI _rewardLabel;
 
-    private const string RewardFormat = "<sprite=0>{0}";
-
-    private IBetweenShiftTask _task;
+    private ISystemicThreat _threat;
 
     private void OnEnable()
     {
         GuidebookTaskRegistry.OnTaskStateChanged += OnTaskStateChanged;
-        Debug.Log($"[GuidebookTaskRow] Subscribed to OnTaskStateChanged. Task: {_task?.TaskName ?? "none"}", this);
+        Debug.Log($"[GuidebookTaskRow] Subscribed to OnTaskStateChanged. Threat: {_threat?.ThreatName ?? "none"}", this);
 
-        // Re-sync checkmark in case the task completed while the panel was closed.
-        if (_task != null)
-            SetComplete(_task.IsComplete);
+        // Re-sync in case the threat level changed while the panel was closed.
+        if (_threat != null)
+            SetHighThreat(_threat.ThreatLevel >= 0.5f);
     }
 
     private void OnDisable()
@@ -39,37 +37,37 @@ public class GuidebookTaskRow : MonoBehaviour
         GuidebookTaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
     }
 
-    /// <summary>Populates all row fields from the given task and syncs the checkmark state.</summary>
-    public void Bind(IBetweenShiftTask task)
+    /// <summary>Populates all row fields from the given threat and syncs the high-threat indicator.</summary>
+    public void Bind(ISystemicThreat threat)
     {
-        if (task == null) return;
+        if (threat == null) return;
 
-        _task = task;
+        _threat = threat;
 
         if (_nameLabel != null)
-            _nameLabel.text = task.TaskName.ToUpper();
+            _nameLabel.text = threat.ThreatName.ToUpper();
 
         if (_descriptionLabel != null)
-            _descriptionLabel.text = task.TaskDescription;
+            _descriptionLabel.text = threat.ThreatDescription;
 
         if (_rewardLabel != null)
-            _rewardLabel.text = string.Format(RewardFormat, task.CouponReward);
+            _rewardLabel.text = $"{threat.ThreatLevel:P0}";
 
-        Debug.Log($"[GuidebookTaskRow] Bind called. Task: '{task.TaskName}', IsComplete: {task.IsComplete}, Checkmark ref: {(_checkmark != null ? _checkmark.name : "NULL")}", this);
-        SetComplete(task.IsComplete);
+        Debug.Log($"[GuidebookTaskRow] Bind called. Threat: '{threat.ThreatName}', Level: {threat.ThreatLevel:P0}", this);
+        SetHighThreat(threat.ThreatLevel >= 0.5f);
     }
 
     private void OnTaskStateChanged()
     {
-        Debug.Log($"[GuidebookTaskRow] OnTaskStateChanged received. Task: '{_task?.TaskName ?? "null"}', IsComplete: {_task?.IsComplete}", this);
-        if (_task != null)
-            SetComplete(_task.IsComplete);
+        if (_threat != null)
+            Bind(_threat);
     }
 
-    private void SetComplete(bool complete)
+    /// <summary>Shows or hides the high-threat warning indicator.</summary>
+    private void SetHighThreat(bool high)
     {
-        Debug.Log($"[GuidebookTaskRow] SetComplete({complete}). Checkmark: {(_checkmark != null ? _checkmark.name : "NULL")}", this);
+        Debug.Log($"[GuidebookTaskRow] SetHighThreat({high}). Indicator: {(_checkmark != null ? _checkmark.name : "NULL")}", this);
         if (_checkmark != null)
-            _checkmark.SetActive(complete);
+            _checkmark.SetActive(high);
     }
 }

@@ -26,6 +26,11 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI _barkText;
     [SerializeField] private Animator _speakerAnimator;
 
+    [Header("Dialogue Positioning")]
+    [SerializeField] private RectTransform _megaphoneDialogueRect;
+    [SerializeField] private RectTransform _dialogueTopPos;
+    [SerializeField] private RectTransform _dialogueBottomPos;
+
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip[] _audioClips;
@@ -479,6 +484,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         if (_hideCoroutine != null)
             StopCoroutine(_hideCoroutine);
 
+        PositionDialogue();
+
         _barkText.text = text;
         _barkCanvas.SetActive(true);
 
@@ -508,6 +515,26 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // Internal Coroutines
     // ---------------------------------------------------------------------------
 
+    /// <summary>
+    /// Snaps the megaphone dialogue panel to the top position when regular character
+    /// dialogue is currently playing, or to the bottom position otherwise.
+    /// </summary>
+    private void PositionDialogue()
+    {
+        if (_megaphoneDialogueRect == null) return;
+
+        bool otherDialogueActive = DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking;
+        RectTransform target = otherDialogueActive ? _dialogueTopPos : _dialogueBottomPos;
+
+        if (target != null)
+        {
+            _megaphoneDialogueRect.anchorMin = target.anchorMin;
+            _megaphoneDialogueRect.anchorMax = target.anchorMax;
+            _megaphoneDialogueRect.pivot = target.pivot;
+            _megaphoneDialogueRect.anchoredPosition = target.anchoredPosition;
+        }
+    }
+
     private IEnumerator ShowBarkSequence(string text)
     {
         if (_hideCoroutine != null)
@@ -515,6 +542,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
         _isSpeaking = true;
         _barkCanvas.SetActive(false);
+
+        PositionDialogue();
 
         yield return new WaitForSeconds(0.4f);
 
