@@ -1,5 +1,3 @@
-using Febucci.TextAnimatorCore;
-using Febucci.TextAnimatorForUnity;
 using TMPro;
 using UnityEngine;
 using System.Collections;
@@ -7,16 +5,17 @@ using System.Text;
 
 public class Subtitles : MonoBehaviour
 {
-    [SerializeField] TextMeshProUGUI subtitlesText;
+    [SerializeField] private TMPTextReveal textReveal;
     [SerializeField] private int maxCharactersPerLine = 50;
     [SerializeField] private CanvasGroup continuePrompt;
 
-    private string originalText; // Stores the raw text without manual breaks
+    private string originalText;
     private string lastDisplayName;
     private Color lastDisplayColor;
 
     public bool IsPromptActive { get; private set; }
 
+    /// <summary>Shows or hides the continue prompt, waiting for the typewriter to finish before showing it.</summary>
     public void ShowContinuePrompt(bool show)
     {
         if (continuePrompt == null) return;
@@ -35,19 +34,18 @@ public class Subtitles : MonoBehaviour
         IsPromptActive = false;
         continuePrompt.alpha = 0;
 
-        var typewriter = subtitlesText.GetComponent<TextAnimatorComponentBase>();
-        if (typewriter != null)
+        if (textReveal != null)
         {
-            yield return new WaitUntil(() => typewriter.allLettersShown);
+            yield return new WaitUntil(() => !textReveal.IsRevealing);
         }
 
         IsPromptActive = true;
         continuePrompt.alpha = 1;
     }
 
+    /// <summary>Sets the subtitle text and starts the typewriter reveal.</summary>
     public void SetText(string text, string name = null, Color nameColor = default)
     {
-        // Store these so OnValidate can refresh the look
         originalText = text;
         lastDisplayName = name;
         lastDisplayColor = nameColor;
@@ -57,15 +55,21 @@ public class Subtitles : MonoBehaviour
 
     private void UpdateVisuals()
     {
-        if (subtitlesText == null || string.IsNullOrEmpty(originalText)) return;
+        if (textReveal == null || string.IsNullOrEmpty(originalText)) return;
 
         string wrappedText = WrapText(originalText, maxCharactersPerLine);
         string colorHex = ColorUtility.ToHtmlStringRGB(lastDisplayColor);
+        string formattedText = $"<color=#{colorHex}>{wrappedText}</color>";
 
-        // Apply color to the entire wrapped text body and remove the name prefix
-        subtitlesText.text = $"<color=#{colorHex}>{wrappedText}</color>";
+        var tmp = textReveal.GetComponent<TextMeshProUGUI>();
+        if (tmp != null)
+            tmp.enableWordWrapping = true;
 
-        subtitlesText.enableWordWrapping = true;
+        // Use typewriter reveal in play mode; instant set in editor to keep OnValidate previews fast.
+        if (Application.isPlaying)
+            textReveal.RevealText(formattedText);
+        else
+            textReveal.SetTextInstant(formattedText);
     }
 
     private string WrapText(string text, int maxChars)
@@ -79,7 +83,6 @@ public class Subtitles : MonoBehaviour
 
         foreach (string word in words)
         {
-            // +1 for the space
             if (currentLineLength + word.Length + 1 > maxChars)
             {
                 sb.Append('\n');
@@ -100,22 +103,22 @@ public class Subtitles : MonoBehaviour
 
     void OnValidate()
     {
-        // If the game is running, we use the stored original text.
-        // If we are just editing in the inspector, we grab what's currently in the text box.
-        if (!Application.isPlaying && subtitlesText != null)
+        if (!Application.isPlaying && textReveal != null)
         {
-            string currentText = subtitlesText.text;
-            
-            // Extract content between color tags if present
-            if (currentText.StartsWith("<color=#") && currentText.EndsWith("</color>"))
+            var tmp = textReveal.GetComponent<TextMeshProUGUI>();
+            if (tmp != null)
             {
-                int start = currentText.IndexOf('>') + 1;
-                int end = currentText.LastIndexOf("</color>");
-                originalText = currentText.Substring(start, end - start);
-            }
-            else
-            {
-                originalText = currentText;
+                string currentText = tmp.text;
+                if (currentText.StartsWith("<color=#") && currentText.EndsWith("</color>"))
+                {
+                    int start = currentText.IndexOf('>') + 1;
+                    int end = currentText.LastIndexOf("</color>");
+                    originalText = currentText.Substring(start, end - start);
+                }
+                else
+                {
+                    originalText = currentText;
+                }
             }
         }
 

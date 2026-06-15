@@ -62,21 +62,46 @@ public class TMPWidthFitter : MonoBehaviour
         UpdateWidth();
     }
 
-    /// <summary>Forces an immediate width recalculation.</summary>
+    /// <summary>Forces an immediate width recalculation based on currently visible characters.</summary>
     public void UpdateWidth()
     {
         if (tmp == null || rectTransform == null)
             return;
 
-        // Measure unconstrained preferred width (no wrapping limit).
-        float preferredWidth = tmp.GetPreferredValues(float.MaxValue, float.MaxValue).x;
-        float targetWidth = preferredWidth + horizontalPadding * 2f;
+        float measuredWidth = MeasureVisibleWidth();
+        float targetWidth = measuredWidth + horizontalPadding * 2f;
 
         rectTransform.sizeDelta = new Vector2(targetWidth, rectTransform.sizeDelta.y);
 
         // Cache state to avoid redundant updates in LateUpdate.
         lastText = tmp.text;
         lastFontSize = tmp.fontSize;
+    }
+
+    /// <summary>
+    /// Measures the preferred width of the currently visible text portion.
+    /// When <see cref="TextMeshProUGUI.maxVisibleCharacters"/> is limiting the output,
+    /// only the visible substring is measured so the box grows character by character.
+    /// </summary>
+    private float MeasureVisibleWidth()
+    {
+        var info = tmp.textInfo;
+        int charCount = (info != null) ? info.characterCount : 0;
+        int maxVisible = tmp.maxVisibleCharacters;
+
+        if (charCount == 0 || maxVisible == 0)
+            return 0f;
+
+        // Fast path: all characters visible — measure the full text.
+        if (maxVisible >= charCount)
+            return tmp.GetPreferredValues(float.MaxValue, float.MaxValue).x;
+
+        // Partial reveal: measure the substring up to and including the last visible character.
+        // characterInfo[i].index gives the source-string position of the i-th visible character,
+        // correctly accounting for rich-text tags in the source string.
+        int lastStringIndex = info.characterInfo[maxVisible - 1].index;
+        string visiblePortion = tmp.text.Substring(0, lastStringIndex + 1);
+        return tmp.GetPreferredValues(visiblePortion, float.MaxValue, float.MaxValue).x;
     }
 
     private void OnTextChanged(Object obj)

@@ -12,6 +12,7 @@ public class TMPTextReveal : MonoBehaviour
 
     private TextMeshProUGUI tmp;
     private Coroutine revealRoutine;
+    private TMPWidthFitter widthFitter;
     [SerializeField] bool revealOnEnable = false;
     [SerializeField] float revealOnEnableDelay = 0.5f;
     [SerializeField] AudioClip[] revealSounds;
@@ -19,6 +20,7 @@ public class TMPTextReveal : MonoBehaviour
     private void Awake()
     {
         tmp = GetComponent<TextMeshProUGUI>();
+        widthFitter = GetComponent<TMPWidthFitter>();
     }
 
     private void OnEnable()
@@ -75,22 +77,40 @@ public class TMPTextReveal : MonoBehaviour
 
     private IEnumerator RevealRoutine(string fullText)
     {
-        tmp.text = fullText;
+        // Set full text with all characters hidden to populate textInfo without a visual flash.
         tmp.maxVisibleCharacters = 0;
+        tmp.text = fullText;
         tmp.ForceMeshUpdate();
 
-        for (int i = 0; i <= fullText.Length; i++)
+        // Cache the source-string index of every visible character before we start
+        // overwriting tmp.text, since textInfo is rebuilt on each text assignment.
+        int totalChars = tmp.textInfo.characterCount;
+        int[] charStringIndices = new int[totalChars];
+        for (int i = 0; i < totalChars; i++)
+            charStringIndices[i] = tmp.textInfo.characterInfo[i].index;
+
+        // Reveal by progressively growing tmp.text to a longer substring each step.
+        // This makes TMP measure only the currently visible portion, so TMPWidthFitter
+        // and any ContentSizeFitter in the hierarchy reflect the actual visible width.
+        tmp.maxVisibleCharacters = 99999;
+
+        for (int i = 0; i < totalChars; i++)
         {
-            tmp.maxVisibleCharacters = i;
+            tmp.text = fullText.Substring(0, charStringIndices[i] + 1);
+
             if (revealSounds.Length != 0)
-            {
                 SFXController.Instance.Play(revealSounds[UnityEngine.Random.Range(0, revealSounds.Length)]);
-            }
+
             yield return new WaitForSeconds(characterDelay);
         }
 
+        // Restore the complete string so any closing rich-text tags are included.
+        tmp.text = fullText;
         revealRoutine = null;
     }
+
+    /// <summary>Returns true while a reveal coroutine is actively running.</summary>
+    public bool IsRevealing => revealRoutine != null;
 
     private void StopCurrentRoutine()
     {

@@ -11,11 +11,10 @@ GameObject:
   - component: {fileID: 1563965812853639549}
   - component: {fileID: 4646899092664296079}
   - component: {fileID: 738791659740328909}
-  - component: {fileID: 95280548864690392}
-  - component: {fileID: 748194693690280966}
   - component: {fileID: 4217997375129972968}
   - component: {fileID: 5783034993355735723}
   - component: {fileID: 573230316302542298}
+  - component: {fileID: 6312536301404610609}
   m_Layer: 5
   m_Name: Text
   m_TagString: Untagged
@@ -39,8 +38,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 143.015, y: -30.14}
-  m_SizeDelta: {x: 238.87, y: 50.28}
+  m_AnchoredPosition: {x: 183.015, y: -75.14}
+  m_SizeDelta: {x: 12.84, y: 50.28}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4646899092664296079
 CanvasRenderer:
@@ -142,80 +141,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &95280548864690392
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3843217040498761709}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8ace8ced0e81c847968cdca0aeda757, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Febucci.TextAnimatorForUnity.TMP.Runtime::Febucci.TextAnimatorForUnity.TextMeshPro.TextAnimator_TMP
-  localSettings:
-    isResettingTimeOnNewText: 1
-    defaultEffectsMode: 1
-    timeScale: 0
-    defaultBehaviorTags: []
-    defaultAppearanceTags: []
-    defaultDisappearanceTags: []
-    isAnimatingBehaviors: 1
-    isAnimatingAppearances: 1
-    isAnimatingDisappearances: 1
-    useDynamicScaling: 1
-    referenceFontSize: 12
-  sharedSettings: {fileID: 11400000, guid: 503730955ff7ed9468949780cdcb9806, type: 2}
-  animationLoop: 0
-  databaseEffects: {fileID: 11400000, guid: 97da1bdf566b589458494ef757ccb8bb, type: 2}
-  styleSheet: {fileID: 0}
---- !u!114 &748194693690280966
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3843217040498761709}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ac6b0a2b8ddbab342ad54b5409ccffec, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Febucci.TextAnimatorForUnity.Runtime::Febucci.TextAnimatorForUnity.TypewriterComponent
-  timingsScriptableBase: {fileID: 11400000, guid: f9029dd0173d57a45ab78e2ad79be0b8, type: 2}
-  actionsDatabase: {fileID: 11400000, guid: 1b2cf8f7a6cae46a6972f7ccec187814, type: 2}
-  localSettings:
-    useTypeWriter: 1
-    startTypewriterMode: -1
-    hideAppearancesOnSkip: 0
-    hideDisappearancesOnSkip: 0
-    triggerEventsOnSkip: 0
-    resetTypingSpeedAtStartup: 1
-    disappearanceOrientation: 0
-    triggerShowedAfterEffectsEnd: 0
-    triggerDisappearedAfterEffectsEnd: 0
-  sharedSettings: {fileID: 11400000, guid: e5ebec8b825794584aa9434d686fed6f, type: 2}
-  onTextShowed:
-    m_PersistentCalls:
-      m_Calls: []
-  onTypewriterStart:
-    m_PersistentCalls:
-      m_Calls: []
-  onTextDisappeared:
-    m_PersistentCalls:
-      m_Calls: []
-  onCharacterVisible:
-    m_PersistentCalls:
-      m_Calls: []
-  onCharacterWaitStarted:
-    m_PersistentCalls:
-      m_Calls: []
-  onCharacterWaitFinished:
-    m_PersistentCalls:
-      m_Calls: []
-  onMessage:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!114 &4217997375129972968
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -269,6 +194,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
   horizontalPadding: 6.42
+--- !u!114 &6312536301404610609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3843217040498761709}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5c211c5ab58e3e4a9794b9216f88204, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPTextReveal
+  characterDelay: 0.015
+  revealOnEnable: 0
+  revealOnEnableDelay: 0.5
+  revealSounds: []
 --- !u!1 &4440882086164474402
 GameObject:
   m_ObjectHideFlags: 0
@@ -330,7 +271,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5749bb2111f8e7443b67920cab097678, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  subtitlesText: {fileID: 738791659740328909}
+  textReveal: {fileID: 6312536301404610609}
   maxCharactersPerLine: 70
   continuePrompt: {fileID: 5962076655665494463}
 --- !u!114 &6192829123893769921
@@ -410,8 +351,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 149.32, y: -30.14}
-  m_SizeDelta: {x: 286.03, y: 0}
+  m_AnchoredPosition: {x: 183.015, y: -75.14}
+  m_SizeDelta: {x: 366.03, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7524897960926430736
 CanvasRenderer:
@@ -464,10 +405,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
   m_Padding:
-    m_Left: 30
-    m_Right: 30
-    m_Top: 5
-    m_Bottom: 5
+    m_Left: 70
+    m_Right: 70
+    m_Top: 50
+    m_Bottom: 50
   m_ChildAlignment: 4
   m_Spacing: 0
   m_ChildForceExpandWidth: 0
@@ -561,7 +502,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6cd664e1175f8794da24b789fe2ef32c, type: 2}
   m_sharedMaterial: {fileID: 7063614062622457439, guid: 6cd664e1175f8794da24b789fe2ef32c, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 7063614062622457439, guid: 6cd664e1175f8794da24b789fe2ef32c, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:

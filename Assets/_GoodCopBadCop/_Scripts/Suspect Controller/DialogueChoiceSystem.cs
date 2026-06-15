@@ -112,12 +112,21 @@ public class DialogueChoiceSystem : NetworkBehaviour
     }
 
     /// <summary>
-    /// Re-displays the choice panel the moment the NPC begins their response,
-    /// so the player can queue their next question or press Back to exit.
+    /// Waits for the NPC's subtitle response to appear and then fully disappear before
+    /// re-displaying the choice panel, so the player is never looking at both simultaneously.
     /// </summary>
     private IEnumerator ReshowChoicesAfterDelay()
     {
+        // Minimum wait that matches the NPC's response delay, ensuring we don't
+        // poll HasActiveSubtitles before the subtitle has had a chance to spawn.
         yield return new WaitForSeconds(ResponseShowChoicesDelay);
+
+        // Wait for the NPC subtitle to arrive (accounts for network latency variance).
+        yield return new WaitUntil(() => DialogueManager.Instance.HasActiveSubtitles);
+
+        // Wait for the NPC subtitle to fully clear (typewriter + linger + destroy).
+        yield return new WaitUntil(() => !DialogueManager.Instance.HasActiveSubtitles);
+
         _reshowCoroutine = null;
 
         if (IsInDialogueMode)

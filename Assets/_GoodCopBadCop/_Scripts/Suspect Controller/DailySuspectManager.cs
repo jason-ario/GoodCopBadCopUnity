@@ -74,6 +74,7 @@ public class DailySuspectManager : MonoBehaviour
         if (PopulateSuspectOverride != null)
         {
             PopulateSuspectOverride.Invoke();
+            RemoveInvalidSuspects();
             Debug.Log($"[DailySuspectManager] Shift populated via override — {shiftSuspects.Count} suspect(s).");
             InjectMutantSlots();
             return;
@@ -200,7 +201,24 @@ public class DailySuspectManager : MonoBehaviour
     private List<SuspectData> GetRandomSuspects(int amount)
     {
         List<SuspectData> randomSuspects = new List<SuspectData>();
-        List<SuspectData> availableSuspects = new List<SuspectData>(allSuspects.suspects);
+        List<SuspectData> availableSuspects = new List<SuspectData>();
+
+        foreach (SuspectData suspect in allSuspects.suspects)
+        {
+            if (suspect == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] SuspectSet '{allSuspects.name}' contains a null SuspectData entry — skipping.");
+                continue;
+            }
+
+            if (suspect.CharacterPrefab == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] SuspectData '{suspect.name}' has no CharacterPrefab assigned — skipping.");
+                continue;
+            }
+
+            availableSuspects.Add(suspect);
+        }
 
         for (int i = 0; i < amount && availableSuspects.Count > 0; i++)
         {
@@ -210,5 +228,31 @@ public class DailySuspectManager : MonoBehaviour
         }
 
         return randomSuspects;
+    }
+
+    /// <summary>
+    /// Removes any entries from <see cref="shiftSuspects"/> that are null or have no
+    /// <see cref="SuspectData.CharacterPrefab"/> assigned. Intended for use after an
+    /// override delegate populates the list, where data validity cannot be guaranteed.
+    /// </summary>
+    private void RemoveInvalidSuspects()
+    {
+        for (int i = shiftSuspects.Count - 1; i >= 0; i--)
+        {
+            SuspectData suspect = shiftSuspects[i];
+
+            if (suspect == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] Override added a null SuspectData at index {i} — removing.");
+                shiftSuspects.RemoveAt(i);
+                continue;
+            }
+
+            if (suspect.CharacterPrefab == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] Override added SuspectData '{suspect.name}' with no CharacterPrefab at index {i} — removing.");
+                shiftSuspects.RemoveAt(i);
+            }
+        }
     }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Febucci.TextAnimatorForUnity;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -229,6 +228,12 @@ public class DialogueManager : NetworkBehaviour
     /// </summary>
     public bool IsSpeaking => audioDialogueCoroutine != null;
 
+    /// <summary>
+    /// True while one or more subtitle instances are present in the subtitles container.
+    /// Use this to gate UI that should not appear while an NPC is responding.
+    /// </summary>
+    public bool HasActiveSubtitles => subtitlesContainer != null && subtitlesContainer.childCount > 0;
+
     private bool _dialogueInputReceived = false;
 
     /// <summary>
@@ -291,9 +296,9 @@ public class DialogueManager : NetworkBehaviour
     IEnumerator DestroySubtitles(GameObject subtitle, float displayDuration)
     {
         // Wait for the typewriter animation to complete before starting the display countdown.
-        var typewriter = subtitle.GetComponentInChildren<TextAnimatorComponentBase>();
-        if (typewriter != null)
-            yield return new WaitUntil(() => subtitle == null || typewriter == null || typewriter.allLettersShown);
+        var textReveal = subtitle.GetComponentInChildren<TMPTextReveal>();
+        if (textReveal != null)
+            yield return new WaitUntil(() => subtitle == null || textReveal == null || !textReveal.IsRevealing);
 
         if (subtitle == null) yield break;
 
