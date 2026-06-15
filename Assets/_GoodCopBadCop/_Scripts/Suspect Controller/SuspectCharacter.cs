@@ -163,6 +163,44 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Initializes this suspect as a doppelganger using the provided configuration.
+    /// Applies overlapping anomalies and all uncanny anomalies, then replicates
+    /// visual modifiers (skin desaturation, idle suppression) to clients.
+    /// </summary>
+    /// <param name="data">The DoppelgangerData driving anomaly count and visual overrides.</param>
+    public void InitializeAsDoppelganger(DoppelgangerData data)
+    {
+        // Anomaly initialization — full doppelganger loadout will be wired here
+        // once AnomalyController.InitializeAsDoppelganger is implemented.
+        anomalyController.Initialize();
+
+        SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+        if (record != null)
+            suspectRecordViewer.SetRecord(record);
+        else
+            Debug.Log($"[SuspectCharacter] No record found for doppelganger target '{suspectData.name}'.");
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
+            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        foreach (var kvp in anomalyController.TumorAnomalyIndices)
+            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
+
+        drunkBehaviour?.TryActivate();
+
+        Debug.Log($"[SuspectCharacter] '{suspectData.name}' initialized as doppelganger " +
+                  $"(overlapping: {data.overlappingAnomalyCount}, desaturation: {data.skinDesaturationAmount:F2}, " +
+                  $"removeIdle: {data.removeIdleMicroMovements}).");
+    }
+
+    /// <summary>
     /// Initializes the suspect with no anomalies. Used for tutorial suspects that must
     /// be clean regardless of the anomaly distribution settings.
     /// </summary>

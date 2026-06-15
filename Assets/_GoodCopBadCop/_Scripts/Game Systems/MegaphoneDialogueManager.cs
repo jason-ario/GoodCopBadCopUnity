@@ -44,6 +44,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     private bool _isSpeaking;
     private Coroutine _hideCoroutine;
+    private Coroutine _positionTrackCoroutine;
 
     /// <summary>
     /// Authoritative speaking state replicated to all clients so server-side tutorial
@@ -485,6 +486,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             StopCoroutine(_hideCoroutine);
 
         PositionDialogue();
+        StartPositionTracking();
 
         _barkText.text = text;
         _barkCanvas.SetActive(true);
@@ -500,6 +502,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     {
         if (_hideCoroutine != null)
             StopCoroutine(_hideCoroutine);
+
+        StopPositionTracking();
 
         _barkCanvas.SetActive(false);
         _isSpeaking = false;
@@ -517,14 +521,14 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     /// <summary>
     /// Snaps the megaphone dialogue panel to the top position when regular character
-    /// dialogue is currently playing, or to the bottom position otherwise.
+    /// dialogue subtitles are active, or to the bottom position otherwise.
     /// </summary>
     private void PositionDialogue()
     {
         if (_megaphoneDialogueRect == null) return;
 
-        bool otherDialogueActive = DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking;
-        RectTransform target = otherDialogueActive ? _dialogueTopPos : _dialogueBottomPos;
+        bool subtitlesActive = DialogueManager.Instance != null && DialogueManager.Instance.HasActiveSubtitles;
+        RectTransform target = subtitlesActive ? _dialogueTopPos : _dialogueBottomPos;
 
         if (target != null)
         {
@@ -532,6 +536,43 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             _megaphoneDialogueRect.anchorMax = target.anchorMax;
             _megaphoneDialogueRect.pivot = target.pivot;
             _megaphoneDialogueRect.anchoredPosition = target.anchoredPosition;
+        }
+    }
+
+    /// <summary>
+    /// Starts a frame-by-frame coroutine that repositions the megaphone panel
+    /// whenever the DialogueManager subtitle state changes while the bark is visible.
+    /// </summary>
+    private void StartPositionTracking()
+    {
+        StopPositionTracking();
+        _positionTrackCoroutine = StartCoroutine(TrackSubtitlePosition());
+    }
+
+    private void StopPositionTracking()
+    {
+        if (_positionTrackCoroutine != null)
+        {
+            StopCoroutine(_positionTrackCoroutine);
+            _positionTrackCoroutine = null;
+        }
+    }
+
+    private IEnumerator TrackSubtitlePosition()
+    {
+        bool lastSubtitlesActive = false;
+
+        while (true)
+        {
+            bool subtitlesActive = DialogueManager.Instance != null && DialogueManager.Instance.HasActiveSubtitles;
+
+            if (subtitlesActive != lastSubtitlesActive)
+            {
+                lastSubtitlesActive = subtitlesActive;
+                PositionDialogue();
+            }
+
+            yield return null;
         }
     }
 
@@ -544,6 +585,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         _barkCanvas.SetActive(false);
 
         PositionDialogue();
+        StartPositionTracking();
 
         yield return new WaitForSeconds(0.4f);
 
@@ -579,6 +621,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     private IEnumerator WaitAndHide()
     {
         yield return new WaitForSeconds(PostSpeakHideDuration);
+        StopPositionTracking();
         _barkCanvas.SetActive(false);
     }
 }

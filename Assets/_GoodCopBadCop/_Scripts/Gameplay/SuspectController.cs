@@ -160,6 +160,8 @@ public class SuspectController : NetworkBehaviour
 
         if (dailySuspectManager.IsMutantSlot(suspectIndex.Value, out MutantSuspectBehaviour mutantPrefab, out MutantIntruderData mutantData))
             SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, mutantPrefab, mutantData);
+        else if (dailySuspectManager.IsDoppelgangerSlot(suspectIndex.Value, out DoppelgangerData doppelgangerData))
+            SpawnDoppelgangerServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation, doppelgangerData);
         else
             SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
     }
@@ -213,6 +215,46 @@ public class SuspectController : NetworkBehaviour
         {
             suspectCharacter.Initialize();
         }
+
+        _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
+        _currentSuspectInitialized = false;
+
+        TryInitializeCurrentSuspect();
+        AssignReferencesClientRpc(netObj.NetworkObjectId);
+    }
+
+    /// <summary>
+    /// Spawns a doppelganger using the target suspect's prefab and flags it via
+    /// <see cref="SuspectCharacter.InitializeAsDoppelganger"/>. The prefab is the same
+    /// as a normal civilian — doppelganger identity is carried by the DoppelgangerData.
+    /// </summary>
+    private void SpawnDoppelgangerServer(int lineupIndex, Vector3 position, Quaternion rotation, DoppelgangerData doppelgangerData)
+    {
+        if (!IsServer) return;
+
+        SuspectData targetData = doppelgangerData.targetSuspect;
+        SuspectCharacter suspectPrefab = targetData.CharacterPrefab;
+
+        if (suspectPrefab == null)
+        {
+            Debug.LogError($"[SuspectController] DoppelgangerData '{doppelgangerData.name}' targetSuspect has no CharacterPrefab — cannot spawn doppelganger at lineup index {lineupIndex}.");
+            return;
+        }
+
+        GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
+        NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
+
+        if (netObj == null)
+        {
+            Debug.LogError($"[SuspectController] Doppelganger prefab '{spawnedSuspect.name}' is missing a NetworkObject.");
+            Destroy(spawnedSuspect);
+            return;
+        }
+
+        netObj.Spawn();
+
+        suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
+        suspectCharacter.InitializeAsDoppelganger(doppelgangerData);
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;

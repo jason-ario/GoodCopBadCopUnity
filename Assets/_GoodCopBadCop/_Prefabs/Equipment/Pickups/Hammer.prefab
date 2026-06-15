@@ -46,6 +46,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponHitbox
   ShowTopMostFoldoutHeaderGroup: 1
   hitRadius: 0.8
+  _hitEffectPrefab: {fileID: 0}
+  _environmentHitEffectPrefab: {fileID: 0}
 --- !u!1001 &8916678516192505795
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -407,9 +409,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Hammer
+  highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 51857c337f439214db5db13f67a38eb1, type: 2}
-  pickupSound: {fileID: 0}
-  putDownSound: {fileID: 0}
   _hitbox: {fileID: 2950890886079734997}
   _damagePerHit: 25
   _hitDelay: 0.3
@@ -447,7 +448,7 @@ MonoBehaviour:
   RotationMaxInterpolationTime: 0.1
   ScaleLerpSmoothing: 1
   ScaleMaxInterpolationTime: 0.1
-  AuthorityMode: 0
+  AuthorityMode: 1
   TickSyncChildren: 0
   UseUnreliableDeltas: 0
   SyncPositionX: 1

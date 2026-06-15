@@ -13,9 +13,13 @@ public class DailySuspectManager : MonoBehaviour
     [SerializeField] private MutantIntruderData mutantIntruderData;
     [SerializeField, Range(0f, 1f)] private float mutantSpawnChance = 0.2f;
 
+    [Header("Doppelganger")]
+    [SerializeField] private DoppelgangerLineupSet lineupDoppelgangers;
+
     public static DailySuspectManager Instance;
 
     private readonly HashSet<int> _mutantSlotIndices = new HashSet<int>();
+    private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
 
     /// <summary>
     /// When assigned, replaces the default random population logic entirely.
@@ -61,6 +65,23 @@ public class DailySuspectManager : MonoBehaviour
         Debug.Log($"[DailySuspectManager] Mutant lineup pool updated to '{mutantSet.name}'.");
     }
 
+    /// <summary>
+    /// Replaces the active doppelganger lineup pool for the upcoming shift.
+    /// Call from a day subclass to control which doppelgangers can appear.
+    /// Set <see cref="DoppelgangerLineupSet.spawnChance"/> to 0 on the asset for Days 1–5.
+    /// </summary>
+    public void SetDoppelgangerLineupSet(DoppelgangerLineupSet doppelgangerSet)
+    {
+        if (doppelgangerSet == null)
+        {
+            Debug.LogWarning("[DailySuspectManager] SetDoppelgangerLineupSet called with null DoppelgangerLineupSet — keeping current pool.");
+            return;
+        }
+
+        lineupDoppelgangers = doppelgangerSet;
+        Debug.Log($"[DailySuspectManager] Doppelganger lineup pool updated to '{doppelgangerSet.name}'.");
+    }
+
     private void Start()
     {
         ShiftManager.Instance.OnShiftStart += PopulateShiftCharacters;
@@ -69,7 +90,7 @@ public class DailySuspectManager : MonoBehaviour
     private void PopulateShiftCharacters()
     {
         shiftSuspects.Clear();
-        ResetMutantSlots();
+        ResetSlotTracking();
 
         if (PopulateSuspectOverride != null)
         {
@@ -77,6 +98,7 @@ public class DailySuspectManager : MonoBehaviour
             RemoveInvalidSuspects();
             Debug.Log($"[DailySuspectManager] Shift populated via override — {shiftSuspects.Count} suspect(s).");
             InjectMutantSlots();
+            InjectDoppelgangerSlots();
             return;
         }
 
@@ -89,6 +111,7 @@ public class DailySuspectManager : MonoBehaviour
         }
 
         InjectMutantSlots();
+        InjectDoppelgangerSlots();
     }
 
     /// <summary>
@@ -129,21 +152,81 @@ public class DailySuspectManager : MonoBehaviour
             shiftSuspects.Insert(insertIndex, null);
             _mutantSlotIndices.Add(insertIndex);
 
-            // Shift any previously recorded indices that are at or above the insertion point.
-            ShiftMutantIndicesAfterInsert(insertIndex);
+            // Shift any previously recorded mutant indices at or above the insertion point,
+            // excluding the one we just added.
+            ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
         }
 
         Debug.Log($"[DailySuspectManager] Lineup: {normalCount} suspect(s) + {mutantCount} mutant intruder(s) = {shiftSuspects.Count} total slot(s).");
     }
 
     /// <summary>
-    /// After inserting a null at insertIndex, all existing recorded mutant slot indices
-    /// at or above that position shift up by one to remain accurate.
+    /// Inserts doppelganger entries into shiftSuspects at random positions after mutant injection.
+    /// Uses the target suspect's SuspectData so the existing prefab spawning path works unchanged.
+    /// The injected slot is tracked in _doppelgangerSlots so IsDoppelgangerSlot can flag it.
+    /// Only runs from Day 2 onwards and only when the spawn chance roll succeeds.
     /// </summary>
-    private void ShiftMutantIndicesAfterInsert(int insertIndex)
+    private void InjectDoppelgangerSlots()
+    {
+        if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay < 2)
+        {
+            Debug.Log("[DailySuspectManager] Day 1 — doppelganger injection skipped.");
+            return;
+        }
+
+        if (lineupDoppelgangers == null)
+            return;
+
+        if (lineupDoppelgangers.doppelgangers == null || lineupDoppelgangers.doppelgangers.Count == 0)
+        {
+            Debug.LogWarning($"[DailySuspectManager] DoppelgangerLineupSet '{lineupDoppelgangers.name}' has no entries — skipping injection.");
+            return;
+        }
+
+        if (UnityEngine.Random.value > lineupDoppelgangers.spawnChance)
+        {
+            Debug.Log("[DailySuspectManager] Doppelganger spawn chance not met — skipping injection.");
+            return;
+        }
+
+        DoppelgangerData doppelgangerData = lineupDoppelgangers.GetRandom();
+        if (doppelgangerData == null)
+            return;
+
+        if (doppelgangerData.targetSuspect == null)
+        {
+            Debug.LogWarning($"[DailySuspectManager] DoppelgangerData '{doppelgangerData.name}' has no targetSuspect assigned — skipping injection.");
+            return;
+        }
+
+        if (doppelgangerData.targetSuspect.CharacterPrefab == null)
+        {
+            Debug.LogWarning($"[DailySuspectManager] DoppelgangerData target '{doppelgangerData.targetSuspect.name}' has no CharacterPrefab — skipping injection.");
+            return;
+        }
+
+        int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
+
+        // Insert the target's SuspectData so the existing prefab spawn path resolves the prefab normally.
+        shiftSuspects.Insert(insertIndex, doppelgangerData.targetSuspect);
+
+        // Shift all existing mutant and doppelganger slot indices that sit at or above the insertion point.
+        ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
+        ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+
+        _doppelgangerSlots[insertIndex] = doppelgangerData;
+
+        Debug.Log($"[DailySuspectManager] Doppelganger of '{doppelgangerData.targetSuspect.name}' injected at lineup index {insertIndex}. Total slots: {shiftSuspects.Count}.");
+    }
+
+    /// <summary>
+    /// Shifts all entries in the given HashSet that are >= insertIndex up by one,
+    /// excluding the entry at exactly insertIndex (which was just added and must not move).
+    /// </summary>
+    private static void ShiftHashSetIndicesAfterInsert(int insertIndex, HashSet<int> indices)
     {
         List<int> toShift = new List<int>();
-        foreach (int idx in _mutantSlotIndices)
+        foreach (int idx in indices)
         {
             if (idx != insertIndex && idx >= insertIndex)
                 toShift.Add(idx);
@@ -151,15 +234,37 @@ public class DailySuspectManager : MonoBehaviour
 
         foreach (int idx in toShift)
         {
-            _mutantSlotIndices.Remove(idx);
-            _mutantSlotIndices.Add(idx + 1);
+            indices.Remove(idx);
+            indices.Add(idx + 1);
         }
     }
 
-    /// <summary>Clears the mutant slot index tracking for the new shift.</summary>
-    private void ResetMutantSlots()
+    /// <summary>
+    /// Shifts all doppelganger slot keys that are >= insertIndex up by one.
+    /// Called before the new entry is written to _doppelgangerSlots.
+    /// </summary>
+    private void ShiftDoppelgangerSlotsAfterInsert(int insertIndex)
+    {
+        List<int> toShift = new List<int>();
+        foreach (int idx in _doppelgangerSlots.Keys)
+        {
+            if (idx >= insertIndex)
+                toShift.Add(idx);
+        }
+
+        foreach (int idx in toShift)
+        {
+            DoppelgangerData data = _doppelgangerSlots[idx];
+            _doppelgangerSlots.Remove(idx);
+            _doppelgangerSlots[idx + 1] = data;
+        }
+    }
+
+    /// <summary>Clears all slot index tracking for the new shift.</summary>
+    private void ResetSlotTracking()
     {
         _mutantSlotIndices.Clear();
+        _doppelgangerSlots.Clear();
     }
 
     /// <summary>
@@ -183,6 +288,25 @@ public class DailySuspectManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns a random DoppelgangerData from the current pool, ignoring slot indices.
+    /// Used by debug tools to force a doppelganger spawn outside of the normal injection flow.
+    /// Returns false with a null out if no pool is assigned or the pool is empty.
+    /// </summary>
+    public bool TryGetRandomDoppelganger(out DoppelgangerData data)
+    {
+        data = null;
+
+        if (lineupDoppelgangers == null)
+        {
+            Debug.LogWarning("[DailySuspectManager] TryGetRandomDoppelganger: lineupDoppelgangers is not assigned.");
+            return false;
+        }
+
+        data = lineupDoppelgangers.GetRandom();
+        return data != null;
+    }
+
+    /// <summary>
     /// Returns true if the given lineup index is a mutant intrusion slot.
     /// Outputs the randomly selected prefab from the pool and the shared config data.
     /// </summary>
@@ -196,6 +320,15 @@ public class DailySuspectManager : MonoBehaviour
 
         selectedPrefab = lineupMutants.GetRandom();
         return selectedPrefab != null;
+    }
+
+    /// <summary>
+    /// Returns true if the given lineup index is a doppelganger slot.
+    /// Outputs the DoppelgangerData that controls anomaly loadout and visual modifiers.
+    /// </summary>
+    public bool IsDoppelgangerSlot(int lineupIndex, out DoppelgangerData data)
+    {
+        return _doppelgangerSlots.TryGetValue(lineupIndex, out data);
     }
 
     private List<SuspectData> GetRandomSuspects(int amount)
