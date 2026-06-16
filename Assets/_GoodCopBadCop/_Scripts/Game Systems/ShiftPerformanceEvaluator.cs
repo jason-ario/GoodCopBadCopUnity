@@ -101,8 +101,10 @@ public class ShiftPerformanceEvaluator : MonoBehaviour
 
         int coupons = Mathf.RoundToInt(Mathf.Lerp(_minCouponReward, _maxCouponReward, LastShiftScore));
 
-        if (GlobalHostVariables.Instance != null)
-            GlobalHostVariables.Instance.AddMoney(coupons);
+        if (ATM.Instance != null)
+            ATM.Instance.SpawnCoupons(coupons);
+        else
+            Debug.LogWarning("[ShiftPerformanceEvaluator] ATM.Instance is null — coupons not dispensed.");
 
         Debug.Log($"[ShiftPerformanceEvaluator] Shift score: {LastShiftScore:P0}. Performance bonus: {coupons} coupons.");
     }

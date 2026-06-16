@@ -43,6 +43,9 @@ public class PlayerMovementController : NetworkBehaviour
     [Header("Gravity Settings")]
     [SerializeField] private float gravity = -20f;
 
+    [Header("Jump Settings")]
+    [SerializeField] private float jumpForce = 7f;
+
     public bool CanMove;
     public bool CanLook;
     
@@ -50,6 +53,7 @@ public class PlayerMovementController : NetworkBehaviour
     public float MoveXRaw { get; private set; }
     public float MoveZRaw { get; private set; }
     public bool IsRunning { get; private set; }
+    public bool IsGrounded { get; private set; }
 
     /// <summary>
     /// Current vertical look pitch in degrees, clamped to [-maxLookAngle, maxLookAngle].
@@ -195,11 +199,18 @@ public class PlayerMovementController : NetworkBehaviour
         if (_characterController.isGrounded)
         {
             _verticalVelocity = -2f; // Small constant to keep grounded
+
+            if (Input.GetButtonDown("Jump"))
+            {
+                _verticalVelocity = jumpForce;
+            }
         }
         else
         {
             _verticalVelocity += gravity * Time.deltaTime;
         }
+
+        IsGrounded = _characterController.isGrounded;
 
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 

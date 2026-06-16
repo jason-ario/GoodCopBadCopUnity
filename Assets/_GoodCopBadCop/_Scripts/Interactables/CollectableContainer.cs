@@ -135,13 +135,15 @@ public abstract class CollectableContainer : Interactable
     {
         if (!IsServer) return;
 
-        if (GlobalHostVariables.Instance != null)
-            GlobalHostVariables.Instance.AddMoney(_couponRewardPerCollection);
+        if (ATM.Instance != null)
+            ATM.Instance.SpawnCoupons(_couponRewardPerCollection);
+        else
+            Debug.LogWarning("[CollectableContainer] ATM.Instance is null — coupons not dispensed.");
 
         _fillCount.Value        = 0;
         _isAwaitingPickup.Value = false;
 
-        Debug.Log($"[CollectableContainer] '{name}' collected. {_couponRewardPerCollection} coupons awarded.");
+        Debug.Log($"[CollectableContainer] '{name}' collected. {_couponRewardPerCollection} coupons queued for ATM dispense.");
     }
 
     // ── Text helpers ──────────────────────────────────────────────────────────
