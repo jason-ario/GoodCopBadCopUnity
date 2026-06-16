@@ -43,14 +43,8 @@ public class PlayerInstance : NetworkBehaviour
     public PlayerHealth PlayerHealth { get; set; }
     public PlayerAnimationController PlayerAnimationController { get; private set; }
 
-    /// <summary>
-    /// Always-active transform that mirrors this player's camera world position and rotation.
-    /// Used by spectators as a precise follow target that reflects DOTween and sequence moves.
-    /// </summary>
-    public Transform CameraTransform => _playerMovementController?.SpectateTarget;
-
-    private bool _isSpectating;
-    private Transform _spectateFollowTarget;
+    /// <summary>The CinemachineCamera transform managed by PlayerMovementController.</summary>
+    public Transform CameraTransform => _playerMovementController?.CameraTransform;
 
     private void Awake()
     {
@@ -173,57 +167,55 @@ public class PlayerInstance : NetworkBehaviour
 
     public void StartSpectating()
     {
-        if (spectateCamera != null)
+        if (deathCamera != null)
         {
-            if (deathCamera != null)
-            {
-                deathCamera.Priority = 0;
-                deathCamera.gameObject.SetActive(false);
-            }
-
-            // Null out Cinemachine follow/aim — the spectateCamera has no body or aim
-            // components, so we drive its transform directly each Update for exact matching.
-            spectateCamera.Follow = null;
-            spectateCamera.LookAt = null;
-            spectateCamera.gameObject.SetActive(true);
-            spectateCamera.Priority = 100;
-
-            _isSpectating = true;
-            SpectateManager.Instance?.StartSpectating();
-            Debug.Log($"[PlayerInstance] Spectate Camera Activated. Priority set to {spectateCamera.Priority}.");
+            deathCamera.Priority = 0;
+            deathCamera.gameObject.SetActive(false);
         }
-        else
-        {
-            Debug.LogWarning("[PlayerInstance] Spectate Camera reference is null!");
-        }
+
+        // Deactivate the dead player's own first-person camera so only the
+        // spectated player's CinemachineCamera is active for this client's brain.
+        _playerMovementController.CameraTransform.gameObject.SetActive(false);
+
+        // Clear the blood-splatter / hurt overlay so it doesn't persist during spectating.
+        UIController.Instance?.ScreenDamage?.Hide();
+
+        SpectateManager.Instance?.StartSpectating();
+        Debug.Log("[PlayerInstance] Started spectating.");
     }
 
     /// <summary>
-    /// Sets the world-space transform that the spectate camera will track each frame.
-    /// The target should be the spectated player's <see cref="PlayerMovementController.SpectateTarget"/>.
+    /// Activates or deactivates this player's CinemachineCamera for a spectating client.
+    /// When active, the camera is given priority 100 so the spectating client's
+    /// CinemachineBrain picks it up as the live camera.
+    /// Also switches the held-item follow target between body arm (normal) and camera arm
+    /// (spectating) to eliminate NetworkAnimator lag on held objects.
     /// </summary>
-    public void SetSpectateTarget(Transform target)
+    public void SetSpectatedByCamera(bool spectated)
     {
-        _spectateFollowTarget = target;
+        Transform camTransform = _playerMovementController?.CameraTransform;
+        if (camTransform == null) return;
+
+        var cinemachineCam = camTransform.GetComponent<Unity.Cinemachine.CinemachineCamera>();
+        if (spectated)
+        {
+            camTransform.gameObject.SetActive(true);
+            if (cinemachineCam != null) cinemachineCam.Priority = 100;
+        }
+        else
+        {
+            if (cinemachineCam != null) cinemachineCam.Priority = 0;
+            camTransform.gameObject.SetActive(false);
+        }
+
+        GetComponent<PlayerPickupController>()?.SetSpectatedView(spectated);
     }
 
     private void Update()
     {
-        // Drive the spectate camera's transform directly each frame so it precisely matches
-        // the spectated player's camera (including DOTween sequences and cinematic moves).
-        if (_isSpectating && _spectateFollowTarget != null && spectateCamera != null)
-        {
-            spectateCamera.transform.SetPositionAndRotation(
-                _spectateFollowTarget.position,
-                _spectateFollowTarget.rotation);
-        }
-
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        // Debug: K instantly kills the local player for testing death/spectate flow.
         if (IsLocalPlayer && Input.GetKeyDown(KeyCode.K))
-        {
             PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth);
-        }
 #endif
     }
 

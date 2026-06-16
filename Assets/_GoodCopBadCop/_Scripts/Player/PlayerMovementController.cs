@@ -111,20 +111,14 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
-    // Syncs the camera's world-space position and rotation to all clients so
-    // sequences (DOTween moves, lever/switch/folder cutscenes) are visible to spectators.
-    private NetworkVariable<Vector3> _netCameraWorldPos =
+    // Syncs the camera's LOCAL position and rotation (relative to the player root) so
+    // spectating clients derive world position from the same interpolated NetworkTransform
+    // root as the body mesh — eliminating the camera/body drift caused by tick-rate mismatch.
+    private NetworkVariable<Vector3> _netCameraLocalPos =
         new NetworkVariable<Vector3>(writePerm: NetworkVariableWritePermission.Owner);
 
-    private NetworkVariable<Quaternion> _netCameraWorldRot =
+    private NetworkVariable<Quaternion> _netCameraLocalRot =
         new NetworkVariable<Quaternion>(Quaternion.identity, writePerm: NetworkVariableWritePermission.Owner);
-
-    // Always-active child transform that proxy clients update each frame with the owner's
-    // camera world position/rotation. The spectate camera Follow this target.
-    private Transform _spectateTarget;
-
-    /// <summary>Always-active child Transform that mirrors the owner's camera world position and rotation.</summary>
-    public Transform SpectateTarget => _spectateTarget;
 
     private void Awake()
     {
@@ -134,11 +128,6 @@ public class PlayerMovementController : NetworkBehaviour
         
         CanMove = true;
         CanLook = true;
-
-        // Create as a child so it inherits scene lifecycle but always stays active.
-        var spectateTargetObj = new GameObject("SpectateTarget");
-        spectateTargetObj.transform.SetParent(transform, false);
-        _spectateTarget = spectateTargetObj.transform;
     }
 
     private void Start()
@@ -445,20 +434,25 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (IsOwner)
         {
-            // Publish this client's camera world position and rotation so proxies (and
-            // spectators watching this player) can track it even during DOTween sequences.
+            // Publish this client's camera LOCAL position and rotation so spectating
+            // clients reconstruct world position as: root.interpolated + local offset.
+            // This keeps camera and body in sync because both share the same
+            // NetworkTransform root interpolation, eliminating the tick-rate drift.
             if (cameraTransform != null)
             {
-                _netCameraWorldPos.Value = cameraTransform.position;
-                _netCameraWorldRot.Value = cameraTransform.rotation;
-                _spectateTarget.SetPositionAndRotation(cameraTransform.position, cameraTransform.rotation);
+                _netCameraLocalPos.Value = cameraTransform.localPosition;
+                _netCameraLocalRot.Value = cameraTransform.localRotation;
             }
         }
         else
         {
-            // Apply the owner's synced camera state to the always-active spectate target
-            // so a spectating dead player's camera can follow it precisely.
-            _spectateTarget.SetPositionAndRotation(_netCameraWorldPos.Value, _netCameraWorldRot.Value);
+            // Apply synced local transform so the camera inherits the root's
+            // NetworkTransform interpolation automatically.
+            if (cameraTransform != null)
+            {
+                cameraTransform.localPosition = _netCameraLocalPos.Value;
+                cameraTransform.localRotation = _netCameraLocalRot.Value;
+            }
         }
     }
 }

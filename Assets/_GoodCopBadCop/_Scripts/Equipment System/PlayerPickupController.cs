@@ -73,6 +73,11 @@ public class PlayerPickupController : NetworkBehaviour
     private Transform _followTarget;
     private NetworkTransform _followNT;
 
+    // When true (set by SpectateManager), SyncWorldObjectToBody follows the camera arm socket
+    // instead of the body arm socket, eliminating the NetworkAnimator interpolation lag that
+    // makes held items drift behind the spectated player's camera position.
+    private bool _isBeingSpectated;
+
     private void Awake()
     {
         _playerAnimationController = GetComponent<PlayerAnimationController>();
@@ -841,6 +846,11 @@ public class PlayerPickupController : NetworkBehaviour
         _followWorldObj = worldObj;
         _followTarget   = _bodyCurrentlyEquippedItem.transform;
         _followNT       = worldObj.GetComponent<NetworkTransform>();
+
+        // If this player is currently being spectated, immediately route the follow
+        // target to the camera arm socket so there's no one-frame snap on pickup.
+        if (_isBeingSpectated)
+            EquipCamContainerForSpectate();
     }
 
     /// <summary>
@@ -850,9 +860,73 @@ public class PlayerPickupController : NetworkBehaviour
     /// </summary>
     private void RemoveBodyConstraint(NetworkObjectReference objectRef)
     {
+        ClearCamContainerSpectate();
         _followWorldObj = null;
         _followTarget   = null;
         _followNT       = null;
+    }
+
+    /// <summary>
+    /// Called by <see cref="PlayerInstance.SetSpectatedByCamera"/> when this non-owner player
+    /// starts or stops being spectated. Switches the world-object follow target from the
+    /// NetworkAnimator-driven body arm socket to the camera arm socket (parented under
+    /// CinemachineCamera and driven by the camera NetworkVariable) to eliminate per-frame lag.
+    /// </summary>
+    public void SetSpectatedView(bool active)
+    {
+        if (IsOwner) return;
+
+        _isBeingSpectated = active;
+
+        if (active)
+        {
+            if (_followWorldObj != null)
+                EquipCamContainerForSpectate();
+        }
+        else
+        {
+            ClearCamContainerSpectate();
+            if (_followWorldObj != null && _bodyCurrentlyEquippedItem != null)
+                _followTarget = _bodyCurrentlyEquippedItem.transform;
+        }
+    }
+
+    /// <summary>
+    /// Equips the currently held item in the camera arm container so its proxy transform
+    /// (under CinemachineCamera) can be used as the LateUpdate follow target while spectating.
+    /// Guards against double-equip via <see cref="_camEquippedItem"/> null check.
+    /// </summary>
+    private void EquipCamContainerForSpectate()
+    {
+        if (_bodyCurrentlyEquippedItem == null || _camEquippedItem != null) return;
+
+        PickableItemData itemData = _bodyCurrentlyEquippedItem.ItemData;
+        ObjectContainer camContainer = itemData.hand == PickableItemData.Hand.Right
+            ? rightArmCamObjectContainer
+            : leftArmCamObjectContainer;
+
+        camContainer.EquipItem(itemData, this);
+        _camEquippedItem = camContainer.CurrentlyEquippedItem;
+
+        if (_camEquippedItem != null)
+            _followTarget = _camEquippedItem.transform;
+    }
+
+    /// <summary>
+    /// Unequips the spectate cam proxy and clears <see cref="_camEquippedItem"/>.
+    /// Called both when spectating stops and when the held item is dropped while spectating.
+    /// </summary>
+    private void ClearCamContainerSpectate()
+    {
+        if (_camEquippedItem == null) return;
+
+        PickableItemData itemData = _camEquippedItem.ItemData;
+        ObjectContainer camContainer = itemData != null && itemData.hand == PickableItemData.Hand.Right
+            ? rightArmCamObjectContainer
+            : leftArmCamObjectContainer;
+
+        camContainer.UnequipItem(this);
+        _camEquippedItem = null;
     }
 
     /// <summary>

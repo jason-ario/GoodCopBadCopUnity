@@ -75,16 +75,16 @@ public class SpectateManager : MonoBehaviour
     {
         if (_currentTarget == newTarget) return;
 
-        // Restore visual defaults on the previously watched player.
+        // Restore previous target: deactivate their camera and clear visual overrides.
         _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
+        _currentTarget?.SetSpectatedByCamera(false);
 
         _currentTarget = newTarget;
 
-        // Apply first-person visual overrides: hide head, shadow-only body mesh.
+        // Activate the new target's CinemachineCamera so the dead player's
+        // CinemachineBrain picks it up as the live camera (correct FOV, noise, etc.).
+        _currentTarget.SetSpectatedByCamera(true);
         _currentTarget.PlayerAnimationController?.SetSpectatorMode(true);
-
-        // Point the dead local player's spectate camera at this player's synced camera transform.
-        PlayerInstance.Instance.SetSpectateTarget(_currentTarget.CameraTransform);
 
         Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
     }
@@ -93,6 +93,7 @@ public class SpectateManager : MonoBehaviour
     private void ClearCurrentTarget()
     {
         _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
+        _currentTarget?.SetSpectatedByCamera(false);
         _currentTarget = null;
         Debug.Log("[SpectateManager] No spectatable teammates available.");
     }

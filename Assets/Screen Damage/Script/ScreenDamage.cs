@@ -370,6 +370,19 @@ public class ScreenDamage : MonoBehaviour
 
     #region APIs
 
+    /// <summary>
+    /// Immediately hides the bloody-frame and blur overlays.
+    /// Call this when switching to spectator mode so death vignettes don't persist on screen.
+    /// </summary>
+    public void Hide()
+    {
+        if (bloodyFrame != null)
+            bloodyFrame.enabled = false;
+
+        if (blurImage != null)
+            blurImage.enabled = false;
+    }
+
     public void ShowDamage(float shownValue)
     {
         hideDamage = false;
