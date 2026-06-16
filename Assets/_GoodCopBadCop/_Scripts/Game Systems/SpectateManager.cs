@@ -6,6 +6,8 @@ public class SpectateManager : MonoBehaviour
 {
     public static SpectateManager Instance;
 
+    [SerializeField] private SpectatorUI spectatorUI;
+
     private List<PlayerInstance> _teammates = new List<PlayerInstance>();
     private int _currentIndex = 0;
     private bool _isSpectating = false;
@@ -38,6 +40,9 @@ public class SpectateManager : MonoBehaviour
         _isSpectating = true;
         _currentIndex = -1;
         UpdateTeammateList();
+        
+        spectatorUI.gameObject.SetActive(true);
+
         SpectateNext();
     }
 
@@ -103,6 +108,9 @@ public class SpectateManager : MonoBehaviour
     {
         _isSpectating = false;
         ClearCurrentTarget();
+
+        if (spectatorUI != null)
+            spectatorUI.Hide();
     }
 
     private void UpdateTeammateList()
