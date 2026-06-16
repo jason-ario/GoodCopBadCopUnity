@@ -306,14 +306,22 @@ public class PlayerMovementController : NetworkBehaviour
         // Rotate camera (X axis) based on vertical mouse movement
         if (cameraTransform != null)
         {
-            cameraTransform.DOLookAt(target.position, 0.5f);
-            
-            // Optional: Update _cameraPitch to match the new rotation to prevent snapping when mouse moves
-            cameraTransform.DOLookAt(target.position, 0.5f).OnUpdate(() => {
-                _cameraPitch = cameraTransform.localEulerAngles.x;
-                if (_cameraPitch > 180) _cameraPitch -= 360;
-            });
+            // Update _cameraPitch to match the new rotation to prevent snapping when mouse moves
+            cameraTransform.DOLookAt(target.position, 0.5f).OnUpdate(SyncPitch);
         }
+    }
+
+    /// <summary>
+    /// Synchronizes the internal _cameraPitch with the actual local X rotation of the camera.
+    /// Use this when the camera is moved by external systems (e.g. DOTween) to ensure
+    /// the look-down lean and networked pitch remain accurate.
+    /// </summary>
+    public void SyncPitch()
+    {
+        if (cameraTransform == null) return;
+        float pitch = cameraTransform.localEulerAngles.x;
+        if (pitch > 180f) pitch -= 360f;
+        _cameraPitch = pitch;
     }
 
     void UpdateCameraPositionBasedOnLook()

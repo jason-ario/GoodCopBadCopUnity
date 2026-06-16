@@ -20,6 +20,9 @@ public class Lever : Interactable
     [Tooltip("World Transform the right-arm IK anchors to while the pull animation plays.")]
     [SerializeField] private Transform _ikTarget;
 
+    [Tooltip("World Transform the player's head look-at is pinned to during the interaction. Leave empty to fall back to the lever's own transform.")]
+    [SerializeField] private Transform _lookTarget;
+
     [Tooltip("Seconds the camera takes to reach _camPos.")]
     [SerializeField] private float _cameraMoveDuration = 0.5f;
 
@@ -70,16 +73,22 @@ public class Lever : Interactable
         movement.SetCanControl(false);
         movement.LookAtTarget(transform);
 
+        // Pin the head look-at to the dedicated look target (or fall back to this transform).
+        Transform lookPoint = _lookTarget != null ? _lookTarget : transform;
+        anim.OverrideHeadLookAt(lookPoint.position);
+
         if (_ikTarget != null)
             anim.RightArmIKTarget = _ikTarget;
 
         if (_camPos != null)
         {
             movement.CameraTransform.DOMove(_camPos.position, _cameraMoveDuration);
-            movement.CameraTransform.DORotate(_camPos.rotation.eulerAngles, _cameraMoveDuration);
+            movement.CameraTransform.DORotate(_camPos.rotation.eulerAngles, _cameraMoveDuration).OnUpdate(movement.SyncPitch);
         }
 
-        anim.SetBodyLeanDirect(1f, 1f);
+        // Removed hardcoded lean as it can fight the head-look IK if the lever is at an unexpected height.
+        // Instead, we rely on the synced camera pitch to drive procedural lean naturally.
+        // anim.SetBodyLeanDirect(1f, 1f);
 
         // Start reaching and enable the grab boolean slightly after the camera starts moving,
         // rather than waiting for it to finish.
@@ -105,6 +114,7 @@ public class Lever : Interactable
         yield return new WaitForSeconds(0.3f);
 
         // ── Phase 3: Camera return + Restore ──────────────────────────────────
+        anim.OverrideHeadLookAt(null);
         anim.SetBodyLeanDirect(0f);
         movement.ResetCameraPos(false, _cameraReturnDuration);
 

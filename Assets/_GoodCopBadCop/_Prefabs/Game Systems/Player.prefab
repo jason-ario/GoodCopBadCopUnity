@@ -90,8 +90,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9971968, z: 0.07482411, w: 0}
-  m_LocalPosition: {x: -1.9593265, y: 1.8317343, z: 11.315362}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.451, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -129,9 +129,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.1
+  near clip plane: 0.12
   far clip plane: 5000
-  field of view: 60
+  field of view: 65
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -10875,7 +10875,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2119203540
+  GlobalObjectIdHash: 2146751676
   InScenePlacedSourceGlobalObjectIdHash: 2146751676
   DeferredDespawnTick: 0
   Ownership: 1
@@ -10962,7 +10962,7 @@ MonoBehaviour:
   armPitchClampUp: 30
   pitchClampDown: 60
   pitchClampUp: 30
-  leanSpineMax: 25
+  leanSpineMax: 35
   leanNeckMax: 14
   leanLerpSpeed: 6
   ikLeanResponseScale: 40
@@ -12256,6 +12256,10 @@ PrefabInstance:
     - target: {fileID: 8736318226311434148, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LinearDamping
       value: 0.24
+      objectReference: {fileID: 0}
+    - target: {fileID: 9132180561106725892, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_Weight
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9132180561106725892, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_Data.m_SourceObjects.m_Item0.transform

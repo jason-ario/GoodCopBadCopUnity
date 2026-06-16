@@ -24,6 +24,19 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] Transform headLookAtTransform;
     [SerializeField] Transform chestLookAtTransform;
 
+    /// <summary>
+    /// When set, overrides the world-space position that is synced as the head look-at target.
+    /// Useful for interactables that want to pin the player's gaze to a specific world point.
+    /// Set to null to resume normal camera-relative look-at behaviour.
+    /// </summary>
+    private Vector3? _headLookAtOverride = null;
+
+    /// <summary>
+    /// Pins the head look-at target to a fixed world-space position for the duration of an
+    /// interaction. Pass null to clear the override and return to normal behaviour.
+    /// </summary>
+    public void OverrideHeadLookAt(Vector3? worldPos) => _headLookAtOverride = worldPos;
+
     private float targetLayer1Weight = 0f;
     private float targetLayer2Weight = 0f;
     private float targetLayer4Weight = 0f;
@@ -519,7 +532,7 @@ public class PlayerAnimationController : NetworkBehaviour
             return;
         }
 
-        headLookAtPos.Value = headLookAtTransform.position;
+        headLookAtPos.Value = _headLookAtOverride ?? headLookAtTransform.position;
         chestLookAtPos.Value = chestLookAtTransform.position;
 
         // Sync the local camera pitch so proxy clients can drive bone rotation.
