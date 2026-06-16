@@ -1,31 +1,105 @@
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UI;
 
+/// <summary>
+/// Manages the "Call in Backup" logic in the HQ Order Screen.
+/// Handles money deduction and requests the local player to send a respawn RPC to the server.
+/// </summary>
 public class HQOrderScreen : MonoBehaviour
 {
     [SerializeField] private Telephone _telephone;
     [SerializeField] private AudioSource _loopingAudio;
+    [SerializeField] private Button _respawnButton;
+    [SerializeField] private TextMeshProUGUI _respawnButtonText;
+    
+    private const int RespawnCost = 10;
+    private const string RespawnTextFormat = "Call in Backup ({0} <sprite=0>)";
 
     private void OnEnable()
     {
         if (_loopingAudio != null)
-        {
             _loopingAudio.Play();
+
+        if (_respawnButtonText != null)
+            _respawnButtonText.text = string.Format(RespawnTextFormat, RespawnCost);
+
+        UpdateRespawnButton();
+    }
+
+    private void Update()
+    {
+        UpdateRespawnButton();
+    }
+
+    private void UpdateRespawnButton()
+    {
+        if (_respawnButton == null) return;
+
+        bool hasFunds = GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value >= RespawnCost;
+        bool hasDeadTeammate = false;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject != null)
+            {
+                var player = client.PlayerObject.GetComponent<PlayerInstance>();
+                if (player != null && player != PlayerInstance.Instance && player.PlayerHealth.IsDead)
+                {
+                    hasDeadTeammate = true;
+                    break;
+                }
+            }
         }
+
+        _respawnButton.interactable = hasFunds && hasDeadTeammate;
+    }
+
+    /// <summary>
+    /// Deducts money and requests the local PlayerInstance to send the respawn RPC.
+    /// UI elements themselves are often not spawned on the network, so we route
+    /// network requests through the local player object.
+    /// </summary>
+    public void CallInBackup()
+    {
+        if (GlobalHostVariables.Instance == null || PlayerInstance.Instance == null) return;
+
+        // Find the first dead teammate
+        ulong targetClientId = ulong.MaxValue;
+        PlayerInstance corpse = null;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject != null)
+            {
+                var player = client.PlayerObject.GetComponent<PlayerInstance>();
+                if (player != null && player != PlayerInstance.Instance && player.PlayerHealth.IsDead)
+                {
+                    targetClientId = client.ClientId;
+                    corpse = player;
+                    break;
+                }
+            }
+        }
+
+        if (targetClientId == ulong.MaxValue || corpse == null) return;
+
+        // Attempt to deduct money from the shared pool
+        GlobalHostVariables.Instance.SubtractMoneyFromClient(RespawnCost);
+
+        // Route the request through the local player instance (which is guaranteed to be spawned and owned)
+        PlayerInstance.Instance.RequestRespawnServerRpc(targetClientId, corpse.NetworkObject);
+
+        HangUp();
     }
 
     private void OnDisable()
     {
         if (_loopingAudio != null)
-        {
             _loopingAudio.Stop();
-        }
     }
 
-    /// <summary>
-    /// Hangs up the telephone, triggering the put-down sequence and closing this screen.
-    /// Intended to be called by the back button's onClick event.
-    /// </summary>
     public void HangUp()
     {
         _telephone.HangUp(NetworkManager.Singleton.LocalClientId);

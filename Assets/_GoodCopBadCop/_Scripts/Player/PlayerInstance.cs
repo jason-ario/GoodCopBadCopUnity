@@ -61,6 +61,12 @@ public class PlayerInstance : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        if (PlayerHealth != null)
+        {
+            PlayerHealth.OnDeath += OnAnyPlayerDeath;
+            PlayerHealth.OnRespawn += OnAnyPlayerRespawn;
+        }
+
         if (IsLocalPlayer)
         {
             _playerMovementController.CanControl = true;
@@ -69,10 +75,8 @@ public class PlayerInstance : NetworkBehaviour
             if (deathCamera != null) deathCamera.gameObject.SetActive(false);
             if (spectateCamera != null) spectateCamera.gameObject.SetActive(false);
 
-            if (PlayerHealth != null)
-            {
-                PlayerHealth.OnDeath += Die;
-            }
+            PlayerHealth.OnDeath += Die;
+            PlayerHealth.OnRespawn += Respawn;
         }
     }
 
@@ -80,10 +84,27 @@ public class PlayerInstance : NetworkBehaviour
     {
         base.OnNetworkDespawn();
 
+        if (PlayerHealth != null)
+        {
+            PlayerHealth.OnDeath -= OnAnyPlayerDeath;
+            PlayerHealth.OnRespawn -= OnAnyPlayerRespawn;
+        }
+
         if (IsLocalPlayer && PlayerHealth != null)
         {
             PlayerHealth.OnDeath -= Die;
+            PlayerHealth.OnRespawn -= Respawn;
         }
+    }
+
+    private void OnAnyPlayerDeath()
+    {
+        if (nameTag != null) nameTag.SetActive(false);
+    }
+
+    private void OnAnyPlayerRespawn()
+    {
+        if (nameTag != null) nameTag.SetActive(true);
     }
 
     public void SetIsOutside(bool value)
@@ -165,6 +186,35 @@ public class PlayerInstance : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Resurrects the local player: restores control, re-enables cameras, and stops spectating.
+    /// Visuals (head, arms) are restored via SetSpectatorMode(false).
+    /// </summary>
+    public void Respawn()
+    {
+        CanControl = true;
+        SetCanInteract(true);
+        SetCanMove(true);
+        EnableReticle();
+
+        if (deathCamera != null)
+        {
+            deathCamera.Priority = 0;
+            deathCamera.gameObject.SetActive(false);
+        }
+
+        // Re-enable own first-person camera
+        _playerMovementController.CameraTransform.gameObject.SetActive(true);
+
+        // Ensure we stop spectating if we were in spectate mode
+        SpectateManager.Instance?.StopSpectating();
+
+        // Restore local visuals (head scale and arms)
+        PlayerAnimationController?.SetSpectatorMode(false);
+
+        Debug.Log("[PlayerInstance] Player respawned.");
+    }
+
     public void StartSpectating()
     {
         if (deathCamera != null)
@@ -217,6 +267,63 @@ public class PlayerInstance : NetworkBehaviour
         if (IsLocalPlayer && Input.GetKeyDown(KeyCode.K))
             PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth);
 #endif
+    }
+
+    /// <summary>
+    /// Deactivates almost all components on this player instance, effectively turning it into
+    /// a static "corpse" or background object. Used when the player is replaced by a fresh
+    /// respawned instance.
+    /// </summary>
+    public void DeactivateAllComponents()
+    {
+        // 1. Disable local-only components
+        if (_playerMovementController != null) _playerMovementController.enabled = false;
+        if (_playerInteractionController != null) _playerInteractionController.enabled = false;
+        if (_characterController != null) _characterController.enabled = false;
+        if (_playerCameraController != null) _playerCameraController.enabled = false;
+        if (PlayerHealth != null) PlayerHealth.enabled = false;
+        if (PlayerRadiation != null) PlayerRadiation.enabled = false;
+
+        // 2. Disable Networking
+        var nt = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+        var na = GetComponent<Unity.Netcode.Components.NetworkAnimator>();
+        if (na != null) na.enabled = false;
+
+        // 3. Keep visual/animation hierarchy but stop the animator itself if needed
+        var animator = GetComponent<Animator>();
+        if (animator != null) animator.enabled = false;
+
+        // 4. Disable name tag and light
+        if (nameTag != null) nameTag.SetActive(false);
+        if (playerLight != null) playerLight.SetActive(false);
+
+        Debug.Log($"[PlayerInstance] Components deactivated for corpse of player {OwnerClientId}.");
+    }
+
+    [ServerRpc]
+    public void RequestRespawnServerRpc(ulong targetClientId, NetworkObjectReference corpseRef)
+    {
+        if (!IsServer) return;
+
+        // 1. Deactivate components on the old player instance (the "corpse")
+        if (corpseRef.TryGet(out NetworkObject corpseObj))
+        {
+            var corpseInstance = corpseObj.GetComponent<PlayerInstance>();
+            if (corpseInstance != null)
+            {
+                corpseObj.RemoveOwnership(); 
+                corpseInstance.DeactivateAllComponents();
+                corpseObj.name = "Player_Corpse_" + targetClientId;
+            }
+        }
+
+        // 2. Spawn a fresh player instance for that client
+        if (PlayerSpawner.Instance != null)
+        {
+            bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+            PlayerSpawner.Instance.SpawnPlayer(targetClientId, isSinglePlayer);
+        }
     }
 
     public void SetPosition(Transform position)

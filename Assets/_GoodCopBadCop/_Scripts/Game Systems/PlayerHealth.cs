@@ -23,6 +23,9 @@ public class PlayerHealth : NetworkBehaviour
     /// <summary>Fired on every client when health reaches zero for the first time.</summary>
     public UnityAction OnDeath;
 
+    /// <summary>Fired on every client when health is reset and the player is no longer dead.</summary>
+    public UnityAction OnRespawn;
+
     // ── Networked State ────────────────────────────────────────────────────────
 
     private readonly NetworkVariable<float> _networkHealth = new NetworkVariable<float>(
@@ -162,6 +165,11 @@ public class PlayerHealth : NetworkBehaviour
         {
             OnHealthChanged?.Invoke();
             OnDeath?.Invoke();
+        }
+        else if (previousValue && !newValue)
+        {
+            OnHealthChanged?.Invoke();
+            OnRespawn?.Invoke();
         }
     }
 }
