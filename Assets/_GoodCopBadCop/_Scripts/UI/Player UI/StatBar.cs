@@ -13,6 +13,7 @@ public class StatBar : MonoBehaviour
     [SerializeField] private RectTransform glowRect;
     [SerializeField] private bool glowEnabled = true;
     [SerializeField] private float glowLingerDuration = 0.5f;
+    [SerializeField] private bool glowOnDecrease = false;
     [Tooltip("Minimum fill increase per second required to activate the glow. Higher = only fast heals glow.")]
     [SerializeField] private float glowRateThreshold = 0.1f;
 
@@ -51,10 +52,14 @@ public class StatBar : MonoBehaviour
         float newFill = max > 0f ? current / max : 0f;
         fillImage.fillAmount = newFill;
 
-        if (newFill > _previousFillAmount && glowEnabled && glowRect != null)
+        bool isChangeSignificant = glowOnDecrease 
+            ? newFill < _previousFillAmount 
+            : newFill > _previousFillAmount;
+
+        if (isChangeSignificant && glowEnabled && glowRect != null)
         {
             float deltaTime = Time.time - _lastUpdateTime;
-            float rate = deltaTime > 0f ? (newFill - _previousFillAmount) / deltaTime : 0f;
+            float rate = deltaTime > 0f ? Mathf.Abs(newFill - _previousFillAmount) / deltaTime : 0f;
 
             if (rate >= glowRateThreshold)
             {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Animations;
 
@@ -15,9 +16,14 @@ public class ObjectPlacer : MonoBehaviour
     [SerializeField] private Color inRangeColor = Color.white;
     [SerializeField] private Color outOfRangeColor = Color.red;
 
+    [Header("Ghost Tint")]
+    [SerializeField] private Color ghostInRangeColor = new Color(0f, 1f, 0f, 0.5f);
+    [SerializeField] private Color ghostOutOfRangeColor = new Color(1f, 0f, 0f, 0.5f);
+
     private PickableItemData _pickableItemData;
     private PickableObject _clonedItem;
     private PlacementBoard _currentPlacementBoard;
+    private readonly List<Material> _ghostMaterials = new List<Material>();
     public bool IsActive;
     public bool IsInRange { get; private set; } = true;
 
@@ -134,6 +140,7 @@ public class ObjectPlacer : MonoBehaviour
         _clonedItem.transform.localPosition = slotTransform.localPosition;
         _clonedItem.transform.localRotation = slotTransform.localRotation;
         _clonedItem.GetComponent<PickableObject>().SetPlacementClone();
+        _clonedItem.GetComponent<PickableObject>().OnSpawnedAsPlacementClone();
 
         // Jump clone's animator to the exact state of the source
         Animator sourceAnimator = sourceItem.GetComponentInChildren<Animator>();
@@ -193,14 +200,16 @@ public class ObjectPlacer : MonoBehaviour
     private static readonly int SrcBlendProperty = Shader.PropertyToID("_SrcBlend");
     private static readonly int DstBlendProperty = Shader.PropertyToID("_DstBlend");
     private static readonly int ZWriteProperty = Shader.PropertyToID("_ZWrite");
-    private const float GhostAlpha = 0.5f;
 
     /// <summary>
     /// Replaces every renderer's materials on the ghost clone with transparent
-    /// material instances at <see cref="GhostAlpha"/> opacity.
+    /// material instances tinted by <see cref="ghostInRangeColor"/>, and caches
+    /// them so <see cref="SetInRange"/> can update their tint each frame.
     /// </summary>
     private void SetupGhostMaterials(GameObject root)
     {
+        _ghostMaterials.Clear();
+
         foreach (Renderer rend in root.GetComponentsInChildren<Renderer>(true))
         {
             Material[] instanceMats = rend.materials;
@@ -215,17 +224,13 @@ public class ObjectPlacer : MonoBehaviour
                 mat.SetInt(SrcBlendProperty, (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
                 mat.SetInt(DstBlendProperty, (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
 
-                // Preserve existing base colour, override alpha only
-                Color baseColor = mat.HasProperty(BaseColorProperty)
-                    ? mat.GetColor(BaseColorProperty)
-                    : Color.white;
-                baseColor.a = GhostAlpha;
-                mat.SetColor(BaseColorProperty, baseColor);
+                mat.SetColor(BaseColorProperty, ghostInRangeColor);
 
                 mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
                 mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
 
                 instanceMats[i] = mat;
+                _ghostMaterials.Add(mat);
             }
             rend.materials = instanceMats;
         }
@@ -257,6 +262,8 @@ public class ObjectPlacer : MonoBehaviour
             _clonedItem = null;
         }
 
+        _ghostMaterials.Clear();
+
         _wasInRangeWhenDeactivated = IsInRange;
         IsInRange = true;
         container.gameObject.SetActive(false);
@@ -285,17 +292,25 @@ public class ObjectPlacer : MonoBehaviour
     }
 
     /// <summary>
-    /// Tints the arc line white (in range, can place) or red (out of range, cannot place).
+    /// Tints the arc line and ghost clone green (in range, can place) or red (out of range, cannot place).
     /// Safe to call every frame while the placer is active.
     /// </summary>
     public void SetInRange(bool inRange)
     {
         IsInRange = inRange;
 
-        if (arcLine == null) return;
+        if (arcLine != null)
+        {
+            Color lineColor = inRange ? inRangeColor : outOfRangeColor;
+            arcLine.startColor = lineColor;
+            arcLine.endColor = lineColor;
+        }
 
-        Color color = inRange ? inRangeColor : outOfRangeColor;
-        arcLine.startColor = color;
-        arcLine.endColor = color;
+        Color ghostColor = inRange ? ghostInRangeColor : ghostOutOfRangeColor;
+        foreach (Material mat in _ghostMaterials)
+        {
+            if (mat != null)
+                mat.SetColor(BaseColorProperty, ghostColor);
+        }
     }
 }

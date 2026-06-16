@@ -111,6 +111,21 @@ public class PlayerMovementController : NetworkBehaviour
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
+    // Syncs the camera's world-space position and rotation to all clients so
+    // sequences (DOTween moves, lever/switch/folder cutscenes) are visible to spectators.
+    private NetworkVariable<Vector3> _netCameraWorldPos =
+        new NetworkVariable<Vector3>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<Quaternion> _netCameraWorldRot =
+        new NetworkVariable<Quaternion>(Quaternion.identity, writePerm: NetworkVariableWritePermission.Owner);
+
+    // Always-active child transform that proxy clients update each frame with the owner's
+    // camera world position/rotation. The spectate camera Follow this target.
+    private Transform _spectateTarget;
+
+    /// <summary>Always-active child Transform that mirrors the owner's camera world position and rotation.</summary>
+    public Transform SpectateTarget => _spectateTarget;
+
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
@@ -119,6 +134,11 @@ public class PlayerMovementController : NetworkBehaviour
         
         CanMove = true;
         CanLook = true;
+
+        // Create as a child so it inherits scene lifecycle but always stays active.
+        var spectateTargetObj = new GameObject("SpectateTarget");
+        spectateTargetObj.transform.SetParent(transform, false);
+        _spectateTarget = spectateTargetObj.transform;
     }
 
     private void Start()
@@ -417,5 +437,28 @@ public class PlayerMovementController : NetworkBehaviour
         // Skip the owner — they already played it above.
         if (IsOwner) return;
         _footstepsAudio.PlayFootstep();
+    }
+
+    private void LateUpdate()
+    {
+        if (!IsSpawned) return;
+
+        if (IsOwner)
+        {
+            // Publish this client's camera world position and rotation so proxies (and
+            // spectators watching this player) can track it even during DOTween sequences.
+            if (cameraTransform != null)
+            {
+                _netCameraWorldPos.Value = cameraTransform.position;
+                _netCameraWorldRot.Value = cameraTransform.rotation;
+                _spectateTarget.SetPositionAndRotation(cameraTransform.position, cameraTransform.rotation);
+            }
+        }
+        else
+        {
+            // Apply the owner's synced camera state to the always-active spectate target
+            // so a spectating dead player's camera can follow it precisely.
+            _spectateTarget.SetPositionAndRotation(_netCameraWorldPos.Value, _netCameraWorldRot.Value);
+        }
     }
 }

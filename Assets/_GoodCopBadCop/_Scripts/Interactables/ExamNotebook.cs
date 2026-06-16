@@ -295,6 +295,10 @@ public class ExamNotebook : PickableObject
 
         ExcludePageCollidersFromCache();
         InitializePageBehavior();
+
+        // If the notebook is delivered inside a supply box, hide the live pages
+        // and show the fake stand-ins until it is picked up.
+        SetPagesActive(!IsInSupplyBox());
     }
 
     /// <summary>Wires up NetworkVariable listeners and syncs initial checklist/page state.</summary>
@@ -386,6 +390,38 @@ public class ExamNotebook : PickableObject
     }
 
     /// <summary>
+    /// Detects if the notebook is currently parented inside a SupplyBox.
+    /// </summary>
+    private bool IsInSupplyBox() => GetComponentInParent<SupplyBox>() != null;
+
+    /// <summary>
+    /// Toggles visibility between the actual spawned ExamPage objects and the
+    /// inactive prefab stand-ins (pagePositions).
+    /// </summary>
+    private void SetPagesActive(bool active)
+    {
+        if (pages == null) return;
+
+        for (int i = 0; i < pages.Length; i++)
+        {
+            var page = pages[i];
+            if (page == null) continue;
+
+            // Actual page is only active if the notebook wants them active AND it hasn't been ripped out.
+            // If it IS ripped out, its own logic handles its activity.
+            if (!page.isRippedOut)
+                page.gameObject.SetActive(active);
+
+            // Stand-in is only active if the notebook wants stand-ins AND this specific page hasn't been ripped out.
+            if (pagePositions != null && i < pagePositions.Length && pagePositions[i] != null)
+            {
+                pagePositions[i].gameObject.SetActive(!active && !page.isRippedOut);
+            }
+        }
+    }
+
+
+    /// <summary>
     /// Called by ExamPage when the local player clicks a checkbox.
     /// Routes through the notebook's ServerRpc since nested NetworkObjects can't send RPCs.
     /// </summary>
@@ -417,6 +453,21 @@ public class ExamNotebook : PickableObject
         playerPickupController.PlayerAnimationController.RightArmIKTarget = ikAnimationTarget;
         StartCoroutine(TurnRightArmRigOff());
     }
+    public override void OnPickedUp()
+    {
+        base.OnPickedUp();
+        // Always restore live pages when picked up out of a box or off the floor.
+        SetPagesActive(true);
+    }
+
+    public override void OnDropped()
+    {
+        base.OnDropped();
+        // If dropped back into a box (rare but possible), hide pages again.
+        // Otherwise keep them active for floor visibility.
+        SetPagesActive(!IsInSupplyBox());
+    }
+
 
     IEnumerator TurnRightArmRigOff()
     {

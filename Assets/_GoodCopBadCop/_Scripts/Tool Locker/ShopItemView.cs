@@ -14,7 +14,8 @@ public class ShopItemView : MonoBehaviour
     private CanvasGroup _canvasGroup;
     private bool _isLocked;
 
-    private const float LockedAlpha = 0.35f;
+    private const float LockedAlpha = 0.55f;
+    private const string UnavailableLabel = "???";
 
     private void Awake()
     {
@@ -24,42 +25,57 @@ public class ShopItemView : MonoBehaviour
     /// <summary>The <see cref="ShopItem"/> this view was initialized with.</summary>
     public ShopItem ShopItem => _shopItem;
 
+    /// <summary>Whether this item is currently in the tutorial-locked state.</summary>
+    public bool IsLocked => _isLocked;
+
     public void Initialize(ShopItem shopItem, ToolShopController toolShopController)
     {
-        shopItemName.text = shopItem.Name;
-        shopItemPrice.text = "<sprite=0>" + shopItem.Price;
-        _toolShopController = toolShopController;
         _shopItem = shopItem;
+        _toolShopController = toolShopController;
+        RefreshAvailability();
+    }
+
+    /// <summary>
+    /// Re-reads availability from the bound <see cref="ShopItem"/> and updates the name and price display.
+    /// Shows '???' for both when the item is not yet available to the player.
+    /// </summary>
+    public void RefreshAvailability()
+    {
+        if (_shopItem == null) return;
+        bool available = _shopItem.IsAvailable;
+        shopItemName.text = available ? _shopItem.Name : UnavailableLabel;
+        shopItemPrice.text = available ? "<sprite=0>" + _shopItem.Price : UnavailableLabel;
     }
 
     /// <summary>
     /// Re-reads the price from the bound <see cref="ShopItem"/> and updates the displayed text.
+    /// No-ops when the item is unavailable (price display stays as '???').
     /// Call this after a price override is applied so the UI stays in sync.
     /// </summary>
     public void RefreshPrice()
     {
-        if (_shopItem != null)
-            shopItemPrice.text = "<sprite=0>" + _shopItem.Price;
+        if (_shopItem == null) return;
+        if (!_shopItem.IsAvailable) return;
+        shopItemPrice.text = "<sprite=0>" + _shopItem.Price;
     }
 
     public void SelectShopItem()
     {
-        if (_isLocked) return;
-        _toolShopController.Select(_shopItem);
+        _toolShopController.Select(_shopItem, _isLocked);
         _anim.SetBool("Selected", true);
     }
 
     /// <summary>
-    /// Greys out this item and prevents interaction when <paramref name="locked"/> is true.
-    /// Restores full visibility and interactability when false.
+    /// Greys out this item when <paramref name="locked"/> is true — dims the whole card
+    /// so it reads as unavailable, while keeping it interactable so the player can still
+    /// click it and see the "Locked" state on the buy button.
+    /// Restores full visibility when false.
     /// </summary>
     public void SetLocked(bool locked)
     {
         _isLocked = locked;
         if (_canvasGroup == null) return;
         _canvasGroup.alpha = locked ? LockedAlpha : 1f;
-        _canvasGroup.interactable = !locked;
-        _canvasGroup.blocksRaycasts = !locked;
     }
 
     public void Deselect()

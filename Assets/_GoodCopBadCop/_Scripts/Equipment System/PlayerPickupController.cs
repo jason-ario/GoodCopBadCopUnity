@@ -767,6 +767,8 @@ public class PlayerPickupController : NetworkBehaviour
             }
 
             _heldObject.ReleaseHolderServerRpc();
+            if (_heldObject is Flashlight flashlight)
+                flashlight.TurnOff();
             _heldObject.OnDropped();
         }
 

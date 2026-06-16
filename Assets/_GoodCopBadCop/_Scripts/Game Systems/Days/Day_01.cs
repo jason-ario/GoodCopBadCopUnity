@@ -87,9 +87,6 @@ public class Day_01 : DayBase
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
     [Header("Day 1 — Phone Task Delivery")]
-    [Tooltip("Index into Telephone._availableTasks that maps to the 'Take Out the Trash' PhoneTaskData.")]
-    [SerializeField] private int _trashTaskCallIndex = 0;
-
     [Tooltip("Index into Telephone._availableTasks that maps to the 'Go Hunting' PhoneTaskData.")]
     [SerializeField] private int _huntingTaskCallIndex = 1;
 
@@ -438,16 +435,12 @@ public class Day_01 : DayBase
         _switchButton?.SetReady(true);
         SetSwitchArrow(true);
 
-        // Deliver the trash task immediately — no refill tutorial to wait for on retry runs.
+        // Trigger the hunting task call. The trash reminder is now driven automatically
+        // by TrashThreat when the bag count crosses the configured threshold.
         if (Telephone.Instance != null)
-        {
-            Telephone.Instance.TriggerCall(_trashTaskCallIndex);
             StartCoroutine(TriggerHuntingCallAfterDelay());
-        }
         else
-        {
-            Debug.LogWarning("[Day_01] Day1FreeshiftSequence: Telephone.Instance is null — trash task call skipped.");
-        }
+            Debug.LogWarning("[Day_01] Day1FreeshiftSequence: Telephone.Instance is null — hunting task call skipped.");
 
         // Unlock the exit door — no tutorial gating on retry runs.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
@@ -1318,18 +1311,14 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("You know what's expected. We'll be watching.");
 
-        // Ring the telephone to deliver the trash task via the phone call system.
-        // The player must pick up the phone to receive it; the call times out after 20 s if ignored.
+        // Ring the telephone with the hunting task call — serves as the phone tutorial beat.
+        // The trash reminder call is now triggered automatically by TrashThreat when
+        // the bag count exceeds the configured threshold.
         // TriggerCall is server-only and this coroutine is already guarded to run on the server.
         if (Telephone.Instance != null)
-        {
-            Telephone.Instance.TriggerCall(_trashTaskCallIndex);
-            StartCoroutine(TriggerHuntingCallAfterDelay());
-        }
+            Telephone.Instance.TriggerCall(_huntingTaskCallIndex);
         else
-        {
-            Debug.LogWarning("[Day_01] Telephone.Instance is null — trash task call skipped.");
-        }
+            Debug.LogWarning("[Day_01] Telephone.Instance is null — hunting task call skipped.");
 
         // Unlock the exit door — the tutorial gating is over.
         ShiftManager.Instance.OnDoorUnlock?.Invoke();
@@ -1378,6 +1367,10 @@ public class Day_01 : DayBase
             _quarantineRefilled = true;
             _quarantineRefillView?.SetArrowVisible(false);
             _quarantineRefillView = null;
+
+            // Restore the price as soon as this item is purchased — don't wait for the other refill.
+            if (_quarantineRefillItem != null)
+                MegaphoneDialogueManager.Instance.ClearShopItemPriceOverrideSynced(_quarantineRefillItem.Name);
         }
 
         if (type == StampContainer.StampType.Kill && !_killRefilled)
@@ -1385,6 +1378,10 @@ public class Day_01 : DayBase
             _killRefilled = true;
             _killRefillView?.SetArrowVisible(false);
             _killRefillView = null;
+
+            // Restore the price as soon as this item is purchased — don't wait for the other refill.
+            if (_killRefillItem != null)
+                MegaphoneDialogueManager.Instance.ClearShopItemPriceOverrideSynced(_killRefillItem.Name);
         }
 
         // Both purchased — re-enable the back button and unlock the shop so the player can leave.

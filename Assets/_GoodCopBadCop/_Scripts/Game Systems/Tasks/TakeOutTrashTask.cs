@@ -19,8 +19,8 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
     [SerializeField] private int    _totalBags        = 5;
 
     [Header("Spawning")]
-    [Tooltip("Must be registered as a Network Prefab in the NetworkManager.")]
-    [SerializeField] private GameObject _trashBagPrefab;
+    [Tooltip("Pool of trash prefabs to pick from. All must be registered as Network Prefabs in the NetworkManager.")]
+    [SerializeField] private GameObject[] _trashPrefabs;
     [Tooltip("One or more zones in which bags are randomly placed. A zone is picked at random for each bag.")]
     [SerializeField] private SpawnZone[] _spawnZones;
     [Tooltip("Layer(s) the downward raycast hits to land bags on the ground.")]
@@ -147,18 +147,21 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
 
     private void SpawnTrashBags()
     {
-        if (_trashBagPrefab == null)
+        if (_trashPrefabs == null || _trashPrefabs.Length == 0)
         {
-            Debug.LogError("[TakeOutTrashTask] _trashBagPrefab is not assigned.");
+            Debug.LogError("[TakeOutTrashTask] _trashPrefabs is empty or not assigned.");
             return;
         }
 
         for (int i = 0; i < _totalBags; i++)
         {
+            GameObject prefab = _trashPrefabs[Random.Range(0, _trashPrefabs.Length)];
+            if (prefab == null) continue;
+
             Vector3 spawnPos = GetRandomSpawnPosition();
             Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-            GameObject bagGo = Instantiate(_trashBagPrefab, spawnPos, spawnRot);
+            GameObject bagGo = Instantiate(prefab, spawnPos, spawnRot);
             NetworkObject netObj = bagGo.GetComponent<NetworkObject>();
 
             if (netObj == null)
@@ -205,24 +208,20 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
         // Pick a random zone, then a random point inside it.
         SpawnZone zone = _spawnZones[Random.Range(0, _spawnZones.Length)];
 
-        if (zone.Center == null)
+        if (zone == null)
         {
-            Debug.LogWarning("[TakeOutTrashTask] A spawn zone has no Centre Transform assigned; spawning at origin.");
+            Debug.LogWarning("[TakeOutTrashTask] A spawn zone is null; spawning at origin.");
             return Vector3.zero;
         }
 
-        Vector3 center  = zone.Center.position;
-        float   randomX = Random.Range(-zone.HalfExtents.x, zone.HalfExtents.x);
-        float   randomZ = Random.Range(-zone.HalfExtents.z, zone.HalfExtents.z);
-
         // Cast from above the zone downward to land on the ground.
-        Vector3 castOrigin = new Vector3(center.x + randomX, center.y + 5f, center.z + randomZ);
+        Vector3 castOrigin = zone.GetRandomPosition() + Vector3.up * 5f;
 
         if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer))
             return hit.point;
 
-        // Fallback: use the zone centre Y if no ground surface was hit.
-        return new Vector3(castOrigin.x, center.y, castOrigin.z);
+        // Fallback: use the zone Y if no ground surface was hit.
+        return new Vector3(castOrigin.x, zone.transform.position.y, castOrigin.z);
     }
 
     // ── Progress sync ─────────────────────────────────────────────────────────
@@ -233,37 +232,5 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
         GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
-    // ── Editor gizmos ─────────────────────────────────────────────────────────
-
-#if UNITY_EDITOR
-    private void OnDrawGizmosSelected()
-    {
-        if (_spawnZones == null) return;
-
-        for (int i = 0; i < _spawnZones.Length; i++)
-        {
-            SpawnZone zone = _spawnZones[i];
-            if (zone.Center == null) continue;
-
-            // Cycle hue across zones so they're visually distinct.
-            float hue = (float)i / Mathf.Max(_spawnZones.Length, 1);
-            Color fill = Color.HSVToRGB(hue, 0.7f, 1f);
-            fill.a = 0.25f;
-
-            Vector3 size = new Vector3(zone.HalfExtents.x * 2f, 0.1f, zone.HalfExtents.z * 2f);
-
-            Gizmos.color = fill;
-            Gizmos.DrawCube(zone.Center.position, size);
-
-            fill.a = 1f;
-            Gizmos.color = fill;
-            Gizmos.DrawWireCube(zone.Center.position, size);
-
-            // Label each zone in the Scene view.
-            UnityEditor.Handles.Label(
-                zone.Center.position + Vector3.up * 0.2f,
-                $"Zone {i}");
-        }
-    }
-#endif
+    // ── Editor gizmos removed: now handled by SpawnZone component ─────────────────
 }

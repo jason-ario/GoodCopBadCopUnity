@@ -232,7 +232,20 @@ public class DialogueManager : NetworkBehaviour
     /// True while one or more subtitle instances are present in the subtitles container.
     /// Use this to gate UI that should not appear while an NPC is responding.
     /// </summary>
-    public bool HasActiveSubtitles => subtitlesContainer != null && subtitlesContainer.childCount > 0;
+    public bool HasActiveSubtitles
+    {
+        get
+        {
+            if (subtitlesContainer == null) return false;
+            foreach (Transform child in subtitlesContainer)
+            {
+                // In Unity, Destroyed objects return true for child != null 
+                // until the end of the frame, but we can check if they are active.
+                if (child.gameObject.activeInHierarchy) return true;
+            }
+            return false;
+        }
+    }
 
     private bool _dialogueInputReceived = false;
 

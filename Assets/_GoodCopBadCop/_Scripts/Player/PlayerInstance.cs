@@ -41,7 +41,16 @@ public class PlayerInstance : NetworkBehaviour
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     public PlayerRadiation PlayerRadiation { get; set; }
     public PlayerHealth PlayerHealth { get; set; }
-    public Transform CameraTransform => _playerCameraController != null ? _playerCameraController.transform : null;
+    public PlayerAnimationController PlayerAnimationController { get; private set; }
+
+    /// <summary>
+    /// Always-active transform that mirrors this player's camera world position and rotation.
+    /// Used by spectators as a precise follow target that reflects DOTween and sequence moves.
+    /// </summary>
+    public Transform CameraTransform => _playerMovementController?.SpectateTarget;
+
+    private bool _isSpectating;
+    private Transform _spectateFollowTarget;
 
     private void Awake()
     {
@@ -51,6 +60,7 @@ public class PlayerInstance : NetworkBehaviour
         _playerCameraController = GetComponent<PlayerCameraController>();
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
+        PlayerAnimationController = GetComponent<PlayerAnimationController>();
     }
 
     public override void OnNetworkSpawn()
@@ -171,8 +181,14 @@ public class PlayerInstance : NetworkBehaviour
                 deathCamera.gameObject.SetActive(false);
             }
 
+            // Null out Cinemachine follow/aim — the spectateCamera has no body or aim
+            // components, so we drive its transform directly each Update for exact matching.
+            spectateCamera.Follow = null;
+            spectateCamera.LookAt = null;
             spectateCamera.gameObject.SetActive(true);
             spectateCamera.Priority = 100;
+
+            _isSpectating = true;
             SpectateManager.Instance?.StartSpectating();
             Debug.Log($"[PlayerInstance] Spectate Camera Activated. Priority set to {spectateCamera.Priority}.");
         }
@@ -182,13 +198,23 @@ public class PlayerInstance : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Sets the world-space transform that the spectate camera will track each frame.
+    /// The target should be the spectated player's <see cref="PlayerMovementController.SpectateTarget"/>.
+    /// </summary>
     public void SetSpectateTarget(Transform target)
     {
-        if (spectateCamera != null)
-        {
-            spectateCamera.Follow = target;
-            spectateCamera.LookAt = target;
-        }
+        _spectateFollowTarget = target;
+    }
+
+    private void Update()
+    {
+        // Drive the spectate camera's transform directly each frame so it precisely matches
+        // the spectated player's camera (including DOTween sequences and cinematic moves).
+        if (!_isSpectating || _spectateFollowTarget == null || spectateCamera == null) return;
+        spectateCamera.transform.SetPositionAndRotation(
+            _spectateFollowTarget.position,
+            _spectateFollowTarget.rotation);
     }
 
     public void SetPosition(Transform position)

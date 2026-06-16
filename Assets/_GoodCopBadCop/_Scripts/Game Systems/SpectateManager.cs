@@ -10,6 +10,9 @@ public class SpectateManager : MonoBehaviour
     private int _currentIndex = 0;
     private bool _isSpectating = false;
 
+    /// <summary>The teammate whose perspective is currently being watched.</summary>
+    private PlayerInstance _currentTarget;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -24,7 +27,7 @@ public class SpectateManager : MonoBehaviour
     {
         if (!_isSpectating) return;
 
-        if (Input.GetMouseButtonDown(0)) // Left click to next teammate
+        if (Input.GetMouseButtonDown(0))
         {
             SpectateNext();
         }
@@ -33,6 +36,7 @@ public class SpectateManager : MonoBehaviour
     public void StartSpectating()
     {
         _isSpectating = true;
+        _currentIndex = -1;
         UpdateTeammateList();
         SpectateNext();
     }
@@ -42,21 +46,62 @@ public class SpectateManager : MonoBehaviour
         if (_teammates.Count == 0)
         {
             UpdateTeammateList();
-            if (_teammates.Count == 0) return;
+            if (_teammates.Count == 0)
+            {
+                ClearCurrentTarget();
+                return;
+            }
         }
 
         _currentIndex = (_currentIndex + 1) % _teammates.Count;
-        var target = _teammates[_currentIndex];
+        PlayerInstance target = _teammates[_currentIndex];
 
-        if (target != null && target != PlayerInstance.Instance)
+        // Guard against stale or self references — skip to the next valid entry.
+        if (target == null || target == PlayerInstance.Instance)
         {
-            PlayerInstance.Instance.SetSpectateTarget(target.CameraTransform);
+            if (_teammates.Count > 1)
+                SpectateNext();
+            return;
         }
-        else if (_teammates.Count > 1)
-        {
-            // If we hit ourselves, skip to next
-            SpectateNext();
-        }
+
+        ApplySpectatorTarget(target);
+    }
+
+    /// <summary>
+    /// Switches all spectator-mode state to <paramref name="newTarget"/>, clearing the
+    /// previous target's visual overrides first.
+    /// </summary>
+    private void ApplySpectatorTarget(PlayerInstance newTarget)
+    {
+        if (_currentTarget == newTarget) return;
+
+        // Restore visual defaults on the previously watched player.
+        _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
+
+        _currentTarget = newTarget;
+
+        // Apply first-person visual overrides: hide head, shadow-only body mesh.
+        _currentTarget.PlayerAnimationController?.SetSpectatorMode(true);
+
+        // Point the dead local player's spectate camera at this player's synced camera transform.
+        PlayerInstance.Instance.SetSpectateTarget(_currentTarget.CameraTransform);
+
+        Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
+    }
+
+    /// <summary>Clears spectator-mode visuals and resets the tracked target.</summary>
+    private void ClearCurrentTarget()
+    {
+        _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
+        _currentTarget = null;
+        Debug.Log("[SpectateManager] No spectatable teammates available.");
+    }
+
+    /// <summary>Stops spectating and cleans up visual overrides.</summary>
+    public void StopSpectating()
+    {
+        _isSpectating = false;
+        ClearCurrentTarget();
     }
 
     private void UpdateTeammateList()

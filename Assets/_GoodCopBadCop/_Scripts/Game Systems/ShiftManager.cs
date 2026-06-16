@@ -35,6 +35,13 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private AudioSource ambientAudio;
     [SerializeField] private AudioSource buzzerSound;
 
+    private PlayableDirector ActiveIntroCutscene => 
+        (CampaignManager.Instance != null && CampaignManager.Instance.ActiveDay != null && CampaignManager.Instance.ActiveDay.IntroCutscene != null) 
+        ? CampaignManager.Instance.ActiveDay.IntroCutscene 
+        : introCutscene;
+
+    private PlayableDirector _playingDirector;
+
     public int suspectsProcessed = 0;
     public int suspectsPassedCorrect = 0;
     public int suspectsPassedWrong = 0;
@@ -152,7 +159,7 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     private void HandleNightPhaseReady()
     {
-        OnShiftReady?.Invoke();
+        // OnShiftReady?.Invoke();
     }
 
     public override void OnNetworkSpawn()
@@ -640,7 +647,15 @@ public class ShiftManager : NetworkBehaviour
 
         if (DebugConsole.Instance.skipInitialShiftTransition || DebugConsole.Instance.autoStart)
         {
-            introCutscene.gameObject.SetActive(false);
+            if (_playingDirector != null)
+            {
+                _playingDirector.gameObject.SetActive(false);
+                _playingDirector = null;
+            }
+            else if (introCutscene != null)
+            {
+                introCutscene.gameObject.SetActive(false);
+            }
             UIController.Instance.HideEndOfShiftReport();
             SuspectController.Instance.ResetSuspects();
             if (PlayerInstance.Instance != null)
@@ -655,7 +670,16 @@ public class ShiftManager : NetworkBehaviour
 
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
-        introCutscene.gameObject.SetActive(false);
+        
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
 
         UIController.Instance.HideEndOfShiftReport();
         SuspectController.Instance.ResetSuspects();
@@ -708,9 +732,17 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public void StopIntroCutscene()
     {
-        if (introCutscene == null) return;
-        introCutscene.Stop();
-        introCutscene.gameObject.SetActive(false);
+        if (_playingDirector != null)
+        {
+            _playingDirector.Stop();
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.Stop();
+            introCutscene.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -758,7 +790,14 @@ public class ShiftManager : NetworkBehaviour
         ResetEverything();
         yield return new WaitForSeconds(1);
         ResetEverything(); // Called twice — player position was not resetting reliably in a single call
-        introCutscene.gameObject.SetActive(true);
+
+        _playingDirector = ActiveIntroCutscene;
+
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(true);
+        }
+
         yield return new WaitForSeconds(.5f);
         UIController.Instance.FadeOut();
     }
@@ -791,7 +830,15 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForEndOfFrame();
 
-        introCutscene.gameObject.SetActive(false);
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
 
         ResetShiftData();
         ResetSuspectsProcessed();
@@ -883,7 +930,16 @@ public class ShiftManager : NetworkBehaviour
 
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(2f);
-        introCutscene.gameObject.SetActive(false);
+        
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
 
         ResetShiftData();
         ResetSuspectsProcessed();

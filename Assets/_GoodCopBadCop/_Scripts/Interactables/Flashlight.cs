@@ -14,6 +14,15 @@ public class Flashlight : PickableObject
 
     private InternalBattery internalBattery;
 
+    private Light _flashlightLightComp;
+    private Light _uvLightComp;
+    private float _baseFlashlightIntensity;
+    private float _baseUVIntensity;
+
+    private float _flickerTimer;
+    private const float FLICKER_THRESHOLD = 0.25f; // Battery level where flickering starts
+    private const float MIN_DIM_THRESHOLD = 0.5f;   // Battery level where dimming starts to be noticeable
+
     // 0 = Off, 1 = Regular, 2 = UV
     private NetworkVariable<int> _lightState = new NetworkVariable<int>(0);
 
@@ -41,6 +50,18 @@ public class Flashlight : PickableObject
     {
         internalBattery = GetComponent<InternalBattery>();
         internalBattery.OnBatteryDrained += TurnOffServerRpc;
+
+        if (flashlightLight != null)
+        {
+            _flashlightLightComp = flashlightLight.GetComponent<Light>();
+            if (_flashlightLightComp != null) _baseFlashlightIntensity = _flashlightLightComp.intensity;
+        }
+
+        if (uvLight != null)
+        {
+            _uvLightComp = uvLight.GetComponent<Light>();
+            if (_uvLightComp != null) _baseUVIntensity = _uvLightComp.intensity;
+        }
     }
 
     void Update()
@@ -48,6 +69,53 @@ public class Flashlight : PickableObject
         if (_lightState.Value != 0 && IsOwner && internalBattery != null)
         {
             internalBattery.DrainBattery();
+        }
+
+        UpdateLightVisuals();
+    }
+
+    private void UpdateLightVisuals()
+    {
+        if (internalBattery == null) return;
+
+        float batteryLevel = internalBattery.GetBatteryPercentage();
+        int state = _lightState.Value;
+
+        if (state == 0) return;
+
+        Light targetLight = (state == 1) ? _flashlightLightComp : _uvLightComp;
+        float baseIntensity = (state == 1) ? _baseFlashlightIntensity : _baseUVIntensity;
+
+        if (targetLight == null) return;
+
+        // Calculate dimming
+        // We start dimming when battery is below MIN_DIM_THRESHOLD
+        float dimFactor = 1f;
+        if (batteryLevel < MIN_DIM_THRESHOLD)
+        {
+            dimFactor = Mathf.Lerp(0.1f, 1f, batteryLevel / MIN_DIM_THRESHOLD);
+        }
+
+        float currentIntensity = baseIntensity * dimFactor;
+
+        // Calculate flickering
+        if (batteryLevel < FLICKER_THRESHOLD)
+        {
+            // The lower the battery, the more aggressive the flicker
+            float flickerChance = Mathf.Lerp(0.8f, 0.1f, batteryLevel / FLICKER_THRESHOLD);
+            _flickerTimer -= Time.deltaTime;
+
+            if (_flickerTimer <= 0)
+            {
+                // Randomly drop intensity to near zero or keep it
+                bool isOn = UnityEngine.Random.value > (1f - flickerChance);
+                targetLight.intensity = isOn ? currentIntensity : currentIntensity * UnityEngine.Random.Range(0f, 0.3f);
+                _flickerTimer = UnityEngine.Random.Range(0.02f, 0.15f);
+            }
+        }
+        else
+        {
+            targetLight.intensity = currentIntensity;
         }
     }
 
@@ -127,6 +195,22 @@ public class Flashlight : PickableObject
     private void TurnOffServerRpc()
     {
         _lightState.Value = 0;
+    }
+
+    /// <summary>Sends a server RPC to turn the flashlight off. Safe to call from any client.</summary>
+    public void TurnOff()
+    {
+        TurnOffServerRpc();
+    }
+
+    /// <summary>
+    /// Disables lights directly on the local ghost clone so the placement preview
+    /// never shows the flashlight as active, regardless of the real item's state.
+    /// </summary>
+    public override void OnSpawnedAsPlacementClone()
+    {
+        flashlightLight.SetActive(false);
+        uvLight.SetActive(false);
     }
 
     /// <summary>Returns the current battery level from the internal battery component.</summary>

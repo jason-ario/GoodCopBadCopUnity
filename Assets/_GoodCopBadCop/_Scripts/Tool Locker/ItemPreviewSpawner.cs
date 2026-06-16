@@ -13,9 +13,17 @@ public class ItemPreviewSpawner : MonoBehaviour
     [Tooltip("Optional manual rotation for the spawned item")]
     public Vector3 itemRotation;
 
+    [Tooltip("Material applied to every renderer of an unavailable item's preview, rendering it as a solid black silhouette.")]
+    [SerializeField] private Material _unavailableItemMaterial;
+
     private ShopItem currentItem;
 
-    public void SpawnAndFrame(ShopItem shopItem)
+    /// <summary>
+    /// Spawns the shop item at the preview position and frames the camera to fit it.
+    /// When <paramref name="obscure"/> is true, all renderers on the spawned instance have their
+    /// materials replaced with <see cref="_unavailableItemMaterial"/> to produce a black silhouette.
+    /// </summary>
+    public void SpawnAndFrame(ShopItem shopItem, bool obscure = false)
     {
         // Clean up old item
         if (currentItem != null)
@@ -23,9 +31,19 @@ public class ItemPreviewSpawner : MonoBehaviour
 
         // Spawn item
         Vector3 rotationOffset = shopItem.RotationOffset;
-        // Combine the base rotations with the rotationOffset from the shopItem
         currentItem = Instantiate(shopItem, spawnPoint.position, Quaternion.Euler(itemRotation) * Quaternion.Euler(0, 180, 0) * Quaternion.Euler(rotationOffset)); 
         currentItem.transform.parent = spawnPoint;
+
+        if (obscure && _unavailableItemMaterial != null)
+        {
+            foreach (Renderer r in currentItem.GetComponentsInChildren<Renderer>())
+            {
+                var mats = new Material[r.materials.Length];
+                for (int i = 0; i < mats.Length; i++)
+                    mats[i] = _unavailableItemMaterial;
+                r.materials = mats;
+            }
+        }
 
         FrameObject(previewCamera, currentItem);
     }

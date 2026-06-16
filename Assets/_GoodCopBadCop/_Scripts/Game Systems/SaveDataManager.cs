@@ -86,6 +86,35 @@ public class SaveDataManager : MonoBehaviour
         set { if (ActiveSlot == null) return; ActiveSlot.Day1TutorialComplete = value; Save(); }
     }
 
+    // -------------------------------------------------------------------------
+    // Shop Item Unlocks
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns true if the named shop item has been explicitly unlocked for the active slot.</summary>
+    public bool IsShopItemUnlocked(string itemName)
+    {
+        string[] unlocked = ActiveSlot?.UnlockedShopItems;
+        if (unlocked == null) return false;
+        return Array.IndexOf(unlocked, itemName) >= 0;
+    }
+
+    /// <summary>
+    /// Marks the named shop item as unlocked in the active slot and persists to disk.
+    /// Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void UnlockShopItem(string itemName)
+    {
+        if (ActiveSlot == null) return;
+        if (IsShopItemUnlocked(itemName)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.UnlockedShopItems ?? new string[0]);
+        list.Add(itemName);
+        ActiveSlot.UnlockedShopItems = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Shop item unlocked: '{itemName}'.");
+    }
+
     /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
     public int CurrentDay
     {
@@ -301,6 +330,12 @@ public class SaveSlot
     /// Causes Day 1 to skip all tutorial gating on subsequent runs.
     /// </summary>
     public bool Day1TutorialComplete;
+
+    /// <summary>
+    /// Names of shop items unlocked through gameplay progression.
+    /// Items absent from this list (and with _unlockedByDefault = false) appear as '???' in the shop.
+    /// </summary>
+    public string[] UnlockedShopItems = new string[0];
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

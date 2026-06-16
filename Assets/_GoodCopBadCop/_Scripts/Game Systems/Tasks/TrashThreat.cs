@@ -8,6 +8,11 @@ using UnityEngine;
 /// Replaces TakeOutTrashTask — there is no fixed bag count to deposit; bags spawn
 /// continuously using the same day-intensity scaling pattern as MutantSpawner.
 ///
+/// Accumulation begins as soon as the day starts (<see cref="OnDayStart"/>), not at
+/// the night phase. When the active bag count crosses <see cref="_phoneCallThreshold"/>,
+/// a phone call reminder is automatically triggered once per day via
+/// <see cref="Telephone.TriggerCall"/> using <see cref="_trashReminderCallIndex"/>.
+///
 /// Players reduce threat by picking up bags and depositing them in a DumpsterInteractable.
 /// Bags are pruned automatically when they are despawned (deposited by any player).
 /// Threat level equals active bag count divided by <see cref="_maxTrackedBags"/>.
@@ -29,8 +34,8 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
     [SerializeField] private float _scoreWeight = 1f;
 
     [Header("Spawning")]
-    [Tooltip("Must be registered as a Network Prefab in the NetworkManager.")]
-    [SerializeField] private GameObject _trashBagPrefab;
+    [Tooltip("Pool of trash prefabs to pick from. All must be registered as Network Prefabs in the NetworkManager.")]
+    [SerializeField] private GameObject[] _trashPrefabs;
 
     [Tooltip("One or more zones in which bags are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
@@ -65,6 +70,14 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
     [Tooltip("Maximum seconds between bag spawns at sparse (first-day) intensity.")]
     [SerializeField] private float _sparseIntervalMax = 300f;
 
+    [Header("Phone Call Reminder")]
+    [Tooltip("Number of active bags that triggers a one-time phone call reminder per day. " +
+             "Set to 0 or above _maxTrackedBags to disable.")]
+    [SerializeField] private int _phoneCallThreshold = 8;
+
+    [Tooltip("Index into Telephone._availableTasks for the trash accumulation reminder call.")]
+    [SerializeField] private int _trashReminderCallIndex = 0;
+
     // ── Networked state ──────────────────────────────────────────────────────
 
     private readonly NetworkVariable<float> _networkThreatLevel = new(
@@ -76,6 +89,9 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
 
     private readonly List<NetworkObject> _spawnedBags = new();
     private Coroutine _spawnCoroutine;
+
+    /// <summary>Prevents the phone reminder from firing more than once per day. Server-only.</summary>
+    private bool _phoneCallFiredToday;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
@@ -122,15 +138,20 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
-    /// <summary>Clears existing bags and starts the continuous spawn loop. SERVER ONLY.</summary>
+    /// <summary>
+    /// Called by BetweenShiftTaskManager when the night phase begins.
+    /// The spawn loop is already running from <see cref="OnDayStart"/>; this only
+    /// restarts it if it somehow stopped before the night phase. SERVER ONLY.
+    /// </summary>
     public void BeginNightPhase()
     {
         if (!IsServer) return;
 
-        DespawnExistingBags();
-
-        if (_spawnCoroutine != null) StopCoroutine(_spawnCoroutine);
-        _spawnCoroutine = StartCoroutine(SpawnLoop());
+        if (_spawnCoroutine == null)
+        {
+            Debug.Log("[TrashThreat] BeginNightPhase: spawn loop was not running — starting now.");
+            _spawnCoroutine = StartCoroutine(SpawnLoop());
+        }
     }
 
     /// <summary>Stops the spawn loop. Remaining bags persist as a day-shift consequence. SERVER ONLY.</summary>
@@ -147,12 +168,24 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
 
     // ── Day start ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Clears any leftover bags from the previous day, resets per-day flags, and
+    /// immediately starts the spawn loop. Called on all clients via ShiftManager.OnDayStart,
+    /// but only the server performs spawn work. SERVER ONLY.
+    /// </summary>
     private void OnDayStart()
     {
         if (!IsServer) return;
 
+        _phoneCallFiredToday = false;
+
         DespawnExistingBags();
         _networkThreatLevel.Value = 0f;
+
+        if (_spawnCoroutine != null) StopCoroutine(_spawnCoroutine);
+        _spawnCoroutine = StartCoroutine(SpawnLoop());
+
+        Debug.Log("[TrashThreat] Day started — trash accumulation loop running.");
     }
 
     // ── Spawn loop ────────────────────────────────────────────────────────────
@@ -177,16 +210,19 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
 
     private void SpawnSingleBag()
     {
-        if (_trashBagPrefab == null)
+        if (_trashPrefabs == null || _trashPrefabs.Length == 0)
         {
-            Debug.LogError("[TrashThreat] _trashBagPrefab is not assigned.");
+            Debug.LogError("[TrashThreat] _trashPrefabs is empty or not assigned.");
             return;
         }
+
+        GameObject prefab = _trashPrefabs[Random.Range(0, _trashPrefabs.Length)];
+        if (prefab == null) return;
 
         Vector3    spawnPos = GetRandomSpawnPosition();
         Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-        GameObject    bagGo  = Instantiate(_trashBagPrefab, spawnPos, spawnRot);
+        GameObject    bagGo  = Instantiate(prefab, spawnPos, spawnRot);
         NetworkObject netObj = bagGo.GetComponent<NetworkObject>();
 
         if (netObj == null)
@@ -200,6 +236,7 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
         _spawnedBags.Add(netObj);
 
         UpdateThreatLevel();
+        CheckPhoneCallThreshold();
     }
 
     /// <summary>Removes stale references (bags despawned by players) and updates the threat level.</summary>
@@ -214,6 +251,29 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
         _networkThreatLevel.Value = _maxTrackedBags > 0
             ? (float)_spawnedBags.Count / _maxTrackedBags
             : 0f;
+    }
+
+    /// <summary>
+    /// Triggers a one-time phone call reminder when the bag count first crosses
+    /// <see cref="_phoneCallThreshold"/> this day. SERVER ONLY.
+    /// </summary>
+    private void CheckPhoneCallThreshold()
+    {
+        if (_phoneCallFiredToday) return;
+        if (_phoneCallThreshold <= 0) return;
+        if (_spawnedBags.Count < _phoneCallThreshold) return;
+
+        _phoneCallFiredToday = true;
+
+        if (Telephone.Instance != null)
+        {
+            Telephone.Instance.TriggerCall(_trashReminderCallIndex);
+            Debug.Log($"[TrashThreat] Bag count ({_spawnedBags.Count}) reached threshold ({_phoneCallThreshold}) — reminder call triggered.");
+        }
+        else
+        {
+            Debug.LogWarning("[TrashThreat] CheckPhoneCallThreshold: Telephone.Instance is null — reminder call skipped.");
+        }
     }
 
     // ── Day intensity ─────────────────────────────────────────────────────────
@@ -247,22 +307,18 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
 
         SpawnZone zone = _spawnZones[Random.Range(0, _spawnZones.Length)];
 
-        if (zone.Center == null)
+        if (zone == null)
         {
-            Debug.LogWarning("[TrashThreat] A spawn zone has no Centre Transform assigned; spawning at origin.");
+            Debug.LogWarning("[TrashThreat] A spawn zone is null; spawning at origin.");
             return Vector3.zero;
         }
 
-        Vector3 center  = zone.Center.position;
-        float   randomX = Random.Range(-zone.HalfExtents.x, zone.HalfExtents.x);
-        float   randomZ = Random.Range(-zone.HalfExtents.z, zone.HalfExtents.z);
-
-        Vector3 castOrigin = new Vector3(center.x + randomX, center.y + 5f, center.z + randomZ);
+        Vector3 castOrigin = zone.GetRandomPosition() + Vector3.up * 5f;
 
         if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer))
             return hit.point;
 
-        return new Vector3(castOrigin.x, center.y, castOrigin.z);
+        return new Vector3(castOrigin.x, zone.transform.position.y, castOrigin.z);
     }
 
     // ── Cleanup ────────────────────────────────────────────────────────────────
@@ -278,33 +334,5 @@ public class TrashThreat : NetworkBehaviour, ISystemicThreat
         UpdateThreatLevel();
     }
 
-    // ── Editor gizmos ─────────────────────────────────────────────────────────
-
-#if UNITY_EDITOR
-    private void OnDrawGizmosSelected()
-    {
-        if (_spawnZones == null) return;
-
-        for (int i = 0; i < _spawnZones.Length; i++)
-        {
-            SpawnZone zone = _spawnZones[i];
-            if (zone.Center == null) continue;
-
-            float hue  = (float)i / Mathf.Max(_spawnZones.Length, 1);
-            Color fill = Color.HSVToRGB(hue, 0.7f, 1f);
-            fill.a = 0.25f;
-
-            Vector3 size = new Vector3(zone.HalfExtents.x * 2f, 0.1f, zone.HalfExtents.z * 2f);
-
-            Gizmos.color = fill;
-            Gizmos.DrawCube(zone.Center.position, size);
-
-            fill.a = 1f;
-            Gizmos.color = fill;
-            Gizmos.DrawWireCube(zone.Center.position, size);
-
-            UnityEditor.Handles.Label(zone.Center.position + Vector3.up * 0.2f, $"Zone {i}");
-        }
-    }
-#endif
+    // ── Editor gizmos removed: now handled by SpawnZone component ─────────────────
 }

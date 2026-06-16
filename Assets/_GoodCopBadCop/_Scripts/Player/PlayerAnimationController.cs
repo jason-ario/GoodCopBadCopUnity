@@ -817,6 +817,32 @@ public class PlayerAnimationController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Toggles spectator-mode visuals on this proxy player for the local dead client.
+    /// When active, hides the head bone (prevents camera clipping) and makes the body
+    /// mesh shadow-only, mirroring the local player first-person setup so the spectator
+    /// sees the scene from the correct perspective.
+    /// Must only be called locally on proxy clients — never sends RPCs.
+    /// </summary>
+    public void SetSpectatorMode(bool active)
+    {
+        if (_headBone != null)
+        {
+            _headBone.localScale = active ? Vector3.zero : Vector3.one;
+        }
+
+        if (armsOnBody != null)
+        {
+            SkinnedMeshRenderer bodyRenderer = armsOnBody.GetComponent<SkinnedMeshRenderer>();
+            if (bodyRenderer != null)
+            {
+                bodyRenderer.shadowCastingMode = active
+                    ? ShadowCastingMode.ShadowsOnly
+                    : ShadowCastingMode.On;
+            }
+        }
+    }
+
     public void EnableRightArmMask()    {
         Debug.Log("Enable Right Arm Mask");
         targetLayer1Weight = 1f;

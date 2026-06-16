@@ -616,4 +616,11 @@ public class PickableObject : Interactable
     {
         _parentConstraint.enabled = false;
     }
+
+    /// <summary>
+    /// Called on the local ghost clone immediately after it is spawned by the ObjectPlacer.
+    /// Override to suppress any visual or audio state that should not appear on the ghost
+    /// (e.g. lights, particles). The clone is never network-spawned, so do not call RPCs here.
+    /// </summary>
+    public virtual void OnSpawnedAsPlacementClone() { }
 }

@@ -41,6 +41,11 @@ public class Day_02 : DayBase
         // Unlock documentation + mutation anomalies and persist immediately.
         AnomalyManager.Instance.UnlockMutationAndDocumentation();
 
+        // Unlock the mutation exam refill in the tool locker shop for all clients.
+        // This is a one-way operation — the unlock is saved and persists across sessions.
+        if (NetworkManager.Singleton.IsServer && MegaphoneDialogueManager.Instance != null)
+            MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced("Mutation Exams (5)");
+
         // Hide the mutation notebook until the tutorial beat spawns it in.
         _mutationNotebook?.SetVisible(false);
         _mutationNotebook?.SetInteractableNetworked(false);

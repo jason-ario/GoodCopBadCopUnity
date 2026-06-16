@@ -154,7 +154,10 @@ public class PlayerInteractionController : NetworkBehaviour
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
             InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
             
-            if (interactableCollider != null)
+            // Only resolve from InteractableCollider when the MonoBehaviour is enabled —
+            // SetInteractable(false) disables it as a belt-and-suspenders guard in case
+            // the physics Collider is re-enabled by a late network update.
+            if (interactableCollider != null && interactableCollider.enabled)
             {
                 interactable = interactableCollider.Interactable;
             }

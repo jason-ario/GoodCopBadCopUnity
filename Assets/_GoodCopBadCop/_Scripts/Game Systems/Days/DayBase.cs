@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Playables;
 
 /// <summary>
 /// Base class for every campaign day. Attach a concrete subclass (e.g. Day_01) to the
@@ -20,6 +21,10 @@ public abstract class DayBase : MonoBehaviour
     [Header("Day Identity")]
     [Tooltip("1-based day number. Must match the child position under CampaignManager.")]
     public int DayNumber;
+
+    [Header("Cutscenes")]
+    [Tooltip("The intro cutscene to play at the start of this day.")]
+    public PlayableDirector IntroCutscene;
 
     [Header("Suspects")]
     [Tooltip("The set of suspects processed during this day's shift.")]

@@ -30,10 +30,14 @@ public class ToolShopController : MonoBehaviour
     public GameObject backButton;
 
     private ShopItem _selectedShopItem;
+    private bool _selectedItemIsLocked;
     private bool _initialized;
+    private CanvasGroup _buyButtonCanvasGroup;
 
     private static readonly string HoldingObjectMessage = "Put down what you're holding first!";
     private static readonly string PurchaseSuccessMessage = "Item purchased!";
+    private static readonly string LockedButtonLabel = "Locked";
+    private const float BuyButtonLockedAlpha = 0.45f;
 
     private void OnEnable()
     {
@@ -45,6 +49,10 @@ public class ToolShopController : MonoBehaviour
             // Re-read prices in case a price override was applied since the last open.
             foreach (ShopItemView view in shopItemViews)
                 view.RefreshPrice();
+
+            // Re-apply availability in case an item was unlocked while the shop was closed.
+            ApplyAvailabilityFromSave();
+            SortViewsByAvailability();
 
             FadeIn();
             OnShopOpened?.Invoke();
@@ -61,6 +69,14 @@ public class ToolShopController : MonoBehaviour
     private void Start()
     {
         FadeIn();
+
+        // Lazily create the CanvasGroup used to dim the buy button when a locked item is selected.
+        if (_buyText != null)
+        {
+            var buyButtonRoot = _buyText.transform.parent;
+            _buyButtonCanvasGroup = buyButtonRoot.GetComponent<CanvasGroup>()
+                                    ?? buyButtonRoot.gameObject.AddComponent<CanvasGroup>();
+        }
         
         for (var i = 0; i < shopItems.Length; i++)
         {
@@ -77,6 +93,8 @@ public class ToolShopController : MonoBehaviour
             shopItemView.Deselect();
         }
 
+        ApplyAvailabilityFromSave();
+        SortViewsByAvailability();
         shopItemViews[0].SelectShopItem();
 
         _initialized = true;
@@ -89,7 +107,7 @@ public class ToolShopController : MonoBehaviour
         _canvasGroup.DOFade(1, .5f);
     }
 
-    public void Select(ShopItem shopItem)
+    public void Select(ShopItem shopItem, bool isLocked = false)
     {
         foreach (var shopItemView in shopItemViews)
         {
@@ -102,10 +120,31 @@ public class ToolShopController : MonoBehaviour
             return;
         }
 
+        bool isUnavailable = !shopItem.IsAvailable;
         _selectedShopItem = shopItem;
-        _itemPreviewSpawner.SpawnAndFrame(shopItem);
-        itemPreviewText.text = shopItem.Name;
-        _buyText.text = "Buy " + "<sprite=0>" + shopItem.Price;
+        _selectedItemIsLocked = isLocked || isUnavailable;
+
+        _itemPreviewSpawner.SpawnAndFrame(shopItem, isUnavailable);
+        itemPreviewText.text = isUnavailable ? "???" : shopItem.Name;
+
+        if (isUnavailable)
+        {
+            _buyText.text = "???";
+            if (_buyButtonCanvasGroup != null)
+                _buyButtonCanvasGroup.alpha = BuyButtonLockedAlpha;
+        }
+        else if (isLocked)
+        {
+            _buyText.text = LockedButtonLabel;
+            if (_buyButtonCanvasGroup != null)
+                _buyButtonCanvasGroup.alpha = BuyButtonLockedAlpha;
+        }
+        else
+        {
+            _buyText.text = "Buy " + "<sprite=0>" + shopItem.Price;
+            if (_buyButtonCanvasGroup != null)
+                _buyButtonCanvasGroup.alpha = 1f;
+        }
     }
 
     /// <summary>
@@ -117,6 +156,12 @@ public class ToolShopController : MonoBehaviour
         if (_selectedShopItem == null)
         {
             Debug.LogWarning("ToolShopController: Buy called with no item selected.");
+            return;
+        }
+
+        if (_selectedItemIsLocked)
+        {
+            Debug.Log($"ToolShopController: Cannot purchase '{_selectedShopItem.Name}' — item is locked.");
             return;
         }
 
@@ -211,15 +256,84 @@ public class ToolShopController : MonoBehaviour
 
     /// <summary>
     /// Refreshes the displayed price for a specific shop item while the shop is open.
-    /// Also updates the buy button text when the given item is currently selected.
+    /// Also updates the buy button text when the given item is currently selected and not locked.
     /// Call this after a price override is applied or cleared so the open UI stays in sync.
     /// </summary>
     public void RefreshPriceForItem(ShopItem item)
     {
         GetViewForItem(item)?.RefreshPrice();
 
-        if (_selectedShopItem == item)
+        if (_selectedShopItem == item && !_selectedItemIsLocked)
             _buyText.text = "Buy " + "<sprite=0>" + item.Price;
+    }
+
+    /// <summary>
+    /// Refreshes the availability display for a specific shop item and, if it is currently
+    /// selected, re-triggers selection so the preview and buy button also update.
+    /// Call this after <see cref="ShopItem.SetAvailable"/> is applied at runtime.
+    /// </summary>
+    public void RefreshItemAvailability(ShopItem item)
+    {
+        var view = GetViewForItem(item);
+        view?.RefreshAvailability();
+
+        // Re-sort so the newly-available item moves back to its original position.
+        SortViewsByAvailability();
+
+        // Re-select so the preview and buy button reflect the new state.
+        if (_selectedShopItem == item)
+            Select(item, view != null && view.IsLocked);
+    }
+
+    /// <summary>
+    /// Reads each shop item's unlock state from <see cref="SaveDataManager"/> and calls
+    /// <see cref="ShopItem.SetAvailable"/> for items whose save data says they are unlocked.
+    /// Items with <c>_unlockedByDefault = true</c> are already available and are skipped.
+    /// </summary>
+    private void ApplyAvailabilityFromSave()
+    {
+        if (SaveDataManager.Instance == null) return;
+
+        foreach (var view in shopItemViews)
+        {
+            ShopItem item = view.ShopItem;
+            if (item == null || item.IsAvailable) continue;
+
+            if (SaveDataManager.Instance.IsShopItemUnlocked(item.Name))
+            {
+                item.SetAvailable(true);
+                view.RefreshAvailability();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reorders the shop item view GameObjects in the scroll list so that available items
+    /// appear first (in their original Inspector order) and unavailable items follow at the
+    /// end (also in their original relative order).
+    /// <para>
+    /// The <see cref="shopItemViews"/> list itself is never reordered — it always reflects
+    /// the canonical Inspector order and is used as the stable source of truth when a newly
+    /// unlocked item needs to return to its correct position.
+    /// </para>
+    /// </summary>
+    private void SortViewsByAvailability()
+    {
+        int siblingIndex = 0;
+
+        // Pass 1 — available items, in original Inspector order.
+        foreach (var view in shopItemViews)
+        {
+            if (view.ShopItem != null && view.ShopItem.IsAvailable)
+                view.transform.SetSiblingIndex(siblingIndex++);
+        }
+
+        // Pass 2 — unavailable items, in original Inspector order.
+        foreach (var view in shopItemViews)
+        {
+            if (view.ShopItem == null || !view.ShopItem.IsAvailable)
+                view.transform.SetSiblingIndex(siblingIndex++);
+        }
     }
 
     private PlayerPickupController GetLocalPlayerPickup()

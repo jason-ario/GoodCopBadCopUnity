@@ -20,6 +20,20 @@ public class MeleeWeaponDurability : NetworkBehaviour
     [Tooltip("Played on the owning client when durability reaches zero.")]
     [SerializeField] private AudioClip breakSound;
 
+    [Header("Visual Degradation")]
+    [Tooltip("The mesh renderer to swap materials on.")]
+    [SerializeField] private MeshRenderer _meshRenderer;
+
+    [Tooltip("Materials for different durability stages. The first element is 100% health, the last is nearly broken.")]
+    [SerializeField] private Material[] _damageStages;
+
+    [Header("Breakage Effect")]
+    [Tooltip("Prefab containing rigidbodies that spawn when the weapon breaks.")]
+    [SerializeField] private GameObject _breakPiecesPrefab;
+
+    [Tooltip("Force applied to broken pieces.")]
+    [SerializeField] private float _breakForce = 5f;
+
     // ── Events ─────────────────────────────────────────────────────────────────
 
     /// <summary>Raised on the owning client the moment durability hits zero.</summary>
@@ -39,8 +53,6 @@ public class MeleeWeaponDurability : NetworkBehaviour
     private void Awake()
     {
         _pickableObject = GetComponent<PickableObject>();
-        _pickableObject.OnEquip += ShowDurabilityBar;
-        _pickableObject.OnUnEquip += HideDurabilityBar;
     }
 
     public override void OnNetworkSpawn()
@@ -50,6 +62,8 @@ public class MeleeWeaponDurability : NetworkBehaviour
 
         if (IsServer && weaponData != null)
             _currentDurability.Value = weaponData.maxDurability;
+
+        UpdateMaterial();
     }
 
     public override void OnNetworkDespawn()
@@ -60,12 +74,6 @@ public class MeleeWeaponDurability : NetworkBehaviour
 
     public override void OnDestroy()
     {
-        if (_pickableObject != null)
-        {
-            _pickableObject.OnEquip -= ShowDurabilityBar;
-            _pickableObject.OnUnEquip -= HideDurabilityBar;
-        }
-
         base.OnDestroy();
     }
 
@@ -104,34 +112,54 @@ public class MeleeWeaponDurability : NetworkBehaviour
 
     // ── Client ─────────────────────────────────────────────────────────────────
 
-    [Rpc(SendTo.Owner)]
+    [Rpc(SendTo.Everyone)]
     private void NotifyDepletedClientRpc()
     {
         if (breakSound != null)
             SFXController.Instance.Play(breakSound);
 
-        OnDepleted?.Invoke();
+        SpawnBreakPieces();
+
+        if (IsOwner)
+        {
+            OnDepleted?.Invoke();
+        }
+    }
+
+    private void SpawnBreakPieces()
+    {
+        if (_breakPiecesPrefab == null) return;
+
+        GameObject pieces = Instantiate(_breakPiecesPrefab, transform.position, transform.rotation);
+        Rigidbody[] rbs = pieces.GetComponentsInChildren<Rigidbody>();
+
+        foreach (Rigidbody rb in rbs)
+        {
+            Vector3 force = Random.insideUnitSphere * _breakForce;
+            rb.AddForce(force, ForceMode.Impulse);
+            rb.AddTorque(Random.insideUnitSphere * _breakForce, ForceMode.Impulse);
+        }
+
+        // Cleanup pieces after some time
+        Destroy(pieces, 10f);
     }
 
     // ── Callbacks ──────────────────────────────────────────────────────────────
 
     private void OnDurabilityChanged(int previousValue, int newValue)
     {
-        // Only update the bar while it is visible (i.e. the weapon is equipped by this player).
-        if (PlayerUI.Instance != null && PlayerUI.Instance.BatteryBar.gameObject.activeSelf)
-            PlayerUI.Instance.BatteryBar.UpdateBar(GetDurabilityPercentage());
+        UpdateMaterial();
     }
 
-    private void ShowDurabilityBar()
+    private void UpdateMaterial()
     {
-        if (PlayerUI.Instance == null) return;
-        PlayerUI.Instance.BatteryBar.Show();
-        PlayerUI.Instance.BatteryBar.UpdateBar(GetDurabilityPercentage());
-    }
+        if (_meshRenderer == null || _damageStages == null || _damageStages.Length == 0) return;
 
-    private void HideDurabilityBar()
-    {
-        if (PlayerUI.Instance != null)
-            PlayerUI.Instance.BatteryBar.Hide();
+        float percentage = GetDurabilityPercentage();
+        
+        // Map percentage to material index. 1.0 -> 0, 0.0 -> Length-1
+        int index = Mathf.Clamp(Mathf.FloorToInt((1f - percentage) * _damageStages.Length), 0, _damageStages.Length - 1);
+        
+        _meshRenderer.material = _damageStages[index];
     }
 }

@@ -14,8 +14,6 @@ public class InternalBattery : NetworkBehaviour
     private void Awake()
     {
         pickableObject = GetComponent<PickableObject>();
-        pickableObject.OnEquip += ShowBatteryBar;
-        pickableObject.OnUnEquip += HideBatteryBar;
     }
 
     public override void OnNetworkSpawn()
@@ -37,35 +35,15 @@ public class InternalBattery : NetworkBehaviour
 
     public override void OnDestroy()
     {
-        if (pickableObject != null)
-        {
-            pickableObject.OnEquip -= ShowBatteryBar;
-            pickableObject.OnUnEquip -= HideBatteryBar;
-        }
         base.OnDestroy();
-    }
-
-    private void HideBatteryBar()
-    {
-        if (PlayerUI.Instance != null)
-        {
-            PlayerUI.Instance.BatteryBar.Hide();
-        }
     }
 
     private void OnBatteryJuiceChanged(float previousValue, float newValue)
     {
-        if (PlayerUI.Instance != null && PlayerUI.Instance.BatteryBar.gameObject.activeSelf)
+        if (newValue <= 0 && previousValue > 0)
         {
-            PlayerUI.Instance.BatteryBar.UpdateBar(this);
+            OnBatteryDrained?.Invoke();
         }
-    }
-
-    void ShowBatteryBar()
-    {
-        if (PlayerUI.Instance == null) return;
-        PlayerUI.Instance.BatteryBar.Show();
-        PlayerUI.Instance.BatteryBar.UpdateBar(this);
     }
     
     public void SetJuiceValue(float batteryJuiceValue)

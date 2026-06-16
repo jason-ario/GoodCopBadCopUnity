@@ -49,6 +49,7 @@ public class GateStartShiftController : Interactable
         _openedIn.OnValueChanged += OnOpenDirectionChanged;
 
         ShiftManager.Instance.OnShiftReady += OnIntroComplete;
+        CampaignManager.OnDayChanged += OnDayChanged;
 
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
@@ -62,6 +63,13 @@ public class GateStartShiftController : Interactable
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftReady -= OnIntroComplete;
+        
+        CampaignManager.OnDayChanged -= OnDayChanged;
+    }
+
+    private void OnDayChanged(int day)
+    {
+        _introComplete = false;
     }
 
     public override void Interact(PlayerInteractionController player)

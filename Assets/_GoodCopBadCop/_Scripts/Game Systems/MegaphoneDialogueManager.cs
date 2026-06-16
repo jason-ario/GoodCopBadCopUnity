@@ -452,6 +452,36 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server-only: marks the named <see cref="ShopItem"/> as available on every client and
+    /// persists the unlock to the save file. The item will switch from '???' to its real
+    /// name and price, and become purchasable.
+    /// </summary>
+    public void SetShopItemAvailableSynced(string itemName)
+    {
+        if (!IsServer) return;
+
+        // Persist on the server so the unlock survives session restarts.
+        SaveDataManager.Instance?.UnlockShopItem(itemName);
+
+        SetShopItemAvailableClientRpc(itemName);
+    }
+
+    [ClientRpc]
+    private void SetShopItemAvailableClientRpc(string itemName)
+    {
+        foreach (ShopItem item in Resources.FindObjectsOfTypeAll<ShopItem>())
+        {
+            if (item.Name == itemName)
+            {
+                item.SetAvailable(true);
+                // Refresh the open shop UI immediately if it is visible.
+                ToolShopController.Instance?.RefreshItemAvailability(item);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Broadcasts the bark to all clients including the host. Each client runs the
     /// visual/audio sequence independently in sync with the server's timing.
     /// </summary>
@@ -536,12 +566,13 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             _megaphoneDialogueRect.anchorMax = target.anchorMax;
             _megaphoneDialogueRect.pivot = target.pivot;
             _megaphoneDialogueRect.anchoredPosition = target.anchoredPosition;
+            _megaphoneDialogueRect.sizeDelta = target.sizeDelta;
         }
     }
 
     /// <summary>
     /// Starts a frame-by-frame coroutine that repositions the megaphone panel
-    /// whenever the DialogueManager subtitle state changes while the bark is visible.
+    /// while the bark is visible.
     /// </summary>
     private void StartPositionTracking()
     {
@@ -560,18 +591,9 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     private IEnumerator TrackSubtitlePosition()
     {
-        bool lastSubtitlesActive = false;
-
         while (true)
         {
-            bool subtitlesActive = DialogueManager.Instance != null && DialogueManager.Instance.HasActiveSubtitles;
-
-            if (subtitlesActive != lastSubtitlesActive)
-            {
-                lastSubtitlesActive = subtitlesActive;
-                PositionDialogue();
-            }
-
+            PositionDialogue();
             yield return null;
         }
     }

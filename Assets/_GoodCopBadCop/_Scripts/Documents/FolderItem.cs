@@ -8,15 +8,16 @@ public class FolderItem : PickableObject
 
     /// <summary>
     /// Prevents the document from becoming interactable while it is inside a folder that
-    /// is currently held by any player. Every code path that tries to re-enable a document
-    /// (e.g. the base-class OnHoldingClientChanged callback) goes through this method,
-    /// so a single guard here is sufficient to close the bug.
+    /// is either held by any player or currently closed. Documents should only be
+    /// interactable when the folder is open and not held.
+    /// Every code path that tries to re-enable a document (e.g. the base-class
+    /// OnHoldingClientChanged callback, or the holder-clear that fires when a notebook
+    /// releases a page) goes through this method, so a single guard here is sufficient.
     /// </summary>
     public override void SetInteractable(bool value)
     {
-        // If another player is holding the folder, keep this document non-interactable
-        // regardless of what the caller requested.
-        if (value && insideThisFolder != null && insideThisFolder.IsHeld)
+        // Block re-enabling when inside a folder that is held OR closed.
+        if (value && insideThisFolder != null && (insideThisFolder.IsHeld || !insideThisFolder.IsOpen))
             return;
 
         base.SetInteractable(value);
