@@ -252,6 +252,18 @@ public class PlayerAnimationController : NetworkBehaviour
     // +1 = lean forward/down, -1 = lean back/up. Derived from camera pitch by default.
     private float _leanDirection = 1f;
 
+    [Header("Crouch Lean")]
+    [Tooltip("Degrees of forward spine tilt applied at full crouch.")]
+    [SerializeField] private float crouchSpineLean = 20f;
+    [Tooltip("Fraction of the spine tilt applied as a counter-rotation on the neck to keep the head more upright. 0 = head follows fully, 1 = head stays fully upright.")]
+    [SerializeField] [Range(0f, 1f)] private float crouchNeckCounterFraction = 0.4f;
+    [Tooltip("How quickly the crouch lean smooths in and out.")]
+    [SerializeField] private float crouchLeanLerpSpeed = 6f;
+
+    // 0 = standing, 1 = fully crouched. Drives the forward spine tilt.
+    private float _crouchLeanTarget;
+    private float _currentCrouchLean;
+
     [Header("IK Reach Lean (Proxy)")]
     [Tooltip("Degrees of forward spine tilt applied per unit the IK target exceeds arm reach.")]
     [SerializeField] private float ikLeanResponseScale = 40f;
@@ -365,10 +377,11 @@ public class PlayerAnimationController : NetworkBehaviour
             : Vector3.zero;
 
         ApplyLocalBodyLean();
+        ApplyCrouchLean();
 
         // Re-solve only when the lean has actually moved the spine (avoids subtle deviations
         // from the Animation Rigging solver on frames where the body is upright).
-        if (rightIKActiveOwner && _currentLeanFactor > 0.001f
+        if (rightIKActiveOwner && (_currentLeanFactor > 0.001f || _currentCrouchLean > 0.001f)
             && _rightUpperArmBone != null && _rightForeArmBone != null
             && _rightHandBone != null && rightArmRigIKTarget != null)
         {
@@ -762,6 +775,40 @@ public class PlayerAnimationController : NetworkBehaviour
         if (_neckBone != null)
         {
             _neckBone.localRotation *= Quaternion.Euler(_leanDirection * _currentLeanFactor * leanNeckMax, 0f, 0f);
+        }
+    }
+
+    /// <summary>
+    /// Tells the animation controller whether the player is crouching. The controller then
+    /// smoothly tilts the spine forward and counter-rotates the neck to keep the head readable,
+    /// producing an upper-body lean without the awkward upward spine curve.
+    /// </summary>
+    public void SetCrouchLean(bool crouching)
+    {
+        _crouchLeanTarget = crouching ? 1f : 0f;
+    }
+
+    /// <summary>
+    /// Smoothly applies a forward spine tilt and a partial neck counter-rotation while
+    /// the player is crouching. Called in LateUpdate after the Animator has evaluated.
+    /// </summary>
+    private void ApplyCrouchLean()
+    {
+        _currentCrouchLean = Mathf.Lerp(_currentCrouchLean, _crouchLeanTarget, crouchLeanLerpSpeed * Time.deltaTime);
+
+        if (_currentCrouchLean < 0.001f) return;
+
+        float spineAngle = _currentCrouchLean * crouchSpineLean;
+
+        if (_spineBone != null)
+        {
+            _spineBone.localRotation *= Quaternion.Euler(spineAngle, 0f, 0f);
+        }
+
+        // Counter-rotate the neck to prevent the head from dipping too far down.
+        if (_neckBone != null)
+        {
+            _neckBone.localRotation *= Quaternion.Euler(-spineAngle * crouchNeckCounterFraction, 0f, 0f);
         }
     }
 

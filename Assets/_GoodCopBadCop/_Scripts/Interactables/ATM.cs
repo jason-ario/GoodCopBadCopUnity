@@ -16,8 +16,11 @@ public class ATM : MonoBehaviour
     [Tooltip("Prefab that has a CouponPickup component and a NetworkObject. Spawned for each coupon unit.")]
     [SerializeField] private GameObject _couponPickupPrefab;
 
-    [Tooltip("World-space point where coupons appear. Assign the CouponSpawnPoint child Transform.")]
-    [SerializeField] private Transform _couponSpawnPoint;
+    [Tooltip("First boundary of the spawn range. Coupons appear at a random position between this and Spawn Point B.")]
+    [SerializeField] private Transform _couponSpawnPointA;
+
+    [Tooltip("Second boundary of the spawn range. Coupons appear at a random position between Spawn Point A and this.")]
+    [SerializeField] private Transform _couponSpawnPointB;
 
     [Tooltip("Seconds between successive coupon spawns when multiple are dispensed at once.")]
     [SerializeField] private float _spawnInterval = 0.3f;
@@ -33,14 +36,37 @@ public class ATM : MonoBehaviour
     [Tooltip("MachineShake component that runs while the ATM is dispensing. Disable the component in the Inspector; it will be toggled on/off automatically.")]
     [SerializeField] private MachineShake _machineShake;
 
+    [Header("Debug")]
+    [Tooltip("Number of coupons to dispense when pressing M in a development build or the editor.")]
+    [SerializeField] private int _debugDispenseAmount = 5;
+
     private int _activeSpawnCount;
-    private bool IsServer => NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+
+    /// <summary>
+    /// True when there is no active NetworkManager session (editor / offline test)
+    /// or when this peer is the server/host.
+    /// </summary>
+    private bool IsServer => NetworkManager.Singleton == null
+        || !NetworkManager.Singleton.IsListening
+        || NetworkManager.Singleton.IsServer;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
     {
         Instance = this;
+
+        // Shake is driven by SpawnCouponsRoutine; ensure it starts off.
+        if (_machineShake != null)
+            _machineShake.enabled = false;
+    }
+
+    private void Update()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (Input.GetKeyDown(KeyCode.M))
+            SpawnCoupons(_debugDispenseAmount);
+#endif
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -95,20 +121,24 @@ public class ATM : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPosition = _couponSpawnPoint != null
-            ? _couponSpawnPoint.position
+        Vector3 spawnPosition = (_couponSpawnPointA != null && _couponSpawnPointB != null)
+            ? Vector3.Lerp(_couponSpawnPointA.position, _couponSpawnPointB.position, Random.value)
             : transform.position;
 
-        GameObject spawned = Instantiate(_couponPickupPrefab, spawnPosition, Quaternion.identity);
-        NetworkObject netObj = spawned.GetComponent<NetworkObject>();
+        Quaternion spawnRotation = Random.rotation;
+        GameObject spawned = Instantiate(_couponPickupPrefab, spawnPosition, spawnRotation);
 
-        if (netObj == null)
+        bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (networked)
         {
-            Debug.LogError("[ATM] The coupon pickup prefab does not have a NetworkObject component.");
-            Destroy(spawned);
-            return;
+            NetworkObject netObj = spawned.GetComponent<NetworkObject>();
+            if (netObj == null)
+            {
+                Debug.LogError("[ATM] The coupon pickup prefab does not have a NetworkObject component.");
+                Destroy(spawned);
+                return;
+            }
+            netObj.Spawn(true);
         }
-
-        netObj.Spawn(true);
     }
 }

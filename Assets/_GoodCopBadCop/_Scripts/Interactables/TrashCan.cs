@@ -15,13 +15,11 @@ public class TrashCan : Interactable
     {
         base.InteractWithItem(playerInteractionController, item);
 
-        if (item.name == "Supply Box")
+        if (item is SupplyBox supplyBox && !supplyBox.IsEmpty)
         {
-            if (item.GetComponent<SupplyBox>().IsEmpty == false)
-            {
-                return;
-            }
+            return;
         }
+
         playerInteractionController.pickupController.DestroyEquippedItem();
         audioSource.PlayOneShot(throwTrashSound);
     }

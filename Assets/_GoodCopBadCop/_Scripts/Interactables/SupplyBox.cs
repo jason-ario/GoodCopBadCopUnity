@@ -27,6 +27,16 @@ public class SupplyBox : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Server-computed empty state replicated to all clients so any player can check
+    /// <see cref="IsEmpty"/> without relying on the local, server-only <see cref="_hasHadItems"/>
+    /// or <see cref="_registeredItems"/> list.
+    /// </summary>
+    private NetworkVariable<bool> _networkIsEmpty = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     /// <summary>Parent transform used to attach per-day items during delivery. Falls back to this transform if contents is unassigned.</summary>
     public Transform ContentsParent => contents != null ? contents.transform : transform;
 
@@ -34,8 +44,14 @@ public class SupplyBox : PickableObject
     /// distinguish "nothing was ever added" from "everything has been taken".</summary>
     private bool _hasHadItems;
 
-    /// <summary>Returns true when at least one item was delivered and all of them have since been picked up.</summary>
-    public bool IsEmpty => _hasHadItems && _registeredItems.Count == 0;
+    /// <summary>
+    /// Returns true when at least one item was delivered and all of them have since been picked up.
+    /// On the server the authoritative local lists are used directly; on clients the value is read
+    /// from <see cref="_networkIsEmpty"/> which the server keeps in sync.
+    /// </summary>
+    public bool IsEmpty => IsServer
+        ? (_hasHadItems && _registeredItems.Count == 0)
+        : _networkIsEmpty.Value;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -58,6 +74,17 @@ public class SupplyBox : PickableObject
 
     public override void OnNetworkDespawn()
     {
+        // Unlock any items that are still registered (e.g. box destroyed while carrying items).
+        // Must run before base.OnNetworkDespawn() so item NetworkVariables are still active.
+        if (IsServer)
+        {
+            foreach (PickableObject item in _registeredItems)
+            {
+                if (item != null && item.IsSpawned)
+                    item.UnlockInteractableNetworked();
+            }
+        }
+
         base.OnNetworkDespawn();
         _networkCanPickUp.OnValueChanged -= OnNetworkCanPickUpChanged;
     }
@@ -88,6 +115,7 @@ public class SupplyBox : PickableObject
         if (item == null || _registeredItems.Contains(item)) return;
         _registeredItems.Add(item);
         _hasHadItems = true;
+        if (IsServer) _networkIsEmpty.Value = false;
 
         // Once the item is equipped by a player, release it from box management.
         item.OnEquip += () =>
@@ -103,7 +131,10 @@ public class SupplyBox : PickableObject
     private void UnregisterItemServerRpc(NetworkObjectReference itemRef)
     {
         if (itemRef.TryGet(out NetworkObject netObj) && netObj.TryGetComponent(out PickableObject pickable))
+        {
             _registeredItems.Remove(pickable);
+            _networkIsEmpty.Value = _hasHadItems && _registeredItems.Count == 0;
+        }
     }
 
     /// <summary>Clears all registered items, e.g. when the box is despawned for a new delivery.</summary>
@@ -111,6 +142,8 @@ public class SupplyBox : PickableObject
     {
         _registeredItems.Clear();
         _hasHadItems = false;
+        if (IsSpawned && IsServer)
+            _networkIsEmpty.Value = false;
     }
 
     // ── Server-Side Item Lock Helpers ─────────────────────────────────────────
@@ -119,7 +152,7 @@ public class SupplyBox : PickableObject
     private void UnlockItemsOnServer()
     {
         foreach (PickableObject item in _registeredItems)
-            if (item != null) item.UnlockInteractableNetworked();
+            if (item != null && item.IsSpawned) item.UnlockInteractableNetworked();
     }
 
     /// <summary>Permanently locks all registered items regardless of holder state.</summary>

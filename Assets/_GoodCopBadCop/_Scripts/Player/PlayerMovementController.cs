@@ -46,6 +46,18 @@ public class PlayerMovementController : NetworkBehaviour
     [Header("Jump Settings")]
     [SerializeField] private float jumpForce = 7f;
 
+    [Header("Crouch Settings")]
+    [SerializeField] private Transform camCrouchPos;
+    [SerializeField] private Transform camCrouchLookDownPos;
+    [SerializeField] private float crouchSpeed = 2f;
+    [SerializeField] private float crouchControllerHeight = 1.2f;
+    [SerializeField] private float crouchControllerCenterY = 0.6f;
+
+    private float _standingControllerHeight;
+    private float _standingControllerCenterY;
+    private bool _isCrouching = false;
+    public bool IsCrouching => _isCrouching;
+
     public bool CanMove;
     public bool CanLook;
     
@@ -132,6 +144,9 @@ public class PlayerMovementController : NetworkBehaviour
         
         CanMove = true;
         CanLook = true;
+
+        _standingControllerHeight = _characterController.height;
+        _standingControllerCenterY = _characterController.center.y;
     }
 
     private void Start()
@@ -167,6 +182,15 @@ public class PlayerMovementController : NetworkBehaviour
         if (CanMove) Move();
         if (CanLook) Rotate();
 
+        if (!_isSitting && CanMove)
+        {
+            bool crouchHeld = Input.GetKey(KeyCode.LeftControl);
+            if (crouchHeld && !_isCrouching)
+                SetCrouching(true);
+            else if (!crouchHeld && _isCrouching)
+                SetCrouching(false);
+        }
+
         if (_isSitting && _canSitOrStand)
         {
             if (Input.GetButtonDown("Back") && UIController.Instance.IsPaused == false)
@@ -184,12 +208,12 @@ public class PlayerMovementController : NetworkBehaviour
         float MoveX = Input.GetAxis("Horizontal");
         float MoveZ = Input.GetAxis("Vertical");
 
-        // Check run input
-        bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        // Check run input — blocked while crouching
+        bool isRunning = !_isCrouching && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
         IsRunning = isRunning;
 
         // Pick speed
-        float currentSpeed = isRunning ? runSpeed : characterSpeed;
+        float currentSpeed = _isCrouching ? crouchSpeed : (isRunning ? runSpeed : characterSpeed);
 
         // Calculate desired direction based on input
         Vector3 inputDir = new Vector3(MoveX, 0, MoveZ);
@@ -200,7 +224,7 @@ public class PlayerMovementController : NetworkBehaviour
         {
             _verticalVelocity = -2f; // Small constant to keep grounded
 
-            if (Input.GetButtonDown("Jump"))
+            if (Input.GetButtonDown("Jump") && !_isCrouching)
             {
                 _verticalVelocity = jumpForce;
             }
@@ -339,33 +363,33 @@ public class PlayerMovementController : NetworkBehaviour
     {
         // Calculate how far down we're looking (0 to 1, where 1 is maximum down)
         float lookDownAmount = Mathf.Clamp01((_cameraPitch) / maxLookAngle);
-        
+
+        // Pick the correct position pair based on crouch state.
+        Transform basePosTransform     = (_isCrouching && camCrouchPos         != null) ? camCrouchPos         : cameraBasePos;
+        Transform lookDownPosTransform = (_isCrouching && camCrouchLookDownPos != null) ? camCrouchLookDownPos : cameraLookDownPos;
+
         Vector3 targetPos;
-        
-        if (cameraLookDownPos != null)
+
+        if (lookDownPosTransform != null)
         {
-            // Lerp between base position and look down position
-            targetPos = Vector3.Lerp(cameraBasePos.localPosition, cameraLookDownPos.localPosition, lookDownAmount);
+            targetPos = Vector3.Lerp(basePosTransform.localPosition, lookDownPosTransform.localPosition, lookDownAmount);
         }
         else
         {
-            // If no look down position is set, just move forward smoothly
-            Vector3 basePos = cameraBasePos.localPosition;
-            Vector3 forwardOffset = Vector3.forward * lookDownAmount * 0.3f; // Adjust 0.3f for amount of forward movement
-            targetPos = basePos + forwardOffset;
+            Vector3 forwardOffset = Vector3.forward * lookDownAmount * 0.3f;
+            targetPos = basePosTransform.localPosition + forwardOffset;
         }
-        
+
         // Apply recoil offset (procedural movement) on top of the lerped position
         targetPos += _recoilRotation;
-        
+
         // Smoothly lerp the camera position
         cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetPos, lookDownLerpSpeed * Time.deltaTime);
 
         // Drive body lean based on how far the camera has moved from its base position.
-        // This makes the character visually bend toward whatever they are looking at.
         if (_playerAnimationController != null && maxCameraOffsetForLean > 0f)
         {
-            float offsetMagnitude = Vector3.Distance(cameraTransform.localPosition, cameraBasePos.localPosition);
+            float offsetMagnitude = Vector3.Distance(cameraTransform.localPosition, basePosTransform.localPosition);
             float leanFactor = Mathf.Clamp01(offsetMagnitude / maxCameraOffsetForLean);
             _playerAnimationController.SetLocalBodyLeanFactor(leanFactor);
         }
@@ -388,9 +412,37 @@ public class PlayerMovementController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Sets the crouch state: resizes the CharacterController capsule and drives the animator bool.
+    /// Camera position is handled each frame by UpdateCameraPositionBasedOnLook(), which switches
+    /// between the standing and crouching position pair automatically.
+    /// </summary>
+    private void SetCrouching(bool crouch)
+    {
+        _isCrouching = crouch;
+
+        // Adjust CharacterController capsule height and center.
+        _characterController.height = crouch ? crouchControllerHeight : _standingControllerHeight;
+        _characterController.center = new Vector3(
+            0f,
+            crouch ? crouchControllerCenterY : _standingControllerCenterY,
+            0f
+        );
+
+        // Drive the animator on both body and arms.
+        _playerAnimationController.SetAnimBool("IsCrouched", crouch);
+
+        // Procedurally tilt the upper body forward so the spine doesn't curve unnaturally.
+        _playerAnimationController.SetCrouchLean(crouch);
+    }
+
     public void Sit(Chair chair)
     {
         if (_isSitting || camSitPos == null) return;
+
+        // Exit crouch cleanly before sitting.
+        if (_isCrouching) SetCrouching(false);
+
         SetMovementLocked(true);
         UIController.Instance.ShowBackButton(StandUp);
         _isSitting = true;
