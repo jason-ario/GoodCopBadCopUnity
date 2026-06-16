@@ -211,10 +211,20 @@ public class PlayerInstance : NetworkBehaviour
     {
         // Drive the spectate camera's transform directly each frame so it precisely matches
         // the spectated player's camera (including DOTween sequences and cinematic moves).
-        if (!_isSpectating || _spectateFollowTarget == null || spectateCamera == null) return;
-        spectateCamera.transform.SetPositionAndRotation(
-            _spectateFollowTarget.position,
-            _spectateFollowTarget.rotation);
+        if (_isSpectating && _spectateFollowTarget != null && spectateCamera != null)
+        {
+            spectateCamera.transform.SetPositionAndRotation(
+                _spectateFollowTarget.position,
+                _spectateFollowTarget.rotation);
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // Debug: K instantly kills the local player for testing death/spectate flow.
+        if (IsLocalPlayer && Input.GetKeyDown(KeyCode.K))
+        {
+            PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth);
+        }
+#endif
     }
 
     public void SetPosition(Transform position)
