@@ -18,6 +18,7 @@ public class RagdollController : MonoBehaviour
     private PlayerHealth _playerHealth;
     private CharacterController _characterController;
     private NetworkTransform _networkTransform;
+    private NetworkAnimator _networkAnimator;
     private PlayerAnimationController _playerAnimationController;
 
     private const int DefaultLayer = 0;
@@ -32,6 +33,7 @@ public class RagdollController : MonoBehaviour
 
         _characterController = GetComponent<CharacterController>();
         _networkTransform = GetComponent<NetworkTransform>();
+        _networkAnimator = GetComponent<NetworkAnimator>();
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         _playerHealth = GetComponent<PlayerHealth>();
         if (_playerHealth != null)
@@ -76,6 +78,11 @@ public class RagdollController : MonoBehaviour
         if (_networkTransform != null)
             _networkTransform.enabled = false;
 
+        // Stop NetworkAnimator from pushing stale animation state to proxy bones
+        // while ragdoll physics is trying to take over.
+        if (_networkAnimator != null)
+            _networkAnimator.enabled = false;
+
         // Stop PlayerAnimationController from writing bone transforms in LateUpdate,
         // which would fight ragdoll physics every frame and cause violent shaking.
         if (_playerAnimationController != null)
@@ -83,13 +90,13 @@ public class RagdollController : MonoBehaviour
 
         SetRagdollActive(true);
 
-        // Zero velocity after going non-kinematic so PhysX doesn't inherit
-        // movement from the CharacterController's positional delta.
+        // Zero inherited velocity from the CharacterController's positional delta,
+        // then explicitly wake each rigidbody so gravity begins immediately on all clients.
         foreach (var rb in ragdollRigidbodies)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            rb.Sleep();
+            rb.WakeUp();
         }
     }
 

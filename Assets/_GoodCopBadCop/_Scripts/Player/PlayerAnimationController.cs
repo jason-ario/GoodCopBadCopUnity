@@ -909,6 +909,11 @@ public class PlayerAnimationController : NetworkBehaviour
                     : ShadowCastingMode.On;
             }
         }
+
+        // Restore the body rig while spectating so IK constraints resolve correctly
+        // from the spectator's first-person perspective. Reset to 0 when done.
+        if (bodyRig != null)
+            bodyRig.weight = active ? 1f : 0f;
     }
 
     public void EnableRightArmMask()    {
