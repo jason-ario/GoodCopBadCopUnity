@@ -18,6 +18,8 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private float animLerpSpeed = 5f;
     [Tooltip("How quickly MoveX/MoveZ blend towards the raw input value. Lower = smoother but laggier feel.")]
     [SerializeField] private float moveAnimSmoothSpeed = 8f;
+    [Tooltip("How long the Jump animator bool stays true after a jump is performed.")]
+    [SerializeField] private float jumpAnimDuration = 0.15f;
 
     
     private float currentMoveX = 0f;
@@ -416,6 +418,32 @@ public class PlayerAnimationController : NetworkBehaviour
         SetAnimBool("Waving", true);
         yield return new WaitForSeconds(1);
         SetAnimBool("Waving", false);
+    }
+
+    /// <summary>
+    /// Sets the Jump animator bool to true for <see cref="jumpAnimDuration"/> seconds, then resets it.
+    /// Networked via <see cref="SetAnimBool"/> so all clients see the jump animation.
+    /// </summary>
+    /// <summary>
+    /// True while the jump animation bool is actively held on. Used by
+    /// <see cref="PlayerMovementController"/> to keep <c>IsGrounded</c> false
+    /// for the duration of the jump anim so the grounded state doesn't flicker
+    /// the moment the player leaves the ground.
+    /// </summary>
+    public bool IsJumpAnimPlaying { get; private set; }
+
+    public void TriggerJumpAnim()
+    {
+        StartCoroutine(JumpAnimCoroutine());
+    }
+
+    private IEnumerator JumpAnimCoroutine()
+    {
+        IsJumpAnimPlaying = true;
+        SetAnimBool("Jump", true);
+        yield return new WaitForSeconds(jumpAnimDuration);
+        SetAnimBool("Jump", false);
+        IsJumpAnimPlaying = false;
     }
 
     public override void OnNetworkSpawn()

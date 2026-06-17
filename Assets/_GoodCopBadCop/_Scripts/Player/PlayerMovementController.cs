@@ -46,6 +46,12 @@ public class PlayerMovementController : NetworkBehaviour
     [Header("Jump Settings")]
     [SerializeField] private float jumpForce = 7f;
 
+    [Header("Ground Check")]
+    [Tooltip("Extra distance below the capsule base to scan for ground. Lower = stricter.")]
+    [SerializeField] private float groundCheckDistance = 0.08f;
+    [Tooltip("Layers treated as ground. Exclude the Player layer to avoid self-detection.")]
+    [SerializeField] private LayerMask groundMask = ~0;
+
     [Header("Crouch Settings")]
     [SerializeField] private Transform camCrouchPos;
     [SerializeField] private Transform camCrouchLookDownPos;
@@ -220,13 +226,14 @@ public class PlayerMovementController : NetworkBehaviour
         inputDir = transform.TransformDirection(inputDir);
 
         // Apply gravity
-        if (_characterController.isGrounded)
+        if (CheckGrounded())
         {
             _verticalVelocity = -2f; // Small constant to keep grounded
 
             if (Input.GetButtonDown("Jump") && !_isCrouching)
             {
                 _verticalVelocity = jumpForce;
+                _playerAnimationController.TriggerJumpAnim();
             }
         }
         else
@@ -234,12 +241,40 @@ public class PlayerMovementController : NetworkBehaviour
             _verticalVelocity += gravity * Time.deltaTime;
         }
 
-        IsGrounded = _characterController.isGrounded;
+        // Keep IsGrounded false for the entire jump animation window so systems
+        // that read this property (e.g. the animation controller) don't see a
+        // grounded flicker the instant the player's feet leave the ground.
+        bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
+        IsGrounded = CheckGrounded() && !jumpAnimActive;
 
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 
         // Apply movement
         _characterController.Move(moveVector * Time.deltaTime);
+    }
+
+    /// <summary>
+    /// Casts a sphere downward from the bottom of the CharacterController capsule.
+    /// More accurate than <c>CharacterController.isGrounded</c>, which uses skin width
+    /// and can register contact before the visual mesh reaches the ground.
+    /// </summary>
+    private bool CheckGrounded()
+    {
+        // Centre of the bottom hemisphere of the capsule
+        Vector3 bottomSphereCentre = transform.position
+            + _characterController.center
+            + Vector3.down * (_characterController.height * 0.5f - _characterController.radius);
+
+        // Slightly smaller radius avoids false positives against steep walls
+        return Physics.SphereCast(
+            bottomSphereCentre,
+            _characterController.radius * 0.9f,
+            Vector3.down,
+            out _,
+            groundCheckDistance,
+            groundMask,
+            QueryTriggerInteraction.Ignore
+        );
     }
 
     void Rotate()
