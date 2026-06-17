@@ -45,6 +45,7 @@ public class PlayerAnimationController : NetworkBehaviour
     private float currentLayer4Weight = 0f;
 
     [Header("Body Arm Rigs")]
+    [SerializeField] private Rig bodyRig;
     [SerializeField] private Rig rightArmRig;
     [SerializeField] private Rig leftArmRig;
     [SerializeField] private Rig shoulderRig;
@@ -454,6 +455,11 @@ public class PlayerAnimationController : NetworkBehaviour
             {
                 armsOnBody.layer = LayerMask.NameToLayer("Default");
             }
+
+            // Body rig IK is only meaningful on the local player. Disable it on all
+            // other players so their body constraints don't fight the animator.
+            if (bodyRig != null)
+                bodyRig.weight = 0f;
         }
         else
         {
