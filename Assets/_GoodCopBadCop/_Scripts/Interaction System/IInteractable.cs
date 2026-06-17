@@ -36,6 +36,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         OnInteract?.Invoke();
     }
 
+    /// <summary>
+    /// Called when the player presses E while this interactable is targeted.
+    /// Distinct from <see cref="Interact"/> which is triggered by LMB (when empty-handed).
+    /// Defaults to calling <see cref="Interact"/> so existing subclasses require no changes.
+    /// Override in subclasses that need separate E vs LMB behaviour
+    /// (e.g. <see cref="ContainerPickableObject"/> picks up on LMB and extracts on E).
+    /// </summary>
+    public virtual void InteractAlternate(PlayerInteractionController player)
+    {
+        Interact(player);
+    }
+
     protected virtual void Awake()
     {
         highlightEffect = GetComponent<HighlightEffect>();

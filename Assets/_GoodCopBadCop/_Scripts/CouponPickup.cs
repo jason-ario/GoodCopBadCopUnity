@@ -8,7 +8,6 @@ using UnityEngine;
 public class CouponPickup : Interactable
 {
     private const string DefaultInteractText = "Coupon";
-    private const string PickupPopupMessage = "Coupon Found";
 
     [Header("Coupon Settings")]
     [Tooltip("Amount of coupon currency awarded to the shared pool on pickup.")]
@@ -64,13 +63,11 @@ public class CouponPickup : Interactable
     // ── Clients ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Displays the cash pop-up notification and plays the pickup sound on every client.
+    /// Plays the pickup sound on every client.
     /// </summary>
     [ClientRpc]
     private void ShowPickupPopupClientRpc(int amount)
     {
-        UIController.Instance?.ShowCashPopUpNotification(amount, PickupPopupMessage);
-
         if (_pickupSound != null && SFXController.Instance != null)
             SFXController.Instance.PlayAtPosition(_pickupSound, transform.position);
     }

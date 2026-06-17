@@ -761,8 +761,8 @@ public class SuspectController : NetworkBehaviour
 
 
     /// <summary>
-    /// Calculates payout values based on percentage accuracy and anomaly count, credits the shared
-    /// cash pool on the server, and broadcasts popup notifications to every connected client.
+    /// Calculates payout values based on percentage accuracy and anomaly count, spawns the
+    /// rounded-up coupon total at the ATM, and broadcasts popup notifications to every connected client.
     /// Must only be called on the server.
     /// </summary>
     private void PayOutResults()
@@ -795,13 +795,16 @@ public class SuspectController : NetworkBehaviour
             ? couponPerfectAnomaliesBonus
             : 0;
 
-        int totalCoupons = anomalyPayout + perfectBonusAmount;
+        int totalCoupons = Mathf.Max(0, anomalyPayout + perfectBonusAmount);
 
-        // Credit the shared pool — server-authoritative write.
-        GlobalHostVariables.Instance.AddMoney(totalCoupons);
+        // Spawn physical coupon pickups at the ATM instead of crediting the pool directly.
+        if (ATM.Instance != null)
+            ATM.Instance.SpawnCoupons(totalCoupons);
+        else
+            Debug.LogError("[SuspectController] ATM.Instance is null — verdict payout coupons not dispensed.");
 
         Debug.Log(
-            $"Payout — Accuracy: {accuracyPercent}%, Base%: +{percentageReward}, Anomaly Booster: +{anomalyBooster}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total: {totalCoupons}");
+            $"Payout — Accuracy: {accuracyPercent}%, Base%: +{percentageReward}, Anomaly Booster: +{anomalyBooster}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total (spawned at ATM): {totalCoupons}");
 
         // Broadcast popup sequence to all clients.
         ShowCashPopUpSequenceClientRpc(

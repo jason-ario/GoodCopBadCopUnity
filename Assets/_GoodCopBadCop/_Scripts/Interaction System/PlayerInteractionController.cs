@@ -111,20 +111,21 @@ public class PlayerInteractionController : NetworkBehaviour
 
 
         // Left click behaviour depends on whether the player is holding an item:
-        // - Empty hands: acts identically to E (pick up or world interact)
+        // - Empty hands: standard world interact (pick up or interact)
         // - Holding item: uses the held item (item-on-item or TryUseObject), never triggers world interact
         if (Input.GetMouseButtonDown(0))
         {
             if (_playerPickupController.HeldObject == null)
-                TryWorldInteract();
+                TryWorldInteract(alternate: false);
             else
                 TryItemUse();
         }
 
-        // E key: always interacts with whatever is targeted (world objects and pickups alike)
+        // E key: always fires the alternate interaction (e.g. extract from a container),
+        // falling back to standard interact for objects that don't override InteractAlternate.
         if (Input.GetKeyDown(KeyCode.E))
         {
-            TryWorldInteract();
+            TryWorldInteract(alternate: true);
         }
     }
     
@@ -432,8 +433,11 @@ public class PlayerInteractionController : NetworkBehaviour
     /// <summary>
     /// Handles E key (and Left Click when empty-handed): interacts with any interactable
     /// in range — pickups, world objects, slots, etc.
+    /// When <paramref name="alternate"/> is true (E key), calls
+    /// <see cref="Interactable.InteractAlternate"/>; otherwise calls
+    /// <see cref="Interactable.Interact"/> (LMB).
     /// </summary>
-    void TryWorldInteract()
+    void TryWorldInteract(bool alternate = false)
     {
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
@@ -449,7 +453,11 @@ public class PlayerInteractionController : NetworkBehaviour
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
         if (interactable == null || !interactable.enabled) return;
 
-        interactable.Interact(this);
+        if (alternate)
+            interactable.InteractAlternate(this);
+        else
+            interactable.Interact(this);
+
         reticle.SetInteractState(false);
         reticle.SetTooFarState(false);
     }
