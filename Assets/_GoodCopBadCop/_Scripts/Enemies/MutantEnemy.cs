@@ -740,6 +740,27 @@ public class MutantEnemy : NetworkBehaviour
         }
     }
 
+    // ── Immobilization ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Stops this enemy's NavMeshAgent for <paramref name="duration"/> seconds, then resumes
+    /// movement. Server-only; has no effect if the enemy is already dead.
+    /// </summary>
+    /// <param name="duration">Seconds to keep the agent stopped.</param>
+    public void Immobilize(float duration)
+    {
+        if (!IsServer || _isDead) return;
+        StartCoroutine(ImmobilizeCoroutine(duration));
+    }
+
+    private IEnumerator ImmobilizeCoroutine(float duration)
+    {
+        _agent.isStopped = true;
+        yield return new WaitForSeconds(duration);
+        if (!_isDead)
+            _agent.isStopped = false;
+    }
+
     // ── Damage / Death ─────────────────────────────────────────────────────────
 
     /// <summary>
