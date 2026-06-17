@@ -23,6 +23,13 @@ public class PlayerInteractionController : NetworkBehaviour
     Interactable lastInteractable;
     private PlayerPickupController _playerPickupController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
+
+    /// <summary>
+    /// Maximum surface slope angle (in degrees from vertical-up) that allows free placement.
+    /// Surfaces steeper than this will show the ghost red and block the drop.
+    /// Hanging placement boards are exempt from this check.
+    /// </summary>
+    private const float MaxPlacementSlopeAngle = 30f;
     private bool _placerBlocked;
     private bool _canInteract = true;
     public bool CanInteract => _canInteract;
@@ -340,6 +347,16 @@ public class PlayerInteractionController : NetworkBehaviour
             if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
             lastInteractable = null;
             return;
+        }
+
+        // Slope check — hanging boards are exempt (they're intentionally vertical/angled).
+        // For all other surfaces, block placement when the surface is steeper than MaxPlacementSlopeAngle.
+        bool isHangingBoard = placementBoard != null && placementBoard.IsHanging;
+        if (!isHangingBoard)
+        {
+            float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+            if (slopeAngle > MaxPlacementSlopeAngle)
+                inRange = false;
         }
 
         // Determine placement rotation: board rotation when available, otherwise align to surface normal
