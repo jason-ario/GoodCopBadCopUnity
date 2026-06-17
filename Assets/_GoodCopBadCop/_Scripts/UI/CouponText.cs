@@ -9,10 +9,10 @@ using UnityEngine;
 /// </summary>
 public class CouponText : MonoBehaviour
 {
-    [SerializeField] private TextMeshProUGUI _label;
+    [SerializeField] private TextMeshPro _label;
 
     /// <summary>Assigns the TMP label at runtime instead of through the Inspector.</summary>
-    public void SetLabel(TextMeshProUGUI label)
+    public void SetLabel(TextMeshPro label)
     {
         _label = label;
 

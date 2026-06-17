@@ -16,6 +16,8 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private GameObject armsOnBody;
     
     [SerializeField] private float animLerpSpeed = 5f;
+    [Tooltip("How quickly MoveX/MoveZ blend towards the raw input value. Lower = smoother but laggier feel.")]
+    [SerializeField] private float moveAnimSmoothSpeed = 8f;
 
     
     private float currentMoveX = 0f;
@@ -558,8 +560,8 @@ public class PlayerAnimationController : NetworkBehaviour
         netPitch.Value = _playerMovementController.CameraPitch;
 
         // Smoothly lerp between current and target values
-        currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * animLerpSpeed);
-        currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * animLerpSpeed);
+        currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * moveAnimSmoothSpeed);
+        currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * moveAnimSmoothSpeed);
 
         bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 
