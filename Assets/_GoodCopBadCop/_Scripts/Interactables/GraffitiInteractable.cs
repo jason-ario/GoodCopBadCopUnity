@@ -130,27 +130,26 @@ public class GraffitiInteractable : NetworkBehaviour
 
     // ── Visual ─────────────────────────────────────────────────────────────────
 
+    private const string ScrubProgressProperty = "_ScrubProgress";
+
     private void OnScrubProgressChanged(float previous, float current)
     {
         ApplyScrubVisual(current);
     }
 
     /// <summary>
-    /// Sets the graffiti renderer's material alpha to <c>1 - progress</c>.
-    /// The material must be set to Transparent surface type in URP for alpha to take effect.
+    /// Pushes the current scrub progress into the renderer's <see cref="MaterialPropertyBlock"/>.
+    /// The graffiti material must use the <c>GoodCopBadCop/GraffitiScrub</c> shader,
+    /// which dissolves the texture in organic chunks as <c>_ScrubProgress</c> rises from 0 to 1.
     /// </summary>
     private void ApplyScrubVisual(float progress)
     {
         if (_graffitiRenderer == null) return;
 
-        // Use a MaterialPropertyBlock to avoid creating a new material instance per change.
+        // MaterialPropertyBlock avoids creating a new material instance per renderer.
         MaterialPropertyBlock block = new MaterialPropertyBlock();
         _graffitiRenderer.GetPropertyBlock(block);
-        Color c = _graffitiRenderer.sharedMaterial != null
-            ? _graffitiRenderer.sharedMaterial.color
-            : Color.white;
-        c.a = 1f - progress;
-        block.SetColor("_BaseColor", c);
+        block.SetFloat(ScrubProgressProperty, progress);
         _graffitiRenderer.SetPropertyBlock(block);
     }
 
