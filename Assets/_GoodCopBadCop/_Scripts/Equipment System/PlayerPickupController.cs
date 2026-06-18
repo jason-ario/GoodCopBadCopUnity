@@ -214,7 +214,7 @@ public class PlayerPickupController : NetworkBehaviour
                     return;
                 }
 
-                if (HeldObject.ItemData.canUsePlacementBoard == false)
+                if (HeldObject.ItemData.cantUsePlacementBoard == true)
                 {
                     Debug.Log("Can't use placement board");
                     return;

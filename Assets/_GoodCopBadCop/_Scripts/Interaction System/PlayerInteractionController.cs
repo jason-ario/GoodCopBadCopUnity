@@ -333,7 +333,7 @@ public class PlayerInteractionController : NetworkBehaviour
         if (!_playerPickupController.IsHoldingObject) return;
 
         // Per-item opt-out
-        if (_playerPickupController.HeldObject.ItemData.canUsePlacementBoard == false)
+        if (_playerPickupController.HeldObject.ItemData.cantUsePlacementBoard == true)
         {
             reticle.SetInteractState(false);
             if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();

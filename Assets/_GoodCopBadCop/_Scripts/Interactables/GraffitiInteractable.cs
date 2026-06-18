@@ -3,119 +3,171 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// A piece of graffiti on a checkpoint wall that can be scrubbed off with a <see cref="Mop"/>.
+/// A piece of graffiti on a checkpoint wall that is gradually scrubbed off by a <see cref="Mop"/>.
 ///
-/// Spawned at runtime by <see cref="CleanGraffitiTask"/>. When the player left-clicks this
-/// object while holding a Mop the scrub sequence starts: a particle effect plays on every
-/// client, and after <see cref="_scrubDuration"/> seconds the server despawns the object and
-/// notifies <see cref="CleanGraffitiTask.OnGraffitiScrubbed"/>.
+/// Scrubbing begins when a <see cref="Mop"/> detects this collider via its overlap sphere while
+/// the owner holds LMB. Progress is accumulated server-side and replicated via
+/// <see cref="_scrubProgress"/>, which all clients use to fade the graffiti renderer.
+/// When progress reaches 1 the server notifies <see cref="GraffitiThreat"/> and despawns.
+///
+/// Multiple players can scrub simultaneously — each active mop increases the scrub rate.
+/// Progress persists if scrubbing is interrupted and resumes from where it left off.
 ///
 /// Prefab requirements:
 ///   - NetworkObject
-///   - HighlightEffect  (required by Interactable base)
-///   - Collider on the Interactable layer
-///   - Mop PickableItemData assigned to <c>itemsThatCanInteractWith</c> in the Inspector
-///   - Visual child (MeshRenderer / SpriteRenderer) representing the graffiti art
+///   - Collider (any layer detectable by the Mop's <c>_graffitiLayerMask</c>)
+///   - <see cref="_graffitiRenderer"/>: Renderer using a URP material with Transparent surface type
 ///   - Optional: ParticleSystem child assigned to <see cref="_scrubParticles"/>
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class GraffitiInteractable : Interactable
+public class GraffitiInteractable : NetworkBehaviour
 {
-    private const string InteractText = "Scrub Graffiti";
-
     [Header("Scrub Settings")]
-    [Tooltip("Seconds the scrubbing effect plays before the graffiti is despawned.")]
-    [SerializeField] private float _scrubDuration = 0.8f;
+    [Tooltip("Seconds required to fully scrub this graffiti when a single mop is active.")]
+    [SerializeField] private float _scrubDuration = 3f;
+
+    [Header("Visual")]
+    [Tooltip("Renderer whose material alpha is faded as scrub progress increases. " +
+             "Assign a material using a URP Lit or Unlit shader with Transparent surface type.")]
+    [SerializeField] private Renderer _graffitiRenderer;
 
     [Header("VFX")]
-    [Tooltip("Optional particle system played on all clients when scrubbing starts.")]
+    [Tooltip("Optional particle system played while scrubbing is active.")]
     [SerializeField] private ParticleSystem _scrubParticles;
 
     [Header("Audio")]
     [SerializeField] private AudioClip _scrubSound;
     [SerializeField] [Range(0f, 1f)] private float _scrubSoundVolume = 1f;
 
-    // Local guard: prevents a second click reaching the server before the first resolves.
-    private bool _beingScrubbed;
-
-    // ── Lifecycle ────────────────────────────────────────────────────────────
-
-    protected override void Awake()
-    {
-        base.Awake();
-        interactText = InteractText;
-    }
-
-    // ── Interact ─────────────────────────────────────────────────────────────
+    // ── Networked state ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Called by <see cref="PlayerInteractionController"/> when the player left-clicks this
-    /// graffiti while holding a Mop. The Mop <see cref="PickableItemData"/> must be listed
-    /// in <c>itemsThatCanInteractWith</c> on the prefab.
+    /// Scrub progress in [0, 1]. Written by the server; all clients drive the renderer fade from it.
     /// </summary>
-    public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
+    private NetworkVariable<float> _scrubProgress = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    // ── Server-only state ──────────────────────────────────────────────────────
+
+    private int _activeScrubbers;
+    private Coroutine _progressCoroutine;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    private void Awake()
     {
-        if (_beingScrubbed) return;
-        if (GraffitiThreat.Instance == null) return;
-        if (item is not Mop) return;
-
-        base.InteractWithItem(player, item);
-
-        _beingScrubbed = true;
-
-        // Immediate local feedback on the clicking client — reduces perceived latency.
-        PlayScrubEffectLocally();
-
-        ScrubServerRpc();
+        if (_graffitiRenderer == null)
+            Debug.LogWarning($"[GraffitiInteractable] No renderer assigned on '{name}'. Visual fade will not work.", this);
     }
 
-    // ── Scrub sequence (server) ───────────────────────────────────────────────
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _scrubProgress.OnValueChanged += OnScrubProgressChanged;
+        // Apply initial visual in case of a late-joining client.
+        ApplyScrubVisual(_scrubProgress.Value);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _scrubProgress.OnValueChanged -= OnScrubProgressChanged;
+    }
+
+    // ── Scrub control (called from Mop) ───────────────────────────────────────
 
     /// <summary>
-    /// Server-authoritative entry point. Broadcasts the scrub effect to all other clients,
-    /// waits for the effect to play out, then notifies the task and despawns this object.
+    /// Registers one more active mop. Starts the server-side progress coroutine if not already
+    /// running and broadcasts the scrub effect to all clients.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void ScrubServerRpc()
+    public void StartScrubServerRpc()
     {
-        StartCoroutine(ScrubSequence());
+        _activeScrubbers++;
+
+        if (_progressCoroutine == null)
+        {
+            PlayScrubEffectClientRpc(transform.position);
+            _progressCoroutine = StartCoroutine(ProgressRoutine());
+        }
     }
 
-    private IEnumerator ScrubSequence()
+    /// <summary>
+    /// Deregisters one active mop. Stops the progress coroutine when no mops remain active.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void StopScrubServerRpc()
     {
-        // Broadcast effect to all clients (originating client already started locally).
-        PlayScrubEffectClientRpc(transform.position);
+        _activeScrubbers = Mathf.Max(0, _activeScrubbers - 1);
 
-        yield return new WaitForSeconds(_scrubDuration);
+        if (_activeScrubbers == 0 && _progressCoroutine != null)
+        {
+            StopCoroutine(_progressCoroutine);
+            _progressCoroutine = null;
+            StopScrubEffectClientRpc();
+        }
+    }
 
-        // Notify threat before despawn — once the object is destroyed the coroutine stops.
+    // ── Progress coroutine (server only) ──────────────────────────────────────
+
+    private IEnumerator ProgressRoutine()
+    {
+        while (_scrubProgress.Value < 1f)
+        {
+            // Progress rate scales with the number of active mops.
+            float rate = _activeScrubbers / _scrubDuration;
+            _scrubProgress.Value = Mathf.Clamp01(_scrubProgress.Value + rate * Time.deltaTime);
+            yield return null;
+        }
+
+        _progressCoroutine = null;
         GraffitiThreat.Instance?.OnGraffitiScrubbed();
-
         NetworkObject.Despawn(destroy: true);
     }
 
-    // ── Effect helpers ────────────────────────────────────────────────────────
+    // ── Visual ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Plays the scrub visual and audio on all clients except the one that initiated the scrub,
-    /// which already called <see cref="PlayScrubEffectLocally"/> in <see cref="InteractWithItem"/>.
-    /// </summary>
-    [ClientRpc]
-    private void PlayScrubEffectClientRpc(Vector3 position)
+    private void OnScrubProgressChanged(float previous, float current)
     {
-        // The originating client already played the effect locally — skip to avoid doubling.
-        if (_beingScrubbed) return;
-
-        _beingScrubbed = true;
-        PlayScrubEffectLocally();
+        ApplyScrubVisual(current);
     }
 
-    private void PlayScrubEffectLocally()
+    /// <summary>
+    /// Sets the graffiti renderer's material alpha to <c>1 - progress</c>.
+    /// The material must be set to Transparent surface type in URP for alpha to take effect.
+    /// </summary>
+    private void ApplyScrubVisual(float progress)
+    {
+        if (_graffitiRenderer == null) return;
+
+        // Use a MaterialPropertyBlock to avoid creating a new material instance per change.
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        _graffitiRenderer.GetPropertyBlock(block);
+        Color c = _graffitiRenderer.sharedMaterial != null
+            ? _graffitiRenderer.sharedMaterial.color
+            : Color.white;
+        c.a = 1f - progress;
+        block.SetColor("_BaseColor", c);
+        _graffitiRenderer.SetPropertyBlock(block);
+    }
+
+    // ── Effects ────────────────────────────────────────────────────────────────
+
+    [ClientRpc]
+    private void PlayScrubEffectClientRpc(Vector3 position)
     {
         _scrubParticles?.Play();
 
         if (SFXController.Instance != null && _scrubSound != null)
-            SFXController.Instance.PlayAtPosition(_scrubSound, transform.position, _scrubSoundVolume);
+            SFXController.Instance.PlayAtPosition(_scrubSound, position, _scrubSoundVolume);
+    }
+
+    [ClientRpc]
+    private void StopScrubEffectClientRpc()
+    {
+        _scrubParticles?.Stop();
     }
 }
