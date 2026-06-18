@@ -158,6 +158,12 @@ public class DebugConsole : MonoBehaviour
             KillLocalPlayer();
         }
 
+        // H — deal a small hit to the local player to test the hit animation.
+        if (Input.GetKeyDown(KeyCode.H))
+        {
+            HitLocalPlayer();
+        }
+
         // O — force-spawn a guaranteed aggroed mutant from the debug spawner.
         if (Input.GetKeyDown(KeyCode.O))
         {
@@ -288,6 +294,26 @@ public class DebugConsole : MonoBehaviour
         }
 
         _debugTask.Complete();
+    }
+
+    /// <summary>Deals a small amount of damage to the local player to test the hit animation.</summary>
+    private void HitLocalPlayer()
+    {
+        if (PlayerInstance.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] PlayerInstance.Instance not found.");
+            return;
+        }
+
+        if (PlayerInstance.Instance.PlayerHealth == null)
+        {
+            Debug.LogWarning("[DebugConsole] Local player does not have a PlayerHealth component.");
+            return;
+        }
+
+        const float DebugHitDamage = 10f;
+        PlayerInstance.Instance.PlayerHealth.TakeDamage(DebugHitDamage);
+        Debug.Log($"[DebugConsole] Local player hit for {DebugHitDamage} damage (H).");
     }
 
     /// <summary>Kills the local player for testing death and spectating.</summary>
