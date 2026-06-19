@@ -45,23 +45,9 @@ public class AnomalyController : MonoBehaviour
         DisabledAnomalySiblingIndices.Clear();
         var anomalies = new List<Anomaly>();
 
-        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
-        {
-            Debug.Log("Mutations are enabled");
-            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        }
-
-        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
-        {
-            Debug.Log("Biological is enabled");
-            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
-        }
-
-        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
-        {
-            Debug.Log("Documentation is enabled");
-            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        }
+        anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+        anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
 
         _allPossibleAnomalies = anomalies.ToArray();
         Debug.Log("Activated anomalies");
@@ -70,8 +56,8 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// Bypasses the clean-chance roll and forces exactly <paramref name="count"/> anomalies
-    /// to be chosen from the currently unlocked pool. Use for tutorial suspects that must
-    /// always have a specific number of anomalies.
+    /// to be chosen from the full pool. Use for tutorial suspects that must always have a
+    /// specific number of anomalies.
     /// </summary>
     /// <param name="count">Exact number of anomalies to activate.</param>
     public void InitializeWithExactAnomalyCount(int count)
@@ -79,12 +65,9 @@ public class AnomalyController : MonoBehaviour
         DisabledAnomalySiblingIndices.Clear();
         var anomalies = new List<Anomaly>();
 
-        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
-            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
-            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
-            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+        anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
 
         _allPossibleAnomalies = anomalies.ToArray();
 
@@ -253,10 +236,9 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
-    /// Re-applies InitializeDisabled on every non-active anomaly across all categories,
-    /// including those from locked categories that were excluded during the initial activation
-    /// pass. Call this when the suspect arrives at the booth to guarantee all shader states
-    /// are clean regardless of which anomaly categories were locked at spawn time.
+    /// Re-applies InitializeDisabled on every non-active anomaly across all categories.
+    /// Call this when the suspect arrives at the booth to guarantee all shader states
+    /// are clean.
     /// </summary>
     public void InitializeDisabledOnArrival()
     {

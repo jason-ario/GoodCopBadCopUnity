@@ -20,34 +20,18 @@ public class Anomaly : MonoBehaviour
     public virtual void InitializeDisabled() { }
 }
 
-[System.Serializable]
-public class MutationAnomaly : Anomaly
-{
-    
-}
+// MutationAnomaly, BehaviorAnomaly, DocumentationAnomaly, VitalsAnomaly, and SupernaturalAnomaly
+// are each defined in their own .cs files so Unity's MonoScript.GetClass() resolves correctly
+// for checklist item anomalyTypeReference wiring.
 
-
-[System.Serializable]
-public class BehaviorAnomaly : Anomaly
-{
-    
-}
-
+// Kept here for save-data backward compatibility — do not inherit from these in new anomaly scripts.
 [System.Serializable]
 public class BiologicalAnomaly : Anomaly
 {
-    
-}
-
-[System.Serializable]
-public class DocumentationAnomaly : Anomaly
-{
-    
 }
 
 [System.Serializable]
 public class EnvironmentalAnomaly : Anomaly
 {
-    
 }
 

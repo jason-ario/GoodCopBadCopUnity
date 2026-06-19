@@ -1002,7 +1002,29 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         SetAnimTrigger("OpenDoor");
     }
-    
+
+    /// <summary>
+    /// Plays or clears the bear-trap-stuck state on the local player's animators.
+    /// When <paramref name="stuck"/> is true, movement floats are snapped to zero
+    /// immediately so the locomotion blend tree cuts out without any lerp tail,
+    /// and the "BearTrapStuck" bool is set on all clients via the networked RPC chain.
+    /// Safe to call only on the owning client.
+    /// </summary>
+    public void SetBearTrapStuck(bool stuck)
+    {
+        if (stuck)
+        {
+            currentMoveX = 0f;
+            currentMoveZ = 0f;
+            bodyAnimator.SetFloat("MoveX", 0f);
+            bodyAnimator.SetFloat("MoveZ", 0f);
+            armsAnimator.SetFloat("MoveX", 0f);
+            armsAnimator.SetFloat("MoveZ", 0f);
+        }
+
+        SetAnimBool("BearTrapStuck", stuck);
+    }
+
     public void SetAnimBool(string animString, bool value)
     {
         if (!IsOwner) return;

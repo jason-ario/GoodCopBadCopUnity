@@ -1056,9 +1056,18 @@ public class FolderController : PickableObject
 
             foreach (ChecklistItem item in checklistItems)
             {
-                Debug.Log($"Checking: {item.AnomalyTypeName} vs {anomaly.GetType().Name}, IsChecked: {item.IsChecked}");
-                if (item.AnomalyTypeName == anomaly.GetType().Name && item.IsChecked)
-                    return true;
+                // Walk the anomaly's type hierarchy so that a category-level reference
+                // (e.g. AnomalyTypeName = "MutationAnomaly") matches any subclass
+                // (e.g. BlueVeinsAnomaly : MutationAnomaly).
+                System.Type t = anomaly.GetType();
+                while (t != null)
+                {
+                    Debug.Log($"Checking: {item.AnomalyTypeName} vs {t.Name}, IsChecked: {item.IsChecked}");
+                    if (item.AnomalyTypeName == t.Name && item.IsChecked)
+                        return true;
+                    if (t == typeof(Anomaly)) break;
+                    t = t.BaseType;
+                }
             }
         }
 

@@ -60,8 +60,7 @@ public class ExamNotebook : PickableObject
     public static bool AnyPageFiled;
 
     /// <summary>
-    /// Returns true when every visible (unlocked) checklist item on the current page is checked.
-    /// Items hidden by <see cref="ExamPage.ApplyAnomalyLocks"/> are skipped.
+    /// Returns true when every visible checklist item on the current page is checked.
     /// Use as a <c>WaitUntil</c> condition in tutorial coroutines.
     /// </summary>
     public bool AllVisibleBoxesChecked
@@ -74,7 +73,6 @@ public class ExamNotebook : PickableObject
             foreach (ChecklistItem item in page.ChecklistItems)
             {
                 if (item == null) continue;
-                // Skip items hidden by ApplyAnomalyLocks — their container is inactive.
                 if (!item.gameObject.activeInHierarchy) continue;
                 if (!item.IsChecked) return false;
             }
