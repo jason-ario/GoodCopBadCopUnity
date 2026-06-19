@@ -57,6 +57,12 @@ public class FolderController : PickableObject
     /// </summary>
     [SerializeField] private Transform[] examPageSlots = new Transform[5];
 
+    /// <summary>
+    /// Slots where physical evidence items (FolderProofDocument) are placed.
+    /// Fill these in the folder prefab Inspector — one Transform child per slot.
+    /// </summary>
+    [SerializeField] private Transform[] _evidenceSlots = new Transform[5];
+
     private FolderItem idCard;
     private FolderItem application;
 
@@ -120,6 +126,14 @@ public class FolderController : PickableObject
     /// </summary>
     private readonly List<NetworkObjectReference> _serverDocuments = new List<NetworkObjectReference>();
 
+    /// <summary>
+    /// Server-authoritative list of evidence documents filed in this folder.
+    /// Stores the category alongside each document reference so PayOutResults can
+    /// award bonuses without re-resolving the component at scoring time.
+    /// </summary>
+    private readonly List<(AnomalyCategory category, NetworkObjectReference docRef)> _evidenceDocuments
+        = new List<(AnomalyCategory, NetworkObjectReference)>();
+
     /// <summary>Registers a document with this folder on the server so it can be despawned later.</summary>
     [ServerRpc(RequireOwnership = false)]
     public void RegisterDocumentServerRpc(NetworkObjectReference documentRef)
@@ -170,6 +184,40 @@ public class FolderController : PickableObject
                 NetworkHelper.Despawn(netObj);
         }
         _serverDocuments.Clear();
+        _evidenceDocuments.Clear();
+    }
+
+    /// <summary>
+    /// Server-authoritative registration of a FolderProofDocument placed in this folder.
+    /// Records the document in both the general despawn list and the evidence-scoring list.
+    /// Called from the client that placed the item; always runs on the server.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RegisterEvidenceDocumentServerRpc(NetworkObjectReference docRef, int categoryInt)
+    {
+        if (!_serverDocuments.Contains(docRef))
+            _serverDocuments.Add(docRef);
+
+        AnomalyCategory category = (AnomalyCategory)categoryInt;
+        _evidenceDocuments.Add((category, docRef));
+
+        Debug.Log($"[FolderController] Evidence registered: {category} ({_evidenceDocuments.Count} total).");
+    }
+
+    /// <summary>
+    /// Returns how many evidence documents have been filed for each category.
+    /// Keyed by AnomalyCategory; missing entries mean zero evidence for that category.
+    /// Must only be called on the server (scoring is server-authoritative).
+    /// </summary>
+    public Dictionary<AnomalyCategory, int> GetEvidenceCountByCategory()
+    {
+        var result = new Dictionary<AnomalyCategory, int>();
+        foreach (var (category, _) in _evidenceDocuments)
+        {
+            result.TryGetValue(category, out int current);
+            result[category] = current + 1;
+        }
+        return result;
     }
 
     public override void OnNetworkSpawn()
@@ -295,6 +343,12 @@ public class FolderController : PickableObject
 
         if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" or "Biological Exam Page" )
         {
+            AddDocument(heldItem, playerInteractionController.pickupController, true);
+        }
+        else if (heldItem.GetComponent<FolderProofDocument>() != null)
+        {
+            // Evidence items are detected by component rather than name so any proof document
+            // prefab can be added without updating this whitelist.
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
 
@@ -864,6 +918,14 @@ public class FolderController : PickableObject
             return;
         }
 
+        // --- Evidence documents: any PickableObject with a FolderProofDocument component ---
+        FolderProofDocument proofDoc = pickableObject.GetComponent<FolderProofDocument>();
+        if (proofDoc != null)
+        {
+            AddEvidenceDocument(pickableObject, proofDoc, player);
+            return;
+        }
+
         // --- Exam pages: queue logic ---
         bool isExamPage = itemName is
             "Behavior Exam Page" or "Mutation Exam Page" or "Reality Exam Page" or
@@ -902,6 +964,43 @@ public class FolderController : PickableObject
         }
 
         examPage.AddToFolder(this);
+    }
+
+    /// <summary>
+    /// Places a FolderProofDocument item in the next free evidence slot, snapping it
+    /// visually to the folder and registering it server-side for scoring.
+    /// </summary>
+    private void AddEvidenceDocument(PickableObject pickableObject, FolderProofDocument proofDoc, PlayerPickupController player)
+    {
+        // Find a free evidence slot.
+        int freeSlot = -1;
+        for (int i = 0; i < _evidenceSlots.Length; i++)
+        {
+            if (_evidenceSlots[i] != null && _evidenceSlots[i].childCount == 0)
+            {
+                freeSlot = i;
+                break;
+            }
+        }
+
+        if (freeSlot < 0)
+        {
+            Debug.LogWarning("[FolderController] All evidence slots are full — cannot add more evidence.");
+            return;
+        }
+
+        // Snap the item to its slot (same pattern as ID card / application placement).
+        player.DropObject(_evidenceSlots[freeSlot]);
+
+        // Notify the suspect this evidence has been filed.
+        proofDoc.OnPlacedInFolder(this);
+
+        // Register server-side for scoring and despawn.
+        RegisterEvidenceDocumentServerRpc(
+            new NetworkObjectReference(pickableObject.NetworkObject),
+            (int)proofDoc.Category);
+
+        Debug.Log($"[FolderController] Evidence '{pickableObject.ItemData.name}' ({proofDoc.Category}) filed in slot {freeSlot}.");
     }
 
     /// <summary>
@@ -1042,6 +1141,28 @@ public class FolderController : PickableObject
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Returns the set of category type names (e.g. "MutationAnomaly") for every checked
+    /// checkbox across all exam pages in this folder. Used by the verdict scoring system
+    /// to determine which categories the player identified.
+    /// </summary>
+    public HashSet<string> GetCheckedCategoryNames()
+    {
+        var result = new HashSet<string>();
+
+        foreach (ExamPage examPage in _examPageQueue)
+        {
+            if (examPage == null) continue;
+            foreach (ChecklistItem item in examPage.ChecklistItems)
+            {
+                if (item != null && item.IsChecked && !string.IsNullOrEmpty(item.AnomalyTypeName))
+                    result.Add(item.AnomalyTypeName);
+            }
+        }
+
+        return result;
     }
 
     public bool ExamContainsAnomaly(Anomaly anomaly)

@@ -32,6 +32,12 @@ public class ATM : MonoBehaviour
     [Tooltip("Spatial audio max-distance for the dispense sound.")]
     [SerializeField] private float _dispenseSfxMaxDistance = 10f;
 
+    [Tooltip("Sound played at the spawn position each time a single coupon is ejected.")]
+    [SerializeField] private AudioClip _couponSpawnSfx;
+
+    [Tooltip("Spatial audio max-distance for the per-coupon spawn sound.")]
+    [SerializeField] private float _couponSpawnSfxMaxDistance = 5f;
+
     [Header("Physics")]
     [Tooltip("Minimum angular velocity magnitude applied to each coupon on spawn.")]
     [SerializeField] private float _torqueMin = 1f;
@@ -104,6 +110,20 @@ public class ATM : MonoBehaviour
         );
     }
 
+    /// <summary>
+    /// Plays the per-coupon ejection sound at the given world position.
+    /// </summary>
+    private void PlayCouponSpawnSound(Vector3 position)
+    {
+        if (_couponSpawnSfx == null || SFXController.Instance == null) return;
+
+        SFXController.Instance.PlayAtPosition(
+            _couponSpawnSfx,
+            position,
+            maxDistance: _couponSpawnSfxMaxDistance
+        );
+    }
+
     private IEnumerator SpawnCouponsRoutine(int amount)
     {
         _activeSpawnCount++;
@@ -134,6 +154,8 @@ public class ATM : MonoBehaviour
 
         Quaternion spawnRotation = _couponSpawnPointA.rotation;
         GameObject spawned = Instantiate(_couponPickupPrefab, spawnPosition, spawnRotation);
+
+        PlayCouponSpawnSound(spawnPosition);
 
         bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (networked)

@@ -350,6 +350,14 @@ public class DailySuspectManager : MonoBehaviour
                 continue;
             }
 
+            // Exclude suspects that were killed during this run.
+            SuspectRecord runRecord = SuspectRunRecords.Instance?.GetRecord(suspect);
+            if (runRecord != null && runRecord.isKilled)
+            {
+                Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — killed.");
+                continue;
+            }
+
             availableSuspects.Add(suspect);
         }
 
