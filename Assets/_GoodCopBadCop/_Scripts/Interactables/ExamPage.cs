@@ -13,11 +13,10 @@ public class ExamPage : FolderItem
 
     // ── RenderTexture overlay system ─────────────────────────────────────────
     /// <summary>
-    /// Visual-side checklist items inside Exam Notebook Contents, captured by the
-    /// checklist camera and composited onto the paper via _OverlayMap.
-    /// Must be indexed in the same order as _checklistItems.
+    /// Visual-side checklist items, resolved from _checklistItems at Awake.
+    /// Each ChecklistVisual lives on the same GameObject as its ChecklistItem.
     /// </summary>
-    [SerializeField] private ChecklistVisual[] _visualItems;
+    private ChecklistVisual[] _visualItems;
 
     /// <summary>The orthographic camera inside Exam Notebook Contents that renders to the RT.</summary>
     [SerializeField] private Camera _checklistCamera;
@@ -49,7 +48,28 @@ public class ExamPage : FolderItem
     protected override void Awake()
     {
         base.Awake();
+        CacheVisualItems();
         SetupRenderTexture();
+    }
+
+    /// <summary>
+    /// Resolves each ChecklistVisual from the same GameObject as its ChecklistItem,
+    /// eliminating the need for a separate serialized array.
+    /// </summary>
+    private void CacheVisualItems()
+    {
+        if (_checklistItems == null || _checklistItems.Length == 0)
+        {
+            _visualItems = System.Array.Empty<ChecklistVisual>();
+            return;
+        }
+
+        _visualItems = new ChecklistVisual[_checklistItems.Length];
+        for (int i = 0; i < _checklistItems.Length; i++)
+        {
+            if (_checklistItems[i] != null)
+                _visualItems[i] = _checklistItems[i].GetComponent<ChecklistVisual>();
+        }
     }
 
     /// <summary>

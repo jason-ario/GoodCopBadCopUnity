@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class RandomTentacleAnomaly : MutationAnomaly
+public class RandomTentacleAnomaly : PhysicalAnomaly
 {
     [SerializeField] private GameObject[] tentacles;
     [SerializeField] private Transform[] parentBones;

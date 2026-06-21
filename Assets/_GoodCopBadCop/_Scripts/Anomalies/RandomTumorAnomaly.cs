@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class RandomTumorAnomaly : MutationAnomaly
+public class RandomTumorAnomaly : PhysicalAnomaly
 {
     [SerializeField] private GameObject[] tumors;
     [SerializeField] private Transform[] parentBones;

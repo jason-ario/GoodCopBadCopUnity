@@ -13,7 +13,7 @@ public class AnomalyController : MonoBehaviour
     [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies = new List<DocumentationAnomaly>();
     [SerializeField] private List<VitalsAnomaly> _vitalsAnomalies = new List<VitalsAnomaly>();
     [SerializeField] private List<BehaviorAnomaly> _behaviorAnomalies = new List<BehaviorAnomaly>();
-    [SerializeField] private List<MutationAnomaly> _mutationAnomalies = new List<MutationAnomaly>();
+    [SerializeField] private List<PhysicalAnomaly> _mutationAnomalies = new List<PhysicalAnomaly>();
     [SerializeField] private List<SupernaturalAnomaly> _supernaturalAnomalies = new List<SupernaturalAnomaly>();
 
     // ── Thresholds ────────────────────────────────────────────────────────────

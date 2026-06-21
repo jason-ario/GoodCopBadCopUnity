@@ -17,7 +17,7 @@ using UnityEditor;
 /// keywords are toggled on the shared material and cleaned up on disable.
 /// </summary>
 [ExecuteAlways]
-public class BlueVeinsAnomaly : MutationAnomaly
+public class BlueVeinsAnomaly : PhysicalAnomaly
 {
     private const string BlueVeinsKeyword  = "TCP2_BLUE_VEINS";
     private const int    MaxLights         = 4; // Must match UV_LIGHT_MAX_COUNT in the shader.

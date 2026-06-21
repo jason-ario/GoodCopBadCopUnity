@@ -7,7 +7,7 @@ using UnityEngine;
 /// multiple renderers (e.g. head, body, hands) so lesions can span the full character.
 /// Each renderer gets its own material instance to avoid affecting other characters.
 /// </summary>
-public class LesionAnomaly : MutationAnomaly
+public class LesionAnomaly : PhysicalAnomaly
 {
     private const string LesionKeyword = "TCP2_LESION";
     private static readonly int LesionStrengthId = Shader.PropertyToID("_LesionStrength");
