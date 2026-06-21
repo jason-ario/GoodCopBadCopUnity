@@ -22,7 +22,7 @@ public class ExamPage : FolderItem
     [SerializeField] private Camera _checklistCamera;
 
     /// <summary>The MeshRenderer on Plane.002 whose material exposes _OverlayMap.</summary>
-    [SerializeField] private MeshRenderer _paperRenderer;
+    [SerializeField] private SkinnedMeshRenderer _paperRenderer;
 
     /// <summary>
     /// Project-asset RenderTexture used as a descriptor template. A runtime clone is created
@@ -102,7 +102,7 @@ public class ExamPage : FolderItem
 
         // Create a per-instance material so pages don't share the same texture slot.
         // _OverlayMap_ST (tiling/offset) is intentionally inherited from the shared material.
-        _paperMaterialInstance = new Material(_paperRenderer.sharedMaterials[0]);
+        _paperMaterialInstance = new Material(_paperRenderer.sharedMaterials[1]);
         _paperMaterialInstance.SetTexture(OverlayMapProperty, _renderTexture);
 
         Material[] newSlots = new Material[_paperRenderer.sharedMaterials.Length];
@@ -172,8 +172,15 @@ public class ExamPage : FolderItem
     /// </summary>
     public void InitializeChecklistIndices()
     {
+        if (_checklistItems == null) return;
+
         for (int i = 0; i < _checklistItems.Length; i++)
-            _checklistItems[i].SetIndex(i);
+        {
+            if (_checklistItems[i] != null)
+                _checklistItems[i].SetIndex(i);
+            else
+                Debug.LogWarning($"[ExamPage] InitializeChecklistIndices: _checklistItems[{i}] is null on '{name}'. Check the prefab's serialized array for missing references.");
+        }
     }
 
     /// <summary>Sets which page slot this page occupies, so clicks reference the correct bitmask.</summary>
@@ -188,6 +195,12 @@ public class ExamPage : FolderItem
     {
         for (int i = 0; i < _checklistItems.Length; i++)
         {
+            if (_checklistItems[i] == null)
+            {
+                Debug.LogWarning($"[ExamPage] ApplyBitmask: _checklistItems[{i}] is null on '{name}'. Check the prefab's serialized array for missing references.");
+                continue;
+            }
+
             bool isChecked = (bitmask & (1 << i)) != 0;
             _checklistItems[i].ApplyCheckedState(isChecked);
 

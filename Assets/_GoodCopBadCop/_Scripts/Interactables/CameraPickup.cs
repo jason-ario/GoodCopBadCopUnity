@@ -25,8 +25,11 @@ using UnityEngine;
 ///   • HighlightEffect   (required by <see cref="Interactable"/>)
 ///   • ParentConstraint  (required by <see cref="PickableObject"/>)
 ///   • Collider on the Interactable layer
-///   • Child <see cref="Camera"/> → assign to <see cref="_viewfinderCamera"/>
-///     with a RenderTexture set as its Target Texture. Starts disabled.
+///   • Child <see cref="Camera"/> (Viewfinder Camera) → assign to <see cref="_viewfinderCamera"/>.
+///     No RenderTexture — renders directly to the player's screen. Starts disabled.
+///   • Child <see cref="Camera"/> (Render Camera) → assign to <see cref="_renderCamera"/>.
+///     Must have <c>Photo.renderTexture</c> set as its Target Texture. Stays disabled
+///     until the shutter fires; enabled for exactly one frame to capture the photo.
 ///   • Two child Transforms → <see cref="_photoSpawnPoint"/> (eject origin) and
 ///     <see cref="_photoFinalPoint"/> (resting slot on the camera body).
 ///   • <see cref="_polaroidPrefab"/> → a prefab with NetworkObject + NetworkTransform
@@ -40,8 +43,10 @@ public class CameraPickup : PickableObject
     // ── Inspector ─────────────────────────────────────────────────────────────
 
     [Header("Camera Mode")]
-    [Tooltip("Child Unity Camera used as the viewfinder. Assign a RenderTexture to its Target Texture. Starts disabled.")]
+    [Tooltip("Child Unity Camera used as the viewfinder. Renders directly to the player's screen — no RenderTexture needed. Starts disabled.")]
     [SerializeField] private Camera _viewfinderCamera;
+    [Tooltip("Child Unity Camera used exclusively for photo capture. Must have Photo.renderTexture assigned as its Target Texture. Stays disabled until the shutter fires.")]
+    [SerializeField] private Camera _renderCamera;
 
     [Header("Photo Polaroid")]
     [Tooltip("Prefab for the polaroid photo. Must have NetworkObject + NetworkTransform + PickableObject + ParentConstraint. Registered in NetworkManager prefabs.")]
@@ -98,6 +103,9 @@ public class CameraPickup : PickableObject
 
         if (_viewfinderCamera != null)
             _viewfinderCamera.gameObject.SetActive(false);
+
+        if (_renderCamera != null)
+            _renderCamera.gameObject.SetActive(false);
 
         interactText = InteractTextDefault;
     }
@@ -171,6 +179,12 @@ public class CameraPickup : PickableObject
         if (_viewfinderCamera != null)
             _viewfinderCamera.gameObject.SetActive(true);
 
+        // Keep the render camera running alongside the viewfinder so its RT is continuously
+        // updated. Capturing mid-Update then reads the previous frame's fully-composed result
+        // without needing a coroutine or WaitForEndOfFrame.
+        if (_renderCamera != null)
+            _renderCamera.gameObject.SetActive(true);
+
         playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolBool, true);
 
         _interactionController ??= playerPickupController.GetComponent<PlayerInteractionController>();
@@ -184,6 +198,9 @@ public class CameraPickup : PickableObject
 
         if (_viewfinderCamera != null)
             _viewfinderCamera.gameObject.SetActive(false);
+
+        if (_renderCamera != null)
+            _renderCamera.gameObject.SetActive(false);
 
         if (playerPickupController != null)
             playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolBool, false);
@@ -228,22 +245,20 @@ public class CameraPickup : PickableObject
             return;
         }
 
+        if (_renderCamera == null || _renderCamera.targetTexture == null)
+        {
+            Debug.LogWarning("[CameraPickup] _renderCamera or its Target Texture is not assigned — cannot capture photo.", this);
+            return;
+        }
+
         _isAnimatingPhoto = true;
 
-        // Exit camera mode immediately so the viewfinder closes on the frame the shutter fires.
-        ExitCameraMode();
+        // The render camera has been running alongside the viewfinder since EnterCameraMode,
+        // so its RT holds the previous frame's fully-composed scene — exactly what the player
+        // last saw through the viewfinder. Capture it now, before ExitCameraMode shuts the camera down.
+        CaptureRenderTexture();
 
-        // Snapshot the viewfinder render texture into a local Texture2D.
-        // Only applied on the local client — not synced over the network.
-        if (_viewfinderCamera != null && _viewfinderCamera.targetTexture != null)
-        {
-            RenderTexture rt = _viewfinderCamera.targetTexture;
-            _capturedPhoto = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
-            RenderTexture.active = rt;
-            _capturedPhoto.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-            _capturedPhoto.Apply();
-            RenderTexture.active = null;
-        }
+        ExitCameraMode();
 
         if (_shutterSound != null)
             SFXController.Instance.PlayAtPosition(_shutterSound, transform.position);
@@ -255,6 +270,27 @@ public class CameraPickup : PickableObject
         Quaternion localFinalRot = _photoFinalPoint.localRotation;
 
         SpawnPhotoServerRpc(localSpawnPos, localSpawnRot, localFinalPos, localFinalRot);
+    }
+
+    /// <summary>
+    /// Reads the current contents of <see cref="_renderCamera"/>'s target RenderTexture into
+    /// <see cref="_capturedPhoto"/>.
+    ///
+    /// The Texture2D is created with <c>linear = true</c> because URP writes linear-space
+    /// values into the <c>R8G8B8A8_UNorm</c> render texture (no automatic gamma encoding).
+    /// Marking the Texture2D as linear prevents the material shader from applying a second
+    /// round of sRGB→linear conversion, which would otherwise cause the photo to appear dark.
+    /// </summary>
+    private void CaptureRenderTexture()
+    {
+        RenderTexture rt   = _renderCamera.targetTexture;
+        RenderTexture prev = RenderTexture.active;
+
+        _capturedPhoto = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false, true);
+        RenderTexture.active = rt;
+        _capturedPhoto.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        _capturedPhoto.Apply();
+        RenderTexture.active = prev;
     }
 
     // ── Photo Spawn RPC ───────────────────────────────────────────────────────
