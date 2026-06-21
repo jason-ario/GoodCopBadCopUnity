@@ -24,7 +24,8 @@ public class Polaroid : PickableObject
 {
     private const string UsingToolBool = "UsingTool";
 
-    private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+    private static readonly int BaseMapId     = Shader.PropertyToID("_BaseMap");
+    private static readonly int EmissionMapId = Shader.PropertyToID("_EmissionMap");
 
     [Header("Photo Display")]
     [Tooltip("The child MeshRenderer whose material _BaseMap slot displays the captured photo.")]
@@ -62,7 +63,8 @@ public class Polaroid : PickableObject
         }
 
         EnsureInstanceMaterial();
-        _instanceMaterial.SetTexture(BaseMapId, photo);
+        _instanceMaterial.SetTexture(BaseMapId,     photo);
+        _instanceMaterial.SetTexture(EmissionMapId, photo);
 
         if (takeOwnership)
             _ownedTexture = photo;
