@@ -6,7 +6,7 @@ using UnityEngine;
 /// at random intervals for as long as the anomaly is active.
 /// The Animator Controller is expected to return to its idle state via exit time after each twitch.
 /// </summary>
-public class TwitchingAnomaly : BiologicalAnomaly
+public class TwitchingAnomaly : VitalsAnomaly
 {
     [SerializeField] private SuspectCharacter suspectCharacter;
 

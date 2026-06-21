@@ -7,16 +7,16 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Physical Exam
-  m_Shader: {fileID: 4800000, guid: cee48b891b6c5034291f6435e1bd81f1, type: 3}
+  m_Name: Mutation Exam
+  m_Shader: {fileID: 4800000, guid: e0973393781f3e64982e723704b48e94, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - TCP2_UV_NORMALS_FULL
-  m_InvalidKeywords:
   - TCP2_REFLECTIONS_FRESNEL
   - TCP2_RIM_LIGHTING_LIGHTMASK
   - TCP2_SHADOW_LIGHT_COLOR
+  m_InvalidKeywords:
+  - TCP2_UV_NORMALS_FULL
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -28,6 +28,10 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _BackMap:
+        m_Texture: {fileID: 2800000, guid: 31691687a14fab24da9b18ab91d5eb4e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: 31691687a14fab24da9b18ab91d5eb4e, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -72,6 +76,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _OverlayMap:
+        m_Texture: {fileID: 8400000, guid: 54336e3eca5eac245a8c71db875c3f8d, type: 2}
+        m_Scale: {x: 0.85, y: 1.1}
+        m_Offset: {x: 0.1, y: -0.03}
     - _ParallaxMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -153,6 +161,9 @@ Material:
     - _OutlineTextureLOD: 5
     - _OutlineTextureType: 0
     - _OutlineWidth: 0.5
+    - _OverlayFlipX: 0
+    - _OverlayFlipY: 0
+    - _OverlayOpacity: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _RampBands: 4
@@ -174,6 +185,7 @@ Material:
     - _SketchTexture_OffsetSpeed: 120
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
+    - _SnapResolution: 1024
     - _SpecularHighlights: 1
     - _SpecularMapType: 0
     - _SpecularRoughness: 0.5
@@ -198,16 +210,17 @@ Material:
     - _UseShadowTexture: 0
     - _UseSketch: 0
     - _UseSpecular: 0
-    - _WobbleAmplitude: 0.0001
+    - _WobbleAmplitude: 0.00001
     - _WobbleFrequency: 15
     - _WobbleSpeed: 15
+    - _WobbleStrength: 0.003
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     - __dummy__: 0
     - _faceCulling: 2
     m_Colors:
-    - _BaseColor: {r: 0.53333336, g: 0.40784314, b: 0.4, a: 1}
+    - _BaseColor: {r: 0.735849, g: 0.52807987, b: 0.5150943, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _HColor: {r: 1, g: 1, b: 1, a: 1}

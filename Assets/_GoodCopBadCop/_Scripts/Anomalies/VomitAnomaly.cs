@@ -10,7 +10,7 @@ using UnityEngine;
 /// a coroutine fires all particle systems 1–2 times at random intervals spread
 /// across a 60-second window.
 /// </summary>
-public class VomitAnomaly : BiologicalAnomaly
+public class VomitAnomaly : VitalsAnomaly
 {
     [Tooltip("Vomit prefab child of this GameObject. Must have ParticleSystems across its children.")]
     [SerializeField] private GameObject vomitPrefab;
