@@ -95,17 +95,32 @@ public class SuspectController : NetworkBehaviour
 
     public UnityAction OnTakeFolder;
     int accuracyOfLastSuspectFolder = 0;
-    private int correctlyMarkedAnomalies = 0;
-    private int totalAnomaliesInLastSuspect = 0;
-    private int incorrectlyMarkedAnomalies = 0;
-    
+
+    // Category-level scoring results — populated by CalculateCategoryScores, consumed by PayOutResults.
+    private int _categoriesCorrect = 0;       // player checked the box AND the category has active anomalies
+    private int _categoriesFalsePositive = 0; // player checked the box but NO anomalies in that category
+    private int _categoriesMissed = 0;        // category has active anomalies but player did NOT check it
+    private int _totalActiveCategories = 0;   // categories that have at least one active anomaly
+
+    /// <summary>
+    /// Type-name strings (e.g. "MutationAnomaly") for every category the player correctly identified.
+    /// Populated by CalculateCategoryScores; used by PayOutResults to gate evidence bonuses.
+    /// </summary>
+    private readonly HashSet<string> _correctCategoryTypeNames = new HashSet<string>();
+
     [Header("Coupon Payouts")]
+    [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
-    [SerializeField] int couponPerCorrectAnomaly = 3;
+    [Tooltip("Coupons earned per correctly identified category.")]
+    [SerializeField] int couponPerCorrectAnomaly = 5;
+    [Tooltip("Coupons deducted per active category the player failed to identify.")]
     [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
+    [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
-    /// <summary>Base reward scaled by accuracy percentage. Guarantees a payout at 100% even with 0 anomalies.</summary>
+    /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
     [SerializeField] int couponBaseReward = 5;
+    [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
+    [SerializeField] int couponPerEvidenceItem = 3;
     
     private void Awake()
     {
@@ -213,7 +228,7 @@ public class SuspectController : NetworkBehaviour
         }
         else
         {
-            suspectCharacter.Initialize();
+            suspectCharacter.InitializeByInfectionStage();
         }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
@@ -717,137 +732,159 @@ public class SuspectController : NetworkBehaviour
         }
     }
 
-    public int CalculatePercentAccuracy(FolderController folder, SuspectCharacter suspectCharacter)
+    /// <summary>
+    /// Evaluates which of the five anomaly categories the player correctly identified via the
+    /// exam-page checkboxes and populates the category scoring fields used by PayOutResults.
+    /// Returns an accuracy percentage (0–100) based on correct identifications vs active categories.
+    /// Must only be called on the server.
+    /// </summary>
+    public int CalculateCategoryScores(FolderController folder, SuspectCharacter suspectCharacter)
     {
-        // Get actual anomalies and marked anomalies
-        List<Anomaly> actualAnomalies = suspectCharacter.AnomalyController.activeAnomalies;
-        Anomaly[] markedAnomalies = folder.GetAnomaliesInFolder();
-        totalAnomaliesInLastSuspect = actualAnomalies.Count;
-        // Count correctly identified anomalies
-        correctlyMarkedAnomalies = 0;
-        foreach (var anomaly in actualAnomalies)
+        _categoriesCorrect = 0;
+        _categoriesFalsePositive = 0;
+        _categoriesMissed = 0;
+        _totalActiveCategories = 0;
+        _correctCategoryTypeNames.Clear();
+
+        if (suspectCharacter == null)
+            return 100;
+
+        AnomalyController ac = suspectCharacter.AnomalyController;
+        HashSet<string> checkedCategories = folder.GetCheckedCategoryNames();
+
+        // The five category base-class names that map directly to the five checklist checkboxes.
+        string[] knownCategories =
         {
-            if (folder.ExamContainsAnomaly(anomaly))
+            "DocumentationAnomaly",
+            "VitalsAnomaly",
+            "BehaviorAnomaly",
+            "MutationAnomaly",
+            "SupernaturalAnomaly"
+        };
+
+        foreach (string category in knownCategories)
+        {
+            bool hasAnomaly = ac.HasActiveAnomalyOfCategory(category);
+            bool wasChecked = checkedCategories.Contains(category);
+
+            if (hasAnomaly) _totalActiveCategories++;
+
+            if (wasChecked && hasAnomaly)
             {
-                correctlyMarkedAnomalies += 1;
+                _categoriesCorrect++;
+                _correctCategoryTypeNames.Add(category);
             }
+            else if (wasChecked && !hasAnomaly)  _categoriesFalsePositive++;
+            else if (!wasChecked && hasAnomaly)  _categoriesMissed++;
         }
-        
-        // Count incorrectly marked anomalies (false positives)
-        incorrectlyMarkedAnomalies = 0;
-        foreach (var anomaly in markedAnomalies)
-        {
-            if (!actualAnomalies.Contains(anomaly))
-            {
-                incorrectlyMarkedAnomalies += 1;
-            }
-        }
-        
-        // Calculate total possible anomalies to check
-        int totalPossibleAnomalies = actualAnomalies.Count + incorrectlyMarkedAnomalies;
-        
-        // Avoid division by zero
-        if (totalPossibleAnomalies == 0)
-        {
-            return 100; // Perfect score if no anomalies exist
-        }
-        
-        // Accuracy = (Correct - Incorrect) / Total
-        // This penalizes false positives while rewarding correct identifications
-        int accuracy = Mathf.Max(0, ((correctlyMarkedAnomalies - incorrectlyMarkedAnomalies) * 100) / totalPossibleAnomalies);
-        
-        return accuracy;
+
+        // Accuracy = fraction of active categories correctly identified.
+        // A clean suspect (no active categories) is 100% only if the player made no false claims.
+        if (_totalActiveCategories == 0)
+            return _categoriesFalsePositive == 0 ? 100 : 0;
+
+        return Mathf.Max(0, (_categoriesCorrect * 100) / _totalActiveCategories);
     }
+
+    // Keep for backward compat with any external callers; routes to the new implementation.
+    public int CalculatePercentAccuracy(FolderController folder, SuspectCharacter suspectCharacter)
+        => CalculateCategoryScores(folder, suspectCharacter);
 
 
     /// <summary>
-    /// Calculates payout values based on percentage accuracy and anomaly count, spawns the
-    /// rounded-up coupon total at the ATM, and broadcasts popup notifications to every connected client.
-    /// Must only be called on the server.
+    /// Calculates coupons from the category scoring fields, spawns them at the ATM,
+    /// and broadcasts popup notifications to every connected client.
+    /// Must only be called on the server after CalculateCategoryScores has run.
+    /// totalBonusAmount consolidates the perfect-identification bonus and the evidence bonus.
     /// </summary>
     private void PayOutResults()
     {
         if (!IsServer) return;
 
-        // Accuracy: 0/0 is treated as 100%. False positives widen the denominator, reducing the score.
-        int totalPossible = totalAnomaliesInLastSuspect + incorrectlyMarkedAnomalies;
-        int accuracyPercent = totalPossible > 0
-            ? Mathf.Max(0, (correctlyMarkedAnomalies * 100) / totalPossible)
-            : 100;
+        // Reward for each correctly identified category.
+        int categoryReward = _categoriesCorrect * couponPerCorrectAnomaly;
 
-        // Base reward scaled linearly by accuracy — ensures a positive payout at 100% even when
-        // there are 0 anomalies (e.g. clean suspect correctly passed through).
-        int percentageReward = Mathf.RoundToInt(accuracyPercent / 100f * couponBaseReward);
+        // Penalties for missed and falsely claimed categories.
+        int missedPenalty = _categoriesMissed * couponPenaltyPerMissedAnomaly;
+        int falsePenalty = _categoriesFalsePositive * couponPenaltyPerFalsePositiveAnomaly;
 
-        // Anomaly booster — each correctly identified anomaly contributes extra coupons,
-        // so suspects with many anomalies yield a higher potential reward ceiling.
-        int anomalyBooster = correctlyMarkedAnomalies * couponPerCorrectAnomaly;
-
-        // Penalties for missed anomalies and false positives.
-        int missedAnomalyPenalty = (totalAnomaliesInLastSuspect - correctlyMarkedAnomalies) * couponPenaltyPerMissedAnomaly;
-        int falsePositivePenalty = incorrectlyMarkedAnomalies * couponPenaltyPerFalsePositiveAnomaly;
-
-        // Combined anomaly payout shown in the first popup: percentage base + booster – penalties.
-        int anomalyPayout = percentageReward + anomalyBooster - missedAnomalyPenalty - falsePositivePenalty;
-
-        // Perfect identification bonus — only awarded when every anomaly is found and no false positives exist.
-        int perfectBonusAmount = (correctlyMarkedAnomalies == totalAnomaliesInLastSuspect && incorrectlyMarkedAnomalies == 0)
+        // Perfect bonus: every active category found and no false positives.
+        int perfectBonusAmount = (_categoriesCorrect == _totalActiveCategories
+                                  && _categoriesFalsePositive == 0
+                                  && _totalActiveCategories > 0)
             ? couponPerfectAnomaliesBonus
             : 0;
 
-        int totalCoupons = Mathf.Max(0, anomalyPayout + perfectBonusAmount);
+        // Evidence bonus: extra coupons per proof document filed for a correctly identified category.
+        // Placing evidence for a category with no active anomaly gives no bonus and no penalty.
+        int evidenceBonus = 0;
+        if (spawnedFolder != null)
+        {
+            System.Collections.Generic.Dictionary<AnomalyCategory, int> evidenceCounts =
+                spawnedFolder.GetEvidenceCountByCategory();
 
-        // Spawn physical coupon pickups at the ATM instead of crediting the pool directly.
+            foreach (var kvp in evidenceCounts)
+            {
+                if (_correctCategoryTypeNames.Contains(kvp.Key.ToTypeName()))
+                    evidenceBonus += kvp.Value * couponPerEvidenceItem;
+            }
+        }
+
+        int totalCoupons = Mathf.Max(0,
+            couponBaseReward + categoryReward - missedPenalty - falsePenalty + perfectBonusAmount + evidenceBonus);
+
         if (ATM.Instance != null)
             ATM.Instance.SpawnCoupons(totalCoupons);
         else
             Debug.LogError("[SuspectController] ATM.Instance is null — verdict payout coupons not dispensed.");
 
         Debug.Log(
-            $"Payout — Accuracy: {accuracyPercent}%, Base%: +{percentageReward}, Anomaly Booster: +{anomalyBooster}, Missed: -{missedAnomalyPenalty}, False Positives: -{falsePositivePenalty}, Perfect Bonus: +{perfectBonusAmount}, Total (spawned at ATM): {totalCoupons}");
+            $"Payout — Correct categories: {_categoriesCorrect}/{_totalActiveCategories}, " +
+            $"Missed: {_categoriesMissed}, False positives: {_categoriesFalsePositive}, " +
+            $"Base: +{couponBaseReward}, Category reward: +{categoryReward}, " +
+            $"Missed penalty: -{missedPenalty}, False penalty: -{falsePenalty}, " +
+            $"Perfect bonus: +{perfectBonusAmount}, Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
 
-        // Broadcast popup sequence to all clients.
-        ShowCashPopUpSequenceClientRpc(
-            anomalyPayout,
-            accuracyPercent,
-            correctlyMarkedAnomalies,
-            totalAnomaliesInLastSuspect,
-            perfectBonusAmount,
+        ShowScoringResultsClientRpc(
+            categoryReward,
+            _categoriesCorrect,
+            _totalActiveCategories,
+            perfectBonusAmount + evidenceBonus,
             totalCoupons);
     }
 
     [ClientRpc]
-    private void ShowCashPopUpSequenceClientRpc(
+    private void ShowScoringResultsClientRpc(
         int anomalyAmount,
-        int accuracyPercent,
         int correctCount,
         int totalCount,
-        int perfectBonus,
+        int totalBonusAmount,
         int totalCoupons)
     {
-        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, accuracyPercent, correctCount, totalCount, perfectBonus, totalCoupons));
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, correctCount, totalCount, totalBonusAmount, totalCoupons));
     }
 
     private IEnumerator ShowCashPopUpSequence(
         int anomalyAmount,
-        int accuracyPercent,
         int correctCount,
         int totalCount,
-        int perfectBonus,
+        int totalBonusAmount,
         int totalCoupons)
     {
         yield return new WaitForSeconds(2f);
 
-        // Message 1: Anomaly accuracy breakdown.
-        string anomalyMessage = $"Anomalies Identified: {accuracyPercent}%\n({correctCount}/{totalCount} identified)";
+        // Message 1: Category identification breakdown.
+        string anomalyMessage = totalCount > 0
+            ? $"Categories Identified: {correctCount}/{totalCount}"
+            : "No anomalies present";
         UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
 
         yield return new WaitForSeconds(2f);
 
-        // Message 2: Perfect identification bonus (if earned).
-        if (perfectBonus > 0)
+        // Message 2: Bonuses (perfect identification + evidence), if any were earned.
+        if (totalBonusAmount > 0)
         {
-            UIController.Instance.ShowCashPopUpNotification(perfectBonus, "Perfect Identification Bonus");
+            UIController.Instance.ShowCashPopUpNotification(totalBonusAmount, "Bonuses");
             yield return new WaitForSeconds(2f);
         }
 
@@ -879,6 +916,10 @@ public class SuspectController : NetworkBehaviour
 
         if (!isClient)
         {
+            // Flag the record for infection score reset on the next day advance (server only).
+            SuspectRecord quarantineRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
+            if (quarantineRecord != null)
+                quarantineRecord.pendingVaccineReset = true;
             suspectCharacter.animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);
 
@@ -970,6 +1011,11 @@ public class SuspectController : NetworkBehaviour
             yield break;
 
         ShiftManager.Instance.KillSuspect(suspectCharacter);
+
+        // Permanently remove this suspect from future shifts.
+        SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
+        if (killRecord != null)
+            killRecord.isKilled = true;
 
         yield return new WaitForSeconds(1f);
         SuspectCharacter thisCharacter = suspectCharacter;
@@ -1186,7 +1232,7 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();
 
         spawnedFolder = folder;
-        accuracyOfLastSuspectFolder = CalculatePercentAccuracy(folder, suspectCharacter);
+        accuracyOfLastSuspectFolder = CalculateCategoryScores(folder, suspectCharacter);
 
         PayOutResults();
 

@@ -296,10 +296,14 @@ public class PlayerAnimationController : NetworkBehaviour
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
 
+    private PlayerHealth _playerHealth;
+    private float _previousHealth;
+
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerPickupController   = GetComponent<PlayerPickupController>();
+        _playerHealth             = GetComponent<PlayerHealth>();
     }
     
 
@@ -450,6 +454,14 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        // Snapshot health before subscribing so the initial sync callback never
+        // falsely triggers the hit animation on late-joining clients.
+        if (_playerHealth != null)
+        {
+            _previousHealth = _playerHealth.Health;
+            _playerHealth.OnHealthChanged += OnPlayerHealthChanged;
+        }
+
         // Proxy clients mirror the owner's rig weight by reacting to the netRightArmRigActive flag.
         // The owner drives its own weight directly inside the coroutine/DOTween, so it is excluded.
         if (!IsOwner)
@@ -510,6 +522,9 @@ public class PlayerAnimationController : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+
+        if (_playerHealth != null)
+            _playerHealth.OnHealthChanged -= OnPlayerHealthChanged;
 
         if (!IsOwner)
             netRightArmRigActive.OnValueChanged -= OnProxyRightArmRigActiveChanged;
@@ -965,11 +980,51 @@ public class PlayerAnimationController : NetworkBehaviour
     }
 
     
+    /// <summary>
+    /// Fires on all clients whenever <see cref="PlayerHealth.OnHealthChanged"/> is invoked.
+    /// Triggers the Hit animation whenever health decreases without reaching zero
+    /// (death is handled by a separate animation state).
+    /// </summary>
+    private void OnPlayerHealthChanged()
+    {
+        float currentHealth = _playerHealth.Health;
+
+        if (currentHealth < _previousHealth && currentHealth > 0f)
+        {
+            bodyAnimator.SetTrigger("Hit");
+            armsAnimator.SetTrigger("Hit");
+        }
+
+        _previousHealth = currentHealth;
+    }
+
     public void OpenDoor()
     {
         SetAnimTrigger("OpenDoor");
     }
-    
+
+    /// <summary>
+    /// Plays or clears the bear-trap-stuck state on the local player's animators.
+    /// When <paramref name="stuck"/> is true, movement floats are snapped to zero
+    /// immediately so the locomotion blend tree cuts out without any lerp tail,
+    /// and the "BearTrapStuck" bool is set on all clients via the networked RPC chain.
+    /// Safe to call only on the owning client.
+    /// </summary>
+    public void SetBearTrapStuck(bool stuck)
+    {
+        if (stuck)
+        {
+            currentMoveX = 0f;
+            currentMoveZ = 0f;
+            bodyAnimator.SetFloat("MoveX", 0f);
+            bodyAnimator.SetFloat("MoveZ", 0f);
+            armsAnimator.SetFloat("MoveX", 0f);
+            armsAnimator.SetFloat("MoveZ", 0f);
+        }
+
+        SetAnimBool("BearTrapStuck", stuck);
+    }
+
     public void SetAnimBool(string animString, bool value)
     {
         if (!IsOwner) return;

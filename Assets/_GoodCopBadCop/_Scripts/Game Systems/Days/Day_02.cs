@@ -36,10 +36,7 @@ public class Day_02 : DayBase
 
     public override void DayActivated()
     {
-        base.DayActivated(); // Calls AnomalyManager.ApplyUnlocksFromSave()
-
-        // Unlock documentation + mutation anomalies and persist immediately.
-        AnomalyManager.Instance.UnlockMutationAndDocumentation();
+        base.DayActivated();
 
         // Unlock the mutation exam refill in the tool locker shop for all clients.
         // This is a one-way operation — the unlock is saved and persists across sessions.

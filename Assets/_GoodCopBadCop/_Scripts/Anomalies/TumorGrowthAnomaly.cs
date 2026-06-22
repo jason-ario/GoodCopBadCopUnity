@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class TumorGrowthAnomaly : MutationAnomaly
+public class TumorGrowthAnomaly : PhysicalAnomaly
 {
     [SerializeField] GameObject tumor;
     [SerializeField] SkinnedMeshRenderer skinnedMeshRendererToChange;

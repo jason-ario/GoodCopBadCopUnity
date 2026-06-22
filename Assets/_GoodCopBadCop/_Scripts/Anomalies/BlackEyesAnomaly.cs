@@ -7,7 +7,7 @@ using UnityEngine;
 /// a per-instance material so other characters sharing the same asset are unaffected.
 /// A MaterialPropertyBlock handles the animated float to avoid redundant material duplication.
 /// </summary>
-public class BlackEyesAnomaly : MutationAnomaly
+public class BlackEyesAnomaly : PhysicalAnomaly
 {
     private const string BlackEyesKeyword = "TCP2_BLACK_EYES";
     private static readonly int BlackEyesStrengthId = Shader.PropertyToID("_BlackEyesStrength");

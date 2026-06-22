@@ -22,7 +22,17 @@ public class SuspectData : ScriptableObject
 
     [Header("Infection")]
     [Range(0, 100)] public int startingInfectionScore = 0;
-    [Min(0)] public int dailyInfectionProgression = 5;
+    [Tooltip("Min and max infection score added per day (noise range).")]
+    public Vector2Int dailyInfectionProgression = new Vector2Int(3, 8);
+
+    [Header("Uncanny Arc — Profile")]
+    [Tooltip("Internal alter-ego name — not shown to the player.")]
+    public string alterEgoName;
+    [Tooltip("3–5 one-liners describing the suspect's normal presentation, shown on the terminal.")]
+    public string[] basePersonalityDescriptors;
+    [TextArea(3, 6)]
+    [Tooltip("Authored note on expected behavior, shown on the terminal.")]
+    public string normalBehaviorNotes;
 
     public Texture2D IDPhoto;
     public SuspectCharacter CharacterPrefab;
@@ -65,6 +75,9 @@ public class SuspectData : ScriptableObject
 
     public DialogueByVerdict entryDialogues = 
         new DialogueByVerdict(Verdict.None, new string[3], new string[3], new string[3]);
+    [Tooltip("Entry dialogues used at infection stage 3+. Falls back to entryDialogues if empty.")]
+    public DialogueByVerdict uncannyEntryDialogues =
+        new DialogueByVerdict(Verdict.None, new string[3], new string[3], new string[3]);
     public DialogueByVerdict exitDialoguesPassed = 
         new DialogueByVerdict(Verdict.Passed, new string[3], new string[3], new string[3]);    
     public DialogueByVerdict exitDialoguesQuarantined = 
@@ -92,6 +105,11 @@ public class SuspectData : ScriptableObject
         [TextArea(2, 6)] public string mismatchEarlyDaysAnswer;
         [TextArea(2, 6)] public string mismatchMidDaysAnswer;
         [TextArea(2, 6)] public string mismatchFinalDaysAnswer;
+
+        [Header("Uncanny Arc — served instead of normal answer at infection stage 3+")]
+        [TextArea(2, 6)] public string uncannyEarlyDaysAnswer;
+        [TextArea(2, 6)] public string uncannyMidDaysAnswer;
+        [TextArea(2, 6)] public string uncannyFinalDaysAnswer;
     }
 
     public QuestionResponseSet[] questionResponses;
@@ -102,6 +120,11 @@ public class SuspectData : ScriptableObject
         [TextArea(1, 3)] public string[] earlyDays;
         [TextArea(1, 3)] public string[] midDays;
         [TextArea(1, 3)] public string[] finalDays;
+
+        [Header("Uncanny Arc — used at infection stage 3+")]
+        [TextArea(1, 3)] public string[] uncannyEarlyDays;
+        [TextArea(1, 3)] public string[] uncannyMidDays;
+        [TextArea(1, 3)] public string[] uncannyFinalDays;
     }
 
     [Header("Idle Barks — Random ambient lines while at the booth")]

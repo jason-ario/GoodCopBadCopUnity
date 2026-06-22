@@ -32,10 +32,7 @@ public class Day_03 : DayBase
 
     public override void DayActivated()
     {
-        base.DayActivated(); // Calls AnomalyManager.ApplyUnlocksFromSave()
-
-        // Unlock documentation, mutation, and biological anomalies and persist immediately.
-        AnomalyManager.Instance.UnlockBiologicalMutationAndDocumentation();
+        base.DayActivated();
 
         // Hide the biological notebook until the tutorial beat spawns it in.
         _biologicalNotebook?.SetVisible(false);

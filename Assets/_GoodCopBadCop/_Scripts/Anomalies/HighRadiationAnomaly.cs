@@ -6,7 +6,7 @@ using UnityEngine;
 /// on deactivation. No changes to RadiationScanner are required — it already reads
 /// radiationAmount directly from SuspectCharacter.
 /// </summary>
-public class HighRadiationAnomaly : BiologicalAnomaly
+public class HighRadiationAnomaly : VitalsAnomaly
 {
     [Tooltip("The radiation level displayed on the scanner while the anomaly is active.")]
     [SerializeField] private int elevatedRadiation = 85;

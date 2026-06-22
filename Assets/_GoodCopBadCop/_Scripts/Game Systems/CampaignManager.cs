@@ -201,6 +201,11 @@ public class CampaignManager : NetworkBehaviour
 
         SaveDataManager.Instance.CurrentDay = nextDay;
         _networkCurrentDay.Value = nextDay;
+
+        // Advance every suspect's infection score before the new shift is populated.
+        if (SuspectRunRecords.Instance != null)
+            SuspectRunRecords.Instance.AdvanceDayInfection();
+
         // Server applies immediately; clients apply via OnNetworkDayChanged.
         ApplyDay(nextDay);
     }

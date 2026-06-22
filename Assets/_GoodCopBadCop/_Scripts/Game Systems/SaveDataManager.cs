@@ -38,43 +38,8 @@ public class SaveDataManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Anomaly Category Unlocks
+    // Anomaly Category Unlocks — removed; all categories are unlocked by default.
     // -------------------------------------------------------------------------
-
-    /// <summary>Whether mutation anomalies have been unlocked via tutorial progression.</summary>
-    public bool MutationAnomaliesUnlocked
-    {
-        get => ActiveSlot?.MutationAnomaliesUnlocked ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.MutationAnomaliesUnlocked = value; Save(); }
-    }
-
-    /// <summary>Whether behavior anomalies have been unlocked via tutorial progression.</summary>
-    public bool BehaviorAnomaliesUnlocked
-    {
-        get => ActiveSlot?.BehaviorAnomaliesUnlocked ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.BehaviorAnomaliesUnlocked = value; Save(); }
-    }
-
-    /// <summary>Whether biological anomalies have been unlocked via tutorial progression.</summary>
-    public bool BiologicalAnomaliesUnlocked
-    {
-        get => ActiveSlot?.BiologicalAnomaliesUnlocked ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.BiologicalAnomaliesUnlocked = value; Save(); }
-    }
-
-    /// <summary>Whether documentation anomalies have been unlocked via tutorial progression.</summary>
-    public bool DocumentationAnomaliesUnlocked
-    {
-        get => ActiveSlot?.DocumentationAnomaliesUnlocked ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.DocumentationAnomaliesUnlocked = value; Save(); }
-    }
-
-    /// <summary>Whether environment anomalies have been unlocked via tutorial progression.</summary>
-    public bool EnvironmentAnomaliesUnlocked
-    {
-        get => ActiveSlot?.EnvironmentAnomaliesUnlocked ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.EnvironmentAnomaliesUnlocked = value; Save(); }
-    }
 
     /// <summary>
     /// True once the player has completed the full Day 1 tutorial sequence (including tool locker refill).
@@ -317,13 +282,7 @@ public class SaveSlot
     public int CurrentDay;
     public int TotalCashEarned;
 
-    // Anomaly category unlock flags — false = locked, true = available to spawn.
-    // Set to true permanently when the corresponding tutorial milestone is cleared.
-    public bool MutationAnomaliesUnlocked;
-    public bool BehaviorAnomaliesUnlocked;
-    public bool BiologicalAnomaliesUnlocked;
-    public bool DocumentationAnomaliesUnlocked;
-    public bool EnvironmentAnomaliesUnlocked;
+    // Anomaly category unlock flags removed — all categories are unlocked by default.
 
     /// <summary>
     /// Set to true once the player completes the Day 1 tutorial sequence (tool locker refill).

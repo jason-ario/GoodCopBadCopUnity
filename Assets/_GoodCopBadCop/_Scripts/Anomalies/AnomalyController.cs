@@ -1,215 +1,232 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 public class AnomalyController : MonoBehaviour
 {
-    [SerializeField] private List<MutationAnomaly> _mutationAnomalies;
-    [SerializeField] private List<BiologicalAnomaly> _biologicalAnomalies;
-    [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies;
+    // ── Category Pools ────────────────────────────────────────────────────────
+    // Each list holds all authored anomaly components for one category on this prefab.
+    // Order within a list determines presentation priority: index 0 activates first
+    // as the infection score rises. Arrange subtler anomalies first, overt ones last.
 
-    [Header("Anomaly Distribution")]
-    [Tooltip("Probability (0–1) that this suspect spawns with no anomalies.")]
-    [SerializeField] [Range(0f, 1f)] private float _cleanChance = 0.2f;
-    [Tooltip("Minimum number of anomalies when the suspect is not clean.")]
-    [SerializeField] private int _minAnomalies = 1;
-    [Tooltip("Maximum number of anomalies (inclusive) when the suspect is not clean.")]
-    [SerializeField] private int _maxAnomalies = 2;
+    [Header("Anomaly Pools — 5 Categories")]
+    [SerializeField] private List<DocumentationAnomaly> _documentationAnomalies = new List<DocumentationAnomaly>();
+    [SerializeField] private List<VitalsAnomaly> _vitalsAnomalies = new List<VitalsAnomaly>();
+    [SerializeField] private List<BehaviorAnomaly> _behaviorAnomalies = new List<BehaviorAnomaly>();
+    [SerializeField] private List<PhysicalAnomaly> _mutationAnomalies = new List<PhysicalAnomaly>();
+    [SerializeField] private List<SupernaturalAnomaly> _supernaturalAnomalies = new List<SupernaturalAnomaly>();
 
-    private Anomaly[] _allPossibleAnomalies;
+    // ── Thresholds ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Infection score at or above which a suspect is considered too far gone:
+    /// all anomalies activate and quarantine has no effect.
+    /// </summary>
+    public const int FULLY_MUTATED_THRESHOLD = 80;
+
+    // ── Runtime State ─────────────────────────────────────────────────────────
+
+    /// <summary>All anomalies currently visible on this suspect.</summary>
     public List<Anomaly> activeAnomalies = new List<Anomaly>();
 
     /// <summary>
-    /// Stores the deterministic active indices chosen on the server for each
-    /// RandomTentacleAnomaly, keyed by the anomaly's sibling index in the hierarchy.
-    /// Used by SuspectCharacter to relay the selection to clients via ClientRpc.
+    /// Deterministic active indices per RandomTentacleAnomaly, keyed by sibling index.
+    /// Used by SuspectCharacter to relay server selections to clients.
     /// </summary>
     public Dictionary<int, int[]> TentacleAnomalyIndices { get; } = new Dictionary<int, int[]>();
 
     /// <summary>
-    /// Stores the deterministic active indices chosen on the server for each
-    /// RandomTumorAnomaly, keyed by the anomaly's sibling index in the hierarchy.
-    /// Used by SuspectCharacter to relay the selection to clients via ClientRpc.
+    /// Deterministic active indices per RandomTumorAnomaly, keyed by sibling index.
+    /// Used by SuspectCharacter to relay server selections to clients.
     /// </summary>
     public Dictionary<int, int[]> TumorAnomalyIndices { get; } = new Dictionary<int, int[]>();
 
     /// <summary>
-    /// Sibling indices of every anomaly on which InitializeDisabled was called during the
-    /// most recent Initialize* pass. Used by SuspectCharacter to relay the call to clients.
+    /// Sibling indices of every anomaly that had InitializeDisabled called on it.
+    /// Used by SuspectCharacter to relay the call to clients.
     /// </summary>
     public List<int> DisabledAnomalySiblingIndices { get; } = new List<int>();
 
-    public void Initialize()
+    // ── Primary Score-Based API ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Activates anomalies using a two-dimensional random strategy:
+    ///
+    ///   Dimension 1 — which categories are active. Below <see cref="FULLY_MUTATED_THRESHOLD"/>
+    ///   exactly <see cref="CATEGORY_CAP_BELOW_THRESHOLD"/> (4) populated categories are chosen
+    ///   at random, leaving one dark. At or above the threshold every populated category
+    ///   activates, which is the observable "too far gone" signal.
+    ///
+    ///   Dimension 2 — how many anomalies within each active category. Anomalies are shuffled
+    ///   randomly within their pool and the count scales proportionally with the score, with
+    ///   a minimum of 1 per active category.
+    ///
+    /// Score 0 delegates to <see cref="InitializeClean"/>.
+    /// </summary>
+    public void InitializeByInfectionScore(int infectionScore)
     {
+        if (infectionScore <= 0)
+        {
+            InitializeClean();
+            return;
+        }
+
         DisabledAnomalySiblingIndices.Clear();
-        var anomalies = new List<Anomaly>();
+        activeAnomalies.Clear();
 
-        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
+        // Build a list of non-empty category pools. Characters without anomalies in a
+        // given category simply have an empty list; excluding them keeps the maths correct.
+        var categoryPools = new List<List<Anomaly>>
         {
-            Debug.Log("Mutations are enabled");
-            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
+            _documentationAnomalies.Cast<Anomaly>().ToList(),
+            _vitalsAnomalies.Cast<Anomaly>().ToList(),
+            _behaviorAnomalies.Cast<Anomaly>().ToList(),
+            _mutationAnomalies.Cast<Anomaly>().ToList(),
+            _supernaturalAnomalies.Cast<Anomaly>().ToList(),
+        };
+        categoryPools.RemoveAll(p => p.Count == 0);
+
+        if (categoryPools.Count == 0)
+        {
+            Debug.LogWarning("[AnomalyController] No anomalies configured — nothing to activate.");
+            return;
         }
 
-        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
+        bool fullyMutated = infectionScore >= FULLY_MUTATED_THRESHOLD;
+
+        // ── Dimension 1: randomly choose which categories are active ──────────
+        // Shuffle the pool list so the first N entries are the "active" ones.
+        // Below the threshold exactly CATEGORY_CAP_BELOW_THRESHOLD categories are active;
+        // at/above it every populated category is active.
+        ShuffleList(categoryPools);
+        int activeCategoryCount = fullyMutated
+            ? categoryPools.Count
+            : Mathf.Min(CATEGORY_CAP_BELOW_THRESHOLD, categoryPools.Count);
+
+        // ── Dimension 2: randomly pick and activate anomalies within each category ──
+        int totalActivated = 0;
+
+        for (int c = 0; c < categoryPools.Count; c++)
         {
-            Debug.Log("Biological is enabled");
-            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
+            List<Anomaly> pool = categoryPools[c];
+
+            if (c >= activeCategoryCount)
+            {
+                // This category is inactive for this spawn — disable all its anomalies.
+                foreach (Anomaly a in pool)
+                    InitializeDisabled(a);
+                continue;
+            }
+
+            // Shuffle anomalies within the category so the active subset is random,
+            // not biased toward Inspector list order.
+            ShuffleList(pool);
+
+            int countInCategory = fullyMutated
+                ? pool.Count
+                : Mathf.Max(1, Mathf.FloorToInt((float)infectionScore / FULLY_MUTATED_THRESHOLD * pool.Count));
+
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (i < countInCategory)
+                {
+                    ActivateAnomaly(pool[i]);
+                    totalActivated++;
+                }
+                else
+                {
+                    InitializeDisabled(pool[i]);
+                }
+            }
         }
 
-        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
-        {
-            Debug.Log("Documentation is enabled");
-            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        }
-
-        _allPossibleAnomalies = anomalies.ToArray();
-        Debug.Log("Activated anomalies");
-        ActivateAnomalies();
+        Debug.Log($"[AnomalyController] Score {infectionScore} → " +
+                  $"{activeCategoryCount}/{categoryPools.Count} categories, " +
+                  $"{totalActivated} anomaly/ies active." +
+                  (fullyMutated ? " (FULLY MUTATED)" : string.Empty));
     }
 
     /// <summary>
-    /// Bypasses the clean-chance roll and forces exactly <paramref name="count"/> anomalies
-    /// to be chosen from the currently unlocked pool. Use for tutorial suspects that must
-    /// always have a specific number of anomalies.
+    /// Maximum categories that may be active while the suspect is below
+    /// <see cref="FULLY_MUTATED_THRESHOLD"/>. One category always stays dark until
+    /// the suspect is truly too far gone.
     /// </summary>
-    /// <param name="count">Exact number of anomalies to activate.</param>
+    private const int CATEGORY_CAP_BELOW_THRESHOLD = 4;
+
+    /// <summary>
+    /// True when every populated anomaly category has at least one active anomaly.
+    /// This is the observable in-game signal that the suspect is past the point of no return —
+    /// all five checklist categories will show a positive result simultaneously.
+    /// </summary>
+    public bool IsFullyMutated
+    {
+        get
+        {
+            if (activeAnomalies.Count == 0) return false;
+            if (_documentationAnomalies.Count > 0 && !HasActiveAnomalyOfCategory("DocumentationAnomaly")) return false;
+            if (_vitalsAnomalies.Count      > 0 && !HasActiveAnomalyOfCategory("VitalsAnomaly"))        return false;
+            if (_behaviorAnomalies.Count    > 0 && !HasActiveAnomalyOfCategory("BehaviorAnomaly"))      return false;
+            if (_mutationAnomalies.Count    > 0 && !HasActiveAnomalyOfCategory("MutationAnomaly"))      return false;
+            if (_supernaturalAnomalies.Count > 0 && !HasActiveAnomalyOfCategory("SupernaturalAnomaly")) return false;
+            return true;
+        }
+    }
+
+    // ── Tutorial / Forced-State API ───────────────────────────────────────────
+
+    /// <summary>
+    /// Forces every anomaly on this suspect to activate regardless of infection score.
+    /// Used for doppelgangers and any scenario requiring a full-anomaly loadout.
+    /// </summary>
+    public void Initialize()
+    {
+        InitializeByInfectionScore(100);
+    }
+
+    /// <summary>
+    /// Forces exactly <paramref name="count"/> anomalies chosen at random from all pools.
+    /// Bypasses score logic entirely. Use for tutorial suspects that must exhibit a specific count.
+    /// </summary>
     public void InitializeWithExactAnomalyCount(int count)
     {
         DisabledAnomalySiblingIndices.Clear();
-        var anomalies = new List<Anomaly>();
+        activeAnomalies.Clear();
 
-        if (!AnomalyManager.Instance.mutationAnomaliesLocked)
-            anomalies.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.biologicalAnomaliesLocked)
-            anomalies.AddRange(_biologicalAnomalies.Cast<Anomaly>());
-        if (!AnomalyManager.Instance.documentationAnomaliesLocked)
-            anomalies.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        Anomaly[] all = CollectAllAnomalies();
+        int clamped = Mathf.Min(count, all.Length);
 
-        _allPossibleAnomalies = anomalies.ToArray();
-
-        int clamped = Mathf.Min(count, _allPossibleAnomalies.Length);
+        // Fisher-Yates partial shuffle to pick `clamped` unique anomalies.
+        List<Anomaly> pool = new List<Anomaly>(all);
         for (int i = 0; i < clamped; i++)
         {
-            if (_allPossibleAnomalies.Length == 0) break;
-
-            Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
-            if (activeAnomalies.Contains(anomaly)) { i--; continue; }
-
-            activeAnomalies.Add(anomaly);
-            Debug.Log($"[AnomalyController] Forced anomaly: {anomaly.name}");
-
-            if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
-            {
-                int[] indices = tentacleAnomaly.PickActiveIndices();
-                TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
-                tentacleAnomaly.ActivateWithIndices(indices);
-            }
-            else if (anomaly is RandomTumorAnomaly tumorAnomaly)
-            {
-                int[] indices = tumorAnomaly.PickActiveIndices();
-                TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
-                tumorAnomaly.ActivateWithIndices(indices);
-            }
-            else
-            {
-                anomaly.ActivateAnomaly();
-            }
+            int j = Random.Range(i, pool.Count);
+            (pool[i], pool[j]) = (pool[j], pool[i]);
+            ActivateAnomaly(pool[i]);
         }
 
-        foreach (Anomaly anomaly in _allPossibleAnomalies)
-        {
-            if (!activeAnomalies.Contains(anomaly))
-                InitializeDisabled(anomaly);
-        }
+        for (int i = clamped; i < pool.Count; i++)
+            InitializeDisabled(pool[i]);
     }
 
     /// <summary>
-    /// Skips all anomaly assignment and ensures every anomaly visual is disabled.
-    /// Use this to guarantee a suspect spawns completely clean — no random roll.
+    /// Disables every anomaly without any transition. Guarantees a clean suspect regardless
+    /// of prior state.
     /// </summary>
     public void InitializeClean()
     {
         DisabledAnomalySiblingIndices.Clear();
-        _allPossibleAnomalies = CollectAllAnomalies();
+        activeAnomalies.Clear();
 
-        foreach (Anomaly anomaly in _allPossibleAnomalies)
+        foreach (Anomaly anomaly in CollectAllAnomalies())
             InitializeDisabled(anomaly);
 
         Debug.Log("[AnomalyController] Suspect forced clean — all anomalies disabled.");
     }
 
-    private Anomaly[] CollectAllAnomalies()
-    {
-        var all = new List<Anomaly>();
-        all.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        all.AddRange(_biologicalAnomalies.Cast<Anomaly>());
-        all.AddRange(_documentationAnomalies.Cast<Anomaly>());
-        return all.ToArray();
-    }
-
-    public void ActivateAnomalies()
-    {
-        // Chance (0–1) that this suspect spawns with no anomalies at all.
-        if (Random.value < _cleanChance)
-        {
-            Debug.Log("Suspect is clean — no anomalies activated.");
-
-            foreach (Anomaly anomaly in _allPossibleAnomalies)
-                InitializeDisabled(anomaly);
-
-            return;
-        }
-
-        int anomalyCount = Random.Range(_minAnomalies, _maxAnomalies + 1);
-
-        for (int i = 0; i < anomalyCount; i++)
-        {
-            if (_allPossibleAnomalies.Length == 0) break;
-
-            Anomaly anomaly = _allPossibleAnomalies[Random.Range(0, _allPossibleAnomalies.Length)];
-
-            // Skip if this anomaly is already active
-            if (activeAnomalies.Contains(anomaly))
-            {
-                i--;
-                continue;
-            }
-
-            Debug.Log("Activated " + anomaly.name);
-            activeAnomalies.Add(anomaly);
-
-            // For tentacle anomalies, pick indices on the server side and store them
-            // so SuspectCharacter can relay the exact selection to clients.
-            if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
-            {
-                int[] indices = tentacleAnomaly.PickActiveIndices();
-                TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
-                tentacleAnomaly.ActivateWithIndices(indices);
-            }
-            else if (anomaly is RandomTumorAnomaly tumorAnomaly)
-            {
-                int[] indices = tumorAnomaly.PickActiveIndices();
-                TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
-                tumorAnomaly.ActivateWithIndices(indices);
-            }
-            else
-            {
-                anomaly.ActivateAnomaly();
-            }
-        }
-
-        // Ensure every anomaly that was not selected has its shader state explicitly cleared.
-        foreach (Anomaly anomaly in _allPossibleAnomalies)
-        {
-            if (!activeAnomalies.Contains(anomaly))
-                InitializeDisabled(anomaly);
-        }
-    }
+    // ── Client Sync Helpers ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Applies tentacle indices that were chosen on the server. Called on clients
-    /// after receiving the synced index data from SuspectCharacter.
+    /// Applies tentacle indices chosen on the server to the matching anomaly on this client.
     /// </summary>
     public void ApplyTentacleIndicesOnClient(int siblingIndex, int[] indices)
     {
@@ -219,12 +236,11 @@ public class AnomalyController : MonoBehaviour
         if (tentacleAnomaly != null)
             tentacleAnomaly.ActivateWithIndices(indices);
         else
-            Debug.LogWarning($"[AnomalyController] No RandomTentacleAnomaly found at sibling index {siblingIndex}.");
+            Debug.LogWarning($"[AnomalyController] No RandomTentacleAnomaly at sibling index {siblingIndex}.");
     }
 
     /// <summary>
-    /// Applies tumor indices that were chosen on the server. Called on clients
-    /// after receiving the synced index data from SuspectCharacter.
+    /// Applies tumor indices chosen on the server to the matching anomaly on this client.
     /// </summary>
     public void ApplyTumorIndicesOnClient(int siblingIndex, int[] indices)
     {
@@ -234,12 +250,12 @@ public class AnomalyController : MonoBehaviour
         if (tumorAnomaly != null)
             tumorAnomaly.ActivateWithIndices(indices);
         else
-            Debug.LogWarning($"[AnomalyController] No RandomTumorAnomaly found at sibling index {siblingIndex}.");
+            Debug.LogWarning($"[AnomalyController] No RandomTumorAnomaly at sibling index {siblingIndex}.");
     }
 
     /// <summary>
-    /// Calls InitializeDisabled on the anomaly identified by <paramref name="siblingIndex"/>.
-    /// Invoked on clients by SuspectCharacter after receiving SyncInitializeDisabledClientRpc.
+    /// Calls InitializeDisabled on the anomaly at <paramref name="siblingIndex"/>.
+    /// Invoked on clients after receiving SyncInitializeDisabledClientRpc.
     /// </summary>
     public void ApplyInitializeDisabledOnClient(int siblingIndex)
     {
@@ -249,14 +265,12 @@ public class AnomalyController : MonoBehaviour
         if (anomaly != null)
             anomaly.InitializeDisabled();
         else
-            Debug.LogWarning($"[AnomalyController] No Anomaly found at sibling index {siblingIndex} for InitializeDisabled.");
+            Debug.LogWarning($"[AnomalyController] No Anomaly at sibling index {siblingIndex} for InitializeDisabled.");
     }
 
     /// <summary>
-    /// Re-applies InitializeDisabled on every non-active anomaly across all categories,
-    /// including those from locked categories that were excluded during the initial activation
-    /// pass. Call this when the suspect arrives at the booth to guarantee all shader states
-    /// are clean regardless of which anomaly categories were locked at spawn time.
+    /// Re-applies InitializeDisabled on every non-active anomaly.
+    /// Call on suspect arrival to ensure shader states are clean for locked-category anomalies.
     /// </summary>
     public void InitializeDisabledOnArrival()
     {
@@ -267,17 +281,91 @@ public class AnomalyController : MonoBehaviour
         }
     }
 
+    // ── Queries ───────────────────────────────────────────────────────────────
+
+    /// <summary>Returns true if at least one active anomaly belongs to <paramref name="categoryTypeName"/>.</summary>
     public bool HasAnomaly(Anomaly anomaly) => activeAnomalies.Contains(anomaly);
 
-    /// <summary>
-    /// Returns the number of currently active anomalies of the given category type.
-    /// </summary>
+    /// <summary>Returns the count of active anomalies belonging to category type <typeparamref name="T"/>.</summary>
     public int ActiveCountOfType<T>() where T : Anomaly
         => activeAnomalies.OfType<T>().Count();
 
     /// <summary>
-    /// Calls InitializeDisabled on an anomaly and records its sibling index so
-    /// SuspectCharacter can relay the call to clients via ClientRpc.
+    /// Returns true if any currently active anomaly is an instance of (or inherits from) the
+    /// category class named <paramref name="categoryTypeName"/> (e.g. "MutationAnomaly").
+    /// Walks the full type hierarchy so concrete subclasses are matched by their category base.
+    /// </summary>
+    public bool HasActiveAnomalyOfCategory(string categoryTypeName)
+    {
+        foreach (Anomaly anomaly in activeAnomalies)
+        {
+            System.Type t = anomaly.GetType();
+            while (t != null && t != typeof(Anomaly))
+            {
+                if (t.Name == categoryTypeName) return true;
+                t = t.BaseType;
+            }
+        }
+        return false;
+    }
+
+    // ── Internals ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Collects all anomaly components from all five category lists.
+    /// Used by InitializeClean, InitializeWithExactAnomalyCount, and InitializeDisabledOnArrival.
+    /// </summary>
+    private Anomaly[] CollectAllAnomalies()
+    {
+        var all = new List<Anomaly>();
+        all.AddRange(_documentationAnomalies.Cast<Anomaly>());
+        all.AddRange(_vitalsAnomalies.Cast<Anomaly>());
+        all.AddRange(_behaviorAnomalies.Cast<Anomaly>());
+        all.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        all.AddRange(_supernaturalAnomalies.Cast<Anomaly>());
+        return all.ToArray();
+    }
+
+    /// <summary>Fisher-Yates in-place shuffle using Unity's Random.</summary>
+    private static void ShuffleList<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
+    /// <summary>
+    /// Activates a single anomaly, handling RandomTentacleAnomaly and RandomTumorAnomaly
+    /// special cases by picking and storing indices for client replication.
+    /// </summary>
+    private void ActivateAnomaly(Anomaly anomaly)
+    {
+        if (anomaly == null || activeAnomalies.Contains(anomaly)) return;
+
+        activeAnomalies.Add(anomaly);
+
+        if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
+        {
+            int[] indices = tentacleAnomaly.PickActiveIndices();
+            TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+            tentacleAnomaly.ActivateWithIndices(indices);
+        }
+        else if (anomaly is RandomTumorAnomaly tumorAnomaly)
+        {
+            int[] indices = tumorAnomaly.PickActiveIndices();
+            TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+            tumorAnomaly.ActivateWithIndices(indices);
+        }
+        else
+        {
+            anomaly.ActivateAnomaly();
+        }
+    }
+
+    /// <summary>
+    /// Calls InitializeDisabled on an anomaly and records its sibling index for client replication.
     /// </summary>
     private void InitializeDisabled(Anomaly anomaly)
     {

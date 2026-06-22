@@ -135,10 +135,7 @@ public class Day_01 : DayBase
 
     public override void DayActivated()
     {
-        base.DayActivated(); // Calls AnomalyManager.ApplyUnlocksFromSave()
-
-        // Persist documentation-only unlock for Day 1 and apply to live category locks.
-        AnomalyManager.Instance.UnlockDocumentationOnly();
+        base.DayActivated();
 
         // Door lock is deferred to OnDayStarted (ShiftManager.OnDayStart) so the sound
         // plays after the intro cutscene ends, not while it is playing.

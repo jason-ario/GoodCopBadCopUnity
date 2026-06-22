@@ -6,7 +6,7 @@ using UnityEngine;
 /// active anomaly suspects show ElevatedTemperature, all other suspects show normal
 /// human body temperature. No shader changes required; this is purely data-driven.
 /// </summary>
-public class HighTemperatureAnomaly : BiologicalAnomaly
+public class HighTemperatureAnomaly : VitalsAnomaly
 {
     [Tooltip("Temperature displayed on the thermometer when this anomaly is active.")]
     [SerializeField] private float elevatedTemperature = 45.5f;

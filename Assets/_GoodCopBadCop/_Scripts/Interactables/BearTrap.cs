@@ -282,7 +282,11 @@ public class BearTrap : PickableObject
     {
         if (!playerRef.TryGet(out NetworkObject playerObj)) return;
         PlayerMovementController m = playerObj.GetComponent<PlayerMovementController>();
-        if (m != null && m.IsLocalPlayer) m.CanControl = false;
+        if (m != null && m.IsLocalPlayer)
+        {
+            m.SetCanMove(false);
+            playerObj.GetComponent<PlayerAnimationController>()?.SetBearTrapStuck(true);
+        }
     }
 
     /// <summary>
@@ -294,7 +298,11 @@ public class BearTrap : PickableObject
     {
         if (!playerRef.TryGet(out NetworkObject playerObj)) return;
         PlayerMovementController m = playerObj.GetComponent<PlayerMovementController>();
-        if (m != null && m.IsLocalPlayer) m.CanControl = true;
+        if (m != null && m.IsLocalPlayer)
+        {
+            m.SetCanMove(true);
+            playerObj.GetComponent<PlayerAnimationController>()?.SetBearTrapStuck(false);
+        }
     }
 
     [ClientRpc]

@@ -1,5 +1,21 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-7272285057760081899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57e7abfd3d6121c4392d06d78c6b2952, type: 3}
+  m_Name: LowResolutionFeature
+  m_EditorClassIdentifier: Assembly-CSharp::LowResolutionFeature
+  m_Active: 0
+  settings:
+    passEvent: 600
+    material: {fileID: 2100000, guid: 6916af2a76a1fa14580a83f4fa16e1ef, type: 2}
 --- !u!114 &-4038359656389517380
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -55,7 +71,7 @@ MonoBehaviour:
     passEvent: 600
     material: {fileID: 2100000, guid: b5089f6f7ecdc1d43a3ada71040a0dae, type: 2}
     direction: {x: 1, y: 0}
-    offset: 0.0098
+    offset: 0.05
     blend: 1
 --- !u!114 &11400000
 MonoBehaviour:
@@ -90,7 +106,8 @@ MonoBehaviour:
   - {fileID: 1841771247995849080}
   - {fileID: -123111962723324806}
   - {fileID: 2153185802762566190}
-  m_RendererFeatureMap: ad6b866f10d7b46c26992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d
+  - {fileID: -7272285057760081899}
+  m_RendererFeatureMap: ad6b866f10d7b46c26992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d1548d42a45a7139b
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -179,9 +196,9 @@ MonoBehaviour:
     passEvent: 600
     material: {fileID: 2100000, guid: 0992bbc6c43a5cd42a3b2da0d13a27a5, type: 2}
     pattern: 2
-    strength: 0.57
+    strength: 0
     blend: 0.054
-    scale: 4.73
+    scale: 8.36
     colorDepth: 256
     lumaOnly: 1
 --- !u!114 &6104699316840559988

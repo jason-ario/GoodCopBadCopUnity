@@ -94,6 +94,49 @@ public class SuspectCharacter : Interactable
             interactText = $"{suspectData.FirstName}";
     }
 
+    /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>
+    public static event Action<SuspectCharacter, int> OnSuspectPresentingUncanny;
+
+    /// <summary>
+    /// Primary initialization path for regular suspects.
+    /// Reads the persistent infection score and activates the proportional anomaly set.
+    /// </summary>
+    public void InitializeByInfectionStage()
+    {
+        SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+
+        if (record == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] No record found for '{suspectData.name}' — falling back to clean initialization.");
+            InitializeClean();
+            return;
+        }
+
+        anomalyController.InitializeByInfectionScore(record.infectionScore);
+        suspectRecordViewer.SetRecord(record);
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
+            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        foreach (var kvp in anomalyController.TumorAnomalyIndices)
+            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
+
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
+
+        drunkBehaviour?.TryActivate();
+
+        if (record.IsFullyMutated)
+            OnSuspectPresentingUncanny?.Invoke(this, record.infectionScore);
+    }
+
+    /// <summary>
+    /// Initializes the suspect using the legacy random anomaly pool. Prefer <see cref="InitializeByInfectionStage"/> for campaign spawns.
+    /// </summary>
     public void Initialize()
     {
         anomalyController.Initialize();
@@ -407,26 +450,33 @@ public class SuspectCharacter : Interactable
             if (drunkLine != null) return drunkLine;
         }
 
-        string entryDialogue = "";
-        
-        // Get entry dialogues
-        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialogues;
-        
-        //Second: Get the day band, 1-10, 11-20, 21-30 etc
         int dayN0 = ShiftManager.Instance.CurrentDay;
+
+        // Uncanny override: fully-mutated suspects use uncanny entry dialogues when authored.
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null && record.IsFullyMutated)
+        {
+            SuspectData.DialogueByVerdict uncannySet = suspectData.uncannyEntryDialogues;
+            string[] uncannyLines = dayN0 < 11
+                ? uncannySet.dialoguesEarlyDays
+                : dayN0 < 21
+                    ? uncannySet.dialoguesMidDays
+                    : uncannySet.dialoguesFinalDays;
+
+            if (uncannyLines != null && uncannyLines.Length > 0)
+                return uncannyLines[UnityEngine.Random.Range(0, uncannyLines.Length)];
+        }
+
+        // Normal entry dialogue
+        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialogues;
         string[] entryDialogues;
-        
+
         if (dayN0 < 11)
-        {
             entryDialogues = dialogueByVerdict.dialoguesEarlyDays;
-        } else if (dayN0 < 21)
-        {
+        else if (dayN0 < 21)
             entryDialogues = dialogueByVerdict.dialoguesMidDays;
-        }
         else
-        {
             entryDialogues = dialogueByVerdict.dialoguesFinalDays;
-        }
 
         return entryDialogues[UnityEngine.Random.Range(0, entryDialogues.Length)];
     }
@@ -465,6 +515,22 @@ public class SuspectCharacter : Interactable
 
             if (!string.IsNullOrEmpty(mismatch))
                 answer = mismatch;
+        }
+
+        // Uncanny override: fully-mutated suspects serve the uncanny answer when authored.
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null && record.IsFullyMutated)
+        {
+            string uncannyAnswer;
+            if (ShiftManager.Instance.IsEarlyDays)
+                uncannyAnswer = set.uncannyEarlyDaysAnswer;
+            else if (ShiftManager.Instance.IsMidDays)
+                uncannyAnswer = set.uncannyMidDaysAnswer;
+            else
+                uncannyAnswer = set.uncannyFinalDaysAnswer;
+
+            if (!string.IsNullOrEmpty(uncannyAnswer))
+                answer = uncannyAnswer;
         }
 
         return string.IsNullOrEmpty(answer) ? null : answer;
