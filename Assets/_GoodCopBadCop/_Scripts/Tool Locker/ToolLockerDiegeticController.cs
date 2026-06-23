@@ -1,10 +1,12 @@
+using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// Diegetic view for the tool locker. Extends <see cref="DiegeticViewController"/> with
-/// shop-specific logic: raycasting for <see cref="ShopItem"/> objects under the cursor,
-/// displaying a purchase prompt, and executing the buy flow on click.
+/// shop-specific logic: responding to <see cref="ShopItem"/> hover/click events dispatched
+/// by <see cref="ClickDetector"/>, displaying a purchase prompt, and executing the buy flow.
 /// </summary>
 public class ToolLockerDiegeticController : DiegeticViewController
 {
@@ -12,11 +14,8 @@ public class ToolLockerDiegeticController : DiegeticViewController
     [Tooltip("All shop items physically placed inside the locker that the player can buy.")]
     [SerializeField] private ShopItem[] _shopItems;
 
-    [Tooltip("Max raycast distance for detecting shop items under the cursor.")]
-    [SerializeField] private float _interactDistance = 3f;
-
-    [Tooltip("Layer mask that includes the ShopItems layer.")]
-    [SerializeField] private LayerMask _shopItemLayer;
+    [Tooltip("The locker's own collider — disabled while the diegetic view is open so it doesn't block item raycasts.")]
+    [SerializeField] private Collider _lockerCollider;
 
     [Header("UI")]
     [Tooltip("Screen-space TextMeshPro label shown when hovering a purchasable item. Optional.")]
@@ -25,7 +24,9 @@ public class ToolLockerDiegeticController : DiegeticViewController
     // ─── Runtime state ───────────────────────────────────────────────────────
 
     private ToolsLocker _locker;
-    private ShopItem _hoveredItem;
+
+    /// <summary>Cached delegates so we can unsubscribe cleanly on close.</summary>
+    private readonly Dictionary<ShopItem, (Action hovered, Action unhovered, Action clicked)> _subs = new();
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -49,15 +50,42 @@ public class ToolLockerDiegeticController : DiegeticViewController
 
     protected override void OnOpened()
     {
+        if (_lockerCollider != null)
+            _lockerCollider.enabled = false;
+
         if (_interactPrompt != null)
         {
             _interactPrompt.gameObject.SetActive(true);
             _interactPrompt.text = string.Empty;
         }
+
+        foreach (ShopItem item in _shopItems)
+        {
+            if (item == null) continue;
+
+            ShopItem captured = item;
+            Action hovered   = () => ShowPrompt(captured);
+            Action unhovered = ClearPrompt;
+            Action clicked   = () => TryPurchase(captured);
+
+            item.Hovered   += hovered;
+            item.Unhovered += unhovered;
+            item.Clicked   += clicked;
+
+            _subs[item] = (hovered, unhovered, clicked);
+        }
     }
 
     protected override void OnClosed()
     {
+        foreach (var (item, subs) in _subs)
+        {
+            item.Hovered   -= subs.hovered;
+            item.Unhovered -= subs.unhovered;
+            item.Clicked   -= subs.clicked;
+        }
+        _subs.Clear();
+
         if (_interactPrompt != null)
             _interactPrompt.gameObject.SetActive(false);
 
@@ -67,38 +95,11 @@ public class ToolLockerDiegeticController : DiegeticViewController
             _locker = null;
         }
 
-        _hoveredItem = null;
-    }
-
-    protected override void OnUpdate()
-    {
-        HandleLockerRaycast();
-
-        if (Input.GetMouseButtonDown(0) && _hoveredItem != null)
-            TryPurchase(_hoveredItem);
+        if (_lockerCollider != null)
+            _lockerCollider.enabled = true;
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
-
-    private void HandleLockerRaycast()
-    {
-        if (Player == null || Player.cam == null) return;
-
-        Ray ray = Player.cam.ScreenPointToRay(Input.mousePosition);
-
-        _hoveredItem = null;
-        ClearPrompt();
-
-        if (!Physics.Raycast(ray, out RaycastHit hit, _interactDistance, _shopItemLayer))
-            return;
-
-        ShopItem item = hit.collider.GetComponentInParent<ShopItem>();
-        if (item == null || !item.IsAvailable)
-            return;
-
-        _hoveredItem = item;
-        ShowPrompt(item);
-    }
 
     private void ShowPrompt(ShopItem item)
     {

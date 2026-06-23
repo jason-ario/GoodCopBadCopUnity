@@ -35,6 +35,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// <summary>The interaction controller of the player who opened this view.</summary>
     protected PlayerInteractionController Player { get; private set; }
 
+    /// <summary>
+    /// The rendering camera (CinemachineBrain) that subclasses should use for
+    /// screen-to-world raycasts. This is the camera that actually composites the
+    /// active virtual camera, so its perspective matches what the player sees.
+    /// </summary>
+    protected Camera RaycastCamera => PlayerInstance.Instance?.GetCamera();
+
     // ─── Private state ────────────────────────────────────────────────────────
 
     private Quaternion _baseCameraRotation;
@@ -73,6 +80,7 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         // Show cursor so the player can point at objects.
         UIController.Instance.ShowCursor();
+        UIController.Instance.ShowBackButton(Close);
 
         // Hide first-person arms so they don't occlude the view.
         _playerArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
@@ -114,6 +122,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         }
 
         UIController.Instance.HideCursor();
+        UIController.Instance.HideBackButton();
 
         if (_playerArms != null)
         {
