@@ -1,11 +1,15 @@
 using System;
+using HighlightPlus;
 using UnityEngine;
 
-public class ShopItem : MonoBehaviour
+[RequireComponent(typeof(HighlightEffect))]
+public class ShopItem : MonoBehaviour, IHoverable, IClickable
 {
     [SerializeField] private string name;
     public string Name => name; 
     public PickableItemData pickableItemData;
+
+    private HighlightEffect _highlightEffect;
 
     [SerializeField] private int price;
     private int? _priceOverride = null;
@@ -52,17 +56,66 @@ public class ShopItem : MonoBehaviour
     /// </summary>
     public void SetAvailable(bool available) => _availabilityOverride = available;
 
+    // -------------------------------------------------------------------------
+    // Events
+    // -------------------------------------------------------------------------
+
+    /// <summary>Fired when the cursor enters this item. Subscribers can show contextual UI.</summary>
+    public event Action Hovered;
+
+    /// <summary>Fired when the cursor leaves this item.</summary>
+    public event Action Unhovered;
+
+    /// <summary>Fired when the player clicks this item.</summary>
+    public event Action Clicked;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
     private void Awake()
     {
-        SetLayer();
+        _highlightEffect = GetComponent<HighlightEffect>();
+        _highlightEffect.enabled = false;
+        _highlightEffect.highlighted = true;
+        _highlightEffect.ProfileLoad(_highlightEffect.profile);
     }
 
-    void SetLayer()
+    // -------------------------------------------------------------------------
+    // IHoverable
+    // -------------------------------------------------------------------------
+
+    public void OnHoverEnter()
     {
-        int layer = LayerMask.NameToLayer("ShopItems");
-        foreach (Transform child in GetComponentsInChildren<Transform>(true))
-        {
-            child.gameObject.layer = layer;
-        }
+        if (!IsAvailable) return;
+        Highlight(true);
+        Hovered?.Invoke();
+    }
+
+    public void OnHoverExit()
+    {
+        Highlight(false);
+        Unhovered?.Invoke();
+    }
+
+    // -------------------------------------------------------------------------
+    // IClickable
+    // -------------------------------------------------------------------------
+
+    public void OnClick()
+    {
+        if (!IsAvailable) return;
+        Clicked?.Invoke();
+    }
+
+    // -------------------------------------------------------------------------
+    // Highlight
+    // -------------------------------------------------------------------------
+
+    /// <summary>Enables or disables the highlight effect on this shop item.</summary>
+    public void Highlight(bool highlight)
+    {
+        if (_highlightEffect != null)
+            _highlightEffect.enabled = highlight;
     }
 }

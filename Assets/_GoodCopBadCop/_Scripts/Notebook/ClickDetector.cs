@@ -1,61 +1,87 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 public class ClickDetector : MonoBehaviour
 { 
     private Camera renderCamera;
     [SerializeField] private RawImage cameraImage; // the UI element showing the render texture
-    
+
+    private IHoverable _lastHoverable;
+
     void Update()
     {
         if (renderCamera == null)
         {
             if (PlayerInstance.Instance == null) return;
-            
             renderCamera = PlayerInstance.Instance.GetCamera();
         }
-        
-        
-        if (!Input.GetMouseButtonDown(0))
-            return;
 
+        // When the cursor is hidden, clear any active hover and skip.
+        if (!Cursor.visible)
+        {
+            ClearHover();
+            return;
+        }
+
+        Vector3? cameraScreenPoint = GetCameraScreenPoint();
+        if (cameraScreenPoint == null)
+        {
+            ClearHover();
+            return;
+        }
+
+        Ray ray = renderCamera.ScreenPointToRay(cameraScreenPoint.Value);
+        bool didHit = Physics.Raycast(ray, out RaycastHit hit, 100f, ~0, QueryTriggerInteraction.Collide);
+
+        // ── Hover ─────────────────────────────────────────────────────────────
+        IHoverable hoverable = didHit ? hit.collider.GetComponentInParent<IHoverable>() : null;
+        if (hoverable != _lastHoverable)
+        {
+            _lastHoverable?.OnHoverExit();
+            hoverable?.OnHoverEnter();
+            _lastHoverable = hoverable;
+        }
+
+        // ── Click ─────────────────────────────────────────────────────────────
+        if (Input.GetMouseButtonDown(0) && didHit)
+        {
+            Debug.Log("Hit: " + hit.collider.name);
+            hit.collider.GetComponentInParent<IClickable>()?.OnClick();
+        }
+    }
+
+    private void ClearHover()
+    {
+        if (_lastHoverable == null) return;
+        _lastHoverable.OnHoverExit();
+        _lastHoverable = null;
+    }
+
+    /// <summary>
+    /// Maps the current mouse position through the <see cref="cameraImage"/> RectTransform
+    /// to camera pixel coordinates. Returns null if the cursor is outside the image.
+    /// </summary>
+    private Vector3? GetCameraScreenPoint()
+    {
         RectTransform rectTransform = cameraImage.rectTransform;
 
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 rectTransform,
                 Input.mousePosition,
-                null, // use null for screen space overlay canvas
+                null, // screen space overlay canvas
                 out Vector2 localPoint))
-        {
-            return;
-        }
+            return null;
 
         Rect rect = rectTransform.rect;
-
-        // Convert local point to 0-1 UV inside the RawImage
         float u = Mathf.InverseLerp(rect.xMin, rect.xMax, localPoint.x);
         float v = Mathf.InverseLerp(rect.yMin, rect.yMax, localPoint.y);
 
-        // Reject clicks outside the image
         if (u < 0f || u > 1f || v < 0f || v > 1f)
-            return;
+            return null;
 
-        // Convert to render camera pixel coordinates
-        Vector3 cameraScreenPoint = new Vector3(
+        return new Vector3(
             u * renderCamera.pixelWidth,
             v * renderCamera.pixelHeight,
-            0f
-        );
-
-        Ray ray = renderCamera.ScreenPointToRay(cameraScreenPoint);
-        Debug.DrawRay(ray.origin, ray.direction * 100f, Color.red, 2f);
-
-        if (Physics.Raycast(ray, out RaycastHit hit, 100f, ~0, QueryTriggerInteraction.Collide))
-        {
-            Debug.Log("Hit: " + hit.collider.name);
-            hit.collider.GetComponentInParent<IClickable>()?.OnClick();
-        }
+            0f);
     }
 }

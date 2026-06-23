@@ -135,6 +135,14 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             // Reticle ref may be null on first entry (early game) — hide it as soon as it's available.
             reticle?.DisableReticle();
+
+            // Clear any highlight that was active before the view was entered.
+            if (lastInteractable != null)
+            {
+                lastInteractable.Highlight(false);
+                lastInteractable = null;
+            }
+
             return;
         }
 
