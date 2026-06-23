@@ -121,7 +121,7 @@ public class SupplyBox : PickableObject
         item.OnEquip += () =>
         {
             _registeredItems.Remove(item); // local removal (client that did the pickup)
-            if (item.IsSpawned)
+            if (IsSpawned && item.IsSpawned)
                 UnregisterItemServerRpc(new NetworkObjectReference(item.NetworkObject));
         };
     }
