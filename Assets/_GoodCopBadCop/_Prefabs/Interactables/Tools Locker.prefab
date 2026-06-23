@@ -1971,9 +1971,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d30de497c8f94e4b9065782a2178ea2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ToolLockerDiegeticController
-  _lockerCamera: {fileID: 3269590564595887837}
-  _maxPanX: 0.15
-  _maxPanY: 0.1
+  _viewCamera: {fileID: 3269590564595887837}
+  _maxPanX: 0.3
+  _maxPanUp: 0.5
+  _maxPanDown: 0.8
+  _exitKey: 113
   _shopItems:
   - {fileID: 0}
   _interactDistance: 3
@@ -1981,7 +1983,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 131072
   _interactPrompt: {fileID: 0}
-  _exitKey: 113
 --- !u!1 &1258636092068193267 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1578116644306278430, guid: 1e6992aa5bfdf1743b8b5d9fcb1fa64c, type: 3}

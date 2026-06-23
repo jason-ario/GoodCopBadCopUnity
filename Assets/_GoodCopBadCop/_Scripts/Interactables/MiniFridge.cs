@@ -8,6 +8,7 @@ public class MiniFridge : Interactable
     [SerializeField] private AudioClip fridgeCloseSound;
     [SerializeField] private Animator animator;
     [SerializeField] private ElectricityController _electricityController;
+    [SerializeField] private MiniFridgeDiegeticController _diegeticController;
 
     /// <summary>True when the fridge has an electricity source and that source is powered on.</summary>
     public bool IsPowered => _electricityController != null && _electricityController.IsPowerOn;
@@ -23,7 +24,7 @@ public class MiniFridge : Interactable
         base.OnNetworkSpawn();
         _isOpen.OnValueChanged += OnFridgeStateChanged;
 
-        // Sync visual state on late join
+        // Sync visual state on late join.
         animator.SetBool("Open", _isOpen.Value);
     }
 
@@ -35,14 +36,51 @@ public class MiniFridge : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        ToggleFridgeServerRpc();
+
+        if (_diegeticController != null && !_isOpen.Value)
+        {
+            // Open the door and enter the diegetic view together.
+            RequestOpenServerRpc();
+            _diegeticController.Open(player, this);
+        }
+        else
+        {
+            // No controller assigned, or door is already open — plain toggle.
+            ToggleFridgeServerRpc();
+        }
     }
+
+    /// <summary>
+    /// Closes the fridge door over the network.
+    /// Called by <see cref="MiniFridgeDiegeticController"/> when the player exits the view.
+    /// </summary>
+    public void RequestClose()
+    {
+        if (_isOpen.Value)
+            RequestCloseServerRpc();
+    }
+
+    // ─── ServerRpcs ──────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
     private void ToggleFridgeServerRpc()
     {
         _isOpen.Value = !_isOpen.Value;
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestOpenServerRpc()
+    {
+        _isOpen.Value = true;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestCloseServerRpc()
+    {
+        _isOpen.Value = false;
+    }
+
+    // ─── Callbacks ───────────────────────────────────────────────────────────
 
     private void OnFridgeStateChanged(bool oldValue, bool newValue)
     {

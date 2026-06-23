@@ -1,28 +1,13 @@
 using TMPro;
-using Unity.Cinemachine;
 using UnityEngine;
 
 /// <summary>
-/// Manages the diegetic tool locker interaction mode.
-/// When activated, switches to the locker camera and lets the player purchase
-/// shop items by pointing at them with the cursor and clicking. Press Q (or the
-/// configured <see cref="ExitKey"/>) to exit.
+/// Diegetic view for the tool locker. Extends <see cref="DiegeticViewController"/> with
+/// shop-specific logic: raycasting for <see cref="ShopItem"/> objects under the cursor,
+/// displaying a purchase prompt, and executing the buy flow on click.
 /// </summary>
-public class ToolLockerDiegeticController : MonoBehaviour
+public class ToolLockerDiegeticController : DiegeticViewController
 {
-    [Header("Camera")]
-    [Tooltip("The CinemachineCamera inside the locker used when the player is browsing.")]
-    [SerializeField] private CinemachineCamera _lockerCamera;
-
-    [Tooltip("Maximum horizontal pan distance (world units) from the camera's resting position.")]
-    [SerializeField] private float _maxPanX = 0.15f;
-
-    [Tooltip("Maximum vertical pan distance (world units) when the cursor is above centre.")]
-    [SerializeField] private float _maxPanUp = 0.1f;
-
-    [Tooltip("Maximum vertical pan distance (world units) when the cursor is below centre.")]
-    [SerializeField] private float _maxPanDown = 0.2f;
-
     [Header("Shop Items")]
     [Tooltip("All shop items physically placed inside the locker that the player can buy.")]
     [SerializeField] private ShopItem[] _shopItems;
@@ -34,25 +19,13 @@ public class ToolLockerDiegeticController : MonoBehaviour
     [SerializeField] private LayerMask _shopItemLayer;
 
     [Header("UI")]
-    [Tooltip("Screen-space TextMeshPro label used to show item name/price when hovering. " +
-             "Must be on an active Canvas. Leave empty if not needed.")]
+    [Tooltip("Screen-space TextMeshPro label shown when hovering a purchasable item. Optional.")]
     [SerializeField] private TextMeshProUGUI _interactPrompt;
-
-    [Tooltip("Key the player presses to exit the locker view.")]
-    [SerializeField] private KeyCode _exitKey = KeyCode.Q;
 
     // ─── Runtime state ───────────────────────────────────────────────────────
 
-    private bool _isActive;
-    private PlayerInteractionController _player;
     private ToolsLocker _locker;
     private ShopItem _hoveredItem;
-    private GameObject _playerArms;
-    private GameObject _playerBody;
-
-    // Camera pan state
-    private Quaternion _baseCameraRotation;
-    private Vector3 _baseCameraPosition;
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -63,45 +36,19 @@ public class ToolLockerDiegeticController : MonoBehaviour
     // ─── Public API ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Opens the diegetic locker view for the given player.
-    /// Should be called from <see cref="ToolsLocker.Interact"/>.
+    /// Opens the locker diegetic view for <paramref name="player"/>.
+    /// Stores the <paramref name="locker"/> reference so it can be notified on close.
     /// </summary>
     public void Open(PlayerInteractionController player, ToolsLocker locker)
     {
-        if (_isActive) return;
-
-        _player = player;
         _locker = locker;
-        _isActive = true;
+        base.Open(player);
+    }
 
-        // Activate the locker camera — Cinemachine blends to it automatically.
-        if (_lockerCamera != null)
-        {
-            // Capture the resting transform so pan offsets are relative to it.
-            _baseCameraRotation = _lockerCamera.transform.rotation;
-            _baseCameraPosition = _lockerCamera.transform.position;
-            _lockerCamera.gameObject.SetActive(true);
-        }
+    // ─── DiegeticViewController hooks ────────────────────────────────────────
 
-        // Disable player movement and camera look so the locker camera is the authority.
-        player.playerMovementController.SetCanControl(false);
-
-        // Suppress the standard interaction/reticle system.
-        player.SetSuspectCamMode(true);
-
-        // Show cursor so the player can point at items.
-        UIController.Instance.ShowCursor();
-
-        // Hide the first-person arms so they don't occlude the locker view.
-        _playerArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
-        if (_playerArms != null)
-            _playerArms.SetActive(false);
-
-        // Hide the body mesh to prevent it clipping into the locker camera view.
-        _playerBody = player.transform.Find("Art")?.gameObject;
-        if (_playerBody != null)
-            _playerBody.SetActive(false);
-
+    protected override void OnOpened()
+    {
         if (_interactPrompt != null)
         {
             _interactPrompt.gameObject.SetActive(true);
@@ -109,42 +56,8 @@ public class ToolLockerDiegeticController : MonoBehaviour
         }
     }
 
-    /// <summary>Exits the locker view and fully restores normal player controls.</summary>
-    public void Close()
+    protected override void OnClosed()
     {
-        if (!_isActive) return;
-        _isActive = false;
-
-        if (_lockerCamera != null)
-        {
-            // Reset to the resting transform so it's clean on the next open.
-            _lockerCamera.transform.SetPositionAndRotation(_baseCameraPosition, _baseCameraRotation);
-            _lockerCamera.gameObject.SetActive(false);
-        }
-
-        if (_player != null)
-        {
-            _player.playerMovementController.SetCanControl(true);
-            _player.SetSuspectCamMode(false);
-            _player = null;
-        }
-
-        UIController.Instance.HideCursor();
-
-        // Restore the first-person arms.
-        if (_playerArms != null)
-        {
-            _playerArms.SetActive(true);
-            _playerArms = null;
-        }
-
-        // Restore the body mesh.
-        if (_playerBody != null)
-        {
-            _playerBody.SetActive(true);
-            _playerBody = null;
-        }
-
         if (_interactPrompt != null)
             _interactPrompt.gameObject.SetActive(false);
 
@@ -157,19 +70,8 @@ public class ToolLockerDiegeticController : MonoBehaviour
         _hoveredItem = null;
     }
 
-    // ─── MonoBehaviour ───────────────────────────────────────────────────────
-
-    private void Update()
+    protected override void OnUpdate()
     {
-        if (!_isActive) return;
-
-        if (Input.GetKeyDown(_exitKey))
-        {
-            Close();
-            return;
-        }
-
-        HandleCameraMovement();
         HandleLockerRaycast();
 
         if (Input.GetMouseButtonDown(0) && _hoveredItem != null)
@@ -178,34 +80,12 @@ public class ToolLockerDiegeticController : MonoBehaviour
 
     // ─── Private helpers ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Translates the locker camera based on cursor position relative to the screen centre.
-    /// Cursor at centre = no offset; cursor at edge = full <see cref="_maxPanX"/>/<see cref="_maxPanY"/> offset.
-    /// The offset is expressed in the camera's local XY plane so it feels natural regardless of
-    /// the camera's world orientation.
-    /// </summary>
-    private void HandleCameraMovement()
-    {
-        if (_lockerCamera == null) return;
-
-        // Normalise cursor position to [-1, 1] relative to the screen centre.
-        float normX = (Input.mousePosition.x / Screen.width)  * 2f - 1f;
-        float normY = (Input.mousePosition.y / Screen.height) * 2f - 1f;
-
-        // Build the offset in the camera's local space, then convert to world space.
-        float panY = normY >= 0f ? normY * _maxPanUp : normY * _maxPanDown;
-        Vector3 localOffset = new Vector3(normX * _maxPanX, panY, 0f);
-        _lockerCamera.transform.position = _baseCameraPosition + _baseCameraRotation * localOffset;
-    }
-
     private void HandleLockerRaycast()
     {
-        if (_player == null || _player.cam == null) return;
+        if (Player == null || Player.cam == null) return;
 
-        // Cast from the cursor's screen position so the mouse pointer acts as the selector.
-        Ray ray = _player.cam.ScreenPointToRay(Input.mousePosition);
+        Ray ray = Player.cam.ScreenPointToRay(Input.mousePosition);
 
-        // Clear the previously hovered item each frame.
         _hoveredItem = null;
         ClearPrompt();
 
