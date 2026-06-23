@@ -19,6 +19,7 @@ public class ToolsLocker : Interactable
     [SerializeField] private AudioClip lockerCloseSound;
     [SerializeField] private Transform lookTarget;
     [SerializeField] private GameObject[] decor;
+    [SerializeField] private ToolLockerDiegeticController _diegeticController;
     Coroutine closeCoroutine;
 
     public override void OnNetworkSpawn()
@@ -53,7 +54,12 @@ public class ToolsLocker : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         Debug.Log("Toggle Tool Locker");
-        UIController.Instance.OpenToolShop(lookTarget, this);
+
+        if (_diegeticController != null)
+            _diegeticController.Open(player, this);
+        else
+            UIController.Instance.OpenToolShop(lookTarget, this);
+
         OpenLockerServerRpc();
     }
 
