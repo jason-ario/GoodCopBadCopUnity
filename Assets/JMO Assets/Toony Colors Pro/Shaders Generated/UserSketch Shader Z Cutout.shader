@@ -21,6 +21,9 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
 		[TCP2ColorNoAlpha] _SColor ("Shadow Color", Color) = (0.2,0.2,0.2,1)
 		[MainTexture] _BaseMap ("Albedo", 2D) = "white" {}
+		[Toggle(TCP2_NORMAL_MAP)] _UseNormalMap ("Enable Normal Map", Float) = 0
+		[NoScaleOffset] _BumpMap ("Normal Map", 2D) = "bump" {}
+		_BumpScale ("Normal Map Scale", Float) = 1.0
 		_Cutoff ("Alpha Cutoff", Range(0,1)) = 0.5
 		_ZClipPosition ("Z Clip Position (World)", Float) = 0.0
 		[Toggle] _InvertZClip ("Invert Z Clip", Float) = 0.0
@@ -107,6 +110,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 
 		// Shader Properties
 		TCP2_TEX2D_WITH_SAMPLER(_BaseMap);
+		TCP2_TEX2D_WITH_SAMPLER(_BumpMap);
 		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
 		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
 		// Injection Point: 'Variables/Outside CBuffer'
@@ -128,6 +132,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 			half _SketchTexture_OffsetSpeed;
 			fixed4 _SColor;
 			fixed4 _HColor;
+			float _BumpScale;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			//================================
@@ -373,12 +378,14 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 			// Toony Colors Pro 2 keywords
 		#pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON
 			#pragma shader_feature_local_fragment TCP2_SKETCH
+			#pragma shader_feature_local TCP2_NORMAL_MAP
 
 			// vertex input
 			struct Attributes
 			{
 				float4 vertex       : POSITION;
 				float3 normal       : NORMAL;
+				float4 tangent      : TANGENT;
 				float4 texcoord0 : TEXCOORD0;
 				// Injection Point: 'Main Pass/Attributes'
 				UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -399,6 +406,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 				float4 screenPosition : TEXCOORD3;
 				float2 pack1 : TEXCOORD4; /* pack1.xy = texcoord0 */
 				float pack2 : TEXCOORD5; /* pack2.x = fogFactor */
+			#if defined(TCP2_NORMAL_MAP)
+				float3 tangentWS   : TEXCOORD6;
+				float3 bitangentWS : TEXCOORD7;
+			#endif
 				// Injection Point: 'Main Pass/Varyings'
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
@@ -439,7 +450,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 				float4 screenPos = ComputeScreenPos(clipPos);
 				output.screenPosition.xyzw = screenPos;
 
-				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal);
+				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal, input.tangent);
+		#if defined(TCP2_NORMAL_MAP)
+				output.tangentWS = vertexNormalInput.tangentWS;
+				output.bitangentWS = vertexNormalInput.bitangentWS;
+			#endif
 			#ifdef _ADDITIONAL_LIGHTS_VERTEX
 				// Vertex lighting
 				output.vertexLights = VertexLighting(vertexInput.positionWS, vertexNormalInput.normalWS);
@@ -472,6 +487,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
+			#if defined(TCP2_NORMAL_MAP)
+				half3 normalTS = UnpackNormalScale(TCP2_TEX2D_SAMPLE(_BumpMap, _BumpMap, input.pack1.xy), _BumpScale);
+				float3x3 tangentToWorld = float3x3(normalize(input.tangentWS), normalize(input.bitangentWS), normalWS);
+				normalWS = normalize(mul(normalTS, tangentToWorld));
+			#endif
 
 				//Screen Space UV
 				float2 screenUV = input.screenPosition.xyzw.xy / input.screenPosition.xyzw.w;

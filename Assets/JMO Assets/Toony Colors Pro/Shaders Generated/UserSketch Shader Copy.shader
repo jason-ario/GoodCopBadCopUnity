@@ -1,4 +1,4 @@
-﻿// Toony Colors Pro+Mobile 2
+// Toony Colors Pro+Mobile 2
 // (c) 2014-2025 Jean Moreno
 
 Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
@@ -10,6 +10,9 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 		[TCP2ColorNoAlpha] _HColor ("Highlight Color", Color) = (0.75,0.75,0.75,1)
 		[TCP2ColorNoAlpha] _SColor ("Shadow Color", Color) = (0.2,0.2,0.2,1)
 		[MainTexture] _BaseMap ("Albedo", 2D) = "white" {}
+		[Toggle(TCP2_NORMAL_MAP)] _UseNormalMap ("Enable Normal Map", Float) = 0
+		[NoScaleOffset] _BumpMap ("Normal Map", 2D) = "bump" {}
+		_BumpScale ("Normal Map Scale", Float) = 1.0
 		[TCP2Separator]
 
 		[TCP2Header(Ramp Shading)]
@@ -82,6 +85,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 
 		// Shader Properties
 		TCP2_TEX2D_WITH_SAMPLER(_BaseMap);
+		TCP2_TEX2D_WITH_SAMPLER(_BumpMap);
 		TCP2_TEX2D_WITH_SAMPLER(_StylizedThreshold);
 		TCP2_TEX2D_WITH_SAMPLER(_SketchTexture);
 
@@ -99,6 +103,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 			half _SketchTexture_OffsetSpeed;
 			fixed4 _SColor;
 			fixed4 _HColor;
+			float _BumpScale;
 		CBUFFER_END
 
 		// Hash without sin and uniform across platforms
@@ -295,12 +300,14 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 			//--------------------------------------
 			// Toony Colors Pro 2 keywords
 			#pragma shader_feature_local_fragment TCP2_SKETCH
+			#pragma shader_feature_local TCP2_NORMAL_MAP
 
 			// vertex input
 			struct Attributes
 			{
 				float4 vertex       : POSITION;
 				float3 normal       : NORMAL;
+				float4 tangent      : TANGENT;
 				float4 texcoord0 : TEXCOORD0;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
@@ -320,6 +327,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 				float4 screenPosition : TEXCOORD3;
 				float2 pack1 : TEXCOORD4; /* pack1.xy = texcoord0 */
 				float pack2 : TEXCOORD5; /* pack2.x = fogFactor */
+			#if defined(TCP2_NORMAL_MAP)
+				float3 tangentWS   : TEXCOORD6;
+				float3 bitangentWS : TEXCOORD7;
+			#endif
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
@@ -353,7 +364,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 				float4 screenPos = ComputeScreenPos(clipPos);
 				output.screenPosition.xyzw = screenPos;
 
-				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal);
+				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal, input.tangent);
+		#if defined(TCP2_NORMAL_MAP)
+				output.tangentWS = vertexNormalInput.tangentWS;
+				output.bitangentWS = vertexNormalInput.bitangentWS;
+			#endif
 			#ifdef _ADDITIONAL_LIGHTS_VERTEX
 				// Vertex lighting
 				output.vertexLights = VertexLighting(vertexInput.positionWS, vertexNormalInput.normalWS);
@@ -382,6 +397,11 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
+			#if defined(TCP2_NORMAL_MAP)
+				half3 normalTS = UnpackNormalScale(TCP2_TEX2D_SAMPLE(_BumpMap, _BumpMap, input.pack1.xy), _BumpScale);
+				float3x3 tangentToWorld = float3x3(normalize(input.tangentWS), normalize(input.bitangentWS), normalWS);
+				normalWS = normalize(mul(normalTS, tangentToWorld));
+			#endif
 
 				//Screen Space UV
 				float2 screenUV = input.screenPosition.xyzw.xy / input.screenPosition.xyzw.w;
