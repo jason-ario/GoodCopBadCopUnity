@@ -310,6 +310,20 @@ public class ToolLockerDiegeticController : DiegeticViewController
         item.gameObject.SetActive(false);
     }
 
+    /// <summary>
+    /// Re-enables all shop items that were hidden by purchases.
+    /// Called via ClientRpc at the start of each new day so the locker is fully restocked.
+    /// </summary>
+    public void RestockItems()
+    {
+        foreach (ShopItem item in _shopItems)
+        {
+            if (item == null) continue;
+            item.SetAvailable(true);
+            item.gameObject.SetActive(true);
+        }
+    }
+
     private int GetItemIndex(ShopItem item)
     {
         for (int i = 0; i < _shopItems.Length; i++)

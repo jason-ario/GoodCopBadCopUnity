@@ -55,11 +55,17 @@ public class ToolsLocker : Interactable
 
         // Snap decor to the current replicated state for late-joining clients.
         ApplyDecorImmediate(isOpen.Value);
+
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart += OnDayStart;
     }
 
     public override void OnNetworkDespawn()
     {
         isOpen.OnValueChanged -= OnIsOpenChanged;
+
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
@@ -112,6 +118,19 @@ public class ToolsLocker : Interactable
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only: called when a new day starts.
+    /// Broadcasts a restock to all clients so sold-out items reappear in the locker.
+    /// </summary>
+    private void OnDayStart()
+    {
+        if (!IsServer) return;
+        RestockClientRpc();
+    }
+
+    [ClientRpc]
+    private void RestockClientRpc() => _diegeticController?.RestockItems();
 
     private void CloseLockerInternal()
     {
