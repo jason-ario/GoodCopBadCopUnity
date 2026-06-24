@@ -81,6 +81,16 @@ public class ToolsLocker : Interactable
 
     // ── Server RPCs ───────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Hides the purchased shop item at <paramref name="itemIndex"/> on all clients.
+    /// Called by the purchasing client immediately after a successful buy.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void HideShopItemServerRpc(int itemIndex) => HideShopItemClientRpc(itemIndex);
+
+    [ClientRpc]
+    private void HideShopItemClientRpc(int itemIndex) => _diegeticController?.HideItem(itemIndex);
+
     /// <summary>Called by each local client when they close the tool shop UI.
     /// Decrements the viewer count and closes the locker when no viewers remain.</summary>
     [ServerRpc(RequireOwnership = false)]

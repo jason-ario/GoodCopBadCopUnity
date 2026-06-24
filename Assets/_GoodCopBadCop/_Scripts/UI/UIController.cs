@@ -21,6 +21,9 @@ public class UIController : MonoBehaviour
     /// <summary>Fired on the local client whenever any player opens the tool shop.</summary>
     public static event Action OnToolShopOpened;
 
+    /// <summary>Fired on the local client when the pause menu is about to open. Use this to close any overlapping UI before the pause menu appears.</summary>
+    public static event Action OnPauseMenuOpened;
+
     [SerializeField] private RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
     [SerializeField] private GameObject playerUI;
@@ -35,6 +38,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject startShiftScreen;
     [SerializeField] private GameObject guardPurchaseScreen;
     [SerializeField] private GuardPurchaseScreenUI guardPurchaseScreenUI;
+    [SerializeField] private GameObject shopItemPurchasePopup;
+    [SerializeField] private ShopItemPurchasePopupUI shopItemPurchasePopupUI;
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
@@ -290,6 +295,26 @@ public class UIController : MonoBehaviour
         CloseGuardPurchaseScreen();
     }
 
+    /// <summary>
+    /// Opens the Shop Item Purchase Popup over the diegetic locker view.
+    /// Shows "Buy [itemName]", the coupon price, and a Buy button.
+    /// </summary>
+    /// <param name="itemName">Name of the item being purchased.</param>
+    /// <param name="price">Coupon price to display and validate against.</param>
+    /// <param name="onBuy">Callback invoked when the player confirms the purchase.</param>
+    public void OpenShopItemPurchasePopup(string itemName, int price, Action onBuy)
+    {
+        shopItemPurchasePopupUI.Setup(itemName, price, onBuy);
+        shopItemPurchasePopup.SetActive(true);
+    }
+
+    /// <summary>Closes the Shop Item Purchase Popup.</summary>
+    public void CloseShopItemPurchasePopup()
+    {
+        if (shopItemPurchasePopup != null)
+            shopItemPurchasePopup.SetActive(false);
+    }
+
     public void OpenInvitePanel()
     {
         PlayerInstance.Instance.OpenedUIPanel();
@@ -334,6 +359,11 @@ public class UIController : MonoBehaviour
         showedReticleBeforePause = couldControlBeforePaused && couldLookBeforePaused;
 
         playerUIWasActiveBeforePaused = playerUI.activeSelf;
+
+        // Give subscribers (e.g. diegetic views with open popups) a chance to clean up
+        // their overlapping UI before the pause menu becomes visible.
+        OnPauseMenuOpened?.Invoke();
+
         playerUI.SetActive(false);
         
         ShowCursor();

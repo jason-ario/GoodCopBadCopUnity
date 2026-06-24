@@ -161,6 +161,9 @@ public abstract class DiegeticViewController : MonoBehaviour
     {
         if (!IsActive) return;
 
+        // Don't process any input or interaction while the game is paused.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
+
         if (Input.GetKeyDown(_exitKey))
         {
             Close();
