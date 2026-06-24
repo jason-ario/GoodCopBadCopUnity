@@ -40,6 +40,10 @@ public class MainMenuController : MonoBehaviour
 
     [SerializeField] public CanvasGroup canvasGroup;
 
+    [Header("Debug")]
+    [SerializeField] private bool _debugSkipToGame;
+    [SerializeField] private int _debugSlotIndex = 0;
+
     private GameObject _currentScreen;
     private List<GameObject> _allScreens;
     private bool _buttonGroupFaded;
@@ -72,6 +76,15 @@ public class MainMenuController : MonoBehaviour
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
+
+#if UNITY_EDITOR
+        if (_debugSkipToGame)
+        {
+            DebugSkipToGame();
+            return;
+        }
+#endif
+
         SwitchToScreen(homeScreen);
         playableDirector.gameObject.SetActive(true);
     }
@@ -281,6 +294,37 @@ public class MainMenuController : MonoBehaviour
         if (!Unity.Netcode.NetworkManager.Singleton.IsHost)
             Debug.LogWarning("[WaitUntilHostReady] Timed out waiting for host to be ready.");
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Editor-only debug shortcut that skips the entire main menu flow and jumps straight into gameplay.
+    /// Mirrors the full sequence: slot selection → lobby creation → game start.
+    /// Toggle via the "Debug Skip To Game" field in the Inspector.
+    /// </summary>
+    private async void DebugSkipToGame()
+    {
+        Debug.Log($"[DebugSkipToGame] Skipping UI flow — using slot {_debugSlotIndex}.");
+
+        SaveDataManager.Instance.SelectSlot(_debugSlotIndex);
+        GameManager.Instance.BeginLobbyTransition();
+
+        bool success = await LobbyManager.Instance.CreateLobby();
+        if (!success)
+        {
+            Debug.LogError("[DebugSkipToGame] CreateLobby failed — aborting debug skip.");
+            GameManager.Instance.CancelLobbyTransition();
+            SwitchToScreen(homeScreen);
+            playableDirector.gameObject.SetActive(true);
+            return;
+        }
+
+        await WaitUntilHostReady();
+
+        SaveDataManager.Instance.InitialiseActiveSlot();
+        GameManager.Instance.TransitionToLobby();
+        GameManager.Instance.TryStartGame();
+    }
+#endif
 
     private IEnumerator WaitAndOpenWindow()
     {
