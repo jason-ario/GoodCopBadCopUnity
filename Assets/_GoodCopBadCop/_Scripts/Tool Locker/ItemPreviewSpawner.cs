@@ -34,6 +34,9 @@ public class ItemPreviewSpawner : MonoBehaviour
         currentItem = Instantiate(shopItem, spawnPoint.position, Quaternion.Euler(itemRotation) * Quaternion.Euler(0, 180, 0) * Quaternion.Euler(rotationOffset)); 
         currentItem.transform.parent = spawnPoint;
 
+        int shopItemLayer = LayerMask.NameToLayer("ShopItems");
+        SetLayerRecursively(currentItem.gameObject, shopItemLayer);
+
         if (obscure && _unavailableItemMaterial != null)
         {
             foreach (Renderer r in currentItem.GetComponentsInChildren<Renderer>())
@@ -46,6 +49,23 @@ public class ItemPreviewSpawner : MonoBehaviour
         }
 
         FrameObject(previewCamera, currentItem);
+    }
+
+    /// <summary>Destroys the currently previewed item and resets the spawner.</summary>
+    public void Clear()
+    {
+        if (currentItem != null)
+        {
+            Destroy(currentItem.gameObject);
+            currentItem = null;
+        }
+    }
+
+    void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+            SetLayerRecursively(child.gameObject, layer);
     }
 
     void FrameObject(Camera cam, ShopItem target)

@@ -32,6 +32,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// <summary>Whether this view is currently open.</summary>
     protected bool IsActive { get; private set; }
 
+    /// <summary>
+    /// True while ANY diegetic view is open on this client.
+    /// Used by external systems (e.g. <see cref="UIController"/>) to suppress
+    /// input handling that would conflict with the view's own exit-key logic.
+    /// </summary>
+    public static bool IsAnyViewActive { get; private set; }
+
     /// <summary>The interaction controller of the player who opened this view.</summary>
     protected PlayerInteractionController Player { get; private set; }
 
@@ -63,6 +70,7 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         Player = player;
         IsActive = true;
+        IsAnyViewActive = true;
 
         // Activate the view camera — Cinemachine blends to it automatically.
         if (_viewCamera != null)
@@ -104,6 +112,7 @@ public abstract class DiegeticViewController : MonoBehaviour
     {
         if (!IsActive) return;
         IsActive = false;
+        IsAnyViewActive = false;
 
         // Give subclass a chance to clean up while Player is still valid.
         OnClosed();
@@ -155,6 +164,18 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// </summary>
     protected virtual void OnUpdate() { }
 
+    /// <summary>
+    /// When overridden to return true, suppresses camera panning for that frame.
+    /// Use this to freeze the view while a popup or overlay is open.
+    /// </summary>
+    protected virtual bool SuppressCameraMovement => false;
+
+    /// <summary>
+    /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.
+    /// Override to intercept the key — for example, to dismiss a popup before closing the view.
+    /// </summary>
+    protected virtual void OnExitKeyPressed() => Close();
+
     // ─── MonoBehaviour ───────────────────────────────────────────────────────
 
     private void Update()
@@ -166,11 +187,12 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         if (Input.GetKeyDown(_exitKey))
         {
-            Close();
+            OnExitKeyPressed();
             return;
         }
 
-        HandleCameraMovement();
+        if (!SuppressCameraMovement)
+            HandleCameraMovement();
         OnUpdate();
     }
 

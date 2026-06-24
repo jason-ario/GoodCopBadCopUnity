@@ -27,9 +27,7 @@ public class CursorPromptController : MonoBehaviour
     /// <summary>Whether the prompt is currently visible.</summary>
     public bool IsVisible => gameObject.activeSelf;
 
-    /// <summary>
-    /// Shows the prompt with <paramref name="text"/> and starts tracking the cursor.
-    /// </summary>
+    /// <summary>Shows the prompt with <paramref name="text"/> and starts tracking the cursor.</summary>
     public void Show(string text)
     {
         _label.text = text;

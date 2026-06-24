@@ -10,6 +10,7 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
     public PickableItemData pickableItemData;
 
     private HighlightEffect _highlightEffect;
+    private bool _highlightBlocked;
 
     [SerializeField] private int price;
     private int? _priceOverride = null;
@@ -87,7 +88,7 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
 
     public void OnHoverEnter()
     {
-        if (!IsAvailable) return;
+        if (!IsAvailable || _highlightBlocked) return;
         Highlight(true);
         Hovered?.Invoke();
     }
@@ -117,5 +118,16 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
     {
         if (_highlightEffect != null)
             _highlightEffect.enabled = highlight;
+    }
+
+    /// <summary>
+    /// Prevents this item from being highlighted regardless of hover state.
+    /// Immediately disables any active highlight when <paramref name="blocked"/> is true.
+    /// </summary>
+    public void SetHighlightBlocked(bool blocked)
+    {
+        _highlightBlocked = blocked;
+        if (blocked)
+            Highlight(false);
     }
 }

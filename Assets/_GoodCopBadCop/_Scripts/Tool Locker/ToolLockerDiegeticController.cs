@@ -26,6 +26,21 @@ public class ToolLockerDiegeticController : DiegeticViewController
     private IHoverable _lastHoverable;
     private bool _popupOpen;
 
+    /// <summary>Freezes camera panning while the purchase popup is open.</summary>
+    protected override bool SuppressCameraMovement => _popupOpen;
+
+    /// <summary>
+    /// When the popup is open, Q dismisses only the popup.
+    /// When no popup is open, Q closes the entire diegetic view as normal.
+    /// </summary>
+    protected override void OnExitKeyPressed()
+    {
+        if (_popupOpen)
+            CloseItemPopup();
+        else
+            Close();
+    }
+
     /// <summary>Cached delegates so we can unsubscribe cleanly on close.</summary>
     private readonly Dictionary<ShopItem, (Action hovered, Action unhovered, Action clicked)> _subs = new();
 
@@ -140,9 +155,15 @@ public class ToolLockerDiegeticController : DiegeticViewController
         _lastHoverable = null;
     }
 
+    private void SetAllItemsHighlightBlocked(bool blocked)
+    {
+        foreach (ShopItem item in _shopItems)
+            item?.SetHighlightBlocked(blocked);
+    }
+
     private void ShowPrompt(ShopItem item)
     {
-        _cursorPrompt?.Show($"{item.Name}  <sprite=0>{item.Price}");
+        _cursorPrompt?.Show($"{item.Name}  <sprite=0>  {item.Price}");
     }
 
     private void ClearPrompt()
@@ -155,14 +176,16 @@ public class ToolLockerDiegeticController : DiegeticViewController
         ClearHover();
         ClearPrompt();
         _popupOpen = true;
+        SetAllItemsHighlightBlocked(true);
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(CloseItemPopup);
-        UIController.Instance.OpenShopItemPurchasePopup(item.Name, item.Price, () => OnPopupBuyConfirmed(item));
+        UIController.Instance.OpenShopItemPurchasePopup(item, () => OnPopupBuyConfirmed(item), CloseItemPopup);
     }
 
     private void CloseItemPopup()
     {
         _popupOpen = false;
+        SetAllItemsHighlightBlocked(false);
         UIController.Instance.CloseShopItemPurchasePopup();
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(Close);

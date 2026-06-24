@@ -80,7 +80,9 @@ public class UIController : MonoBehaviour
             return;
         }
 
-        if (backButtonUI.activeSelf == true)
+        // While a diegetic view is open, Q is its exit key — suppress the global
+        // "Back" shortcut so it doesn't double-fire through the back button as well.
+        if (backButtonUI.activeSelf == true && !DiegeticViewController.IsAnyViewActive)
         {
             if(Input.GetButtonDown("Back"))
             {
@@ -297,14 +299,14 @@ public class UIController : MonoBehaviour
 
     /// <summary>
     /// Opens the Shop Item Purchase Popup over the diegetic locker view.
-    /// Shows "Buy [itemName]", the coupon price, and a Buy button.
+    /// Shows "Buy [itemName]", the coupon price, a live 3-D preview, and a Buy button.
     /// </summary>
-    /// <param name="itemName">Name of the item being purchased.</param>
-    /// <param name="price">Coupon price to display and validate against.</param>
+    /// <param name="item">The shop item to display and purchase.</param>
     /// <param name="onBuy">Callback invoked when the player confirms the purchase.</param>
-    public void OpenShopItemPurchasePopup(string itemName, int price, Action onBuy)
+    /// <param name="onCancel">Callback invoked when the player presses the No button.</param>
+    public void OpenShopItemPurchasePopup(ShopItem item, Action onBuy, Action onCancel)
     {
-        shopItemPurchasePopupUI.Setup(itemName, price, onBuy);
+        shopItemPurchasePopupUI.Setup(item, onBuy, onCancel);
         shopItemPurchasePopup.SetActive(true);
     }
 
