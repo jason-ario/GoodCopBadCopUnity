@@ -37,7 +37,7 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
         _price = item.Price;
         _titleLabel.text = $"Buy {item.Name}";
         _priceLabel.text = $"<sprite=0>  {item.Price}";
-        _previewSpawner?.SpawnAndFrame(item);
+        // Preview is handled by the in-world Cinemachine zoom camera.
     }
 
     /// <summary>Called by the Buy button's OnClick event.</summary>
@@ -65,8 +65,6 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
     {
         if (GlobalHostVariables.Instance != null)
             GlobalHostVariables.Instance.money.OnValueChanged -= OnMoneyChanged;
-
-        _previewSpawner?.Clear();
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────

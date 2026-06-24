@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Cinemachine;
 using UnityEngine;
 
 /// <summary>
@@ -19,6 +20,10 @@ public class ToolLockerDiegeticController : DiegeticViewController
     [Header("UI")]
     [Tooltip("Cursor-following prompt shown when hovering a purchasable item. Optional.")]
     [SerializeField] private CursorPromptController _cursorPrompt;
+
+    [Header("Item Zoom Camera")]
+    [Tooltip("Secondary CinemachineCamera that activates and zooms in on the selected shop item when the purchase popup is open.")]
+    [SerializeField] private CinemachineCamera _itemZoomCamera;
 
     // ─── Runtime state ───────────────────────────────────────────────────────
 
@@ -161,6 +166,41 @@ public class ToolLockerDiegeticController : DiegeticViewController
             item?.SetHighlightBlocked(blocked);
     }
 
+    /// <summary>
+    /// Positions <see cref="_itemZoomCamera"/> to frame <paramref name="item"/> and activates it,
+    /// causing Cinemachine to blend from the locker camera into the item close-up.
+    /// </summary>
+    private void ActivateItemZoomCamera(ShopItem item)
+    {
+        if (_itemZoomCamera == null) return;
+
+        Renderer[] renderers = item.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+
+        Bounds bounds = renderers[0].bounds;
+        foreach (Renderer r in renderers)
+            bounds.Encapsulate(r.bounds);
+
+        Camera rayCam = RaycastCamera;
+        if (rayCam == null) return;
+
+        // Place the zoom camera along the current view direction toward the item centre.
+        Vector3 dir = (bounds.center - rayCam.transform.position).normalized;
+        float fovRad  = _itemZoomCamera.Lens.FieldOfView * Mathf.Deg2Rad;
+        float radius   = bounds.extents.magnitude * 1.5f;
+        float distance = radius / Mathf.Sin(fovRad * 0.5f);
+
+        _itemZoomCamera.transform.position = bounds.center - dir * distance;
+        _itemZoomCamera.transform.LookAt(bounds.center);
+        _itemZoomCamera.gameObject.SetActive(true);
+    }
+
+    private void DeactivateItemZoomCamera()
+    {
+        if (_itemZoomCamera != null)
+            _itemZoomCamera.gameObject.SetActive(false);
+    }
+
     private void ShowPrompt(ShopItem item)
     {
         _cursorPrompt?.Show($"{item.Name}  <sprite=0>  {item.Price}");
@@ -177,6 +217,7 @@ public class ToolLockerDiegeticController : DiegeticViewController
         ClearPrompt();
         _popupOpen = true;
         SetAllItemsHighlightBlocked(true);
+        ActivateItemZoomCamera(item);
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(CloseItemPopup);
         UIController.Instance.OpenShopItemPurchasePopup(item, () => OnPopupBuyConfirmed(item), CloseItemPopup);
@@ -186,6 +227,7 @@ public class ToolLockerDiegeticController : DiegeticViewController
     {
         _popupOpen = false;
         SetAllItemsHighlightBlocked(false);
+        DeactivateItemZoomCamera();
         UIController.Instance.CloseShopItemPurchasePopup();
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(Close);
@@ -193,7 +235,6 @@ public class ToolLockerDiegeticController : DiegeticViewController
 
     private void OnPopupBuyConfirmed(ShopItem item)
     {
-        CloseItemPopup();
         TryPurchase(item);
     }
 
