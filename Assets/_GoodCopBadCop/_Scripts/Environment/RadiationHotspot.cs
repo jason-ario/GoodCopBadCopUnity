@@ -29,7 +29,7 @@ public class RadiationHotspot : MonoBehaviour
     {
         if (!_playerInside || _playerRadiation == null) return;
 
-        _playerRadiation.AddRadiation(bonusRadiationPerSecond * Time.deltaTime);
+        _playerRadiation.AddRadiation(bonusRadiationPerSecond * _playerRadiation.RadiationMultiplier * Time.deltaTime);
     }
 
     private void OnTriggerEnter(Collider other)

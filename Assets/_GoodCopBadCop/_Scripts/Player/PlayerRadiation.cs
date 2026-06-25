@@ -41,6 +41,13 @@ public class PlayerRadiation : NetworkBehaviour
     /// <summary>When true, passive radiation gain and radiation damage are paused. Server-side only.</summary>
     public bool IsInvincible { get; set; }
 
+    /// <summary>
+    /// Scales all incoming radiation accumulation (passive and hotspot).
+    /// Set to a value less than 1 to slow radiation build-up (e.g. 0.2 while wearing the mask).
+    /// Server-side only — only meaningful on the host since radiation runs there.
+    /// </summary>
+    public float RadiationMultiplier { get; set; } = 1f;
+
     private void Awake()
     {
         playerHealth = GetComponent<PlayerHealth>();
@@ -57,7 +64,7 @@ public class PlayerRadiation : NetworkBehaviour
         if (IsInvincible)
             return;
 
-        AddRadiation(passiveRadiationPerSecond * Time.deltaTime);
+        AddRadiation(passiveRadiationPerSecond * RadiationMultiplier * Time.deltaTime);
 
         if (isTakingPill)
         {

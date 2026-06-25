@@ -15,7 +15,11 @@ public class PlayerEquipmentController : NetworkBehaviour
     [Tooltip("Item data for the Radiation Mask — used to spawn the pickup when unequipping.")]
     [SerializeField] private PickableItemData radiationMaskItemData;
 
+    [Tooltip("Multiplier applied to all radiation accumulation while the mask is worn. 0.2 = 20% of normal rate.")]
+    [SerializeField] private float maskRadiationMultiplier = 0.2f;
+
     private PlayerPickupController _pickupController;
+    private PlayerRadiation _radiationController;
 
     private readonly NetworkVariable<bool> _isMaskEquipped = new(
         false,
@@ -28,6 +32,7 @@ public class PlayerEquipmentController : NetworkBehaviour
     private void Awake()
     {
         _pickupController = GetComponent<PlayerPickupController>();
+        _radiationController = GetComponent<PlayerRadiation>();
     }
 
     public override void OnNetworkSpawn()
@@ -65,6 +70,10 @@ public class PlayerEquipmentController : NetworkBehaviour
         // Drive the local first-person overlay for the owner only.
         if (IsOwner && MaskOverlayController.Instance != null)
             MaskOverlayController.Instance.SetVisible(equipped);
+
+        // Radiation runs server-side only — set the multiplier only on the server.
+        if (IsServer && _radiationController != null)
+            _radiationController.RadiationMultiplier = equipped ? maskRadiationMultiplier : 1f;
     }
 
     /// <summary>
