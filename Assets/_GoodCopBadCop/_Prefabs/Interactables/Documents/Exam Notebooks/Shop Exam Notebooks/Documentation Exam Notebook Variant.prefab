@@ -629,6 +629,8 @@ PrefabInstance:
     - {fileID: 3565806528623815997, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
     - {fileID: 8729848145663975382, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
     - {fileID: 8405223072480831118, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
+    - {fileID: 1842763018772811204, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
+    - {fileID: 6510248483042599558, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
     m_RemovedGameObjects:
     - {fileID: 4497373234105987888, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
     - {fileID: 437479862122802218, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
@@ -654,84 +656,10 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3172141296290712066, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6953837401903131857}
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 2832312401031925944, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 9208699232882434807}
-    - targetCorrespondingSourceObject: {fileID: 2832312401031925944, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8380634526182539151}
-    - targetCorrespondingSourceObject: {fileID: 2832312401031925944, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 3709956074301236104}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
 --- !u!4 &2364621140838780074 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3172141296290712066, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
   m_PrefabInstance: {fileID: 924759467295393448}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &3142108234356315664 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 2832312401031925944, guid: 552098201c4999a459defe5cb5aff32a, type: 3}
-  m_PrefabInstance: {fileID: 924759467295393448}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &9208699232882434807
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3142108234356315664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1935996612e8a2d46b890930c54d344a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShopItem
-  name: Documentation Exam Notebook
-  pickableItemData: {fileID: 11400000, guid: 41407236e36c88f498d006bc306cd765, type: 2}
-  price: 20
-  rotationOffset: {x: 0, y: 0, z: 0}
-  customPurchaseAction: {fileID: 0}
-  _unlockedByDefault: 1
---- !u!114 &8380634526182539151
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3142108234356315664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 154646715
-  InScenePlacedSourceGlobalObjectIdHash: 2153001971
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 0
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
---- !u!114 &3709956074301236104
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3142108234356315664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80fed2498e78f78488216968af23522e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WorldShopItemInteractable
-  ShowTopMostFoldoutHeaderGroup: 1
-  itemsThatCanInteractWith: []
-  interactText: Documentation Exam Notebook
-  highlightNameFilter: 
-  _itemZoomCamera: {fileID: 5857926693841800573}

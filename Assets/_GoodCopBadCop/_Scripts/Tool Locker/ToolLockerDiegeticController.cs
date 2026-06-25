@@ -112,6 +112,13 @@ public class ToolLockerDiegeticController : DiegeticViewController
 
         _cursorPrompt?.Hide();
 
+        // Always deactivate the item zoom camera regardless of how the view was closed
+        // (purchase, Q key, or back button). Without this the zoom camera stays active
+        // after the locker camera deactivates and Cinemachine never returns to the player camera.
+        _popupOpen = false;
+        DeactivateItemZoomCamera();
+        SetAllItemsHighlightBlocked(false);
+
         UIController.Instance.CloseShopItemPurchasePopup();
 
         if (_locker != null)

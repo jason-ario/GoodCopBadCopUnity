@@ -22,6 +22,16 @@ public class WorldShopItemInteractable : Interactable
     [Tooltip("Optional CinemachineCamera that activates and zooms in on this item during purchase. Leave empty to skip zoom.")]
     [SerializeField] private CinemachineCamera _itemZoomCamera;
 
+    [Header("Despawn Behaviour")]
+    [Tooltip("When true, the item is hidden for all clients after a successful purchase (default shop behaviour). " +
+             "Set to false for pile-style items that should remain in the world regardless of how many times they are purchased.")]
+    [SerializeField] private bool _despawnOnPurchase = true;
+
+    [Header("Drawer Lock")]
+    [Tooltip("Optional drawer to lock for all clients while the purchase view is open. " +
+             "Assign this when the item lives inside a drawer that should not be moved during purchase.")]
+    [SerializeField] private Drawer _drawerToLock;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     private ShopItem _shopItem;
@@ -87,6 +97,7 @@ public class WorldShopItemInteractable : Interactable
 
         ActivateZoomCamera();
         UIController.Instance.OpenShopItemPurchasePopup(_shopItem, OnBuyConfirmed, ClosePurchaseView);
+        _drawerToLock?.SetLocked(true);
     }
 
     private void ClosePurchaseView()
@@ -103,6 +114,7 @@ public class WorldShopItemInteractable : Interactable
         UIController.Instance.CloseShopItemPurchasePopup();
         UIController.Instance.HideBackButton();
         UIController.Instance.HideCursor();
+        _drawerToLock?.SetLocked(false);
 
         if (_currentPlayer != null)
         {
@@ -151,7 +163,8 @@ public class WorldShopItemInteractable : Interactable
         }
 
         UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
-        DespawnItemServerRpc();
+        if (_despawnOnPurchase)
+            DespawnItemServerRpc();
         ClosePurchaseView();
     }
 
