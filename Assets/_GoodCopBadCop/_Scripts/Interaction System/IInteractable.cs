@@ -15,6 +15,14 @@ public interface IInteractable
 /// </summary>
 public interface IPickupSlot { }
 
+/// <summary>
+/// Marker interface for interactables that handle LMB interaction regardless of
+/// what the player is holding. When implemented, <see cref="PlayerInteractionController"/>
+/// will call <see cref="IInteractable.Interact"/> via <c>TryItemUse</c> instead of
+/// routing to <c>TryUseObject</c> when the held item is not compatible.
+/// </summary>
+public interface IHeldItemPassthrough { }
+
 [RequireComponent(typeof(HighlightEffect))]
 public abstract class Interactable : NetworkBehaviour, IInteractable
 {

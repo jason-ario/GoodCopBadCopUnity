@@ -431,6 +431,12 @@ public class PlayerInteractionController : NetworkBehaviour
             interactable.InteractWithItem(this, pickupController.HeldObject);
             _playerPickupController.TryUseObject();
         }
+        else if (interactable is IHeldItemPassthrough)
+        {
+            // This interactable explicitly handles LMB input itself regardless of held item.
+            // Do not call TryUseObject — the interactable manages the held-button lifecycle.
+            interactable.Interact(this);
+        }
         else
         {
             Debug.Log("Held object is not compatible with this interactable");

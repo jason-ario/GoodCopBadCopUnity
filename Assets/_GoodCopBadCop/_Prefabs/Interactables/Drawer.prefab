@@ -115,8 +115,10 @@ MonoBehaviour:
   _drawerMesh: {fileID: 3372983779603771663}
   _closedPos: {x: 0, y: 0, z: 0}
   _openPos: {x: 0.001, y: 0, z: 0.357}
-  _ikTarget: {fileID: 6993434595672701275}
+  _rightIkTarget: {fileID: 8047937578891929337}
+  _leftIkTarget: {fileID: 5860300106050939416}
   _dragSensitivity: -0.05
+  _snapDuration: 0.2
 --- !u!95 &7015960570428413188
 Animator:
   serializedVersion: 7
@@ -474,6 +476,8 @@ Transform:
   m_Children:
   - {fileID: 8302128693479910716}
   - {fileID: 6993434595672701275}
+  - {fileID: 8047937578891929337}
+  - {fileID: 5860300106050939416}
   m_Father: {fileID: 6739093489705989157}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &5975077672217129541
@@ -630,6 +634,68 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.34298277, y: 0.07973523, z: 0.44615474}
   m_Center: {x: 7.1953325e-11, y: 0.37697047, z: 0.08272015}
+--- !u!1 &4183137291122828574
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8047937578891929337}
+  m_Layer: 0
+  m_Name: IK Target Right
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8047937578891929337
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4183137291122828574}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.002628106, y: 0.70710725, z: -0.70710146, w: 0.00000051725436}
+  m_LocalPosition: {x: 0.004315743, y: 0.42398143, z: 0.3825998}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3372983779603771663}
+  m_LocalEulerAnglesHint: {x: -269.788, y: -89.768005, z: 90.019}
+--- !u!1 &5038390696066203666
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5860300106050939416}
+  m_Layer: 0
+  m_Name: IK Target Left
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5860300106050939416
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5038390696066203666}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071016, y: 0.0000003586968, z: -0.0026279325, w: -0.70710725}
+  m_LocalPosition: {x: 0.0043157456, y: 0.42398146, z: 0.38259974}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3372983779603771663}
+  m_LocalEulerAnglesHint: {x: -449.79102, y: -89.77, z: 89.983}
 --- !u!1001 &2928185612852235926
 PrefabInstance:
   m_ObjectHideFlags: 0

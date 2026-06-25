@@ -4,7 +4,7 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 
-public class Drawer : Interactable
+public class Drawer : Interactable, IHeldItemPassthrough
 {
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip drawerOpenSound;
@@ -22,7 +22,10 @@ public class Drawer : Interactable
 
     [Header("IK")]
     [Tooltip("Child Transform the right-arm IK anchors to while the player holds the drawer.")]
-    [SerializeField] private Transform _ikTarget;
+    [SerializeField] private Transform _rightIkTarget;
+
+    [Tooltip("Child Transform the left-arm IK anchors to while the player holds the drawer.")]
+    [SerializeField] private Transform _leftIkTarget;
 
     [Header("Drag")]
     [Tooltip("Drag speed magnitude. The drag direction is computed automatically from the camera angle relative to the drawer's slide axis — sign is ignored.")]
@@ -30,6 +33,9 @@ public class Drawer : Interactable
 
     [Tooltip("Duration of the smooth lerp when remote clients receive a state change.")]
     [SerializeField] private float _snapDuration = 0.2f;
+
+    private const string RightGripBool = "RightGrip";
+    private const string LeftGripBool  = "LeftGrip";
 
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(
         false,
@@ -47,7 +53,9 @@ public class Drawer : Interactable
     private float _dragT = 0f;
 
     private bool _inControl = false;
+    private bool _usingRightArm = true;
     private PlayerInteractionController _currentPlayer;
+    private Coroutine _exitCoroutine;
 
     /// <summary>
     /// Fired locally whenever this drawer transitions to open.
@@ -110,17 +118,43 @@ public class Drawer : Interactable
         if (Input.GetMouseButtonUp(0))
         {
             CommitDrawer();
-            StartCoroutine(ExitDrawerInteraction());
+            _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
         }
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Drawer interaction is LMB-only. Suppress the default E-key alternate path
+    /// so pressing E never starts the grab sequence (which would lock the player
+    /// with no LMB-up event to exit).
+    /// </summary>
+    public override void InteractAlternate(PlayerInteractionController player) { }
 
     public override void Interact(PlayerInteractionController player)
     {
         if (_isLocked.Value) return;
         base.Interact(player);
         if (_inControl) return;
+
+        // Kill any in-progress exit coroutine before it can clean up our new interaction.
+        if (_exitCoroutine != null)
+        {
+            StopCoroutine(_exitCoroutine);
+            _exitCoroutine = null;
+        }
+
+        PlayerAnimationController anim     = player.playerAnimationController;
+        PlayerPickupController    pickup   = player.GetComponent<PlayerPickupController>();
+
+        // Right arm is busy if it's IK-active OR if the hand is physically holding an item
+        // (some items occupy the hand without driving the IK rig).
+        bool rightArmBusy = anim.RightArmRig.weight > 0.5f || (pickup != null && pickup.HeldObject != null);
+        bool leftArmBusy  = anim.LeftArmRig.weight  > 0.5f;
+
+        if (rightArmBusy && leftArmBusy) return; // both arms in active use
+
+        _usingRightArm = !rightArmBusy; // prefer right, fall back to left
 
         // Seed _dragT from the actual current mesh position so the next grab
         // starts from wherever the drawer was left, not from a binary open/closed state.
@@ -130,16 +164,30 @@ public class Drawer : Interactable
         _currentPlayer = player;
         _inControl = true;
 
-        PlayerMovementController movement = player.playerMovementController;
-        PlayerAnimationController anim    = player.playerAnimationController;
+        player.playerMovementController.SetMovementLocked(true);
 
-        movement.SetMovementLocked(true);
-
-        if (_ikTarget != null)
-            anim.RightArmIKTarget = _ikTarget;
-
-        anim.EnableRightArmMask();
-        anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+        if (_usingRightArm)
+        {
+            if (_rightIkTarget != null)
+            {
+                anim.RightArmIKTarget       = _rightIkTarget;
+                anim.CamRightArmRigIKTarget = _rightIkTarget;
+            }
+            anim.SetAnimBool(RightGripBool, true);
+            anim.EnableRightArmMask();
+            anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+        }
+        else
+        {
+            if (_leftIkTarget != null)
+            {
+                anim.LeftArmIKTarget        = _leftIkTarget;
+                anim.CamLeftArmRigIKTarget  = _leftIkTarget;
+            }
+            anim.SetAnimBool(LeftGripBool, true);
+            anim.EnableLeftArmMask();
+            anim.SetLeftArmRigWeightSmooth(1f, 0.2f);
+        }
     }
 
     private IEnumerator ExitDrawerInteraction()
@@ -155,14 +203,33 @@ public class Drawer : Interactable
         PlayerMovementController movement = player.playerMovementController;
         PlayerAnimationController anim    = player.playerAnimationController;
 
-        anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+        if (_usingRightArm)
+            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+        else
+            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
 
         // Wait for the IK weight to finish ramping down before releasing the mask.
         yield return new WaitForSeconds(0.25f);
 
-        anim.RightArmIKTarget = null;
-        anim.DisableRightArmMask();
+        if (_usingRightArm)
+        {
+            anim.RightArmIKTarget       = null;
+            anim.CamRightArmRigIKTarget = null;
+            anim.SetAnimBool(RightGripBool, false);
+            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+            anim.DisableRightArmMask();
+        }
+        else
+        {
+            anim.LeftArmIKTarget       = null;
+            anim.CamLeftArmRigIKTarget = null;
+            anim.SetAnimBool(LeftGripBool, false);
+            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
+            anim.DisableLeftArmMask();
+        }
+
         movement.SetMovementLocked(false);
+        _exitCoroutine = null;
     }
 
     // ── Drawer position ───────────────────────────────────────────────────────

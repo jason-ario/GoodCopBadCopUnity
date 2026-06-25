@@ -3,7 +3,7 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 
-public class Lever : Interactable
+public class Lever : Interactable, IHeldItemPassthrough
 {
     [SerializeField] private AudioSource leverAudio;
     [SerializeField] private AudioClip leverOnSound;
@@ -14,8 +14,11 @@ public class Lever : Interactable
     [Tooltip("Child Transform the player camera DOTweens to during the interaction.")]
     [SerializeField] private Transform _camPos;
 
-    [Tooltip("World Transform the right-arm IK anchors to while the player holds the lever.")]
-    [SerializeField] private Transform _ikTarget;
+    [Tooltip("Child Transform the right-arm IK anchors to while the player holds the lever.")]
+    [SerializeField] private Transform _rightIkTarget;
+
+    [Tooltip("Child Transform the left-arm IK anchors to while the player holds the lever.")]
+    [SerializeField] private Transform _leftIkTarget;
 
     [Tooltip("World Transform the player's head look-at is pinned to. Leave empty to fall back to the lever's own transform.")]
     [SerializeField] private Transform _lookTarget;
@@ -43,6 +46,8 @@ public class Lever : Interactable
     [SerializeField] private float _snapDuration = 0.1f;
 
     private const string GrabLeverBool = "GrabLever";
+    private const string RightGripBool  = "RightGrip";
+    private const string LeftGripBool   = "LeftGrip";
 
     private NetworkVariable<bool> _isUp = new NetworkVariable<bool>(
         false,
@@ -62,6 +67,7 @@ public class Lever : Interactable
     private bool _localShutterOpen;
 
     private bool _inControl = false;
+    private bool _usingRightArm = true;
     private PlayerInteractionController _currentPlayer;
 
     public override void OnNetworkSpawn()
@@ -117,8 +123,17 @@ public class Lever : Interactable
         base.Interact(player);
         if (_inControl) return;
 
-        // Seed drag position and local shutter state from current network state and go live
-        // immediately, so releasing before the camera finishes still triggers a proper exit.
+        PlayerAnimationController   anim   = player.playerAnimationController;
+        PlayerPickupController      pickup = player.GetComponent<PlayerPickupController>();
+
+        // Right arm is busy if IK-active or physically holding an item.
+        bool rightArmBusy = anim.RightArmRig.weight > 0.5f || (pickup != null && pickup.HeldObject != null);
+        bool leftArmBusy  = anim.LeftArmRig.weight  > 0.5f;
+
+        if (rightArmBusy && leftArmBusy) return;
+
+        _usingRightArm = !rightArmBusy;
+
         _dragT = _isUp.Value ? 1f : 0f;
         _localShutterOpen = _isUp.Value;
         _currentPlayer = player;
@@ -130,7 +145,7 @@ public class Lever : Interactable
     private IEnumerator EnterLeverSequence(PlayerInteractionController player)
     {
         PlayerMovementController movement = player.playerMovementController;
-        PlayerAnimationController anim = player.playerAnimationController;
+        PlayerAnimationController anim    = player.playerAnimationController;
 
         movement.SetCanControl(false);
         movement.LookAtTarget(transform);
@@ -138,8 +153,21 @@ public class Lever : Interactable
         Transform lookPoint = _lookTarget != null ? _lookTarget : transform;
         anim.OverrideHeadLookAt(lookPoint.position);
 
-        if (_ikTarget != null)
-            anim.RightArmIKTarget = _ikTarget;
+        // Set the IK target for whichever arm we're using (body + camera).
+        Transform ikTarget = _usingRightArm ? _rightIkTarget : _leftIkTarget;
+        if (ikTarget != null)
+        {
+            if (_usingRightArm)
+            {
+                anim.RightArmIKTarget       = ikTarget;
+                anim.CamRightArmRigIKTarget = ikTarget;
+            }
+            else
+            {
+                anim.LeftArmIKTarget       = ikTarget;
+                anim.CamLeftArmRigIKTarget = ikTarget;
+            }
+        }
 
         if (_camPos != null)
         {
@@ -152,11 +180,19 @@ public class Lever : Interactable
         yield return new WaitForSeconds(0.1f);
         if (!_inControl) yield break; // Player already released — ExitLeverView handles cleanup.
 
-        anim.EnableRightArmMask();
         anim.SetAnimBool(GrabLeverBool, true);
+        anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, true);
 
-        // Ramp IK weight up and hold it — ExitLeverView ramps it back down.
-        anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+        if (_usingRightArm)
+        {
+            anim.EnableRightArmMask();
+            anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+        }
+        else
+        {
+            anim.EnableLeftArmMask();
+            anim.SetLeftArmRigWeightSmooth(1f, 0.2f);
+        }
     }
 
     private IEnumerator ExitLeverView()
@@ -171,23 +207,37 @@ public class Lever : Interactable
         if (player == null) yield break;
 
         PlayerMovementController movement = player.playerMovementController;
-        PlayerAnimationController anim = player.playerAnimationController;
+        PlayerAnimationController anim    = player.playerAnimationController;
 
         // Kill any in-progress camera tweens before starting the return.
         movement.CameraTransform.DOKill();
 
         anim.SetAnimBool(GrabLeverBool, false);
-        anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+        anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, false);
 
-        yield return new WaitForSeconds(0.3f);
+        if (_usingRightArm)
+        {
+            anim.RightArmIKTarget       = null;
+            anim.CamRightArmRigIKTarget = null;
+            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+            anim.DisableRightArmMask();
+        }
+        else
+        {
+            anim.LeftArmIKTarget       = null;
+            anim.CamLeftArmRigIKTarget = null;
+            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
+            anim.DisableLeftArmMask();
+        }
 
+        // Exit immediately — restore head look and lean, then return the camera.
         anim.OverrideHeadLookAt(null);
         anim.SetBodyLeanDirect(0f);
         movement.ResetCameraPos(false, _cameraReturnDuration);
 
+        // Wait for the camera return tween before re-enabling controls.
         yield return new WaitForSeconds(_cameraReturnDuration);
 
-        anim.DisableRightArmMask();
         movement.SetCanControl(true);
     }
 
@@ -264,10 +314,6 @@ public class Lever : Interactable
         BroadcastLeverStateClientRpc(isUp, senderClientId);
     }
 
-    /// <summary>
-    /// Applies the committed lever state on all clients except the one that already
-    /// predicted it locally.
-    /// </summary>
     [ClientRpc]
     private void BroadcastLeverStateClientRpc(bool isUp, ulong excludeClientId)
     {
