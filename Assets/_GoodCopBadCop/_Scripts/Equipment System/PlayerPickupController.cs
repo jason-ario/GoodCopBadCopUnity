@@ -700,6 +700,37 @@ public class PlayerPickupController : NetworkBehaviour
         return released;
     }
 
+    /// <summary>
+    /// Releases the held object to a container (e.g. a BackpackPickable) without dropping
+    /// it to the world. Clears all local pickup state and animations.
+    /// Does NOT call RemoveParent — the container sets the correct constraint after this.
+    /// Does NOT send holder or ownership RPCs — the container handles those server-side.
+    /// </summary>
+    public void ReleaseObjectToBackpack()
+    {
+        if (_heldObject == null) return;
+
+        OnPlaceObject?.Invoke();
+        pickUpCooldownComplete = false;
+
+        DisableArmIKs();
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+
+        foreach (var objectContainer in objectContainers)
+            objectContainer.UnequipItem(this);
+
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        _heldObjectRef.Value = default;
+        itemEquippedIndex.Value = -1;
+        _playerAnimationController.DisableRightArmMask();
+
+        ObjectPlacer.Instance.DeactivatePlacer();
+    }
+
     public void DropObject(Transform dropPoint = null)
     {
         OnPlaceObject?.Invoke();

@@ -15,6 +15,23 @@ public class PlayerEquipmentController : NetworkBehaviour
     [Tooltip("Item data for the Radiation Mask — used to spawn the pickup when unequipping.")]
     [SerializeField] private PickableItemData radiationMaskItemData;
 
+    [Header("Backpack")]
+    [Tooltip("The backpack mesh GameObject on the player's back. Shown when a BackpackPickable is equipped.")]
+    [SerializeField] private GameObject backpackMesh;
+
+    [Tooltip("Transform on the player's back that the equipped BackpackPickable world object follows.")]
+    [SerializeField] private Transform backpackAnchor;
+
+    /// <summary>Anchor on the player's back for the BackpackPickable world object constraint.</summary>
+    public Transform BackpackAnchor => backpackAnchor;
+
+    /// <summary>Shows or hides the backpack mesh on this player's character model.</summary>
+    public void ShowBackpackMesh(bool visible)
+    {
+        if (backpackMesh != null)
+            backpackMesh.SetActive(visible);
+    }
+
     [Tooltip("Multiplier applied to all radiation accumulation while the mask is worn. 0.2 = 20% of normal rate.")]
     [SerializeField] private float maskRadiationMultiplier = 0.2f;
 

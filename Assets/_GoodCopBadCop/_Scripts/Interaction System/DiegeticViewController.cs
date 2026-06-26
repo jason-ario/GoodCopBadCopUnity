@@ -123,6 +123,8 @@ public abstract class DiegeticViewController : MonoBehaviour
             _viewCamera.gameObject.SetActive(false);
         }
 
+        // Cache before nulling so we can re-apply pickup state after arms are re-enabled.
+        PlayerInteractionController closingPlayer = Player;
         if (Player != null)
         {
             Player.playerMovementController.SetCanControl(true);
@@ -137,6 +139,13 @@ public abstract class DiegeticViewController : MonoBehaviour
         {
             _playerArms.SetActive(true);
             _playerArms = null;
+
+            // On host, SpawnAndPickUpClientRpc fires synchronously within the purchase
+            // call stack while the arms Animator is inactive. Unity resets all Animator
+            // parameters to defaults on re-enable (keepAnimatorStateOnDisable = false),
+            // which clears any pickupAnimBool set during that window. Re-apply it now
+            // so the hold animation matches the actual held item.
+            ReapplyHeldItemAnimatorState(closingPlayer);
         }
 
         if (_playerBody != null)
@@ -144,6 +153,24 @@ public abstract class DiegeticViewController : MonoBehaviour
             _playerBody.SetActive(true);
             _playerBody = null;
         }
+    }
+
+    /// <summary>
+    /// Re-applies the currently held item's <see cref="PickableItemData.pickupAnimBool"/>
+    /// to the local animators directly. Called after the arm GameObject is re-enabled to
+    /// counteract the Animator parameter reset that Unity performs on re-activation.
+    /// Uses <see cref="PlayerAnimationController.SetAnimBoolLocal"/> to avoid sending a
+    /// redundant RPC (the original RPC from <see cref="PickableObject.OnEquipped"/> already
+    /// handles all other clients).
+    /// </summary>
+    private static void ReapplyHeldItemAnimatorState(PlayerInteractionController player)
+    {
+        if (player == null) return;
+        PlayerPickupController pickup = player.GetComponent<PlayerPickupController>();
+        PickableItemData itemData = pickup?.HeldObject?.ItemData;
+        if (itemData == null || string.IsNullOrEmpty(itemData.pickupAnimBool)) return;
+        PlayerAnimationController pac = player.GetComponent<PlayerAnimationController>();
+        pac?.SetAnimBoolLocal(itemData.pickupAnimBool, true);
     }
 
     // ─── Subclass hooks ──────────────────────────────────────────────────────

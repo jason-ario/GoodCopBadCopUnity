@@ -50,7 +50,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2980638510
+  GlobalObjectIdHash: 3130973162
   InScenePlacedSourceGlobalObjectIdHash: 3130973162
   DeferredDespawnTick: 0
   Ownership: 1
@@ -85,6 +85,8 @@ MonoBehaviour:
   _cinemachineImpulseSource: {fileID: 4456400324821632425}
   _muzzleFlashLight: {fileID: 4049969978638618102}
   _lightOnTime: 0.08
+  _damage: 25
+  _bulletRange: 150
   _shootSound: {fileID: 0}
   _emptySound: {fileID: 0}
   _reloadSound: {fileID: 0}
@@ -539,6 +541,10 @@ PrefabInstance:
     - target: {fileID: 1230823366877782044, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
       propertyPath: m_Name
       value: VFX_Pistol Muzzle Flash Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 1230823366877782044, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1418531203936213030, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
       propertyPath: moveWithTransform

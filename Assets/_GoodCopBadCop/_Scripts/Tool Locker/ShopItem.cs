@@ -105,7 +105,7 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
 
     public void OnClick()
     {
-        if (!IsAvailable) return;
+        if (!IsAvailable || _highlightBlocked) return;
         Clicked?.Invoke();
     }
 
