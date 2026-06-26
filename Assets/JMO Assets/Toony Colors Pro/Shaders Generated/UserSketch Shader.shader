@@ -311,6 +311,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			float4 __outlineColor = ( float4(1,1,1,1) );
 
 			half4 outlineColor = __outlineColor * input.vcolor.xyzw;
+			outlineColor.a *= _BaseColor.a;
 			outlineColor.rgb = MixFog(outlineColor.rgb, input.pack1.x);
 
 			// Injection Point: 'Outline Pass/Fragment Shader/End'
@@ -743,7 +744,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// Injection Point: 'Outline Pass/Tags'
 			}
 			Cull Front
-			Blend One Zero
+			Blend [_SrcBlend] [_DstBlend]
 			ZWrite On
 			// Injection Point: 'Outline Pass/Shader States'
 

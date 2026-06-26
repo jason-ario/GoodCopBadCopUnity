@@ -45,6 +45,13 @@ public class Pistol : PickableObject
     [Tooltip("Duration the muzzle flash light stays on, in seconds.")]
     [SerializeField] private float _lightOnTime = 0.08f;
 
+    [Header("Pistol — Combat")]
+    [Tooltip("Damage dealt to a MutantEnemy per bullet.")]
+    [SerializeField] private float _damage = 25f;
+
+    [Tooltip("Maximum hitscan range in metres.")]
+    [SerializeField] private float _bulletRange = 150f;
+
     [Header("Pistol — Audio")]
     [Tooltip("Gunshot sound played on every client when a round is fired.")]
     [SerializeField] private AudioClip _shootSound;
@@ -138,7 +145,8 @@ public class Pistol : PickableObject
         PlayerMovementController movement = playerPickupController.GetComponent<PlayerMovementController>();
         movement?.ApplyRecoil();
 
-        FireServerRpc();
+        Camera cam = Camera.main;
+        FireServerRpc(cam.transform.position, cam.transform.forward);
     }
 
     /// <summary>
@@ -175,25 +183,32 @@ public class Pistol : PickableObject
 
     /// <summary>
     /// Server-side: validates the sender is the current holder and has rounds remaining,
-    /// decrements <see cref="_roundsRemaining"/>, then relays shoot VFX to all clients
-    /// except the shooter (who already played it locally in <see cref="OnStartUse"/>).
+    /// decrements <see cref="_roundsRemaining"/>, performs a hitscan against enemies,
+    /// then relays shoot VFX to all other clients.
     /// RequireOwnership = false because ownership transfer may still be in flight when the RPC lands.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void FireServerRpc(ServerRpcParams rpcParams = default)
+    private void FireServerRpc(Vector3 rayOrigin, Vector3 rayDirection, ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
 
         if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
             return;
 
-        // Only the client actually holding this pistol may decrement the counter.
+        // Only the client actually holding this pistol may fire.
         PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
         if (ppc?.HeldObject != this) return;
 
         if (_roundsRemaining.Value <= 0) return;
 
         _roundsRemaining.Value--;
+
+        // Hitscan — raycast from the camera position in the aim direction.
+        if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, _bulletRange))
+        {
+            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+            enemy?.TakeDamage(_damage, hit.point);
+        }
 
         // Relay VFX to every other connected client; shooter already played it locally.
         List<ulong> others = new List<ulong>();
@@ -227,11 +242,27 @@ public class Pistol : PickableObject
 
     /// <summary>
     /// Called when the player presses E while targeting the pistol.
-    /// If the player is holding a <see cref="PistolAmmo"/> clip and the pistol is not full,
-    /// sends a reload request to the server which refills rounds and consumes the clip.
-    /// LMB pickup is inherited unchanged from <see cref="PickableObject.Interact"/>.
+    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
     /// </summary>
     public override void InteractAlternate(PlayerInteractionController player)
+        => TryReload(player);
+
+    /// <summary>
+    /// Called when the player LMB-clicks the pistol while holding a compatible item
+    /// (i.e. <see cref="PistolAmmo"/> is listed in <c>itemsThatCanInteractWith</c>).
+    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
+    /// </summary>
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    {
+        base.InteractWithItem(playerInteractionController, item);
+        TryReload(playerInteractionController);
+    }
+
+    /// <summary>
+    /// Validates that the player is holding a <see cref="PistolAmmo"/> clip and the pistol
+    /// has room for more rounds, then sends <see cref="ReloadServerRpc"/>.
+    /// </summary>
+    private void TryReload(PlayerInteractionController player)
     {
         if (player.pickupController.HeldObject is not PistolAmmo) return;
         if (_roundsRemaining.Value >= MaxRounds) return;
@@ -241,8 +272,9 @@ public class Pistol : PickableObject
 
     /// <summary>
     /// Validates server-side that the requesting player is holding a <see cref="PistolAmmo"/>
-    /// clip and the pistol is not already full. On success, refills the round counter and
-    /// sends a targeted <see cref="ConsumeAmmoClientRpc"/> to that player.
+    /// clip and the pistol is not already full. On success, transfers only the rounds needed
+    /// to reach <see cref="MaxRounds"/> from the clip. If the clip reaches zero it is despawned
+    /// via <see cref="ConsumeAmmoClientRpc"/>; otherwise it stays equipped with the updated count.
     /// RequireOwnership = false so any client can reload the pistol regardless of who holds it.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
@@ -257,7 +289,7 @@ public class Pistol : PickableObject
         }
 
         PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || ppc.HeldObject is not PistolAmmo)
+        if (ppc == null || ppc.HeldObject is not PistolAmmo ammo)
         {
             Debug.LogWarning($"[Pistol] ReloadServerRpc: client {clientId} is not holding PistolAmmo.");
             return;
@@ -265,12 +297,18 @@ public class Pistol : PickableObject
 
         if (_roundsRemaining.Value >= MaxRounds) return;
 
-        _roundsRemaining.Value = MaxRounds;
+        int needed = MaxRounds - _roundsRemaining.Value;
+        int transferred = ammo.ConsumeRounds(needed);
+        _roundsRemaining.Value += transferred;
 
-        ConsumeAmmoClientRpc(new ClientRpcParams
+        // Only despawn the clip when it has been fully emptied.
+        if (ammo.RoundsInClip <= 0)
         {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-        });
+            ConsumeAmmoClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+        }
     }
 
     /// <summary>
