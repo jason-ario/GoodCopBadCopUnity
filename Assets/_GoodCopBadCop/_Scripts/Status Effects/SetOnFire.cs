@@ -17,8 +17,32 @@ public class SetOnFire : MonoBehaviour
     [Tooltip("Maximum number of fire emitters that can be active on this character at once.")]
     public int maxFireInstances = 5;
 
+    [Tooltip("Seconds after the last ignition call before the fire is automatically extinguished.")]
+    public float burnDuration = 5f;
+
+    [Tooltip("Damage dealt to the MutantEnemy every 0.5 seconds while on fire.")]
+    public float fireDamagePerTick = 5f;
+
     private readonly List<GameObject> _fireInstances = new List<GameObject>();
     private bool _isOnFire = false;
+    private bool _isMonitoring = false;
+    private bool _isDamaging = false;
+    private Coroutine _autoExtinguishCoroutine;
+
+    /// <summary>True while at least one fire emitter is alive on this character.</summary>
+    public bool IsOnFire => _isOnFire;
+
+    /// <summary>True when the number of live (non-destroyed) emitters has reached <see cref="maxFireInstances"/>.</summary>
+    public bool IsAtMaxFire => LiveFireCount() >= maxFireInstances;
+
+    /// <summary>Counts only non-destroyed entries so the cap responds immediately when particles die.</summary>
+    private int LiveFireCount()
+    {
+        int n = 0;
+        foreach (GameObject f in _fireInstances)
+            if (f != null) n++;
+        return n;
+    }
 
     void Start()
     {
@@ -28,7 +52,7 @@ public class SetOnFire : MonoBehaviour
 
     public void Ignite()
     {
-        if (_isOnFire) return;
+        if (LiveFireCount() >= maxFireInstances) return;
 
         if (firePrefab == null)
         {
@@ -51,6 +75,18 @@ public class SetOnFire : MonoBehaviour
         allBones = allBones.GetRange(0, count);
 
         StartCoroutine(SpawnFireOverTime(allBones));
+
+        // Only start one monitor coroutine — it keeps running until all fires die.
+        if (!_isMonitoring)
+            StartCoroutine(MonitorFireInstances());
+
+        if (!_isDamaging)
+            StartCoroutine(DamageOverTime());
+
+        // Reset the auto-extinguish timer so sustained burning keeps the fire alive.
+        if (_autoExtinguishCoroutine != null)
+            StopCoroutine(_autoExtinguishCoroutine);
+        _autoExtinguishCoroutine = StartCoroutine(AutoExtinguish());
     }
 
     /// <summary>
@@ -87,7 +123,7 @@ public class SetOnFire : MonoBehaviour
         foreach (Transform boneTransform in bones)
         {
             if (!_isOnFire) yield break;
-            if (_fireInstances.Count >= maxFireInstances) yield break;
+            if (LiveFireCount() >= maxFireInstances) yield break;
 
             Vector3 worldPos = boneTransform.position;
             if (boneTransform.childCount > 0)
@@ -116,10 +152,58 @@ public class SetOnFire : MonoBehaviour
         Debug.Log($"[SetOnFire] {gameObject.name} is on fire! ({_fireInstances.Count} emitters)");
     }
 
+    /// <summary>
+    /// Polls the live instance list every half-second. Removes destroyed entries and
+    /// resets <see cref="IsOnFire"/> once all emitters have burned out, allowing the
+    /// character to be ignited again.
+    /// </summary>
+    private IEnumerator MonitorFireInstances()
+    {
+        _isMonitoring = true;
+        while (_isOnFire)
+        {
+            yield return new WaitForSeconds(0.5f);
+            _fireInstances.RemoveAll(f => f == null);
+            if (_fireInstances.Count == 0)
+                _isOnFire = false;
+        }
+        _isMonitoring = false;
+    }
+
+    /// <summary>
+    /// Ticks damage onto the <see cref="MutantEnemy"/> every 0.5 seconds while on fire.
+    /// Only executes on the server so health changes are authoritative.
+    /// </summary>
+    private IEnumerator DamageOverTime()
+    {
+        _isDamaging = true;
+        MutantEnemy enemy = GetComponent<MutantEnemy>();
+
+        while (_isOnFire)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (!_isOnFire) break;
+
+            if (enemy != null && enemy.IsServer)
+                enemy.TakeDamage(fireDamagePerTick, transform.position);
+        }
+
+        _isDamaging = false;
+    }
+
+    private IEnumerator AutoExtinguish()
+    {
+        yield return new WaitForSeconds(burnDuration);
+        Extinguish();
+    }
+
     public void Extinguish()
     {
         if (!_isOnFire) return;
         _isOnFire = false;
+        _isMonitoring = false;
+        _isDamaging = false;
+        _autoExtinguishCoroutine = null;
 
         StopAllCoroutines();
 

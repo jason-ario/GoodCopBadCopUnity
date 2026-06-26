@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -68,11 +67,6 @@ public class Flamethrower : PickableObject
     /// <summary>Current fuel level [0, <see cref="MaxFuel"/>].</summary>
     public float Fuel => _fuel.Value;
 
-    // ── Hit detection (server only) ────────────────────────────────────────────
-
-    /// <summary>NetworkObject IDs of enemies already ignited this session, to avoid re-igniting.</summary>
-    private readonly HashSet<ulong> _ignitedEnemies = new();
-
     // ── Hit check throttle (owner only) ───────────────────────────────────────
 
     private const float HitCheckInterval = 0.2f;
@@ -115,6 +109,10 @@ public class Flamethrower : PickableObject
         // Sync UI and particle state for late-joining clients.
         UpdateInteractText(_fuel.Value);
         ApplyParticleScale(_fuel.Value / MaxFuel);
+
+        // Late-join sync: non-owners need to start the flame if it is already firing.
+        if (!IsOwner && _isFiring.Value)
+            StartFlame();
     }
 
     public override void OnNetworkDespawn()
@@ -162,6 +160,11 @@ public class Flamethrower : PickableObject
 
     private void OnIsFiringChanged(bool previous, bool current)
     {
+        // The owner drives VFX directly in OnStartUse/OnStopUse for instant,
+        // lag-free feedback. Applying the NetworkVariable echo here would create
+        // a race: a delayed StopFlame() could kill a flame the owner just restarted.
+        if (IsOwner) return;
+
         if (current)
             StartFlame();
         else
@@ -206,7 +209,7 @@ public class Flamethrower : PickableObject
 
     private void StartFlame()
     {
-        if (_flameVFX != null && !_flameVFX.isPlaying)
+        if (_flameVFX != null)
             _flameVFX.Play();
 
         if (_flameAudioSource != null && !_flameAudioSource.isPlaying)
@@ -281,10 +284,11 @@ public class Flamethrower : PickableObject
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy == null || enemy.IsDead) continue;
 
-            ulong id = enemy.NetworkObjectId;
-            if (_ignitedEnemies.Contains(id)) continue;
+            // Skip enemies already at max flames — SetOnFire handles re-ignition
+            // automatically once emitters burn out and the count drops below the cap.
+            SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
+            if (setOnFire == null || setOnFire.IsAtMaxFire) continue;
 
-            _ignitedEnemies.Add(id);
             IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
         }
     }

@@ -391,7 +391,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4000246964
+  GlobalObjectIdHash: 11217847
   InScenePlacedSourceGlobalObjectIdHash: 4000246964
   DeferredDespawnTick: 0
   Ownership: 1
@@ -427,9 +427,6 @@ MonoBehaviour:
   _minVelocityRatio: 0.05
   _maxFlameRange: 4
   _flameWidth: 0.5
-  _enemyLayer:
-    serializedVersion: 2
-    m_Bits: 0
   _flameAudioSource: {fileID: 6719636838967982140}
 --- !u!82 &6719636838967982140
 AudioSource:
@@ -615,27 +612,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.0047255284
+      value: 0.011140905
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.004725528
+      value: 0.011140904
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.004725529
+      value: 0.011140907
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.00003
+      value: -0.00003001
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.00066
+      value: 0.00065999
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.00474
+      value: -0.0034569
       objectReference: {fileID: 0}
     - target: {fileID: 400002, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: m_LocalRotation.w
@@ -676,6 +673,10 @@ PrefabInstance:
     - target: {fileID: 19800000, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19800000, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 19800000, guid: 21f6aea0c9b788c4b9b6275efc33d0f9, type: 3}
       propertyPath: InitialModule.startSizeY.minMaxState
