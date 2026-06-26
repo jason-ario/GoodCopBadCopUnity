@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1883899283990827010}
   - component: {fileID: 4170097470936915313}
   - component: {fileID: 1650955673414627107}
+  - component: {fileID: 4456400324821632425}
   m_Layer: 0
   m_Name: Pistol
   m_TagString: Untagged
@@ -30,10 +31,11 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.6012124, y: 0.095572285, z: 0.78351533, w: 0.12455225}
   m_LocalPosition: {x: 0.36320028, y: 1.8279003, z: -0.034099877}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.1626, y: 1.1626, z: 1.1626}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 685279743415384249}
+  - {fileID: 4716398778899049708}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 75, z: 161.935}
 --- !u!114 &632359000385211903
@@ -48,14 +50,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2980638510
+  InScenePlacedSourceGlobalObjectIdHash: 3130973162
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -75,9 +77,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: 
+  interactText: Pistol
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 5caf33b77dd741944b0fd05ae9e1b587, type: 2}
+  _shootVFX: {fileID: 4874645927553164904}
+  _cinemachineImpulseSource: {fileID: 4456400324821632425}
+  _muzzleFlashLight: {fileID: 4049969978638618102}
+  _lightOnTime: 0.08
+  _shootSound: {fileID: 0}
+  _emptySound: {fileID: 0}
+  _reloadSound: {fileID: 0}
 --- !u!1773428102 &4170097470936915313
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -301,6 +310,59 @@ MonoBehaviour:
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
+--- !u!114 &4456400324821632425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5786802018313121078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 180ecf9b41d478f468eb3e9083753217, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseSource
+  ImpulseDefinition:
+    ImpulseChannel: 1
+    ImpulseShape: 3
+    CustomImpulseShape:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    ImpulseDuration: 0.2
+    ImpulseType: 0
+    DissipationRate: 0.25
+    RawSignal: {fileID: 0}
+    AmplitudeGain: 0.6
+    FrequencyGain: 1
+    RepeatMode: 0
+    Randomize: 1
+    TimeEnvelope:
+      AttackShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      DecayShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      AttackTime: 0
+      SustainTime: 0.1
+      DecayTime: 0.5
+      ScaleWithImpact: 1
+      HoldForever: 0
+    ImpactRadius: 100
+    DirectionMode: 0
+    DissipationMode: 2
+    DissipationDistance: 100
+    PropagationSpeed: 343
+  DefaultVelocity: {x: 0.03, y: -0.03, z: 0}
 --- !u!1001 &1011096834413043538
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -424,4 +486,112 @@ MonoBehaviour:
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 5e800a7436cf758419d983b2dd94262a, type: 3}
   m_PrefabInstance: {fileID: 1011096834413043538}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &5797264096038056922
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 2013997367085055552}
+    m_Modifications:
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.013
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.082
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.194
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.707107
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.000000055879354
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.7071066
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1230823366877782044, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_Name
+      value: VFX_Pistol Muzzle Flash Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 1418531203936213030, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1418558844830435618, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1418561467971978826, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1418620406549514084, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1427887735912629584, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1427898946981989204, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1428068752879903296, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1428270406470800818, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: moveWithTransform
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7512117179290566188, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+--- !u!1 &4049969978638618102 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7512117179290566188, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+  m_PrefabInstance: {fileID: 5797264096038056922}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4716398778899049708 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1224987110942203702, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+  m_PrefabInstance: {fileID: 5797264096038056922}
+  m_PrefabAsset: {fileID: 0}
+--- !u!198 &4874645927553164904 stripped
+ParticleSystem:
+  m_CorrespondingSourceObject: {fileID: 1428270406470800818, guid: 2737f3569551fcb4c962688abbc351b5, type: 3}
+  m_PrefabInstance: {fileID: 5797264096038056922}
   m_PrefabAsset: {fileID: 0}

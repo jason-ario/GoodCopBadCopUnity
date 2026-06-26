@@ -415,9 +415,6 @@ public class PlayerMovementController : NetworkBehaviour
             targetPos = basePosTransform.localPosition + forwardOffset;
         }
 
-        // Apply recoil offset (procedural movement) on top of the lerped position
-        targetPos += _recoilRotation;
-
         // Smoothly lerp the camera position
         cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetPos, lookDownLerpSpeed * Time.deltaTime);
 
