@@ -12,7 +12,10 @@ public class SetOnFire : MonoBehaviour
     public GameObject firePrefab;
 
     [Tooltip("How many seconds between each fire spawn.")]
-    public float spawnInterval = 0.3f;
+    public float spawnInterval = 1.5f;
+
+    [Tooltip("Maximum number of fire emitters that can be active on this character at once.")]
+    public int maxFireInstances = 5;
 
     private readonly List<GameObject> _fireInstances = new List<GameObject>();
     private bool _isOnFire = false;
@@ -27,38 +30,22 @@ public class SetOnFire : MonoBehaviour
     {
         if (_isOnFire) return;
 
-        Animator anim = animator != null ? animator : GetComponentInChildren<Animator>();
-
-        if (anim == null)
-        {
-            Debug.LogWarning($"[SetOnFire] No Animator found on {gameObject.name}.");
-            return;
-        }
-
-        if (!anim.isHuman)
-        {
-            Debug.LogWarning($"[SetOnFire] Animator on {gameObject.name} is not Humanoid.");
-            return;
-        }
-
         if (firePrefab == null)
         {
             Debug.LogWarning($"[SetOnFire] No fire prefab assigned on {gameObject.name}.");
             return;
         }
 
-        _isOnFire = true;
+        List<Transform> allBones = CollectBones();
 
-        // Collect all valid bone transforms
-        var allBones = new List<Transform>();
-        foreach (HumanBodyBones bone in System.Enum.GetValues(typeof(HumanBodyBones)))
+        if (allBones.Count == 0)
         {
-            if (bone == HumanBodyBones.LastBone) continue;
-            Transform t = anim.GetBoneTransform(bone);
-            if (t != null) allBones.Add(t);
+            Debug.LogWarning($"[SetOnFire] No bones found on {gameObject.name}.");
+            return;
         }
 
-        // Shuffle and take one third
+        _isOnFire = true;
+
         Shuffle(allBones);
         int count = Mathf.Max(1, allBones.Count / 5);
         allBones = allBones.GetRange(0, count);
@@ -66,11 +53,41 @@ public class SetOnFire : MonoBehaviour
         StartCoroutine(SpawnFireOverTime(allBones));
     }
 
+    /// <summary>
+    /// Collects bone transforms for fire spawning.
+    /// For humanoid rigs uses <see cref="HumanBodyBones"/> via the Animator.
+    /// For generic rigs falls back to <see cref="SkinnedMeshRenderer.bones"/>.
+    /// </summary>
+    private List<Transform> CollectBones()
+    {
+        Animator anim = animator != null ? animator : GetComponentInChildren<Animator>();
+
+        if (anim != null && anim.isHuman)
+        {
+            var bones = new List<Transform>();
+            foreach (HumanBodyBones bone in System.Enum.GetValues(typeof(HumanBodyBones)))
+            {
+                if (bone == HumanBodyBones.LastBone) continue;
+                Transform t = anim.GetBoneTransform(bone);
+                if (t != null) bones.Add(t);
+            }
+            return bones;
+        }
+
+        // Generic rig: read bone transforms directly from the SkinnedMeshRenderer.
+        SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
+        if (smr != null && smr.bones.Length > 0)
+            return new List<Transform>(smr.bones);
+
+        return new List<Transform>();
+    }
+
     private IEnumerator SpawnFireOverTime(List<Transform> bones)
     {
         foreach (Transform boneTransform in bones)
         {
             if (!_isOnFire) yield break;
+            if (_fireInstances.Count >= maxFireInstances) yield break;
 
             Vector3 worldPos = boneTransform.position;
             if (boneTransform.childCount > 0)
@@ -79,6 +96,17 @@ public class SetOnFire : MonoBehaviour
             GameObject instance = Instantiate(firePrefab, boneTransform);
             instance.transform.position = worldPos;
             instance.transform.localRotation = Quaternion.identity;
+
+            // Compensate for the bone's lossy scale so the fire renders at the
+            // prefab's intended world size regardless of the character's scale.
+            Vector3 prefabScale  = firePrefab.transform.localScale;
+            Vector3 parentLossy  = boneTransform.lossyScale;
+            instance.transform.localScale = new Vector3(
+                parentLossy.x != 0f ? prefabScale.x / parentLossy.x : prefabScale.x,
+                parentLossy.y != 0f ? prefabScale.y / parentLossy.y : prefabScale.y,
+                parentLossy.z != 0f ? prefabScale.z / parentLossy.z : prefabScale.z
+            );
+
             instance.name = $"Fire_{boneTransform.name}";
             _fireInstances.Add(instance);
 

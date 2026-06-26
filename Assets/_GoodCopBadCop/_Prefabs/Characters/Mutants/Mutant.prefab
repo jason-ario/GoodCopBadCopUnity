@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 7127085182576174026}
   - component: {fileID: 4700978623447278918}
   - component: {fileID: -1946918825076805320}
+  - component: {fileID: 8952666811533099273}
   m_Layer: 0
   m_Name: Mutant
   m_TagString: Enemy
@@ -195,6 +196,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MutantSuspectBehaviour
   ShowTopMostFoldoutHeaderGroup: 1
   canClimb: 1
+--- !u!114 &8952666811533099273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7307716854411765365}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47896547466ac8d4bb21a5d14b1eb3a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SetOnFire
+  animator: {fileID: 386687839824223625}
+  firePrefab: {fileID: 100000, guid: a817de05addd7b64faa73b34c74013ce, type: 3}
+  spawnInterval: 0.3
 --- !u!1 &7932345873243114423
 GameObject:
   m_ObjectHideFlags: 0

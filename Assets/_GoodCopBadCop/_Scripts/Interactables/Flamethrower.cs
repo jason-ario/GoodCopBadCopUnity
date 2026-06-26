@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -38,6 +39,12 @@ public class Flamethrower : PickableObject
     [Tooltip("Velocity-Z multiplier at minimum fuel (stream barely visible).")]
     [SerializeField] private float _minVelocityRatio = 0.05f;
 
+    [Tooltip("Maximum flame reach in metres at full fuel, used for enemy hit detection.")]
+    [SerializeField] private float _maxFlameRange = 4f;
+
+    [Tooltip("Spherecast radius for enemy hit detection — controls how wide the flame cone feels.")]
+    [SerializeField] private float _flameWidth = 0.5f;
+
     [Header("Flamethrower — Audio")]
     [Tooltip("Looping AudioSource for the flame sound. Starts and stops with firing.")]
     [SerializeField] private AudioSource _flameAudioSource;
@@ -60,6 +67,16 @@ public class Flamethrower : PickableObject
 
     /// <summary>Current fuel level [0, <see cref="MaxFuel"/>].</summary>
     public float Fuel => _fuel.Value;
+
+    // ── Hit detection (server only) ────────────────────────────────────────────
+
+    /// <summary>NetworkObject IDs of enemies already ignited this session, to avoid re-igniting.</summary>
+    private readonly HashSet<ulong> _ignitedEnemies = new();
+
+    // ── Hit check throttle (owner only) ───────────────────────────────────────
+
+    private const float HitCheckInterval = 0.2f;
+    private float _hitCheckTimer;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -110,9 +127,20 @@ public class Flamethrower : PickableObject
 
     private void Update()
     {
-        // Owner drains fuel every frame while firing.
-        if (IsOwner && isUsing && _fuel.Value > 0f)
-            DrainFuelServerRpc(_fuelDrainRate * Time.deltaTime);
+        if (!IsOwner || !isUsing || _fuel.Value <= 0f) return;
+
+        // Drain fuel every frame.
+        DrainFuelServerRpc(_fuelDrainRate * Time.deltaTime);
+
+        // Throttled enemy hit check — avoids sending a heavy RPC every frame.
+        _hitCheckTimer -= Time.deltaTime;
+        if (_hitCheckTimer <= 0f)
+        {
+            _hitCheckTimer = HitCheckInterval;
+            Camera cam = Camera.main;
+            if (cam != null)
+                FireHitCheckServerRpc(cam.transform.position, cam.transform.forward);
+        }
     }
 
     // ── NetworkVariable callbacks ──────────────────────────────────────────────
@@ -232,6 +260,44 @@ public class Flamethrower : PickableObject
         if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
 
         _fuel.Value = Mathf.Max(_fuel.Value - amount, 0f);
+    }
+
+    /// <summary>
+    /// Server-side: SphereCasts along the aim direction to find enemies inside the
+    /// current flame range. Newly detected enemies are ignited on all clients via
+    /// <see cref="IgniteEnemyClientRpc"/>. Already-ignited enemies are skipped.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void FireHitCheckServerRpc(Vector3 origin, Vector3 direction, ServerRpcParams rpcParams = default)
+    {
+        if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
+
+        float fuelRatio  = Mathf.Clamp01(_fuel.Value / MaxFuel);
+        float effectiveRange = Mathf.Lerp(_minVelocityRatio * _maxFlameRange, _maxFlameRange, fuelRatio);
+
+        RaycastHit[] hits = Physics.SphereCastAll(origin, _flameWidth, direction, effectiveRange, ~0, QueryTriggerInteraction.Collide);
+        foreach (RaycastHit hit in hits)
+        {
+            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+            if (enemy == null || enemy.IsDead) continue;
+
+            ulong id = enemy.NetworkObjectId;
+            if (_ignitedEnemies.Contains(id)) continue;
+
+            _ignitedEnemies.Add(id);
+            IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
+        }
+    }
+
+    /// <summary>
+    /// Received on all clients. Resolves the enemy NetworkObject and calls
+    /// <see cref="SetOnFire.Ignite"/> so fire particles appear on every machine.
+    /// </summary>
+    [ClientRpc]
+    private void IgniteEnemyClientRpc(NetworkObjectReference enemyRef)
+    {
+        if (!enemyRef.TryGet(out NetworkObject enemyObj)) return;
+        enemyObj.GetComponent<SetOnFire>()?.Ignite();
     }
 
     // ── Refuelling ─────────────────────────────────────────────────────────────
