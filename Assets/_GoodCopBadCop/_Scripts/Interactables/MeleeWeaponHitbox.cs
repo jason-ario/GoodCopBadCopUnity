@@ -154,17 +154,30 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
-            // Walk up from the hit collider to find a MutantEnemy — no tag dependency.
+            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter — no tag dependency.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
-            if (enemy == null)
+            SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
+
+            if (enemy == null && suspect == null)
                 continue;
 
-            Vector3 enemyHitPosition = col.ClosestPoint(attackOrigin);
-            enemy.TakeDamage(damage, enemyHitPosition);
-            Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
+            if (enemy != null)
+            {
+                Vector3 enemyHitPosition = col.ClosestPoint(attackOrigin);
+                enemy.TakeDamage(damage, enemyHitPosition);
+                Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
+                NotifyHitClientRpc(enemyHitPosition, ownerParams);
+                return;
+            }
 
-            NotifyHitClientRpc(enemyHitPosition, ownerParams);
-            return;
+            if (!suspect.IsDead)
+            {
+                Vector3 suspectHitPosition = col.ClosestPoint(attackOrigin);
+                suspect.TakeDamage(damage, suspectHitPosition);
+                Debug.Log($"[MeleeWeaponHitbox] Hit suspect '{suspect.name}' via '{col.name}' for {damage} damage.", this);
+                NotifyHitClientRpc(suspectHitPosition, ownerParams);
+                return;
+            }
         }
 
         if (anyNonSelfHit)

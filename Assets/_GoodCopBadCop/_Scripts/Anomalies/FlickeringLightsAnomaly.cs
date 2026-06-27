@@ -1,6 +1,35 @@
+using UnityEngine;
+
 /// <summary>
-/// Supernatural anomaly where the suspect causes nearby lights to flicker.
+/// Supernatural anomaly where the suspect causes the booth lights to flicker.
+/// Activating the anomaly starts a periodic flickering sequence on the assigned
+/// <see cref="BoothFlickeringLightsController"/>; deactivating it stops the sequence
+/// and restores the lights.
 /// </summary>
 public class FlickeringLightsAnomaly : SupernaturalAnomaly
 {
+    [Tooltip("Scene-level controller that owns the booth lights and drives the flicker sequence.")]
+    [SerializeField] private BoothFlickeringLightsController lightsController;
+
+    public override void ActivateAnomaly()
+    {
+        base.ActivateAnomaly();
+
+        if (lightsController == null)
+        {
+            Debug.LogWarning($"[FlickeringLightsAnomaly] lightsController is not assigned on '{gameObject.name}'.", this);
+            return;
+        }
+
+        lightsController.StartFlickering();
+    }
+
+    public override void DeactivateAnomaly()
+    {
+        base.DeactivateAnomaly();
+        lightsController?.StopFlickering();
+    }
+
+    [ContextMenu("Activate Anomaly")]
+    private void ActivateAnomalyDebug() => ActivateAnomaly();
 }

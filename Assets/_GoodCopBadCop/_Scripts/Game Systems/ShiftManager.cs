@@ -115,6 +115,11 @@ public class ShiftManager : NetworkBehaviour
     public Action OnDoorLock { get; set; }
     /// <summary>Fired after the end-of-shift dialogue finishes, signalling the door should unlock.</summary>
     public Action OnDoorUnlock { get; set; }
+    /// <summary>
+    /// Fired on all clients when the shift ends and the night phase begins — door unlocked,
+    /// player is free to roam, and tasks (fax, etc.) become available.
+    /// </summary>
+    public Action OnNightPhaseBegin { get; set; }
 
     private DateTime CurrentGameDateTime => _startDate.AddDays(_currentDay - 1);
     public string currentMonth => CurrentGameDateTime.ToString("MMMM");
@@ -390,40 +395,31 @@ public class ShiftManager : NetworkBehaviour
         PauseSuspectScheduling          = false;
         _pendingNextSuspect             = false;
 
-        CompletedShift();
+        // Reset the shift flag immediately so the next shift can be started after the night phase.
+        shiftStarted.Value = false;
 
-        EndShiftClientRpc(
-            suspectsProcessed,
-            suspectsPassedCorrect,
-            suspectsPassedWrong,
-            suspectsQuarantined,
-            suspectsKilledCorrect,
-            suspectsKilledWrong
-        );
+        // Unlock and open the booth door so the player can leave for the night phase.
+        _doorController?.ForceOpen();
+
+        // Unlock the door and announce the end of shift on all clients.
+        EndShiftAndBeginNightClientRpc();
+
+        // Begin the night phase on the server, then replicate to clients.
+        BetweenShiftTaskManager.Instance?.BeginNightPhase();
+        BeginNightPhaseClientRpc();
     }
 
+    /// <summary>
+    /// Runs on all clients when the shift ends. Plays the end-of-shift sound, fires
+    /// <see cref="OnShiftEnd"/>, unlocks the booth door, and announces the night phase start.
+    /// </summary>
     [ClientRpc]
-    private void EndShiftClientRpc(
-        int processed, int passedCorrect, int passedWrong,
-        int quarantined, int killedCorrect, int killedWrong)
+    private void EndShiftAndBeginNightClientRpc()
     {
         SFXController.Instance.Play(endOfLevelSound);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().StopMoving();
         OnShiftEnd?.Invoke();
-
-        var rows = new List<EndOfShiftReportUI.ReportRowData>
-        {
-            new EndOfShiftReportUI.ReportRowData("Processed: " + processed + " Citizens",           0,                                   false, true),
-            new EndOfShiftReportUI.ReportRowData("Passed: " + (passedCorrect + passedWrong),        0,                                   false, true),
-            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + passedCorrect,              passedCorrect  * rewardPerCorrectPass, false),
-            new EndOfShiftReportUI.ReportRowData("    Infected: " + passedWrong,                    passedWrong    * penaltyPerWrongPass,  true),
-            new EndOfShiftReportUI.ReportRowData("Quarantined: " + quarantined,                     0,                                   false),
-            new EndOfShiftReportUI.ReportRowData("Killed: " + (killedCorrect + killedWrong),        0,                                   false, true),
-            new EndOfShiftReportUI.ReportRowData("    Infected: " + killedCorrect,                  killedCorrect  * rewardPerCorrectKill, false),
-            new EndOfShiftReportUI.ReportRowData("    Non-Infected: " + killedWrong,                killedWrong    * penaltyPerWrongKill,  true),
-        };
-
-        UIController.Instance.ShowEndShiftReport(rows);
+        OnDoorUnlock?.Invoke();
+        OnNightPhaseBegin?.Invoke();
     }
 
     /// <summary>Records a passed suspect and updates the correct/wrong tally.</summary>
@@ -542,7 +538,6 @@ public class ShiftManager : NetworkBehaviour
 
         UIController.Instance.FadeIn();
         yield return new WaitForSeconds(1.5f);
-        UIController.Instance.HideEndOfShiftReport();
 
         // Reset all shift state for the new day.
         ResetShiftData();
@@ -550,7 +545,8 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
-        // Advance to the next campaign day — server-only; propagates to clients via NetworkVariable.
+        // Increment the day counter and advance the campaign — server-only; propagates to clients via NetworkVariable.
+        CompletedShift();
         if (IsServer)
             CampaignManager.Instance.AdvanceDay();
 
@@ -569,13 +565,6 @@ public class ShiftManager : NetworkBehaviour
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
         OnDayStart?.Invoke();
-
-        // Start the new night phase and minimum timer on server + all clients.
-        if (IsServer)
-        {
-            BetweenShiftTaskManager.Instance?.BeginNightPhase();
-            BeginNightPhaseClientRpc();
-        }
     }
 
     [ClientRpc]
@@ -860,9 +849,8 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Debug shortcut: runs the full booth-ready setup then immediately ends the shift
-    /// and auto-dismisses the end-of-shift report, landing directly in the night phase
-    /// with tasks assigned.
+    /// Debug shortcut: runs the full booth-ready setup then immediately ends the shift,
+    /// landing directly in the night phase with tasks assigned.
     /// </summary>
     private IEnumerator DebugSkipToAfterShift()
     {
@@ -872,10 +860,7 @@ public class ShiftManager : NetworkBehaviour
         yield return null;
 
         EndShift();
-
-        yield return new WaitForSeconds(1f);
-
-        StartInBetweenShiftSequence();
+        // Night phase begins automatically via EndShift() — no manual transition needed.
     }
 
     /// <summary>
@@ -961,6 +946,21 @@ public class ShiftManager : NetworkBehaviour
         OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
         PlayShiftStartFanfare();
+    }
+
+    /// <summary>
+    /// Debug helper — enables clock-out on the timecard machine as if all suspects had been
+    /// processed, without ending the shift or skipping any suspects. Server only.
+    /// </summary>
+    public void DebugEnableClockOut()
+    {
+        if (!IsServer) return;
+
+        if (_timecardMachine != null)
+            _timecardMachine.EnableClockOut();
+
+        NotifyClockOutReadyClientRpc();
+        Debug.Log("[ShiftManager] DebugEnableClockOut: timecard machine primed for clock-out.");
     }
 
     public void SetNextShiftReady()

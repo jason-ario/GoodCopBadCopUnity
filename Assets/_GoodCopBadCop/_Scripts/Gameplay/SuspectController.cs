@@ -1104,6 +1104,47 @@ public class SuspectController : NetworkBehaviour
         }
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        if (IsServer)
+            SuspectCharacter.OnSuspectKilledByPlayer += HandleSuspectKilledByPlayer;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        SuspectCharacter.OnSuspectKilledByPlayer -= HandleSuspectKilledByPlayer;
+    }
+
+    /// <summary>
+    /// Called on the server when a suspect is killed by a player melee hit.
+    /// Skips all scoring and payout, then advances the lineup after the death animation plays out.
+    /// </summary>
+    private void HandleSuspectKilledByPlayer(SuspectCharacter killed)
+    {
+        if (!IsServer) return;
+        if (killed != suspectCharacter) return;
+
+        StartCoroutine(KilledByPlayerSequence(killed));
+    }
+
+    /// <summary>
+    /// Waits for the death animation, cleans up documents and the folder,
+    /// despawns the suspect, and advances to the next suspect — with no payout.
+    /// </summary>
+    private IEnumerator KilledByPlayerSequence(SuspectCharacter killed)
+    {
+        killed.GetComponent<SuspectBarkController>()?.StopBarks();
+
+        // Give the death animation time to play before cleaning up.
+        yield return new WaitForSeconds(3f);
+
+        CleanupSpawnedFolder();
+        DespawnSuspect(killed);
+        ShiftManager.Instance.SetNextSuspectReady();
+    }
+
     public void ResetSuspects()
     {
         suspectIndex.Value = -1;

@@ -57,6 +57,25 @@ public class SuspectCharacter : Interactable
 
     private bool _facingPlayer;
 
+    [Header("Combat")]
+    [Tooltip("Maximum health points. Reaching zero triggers the death animation.")]
+    [SerializeField] private float maxHealth = 100f;
+
+    [Tooltip("Particle prefab spawned at the world-space hit point on all clients when the suspect is struck.")]
+    [SerializeField] private GameObject hitParticlePrefab;
+
+    [Tooltip("Animator trigger name to play on hit. Must exist in the suspect's Animator Controller.")]
+    [SerializeField] private string hitAnimTrigger = "Hit";
+
+    private float _health;
+    private bool _isDead;
+
+    /// <summary>True once this suspect has died, regardless of visual state.</summary>
+    public bool IsDead => _isDead;
+
+    /// <summary>Raised on the server when the suspect is killed by a player melee hit.</summary>
+    public static event Action<SuspectCharacter> OnSuspectKilledByPlayer;
+
     [Header("Anomalies")] [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
 
@@ -92,6 +111,8 @@ public class SuspectCharacter : Interactable
 
         if (suspectData != null)
             interactText = $"{suspectData.FirstName}";
+
+        _health = maxHealth;
     }
 
     /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>
@@ -375,6 +396,58 @@ public class SuspectCharacter : Interactable
         anomalyController.RemoveAnomalyBySiblingIndex(siblingIndex);
     }
 
+    // ── Combat ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies damage to this suspect. Server-only. Triggers a hit reaction and,
+    /// when health reaches zero, plays the death animation on all clients.
+    /// </summary>
+    /// <param name="amount">Damage points to subtract.</param>
+    /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
+    public void TakeDamage(float amount, Vector3 hitPoint)
+    {
+        if (!IsServer || _isDead)
+            return;
+
+        _health -= amount;
+        SpawnHitParticleClientRpc(hitPoint);
+
+        if (_health <= 0f)
+            KillSuspect();
+    }
+
+    /// <summary>Spawns the blood hit particle and plays the hit reaction animation on all clients.</summary>
+    [ClientRpc]
+    private void SpawnHitParticleClientRpc(Vector3 hitPoint)
+    {
+        if (hitParticlePrefab != null)
+        {
+            GameObject fx = Instantiate(hitParticlePrefab, hitPoint, Quaternion.identity);
+            if (fx.GetComponentInChildren<AutoDestroy>() == null)
+                fx.AddComponent<AutoDestroy>();
+        }
+
+        if (animator != null && !string.IsNullOrEmpty(hitAnimTrigger))
+            animator.SetTrigger(hitAnimTrigger);
+    }
+
+    /// <summary>Marks this suspect as dead and triggers death visuals on all clients.</summary>
+    private void KillSuspect()
+    {
+        _isDead = true;
+        OnSuspectKilledByPlayer?.Invoke(this);
+        DisableInteractionClientRpc();
+        // Reuse the existing networked death visuals (blood explosion + Die trigger).
+        GetShotClientRpc();
+    }
+
+    /// <summary>Disables the interaction collider on all clients so the corpse cannot be interacted with.</summary>
+    [ClientRpc]
+    private void DisableInteractionClientRpc()
+    {
+        SetCanInteract(false);
+    }
+
     public void GetShot()
     {
         if (NetworkManager.Singleton.IsClient)
@@ -386,6 +459,7 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void GetShotServerRpc()
     {
+        _isDead = true;
         GetShotClientRpc();
     }
 

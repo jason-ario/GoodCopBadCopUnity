@@ -96,6 +96,12 @@ public class DebugConsole : MonoBehaviour
             GlobalHostVariables.Instance.AddMoney(1000);
         }
 
+        // F1 — prime the timecard machine for clock-out (simulates all suspects processed).
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            EnableClockOut();
+        }
+
         if (Input.GetKeyDown(KeyCode.F2))
         {
             SkipToDay(2);
@@ -187,6 +193,23 @@ public class DebugConsole : MonoBehaviour
             _isFastForwarding = false;
             Time.timeScale = 1f;
         }
+    }
+
+    /// <summary>
+    /// Primes the timecard machine for clock-out as if all suspects had been processed.
+    /// The shift does not end until the player physically interacts with the machine.
+    /// Server only — no-op on clients.
+    /// </summary>
+    private void EnableClockOut()
+    {
+        if (ShiftManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] ShiftManager not available — start the game first.");
+            return;
+        }
+
+        ShiftManager.Instance.DebugEnableClockOut();
+        Debug.Log("[DebugConsole] Timecard machine primed for clock-out (F1).");
     }
 
     /// <summary>

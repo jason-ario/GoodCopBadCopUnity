@@ -865,7 +865,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4132653483
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -895,6 +895,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: f5217ba507173ee419b1f7965e8e5f88, type: 2}
   - {fileID: 11400000, guid: 92d7f584cbed9394aac938b01265850f, type: 2}
   interactText: 
+  highlightNameFilter: 
   suspectData: {fileID: 0}
   InfectionScore: 0
   lookAnimator: {fileID: 253971976340002767}
@@ -918,7 +919,11 @@ MonoBehaviour:
     animationTriggerName: ThrowFolder
   _folderGivingAnimation: 0
   handSpawnPos: {fileID: 0}
+  maxHealth: 100
+  hitParticlePrefab: {fileID: 893913727056456344, guid: 89207601446ace84aba6d7aba7eb7c8b, type: 3}
+  hitAnimTrigger: Hit
   anomalyController: {fileID: 5350706457408493353}
+  drunkBehaviour: {fileID: 0}
   ChosenEntryReasonIndex: -1
   ChosenSymptomResponseIndex: -1
   ChosenWhoDoYouLiveWithIndex: -1
@@ -1074,6 +1079,34 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: -984792713
     TransitionIndex: 13
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: 1940389213
+    TransitionDuration: 0.25
+    TriggerNameHash: 506564194
+    TransitionIndex: 14
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: -357651225
+    TransitionDuration: 0.25
+    TriggerNameHash: -2026315816
+    TransitionIndex: 15
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: -1649828751
+    TransitionDuration: 0.25
+    TriggerNameHash: -264245426
+    TransitionIndex: 16
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: 1654612129
+    TransitionDuration: 0.25
+    TriggerNameHash: 1654612129
+    TransitionIndex: 17
   - IsCrossFadeExit: 0
     Layer: 0
     OriginatingState: 607913104
@@ -1315,26 +1348,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de2416234f202204d98b082e5b5d9904, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnomalyController
-  _mutationAnomalies:
-  - {fileID: 2637578589128851314}
-  - {fileID: 5463161838283403662}
-  - {fileID: 4374993038035683967}
-  - {fileID: 9059146522512625062}
-  - {fileID: 6657026380098968827}
-  _biologicalAnomalies:
-  - {fileID: 3493706933859189403}
-  - {fileID: 9137473991678056783}
-  - {fileID: 5765639040211887294}
-  - {fileID: 8223839652175722284}
   _documentationAnomalies:
   - {fileID: 3288529405124597729}
   - {fileID: 958851062351873305}
   - {fileID: 1851964698287790021}
   - {fileID: 8872331537606341429}
   - {fileID: 8595448999996197533}
-  _cleanChance: 0.2
-  _minAnomalies: 1
-  _maxAnomalies: 2
+  _vitalsAnomalies: []
+  _behaviorAnomalies: []
+  _mutationAnomalies:
+  - {fileID: 2637578589128851314}
+  - {fileID: 5463161838283403662}
+  - {fileID: 4374993038035683967}
+  - {fileID: 9059146522512625062}
+  - {fileID: 6657026380098968827}
+  _supernaturalAnomalies: []
   activeAnomalies: []
 --- !u!114 &820681201371413921
 MonoBehaviour:
@@ -1353,6 +1381,8 @@ MonoBehaviour:
     daysShown: 0
     lastDayShown: 0
     infectionScore: 0
+    pendingVaccineReset: 0
+    isKilled: 0
 --- !u!114 &7888620099599006139
 MonoBehaviour:
   m_ObjectHideFlags: 0

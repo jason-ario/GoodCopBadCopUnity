@@ -13,10 +13,19 @@ public class TimecardMachine : Interactable
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
 
-    /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift report.</summary>
+    [Header("Small Light")]
+    [Tooltip("Animator on the Small Light child — drives the 'Ready' bool for the blink animation.")]
+    [SerializeField] private Animator _lightAnimator;
+    [Tooltip("World-space AudioSource to play the fanfare through when the machine becomes ready.")]
+    [SerializeField] private AudioSource _fanfareSource;
+    [Tooltip("Fanfare clip played when the timecard machine is primed for clock-out.")]
+    [SerializeField] private AudioClip _fanfareClip;
+
+    /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift.</summary>
     [SerializeField] private float _punchToReportDelay = 1.5f;
 
     private static readonly int PunchTrigger = Animator.StringToHash("Punch");
+    private static readonly int ReadyBool    = Animator.StringToHash("Ready");
 
     private bool _clockOutReady = false;
 
@@ -60,8 +69,7 @@ public class TimecardMachine : Interactable
 
     /// <summary>
     /// Called by ShiftManager on the server when all suspects have been processed.
-    /// Enables clock-out interaction on all clients. The tutorial notification is
-    /// already shown by ShiftManager.NotifyClockOutReadyClientRpc.
+    /// Enables clock-out interaction on all clients and triggers the fanfare and light.
     /// </summary>
     public void EnableClockOut()
     {
@@ -75,26 +83,36 @@ public class TimecardMachine : Interactable
     public void Reset()
     {
         _clockOutReady = false;
-        TutorialMarkerManager.Instance?.Unmark(transform);
+        SetLightReady(false);
     }
 
     [ClientRpc]
     private void EnableClockOutClientRpc()
     {
         _clockOutReady = true;
-        TutorialMarkerManager.Instance?.Mark(transform);
+        SetLightReady(true);
+
+        if (_fanfareSource != null && _fanfareClip != null)
+            _fanfareSource.PlayOneShot(_fanfareClip);
     }
 
     [ClientRpc]
     private void PunchCardClientRpc()
     {
         _clockOutReady = false;
-        TutorialMarkerManager.Instance?.Unmark(transform);
+        SetLightReady(false);
 
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
 
         if (_animator != null)
             _animator.SetTrigger(PunchTrigger);
+    }
+
+    /// <summary>Sets the 'Ready' bool on the small light animator to drive the blink animation.</summary>
+    private void SetLightReady(bool ready)
+    {
+        if (_lightAnimator != null)
+            _lightAnimator.SetBool(ReadyBool, ready);
     }
 }

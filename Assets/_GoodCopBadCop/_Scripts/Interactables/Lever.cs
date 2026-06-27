@@ -45,7 +45,6 @@ public class Lever : Interactable, IHeldItemPassthrough
     [Tooltip("Duration of the snap tween when the lever commits to an end position on mouse release.")]
     [SerializeField] private float _snapDuration = 0.1f;
 
-    private const string GrabLeverBool = "GrabLever";
     private const string RightGripBool  = "RightGrip";
     private const string LeftGripBool   = "LeftGrip";
 
@@ -69,6 +68,7 @@ public class Lever : Interactable, IHeldItemPassthrough
     private bool _inControl = false;
     private bool _usingRightArm = true;
     private PlayerInteractionController _currentPlayer;
+    private Coroutine _exitCoroutine;
 
     public override void OnNetworkSpawn()
     {
@@ -114,7 +114,7 @@ public class Lever : Interactable, IHeldItemPassthrough
         if (Input.GetMouseButtonUp(0))
         {
             CommitLever();
-            StartCoroutine(ExitLeverView());
+            _exitCoroutine = StartCoroutine(ExitLeverView());
         }
     }
 
@@ -122,6 +122,15 @@ public class Lever : Interactable, IHeldItemPassthrough
     {
         base.Interact(player);
         if (_inControl) return;
+
+        // Stop any in-flight exit coroutine before writing new interaction state.
+        // Also kill the camera return tween it may have started so the new entry tween wins.
+        if (_exitCoroutine != null)
+        {
+            StopCoroutine(_exitCoroutine);
+            _exitCoroutine = null;
+            player.playerMovementController.CameraTransform.DOKill();
+        }
 
         PlayerAnimationController   anim   = player.playerAnimationController;
         PlayerPickupController      pickup = player.GetComponent<PlayerPickupController>();
@@ -180,7 +189,6 @@ public class Lever : Interactable, IHeldItemPassthrough
         yield return new WaitForSeconds(0.1f);
         if (!_inControl) yield break; // Player already released — ExitLeverView handles cleanup.
 
-        anim.SetAnimBool(GrabLeverBool, true);
         anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, true);
 
         if (_usingRightArm)
@@ -212,7 +220,6 @@ public class Lever : Interactable, IHeldItemPassthrough
         // Kill any in-progress camera tweens before starting the return.
         movement.CameraTransform.DOKill();
 
-        anim.SetAnimBool(GrabLeverBool, false);
         anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, false);
 
         if (_usingRightArm)
@@ -239,6 +246,7 @@ public class Lever : Interactable, IHeldItemPassthrough
         yield return new WaitForSeconds(_cameraReturnDuration);
 
         movement.SetCanControl(true);
+        _exitCoroutine = null;
     }
 
     /// <summary>
