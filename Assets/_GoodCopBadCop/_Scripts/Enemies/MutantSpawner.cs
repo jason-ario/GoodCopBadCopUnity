@@ -101,10 +101,15 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged += OnDayChanged;
 
-        // Only start immediately if we are already on the first active day or later (e.g. loaded from save).
-        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
-        if (currentDay >= firstActiveDay)
-            BeginSpawning();
+        if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart      += OnShiftStarted;
+            ShiftManager.Instance.OnNightPhaseBegin += OnNightPhaseBegun;
+        }
+        else
+        {
+            Debug.LogWarning("[MutantSpawner] ShiftManager.Instance not found — day/night gating unavailable.", this);
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -113,18 +118,49 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
+
+        if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart      -= OnShiftStarted;
+            ShiftManager.Instance.OnNightPhaseBegin -= OnNightPhaseBegun;
+        }
     }
 
     /// <summary>
-    /// Responds to day transitions. Starts spawning from <see cref="firstActiveDay"/> onwards.
+    /// Stops spawning if the day drops below <see cref="firstActiveDay"/>.
+    /// Does not start spawning on day advance — that is handled by <see cref="OnNightPhaseBegun"/>.
     /// SERVER ONLY (subscribed only on the server in <see cref="OnNetworkSpawn"/>).
     /// </summary>
     private void OnDayChanged(int newDay)
     {
-        if (newDay >= firstActiveDay && !_isRunning)
-            BeginSpawning();
-        else if (newDay < firstActiveDay && _isRunning)
+        if (newDay < firstActiveDay && _isRunning)
             StopSpawning();
+    }
+
+    /// <summary>
+    /// Stops the spawner when the shift starts so mutants do not spawn during the day phase.
+    /// </summary>
+    private void OnShiftStarted()
+    {
+        if (_isRunning)
+        {
+            StopSpawning();
+            Debug.Log("[MutantSpawner] Spawning paused — shift started (day phase).");
+        }
+    }
+
+    /// <summary>
+    /// Starts the spawner when the night phase begins, provided the current day meets
+    /// the <see cref="firstActiveDay"/> threshold.
+    /// </summary>
+    private void OnNightPhaseBegun()
+    {
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        if (currentDay >= firstActiveDay)
+        {
+            BeginSpawning();
+            Debug.Log($"[MutantSpawner] Spawning started — night phase begun (Day {currentDay}).");
+        }
     }
 
     private void BeginSpawning()

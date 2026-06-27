@@ -77,17 +77,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart += OnDayStart;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
     private void OnDestroy()
