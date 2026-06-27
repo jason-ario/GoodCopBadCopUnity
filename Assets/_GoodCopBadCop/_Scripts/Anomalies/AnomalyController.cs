@@ -337,6 +337,53 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
+    /// Picks a random anomaly from the active list, deactivates it, and removes it.
+    /// Returns the sibling index of the removed anomaly for client replication,
+    /// or -1 if there are no active anomalies.
+    /// </summary>
+    public int RemoveRandomActiveAnomaly()
+    {
+        if (activeAnomalies.Count == 0) return -1;
+
+        int index = Random.Range(0, activeAnomalies.Count);
+        Anomaly anomaly = activeAnomalies[index];
+        int siblingIndex = anomaly.transform.GetSiblingIndex();
+
+        anomaly.DeactivateAnomaly();
+        activeAnomalies.RemoveAt(index);
+
+        Debug.Log($"[AnomalyController] Vaccine applied — deactivated '{anomaly.name}' (siblingIndex {siblingIndex}). " +
+                  $"{activeAnomalies.Count} anomaly/ies remaining.");
+        return siblingIndex;
+    }
+
+    /// <summary>
+    /// Deactivates and removes the anomaly that has the given sibling index in the hierarchy.
+    /// Used on non-server clients to replicate a server-chosen anomaly removal.
+    /// </summary>
+    public void RemoveAnomalyBySiblingIndex(int siblingIndex)
+    {
+        Anomaly target = null;
+        foreach (Anomaly a in CollectAllAnomalies())
+        {
+            if (a.transform.GetSiblingIndex() == siblingIndex)
+            {
+                target = a;
+                break;
+            }
+        }
+
+        if (target == null)
+        {
+            Debug.LogWarning($"[AnomalyController] RemoveAnomalyBySiblingIndex: no anomaly at sibling index {siblingIndex}.");
+            return;
+        }
+
+        target.DeactivateAnomaly();
+        activeAnomalies.Remove(target);
+    }
+
+    /// <summary>
     /// Activates a single anomaly, handling RandomTentacleAnomaly and RandomTumorAnomaly
     /// special cases by picking and storing indices for client replication.
     /// </summary>

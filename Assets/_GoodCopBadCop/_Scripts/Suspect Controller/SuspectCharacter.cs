@@ -340,11 +340,39 @@ public class SuspectCharacter : Interactable
             return;
         }
 
+        if (item is Vaccine vaccine)
+        {
+            vaccine.UseSyringe(this);
+            return;
+        }
+
         if (item.ItemData.name == "Shotgun")
         {
             base.InteractWithItem(playerInteractionController, item);
             GetShot();
         }
+    }
+
+    /// <summary>Routes a vaccine application to the server so anomaly removal is authoritative.</summary>
+    public void ReceiveVaccine()
+    {
+        ReceiveVaccineServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ReceiveVaccineServerRpc()
+    {
+        int siblingIndex = anomalyController.RemoveRandomActiveAnomaly();
+        if (siblingIndex >= 0)
+            ReceiveVaccineClientRpc(siblingIndex);
+    }
+
+    /// <summary>Replicates the server's anomaly removal choice to all non-server clients.</summary>
+    [ClientRpc]
+    private void ReceiveVaccineClientRpc(int siblingIndex)
+    {
+        if (IsServer) return;
+        anomalyController.RemoveAnomalyBySiblingIndex(siblingIndex);
     }
 
     public void GetShot()
