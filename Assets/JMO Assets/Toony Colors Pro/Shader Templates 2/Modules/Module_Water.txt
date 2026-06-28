@@ -1,5 +1,5 @@
 // Toony Colors Pro+Mobile 2
-// (c) 2014-2023 Jean Moreno
+// (c) 2014-2026 Jean Moreno
 
 // Shader Generator Module: Water Effects
 
@@ -8,7 +8,9 @@
 subh	lbl="Water Effects"											help="featuresreference/specialeffects/watereffects"
 sngl	lbl="Vertex Waves"				kw=VERTEX_SIN_WAVES			help="featuresreference/specialeffects/watereffects/vertexwaves"	tt="Basic vertex motion using a sine displacement function"
 mult	lbl="Sine Functions Count"		kw=1|,2|VSW_2,4|VSW_4,8|VSW_8			indent	needs=VERTEX_SIN_WAVES							tt="Number of sine functions to add together (more randomness but also more shader instructions)"
-sngl	lbl="World-based Position"		kw=VSW_WORLDPOS							indent	needs=VERTEX_SIN_WAVES							tt="Calculates the sine function according to the vertices' world position (useful when using multiple meshes as tiles, so that they can connect seamlessly)"
+#sngl	lbl="World-based Position"		kw=VSW_WORLDPOS							indent	needs=VERTEX_SIN_WAVES							tt="Calculates the sine function according to the vertices' world position (useful when using multiple meshes as tiles, so that they can connect seamlessly)"
+mult	lbl="Position"					kw=Local Vertex|,World Vertex|VSW_WORLDPOS,World Object|VSW_WORLDOBJ	indent	needs=VERTEX_SIN_WAVES	tt="In which space to calculate the sine function: world vertex is useful to connect different objects together, world object is useful to move the whole object at once, e.g. for objects that float over the water"
+sngl	lbl="Rotate along waves"		kw=VSW_WORLDOBJ_ROTATE				indent=2	needs=VERTEX_SIN_WAVES,VSW_WORLDOBJ		tt="Orientate the whole mesh along the normals, e.g. for floating objects on the water"
 mult	lbl="Displacement Axis"			kw=Y|,Z|VSW_AXIS_Z,X|VSW_AXIS_X		indent		needs=VERTEX_SIN_WAVES	excl=VSW_FOLLOWNORM		tt="Defines along which local axis to move the vertices"
 sngl	lbl="Follow Mesh Normals"		kw=VSW_FOLLOWNORM					indent=2	needs=VERTEX_SIN_WAVES		tt="Moves the vertices along their base normal, rather than along their up axis (useful for non-planar meshes)"
 sngl	lbl="Calculate Normals"			kw=VERTEX_SIN_NORMALS				indent		needs=VERTEX_SIN_WAVES		tt="Recalculate the normals based on the sine waves (assuming a planar mesh)"
@@ -192,6 +194,9 @@ space	space=4
 			float _waveHeight = [[VALUE:Waves Height]];
 	/// IF VSW_WORLDPOS
 			float3 _vertexWavePos = worldPosition.xyz * _waveFrequency;
+	/// ELIF VSW_WORLDOBJ
+			float3 _vertexWavePos = unity_ObjectToWorld._m03_m13_m23.xyz * _waveFrequency;
+			vertexPos = mul(unity_ObjectToWorld, float4(vertexPos.xyz, 0));
 	/// ELSE
 			float3 _vertexWavePos = vertexPos.xyz * _waveFrequency;
 	///
@@ -240,7 +245,12 @@ space	space=4
 	/// ELSE
 			vertexPos.y += (waveFactorX + waveFactorZ);
 	///
-	/// IF VERTEX_SIN_NORMALS
+
+	/// IF VSW_WORLDOBJ
+			vertexPos = mul(unity_WorldToObject, float4(vertexPos.xyz, 0));
+	///
+
+	/// IF VERTEX_SIN_NORMALS || VSW_WORLDOBJ_ROTATE
 		/// IF VSW_2
 			half4 waveXZn = cos((_vertexWavePos.xxzz * vsw_offsets_x) + (_phase.xxxx * vsw_ph_offsets_x)) * (vsw_offsets_x / 2);
 			float xn = -_waveHeight * (waveXZn.x + waveXZn.y);
@@ -261,7 +271,17 @@ space	space=4
 			float xn = -_waveHeight * cos(_vertexWavePos.x + _phase);
 			float zn = -_waveHeight * cos(_vertexWavePos.z + _phase);
 		///
+		/// IF VERTEX_SIN_NORMALS
 			vertexNormal = normalize(float3(xn, 1, zn));
+		///
+		/// IF VSW_WORLDOBJ_ROTATE
+			float3 waveVecUp = normalize(float3(xn, 1, zn));
+			float3 waveVecForward = float3(0,0,1);
+			float3 waveVecRight = normalize(cross(waveVecUp, waveVecForward));
+			waveVecForward = cross(waveVecRight, waveVecUp);
+			float3x3 waveRotationMatrix = float3x3(waveVecRight, waveVecUp, waveVecForward);
+			vertexPos.xyz = mul(vertexPos.xyz, waveRotationMatrix);
+		///
 	///
 ///
 #END

@@ -8,7 +8,7 @@ using UnityEngine.Rendering.RenderGraphModule;
 
 namespace VolumetricLights {
 
-    public class VolumetricLightsTranslucentShadowMapFeature : ScriptableRendererFeature {
+    public partial class VolumetricLightsTranslucentShadowMapFeature : ScriptableRendererFeature {
 
         static class ShaderParams {
             public static int MainTex = Shader.PropertyToID("_MainTex");
@@ -20,7 +20,7 @@ namespace VolumetricLights {
         }
 
 
-        public class TranspRenderPass : ScriptableRenderPass {
+        public partial class TranspRenderPass : ScriptableRenderPass {
 
             public VolumetricLightsTranslucentShadowMapFeature settings;
 
@@ -58,50 +58,6 @@ namespace VolumetricLights {
             public void Setup (ScriptableRenderer renderer, VolumetricLight light) {
                 this.renderer = renderer;
                 TranspRenderPass.light = light;
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void OnCameraSetup (CommandBuffer cmd, ref RenderingData renderingData) {
-                base.OnCameraSetup(cmd, ref renderingData);
-#if UNITY_2022_1_OR_NEWER
-                cameraDepth = renderer.cameraDepthTargetHandle;
-#else
-                cameraDepth = renderer.cameraDepthTarget;
-#endif
-            }
-
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-
-                if (light.translucencyMapHandle == null || light.translucencyMapHandle.rt != light.translucentMap) {
-                    if (light.translucencyMapHandle != null) {
-                        RTHandles.Release(light.translucencyMapHandle);
-                    }
-                    light.translucencyMapHandle = RTHandles.Alloc(light.translucentMap);
-                }
-
-
-                ConfigureTarget(light.translucencyMapHandle, cameraDepth);
-                ConfigureClear(ClearFlag.Color, Color.white);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute (ScriptableRenderContext context, ref RenderingData renderingData) {
-                CommandBuffer cmd = CommandBufferPool.Get(m_strProfilerTag);
-                context.ExecuteCommandBuffer(cmd);
-                cmd.Clear();
-
-                ExecutePass(cmd);
-
-                context.ExecuteCommandBuffer(cmd);
-                CommandBufferPool.Release(cmd);
             }
 
 #if UNITY_2023_3_OR_NEWER

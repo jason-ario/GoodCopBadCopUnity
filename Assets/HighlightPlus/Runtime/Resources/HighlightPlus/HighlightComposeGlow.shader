@@ -9,15 +9,19 @@ Properties {
 	[HideInInspector] _BlendDst("Blend Dst", Int) = 1
 	_Debug("Debug Color", Color) = (0,0,0,0)
     [HideInInspector] _GlowStencilComp ("Stencil Comp", Int) = 6
+	_Padding("Padding", Float) = 0
+	[HideInInspector] _Pixelation("Pixelation", Int) = 0
 }
     SubShader
     {
         Tags { "Queue"="Transparent+102" "RenderType"="Transparent" "DisableBatching" = "True" }
         Blend [_BlendSrc] [_BlendDst]
+		BlendOp Add
 
         // Compose effect on camera target
         Pass
         {
+            Name "Compose Glow"
             ZWrite Off
 			ZTest Always // [_ZTest]
 			Cull Off //[_Cull]
@@ -33,9 +37,11 @@ Properties {
             #pragma vertex vert
             #pragma fragment frag
 			#pragma multi_compile_local _ HP_MASK_CUTOUT
+			#pragma multi_compile_local _ HP_ALL_EDGES			
 
             #include "UnityCG.cginc"
 
+			UNITY_DECLARE_SCREENSPACE_TEXTURE(_HPComposeOutlineFinal);
 			UNITY_DECLARE_SCREENSPACE_TEXTURE(_HPComposeGlowFinal);
 			UNITY_DECLARE_SCREENSPACE_TEXTURE(_HPSourceRT);
 			float4 _HPSourceRT_TexelSize;
@@ -43,6 +49,15 @@ Properties {
 			fixed4 _Color;
 			float3 _Flip;
 			fixed4 _Debug;
+			half _Padding;
+			int _Pixelation;
+
+			#if HP_ALL_EDGES
+				#define OUTLINE_SOURCE outline.g
+			#else
+				#define OUTLINE_SOURCE outline.r
+			#endif
+
 
             struct appdata
             {
@@ -77,6 +92,13 @@ Properties {
 				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
 				float2 uv = i.scrPos.xy/i.scrPos.w;
+
+				if (_Pixelation > 1) {
+					float2 pixel_uv = uv * _HPSourceRT_TexelSize.zw;
+					pixel_uv = (floor(pixel_uv / _Pixelation) + 0.5) * _Pixelation;
+					uv = pixel_uv * _HPSourceRT_TexelSize.xy;
+				}
+
             	fixed glow = UNITY_SAMPLE_SCREENSPACE_TEXTURE(_HPComposeGlowFinal, uv).r;
 
 				#if HP_MASK_CUTOUT
@@ -87,82 +109,21 @@ Properties {
 					glow *= maskN == 0 || maskS == 0 || maskW == 0 || maskE == 0;
 				#endif
 
-            	fixed4 color = _Color;
-            	color *= glow;
-				
+				fixed4 color = _Color;
 
-				color += _Debug;
+				// read padding from outline
+				fixed4 outline = UNITY_SAMPLE_SCREENSPACE_TEXTURE(_HPComposeOutlineFinal, uv);
+				glow = step(OUTLINE_SOURCE, _Padding) * glow / _Padding;
+
+            	color.a *= glow;
+
                 color.a = saturate(color.a);
+				color = lerp(color, _Debug, 1.0 - color.a);
+
             	return color;
             }
             ENDCG
         }
-
-		// Compose effect on camera target (full-screen blit)
-			Pass
-				{
-					ZWrite Off
-					ZTest Always //[_ZTest]
-					Cull Off //[_Cull]
-
-					Stencil {
-						Ref 2
-						Comp NotEqual
-						Pass keep
-						ReadMask 2
-						WriteMask 2
-					}
-
-					CGPROGRAM
-					#pragma vertex vert
-					#pragma fragment frag
-
-					#include "UnityCG.cginc"
-
-					UNITY_DECLARE_SCREENSPACE_TEXTURE(_MainTex);
-					float4 _MainTex_ST;
-					fixed4 _Color;
-					float3 _Flip;
-
-					struct appdata
-					{
-						float4 vertex : POSITION;
-						float2 uv     : TEXCOORD0;
-						UNITY_VERTEX_INPUT_INSTANCE_ID
-					};
-
-					struct v2f
-					{
-						float4 pos: SV_POSITION;
-						float2 uv     : TEXCOORD0;
-						UNITY_VERTEX_INPUT_INSTANCE_ID
-						UNITY_VERTEX_OUTPUT_STEREO
-					};
-
-					v2f vert(appdata v)
-					{
-						v2f o;
-						UNITY_SETUP_INSTANCE_ID(v);
-						UNITY_INITIALIZE_OUTPUT(v2f, o);
-						UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-						o.pos = UnityObjectToClipPos(v.vertex);
-						o.uv = UnityStereoScreenSpaceUVAdjust(v.uv, _MainTex_ST);
-						o.uv.y = _Flip.x + o.uv.y * _Flip.y;
-						return o;
-					}
-
-					fixed4 frag(v2f i) : SV_Target
-					{
-						UNITY_SETUP_INSTANCE_ID(i);
-						UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-						fixed4 glow = UNITY_SAMPLE_SCREENSPACE_TEXTURE(_MainTex, i.uv);
-						fixed4 color = _Color;
-						color *= glow.r;
-                        color.a = saturate(color.a);
-						return color;
-					}
-					ENDCG
-				}
 
     }
 }

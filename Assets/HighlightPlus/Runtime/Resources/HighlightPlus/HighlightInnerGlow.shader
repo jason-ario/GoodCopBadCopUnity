@@ -3,7 +3,7 @@ Properties {
     _MainTex ("Texture", Any) = "white" {}
     _Color ("Color", Color) = (1,1,1) // not used; dummy property to avoid inspector warning "material has no _Color property"
     _InnerGlowColor ("Inner Glow Color", Color) = (1,1,1,1)
-    _InnerGlowWidth ("Width", Float) = 1.0
+    _InnerGlowData ("Data", Vector) = (1,1,1,0)
     _CutOff("CutOff", Float ) = 0.5
     _Cull ("Cull Mode", Int) = 2
     _InnerGlowZTest ("ZTest", Int) = 4
@@ -39,7 +39,7 @@ Properties {
             {
                 float4 vertex : POSITION;
                 float2 uv     : TEXCOORD0;
-                float3 normal : NORMAL;
+                float3 norm   : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -48,7 +48,7 @@ Properties {
                 float4 pos    : SV_POSITION;
                 float2 uv     : TEXCOORD0;
                 float3 wpos   : TEXCOORD1;
-                float3 normal : NORMAL;
+                float3 norm   : NORMAL;
 				UNITY_VERTEX_OUTPUT_STEREO
             };
             
@@ -56,8 +56,9 @@ Properties {
             float4 _MainTex_ST;
             fixed _CutOff;
       		fixed4 _InnerGlowColor;
-      		fixed _InnerGlowWidth;
-
+      		fixed4 _InnerGlowData;
+            #define INNER_GLOW_WIDTH _InnerGlowData.x
+            #define INNER_GLOW_POWER _InnerGlowData.y
 
             v2f vert (appdata v)
             {
@@ -67,7 +68,7 @@ Properties {
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.pos = ComputeVertexPosition(v.vertex);
                 o.wpos = mul(unity_ObjectToWorld, v.vertex).xyz;
-                o.normal = UnityObjectToWorldNormal(v.normal);
+                o.norm = UnityObjectToWorldNormal(v.norm);
                 o.uv = TRANSFORM_TEX (v.uv, _MainTex);
 
                 #if UNITY_REVERSED_Z
@@ -82,13 +83,17 @@ Properties {
             fixed4 frag (v2f i) : SV_Target
             {
                 #if HP_ALPHACLIP
-                fixed4 color = tex2D(_MainTex, i.uv);
-                clip(color.a - _CutOff);
+                    fixed4 color = tex2D(_MainTex, i.uv);
+                    clip(color.a - _CutOff);
                 #endif
             
             	float3 viewDir = normalize(i.wpos - _WorldSpaceCameraPos.xyz);
-            	fixed dx = saturate(_InnerGlowWidth - abs(dot(viewDir, normalize(i.normal)))) / _InnerGlowWidth;
-                fixed4 col = _InnerGlowColor * dx;
+                float hn = abs(dot(viewDir, normalize(i.norm)));
+            	fixed dx = saturate((INNER_GLOW_WIDTH - hn) / INNER_GLOW_WIDTH);
+                dx = 1.0 - pow( 1.0 - dx, INNER_GLOW_POWER);
+                fixed4 col = _InnerGlowColor;
+                col.a *= dx;
+                col.a = saturate(col.a);
 				return col;
             }
             ENDCG

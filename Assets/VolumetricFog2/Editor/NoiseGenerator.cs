@@ -38,7 +38,7 @@ namespace VolumetricFogAndMist2 {
         bool requestRebuild;
 
 
-        [MenuItem("Window/Volumetric Fog \x8B& Mist/Noise Generator...", false, 1001)]
+        [MenuItem("Window/Kronnect/Volumetric Fog \x8B& Mist/Noise Generator...", false, 1001)]
         public static void ShowWindow() {
             NoiseGenerator window = GetWindow<NoiseGenerator>("Noise Generator", true);
             window.minSize = new Vector2(400, 400);

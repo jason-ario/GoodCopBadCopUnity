@@ -92,7 +92,7 @@ public class ExamPage : FolderItem
 
         _renderTexture = new RenderTexture(desc)
         {
-            name = $"ChecklistRT_{GetInstanceID()}",
+            name = $"ChecklistRT_{GetEntityId()}",
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Bilinear
         };

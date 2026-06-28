@@ -583,6 +583,17 @@ namespace ToonyColorsPro
 				CheckHash();
 			}
 
+			public bool IsImplementationUsedInCustomCode(Implementation imp)
+			{
+				int index = this.implementations.IndexOf(imp);
+				if (index < 0)
+				{
+					Debug.LogWarning($"Implementation '{imp.Label}' is not used in this Shader Property '{this.Name}'");
+					return false;
+				}
+				return this.usedImplementationsForCustomCode.Contains(index);
+			}
+
 			public void ForceUpdateDefaultHash()
 			{
 				defaultImplementationHash = GetImplementationsHash();
@@ -2223,7 +2234,7 @@ namespace ToonyColorsPro
 				return associatedData;
 			}
 
-			static Dictionary<string, ShaderProperty> CachedShaderPropertiesFromTemplate = new Dictionary<string, ShaderProperty>();
+			static readonly Dictionary<string, ShaderProperty> CachedShaderPropertiesFromTemplate = new Dictionary<string, ShaderProperty>();
 
 			public static void ClearCache()
 			{
@@ -2469,6 +2480,15 @@ namespace ToonyColorsPro
 						var channels = GetAssociatedDataString(associatedData, "swizzle", null);
 						if (!string.IsNullOrEmpty(channels))
 							(imp as Imp_WorldPosition).Channels = channels;
+					}
+					break;
+
+					case "mesh_world_position":
+					{
+						imp = new Imp_ObjectWorldPosition(shaderProperty);
+						var channels = GetAssociatedDataString(associatedData, "swizzle", null);
+						if (!string.IsNullOrEmpty(channels))
+							(imp as Imp_ObjectWorldPosition).Channels = channels;
 					}
 					break;
 

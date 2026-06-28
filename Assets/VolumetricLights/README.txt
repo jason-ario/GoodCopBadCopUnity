@@ -23,7 +23,7 @@ Please read the documentation folder for additional instructions and options.
 
 Support
 -------
-* Support-Web: https://kronnect.com/support
+* Support-Web: https://kronnect.com/docs/volumetric-lights-urp/
 * Support-Discord: https://discord.gg/EH2GMaM
 * Email: contact@kronnect.com
 * Twitter: @Kronnect
@@ -39,6 +39,23 @@ Of course, all updates of Volumetric Lights will be eventually available on the 
 
 Version history
 ---------------
+
+v20.1
+- Shadow Occlusion: added "Include Transparent" option to let transparent objects and 2D sprites occlude volumetric lights. When enabled, the occlusion capture also includes the transparent render queue and no longer auto-excludes the TransparentFX layer.
+- [Fix] Custom shaders without a forward/lit pass now correctly occlude volumetric lights (including URP Forward+ and Deferred+).
+
+v20.0.2
+- Depth Pre-Pass Feature: added "Use Optimized Shader" option for the Transparent Layer Mask path. Disable to use each object's own shader (useful for shaders with vertex transformations like wind, or for custom alpha clipping).
+- Depth Pre-Pass Feature: added cull mode options for the optimized shader and as a fallback for the Alpha Cutout Layer Mask.
+- Inspector: added info HelpBox when Shadow Occlusion is enabled, explaining the auto-managed VolumetricLightsDepthRenderer added to the URP Asset. Includes a 'Select Active URP Asset' button for quick verification.
+- [Fix] Depth pre-pass shader is now compatible with SRP Batcher, BatchRendererGroup, GPU Resident Drawer and Entities Graphics.
+- [Fix] Alpha Cutout Layer Mask: corrected texture binding so foliage/leaves now properly clip in the depth pre-pass.
+
+v20.0.1
+- Updated help and documentation URLs
+
+v20.0
+- Added support for Unity 6.4
 
 v11.0
 - Added Light Mode (Simple / Volumetric): Simple mode skips some volumeric features and ignoring shadows improving performance at reduced feature set

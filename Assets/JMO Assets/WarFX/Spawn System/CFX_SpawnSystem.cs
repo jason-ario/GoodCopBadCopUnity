@@ -24,7 +24,7 @@ public class CFX_SpawnSystem : MonoBehaviour
 	/// </param>
 	static public GameObject GetNextObject(GameObject sourceObj, bool activateObject = true)
 	{
-		int uniqueId = sourceObj.GetInstanceID();
+		EntityId uniqueId = sourceObj.GetEntityId();
 		
 		if(!instance.poolCursors.ContainsKey(uniqueId))
 		{
@@ -128,12 +128,12 @@ public class CFX_SpawnSystem : MonoBehaviour
 	public bool instantiateIfNeeded = false;
 	
 	private bool allObjectsLoaded;
-	private Dictionary<int,List<GameObject>> instantiatedObjects = new Dictionary<int, List<GameObject>>();
-	private Dictionary<int,int> poolCursors = new Dictionary<int, int>();
+	private Dictionary<EntityId,List<GameObject>> instantiatedObjects = new Dictionary<EntityId, List<GameObject>>();
+	private Dictionary<EntityId,int> poolCursors = new Dictionary<EntityId, int>();
 	
 	private void addObjectToPool(GameObject sourceObject, int number)
 	{
-		int uniqueId = sourceObject.GetInstanceID();
+		EntityId uniqueId = sourceObject.GetEntityId();
 
 		//Add new entry if it doesn't exist
 		if(!instantiatedObjects.ContainsKey(uniqueId))
@@ -174,7 +174,7 @@ public class CFX_SpawnSystem : MonoBehaviour
 	
 	private void removeObjectsFromPool(GameObject sourceObject)
 	{
-		int uniqueId = sourceObject.GetInstanceID();
+		EntityId uniqueId = sourceObject.GetEntityId();
 		
 		if(!instantiatedObjects.ContainsKey(uniqueId))
 		{
@@ -195,7 +195,7 @@ public class CFX_SpawnSystem : MonoBehaviour
 		poolCursors.Remove(uniqueId);
 	}
 
-	private void increasePoolCursor(int uniqueId)
+	private void increasePoolCursor(EntityId uniqueId)
 	{
 		instance.poolCursors[uniqueId]++;
 		if(instance.poolCursors[uniqueId] >= instance.instantiatedObjects[uniqueId].Count)

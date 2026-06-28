@@ -3011,7 +3011,11 @@ namespace ToonyColorsPro
 					}
 					else
 					{
-						return $"{inputSource}.{coord}.{Channels.ToLowerInvariant()}";
+						bool usedByCustomCode = this.ParentShaderProperty.IsImplementationUsedInCustomCode(this);
+						if (usedByCustomCode)
+							return $"{inputSource}.{coord}";
+						else
+							return $"{inputSource}.{coord}.{Channels.ToLowerInvariant()}";
 					}
 
 					//var hideChannels = TryGetArgument("hide_channels", arguments);
@@ -3253,11 +3257,105 @@ namespace ToonyColorsPro
 				}
 			}
 
+			[Serialization.SerializeAs("imp_objworldpos")]
+			public class Imp_ObjectWorldPosition : Implementation
+			{
+				public static VariableType VariableCompatibility { get { return VariableTypeAll; } }
+				public static string MenuLabel { get { return "Vertex/Mesh World Position"; } }
+				internal override string GUILabel() { return MenuLabel; }
+				internal override OptionFeatures[] NeededFeatures() { return new OptionFeatures[0]; }
+
+				[Serialization.SerializeAs("cc")] public int ChannelsCount = 3;
+				[Serialization.SerializeAs("chan")] public string Channels = "XYZ";
+				string DefaultChannels = "XYZ";
+
+				public Imp_ObjectWorldPosition(ShaderProperty shaderProperty) : base(shaderProperty)
+				{
+					InitChannelsCount();
+					InitChannelsSwizzle();
+				}
+
+				void InitChannelsCount()
+				{
+					switch (ParentShaderProperty.Type)
+					{
+						case VariableType.@float: ChannelsCount = 1; break;
+						case VariableType.float2: ChannelsCount = 2; break;
+						case VariableType.color:
+						case VariableType.float3: ChannelsCount = 3; break;
+						case VariableType.color_rgba:
+						case VariableType.float4: ChannelsCount = 4; break;
+					}
+				}
+
+				void InitChannelsSwizzle()
+				{
+					switch (ParentShaderProperty.Type)
+					{
+						case VariableType.@float: Channels = "X"; break;
+						case VariableType.float2: Channels = "XY"; break;
+						case VariableType.color:
+						case VariableType.float3: Channels = "XYZ"; break;
+						case VariableType.color_rgba:
+						case VariableType.float4: Channels = "XYZW"; break;
+					}
+					DefaultChannels = Channels;
+				}
+
+				public override void OnPasted()
+				{
+					InitChannelsCount();
+				}
+
+				internal override string PrintVariableVertex(string inputSource, string outputSource, string arguments)
+				{
+					var hideChannels = TryGetArgument("hide_channels", arguments);
+					var channels = string.IsNullOrEmpty(hideChannels) ? "." + Channels.ToLowerInvariant() : "";
+					return string.Format("unity_ObjectToWorld._m03_m13_m23{1}", inputSource, channels);
+				}
+
+				internal override string PrintVariableFragment(string inputSource, string outputSource, string arguments)
+				{
+					var hideChannels = TryGetArgument("hide_channels", arguments);
+					var channels = string.IsNullOrEmpty(hideChannels) ? "." + Channels.ToLowerInvariant() : "";
+					return $"unity_ObjectToWorld._m03_m13_m23{channels}";
+				}
+
+				internal override void NewLineGUI(bool usedByCustomCode)
+				{
+					BeginHorizontal();
+					ShaderGenerator2.ContextualHelpBox("The world space position for the whole mesh.");
+					EndHorizontal();
+
+					BeginHorizontal();
+					{
+						bool highlighted = !IsDefaultImplementation ? Channels != DefaultChannels : Channels != GetDefaultImplementation<Imp_ObjectWorldPosition>().Channels;
+						SGUILayout.InlineLabel("Swizzle", highlighted);
+
+						if (usedByCustomCode)
+						{
+							using (new EditorGUI.DisabledScope(true))
+							{
+								GUILayout.Label(TCP2_GUI.TempContent("Defined in Custom Code"), SGUILayout.Styles.ShurikenValue, GUILayout.Height(16), GUILayout.ExpandWidth(false));
+							}
+						}
+						else
+						{
+							if (ChannelsCount == 1)
+								Channels = SGUILayout.XYZSelector(Channels);
+							else
+								Channels = SGUILayout.XYZSwizzle(Channels, ChannelsCount);
+						}
+					}
+					EndHorizontal();
+				}
+			}
+
 			[Serialization.SerializeAs("imp_localnorm")]
 			public class Imp_LocalNormal: Implementation
 			{
 				public static VariableType VariableCompatibility { get { return VariableTypeAll; } }
-				public static string MenuLabel { get { return "Vertex/Object Normal"; } }
+				public static string MenuLabel { get { return "Vertex/Local Normal"; } }
 				internal override string GUILabel() { return MenuLabel; }
 				internal override OptionFeatures[] NeededFeatures()
 				{

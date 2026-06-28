@@ -32,6 +32,9 @@ namespace VolumetricFogAndMist2 {
         public float intensity = 1f;
         [Tooltip("Reduces light intensity near point lights")]
         public float insideAtten;
+        [Tooltip("Controls point light color normalization. 0 = pure additive, higher values prevent oversaturation by normalizing each light's contribution")]
+        [Range(0, 0.8f)]
+        public float blending;
 
         [Header("Distance Dimming")]
         [Tooltip("Enables distance-based dimming for point lights")]
@@ -141,10 +144,13 @@ namespace VolumetricFogAndMist2 {
                     pointLightPositionBuffer[count].z = pos.z;
                     pointLightPositionBuffer[count].w = 0;
                     Color color = light.color;
+                    if (light.useColorTemperature) {
+                        color *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
+                    }
                     pointLightColorBuffer[count].x = color.r * multiplier;
                     pointLightColorBuffer[count].y = color.g * multiplier;
                     pointLightColorBuffer[count].z = color.b * multiplier;
-                    pointLightColorBuffer[count].w = range;
+                    pointLightColorBuffer[count].w = 1f / range;
                     count++;
                 }
             }
@@ -153,7 +159,7 @@ namespace VolumetricFogAndMist2 {
             if (count > 0) {
                 Shader.SetGlobalVectorArray(ShaderParams.PointLightColors, pointLightColorBuffer);
                 Shader.SetGlobalVectorArray(ShaderParams.PointLightPositions, pointLightPositionBuffer);
-                Shader.SetGlobalFloat(ShaderParams.PointLightInsideAtten, insideAtten);
+                Shader.SetGlobalVector(ShaderParams.PointLightParams, new Vector4(insideAtten, blending, 0, 0));
             }
         }
 

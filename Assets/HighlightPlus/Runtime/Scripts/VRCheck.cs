@@ -1,10 +1,7 @@
-// Comment this line to disable usage of XR module
-#define ENABLE_XR
-
 using System.Collections.Generic;
 using UnityEngine;
 
-#if ENABLE_XR
+#if HP2_XR
 using UnityEngine.XR;
 #endif
 
@@ -15,7 +12,7 @@ namespace HighlightPlus {
         public static bool isActive;
         public static bool isVrRunning;
 
-#if !ENABLE_XR
+#if !HP2_XR
             static bool IsActive() {
                 return false;
             }

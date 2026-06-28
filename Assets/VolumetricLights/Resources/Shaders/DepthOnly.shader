@@ -2,13 +2,15 @@ Shader "Hidden/VolumetricLights/DepthOnly"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
+        [MainTexture] _BaseMap ("Texture", 2D) = "white" {}
         _AlphaCutOff("Alpha CutOff", Float) = 0
+        _Cull("Culling", Int) = 2
     }
     SubShader
     {
         ColorMask 0
         ZWrite On
+        Cull [_Cull]
 
         Pass
         {
@@ -26,20 +28,18 @@ Shader "Hidden/VolumetricLights/DepthOnly"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            #if DEPTH_PREPASS_ALPHA_TEST
-                CBUFFER_START(UnityPerMaterial)
-                half _AlphaCutOff;
-                float4 _BaseMap_ST;
-                CBUFFER_END
+            CBUFFER_START(UnityPerMaterial)
+            half _AlphaCutOff;
+            float4 _BaseMap_ST;
+            CBUFFER_END
 
-                #ifdef UNITY_DOTS_INSTANCING_ENABLED
-                    UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
-                        UNITY_DOTS_INSTANCED_PROP(float, _AlphaCutOff)
-                        UNITY_DOTS_INSTANCED_PROP(float4, _BaseMap_ST)
-                    UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
-                    #define _AlphaCutOff UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float, _AlphaCutOff)
-                    #define _BaseMap_ST UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseMap_ST)
-                #endif
+            #ifdef UNITY_DOTS_INSTANCING_ENABLED
+                UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
+                    UNITY_DOTS_INSTANCED_PROP(float, _AlphaCutOff)
+                    UNITY_DOTS_INSTANCED_PROP(float4, _BaseMap_ST)
+                UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
+                #define _AlphaCutOff UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float, _AlphaCutOff)
+                #define _BaseMap_ST UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseMap_ST)
             #endif
 
             #include "DepthOnly_Include.hlsl"
@@ -63,12 +63,10 @@ Shader "Hidden/VolumetricLights/DepthOnly"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            #if DEPTH_PREPASS_ALPHA_TEST
-                CBUFFER_START(UnityPerMaterial)
-                half _AlphaCutOff;
-                float4 _BaseMap_ST;
-                CBUFFER_END
-            #endif
+            CBUFFER_START(UnityPerMaterial)
+            half _AlphaCutOff;
+            float4 _BaseMap_ST;
+            CBUFFER_END
 
             #include "DepthOnly_Include.hlsl"
 

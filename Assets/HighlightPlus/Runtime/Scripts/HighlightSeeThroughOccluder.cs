@@ -62,7 +62,9 @@ namespace HighlightPlus {
                     }
                 } else if (rr[k] is SkinnedMeshRenderer) {
                     SkinnedMeshRenderer smr = (SkinnedMeshRenderer)rr[k];
-                    meshData[k].subMeshCount = smr.sharedMesh.subMeshCount;
+                    if (smr.sharedMesh != null) {
+                        meshData[k].subMeshCount = smr.sharedMesh.subMeshCount;
+                    }
                 }
             }
             if (rrCount > 0) {

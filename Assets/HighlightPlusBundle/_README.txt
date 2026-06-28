@@ -11,7 +11,7 @@ This asset contains 2 main packages. Please use the appropriate package accordin
 
 
 Once imported, read the PDF documentation for additional details.
-Thanks for using Highlight Plus.
+Thanks for using Highlight Plus 2!
 
 
 Questions / Suggestions / Support

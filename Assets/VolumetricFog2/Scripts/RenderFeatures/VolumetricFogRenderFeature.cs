@@ -14,7 +14,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace VolumetricFogAndMist2 {
 
-    public class VolumetricFogRenderFeature : ScriptableRendererFeature {
+    public partial class VolumetricFogRenderFeature : ScriptableRendererFeature {
 
         public static class ShaderParams {
             public const string LightBufferName = "_LightBuffer";
@@ -25,6 +25,7 @@ namespace VolumetricFogAndMist2 {
             public static int BlurRT2 = Shader.PropertyToID("_BlurTex2");
             public static int MiscData = Shader.PropertyToID("_MiscData");
             public static int ForcedInvisible = Shader.PropertyToID("_ForcedInvisible");
+            public static int FogLayerMask = Shader.PropertyToID("_VFLayerMask");
             public static int DownsampledDepth = Shader.PropertyToID("_DownsampledDepth");
             public static int BlueNoiseTexture = Shader.PropertyToID("_BlueNoise");
             public static int BlurScale = Shader.PropertyToID("_BlurScale");
@@ -40,6 +41,7 @@ namespace VolumetricFogAndMist2 {
             public const string SKW_SCATTERING_HQ = "SCATTERING_HQ";
             public const string SKW_DEPTH_PEELING = "VF2_DEPTH_PEELING";
             public const string SKW_DEPTH_PREPASS = "VF2_DEPTH_PREPASS";
+            public const string SKW_DISTANT_FOG_PEELING = "VF2_DISTANT_FOG_PEELING";
         }
 
         public static int GetScaledSize (int size, float factor) {
@@ -50,7 +52,23 @@ namespace VolumetricFogAndMist2 {
             return size * 2;
         }
 
-        class VolumetricFogRenderPass : ScriptableRenderPass {
+        internal static void EnsureFogVolumeRenderingLayerMask () {
+            int vgCount = VolumetricFog.volumetricFogs.Count;
+            for (int i = 0; i < vgCount; i++) {
+                VolumetricFog vg = VolumetricFog.volumetricFogs[i];
+                if (vg == null) continue;
+                MeshRenderer meshRenderer = vg.meshRenderer;
+                if (meshRenderer == null) {
+                    meshRenderer = vg.GetComponent<MeshRenderer>();
+                    vg.meshRenderer = meshRenderer;
+                }
+                if (meshRenderer != null) {
+                    meshRenderer.renderingLayerMask |= VolumetricFogManager.FOG_VOLUMES_RENDERING_LAYER;
+                }
+            }
+        }
+
+        partial class VolumetricFogRenderPass : ScriptableRenderPass {
 
             const string m_ProfilerTag = "Volumetric Fog Buffer Rendering";
 
@@ -74,80 +92,6 @@ namespace VolumetricFogAndMist2 {
             public void Setup (VolumetricFogRenderFeature settings, RenderPassEvent renderPassEvent) {
                 this.settings = settings;
                 this.renderPassEvent = renderPassEvent;
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-                RenderTextureDescriptor lightBufferDesc = cameraTextureDescriptor;
-                VolumetricFogManager manager = VolumetricFogManager.GetManagerIfExists();
-                if (manager != null) {
-                    if (manager.downscaling > 1f) {
-                        int size = GetScaledSize(cameraTextureDescriptor.width, manager.downscaling);
-                        lightBufferDesc.width = size;
-                        lightBufferDesc.height = size;
-                    }
-                    lightBufferDesc.colorFormat = manager.blurHDR ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGB32;
-                    cmd.SetGlobalVector(ShaderParams.LightBufferSize, new Vector4(lightBufferDesc.width, lightBufferDesc.height, manager.downscaling > 1f ? 1f : 0, 0));
-                }
-                lightBufferDesc.depthBufferBits = 0;
-                lightBufferDesc.msaaSamples = 1;
-                lightBufferDesc.useMipMap = false;
-
-                cmd.GetTemporaryRT(ShaderParams.LightBuffer, lightBufferDesc, FilterMode.Bilinear);
-                ConfigureTarget(m_LightBuffer);
-                ConfigureClear(ClearFlag.Color, new Color(0, 0, 0, 0));
-                ConfigureInput(ScriptableRenderPassInput.Depth);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute (ScriptableRenderContext context, ref RenderingData renderingData) {
-
-                VolumetricFogManager manager = VolumetricFogManager.GetManagerIfExists();
-
-                CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
-                cmd.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
-                context.ExecuteCommandBuffer(cmd);
-
-                if (manager == null || (manager.downscaling <= 1f && manager.blurPasses < 1 && manager.scattering <= 0 && !isUsingDepthPeeling)) {
-                    CommandBufferPool.Release(cmd);
-                    return;
-                }
-
-                cmd.Clear();
-
-                foreach (VolumetricFog vg in VolumetricFog.volumetricFogs) {
-                    if (vg != null) {
-                        vg.meshRenderer.renderingLayerMask |= VolumetricFogManager.FOG_VOLUMES_RENDERING_LAYER;
-                        if (isUsingDepthPeeling && renderPassEvent < RenderPassEvent.AfterRenderingTransparents) {
-                            vg.RenderDistantFog(cmd);
-                        }
-                    }
-                }
-
-                if (isUsingDepthPeeling) {
-                    if (renderPassEvent < RenderPassEvent.AfterRenderingTransparents) {
-                        cmd.DisableShaderKeyword(ShaderParams.SKW_DEPTH_PREPASS);
-                        cmd.EnableShaderKeyword(ShaderParams.SKW_DEPTH_PEELING);
-                    } else {
-                        cmd.DisableShaderKeyword(ShaderParams.SKW_DEPTH_PEELING);
-                        cmd.EnableShaderKeyword(ShaderParams.SKW_DEPTH_PREPASS);
-                    }
-                    context.ExecuteCommandBuffer(cmd);
-                }
-                var sortFlags = SortingCriteria.CommonTransparent;
-                var drawSettings = CreateDrawingSettings(shaderTagIdList, ref renderingData, sortFlags);
-                var filterSettings = filteringSettings;
-                filterSettings.layerMask = settings.fogLayerMask;
-                filterSettings.renderingLayerMask = VolumetricFogManager.FOG_VOLUMES_RENDERING_LAYER;
-
-                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
-
-                CommandBufferPool.Release(cmd);
-
             }
 
 #if UNITY_2023_3_OR_NEWER
@@ -212,18 +156,31 @@ namespace VolumetricFogAndMist2 {
                         }
 
                         int vgCount = VolumetricFog.volumetricFogs.Count;
+                        bool isFrontPass = passData.renderPassEvent >= RenderPassEvent.AfterRenderingTransparents;
+
                         for (int i = 0; i < vgCount; i++) {
                             VolumetricFog vg = VolumetricFog.volumetricFogs[i];
                             if (vg != null) {
-                                vg.meshRenderer.renderingLayerMask |= VolumetricFogManager.FOG_VOLUMES_RENDERING_LAYER;
-                                if (isUsingDepthPeeling && passData.renderPassEvent < RenderPassEvent.AfterRenderingTransparents) {
+                                if (isUsingDepthPeeling && vg.DistantFogUsesTransparencySupport) {
+                                    if (!isFrontPass) {
+                                        // First pass: render distant fog only behind transparent objects
+                                        cmd.EnableShaderKeyword(ShaderParams.SKW_DEPTH_PEELING);
+                                        cmd.DisableShaderKeyword(ShaderParams.SKW_DEPTH_PREPASS);
+                                        vg.RenderDistantFog(cmd);
+                                    } else {
+                                        // Second pass: render distant fog using custom depth for correct distance to transparents
+                                        cmd.DisableShaderKeyword(ShaderParams.SKW_DEPTH_PEELING);
+                                        cmd.EnableShaderKeyword(ShaderParams.SKW_DEPTH_PREPASS);
+                                        vg.RenderDistantFog(cmd);
+                                    }
+                                } else if (!isFrontPass) {
                                     vg.RenderDistantFog(cmd);
                                 }
                             }
                         }
 
                         if (isUsingDepthPeeling) {
-                            if (passData.renderPassEvent < RenderPassEvent.AfterRenderingTransparents) {
+                            if (!isFrontPass) {
                                 cmd.DisableShaderKeyword(ShaderParams.SKW_DEPTH_PREPASS);
                                 cmd.EnableShaderKeyword(ShaderParams.SKW_DEPTH_PEELING);
                             } else {
@@ -241,7 +198,7 @@ namespace VolumetricFogAndMist2 {
         }
 
 
-        class BlurRenderPass : ScriptableRenderPass {
+        partial class BlurRenderPass : ScriptableRenderPass {
 
             enum Pass {
                 BlurHorizontal = 0,
@@ -290,33 +247,6 @@ namespace VolumetricFogAndMist2 {
             }
 
 #if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-                sourceDesc = cameraTextureDescriptor;
-                ConfigureInput(ScriptableRenderPassInput.Depth);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute (ScriptableRenderContext context, ref RenderingData renderingData) {
-
-#if UNITY_2022_1_OR_NEWER
-                passData.source = renderer.cameraColorTargetHandle;
-#else
-                passData.source = renderer.cameraColorTarget;
-#endif
-                passData.renderPassEvent = renderPassEvent;
-                CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
-                ExecutePass(passData, cmd);
-                context.ExecuteCommandBuffer(cmd);
-
-                CommandBufferPool.Release(cmd);
-
-            }
-
-#if UNITY_2023_3_OR_NEWER
 
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData) {
 
@@ -341,6 +271,7 @@ namespace VolumetricFogAndMist2 {
                         CommandBuffer cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                         passData.source = passData.colorTexture;
                         ExecutePass(passData, cmd);
+                        Shader.SetGlobalInt(ShaderParams.ForcedInvisible, 1);
                     });
                 }
             }
@@ -442,7 +373,7 @@ namespace VolumetricFogAndMist2 {
 
 
 #if UNITY_2022_1_OR_NEWER
-            static void ComputeScattering(CommandBuffer cmd, RTHandle source, Material mat) {
+            static void ComputeScattering (CommandBuffer cmd, RTHandle source, Material mat) {
 #else
             static void ComputeScattering (CommandBuffer cmd, RenderTargetIdentifier source, Material mat) {
 #endif
@@ -532,6 +463,8 @@ namespace VolumetricFogAndMist2 {
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
 
+        public int renderPassEventOrder;
+
         [Tooltip("Specify which fog volumes will be rendered by this feature.")]
         public LayerMask fogLayerMask = -1;
 
@@ -574,7 +507,10 @@ namespace VolumetricFogAndMist2 {
 
             installed = true;
 
-            if (VolumetricFog.volumetricFogs.Count == 0) return;
+            if (VolumetricFog.volumetricFogs.Count == 0) {
+                Shader.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
+                return;
+            }
 
             VolumetricFogManager manager = VolumetricFogManager.GetManagerIfExists();
             if (manager == null) {
@@ -596,13 +532,28 @@ namespace VolumetricFogAndMist2 {
             if (camType == CameraType.Preview) return;
             if (ignoreReflectionProbes && camType == CameraType.Reflection) return;
 
-            if ((fogLayerMask & cam.cullingMask) == 0) return;
+            if ((fogLayerMask & cam.cullingMask) == 0) {
+                Shader.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
+                return;
+            }
 
-            if ((cameraLayerMask & (1 << cam.gameObject.layer)) == 0) return;
+            if ((cameraLayerMask & (1 << cam.gameObject.layer)) == 0) {
+                Shader.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
+                return;
+            }
 
-            if (cam.targetTexture != null && cam.targetTexture.format == RenderTextureFormat.Depth) return; // ignore occlusion cams!
+            EnsureFogVolumeRenderingLayerMask();
+            Shader.SetGlobalInt(ShaderParams.FogLayerMask, fogLayerMask);
 
-            RenderPassEvent injectionPoint = renderPassEvent;
+            if (cam.targetTexture != null && cam.targetTexture.format == RenderTextureFormat.Depth) {
+                Shader.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
+                return; // ignore occlusion cams!
+            }
+
+            if (renderPassEventOrder <= 0) {
+                renderPassEventOrder = (int)renderPassEvent;
+            }
+            RenderPassEvent injectionPoint = (RenderPassEvent)renderPassEventOrder;
 
             if (isUsingDepthPeeling) {
                 fogRenderBackTranspPass.Setup(this, RenderPassEvent.AfterRenderingSkybox);

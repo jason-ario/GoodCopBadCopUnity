@@ -24,6 +24,7 @@ Properties {
             {
                 float4 vertex : POSITION;
                 float2 uv     : TEXCOORD0;
+				float3 normal : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -41,8 +42,13 @@ Properties {
 				UNITY_SETUP_INSTANCE_ID(v);
 				UNITY_INITIALIZE_OUTPUT(v2f, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-                v.vertex.xyz *= 1 + _Padding;
                 o.pos = ComputeVertexPosition(v.vertex);
+
+				float3 norm   = mul ((float3x3)UNITY_MATRIX_IT_MV, v.normal);
+                float2 offset = any(norm.xy)!=0 ? TransformViewToProjection(normalize(norm.xy)) : 0.0.xx;
+                float z = lerp(UNITY_Z_0_FAR_FROM_CLIPSPACE(o.pos.z), 2.0, UNITY_MATRIX_P[3][3]);
+                o.pos.xy += offset * z * _Padding;
+
 				o.uv = TRANSFORM_TEX (v.uv, _MainTex);
 
                 #if UNITY_REVERSED_Z
@@ -71,10 +77,10 @@ Properties {
         {
             Name "Mask"
 			Stencil {
-                Ref 2
+                Ref [_MaskStencilRef]
                 Comp always
                 Pass replace
-                WriteMask 2
+                WriteMask [_MaskWriteMask]
                 ReadMask 2
             }
             ColorMask 0
@@ -95,10 +101,10 @@ Properties {
         {
             Name "See-through Mask"
 			Stencil {
-                Ref 2
+                Ref [_MaskStencilRef]
                 Comp always
                 Pass replace
-                WriteMask 2
+                WriteMask [_MaskWriteMask]
                 ReadMask 2
             }
             ColorMask 0

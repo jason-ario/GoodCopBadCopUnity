@@ -1,5 +1,5 @@
 // Toony Colors Pro+Mobile 2
-// (c) 2014-2023 Jean Moreno
+// (c) 2014-2026 Jean Moreno
 
 using System.Collections.Generic;
 using System.IO;
@@ -463,7 +463,7 @@ namespace ToonyColorsPro
 			if (!AssetDatabase.IsMainAsset(meshAsset))
 			{
 				var main = AssetDatabase.LoadMainAssetAtPath(meshPath);
-				meshName = main.name + " - " + meshName + "_" + mesh.GetInstanceID();
+				meshName = main.name + " - " + meshName + "_" + mesh.GetEntityId();
 			}
 
 			var sm = new SelectedMesh(mesh, meshName, isProjectAsset, _assoObj);

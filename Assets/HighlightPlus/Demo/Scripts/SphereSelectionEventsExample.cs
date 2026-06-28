@@ -5,9 +5,11 @@ namespace HighlightPlus.Demos {
 	
 	public class SphereSelectionEventsExample : MonoBehaviour {
 
+		public HighlightManager manager;
+			
 		void Start() {
-			HighlightManager.instance.OnObjectSelected += OnObjectSelected;
-			HighlightManager.instance.OnObjectUnSelected += OnObjectUnSelected;
+			manager.OnObjectSelected += OnObjectSelected;
+			manager.OnObjectUnSelected += OnObjectUnSelected;
 		}
 
 		bool OnObjectSelected(GameObject go) {

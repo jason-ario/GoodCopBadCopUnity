@@ -12,6 +12,7 @@ namespace VolumetricFogAndMist2 {
         const string OPTIONS_VOID_MANAGER_FILENAME = "VolumetricFogManager.cs";
         const string OPTIONS_FOG_SCRIPT_FILENAME = "VolumetricFog.cs";
         const string OPTIONS_FOG_EDITOR_SCRIPT_FILENAME = "VolumetricFogProfileEditor.cs";
+        const string OPTIONS_FOG_VOLUME_EDITOR_SCRIPT_FILENAME = "VolumetricFogEditor.cs";
 
         public bool pendingChanges;
         public ShaderAdvancedOption[] options;
@@ -66,6 +67,12 @@ namespace VolumetricFogAndMist2 {
                     id = "FOG_BORDER",
                     name = "Volume Border Option",
                     description = "Enables the 'border' option in the profile which adds a falloff to the edges of the volume."
+                },
+                new ShaderAdvancedOption
+                {
+                    id = "FOG_NATIVE_LIGHT_FALLOFF",
+                    name = "Native Light Distance Falloff",
+                    description = "Enables the native light distance falloff control in fog volumes."
                 },
                 new ShaderAdvancedOption
                 {
@@ -167,6 +174,8 @@ namespace VolumetricFogAndMist2 {
 
                 // update editor script options
                 file = Path.GetDirectoryName(path) + "/../../Editor/" + OPTIONS_FOG_EDITOR_SCRIPT_FILENAME;
+                UpdateOptionsFile(file);
+                file = Path.GetDirectoryName(path) + "/../../Editor/" + OPTIONS_FOG_VOLUME_EDITOR_SCRIPT_FILENAME;
                 UpdateOptionsFile(file);
             }
 

@@ -156,6 +156,8 @@ namespace VolumetricLights {
         [Range(0, 1)] public float shadowTranslucencyBlend = 0.5f;
         public ShadowResolution shadowResolution = ShadowResolution._256;
         public LayerMask shadowCullingMask = ~2;
+        [Tooltip("Include transparent objects in the shadow occlusion depth capture, so transparent geometry or 2D sprites can occlude this light like opaque objects. The object's material must write depth (have a DepthOnly pass). When enabled, the built-in TransparentFX layer is no longer auto-excluded from the Culling Mask.")]
+        public bool shadowIncludeTransparent;
         public ShadowBakeInterval shadowBakeInterval = ShadowBakeInterval.OnStart;
         [Tooltip("When enabled, baked shadows won't be updated when light rotates, only when position changes. This produces that baked shadows can also rotate when the light does, improving performance. This option only works in play mode.")]
         public bool shadowBakeIgnoreRotationChange;

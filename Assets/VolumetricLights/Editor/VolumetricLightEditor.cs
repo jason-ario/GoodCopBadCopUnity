@@ -21,7 +21,7 @@ namespace VolumetricLights {
         SerializedProperty attenuationMode, attenCoefConstant, attenCoefLinear, attenCoefQuadratic, rangeFallOff, diffusionIntensity, penumbra;
         SerializedProperty tipRadius, nearClipDistance, cookieTexture, cookieScale, cookieOffset, cookieSpeed, frustumAngle, windDirection;
         SerializedProperty enableDustParticles, dustBrightness, dustMinSize, dustMaxSize, dustDistanceAttenuation, dustWindSpeed, dustAutoToggle, dustDistanceDeactivation, dustPrewarm;
-        SerializedProperty enableShadows, shadowIntensity, shadowColor, shadowTranslucency, shadowTranslucencyIntensity, shadowTranslucencyBlend, shadowResolution, shadowCullingMask, shadowBakeInterval, shadowNearDistance, shadowAutoToggle, shadowDistanceDeactivation;
+        SerializedProperty enableShadows, shadowIntensity, shadowColor, shadowTranslucency, shadowTranslucencyIntensity, shadowTranslucencyBlend, shadowResolution, shadowCullingMask, shadowIncludeTransparent, shadowBakeInterval, shadowNearDistance, shadowAutoToggle, shadowDistanceDeactivation;
         SerializedProperty shadowBakeMode, shadowBakeIgnoreRotationChange, shadowOrientation, shadowDirection;
 
         SerializedProperty useCustomBounds, bounds, boundsInLocalSpace;
@@ -106,6 +106,7 @@ namespace VolumetricLights {
             shadowTranslucencyBlend = serializedObject.FindProperty("shadowTranslucencyBlend");
             shadowResolution = serializedObject.FindProperty("shadowResolution");
             shadowCullingMask = serializedObject.FindProperty("shadowCullingMask");
+            shadowIncludeTransparent = serializedObject.FindProperty("shadowIncludeTransparent");
             shadowBakeInterval = serializedObject.FindProperty("shadowBakeInterval");
             shadowNearDistance = serializedObject.FindProperty("shadowNearDistance");
             shadowAutoToggle = serializedObject.FindProperty("shadowAutoToggle");
@@ -196,7 +197,7 @@ namespace VolumetricLights {
                 }
             }
             if (GUILayout.Button("Help & Tips")) {
-                Application.OpenURL("https://kronnect.com/guides/volumetric-lights-2-urp-performance-tips/");
+                Application.OpenURL("https://kronnect.com/docs/volumetric-lights-urp/");
             }
             if (GUILayout.Button("Contact Us", EditorStyles.miniButton)) {
                 Application.OpenURL("https://kronnect.com");
@@ -370,6 +371,19 @@ namespace VolumetricLights {
             if (lightMode.intValue == (int)VolumetricLight.LightMode.Volumetric) {
                 EditorGUILayout.PropertyField(enableShadows);
                 if (enableShadows.boolValue) {
+                    if (canUseTranslucency) {
+                        EditorGUILayout.HelpBox("Shadow Occlusion adds a self-managed renderer (VolumetricLightsDepthRenderer) to your URP Asset for the internal shadow depth capture. Your main camera is not affected. If you use GPU Occlusion Culling and it stops working, match the Rendering Path of that renderer to your Default Renderer. See documentation.", MessageType.Info);
+                        UniversalRenderPipelineAsset urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+                        if (urpAsset != null) {
+                            EditorGUILayout.BeginHorizontal();
+                            GUILayout.FlexibleSpace();
+                            if (GUILayout.Button(new GUIContent("Select Active URP Asset", "Ping and select the URP Asset in the Project window so you can verify the VolumetricLightsDepthRenderer entry."), GUILayout.Width(180))) {
+                                Selection.activeObject = urpAsset;
+                                EditorGUIUtility.PingObject(urpAsset);
+                            }
+                            EditorGUILayout.EndHorizontal();
+                        }
+                    }
                     EditorGUI.indentLevel++;
                     EditorGUILayout.PropertyField(shadowIntensity, new GUIContent("Intensity"));
                     EditorGUILayout.PropertyField(shadowColor, new GUIContent("Color"));
@@ -391,6 +405,7 @@ namespace VolumetricLights {
 #endif
                 EditorGUILayout.PropertyField(shadowResolution, new GUIContent("Resolution"));
                 EditorGUILayout.PropertyField(shadowCullingMask, new GUIContent("Culling Mask"));
+                EditorGUILayout.PropertyField(shadowIncludeTransparent, new GUIContent("Include Transparent"));
                 EditorGUILayout.PropertyField(shadowBakeInterval, new GUIContent("Bake Interval"));
                 if (shadowBakeInterval.intValue == (int)ShadowBakeInterval.OnStart) {
                     EditorGUI.indentLevel++;

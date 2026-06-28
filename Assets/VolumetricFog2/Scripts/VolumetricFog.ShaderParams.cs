@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace VolumetricFogAndMist2 {
 
@@ -10,10 +10,11 @@ namespace VolumetricFogAndMist2 {
         public static int DetailColor = Shader.PropertyToID("_DetailColor");
         public static int DetailData = Shader.PropertyToID("_DetailData");
         public static int Density = Shader.PropertyToID("_Density");
-        public static int NativeLightsMultiplier = Shader.PropertyToID("_NativeLightsMultiplier");
+        public static int NativeLightsData = Shader.PropertyToID("_NativeLightsData");
         public static int APVIntensityMultiplier = Shader.PropertyToID("_APVIntensityMultiplier");
         public static int ShadowData = Shader.PropertyToID("_ShadowData");
         public static int LightDiffusionData = Shader.PropertyToID("_LightDiffusionData");
+        public static int DiffusionFloor = Shader.PropertyToID("_DiffusionFloor");
         public static int DeepObscurance = Shader.PropertyToID("_DeepObscurance");
         public static int NoiseScale = Shader.PropertyToID("_NoiseScale");
         public static int SpecularThreshold = Shader.PropertyToID("_SpecularThreshold");
@@ -47,7 +48,7 @@ namespace VolumetricFogAndMist2 {
         public static int SurfaceDepthTexture = Shader.PropertyToID("_SurfaceDepthTexture");
         public static int SurfaceData = Shader.PropertyToID("_SurfaceData");
         public static int PointLightCount = Shader.PropertyToID("_VF2_PointLightCount");
-        public static int PointLightInsideAtten = Shader.PropertyToID("_VF2_PointLightInsideAtten");
+        public static int PointLightParams = Shader.PropertyToID("_VF2_PointLightParams");
         public static int PointLightPositions = Shader.PropertyToID("_VF2_FogPointLightPosition");
         public static int PointLightColors = Shader.PropertyToID("_VF2_PointLightColor");
         public static int VoidCount = Shader.PropertyToID("_VF2_FogVoidCount");
@@ -70,6 +71,8 @@ namespace VolumetricFogAndMist2 {
         public static int DistantFogNoiseTexture = Shader.PropertyToID("_DistantFogNoiseTexture");
         public static int DistantFogNoiseWind = Shader.PropertyToID("_DistantFogNoiseWind");
         public static int CullMode = Shader.PropertyToID("_Cull");
+        public static int SkipRendering = Shader.PropertyToID("_SkipRendering");
+        public static int VolumeLayerMask = Shader.PropertyToID("_VFVolumeLayer");
 
         public const string SKW_CUSTOM_DEPTH_ALPHA_TEST = "DEPTH_PREPASS_ALPHA_TEST";
 
@@ -93,6 +96,7 @@ namespace VolumetricFogAndMist2 {
         public const string SKW_DIFFUSION_STRONG = "VF2_DIFFUSION_STRONG";
 
         public const string SKW_DISTANT_FOG_NOISE = "VF2_DISTANT_FOG_NOISE";
+        public const string SKW_DISTANT_FOG_PEELING = "VF2_DISTANT_FOG_PEELING";
     }
 
 }

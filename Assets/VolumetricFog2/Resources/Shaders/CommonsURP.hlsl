@@ -20,6 +20,8 @@
 
 //#define FOG_BORDER
 
+//#define FOG_NATIVE_LIGHT_FALLOFF
+
 //#define FOG_MAX_DISTANCE_XZ
 
 //#define FOG_SHADOW_CANCELLATION

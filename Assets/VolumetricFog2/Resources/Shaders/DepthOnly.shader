@@ -5,6 +5,7 @@ Shader "Hidden/VolumetricFog2/DepthOnly"
         [MainTexture] _BaseMap ("Texture", 2D) = "white" {}
         _AlphaCutOff("Alpha CutOff", Float) = 0
         _Cull("Culling", Int) = 2
+        _SkipRendering("Skip Rendering", Float) = 0
     }
     SubShader
     {
@@ -28,20 +29,19 @@ Shader "Hidden/VolumetricFog2/DepthOnly"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            #if DEPTH_PREPASS_ALPHA_TEST
-                CBUFFER_START(UnityPerMaterial)
+            CBUFFER_START(UnityPerMaterial)
+                float _SkipRendering;
                 half _AlphaCutOff;
                 float4 _BaseMap_ST;
-                CBUFFER_END
+            CBUFFER_END
 
-                #ifdef UNITY_DOTS_INSTANCING_ENABLED
-                    UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
-                        UNITY_DOTS_INSTANCED_PROP(float, _AlphaCutOff)
-                        UNITY_DOTS_INSTANCED_PROP(float4, _BaseMap_ST)
-                    UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
-                    #define _AlphaCutOff UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float, _AlphaCutOff)
-                    #define _BaseMap_ST UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseMap_ST)
-                #endif
+            #ifdef UNITY_DOTS_INSTANCING_ENABLED
+                UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
+                    UNITY_DOTS_INSTANCED_PROP(float, _AlphaCutOff)
+                    UNITY_DOTS_INSTANCED_PROP(float4, _BaseMap_ST)
+                UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
+                #define _AlphaCutOff UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float, _AlphaCutOff)
+                #define _BaseMap_ST UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BaseMap_ST)
             #endif
 
             #include "DepthOnly_Include.hlsl"
@@ -67,12 +67,11 @@ Shader "Hidden/VolumetricFog2/DepthOnly"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            #if DEPTH_PREPASS_ALPHA_TEST
-                CBUFFER_START(UnityPerMaterial)
+            CBUFFER_START(UnityPerMaterial)
+                float _SkipRendering;
                 half _AlphaCutOff;
                 float4 _BaseMap_ST;
-                CBUFFER_END
-            #endif
+            CBUFFER_END
 
             #include "DepthOnly_Include.hlsl"
 

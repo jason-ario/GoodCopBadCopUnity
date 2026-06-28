@@ -1,5 +1,5 @@
 // Toony Colors Pro+Mobile 2
-// (c) 2014-2023 Jean Moreno
+// (c) 2014-2026 Jean Moreno
 
 // Shader Generator Module: Rim Lighting
 
@@ -202,7 +202,7 @@ sngl	lbl="Make Optional"			kw=RIM_SHADER_FEATURE													needsOr=RIM,RIM_OUT
 				half rimStrength = [[VALUE:Rim Strength]];
 	/// IF RIM && RIM_LIGHTMASK
 				//Rim light mask
-				color.rgb += ndl * atten * rim * rimColor * rimStrength;
+				color.rgb += ndl * saturate(atten) * rim * rimColor * rimStrength;
 	/// ELIF RIM
 				color.rgb += rim * rimColor * rimStrength;
 	/// ELIF RIM_OUTLINE
@@ -225,7 +225,7 @@ sngl	lbl="Make Optional"			kw=RIM_SHADER_FEATURE													needsOr=RIM,RIM_OUT
 		// Rim light mask
 		half3 rimColor = [[VALUE:Rim Color]];
 		half rimStrength = [[VALUE:Rim Strength]];
-		color.rgb += ndl * atten * rim * rimColor * rimStrength;
+		color.rgb += ndl * saturate(atten) * rim * rimColor * rimStrength;
 	/// IF RIM_SHADER_FEATURE
 		#endif
 	///

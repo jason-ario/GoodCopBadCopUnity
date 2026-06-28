@@ -14,7 +14,7 @@ using UnityEngine.Rendering.RenderGraphModule;
 
 namespace VolumetricLights {
 
-    public class VolumetricLightsRenderFeature : ScriptableRendererFeature {
+    public partial class VolumetricLightsRenderFeature : ScriptableRendererFeature {
 
         static class ShaderParams {
             public static int LightBuffer = Shader.PropertyToID("_LightBuffer");
@@ -48,7 +48,7 @@ namespace VolumetricLights {
             return size * 2;
         }
 
-        class VolumetricLightsRenderPass : ScriptableRenderPass {
+        partial class VolumetricLightsRenderPass : ScriptableRenderPass {
 
             const int renderingLayer = 1 << 50;
             const string m_ProfilerTag = "Volumetric Lights Buffer Rendering";
@@ -75,61 +75,6 @@ namespace VolumetricLights {
                 renderPassEvent = settings.renderPassEvent;
             }
 
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-                RenderTextureDescriptor lightBufferDesc = cameraTextureDescriptor;
-                if (settings.blendMode != BlendMode.Additive) {
-                    lightBufferDesc.colorFormat = RenderTextureFormat.ARGBHalf;
-                }
-                lightBufferDesc.width = GetScaledSize(cameraTextureDescriptor.width, settings.downscaling);
-                lightBufferDesc.height = GetScaledSize(cameraTextureDescriptor.height, settings.downscaling);
-                lightBufferDesc.depthBufferBits = 0;
-                lightBufferDesc.useMipMap = false;
-                lightBufferDesc.msaaSamples = 1;
-                cmd.GetTemporaryRT(ShaderParams.LightBuffer, lightBufferDesc, FilterMode.Bilinear);
-                ConfigureTarget(m_LightBuffer);
-                ConfigureClear(ClearFlag.Color, new Color(0, 0, 0, 0));
-                ConfigureInput(ScriptableRenderPassInput.Depth);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute (ScriptableRenderContext context, ref RenderingData renderingData) {
-
-                CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
-                cmd.SetGlobalInt(ShaderParams.ForcedInvisible, 0);
-                context.ExecuteCommandBuffer(cmd);
-
-                if ((settings.downscaling <= 1f && settings.blurPasses < 1) || VolumetricLight.volumetricLights.Count == 0) {
-                    CommandBufferPool.Release(cmd);
-                    return;
-                }
-
-                foreach (VolumetricLight vl in VolumetricLight.volumetricLights) {
-                    if (vl != null && vl.meshRenderer != null) {
-                        vl.meshRenderer.renderingLayerMask = renderingLayer;
-                    }
-                }
-
-                cmd.Clear();
-
-                var sortFlags = SortingCriteria.CommonTransparent;
-                var drawSettings = CreateDrawingSettings(shaderTagIdList, ref renderingData, sortFlags);
-                var filterSettings = filteringSettings;
-                filterSettings.renderingLayerMask = renderingLayer;
-
-                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
-
-                RenderTargetIdentifier lightBuffer = new RenderTargetIdentifier(ShaderParams.LightBuffer, 0, CubemapFace.Unknown, -1);
-                cmd.SetGlobalTexture(ShaderParams.LightBuffer, lightBuffer);
-
-                CommandBufferPool.Release(cmd);
-
-            }
 
 #if UNITY_2023_3_OR_NEWER
 
@@ -234,7 +179,7 @@ if (resourceData.cameraNormalsTexture.IsValid()) {
 
 
 
-        class BlurRenderPass : ScriptableRenderPass {
+        partial class BlurRenderPass : ScriptableRenderPass {
 
             const string m_strProfilerTag = "Volumetric Lights Render Feature";
 
@@ -308,31 +253,6 @@ if (resourceData.cameraNormalsTexture.IsValid()) {
                 if (settings.blurPasses > 0 && settings.blurEdgePreserve) {
                     mat.EnableKeyword(settings.downscaling > 1f ? ShaderParams.SKW_EDGE_PRESERVE_UPSCALING : ShaderParams.SKW_EDGE_PRESERVE);
                 }
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-                sourceDesc = cameraTextureDescriptor;
-                ConfigureInput(ScriptableRenderPassInput.Depth);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute (ScriptableRenderContext context, ref RenderingData renderingData) {
-
-#if UNITY_2022_1_OR_NEWER
-                passData.source = renderer.cameraColorTargetHandle;
-#else
-                passData.source = renderer.cameraColorTarget;
-#endif
-                CommandBuffer cmd = CommandBufferPool.Get(m_strProfilerTag);
-                ExecutePass(passData, cmd);
-                context.ExecuteCommandBuffer(cmd);
-
-                CommandBufferPool.Release(cmd);
             }
 
 #if UNITY_2023_3_OR_NEWER

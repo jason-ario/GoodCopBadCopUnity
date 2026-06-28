@@ -1,5 +1,5 @@
 // Toony Colors Pro 2
-// (c) 2014-2023 Jean Moreno
+// (c) 2014-2026 Jean Moreno
 
 using System;
 using System.Collections.Generic;
@@ -21,9 +21,9 @@ namespace ToonyColorsPro
 	{
 		public class ShaderGenerator2 : EditorWindow
 		{
-			public static bool DEBUG_MODE = false;
+			public static readonly bool DEBUG_MODE = false;
 
-			internal const string TCP2_VERSION = "2.9.20";
+			internal const string TCP2_VERSION = "2.9.21";
 			internal const string DOCUMENTATION_URL = "https://jeanmoreno.com/unity/toonycolorspro/doc/shader_generator_2";
 			internal const string OUTPUT_PATH = "/JMO Assets/Toony Colors Pro/Shaders Generated/";
 
@@ -88,7 +88,7 @@ namespace ToonyColorsPro
 			//Only one window at a time, so this should always be the correct value.
 			//Used to create communication between Shader Properties and Custom Material Properties
 			internal static Config CurrentConfig { get; private set; }
-			internal static Template CurrentTemplate { get { return instance.template; }}
+			internal static Template CurrentTemplate => instance.template;
 
 			internal static VertexToFragmentVariablesManager VariablesManager { get; private set; }
 			internal static ShaderProperty.ProgramType CurrentProgram = ShaderProperty.ProgramType.Undefined;
@@ -345,7 +345,7 @@ namespace ToonyColorsPro
 				}
 			}
 
-			static internal void PushUndoState()
+			internal static void PushUndoState()
 			{
 				if (instance != null)
 				{
@@ -2188,7 +2188,11 @@ namespace ToonyColorsPro
 									if (isUsedInFragment)
 									{
 										int dimensions = 2;
-										if (vertexUvImp.Channels.Contains("W"))
+										if (sp.IsImplementationUsedInCustomCode(imp))
+										{
+											dimensions = 4;
+										}
+										else if (vertexUvImp.Channels.Contains("W"))
 										{
 											dimensions = 4;
 										}
@@ -2196,6 +2200,7 @@ namespace ToonyColorsPro
 										{
 											dimensions = 3;
 										}
+
 										AddUvChannelUsage(usedUvChannelsFragment, vertexUvImp.TexcoordChannel, dimensions);
 									}
 								}

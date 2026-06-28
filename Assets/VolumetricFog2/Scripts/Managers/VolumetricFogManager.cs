@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 namespace VolumetricFogAndMist2 {
 
     [ExecuteInEditMode]
-    [HelpURL("https://kronnect.com/guides/volumetric-fog-urp-adding-volumetric-fog-mist-to-your-scene/#ftoc-heading-1")]
+    [HelpURL("https://kronnect.com/docs/volumetric-fog-urp/")]
     public class VolumetricFogManager : MonoBehaviour, IVolumetricFogManager {
 
         public string managerName {
@@ -129,6 +129,18 @@ namespace VolumetricFogAndMist2 {
             }
             return _instance;
         }
+
+#if UNITY_EDITOR
+        // Editor-only, project-wide opt-out for automatic manager creation in Edit mode
+        public static bool disableAutoManagerCreation {
+            get { return UnityEditor.EditorPrefs.GetBool(AutoManagerPrefsKey, false); }
+            set { UnityEditor.EditorPrefs.SetBool(AutoManagerPrefsKey, value); }
+        }
+
+        static string AutoManagerPrefsKey {
+            get { return "VolumetricFog2.DisableAutoManagerCreation." + UnityEditor.PlayerSettings.productGUID; }
+        }
+#endif
 
         public static PointLightManager pointLightManager {
             get {

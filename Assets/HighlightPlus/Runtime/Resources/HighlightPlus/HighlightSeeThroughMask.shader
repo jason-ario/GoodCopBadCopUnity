@@ -18,9 +18,10 @@ Properties {
                 Pass replace
             }
 
-            ZTest Always
-            ZWrite On
+            ZTest LEqual
+            ZWrite Off
             ColorMask 0
+            Offset -1, -1
 
             CGPROGRAM
             #pragma vertex vert

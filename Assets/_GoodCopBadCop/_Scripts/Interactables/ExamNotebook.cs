@@ -817,6 +817,6 @@ public class ExamNotebook : PickableObject
         // Give the folder placement RPC one extra frame to move the renderer.
         yield return null;
 
-        GetComponent<HighlightEffect>().SetupMaterial();
+        GetComponent<HighlightEffect>().Refresh();
     }
 }

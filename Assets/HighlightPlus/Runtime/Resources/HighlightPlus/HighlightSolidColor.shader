@@ -6,13 +6,11 @@ Properties {
     _Cull ("Cull Mode", Int) = 2
 	_ZTest("ZTest", Int) = 4
     _EdgeThreshold("Edge Threshold", Float) = 0.995
-    _Padding("Padding", Float) = 0
 }
     SubShader
     {
         Tags { "Queue"="Transparent+100" "RenderType"="Transparent" "DisableBatching" = "True" }
 
-        // Compose effect on camera target
         Pass
         {
             Name "Solid Color"
@@ -42,7 +40,6 @@ Properties {
 	        #endif
 
       		float4 _MainTex_ST;
-            float _Padding;
             fixed _CutOff;
             fixed4 _Color;
 
@@ -50,6 +47,7 @@ Properties {
             {
                 float4 vertex : POSITION;
                 float2 uv     : TEXCOORD0;
+				float3 normal : NORMAL;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -72,8 +70,8 @@ Properties {
 				UNITY_INITIALIZE_OUTPUT(v2f, o);
                 UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-                v.vertex.xyz *= 1.0 + _Padding;
 				o.pos = ComputeVertexPosition(v.vertex);
+
 				o.uv = TRANSFORM_TEX (v.uv, _MainTex);
                 o.scrPos = ComputeScreenPos(o.pos);
                 #if HP_DEPTHCLIP || HP_DEPTHCLIP_INV
@@ -114,7 +112,9 @@ Properties {
             	    fixed4 col = tex2D(_MainTex, i.uv);
             	    clip(col.a - _CutOff);
             	#endif
-                float2 uv = UnityStereoTransformScreenSpaceTex(i.scrPos.xy / i.scrPos.w);
+                
+                float2 screenUV = i.scrPos.xy / i.scrPos.w;
+                float2 uv = UnityStereoTransformScreenSpaceTex(screenUV);
                 #if HP_DEPTHCLIP || HP_DEPTHCLIP_INV
                     float depthRaw = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
                     float depthPersp = LinearEyeDepth(depthRaw);

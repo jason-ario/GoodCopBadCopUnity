@@ -14,6 +14,7 @@ Properties {
         // Create mask
         Pass
         {
+            Name "Highlight Plus UI Mask"
 			Stencil {
                 Ref [_Stencil]
                 Comp always

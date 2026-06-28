@@ -1,13 +1,14 @@
 // Toony Colors Pro+Mobile 2
-// (c) 2014-2023 Jean Moreno
+// (c) 2014-2026 Jean Moreno
 
 // Shader Generator Module: Wind Vertex Animations
 // TODO: pivot-based wind option, as in Book of the Dead
 
 #FEATURES
-mult	lbl="Wind Animation"		kw=Off|,Sine Wave|WIND_ANIM_SIN,Scrolling Texture|WIND_ANIM_TEX		toggles=WIND_ANIM	tt="Adds some vertex movement to simulate wind"		help="featuresreference/specialeffects/windanimation"
-mult	lbl=Sine Functions Count	kw=1|,2|WIND_SIN_2,4|WIND_SIN_4,6|WIND_SIN_6	nohelp	indent	needs=WIND_ANIM_SIN		tt="Number of sine functions to add together (more randomness but also more shader instructions)"
-sngl	lbl="Make Optional"			kw=WIND_SHADER_FEATURE									indent	needs=WIND_ANIM			tt="Will make wind animation optional in the material inspector, using a shader keyword"
+mult	lbl="Wind Animation"		kw=Off|,Sine Wave|WIND_ANIM_SIN,Scrolling Texture|WIND_ANIM_TEX			toggles=WIND_ANIM		tt="Adds some vertex movement to simulate wind"		help="featuresreference/specialeffects/windanimation"
+mult	lbl=Wind Movement			kw=Vertex Position|,Object Rotation|WIND_OBJ_ROTATION	nohelp	indent	needs=WIND_ANIM		tt="Number of sine functions to add together (more randomness but also more shader instructions)"
+mult	lbl=Sine Functions Count	kw=1|,2|WIND_SIN_2,4|WIND_SIN_4,6|WIND_SIN_6	nohelp	indent			needs=WIND_ANIM_SIN		tt="Number of sine functions to add together (more randomness but also more shader instructions)"
+sngl	lbl="Make Optional"			kw=WIND_SHADER_FEATURE									indent			needs=WIND_ANIM			tt="Will make wind animation optional in the material inspector, using a shader keyword"
 #END
 
 //================================================================
@@ -21,8 +22,13 @@ sngl	lbl="Make Optional"			kw=WIND_SHADER_FEATURE									indent	needs=WIND_ANIM
 		float		Wind Speed					vertex, imp(range, label = "Speed", default = 2.5, min = 0, max = 10)
 		float		Wind Frequency				vertex, imp(constant, label = "Frequency", default = 1.0)
 /// ELIF WIND_ANIM_TEX
+	/// IF WIND_OBJ_ROTATION
+		float3		Wind Texture Rot				vertex, imp(texture, label = "Wind Texture", default = gray, uv_shaderproperty = "Wind Texture Rot UV", swizzle = "XY"), help = "Usually a noise texture, where tiling values will define the frequency and scrolling values will define the speed of the wind effect"
+		float2		Wind Texture Rot UV				vertex, imp(mesh_world_position, label = "Wind Texture UV", swizzle = "XZ"), imp(custom_code, code = "* {4}.xy + (_Time.yy + {3}) * {4}.zw"), imp(shader_property_ref, reference = "Wind Time Offset"), imp(vector, label = "Tiling (XY) Speed (ZW)", variable = "_WindTexTilingSpeed", default = (0.2, 0.2, 0.1, 0.1))
+	/// ELSE
 		float3		Wind Texture				vertex, imp(texture, label = "Wind Texture", default = gray, uv_shaderproperty = "Wind Texture UV", swizzle = "XY"), help = "Usually a noise texture, where tiling values will define the frequency and scrolling values will define the speed of the wind effect"
 		float2		Wind Texture UV				vertex, imp(world_position, label = "Wind Texture UV", swizzle = "XZ"), imp(custom_code, code = "* {4}.xy + (_Time.yy + {3}) * {4}.zw"), imp(shader_property_ref, reference = "Wind Time Offset"), imp(vector, label = "Tiling (XY) Speed (ZW)", variable = "_WindTexTilingSpeed", default = (0.2, 0.2, 0.1, 0.1))
+	///
 ///
 /// IF WIND_ANIM
 		float		Wind Strength				vertex, imp(range, label = "Strength", default = 0.025, min = 0, max = 0.2)
@@ -84,8 +90,14 @@ sngl	lbl="Make Optional"			kw=WIND_SHADER_FEATURE									indent	needs=WIND_ANIM
 		[[PROP:Wind Speed]]
 		[[PROP:Wind Frequency]]
 	/// ELIF WIND_ANIM_TEX
+	
+		/// IF WIND_OBJ_ROTATION
+		[[PROP:Wind Texture Rot]]
+		[[PROP:Wind Texture Rot UV]]
+		/// ELSE
 		[[PROP:Wind Texture]]
 		[[PROP:Wind Texture UV]]
+		///
 	///
 	#end_not_empty_block
 	#end_not_empty
@@ -139,13 +151,28 @@ sngl	lbl="Make Optional"			kw=WIND_SHADER_FEATURE									indent	needs=WIND_ANIM
 		windFactor += sin(windPhase.xxx * windSin6scale.www + windFrequency * windSin6scale.xyz) * windSin6strength;
 	///
 /// ELIF WIND_ANIM_TEX
+	/// IF WIND_OBJ_ROTATION
+		float3 windFactor = [[VALUE:Wind Texture Rot]] * 2.0 - 1.0;
+	/// ELSE
 		float3 windFactor = [[VALUE:Wind Texture]] * 2.0 - 1.0;
+	///
 ///
 /// IF WIND_ANIM
 		float3 windDir = normalize([[VALUE:Wind Direction]]);
 		float3 windMask = [[VALUE:Wind Mask]];
 		float windStrength = [[VALUE:Wind Strength]];
+	/// IF WIND_OBJ_ROTATION
+		float3 windVecUp = normalize( lerp(float3(0,1,0), windDir, windFactor * windMask * windStrength) );
+		float3 windVecForward = float3(0,0,1);
+		float3 windVecRight = normalize(cross(windVecUp, windVecForward));
+		windVecForward = cross(windVecRight, windVecUp);
+		float3x3 windRotationMatrix = float3x3(windVecRight, windVecUp, windVecForward);
+		worldPos.xyz -= unity_ObjectToWorld._m03_m13_m23;
+		worldPosition.xyz = mul(worldPosition.xyz, windRotationMatrix);
+		worldPos.xyz += unity_ObjectToWorld._m03_m13_m23;
+	/// ELSE
 		worldPosition += windDir * windFactor * windMask * windStrength;
+	///
 	/// IF WIND_SHADER_FEATURE
 		#endif
 	///

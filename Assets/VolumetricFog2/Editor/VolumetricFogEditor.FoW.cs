@@ -8,7 +8,7 @@ namespace VolumetricFogAndMist2 {
 
         bool mouseIsDown;
 
-        private void OnSceneGUI_FogOfWar() {
+        private void OnSceneGUI_FogOfWar () {
 
             Event e = Event.current;
             if (fog == null || !fog.enableFogOfWar || !maskEditorEnabled.boolValue || e == null || fog.fogOfWarTexture == null) {
@@ -24,21 +24,23 @@ namespace VolumetricFogAndMist2 {
             if (mousePos.x < 0 || mousePos.x > sceneCamera.pixelWidth || mousePos.y < 0 || mousePos.y > sceneCamera.pixelHeight) return;
 
             Selection.activeGameObject = fog.gameObject;
-            fog.UpdateMaterialPropertiesNow();
 
             Ray ray = HandleUtility.GUIPointToWorldRay(mousePos);
             Bounds bounds = new Bounds(fog.transform.position, new Vector3(fog.transform.lossyScale.x, 0.01f, fog.transform.lossyScale.z));
             if (bounds.IntersectRay(ray, out float distance)) {
                 Vector3 hitPoint = ray.origin + ray.direction * distance;
-                float handleSize = HandleUtility.GetHandleSize(hitPoint) * 0.5f;
-                Handles.color = new Color(0, 0, 1, 0.5f);
-                Handles.SphereHandleCap(0, hitPoint, Quaternion.identity, handleSize, EventType.Repaint);
-                HandleUtility.Repaint();
 
-                Handles.color = new Color(1, 1, 0, 0.85f);
-                Handles.DrawWireDisc(hitPoint, Vector3.up, maskBrushWidth.intValue * 0.995f);
-                Handles.color = new Color(0, 0, 1, 0.85f);
-                Handles.DrawWireDisc(hitPoint, Vector3.up, maskBrushWidth.intValue);
+                if (e.type == EventType.Repaint) {
+                    float handleSize = HandleUtility.GetHandleSize(hitPoint) * 0.5f;
+                    Handles.color = new Color(0, 0, 1, 0.5f);
+                    Handles.SphereHandleCap(0, hitPoint, Quaternion.identity, handleSize, EventType.Repaint);
+
+                    Handles.color = new Color(1, 1, 0, 0.85f);
+                    Handles.DrawWireDisc(hitPoint, Vector3.up, maskBrushWidth.intValue * 0.995f);
+                    Handles.color = new Color(0, 0, 1, 0.85f);
+                    Handles.DrawWireDisc(hitPoint, Vector3.up, maskBrushWidth.intValue);
+                    HandleUtility.Repaint();
+                }
 
                 if (e.isMouse && e.button == 0) {
                     int controlID = GUIUtility.GetControlID(FocusType.Passive);
@@ -62,9 +64,9 @@ namespace VolumetricFogAndMist2 {
 
         #region Mask Texture support functions
 
-        private void CreateNewMaskTexture() {
-            int width = Mathf.Clamp(fog.fogOfWarTextureWidth, 256, 8192);
-            int height = Mathf.Clamp(fog.fogOfWarTextureHeight, 256, 8192);
+        private void CreateNewMaskTexture () {
+            int width = Mathf.Clamp(fog.fogOfWarTextureWidth, 32, 8192);
+            int height = Mathf.Clamp(fog.fogOfWarTextureHeight, 32, 8192);
             Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false, true);
             tex.wrapMode = TextureWrapMode.Clamp;
             int len = width * height;
@@ -87,7 +89,7 @@ namespace VolumetricFogAndMist2 {
             EditorGUIUtility.PingObject(tex);
         }
 
-        void PaintOnMaskPosition(Vector3 pos) {
+        void PaintOnMaskPosition (Vector3 pos) {
             if (maskBrushMode.intValue == (int)MaskTextureBrushMode.ColorFog) {
                 PaintColorOnMaskPosition(pos);
             } else {
@@ -95,7 +97,7 @@ namespace VolumetricFogAndMist2 {
             }
         }
 
-        private void PaintAlphaOnMaskPosition(Vector3 pos) {
+        private void PaintAlphaOnMaskPosition (Vector3 pos) {
             // Get texture location
             Color32[] maskColors = fog.fogOfWarTextureData;
             if (maskColors == null) {
@@ -141,7 +143,7 @@ namespace VolumetricFogAndMist2 {
         }
 
 
-        private void PaintColorOnMaskPosition(Vector3 pos) {
+        private void PaintColorOnMaskPosition (Vector3 pos) {
             // Get texture location
             Color32[] maskColors = fog.fogOfWarTextureData;
             if (maskColors == null) {

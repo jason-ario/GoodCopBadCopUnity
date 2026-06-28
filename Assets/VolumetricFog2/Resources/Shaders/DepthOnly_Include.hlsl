@@ -28,6 +28,11 @@ Varyings UnlitPassVertex(Attributes input)
     UNITY_TRANSFER_INSTANCE_ID(input, output);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
+    if (_SkipRendering > 0.5) {
+        output.positionCS = float4(0, 0, 0, 0);
+        return output;
+    }
+
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
     output.positionCS = vertexInput.positionCS;

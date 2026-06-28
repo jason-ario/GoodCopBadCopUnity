@@ -5,24 +5,28 @@ namespace HighlightPlus.Demos {
 
     public class ManualSelectionDemo : MonoBehaviour {
 
-        HighlightManager hm;
-
+        public HighlightManager manager;
         public Transform objectToSelect;
 
-        void Start() {
-            hm = Misc.FindObjectOfType<HighlightManager>();
-        }
+        public Transform[] objectsToSelect;
 
-        void Update() {
-            if (Input.GetKeyDown(KeyCode.Alpha1)) {
-                hm.SelectObject(objectToSelect);
+        void Update () {
+            if (InputProxy.GetKeyDown("1")) {
+                manager.SelectObject(objectToSelect);
             }
-            if (Input.GetKeyDown(KeyCode.Alpha2)) {
-                hm.ToggleObject(objectToSelect);
+            if (InputProxy.GetKeyDown("2")) {
+                manager.ToggleObject(objectToSelect);
             }
-            if (Input.GetKeyDown(KeyCode.Alpha3)) {
-                hm.UnselectObject(objectToSelect);
+            if (InputProxy.GetKeyDown("3")) {
+                manager.UnselectObject(objectToSelect);
             }
+            if (InputProxy.GetKeyDown("4")) {
+                manager.SelectObjects(objectsToSelect);
+            }
+            if (InputProxy.GetKeyDown("5")) {
+                manager.UnselectObjects();
+            }
+
         }
     }
 }

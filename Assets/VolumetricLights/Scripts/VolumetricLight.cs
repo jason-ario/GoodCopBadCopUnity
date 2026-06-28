@@ -12,10 +12,10 @@ using UnityEditor.SceneManagement;
 
 namespace VolumetricLights {
 
-    public delegate void PropertiesChangedEvent(VolumetricLight volumetricLight);
+    public delegate void PropertiesChangedEvent (VolumetricLight volumetricLight);
 
     [ExecuteAlways, RequireComponent(typeof(Light)), AddComponentMenu("Effects/Volumetric Light", 1000)]
-    [HelpURL("https://kronnect.com/guides/volumetric-lights-2-urp-volumetric-light-parameters/")]
+    [HelpURL("https://kronnect.com/docs/volumetric-lights-urp/")]
     [DefaultExecutionOrder(100)]
     public partial class VolumetricLight : MonoBehaviour {
 
@@ -74,20 +74,13 @@ namespace VolumetricLights {
         public static List<VolumetricLight> volumetricLights = new List<VolumetricLight>();
 
 
-        void OnEnable() {
+        void OnEnable () {
             Init();
-#if UNITY_EDITOR
-            // workaround for volumetric effect disappearing when saving the scene
-            EditorSceneManager.sceneSaving += OnSceneSaving;
-#endif
-        }
-
-        void OnSceneSaving (UnityEngine.SceneManagement.Scene scene, string path) {
-            requireUpdateMaterial = true;
         }
 
 
-        public void Init() {
+
+        public void Init () {
             fogMatShader = Shader.Find("VolumetricLights/VolumetricLightURP");
             fogMatSimpleShader = Shader.Find("VolumetricLights/Simple");
             fogMatInvisibleShader = Shader.Find("VolumetricLights/Invisible");
@@ -103,7 +96,7 @@ namespace VolumetricLights {
             Refresh();
         }
 
-        public void Refresh() {
+        public void Refresh () {
             if (!enabled) return;
             CheckProfile();
 
@@ -114,28 +107,23 @@ namespace VolumetricLights {
             UpdateMaterialPropertiesNow();
         }
 
-        private void OnValidate() {
+        private void OnValidate () {
             SettingsValidate();
             requireUpdateMaterial = true;
         }
 
-        public void OnDidApplyAnimationProperties() {
+        public void OnDidApplyAnimationProperties () {
             requireUpdateMaterial = true;
         }
 
         private void OnDisable () {
-#if UNITY_EDITOR
-            EditorSceneManager.sceneSaving -= OnSceneSaving;
-
-#endif
-
             if (volumetricLights.Contains(this)) {
                 volumetricLights.Remove(this);
             }
             TurnOff();
         }
 
-        void TurnOff() {
+        void TurnOff () {
             if (meshRenderer != null) {
                 meshRenderer.enabled = false;
             }
@@ -143,7 +131,7 @@ namespace VolumetricLights {
             ParticlesDisable();
         }
 
-        private void OnDestroy() {
+        private void OnDestroy () {
             if (fogMatInvisible != null) {
                 DestroyImmediate(fogMatInvisible);
                 fogMatInvisible = null;
@@ -154,7 +142,7 @@ namespace VolumetricLights {
             ShadowsDispose();
         }
 
-        void LateUpdate() {
+        void LateUpdate () {
 
             bool isActiveAndEnabled = lightComp.isActiveAndEnabled || alwaysOn;
             if (isActiveAndEnabled) {
@@ -175,6 +163,16 @@ namespace VolumetricLights {
                 ScheduleShadowCapture();
                 requireUpdateMaterial = true;
             }
+
+#if !UNITY_6000_3_OR_NEWER
+#if UNITY_EDITOR
+            // In editor, check if we need to refresh materials (matrices get lost during domain reloads)
+            if (!Application.isPlaying && (enableShadows || enableDustParticles) && fogMat != null && !fogMat.HasProperty(ShaderParams.ShadowMatrix)) {
+                requireUpdateMaterial = true;
+            }
+#endif
+#endif
+
 
             if (requireUpdateMaterial) {
                 requireUpdateMaterial = false;
@@ -228,7 +226,7 @@ namespace VolumetricLights {
         }
 
 
-        void ComputeDistanceToCamera() {
+        void ComputeDistanceToCamera () {
             if (mainCamera == null) {
                 mainCamera = targetCamera;
                 if (mainCamera == null && Camera.main != null) {
@@ -241,14 +239,14 @@ namespace VolumetricLights {
             distanceToCameraSqr = (camPos - pos).sqrMagnitude;
         }
 
-        void UpdateDiffusionTerm() {
+        void UpdateDiffusionTerm () {
             Vector4 toLightDir = -transform.forward;
             toLightDir.w = diffusionIntensity;
             fogMat.SetVector(ShaderParams.ToLightDir, toLightDir);
         }
 
 
-        public void UpdateVolumeGeometry() {
+        public void UpdateVolumeGeometry () {
             NormalizeScale();
             UpdateVolumeGeometryMaterial(fogMat);
             if (enableDustParticles && particleMaterial != null) {
@@ -257,7 +255,7 @@ namespace VolumetricLights {
             }
         }
 
-        void UpdateVolumeGeometryMaterial(Material mat) {
+        void UpdateVolumeGeometryMaterial (Material mat) {
             if (mat == null) return;
 
             Transform t = transform;
@@ -310,11 +308,11 @@ namespace VolumetricLights {
         }
 
 
-        public void UpdateMaterialProperties() {
+        public void UpdateMaterialProperties () {
             requireUpdateMaterial = true;
         }
 
-        void UpdateMaterialPropertiesNow() {
+        void UpdateMaterialPropertiesNow () {
 
             wasInRange = Tribool.Unknown;
             lastDistanceCheckTime = -999;
@@ -366,7 +364,7 @@ namespace VolumetricLights {
 
             // Ensure material uses correct shader if mode changed
             if (fogMat.shader != targetShader && fogMat.shader != fogMatInvisibleShader) {
-                 fogMat.shader = targetShader;
+                fogMat.shader = targetShader;
             }
 
             SetFogMaterial();
@@ -478,7 +476,7 @@ namespace VolumetricLights {
             }
         }
 
-        void SetFogMaterial() {
+        void SetFogMaterial () {
             if (meshRenderer != null) {
                 if (density <= 0 || mediumAlbedo.a == 0) {
                     if (fogMatInvisible == null) {
@@ -494,7 +492,7 @@ namespace VolumetricLights {
 
         /// <summary>
         /// Creates an automatic profile if profile is not set
-        public void CheckProfile() {
+        public void CheckProfile () {
             if (profile != null) {
                 if ("Auto".Equals(profile.name)) {
                     profile.ApplyTo(this);
@@ -508,7 +506,7 @@ namespace VolumetricLights {
         /// <summary>
         /// Gets bounds in world space
         /// </summary>
-        public Bounds GetBounds() {
+        public Bounds GetBounds () {
             Bounds bounds = this.bounds;
             if (useCustomBounds && boundsInLocalSpace) {
                 bounds.center += transform.position;
@@ -520,7 +518,7 @@ namespace VolumetricLights {
         /// <summary>
         /// Sets bounds in world space
         /// </summary>
-        public void SetBounds(Bounds bounds) {
+        public void SetBounds (Bounds bounds) {
             if (useCustomBounds && boundsInLocalSpace) {
                 bounds.center -= transform.position;
             }

@@ -206,6 +206,7 @@ namespace VolumetricLights {
         [Range(0, 1)] public float shadowTranslucencyBlend = 0.5f;
         public ShadowResolution shadowResolution = ShadowResolution._256;
         public LayerMask shadowCullingMask = ~2;
+        public bool shadowIncludeTransparent;
         public ShadowBakeInterval shadowBakeInterval = ShadowBakeInterval.OnStart;
         [Tooltip("When enabled, baked shadows won't be updated when light rotates, only when position changes. This produces that baked shadows can also rotate when the light does, improving performance. This option only works in play mode.")]
         public bool shadowBakeIgnoreRotationChange;        
@@ -352,6 +353,7 @@ namespace VolumetricLights {
             vl.shadowTranslucencyBlend = shadowTranslucencyBlend;
             vl.shadowResolution = shadowResolution;
             vl.shadowCullingMask = shadowCullingMask;
+            vl.shadowIncludeTransparent = shadowIncludeTransparent;
             vl.shadowBakeInterval = shadowBakeInterval;
             vl.shadowNearDistance = shadowNearDistance;
             vl.shadowBakeIgnoreRotationChange = shadowBakeIgnoreRotationChange;
@@ -429,6 +431,7 @@ namespace VolumetricLights {
             shadowTranslucencyBlend = vl.shadowTranslucencyBlend;
             shadowResolution = vl.shadowResolution;
             shadowCullingMask = vl.shadowCullingMask;
+            shadowIncludeTransparent = vl.shadowIncludeTransparent;
             shadowBakeInterval = vl.shadowBakeInterval;
             shadowNearDistance = vl.shadowNearDistance;
             shadowBakeIgnoreRotationChange = vl.shadowBakeIgnoreRotationChange;

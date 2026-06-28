@@ -1,6 +1,6 @@
 Toony Colors Pro, version 2.9
-2025/09/23
-© 2013-2025 - Jean Moreno
+2026/01/13
+© 2013-2026 - Jean Moreno
 =============================
 
 QUICK START
@@ -37,6 +37,20 @@ UPDATE NOTES
 ------------
 
 See full and formatted changelog here: https://jeanmoreno.com/unity/toonycolorspro/doc/changelog
+
+2.9.21
+#### Added
+- [Shader Generator 2] (URP) Added Scene Selection and Picking passes, so that mouse picking and selection outline work properly when the shader does vertex displacement
+- [Shader Generator 2] (URP) Water Vertex Waves: added options to move and rotate the whole object along with the wave, for shader-based animation of floating objects on the water
+- [Shader Generator 2] (URP) Wind: added an option for rotation-based movement instead of vertex position (useful for trees and bigger objects)
+- [Shader Generator 2] Added "Vertex/Mesh World Position" variable in "Shader Properties" system
+#### Modified
+- Updated URP shaders for Cat and Material Layers demos so that they work properly with the latest URP versions
+- [Shader Generator 2] Renamed "Vertex/Object Normal" to "Vertex/Local Normal" for consistency with "Vertex/Local Position"
+#### Fixed
+- [Shader Generator 2] (URP) Prevent Rim Lighting from being very high when light-based mask is used due to point lights distance attenuation being very high
+- [Demo Scenes] Fixed InputAbstraction class error when using the new input system
+- [Cat Demo Scene] Fixed Ground shader not having "Depth Normals" pass (and thus not working with water depth effects)
 
 2.9.20
 #### Fixed

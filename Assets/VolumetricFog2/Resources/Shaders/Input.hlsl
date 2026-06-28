@@ -1,4 +1,4 @@
-﻿#ifndef VOLUMETRIC_FOG_2_INPUT
+#ifndef VOLUMETRIC_FOG_2_INPUT
 #define VOLUMETRIC_FOG_2_INPUT
 
 #ifndef VOLUMETRIC_FOG_2_SHADERGRAPH_SUPPORT
@@ -6,7 +6,10 @@ CBUFFER_START(UnityPerMaterial)
 #endif
 
 half4 _LightColor;
-half _NativeLightsMultiplier;
+half3 _NativeLightsData;
+#define NATIVE_LIGHTS_MULTIPLIER _NativeLightsData.x
+#define NATIVE_LIGHT_FALLOFF _NativeLightsData.y
+#define ONE_MINUS_NATIVE_LIGHT_FALLOFF _NativeLightsData.z
 
 float _NoiseScale;
 half4 _DetailColor;
@@ -19,10 +22,13 @@ half4 _DetailData; // x = strength, y = offset, z = scale, w = importance
 
 half _DeepObscurance;
 
-half3 _LightDiffusionData;
+half4 _LightDiffusionData;
 #define LIGHT_DIFFUSION_POWER _LightDiffusionData.x
 #define LIGHT_DIFFUSION_INTENSITY _LightDiffusionData.y
 #define LIGHT_DIFFUSION_DEPTH_ATTEN _LightDiffusionData.z
+#define LIGHT_DIFFUSION_BACKSCATTER _LightDiffusionData.w
+
+half _DiffusionFloor;
 
 half  _Density;
 float3 _BoundsCenter, _BoundsExtents;
@@ -67,6 +73,8 @@ float3 _FogOfWarCenterAdjusted;
 
 float4x4 _InvRotMatrix;
 float4x4 _RotMatrix;
+
+int _VFVolumeLayer;
 
 #ifndef VOLUMETRIC_FOG_2_SHADERGRAPH_SUPPORT
 CBUFFER_END

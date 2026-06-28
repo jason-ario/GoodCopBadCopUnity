@@ -7,7 +7,7 @@ namespace HighlightPlus {
     [CustomEditor(typeof(HighlightManager))]
     public class HighlightManagerEditor : UnityEditor.Editor {
 
-        SerializedProperty highlightOnHover, layerMask, raycastCamera, raycastSource, minDistance, maxDistance, respectUI;
+        SerializedProperty highlightOnHover, layerMask, raycastCamera, raycastSource, blockingLayerMask, minDistance, maxDistance, respectUI, unhighlightOnUI;
         SerializedProperty selectOnClick, selectedProfile, selectedAndHighlightedProfile, singleSelection, toggleOnClick, keepSelection;
 
         void OnEnable() {
@@ -15,6 +15,7 @@ namespace HighlightPlus {
             layerMask = serializedObject.FindProperty("layerMask");
             raycastCamera = serializedObject.FindProperty("raycastCamera");
             raycastSource = serializedObject.FindProperty("raycastSource");
+            blockingLayerMask = serializedObject.FindProperty("blockingLayerMask");
             minDistance = serializedObject.FindProperty("minDistance");
             maxDistance = serializedObject.FindProperty("maxDistance");
             respectUI = serializedObject.FindProperty("respectUI");
@@ -24,6 +25,7 @@ namespace HighlightPlus {
             singleSelection = serializedObject.FindProperty("singleSelection");
             toggleOnClick = serializedObject.FindProperty("toggle");
             keepSelection = serializedObject.FindProperty("keepSelection");
+            unhighlightOnUI = serializedObject.FindProperty("unhighlightOnUI");
         }
 
         public override void OnInspectorGUI() {
@@ -35,9 +37,15 @@ namespace HighlightPlus {
             EditorGUILayout.PropertyField(layerMask);
             EditorGUILayout.PropertyField(raycastCamera);
             EditorGUILayout.PropertyField(raycastSource);
+            EditorGUILayout.PropertyField(blockingLayerMask);
             EditorGUILayout.PropertyField(minDistance);
             EditorGUILayout.PropertyField(maxDistance);
             EditorGUILayout.PropertyField(respectUI);
+            if (respectUI.boolValue) {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(unhighlightOnUI);
+                EditorGUI.indentLevel--;
+            }
             EditorGUILayout.PropertyField(highlightOnHover);
             EditorGUILayout.PropertyField(selectOnClick);
             if (selectOnClick.boolValue) {

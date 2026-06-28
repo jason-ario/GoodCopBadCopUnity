@@ -1,4 +1,4 @@
-﻿//////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
 // Copyright (c) BrainFailProductions
 //////////////////////////////////////////////////////
 
@@ -26,14 +26,13 @@ namespace BrainFailProductions.PolyFew
 
             // This is the unique Id for the current GameObject and it's children hierarchy
             [HideInInspector]
-            [SerializeField]
-            private int uniqueId;
+            private EntityId uniqueId;
 
             private TempGameObjectWrapper(GameObject gameObject)
             {
                 if(gameObject == null) { throw new ArgumentNullException(nameof(gameObject)); }
                 this.gameObject = gameObject;
-                uniqueId = gameObject.GetInstanceID();
+                uniqueId = gameObject.GetEntityId();
             }
 
             public static implicit operator GameObject(TempGameObjectWrapper gameObjectWrapper) => gameObjectWrapper.gameObject;
@@ -42,7 +41,7 @@ namespace BrainFailProductions.PolyFew
 
             public override int GetHashCode()
             {
-                return uniqueId;
+                return uniqueId.GetHashCode();
             }
 
 

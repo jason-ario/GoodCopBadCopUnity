@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 
 using System.Collections.Generic;
 using System.IO;
@@ -157,7 +157,7 @@ namespace BrainFailProductions.PolyFew
 
             if (Selection.activeObject != null)
             {
-                folderPath = AssetDatabase.GetAssetPath(Selection.activeObject.GetInstanceID());
+                folderPath = AssetDatabase.GetAssetPath(Selection.activeObject);
             }
 
             if(!string.IsNullOrWhiteSpace(folderPath))
@@ -228,7 +228,7 @@ namespace BrainFailProductions.PolyFew
 
             if (Selection.activeObject != null)
             {
-                folderPath = AssetDatabase.GetAssetPath(Selection.activeObject.GetInstanceID());
+                folderPath = AssetDatabase.GetAssetPath(Selection.activeObject);
             }
 
             if (!string.IsNullOrWhiteSpace(folderPath))

@@ -8,7 +8,7 @@ namespace VolumetricFogAndMist2 {
 
         [MenuItem("GameObject/Effects/Volumetric Fog 2/Manager", false, 100)]
         public static void CreateManager(MenuCommand menuCommand) {
-            VolumetricFogManager manager = Tools.CheckMainManager();
+            VolumetricFogManager manager = Tools.CheckMainManager(true);
             if (StageUtility.GetCurrentStage() != StageUtility.GetMainStage()) {
                 StageUtility.PlaceGameObjectInCurrentStage(manager.gameObject);
             }

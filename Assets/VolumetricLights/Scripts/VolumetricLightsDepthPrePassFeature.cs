@@ -9,20 +9,21 @@ using UnityEngine.Rendering.RenderGraphModule;
 
 namespace VolumetricLights {
 
-    public class VolumetricLightsDepthPrePassFeature : ScriptableRendererFeature {
+    public partial class VolumetricLightsDepthPrePassFeature : ScriptableRendererFeature {
 
         static class ShaderParams {
             public static int MainTex = Shader.PropertyToID("_MainTex");
             public static int CustomDepthTexture = Shader.PropertyToID("_CustomDepthTexture");
             public static int CustomDepthAlphaCutoff = Shader.PropertyToID("_AlphaCutOff");
             public static int CustomDepthBaseMap = Shader.PropertyToID("_BaseMap");
+            public static int CullMode = Shader.PropertyToID("_Cull");
 
             public const string SKW_DEPTH_PREPASS = "VF2_DEPTH_PREPASS";
             public const string SKW_CUSTOM_DEPTH_ALPHA_TEST = "DEPTH_PREPASS_ALPHA_TEST";
         }
 
 
-        public class DepthRenderPass : ScriptableRenderPass {
+        public partial class DepthRenderPass : ScriptableRenderPass {
 
             public VolumetricLightsDepthPrePassFeature settings;
 
@@ -74,89 +75,6 @@ namespace VolumetricLights {
             }
 
 #if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
-                if (settings.transparentLayerMask != filterSettings.layerMask || settings.alphaCutoutLayerMask != currentCutoutLayerMask) {
-                    filterSettings = new FilteringSettings(RenderQueueRange.transparent, settings.transparentLayerMask);
-                    if (settings.alphaCutoutLayerMask != currentCutoutLayerMask) {
-                        FindAlphaClippingRenderers();
-                    }
-                    currentCutoutLayerMask = settings.alphaCutoutLayerMask;
-                    SetupKeywords();
-                }
-                RenderTextureDescriptor depthDesc = cameraTextureDescriptor;
-                depthDesc.colorFormat = RenderTextureFormat.Depth;
-                depthDesc.depthBufferBits = 24;
-                depthDesc.msaaSamples = 1;
-
-                cmd.GetTemporaryRT(ShaderParams.CustomDepthTexture, depthDesc, FilterMode.Point);
-                cmd.SetGlobalTexture(ShaderParams.CustomDepthTexture, m_Depth);
-                ConfigureTarget(m_Depth);
-                ConfigureClear(ClearFlag.All, Color.black);
-            }
-
-#if UNITY_2023_3_OR_NEWER
-            [Obsolete]
-#endif
-            public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) {
-
-                if (settings.transparentLayerMask == 0 && settings.alphaCutoutLayerMask == 0) return;
-
-                CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
-                context.ExecuteCommandBuffer(cmd);
-                cmd.Clear();
-
-                if (settings.alphaCutoutLayerMask != 0) {
-                    if (depthOnlyMaterialCutOff == null) {
-                        Shader depthOnlyCutOff = Shader.Find(m_DepthOnlyShader);
-                        depthOnlyMaterialCutOff = new Material(depthOnlyCutOff);
-                    }
-                    int renderersCount = cutOutRenderers.Count;
-                    if (depthOverrideMaterials == null || depthOverrideMaterials.Length < renderersCount) {
-                        depthOverrideMaterials = new Material[renderersCount];
-                    }
-                    for (int k = 0; k < renderersCount; k++) {
-                        Renderer renderer = cutOutRenderers[k];
-                        if (renderer != null && renderer.isVisible) {
-                            Material mat = renderer.sharedMaterial;
-                            if (mat != null) {
-                                if (depthOverrideMaterials[k] == null) {
-                                    depthOverrideMaterials[k] = Instantiate(depthOnlyMaterialCutOff);
-                                    depthOverrideMaterials[k].EnableKeyword(ShaderParams.SKW_CUSTOM_DEPTH_ALPHA_TEST);
-                                }
-                                Material overrideMaterial = depthOverrideMaterials[k];
-                                overrideMaterial.SetFloat(ShaderParams.CustomDepthAlphaCutoff, settings.alphaCutOff);
-                                if (mat.HasProperty(ShaderParams.CustomDepthBaseMap)) {
-                                    overrideMaterial.SetTexture(ShaderParams.MainTex, mat.GetTexture(ShaderParams.CustomDepthBaseMap));
-                                } else if (mat.HasProperty(ShaderParams.MainTex)) {
-                                    overrideMaterial.SetTexture(ShaderParams.MainTex, mat.GetTexture(ShaderParams.MainTex));
-                                }
-                                cmd.DrawRenderer(renderer, overrideMaterial);
-                            }
-                        }
-                    }
-
-                }
-
-                if (settings.transparentLayerMask != 0) {
-                    SortingCriteria sortingCriteria = SortingCriteria.CommonTransparent;
-                    var drawSettings = CreateDrawingSettings(shaderTagIdList, ref renderingData, sortingCriteria);
-                    drawSettings.perObjectData = PerObjectData.None;
-                    if (depthOnlyMaterial == null) {
-                        Shader depthOnly = Shader.Find(m_DepthOnlyShader);
-                        depthOnlyMaterial = new Material(depthOnly);
-                    }
-                    drawSettings.overrideMaterial = depthOnlyMaterial;
-                    context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
-                }
-
-                context.ExecuteCommandBuffer(cmd);
-
-                CommandBufferPool.Release(cmd);
-            }
-
-#if UNITY_2023_3_OR_NEWER
 
             class PassData {
                 public RendererListHandle rendererListHandle;
@@ -183,11 +101,14 @@ namespace VolumetricLights {
                     SortingCriteria sortingCriteria = SortingCriteria.CommonTransparent;
                     var drawingSettings = CreateDrawingSettings(shaderTagIdList, renderingData, cameraData, lightData, sortingCriteria);
                     drawingSettings.perObjectData = PerObjectData.None;
-                    if (depthOnlyMaterial == null) {
-                        Shader depthOnly = Shader.Find(m_DepthOnlyShader);
-                        depthOnlyMaterial = new Material(depthOnly);
+                    if (settings.useOptimizedDepthOnlyShader) {
+                        if (depthOnlyMaterial == null) {
+                            Shader depthOnly = Shader.Find(m_DepthOnlyShader);
+                            depthOnlyMaterial = new Material(depthOnly);
+                        }
+                        depthOnlyMaterial.SetInt(ShaderParams.CullMode, (int)settings.transparentCullMode);
+                        drawingSettings.overrideMaterial = depthOnlyMaterial;
                     }
-                    drawingSettings.overrideMaterial = depthOnlyMaterial;
                     RendererListParams listParams = new RendererListParams(renderingData.cullResults, drawingSettings, filterSettings);
                     passData.rendererListHandle = renderGraph.CreateRendererList(listParams);
                     builder.UseRendererList(passData.rendererListHandle);
@@ -236,9 +157,14 @@ namespace VolumetricLights {
                                         Material overrideMaterial = depthOverrideMaterials[k];
                                         overrideMaterial.SetFloat(ShaderParams.CustomDepthAlphaCutoff, settings.alphaCutOff);
                                         if (mat.HasProperty(ShaderParams.CustomDepthBaseMap)) {
-                                            overrideMaterial.SetTexture(ShaderParams.MainTex, mat.GetTexture(ShaderParams.CustomDepthBaseMap));
+                                            overrideMaterial.SetTexture(ShaderParams.CustomDepthBaseMap, mat.GetTexture(ShaderParams.CustomDepthBaseMap));
                                         } else if (mat.HasProperty(ShaderParams.MainTex)) {
-                                            overrideMaterial.SetTexture(ShaderParams.MainTex, mat.GetTexture(ShaderParams.MainTex));
+                                            overrideMaterial.SetTexture(ShaderParams.CustomDepthBaseMap, mat.GetTexture(ShaderParams.MainTex));
+                                        }
+                                        if (mat.HasProperty(ShaderParams.CullMode)) {
+                                            overrideMaterial.SetInt(ShaderParams.CullMode, mat.GetInt(ShaderParams.CullMode));
+                                        } else {
+                                            overrideMaterial.SetInt(ShaderParams.CullMode, (int)settings.semiTransparentCullMode);
                                         }
                                         cmd.DrawRenderer(renderer, overrideMaterial);
                                     }
@@ -268,11 +194,17 @@ namespace VolumetricLights {
 
         [Tooltip("Optionally specify which transparent layers must be included in the depth prepass. Use only to avoid fog clipping with certain transparent objects.")]
         public LayerMask transparentLayerMask;
+        [Tooltip("Uses an optimized shader to compute depth for objects in the Transparent Layer Mask. Disable to use each object's own shader (useful for shaders with vertex transformations like wind or for custom alpha clipping not exposed via _BaseMap/_MainTex).")]
+        public bool useOptimizedDepthOnlyShader = true;
+        [Tooltip("Cull mode used by the optimized depth-only shader when rendering Transparent Layer Mask objects.")]
+        public CullMode transparentCullMode = CullMode.Back;
         [Tooltip("Optionally specify which semi-transparent (materials using alpha clipping or cut-off) must be included in the depth prepass. Use only to avoid fog clipping with certain transparent objects.")]
         public LayerMask alphaCutoutLayerMask;
         [Tooltip("Optionally determines the alpha cut off for semitransparent objects.")]
         [Range(0, 1)]
         public float alphaCutOff;
+        [Tooltip("Fallback cull mode used by the depth-only override material for Alpha Cutout Layer Mask objects when their material does not expose a _Cull property.")]
+        public CullMode semiTransparentCullMode = CullMode.Back;
 
         [Tooltip("If this depth pre-pass render feature can execute on reflection probes.")]
         public bool ignoreReflectionProbes = true;

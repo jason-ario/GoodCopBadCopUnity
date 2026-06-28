@@ -41,6 +41,8 @@ Shader "VolumetricLights/VolumetricLightURP"
 		[HideInInspector] _RayMarchMaxSteps("Raymarch Max Steps", Int) = 16
 		[HideInInspector] _FlipDepthTexture("Flip Depth Texture", Int) = 0
 		[HideInInspector] _DirectLightData("Direct Light Data", Vector) = (1, 8, 4)
+		[HideInInspector] _ShadowTexture("Shadow Texture", 2D) = "black" {}
+		[HideInInspector] _TranslucencyTexture("Translucency Texture", 2D) = "black" {}
 	}
 		SubShader
 		{

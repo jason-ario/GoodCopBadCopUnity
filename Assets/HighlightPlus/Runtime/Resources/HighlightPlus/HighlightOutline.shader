@@ -97,7 +97,8 @@ Properties {
                 #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED) || defined(SINGLE_PASS_STEREO)
                     outlineDirection.x *= 2.0;
                 #endif
-				o.pos.xy += offset * z * _OutlineWidth + outlineDirection.xy * z;
+				float z_dir = lerp(z, 2.0, _ConstantWidth);
+				o.pos.xy += offset * z * _OutlineWidth + outlineDirection.xy * z_dir;
 				o.uv = TRANSFORM_TEX (v.uv, _MainTex);
                 return o;
             }
@@ -177,7 +178,8 @@ Properties {
                     outlineDirection.x *= 2.0;
                 #endif
 
-				o.pos.xy += offset * z * _OutlineWidth + outlineDirection.xy * z;
+				float z_dir = lerp(z, 2.0, _ConstantWidth);
+				o.pos.xy += offset * z * _OutlineWidth + outlineDirection.xy * z_dir;
                 return o;
             }
             

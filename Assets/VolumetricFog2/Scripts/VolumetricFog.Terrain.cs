@@ -102,11 +102,6 @@ namespace VolumetricFogAndMist2 {
                 needsSurfaceCapture = true;
             }
 
-            int thisLayer = 1 << gameObject.layer;
-            if ((activeProfile.terrainLayerMask & thisLayer) != 0) {
-                activeProfile.terrainLayerMask &= ~thisLayer; // exclude fog layer
-            }
-
             surfaceCam.cullingMask = activeProfile.terrainLayerMask;
             surfaceCam.targetTexture = rt;
 
@@ -177,7 +172,11 @@ namespace VolumetricFogAndMist2 {
         /// </summary>
         public void PerformHeightmapCapture() {
             if (surfaceCam != null) {
+                // Temporarily hide the fog renderer so the capture camera only sees terrain
+                bool wasVisible = meshRenderer != null && meshRenderer.enabled;
+                if (meshRenderer != null) meshRenderer.enabled = false;
                 surfaceCam.Render();
+                if (meshRenderer != null) meshRenderer.enabled = wasVisible;
                 surfaceCam.enabled = false;
                 if (!fogMat.IsKeywordEnabled(ShaderParams.SKW_SURFACE)) {
                     fogMat.EnableKeyword(ShaderParams.SKW_SURFACE);

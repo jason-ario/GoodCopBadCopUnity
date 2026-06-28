@@ -15,13 +15,14 @@ MonoBehaviour:
   effectGroup: 0
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 255
+    m_Bits: 4294967295
   effectNameFilter: 
   effectNameUseRegEx: 0
+  excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
   alphaCutOff: 0
-  cullBackFaces: 0
-  padding: 0
+  alphaCutOffTextureName: 
+  cullBackFaces: 1
   normalsOption: 0
   fadeInDuration: 0
   fadeOutDuration: 0
@@ -42,8 +43,15 @@ MonoBehaviour:
   overlayTextureScale: 1
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
+  overlayBlendMode: 0
+  overlayPattern: 0
+  overlayPatternScrolling: {x: 0, y: 0}
+  overlayPatternScale: 10
+  overlayPatternSize: 0.15
+  overlayPatternSoftness: 0.02
+  overlayPatternRotation: 0
   outline: 1
-  outlineColor: {r: 0.49245283, g: 0.2139757, b: 0.121719465, a: 1}
+  outlineColor: {r: 0, g: 0, b: 0, a: 1}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -81,17 +89,35 @@ MonoBehaviour:
   outlineQuality: 1
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
+  outlineDistanceScaleBias: 25
   outlineSharpness: 1
   outlineDownsampling: 2
   outlineContourStyle: 0
-  outlineVisibility: 1
+  outlineGradientKnee: 0.4
+  outlineGradientPower: 8
+  outlineStylized: 0
+  outlinePattern: {fileID: 0}
+  outlinePatternScale: 0.3
+  outlinePatternThreshold: 0.3
+  outlinePatternDistortionAmount: 0.5
+  outlinePatternStopMotionScale: 5
+  outlinePatternDistortionTexture: {fileID: 0}
+  padding: 0
+  outlinePixelation: 0
+  outlineDashed: 0
+  outlineDashWidth: 0.5
+  outlineDashGap: 0.3
+  outlineDashSpeed: 2
+  outlineVisibility: 0
   outlineIndependent: 0
   outlineMaskMode: 0
-  glow: 0
-  glowWidth: 0.5
-  glowQuality: 1
+  glow: 1
+  glowWidth: 1
+  glowQuality: 2
   glowBlurMethod: 0
-  glowDownsampling: 2
+  glowHighPrecision: 1
+  glowDistanceScaleBias: 25
+  glowDownsampling: 1
   glowHQColor: {r: 0.64, g: 1, b: 0, a: 1}
   glowDithering: 1
   glowDitheringStyle: 0
@@ -115,18 +141,31 @@ MonoBehaviour:
     alpha: 0.4
     color: {r: 0.64, g: 1, b: 0, a: 1}
   glowMaskMode: 0
-  innerGlow: 0
+  glowPixelation: 0
+  innerGlow: 0.5
   innerGlowWidth: 1
+  innerGlowPower: 1
   innerGlowBlendMode: 0
   innerGlowColor: {r: 1, g: 1, b: 1, a: 1}
   innerGlowVisibility: 0
+  focus: 0
+  focusColor: {r: 0, g: 0, b: 0, a: 0.9412}
+  focusBlur: 0
+  focusBlurDownsampling: 2
+  focusDesaturation: 0
   targetFX: 0
+  targetFXStyle: 0
+  targetFXFrameWidth: 0.1
+  targetFXCornerLength: 0.25
+  targetFXFrameMinOpacity: 0
   targetFXTexture: {fileID: 0}
   targetFXColor: {r: 1, g: 1, b: 1, a: 1}
   targetFXRotationSpeed: 50
+  targetFXRotationAngle: 0
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
   targetFXScaleToRenderBounds: 0
+  targetFXSquare: 1
   targetFXAlignToGround: 0
   targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
@@ -135,10 +174,15 @@ MonoBehaviour:
   targetFXFadePower: 32
   targetFXUseEnclosingBounds: 0
   targetFXOffset: {x: 0, y: 0, z: 0}
+  targetFxCenterOnHitPosition: 0
+  targetFxAlignToNormal: 0
   targetFXTransitionDuration: 0.5
   targetFXStayDuration: 1.5
   targetFXVisibility: 1
+  targetFXGroundMinAltitude: -1000
   iconFX: 0
+  iconFXAssetType: 0
+  iconFXPrefab: {fileID: 0}
   iconFXMesh: {fileID: 0}
   iconFXLightColor: {r: 1, g: 1, b: 1, a: 1}
   iconFXDarkColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -151,6 +195,28 @@ MonoBehaviour:
   iconFXOffset: {x: 0, y: 1, z: 0}
   iconFXTransitionDuration: 0.5
   iconFXStayDuration: 1.5
+  labelEnabled: 0
+  labelRenderMode: 0
+  labelText: Label
+  labelTextSize: 14
+  labelColor: {r: 1, g: 1, b: 1, a: 1}
+  labelPrefab: {fileID: 7963606135631250497, guid: 933a5612c43104c29af0a700ea5fa149,
+    type: 3}
+  labelVerticalOffset: 0
+  labelViewportOffset: {x: 0, y: 0}
+  labelLineLength: 200
+  labelFollowCursor: 1
+  labelMode: 0
+  labelShowInEditorMode: 1
+  labelAlignment: 0
+  labelRelativeAlignment: 0
+  labelAlignmentTransform: {fileID: 0}
+  labelMaxDistance: 250
+  labelFadeStartDistance: 200
+  labelScaleByDistance: 0
+  labelScaleMin: 1
+  labelScaleMax: 1
+  labelWorldSpaceScale: 0.01
   seeThrough: 2
   seeThroughOccluderMask:
     serializedVersion: 2
@@ -161,6 +227,7 @@ MonoBehaviour:
   seeThroughOccluderCheckIndividualObjects: 0
   seeThroughDepthOffset: 0
   seeThroughMaxDepth: 0
+  seeThroughFadeRange: 0
   seeThroughIntensity: 0.8
   seeThroughTintAlpha: 0.5
   seeThroughTintColor: {r: 1, g: 0, b: 0, a: 1}
@@ -176,6 +243,7 @@ MonoBehaviour:
   seeThroughChildrenSortingMode: 0
   hitFxInitialIntensity: 0
   hitFxMode: 0
+  hitFXTriggerMode: 0
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5

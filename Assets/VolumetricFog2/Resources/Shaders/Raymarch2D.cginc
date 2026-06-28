@@ -5,6 +5,12 @@
     static uint meshRenderingLayers;
 #endif
 
+#if defined(FOG_NATIVE_LIGHT_FALLOFF)
+    #define VF2_NATIVE_LIGHT_ATTEN(light) ((light).distanceAttenuation * NATIVE_LIGHT_FALLOFF + ONE_MINUS_NATIVE_LIGHT_FALLOFF)
+#else
+    #define VF2_NATIVE_LIGHT_ATTEN(light) ((light).distanceAttenuation)
+#endif
+
 void SetJitter(float2 uv) {
 
     float2 screenSize = lerp(_ScreenParams.xy, _VFRTSize.xy, _VFRTSize.z);
@@ -107,13 +113,12 @@ void AddFog(float3 rayStart, float3 wpos, float2 uv, half energyStep, half4 base
             float3 delta = wpos - _BoundsCenter;
             float distSqr = dot2(delta);
             float border = 1.0 - saturate( (distSqr - BORDER_START_SPHERE) / BORDER_SIZE_SPHERE );
-            density.a *= border * border;
         #else
             float2 dist2 = abs(wpos.xz - _BoundsCenter.xz);
             float2 border2 = saturate( (dist2 - BORDER_START_BOX) / BORDER_SIZE_BOX );
             float border = 1.0 - max(border2.x, border2.y);
-            density.a *= border * border;
         #endif
+        density.a *= smoothstep(0, 1, border);
    #endif
 
    #if VF2_DISTANCE
@@ -142,7 +147,8 @@ void AddFog(float3 rayStart, float3 wpos, float2 uv, half energyStep, half4 base
                             if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
                         #endif
                         {
-                            fgCol.rgb += light.color * (light.distanceAttenuation * light.shadowAttenuation * _NativeLightsMultiplier);
+                            half distanceAtten = VF2_NATIVE_LIGHT_ATTEN(light);
+                            fgCol.rgb += light.color * (distanceAtten * light.shadowAttenuation * NATIVE_LIGHTS_MULTIPLIER);
                         }
                     }
                 #endif
@@ -157,7 +163,8 @@ void AddFog(float3 rayStart, float3 wpos, float2 uv, half energyStep, half4 base
                             if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
                         #endif
                         {
-                            fgCol.rgb += light.color * (light.distanceAttenuation * light.shadowAttenuation * _NativeLightsMultiplier);
+                            half distanceAtten = VF2_NATIVE_LIGHT_ATTEN(light);
+                            fgCol.rgb += light.color * (distanceAtten * light.shadowAttenuation * NATIVE_LIGHTS_MULTIPLIER);
                         }
                     }
                 }
@@ -177,7 +184,8 @@ void AddFog(float3 rayStart, float3 wpos, float2 uv, half energyStep, half4 base
                         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
                     #endif
                     {
-                        fgCol.rgb += light.color * (light.distanceAttenuation * light.shadowAttenuation * _NativeLightsMultiplier);
+                        half distanceAtten = VF2_NATIVE_LIGHT_ATTEN(light);
+                        fgCol.rgb += light.color * (distanceAtten * light.shadowAttenuation * NATIVE_LIGHTS_MULTIPLIER);
                     }
                 }
             #endif
@@ -232,20 +240,21 @@ half MiePhase(half cosTheta, half g) {
 }
 
 half GetDiffusionIntensity(float3 viewDir) {
-    half cosTheta = max(dot(viewDir, _SunDir.xyz), 0);
+    half cosTheta = dot(viewDir, _SunDir.xyz);
+    half cosThetaFwd = max(cosTheta, 0);
     #if VF2_DIFFUSION_SMOOTH
-        half diffusion = HenyeyGreenstein(cosTheta, LIGHT_DIFFUSION_POWER);
+        half diffusion = HenyeyGreenstein(cosThetaFwd, LIGHT_DIFFUSION_POWER) + LIGHT_DIFFUSION_BACKSCATTER * HenyeyGreenstein(cosTheta, -LIGHT_DIFFUSION_POWER * 0.5);
     #elif VF2_DIFFUSION_STRONG
-        half diffusion = MiePhase(cosTheta, LIGHT_DIFFUSION_POWER);
+        half diffusion = MiePhase(cosThetaFwd, LIGHT_DIFFUSION_POWER) + LIGHT_DIFFUSION_BACKSCATTER * MiePhase(cosTheta, -LIGHT_DIFFUSION_POWER * 0.5);
     #else
-        half diffusion = SimpleDiffusionIntensity(cosTheta, LIGHT_DIFFUSION_POWER);
+        half diffusion = SimpleDiffusionIntensity(cosThetaFwd, LIGHT_DIFFUSION_POWER);
     #endif
     return diffusion * LIGHT_DIFFUSION_INTENSITY;
 }
  
 half3 GetDiffusionColor(float3 viewDir, float t1) {
     half diffusion = GetDiffusionIntensity(viewDir);
-    half3 diffusionColor = _LightColor.rgb * (1.0 + diffusion * saturate(dot2(t1 / LIGHT_DIFFUSION_DEPTH_ATTEN)));
+    half3 diffusionColor = _LightColor.rgb * (_DiffusionFloor + diffusion * saturate(dot2(t1 / LIGHT_DIFFUSION_DEPTH_ATTEN)));
     return diffusionColor;
 }
 

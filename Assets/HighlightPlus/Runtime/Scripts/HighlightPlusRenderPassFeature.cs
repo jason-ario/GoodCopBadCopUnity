@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 #if UNITY_2023_3_OR_NEWER
@@ -24,6 +25,7 @@ namespace HighlightPlus {
                   public TextureHandle colorTexture, depthTexture;
 #endif
                 public bool clearStencil;
+                public bool skipRendering;
                 public CommandBuffer cmd;
             }
 
@@ -54,23 +56,60 @@ namespace HighlightPlus {
             }
 
             public bool usesCameraOverlay;
+            public bool skipRendering;
 
             ScriptableRenderer renderer;
             RenderTextureDescriptor cameraTextureDescriptor;
             static DistanceComparer effectDistanceComparer = new DistanceComparer();
+            static Comparison<HighlightEffect> cachedEffectComparisonDelegate;
             bool clearStencil;
             static RenderTextureDescriptor sourceDesc;
             static Material blockerOutlineAndGlowMat, blockerOverlayMat, blockerAllMat;
+
+            struct CameraTargetState {
+                public Vector2Int size;
+                public float renderScale;
+                public int skipFrames;
+            }
+
+            readonly Dictionary<EntityId, CameraTargetState> lastTargetStateByCamera = new Dictionary<EntityId, CameraTargetState>(4);
+            const int ResizeStabilizationFrames = 1;
+
+            /// <summary>
+            /// URP reallocates camera color/depth when render scale or target size changes. Drawing Highlight Plus
+            /// around that transition (UnsafePass + SetRenderTarget Load) can corrupt the screen.
+            /// </summary>
+            public bool ShouldSkipPassForAttachmentResize (Camera cam, in RenderTextureDescriptor targetDesc, float renderScale) {
+                EntityId camId = Misc.GetInstanceID(cam);
+                var size = new Vector2Int(targetDesc.width, targetDesc.height);
+
+                if (lastTargetStateByCamera.TryGetValue(camId, out CameraTargetState previous)) {
+                    bool resized = previous.size != size || !Mathf.Approximately(previous.renderScale, renderScale);
+                    int skipFrames = resized ? ResizeStabilizationFrames : previous.skipFrames;
+                    bool skip = skipFrames > 0;
+                    if (skip) {
+                        skipFrames--;
+                    }
+                    lastTargetStateByCamera[camId] = new CameraTargetState { size = size, renderScale = renderScale, skipFrames = skipFrames };
+                    return skip;
+                }
+
+                lastTargetStateByCamera[camId] = new CameraTargetState { size = size, renderScale = renderScale };
+                return false;
+            }
 
             public void Setup (HighlightPlusRenderPassFeature passFeature, ScriptableRenderer renderer) {
                 this.renderPassEvent = passFeature.renderPassEvent;
                 this.clearStencil = passFeature.clearStencil;
                 this.renderer = renderer;
+                // Always request Depth so URP preserves the depth/stencil attachment across passes (mask/compose materials rely on stencil).
+                // The actual _CameraDepthTexture sampleable copy is gated separately via UseTexture in RecordRenderGraph.
                 ConfigureInput(ScriptableRenderPassInput.Depth);
             }
 
+#if !UNITY_6000_4_OR_NEWER
 #if UNITY_2023_3_OR_NEWER
-            [Obsolete]
+[Obsolete]
 #endif
             public override void Configure (CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor) {
                 this.cameraTextureDescriptor = cameraTextureDescriptor;
@@ -96,6 +135,7 @@ namespace HighlightPlus {
 #endif
 
                 passData.clearStencil = clearStencil;
+                passData.skipRendering = skipRendering;
                 passData.camera = renderingData.cameraData.camera;
                 passData.colorTarget = cameraColorTarget;
                 passData.depthTarget = cameraDepthTarget;
@@ -105,11 +145,14 @@ namespace HighlightPlus {
                 cmd.Clear();
 
                 passData.cmd = cmd;
-                ExecutePass(passData);
+                if (!passData.skipRendering) {
+                    ExecutePass(passData);
+                }
                 context.ExecuteCommandBuffer(cmd);
                 CommandBufferPool.Release(cmd);
 
             }
+#endif
 
             static void ExecutePass (PassData passData) {
 
@@ -125,10 +168,14 @@ namespace HighlightPlus {
 
                 if (!HighlightEffect.customSorting && ((camType == CameraType.Game && (sortFrameCount++) % 10 == 0) || !Application.isPlaying)) {
                     effectDistanceComparer.camPos = cam.transform.position;
-                    HighlightEffect.effects.Sort(effectDistanceComparer);
+                    if (cachedEffectComparisonDelegate == null) {
+                        cachedEffectComparisonDelegate = effectDistanceComparer.Compare;
+                    }
+                    HighlightEffect.effects.Sort(cachedEffectComparisonDelegate);
                 }
 
                 bool outlineOccludersPending = outlineAndGlowOccluders.Count > 0;
+                HighlightEffect.focusRendered = false;
 
                 for (int k = 0; k < count; k++) {
                     HighlightEffect effect = HighlightEffect.effects[k];
@@ -179,25 +226,43 @@ namespace HighlightPlus {
 #if UNITY_2023_3_OR_NEWER
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData) {
 
+                UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
+                if (IsDepthOnlyTarget(cameraData.cameraTargetDescriptor)) {
+                    return;
+                }
+
+                UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
+                if (!resourceData.activeColorTexture.IsValid()) {
+                    return;
+                }
+
+                bool needsCameraDepthTexture = NeedsCameraDepthTexture(cameraData.camera);
+
                 using (var builder = renderGraph.AddUnsafePass<PassData>("Highlight Plus Pass RG", out var passData)) {
 
                     builder.AllowPassCulling(false);
 
                     passData.clearStencil = clearStencil;
-                    UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
+                    passData.skipRendering = skipRendering;
                     passData.camera = cameraData.camera;
 
-                    UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
                     passData.colorTexture = resourceData.activeColorTexture;
                     passData.depthTexture = resourceData.activeDepthTexture;
                     
                     builder.UseTexture(resourceData.activeColorTexture, AccessFlags.ReadWrite);
-                    builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Read);
-                    builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
+                    // ReadWrite so RG knows we write to stencil (compose/mask materials).
+                    builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.ReadWrite);
+                    if (needsCameraDepthTexture) {
+                        builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
+                    }
 
                     sourceDesc = cameraData.cameraTargetDescriptor;
 
                     builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) => {
+                        if (passData.skipRendering) {
+                            context.cmd.SetRenderTarget(passData.colorTexture, passData.depthTexture);
+                            return;
+                        }
                         CommandBuffer cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                         passData.cmd = cmd;
                         passData.colorTarget = passData.colorTexture;
@@ -222,10 +287,16 @@ namespace HighlightPlus {
         public bool previewInEditMode = true;
 
         /// <summary>
+        /// Makes the effects visible in Scene View.
+        /// </summary>
+        [Tooltip("If enabled, effects will be visible also in Scene View.")]
+        public bool showInSceneView = true;
+
+        /// <summary>
         /// Makes the effects visible in Edit mode.
         /// </summary>
         [Tooltip("If enabled, effects will be visible also in Preview camera (preview camera shown when a camera is selected in Editor).")]
-        public bool showInPreviewCamera = true;
+        public bool showInPreviewCamera;
 
         public static bool installed;
         public static bool showingInEditMode;
@@ -233,7 +304,7 @@ namespace HighlightPlus {
         public static List<HighlightEffectBlocker> outlineAndGlowOccluders = new List<HighlightEffectBlocker>();
         public static int sortFrameCount;
 
-        const string PREVIEW_CAMERA_NAME = "Preview Camera";
+        const string PREVIEW_CAMERA_NAME = "Preview";
 
         void OnDisable () {
             installed = false;
@@ -256,13 +327,25 @@ namespace HighlightPlus {
             if (!previewInEditMode && !Application.isPlaying) {
                 return;
             }
-            if (cam.cameraType == CameraType.Preview) {
+
+            CameraType camType = cam.cameraType;
+
+            if (camType == CameraType.SceneView && !showInSceneView) {
                 return;
             }
-            if (!showInPreviewCamera && PREVIEW_CAMERA_NAME.Equals(cam.name)) {
+
+            if (!showInPreviewCamera && (camType == CameraType.Preview || cam.name.StartsWith(PREVIEW_CAMERA_NAME))) {
                 return;
             }
 #endif
+
+            if (IsDepthOnlyTarget(renderingData.cameraData.cameraTargetDescriptor)) {
+                return;
+            }
+
+            installed = true;
+
+            renderPass.skipRendering = renderPass.ShouldSkipPassForAttachmentResize(cam, renderingData.cameraData.cameraTargetDescriptor, renderingData.cameraData.renderScale);
 
 #if UNITY_2019_4_OR_NEWER
             if (renderingData.cameraData.renderType == CameraRenderType.Base) {
@@ -271,7 +354,66 @@ namespace HighlightPlus {
 #endif
             renderPass.Setup(this, renderer);
             renderer.EnqueuePass(renderPass);
-            installed = true;
+        }
+
+        /// <summary>
+        /// True if any effect eligible for this camera will sample _CameraDepthTexture this frame.
+        /// </summary>
+        static bool NeedsCameraDepthTexture (Camera cam) {
+            List<HighlightEffect> effects = HighlightEffect.effects;
+            int count = effects.Count;
+            int camLayer = 1 << cam.gameObject.layer;
+            CameraType camType = cam.cameraType;
+
+            for (int i = 0; i < count; i++) {
+                HighlightEffect effect = effects[i];
+                if (effect == null || effect.ignore || !effect.isActiveAndEnabled) {
+                    continue;
+                }
+                if (!(effect.ignoreObjectVisibility || effect.isVisible)) {
+                    continue;
+                }
+                if (camType == CameraType.Reflection && !effect.reflectionProbes) {
+                    continue;
+                }
+                if ((effect.camerasLayerMask & camLayer) == 0) {
+                    continue;
+                }
+                if (effect.RequiresCameraDepthTextureContent()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static Material sBlockerOutlineAndGlowMat, sBlockerOverlayMat, sBlockerAllMat;
+
+        public static void RenderBlockers(CommandBuffer cmd) {
+            int count = outlineAndGlowOccluders.Count;
+            if (count == 0) return;
+            for (int i = 0; i < count; i++) {
+                HighlightEffectBlocker blocker = outlineAndGlowOccluders[i];
+                if (blocker == null || !blocker.isActiveAndEnabled) continue;
+                int stencilOp = 0;
+                if (blocker.blockOutlineAndGlow) stencilOp += 2;
+                if (blocker.blockOverlay) stencilOp += 4;
+                if (stencilOp == 2) {
+                    if (sBlockerOutlineAndGlowMat == null) {
+                        sBlockerOutlineAndGlowMat = Resources.Load<Material>("HighlightPlus/HighlightBlockerOutlineAndGlow");
+                    }
+                    blocker.BuildCommandBuffer(cmd, sBlockerOutlineAndGlowMat);
+                } else if (stencilOp == 4) {
+                    if (sBlockerOverlayMat == null) {
+                        sBlockerOverlayMat = Resources.Load<Material>("HighlightPlus/HighlightBlockerOverlay");
+                    }
+                    blocker.BuildCommandBuffer(cmd, sBlockerOverlayMat);
+                } else if (stencilOp == 6) {
+                    if (sBlockerAllMat == null) {
+                        sBlockerAllMat = Resources.Load<Material>("HighlightPlus/HighlightUIMask");
+                    }
+                    blocker.BuildCommandBuffer(cmd, sBlockerAllMat);
+                }
+            }
         }
 
         public static void RegisterBlocker (HighlightEffectBlocker occluder) {
@@ -282,6 +424,18 @@ namespace HighlightPlus {
 
         public static void UnregisterBlocker (HighlightEffectBlocker occluder) {
             outlineAndGlowOccluders.Remove(occluder);
+        }
+
+        static bool IsDepthOnlyTarget(in RenderTextureDescriptor descriptor) {
+            if (descriptor.colorFormat == RenderTextureFormat.Depth) {
+                return true;
+            }
+#if UNITY_2019_1_OR_NEWER
+            if (descriptor.graphicsFormat == GraphicsFormat.None) {
+                return true;
+            }
+#endif
+            return false;
         }
     }
 }

@@ -2,7 +2,7 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &-7272285057760081899
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -18,7 +18,7 @@ MonoBehaviour:
     material: {fileID: 2100000, guid: 6916af2a76a1fa14580a83f4fa16e1ef, type: 2}
 --- !u!114 &-4038359656389517380
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -32,10 +32,11 @@ MonoBehaviour:
   renderPassEvent: 500
   clearStencil: 0
   previewInEditMode: 1
+  showInSceneView: 1
   showInPreviewCamera: 1
 --- !u!114 &-2075444741547056404
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -56,7 +57,7 @@ MonoBehaviour:
       normalBlend: 0
 --- !u!114 &-123111962723324806
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -108,7 +109,6 @@ MonoBehaviour:
   - {fileID: 2153185802762566190}
   - {fileID: -7272285057760081899}
   m_RendererFeatureMap: ad6b866f10d7b46c26992ebdc886197abc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d1548d42a45a7139b
-  m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -136,9 +136,10 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+  m_TileOnlyMode: 0
 --- !u!114 &1841771247995849080
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -181,7 +182,7 @@ MonoBehaviour:
       cameraFieldOfView: 60
 --- !u!114 &2153185802762566190
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -203,7 +204,7 @@ MonoBehaviour:
     lumaOnly: 1
 --- !u!114 &6104699316840559988
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -265,7 +266,7 @@ MonoBehaviour:
     useScaledTime: 1
 --- !u!114 &7833122117494664109
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -291,7 +292,7 @@ MonoBehaviour:
     SampleCount: -1
 --- !u!114 &8798211543770503462
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -304,6 +305,7 @@ MonoBehaviour:
   m_Active: 1
   blurShader: {fileID: 4800000, guid: c9391e295126842e589edc35e6cfa61a, type: 3}
   renderPassEvent: 450
+  renderPassEventOrder: 0
   fogLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295

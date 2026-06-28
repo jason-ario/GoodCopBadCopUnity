@@ -7,7 +7,7 @@ namespace VolumetricLights {
 
     [ExecuteAlways]
     [RequireComponent(typeof(Renderer))]
-    [HelpURL("https://kronnect.com/guides-category/volumetric-lights-2-urp/")]
+    [HelpURL("https://kronnect.com/docs/volumetric-lights-urp/")]
     public class VolumetricLightsTranslucency : MonoBehaviour {
 
         [Tooltip("Uses the same shader assigned to the transparent material to compute translucency colors instead of using an internal simple (but a bit faster) shader.")]

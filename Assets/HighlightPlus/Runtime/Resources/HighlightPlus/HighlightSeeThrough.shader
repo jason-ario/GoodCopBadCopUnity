@@ -11,6 +11,7 @@ Properties {
     _SeeThroughStencilPassOp ("Stencil Pass Operation", Int) = 0
     _SeeThroughDepthOffset ("Depth Offset", Float) = 0
     _SeeThroughMaxDepth("Max Depth", Float) = 0
+    _SeeThroughFadeRange("Fade Range", Float) = 0
     _SeeThroughTexture("Mask Texture", 2D) = "white" {}
     _SeeThroughTextureScale("Mask Texture Scale", Float) = 1.0
     _Cull ("Cull Mode", Int) = 2
@@ -80,6 +81,7 @@ Properties {
 			fixed _SeeThroughNoise;
             float _SeeThroughDepthOffset;
             float _SeeThroughMaxDepth;
+            float _SeeThroughFadeRange;
 	        fixed _HP_Fade;
             sampler2D _SeeThroughTexture;
             fixed _SeeThroughTextureScale;
@@ -121,7 +123,16 @@ Properties {
                 #if HP_DEPTH_OFFSET
                     float sceneZ = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.scrPos.xy / i.scrPos.w);
                     float sceneDepth = GetEyeDepth(sceneZ);
-                    if (i.depth - sceneDepth - _SeeThroughDepthOffset < 0 || i.depth - sceneDepth > _SeeThroughMaxDepth) discard;
+                    float dd = i.depth - sceneDepth;
+                    if (dd - _SeeThroughDepthOffset < 0) discard;
+                    float fadeMul = 1.0;
+                    if (_SeeThroughMaxDepth > 0) {
+                        if (_SeeThroughFadeRange <= 0) {
+                            if (dd > _SeeThroughMaxDepth) discard;
+                        } else {
+                            fadeMul = saturate((_SeeThroughMaxDepth - dd) / _SeeThroughFadeRange);
+                        }
+                    }
                 #endif
                     fixed4 col = tex2D(_MainTex, i.uv);
                 #if HP_ALPHACLIP
@@ -133,6 +144,9 @@ Properties {
                 col.rgb += _SeeThroughNoise *(frac( scry * time ) * 0.1);
                 col.a = _SeeThrough;
             	col.a = lerp(col.a, col.a * ( (scry % 2) - 1.0 ), _SeeThroughNoise);
+                #if HP_DEPTH_OFFSET
+                    col.a *= fadeMul;
+                #endif
                 col.a *= _HP_Fade;
 
                 #if HP_TEXTURE_TRIPLANAR

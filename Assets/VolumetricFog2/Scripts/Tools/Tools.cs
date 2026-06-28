@@ -25,9 +25,14 @@ namespace VolumetricFogAndMist2 {
             }
         }
 
-        public static VolumetricFogManager CheckMainManager() {
+        public static VolumetricFogManager CheckMainManager(bool forceCreate = false) {
             VolumetricFogManager fogManager = VolumetricFogManager.GetManagerIfExists();
             if (fogManager == null) {
+#if UNITY_EDITOR
+                if (!forceCreate && !Application.isPlaying && VolumetricFogManager.disableAutoManagerCreation) {
+                    return null;
+                }
+#endif
                 GameObject go = new GameObject();
                 fogManager = go.AddComponent<VolumetricFogManager>();
                 go.name = fogManager.managerName;

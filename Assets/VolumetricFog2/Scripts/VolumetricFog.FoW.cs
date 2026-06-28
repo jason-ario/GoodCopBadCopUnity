@@ -686,14 +686,14 @@ namespace VolumetricFogAndMist2 {
             wpos.y = bounds.center.y;
             for (int rr = 0; rr <= deltaz * 2; rr++) {
                 int r = pz - deltaz + rr;
-                if (r > 0 && r < th - 1) {
+                if (r >= 0 && r < th) {
                     int distancezSqr = (pz - r) * (pz - r);
                     distancezSqr = deltazSqr - distancezSqr;
                     float t1 = (float)distancezSqr * aspect1 / (deltazSqr * sm);
                     wpos.z = bounds.min.z + bounds.size.z * rr / (deltaz * 2f);
                     for (int cc = 0; cc <= deltax * 2; cc++) {
                         int c = px - deltax + cc;
-                        if (c > 0 && c < tw - 1) {
+                        if (c >= 0 && c < tw) {
                             wpos.x = bounds.min.x + bounds.size.x * cc / (deltax * 2f);
                             Vector3 colliderPos = collider.ClosestPoint(wpos);
                             if (colliderPos != wpos) continue; // point is outside collider
@@ -807,6 +807,187 @@ namespace VolumetricFogAndMist2 {
             internal_SetFogOfWarAlpha(tw, th, bounds, indices, vertices, fogNewAlpha, duration, restoreDelay, restoreDuration, restoreToAlpha);
         }
 
+        /// <summary>
+        /// Changes the alpha value of the fog of war using a mesh shape at multiple world positions.
+        /// The mesh is extracted once and stamped at each position, making this much more efficient than calling the single-position overload in a loop.
+        /// Useful for tile-based games (hex grids, etc.) where the same shape is repeated at many locations.
+        /// </summary>
+        /// <param name="go">gameobject whose mesh defines the shape. The gameobject must have a mesh associated.</param>
+        /// <param name="positions">array of world positions where the shape should be applied.</param>
+        /// <param name="fogNewAlpha">target alpha value (0-1) applied to all positions.</param>
+        /// <param name="duration">duration of transition in seconds (0 = apply fogNewAlpha instantly).</param>
+        /// <param name="restoreDelay">delay before the fog alpha is restored. Pass 0 to keep change forever.</param>
+        /// <param name="restoreDuration">restore duration in seconds.</param>
+        /// <param name="restoreToAlpha">alpha value (0-1) for the fog when restore is completed.</param>
+        /// <param name="updateMethod">if method should run on main thread or background thread.</param>
+        public void SetFogOfWarAlpha (GameObject go, Vector3[] positions, float fogNewAlpha, float duration = 0, float restoreDelay = 0, float restoreDuration = 2, float restoreToAlpha = 1f, FoWUpdateMethod updateMethod = FoWUpdateMethod.BackgroundThread) {
+            if (positions == null || positions.Length == 0) return;
+            float[] fogNewAlphas = new float[positions.Length];
+            for (int i = 0; i < positions.Length; i++) fogNewAlphas[i] = fogNewAlpha;
+            SetFogOfWarAlpha(go, positions, fogNewAlphas, duration, restoreDelay, restoreDuration, restoreToAlpha, updateMethod);
+        }
+
+        /// <summary>
+        /// Changes the alpha value of the fog of war using a mesh shape at multiple world positions with per-position alpha values.
+        /// The mesh is extracted once and stamped at each position, making this much more efficient than calling the single-position overload in a loop.
+        /// Useful for tile-based games (hex grids, etc.) where the same shape is repeated at many locations.
+        /// </summary>
+        /// <param name="go">gameobject whose mesh defines the shape. The gameobject must have a mesh associated.</param>
+        /// <param name="positions">array of world positions where the shape should be applied.</param>
+        /// <param name="fogNewAlphas">array of target alpha values (0-1), one per position.</param>
+        /// <param name="duration">duration of transition in seconds (0 = apply fogNewAlpha instantly).</param>
+        /// <param name="restoreDelay">delay before the fog alpha is restored. Pass 0 to keep change forever.</param>
+        /// <param name="restoreDuration">restore duration in seconds.</param>
+        /// <param name="restoreToAlpha">alpha value (0-1) for the fog when restore is completed.</param>
+        /// <param name="updateMethod">if method should run on main thread or background thread.</param>
+        public void SetFogOfWarAlpha (GameObject go, Vector3[] positions, float[] fogNewAlphas, float duration = 0, float restoreDelay = 0, float restoreDuration = 2, float restoreToAlpha = 1f, FoWUpdateMethod updateMethod = FoWUpdateMethod.BackgroundThread) {
+            EnsureFogOfWarInit();
+            if (_fogOfWarTexture == null || fogOfWarColorBuffer == null || fogOfWarColorBuffer.Length == 0)
+                return;
+
+            if (go == null || positions == null || positions.Length == 0 || fogNewAlphas == null || fogNewAlphas.Length != positions.Length) return;
+
+            int tw = _fogOfWarTexture.width;
+            int th = _fogOfWarTexture.height;
+            now = Time.time;
+
+            MeshRenderer meshRenderer = go.GetComponentInChildren<MeshRenderer>();
+            if (meshRenderer == null) {
+                Debug.LogError("No MeshRenderer found on this object.");
+                return;
+            }
+
+            MeshFilter mf = meshRenderer.GetComponent<MeshFilter>();
+            if (mf == null) {
+                Debug.LogError("No MeshFilter found on this object.");
+                return;
+            }
+            Mesh mesh = mf.sharedMesh;
+            if (mesh == null) {
+                Debug.LogError("No Mesh found on this object.");
+                return;
+            }
+            if (mesh.GetTopology(0) != MeshTopology.Triangles) {
+                Debug.LogError("Only triangle topology is supported by this tool.");
+                return;
+            }
+
+            // Get triangle info and transform vertices to world space
+            int[] indices = mesh.triangles;
+            Vector3[] vertices = mesh.vertices;
+            int verticesLength = vertices.Length;
+            Transform t = meshRenderer.transform;
+            for (int k = 0; k < verticesLength; k++) {
+                vertices[k] = t.TransformPoint(vertices[k]);
+            }
+
+            // Build 2D triangles in local space (relative to mesh center)
+            Bounds bounds = meshRenderer.bounds;
+            Vector3 meshCenter = bounds.center;
+            int indicesLength = indices.Length;
+            Vector2[] localTriangles = new Vector2[indicesLength];
+            for (int k = 0; k < indicesLength; k += 3) {
+                localTriangles[k].x = vertices[indices[k]].x - meshCenter.x;
+                localTriangles[k].y = vertices[indices[k]].z - meshCenter.z;
+                localTriangles[k + 1].x = vertices[indices[k + 1]].x - meshCenter.x;
+                localTriangles[k + 1].y = vertices[indices[k + 1]].z - meshCenter.z;
+                localTriangles[k + 2].x = vertices[indices[k + 2]].x - meshCenter.x;
+                localTriangles[k + 2].y = vertices[indices[k + 2]].z - meshCenter.z;
+            }
+
+            Vector3 meshExtents = bounds.extents;
+
+            if (updateMethod == FoWUpdateMethod.BackgroundThread && Application.isPlaying) {
+                System.Threading.Tasks.Task.Run(() => {
+                    lock (_lock) {
+                        try {
+                            backgroundThreadBusy = true;
+                            internal_SetFogOfWarAlphaBatched(tw, th, meshExtents, localTriangles, indicesLength, positions, fogNewAlphas, duration, restoreDelay, restoreDuration, restoreToAlpha);
+                        }
+                        finally {
+                            backgroundThreadBusy = false;
+                        }
+                    }
+                });
+                return;
+            }
+
+            internal_SetFogOfWarAlphaBatched(tw, th, meshExtents, localTriangles, indicesLength, positions, fogNewAlphas, duration, restoreDelay, restoreDuration, restoreToAlpha);
+        }
+
+        void internal_SetFogOfWarAlphaBatched (int tw, int th, Vector3 meshExtents, Vector2[] localTriangles, int indicesLength, Vector3[] positions, float[] fogNewAlphas, float duration, float restoreDelay, float restoreDuration, float restoreToAlpha) {
+
+            Vector3 fogOfWarCenter = anchoredFogOfWarCenter;
+            float trz = meshExtents.z / fogOfWarSize.z;
+            float trx = meshExtents.x / fogOfWarSize.x;
+            int deltaz = (int)(th * trz);
+            int deltax = (int)(tw * trx);
+            byte restoreAlpha = (byte)(restoreToAlpha * 255);
+
+            for (int p = 0; p < positions.Length; p++) {
+                Vector3 worldPosition = positions[p];
+
+                float tx = (worldPosition.x - fogOfWarCenter.x) / fogOfWarSize.x + 0.5f;
+                if (tx < 0 || tx > 1f)
+                    continue;
+                float tz = (worldPosition.z - fogOfWarCenter.z) / fogOfWarSize.z + 0.5f;
+                if (tz < 0 || tz > 1f)
+                    continue;
+
+                byte newAlpha8 = (byte)(fogNewAlphas[p] * 255);
+
+                int px = (int)(tx * tw);
+                int pz = (int)(tz * th);
+                int r0 = pz - deltaz;
+                if (r0 < 0) r0 = 0; else if (r0 >= th) r0 = th - 1;
+                int r1 = pz + deltaz;
+                if (r1 < 0) r1 = 0; else if (r1 >= th) r1 = th - 1;
+                int c0 = px - deltax;
+                if (c0 < 0) c0 = 0; else if (c0 >= tw) c0 = tw - 1;
+                int c1 = px + deltax;
+                if (c1 < 0) c1 = 0; else if (c1 >= tw) c1 = tw - 1;
+
+                int index = 0;
+                Vector2 v0 = localTriangles[index];
+                Vector2 v1 = localTriangles[index + 1];
+                Vector2 v2 = localTriangles[index + 2];
+
+                for (int r = r0; r <= r1; r++) {
+                    int rr = r * tw;
+                    float wz = (((r + 0.5f) / th) - 0.5f) * fogOfWarSize.z + fogOfWarCenter.z - worldPosition.z;
+                    for (int c = c0; c <= c1; c++) {
+                        float wx = (((c + 0.5f) / tw) - 0.5f) * fogOfWarSize.x + fogOfWarCenter.x - worldPosition.x;
+                        // Check if any triangle contains this position (in local space)
+                        for (int i = 0; i < indicesLength; i += 3) {
+                            if (PointInTriangle(wx, wz, v0.x, v0.y, v1.x, v1.y, v2.x, v2.y)) {
+                                int colorBufferPos = rr + c;
+                                Color32 colorBuffer = fogOfWarColorBuffer[colorBufferPos];
+                                if (colorBuffer.a != newAlpha8 || restoreDelay > 0) {
+                                    if (duration > 0) {
+                                        AddFogOfWarTransitionSlot(c, r, colorBuffer.a, newAlpha8, 0, duration, restoreAlpha, restoreDelay, restoreDuration);
+                                    } else {
+                                        colorBuffer.a = newAlpha8;
+                                        fogOfWarColorBuffer[colorBufferPos] = colorBuffer;
+                                        requiresTextureUpload = true;
+                                        if (restoreDelay > 0) {
+                                            AddFogOfWarTransitionSlot(c, r, newAlpha8, restoreAlpha, restoreDelay, restoreDuration, restoreAlpha, 0, 0);
+                                        }
+                                    }
+                                }
+                                break;
+                            } else {
+                                index += 3;
+                                index %= indicesLength;
+                                v0 = localTriangles[index];
+                                v1 = localTriangles[index + 1];
+                                v2 = localTriangles[index + 2];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
 
         void internal_SetFogOfWarAlpha (int tw, int th, Bounds bounds, int[] indices, Vector3[] vertices, float fogNewAlpha, float duration = 0, float restoreDelay = 0, float restoreDuration = 2, float restoreToAlpha = 1f) {
 
@@ -842,13 +1023,13 @@ namespace VolumetricFogAndMist2 {
             int deltaz = (int)(th * trz);
             int deltax = (int)(tw * trx);
             int r0 = pz - deltaz;
-            if (r0 < 1) r0 = 1; else if (r0 >= th) r0 = th - 1;
+            if (r0 < 0) r0 = 0; else if (r0 >= th) r0 = th - 1;
             int r1 = pz + deltaz;
-            if (r1 < 1) r1 = 1; else if (r1 >= th) r1 = th - 1;
+            if (r1 < 0) r1 = 0; else if (r1 >= th) r1 = th - 1;
             int c0 = px - deltax;
-            if (c0 < 1) c0 = 1; else if (c0 >= tw) c0 = tw - 1;
+            if (c0 < 0) c0 = 0; else if (c0 >= tw) c0 = tw - 1;
             int c1 = px + deltax;
-            if (c1 < 1) c1 = 1; else if (c1 >= tw) c1 = tw - 1;
+            if (c1 < 0) c1 = 0; else if (c1 >= tw) c1 = tw - 1;
 
             Vector2 v0 = triangles[index];
             Vector2 v1 = triangles[index + 1];
@@ -935,9 +1116,9 @@ namespace VolumetricFogAndMist2 {
             int deltaSqr = delta * delta;
             byte fogAlpha = (byte)(alpha * 255);
             for (int r = pz - delta; r <= pz + delta; r++) {
-                if (r > 0 && r < th - 1) {
+                if (r >= 0 && r < th) {
                     for (int c = px - delta; c <= px + delta; c++) {
-                        if (c > 0 && c < tw - 1) {
+                        if (c >= 0 && c < tw) {
                             int distanceSqr = (pz - r) * (pz - r) + (px - c) * (px - c);
                             if (distanceSqr <= deltaSqr) {
                                 int colorBufferPos = r * tw + c;
@@ -995,12 +1176,12 @@ namespace VolumetricFogAndMist2 {
             wpos.y = bounds.center.y;
             for (int rr = 0; rr <= deltaz * 2; rr++) {
                 int r = pz - deltaz + rr;
-                if (r > 0 && r < th - 1) {
+                if (r >= 0 && r < th) {
                     int rOffset = r * tw;
                     wpos.z = bounds.min.z + bounds.size.z * rr / (deltaz * 2f);
                     for (int cc = 0; cc <= deltax * 2; cc++) {
                         int c = px - deltax + cc;
-                        if (c > 0 && c < tw - 1) {
+                        if (c >= 0 && c < tw) {
                             wpos.x = bounds.min.x + bounds.size.x * cc / (deltax * 2f);
                             Vector3 colliderPos = collider.ClosestPoint(wpos);
                             if (colliderPos != wpos) continue;
@@ -1096,9 +1277,9 @@ namespace VolumetricFogAndMist2 {
             int deltax = (int)(tw * trx);
             byte fogAlpha = (byte)(alpha * 255);
             for (int r = pz - deltaz; r <= pz + deltaz; r++) {
-                if (r > 0 && r < th - 1) {
+                if (r >= 0 && r < th) {
                     for (int c = px - deltax; c <= px + deltax; c++) {
-                        if (c > 0 && c < tw - 1) {
+                        if (c >= 0 && c < tw) {
                             int colorBufferPos = r * tw + c;
                             Color32 colorBuffer = fogOfWarColorBuffer[colorBufferPos];
                             colorBuffer.a = fogAlpha;

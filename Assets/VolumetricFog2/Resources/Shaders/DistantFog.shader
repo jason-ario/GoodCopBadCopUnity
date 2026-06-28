@@ -32,6 +32,7 @@ Shader "Hidden/VolumetricFog2/DistantFog"
 				#pragma target 3.0
 				#pragma vertex vert
 				#pragma fragment frag
+				#pragma multi_compile _ VF2_DEPTH_PREPASS VF2_DEPTH_PEELING
 				#pragma multi_compile_local_fragment _ VF2_DISTANT_FOG_NOISE
 
 				#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
@@ -121,8 +122,41 @@ Shader "Hidden/VolumetricFog2/DistantFog"
 
 					float2 uv = i.scrPos.xy / i.scrPos.w;
 
-					float depth = GetRawDepth(uv);
-					float isSkybox = IsSkybox(depth);
+					float depth;
+					float isSkybox;
+					#if VF2_DEPTH_PEELING
+						// First pass (before transparents): Only render behind transparent objects
+						float sceneDepth = SampleSceneDepth(VF2_FLIP_DEPTH_TEXTURE ? float2(uv.x, 1.0 - uv.y) : uv);
+						float customDepth = SAMPLE_TEXTURE2D_X(_CustomDepthTexture, sampler_CustomDepthTexture, uv).r;
+						#if UNITY_REVERSED_Z
+							// In reversed Z, closer objects have higher depth values
+							// If custom depth <= scene depth or is skybox, there's no transparent object - skip
+							if (customDepth <= sceneDepth || IsSkybox(customDepth)) {
+								return 0;
+							}
+						#else
+							// In regular Z, closer objects have lower depth values
+							// If custom depth >= scene depth or is skybox, there's no transparent object - skip
+							if (customDepth >= sceneDepth || IsSkybox(customDepth)) {
+								return 0;
+							}
+						#endif
+						depth = sceneDepth;
+						isSkybox = IsSkybox(sceneDepth);
+					#elif VF2_DEPTH_PREPASS
+						// Second pass (after transparents): Use custom depth to compute distance to transparents
+						float sceneDepth = SampleSceneDepth(VF2_FLIP_DEPTH_TEXTURE ? float2(uv.x, 1.0 - uv.y) : uv);
+						float customDepth = SAMPLE_TEXTURE2D_X(_CustomDepthTexture, sampler_CustomDepthTexture, uv).r;
+						#if UNITY_REVERSED_Z
+							depth = max(sceneDepth, customDepth);
+						#else
+							depth = min(sceneDepth, customDepth);
+						#endif
+						isSkybox = IsSkybox(sceneDepth);
+					#else
+						depth = GetRawDepth(uv);
+						isSkybox = IsSkybox(depth);
+					#endif
 
 					#if !UNITY_REVERSED_Z
 						depth = depth * 2.0 - 1.0;

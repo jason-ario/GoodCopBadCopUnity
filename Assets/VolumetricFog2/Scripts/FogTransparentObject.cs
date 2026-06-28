@@ -12,7 +12,7 @@ namespace VolumetricFogAndMist2 {
         public VolumetricFog fogVolume;
 
         Renderer thisRenderer;
-        Material mat;
+        Material[] registeredMats;
 
         void OnEnable () {
             CheckSettings();
@@ -32,9 +32,12 @@ namespace VolumetricFogAndMist2 {
                 EditorApplication.update -= OnEditorUpdate;
             }
 #endif
-            if (fogVolume != null) {
-                fogVolume.UnregisterFogMat(mat);
+            if (fogVolume != null && registeredMats != null) {
+                for (int i = 0; i < registeredMats.Length; i++) {
+                    fogVolume.UnregisterFogMat(registeredMats[i]);
+                }
             }
+            registeredMats = null;
         }
 
         void OnSceneSaving (UnityEngine.SceneManagement.Scene scene, string path) {
@@ -44,10 +47,8 @@ namespace VolumetricFogAndMist2 {
 
 #if UNITY_EDITOR
         void OnEditorUpdate () {
-            // check if fog density is lost due to saving scene (control + s) which resets the fog uniforms
-            if (mat == null) return;
-
-            if (!mat.HasProperty(ShaderParams.Density)) {
+            if (registeredMats == null || registeredMats.Length == 0) return;
+            if (!registeredMats[0].HasProperty(ShaderParams.Density)) {
                 CheckSettings();
             }
         }
@@ -63,8 +64,8 @@ namespace VolumetricFogAndMist2 {
                 if (thisRenderer == null) return;
             }
 
-            mat = thisRenderer.sharedMaterial;
-            if (mat == null) return;
+            Material[] materials = thisRenderer.sharedMaterials;
+            if (materials.Length == 0) return;
 
             if (fogVolume == null) {
                 if (VolumetricFog.volumetricFogs.Count > 0) {
@@ -73,7 +74,16 @@ namespace VolumetricFogAndMist2 {
                 if (fogVolume == null) return;
             }
 
-            fogVolume.RegisterFogMat(thisRenderer.sharedMaterial);
+            if (registeredMats != null) {
+                for (int i = 0; i < registeredMats.Length; i++) {
+                    fogVolume.UnregisterFogMat(registeredMats[i]);
+                }
+            }
+
+            for (int i = 0; i < materials.Length; i++) {
+                fogVolume.RegisterFogMat(materials[i]);
+            }
+            registeredMats = materials;
             fogVolume.UpdateMaterialProperties();
         }
     }

@@ -26,17 +26,17 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 0}
   m_RendererFeatures:
   - {fileID: 7047616831015882392}
+  - {fileID: 7047616831015882393}
   m_RendererFeatureMap: 980ec4fd2a2ace61
-  m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
   postProcessData: {fileID: 0}
   m_AssetVersion: 3
   m_PrepassLayerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 0
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 0
   m_TransparentLayerMask:
     serializedVersion: 2
     m_Bits: 0
@@ -54,10 +54,11 @@ MonoBehaviour:
   m_DepthAttachmentFormat: 0
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
-  m_IntermediateTextureMode: 1
+  m_IntermediateTextureMode: 0
+  m_TileOnlyMode: 0
 --- !u!114 &7047616831015882392
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -69,3 +70,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   ignoreOverlayCamera: 1
+--- !u!114 &7047616831015882393
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04270590f6d042aebd5dee61507e8a91, type: 3}
+  m_Name: Volumetric Lights Occlusion Depth
+  m_EditorClassIdentifier: 
+  m_Active: 1

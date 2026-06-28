@@ -11,17 +11,17 @@ public static class HierarchyAutoSections
     private static readonly Color InactiveRowColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
     static HierarchyAutoSections()
     {
-        EditorApplication.hierarchyWindowItemOnGUI -= OnHierarchyGUI;
-        EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
+        EditorApplication.hierarchyWindowItemByEntityIdOnGUI -= OnHierarchyGUI;
+        EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyGUI;
         EditorApplication.RepaintHierarchyWindow();
     }
 
-    private static void OnHierarchyGUI(int instanceID, Rect selectionRect)
+    private static void OnHierarchyGUI(EntityId entityId, Rect selectionRect)
     {
         if (Event.current.type != EventType.Repaint)
             return;
 
-        if (EditorUtility.InstanceIDToObject(instanceID) is not GameObject go)
+        if (EditorUtility.EntityIdToObject(entityId) is not GameObject go)
             return;
 
         if (!go.name.Contains("---"))

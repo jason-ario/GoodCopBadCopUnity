@@ -10,6 +10,7 @@ Properties {
     _SeeThroughStencilComp ("Stencil Comp", Int) = 5
     _SeeThroughDepthOffset ("Depth Offset", Float) = 0
     _SeeThroughMaxDepth("Max Depth", Float) = 0
+    _SeeThroughFadeRange("Fade Range", Float) = 0
     _SeeThroughStencilPassOp ("Stencil Pass Operation", Int) = 0
     _Cull ("Cull Mode", Int) = 2
 }
@@ -68,6 +69,7 @@ Properties {
             fixed _CutOff;
             float _SeeThroughDepthOffset;
             float _SeeThroughMaxDepth;
+            float _SeeThroughFadeRange;
             float _SeeThroughBorderWidth;
             float _SeeThroughBorderConstantWidth;
 	        fixed _HP_Fade;
@@ -107,13 +109,25 @@ Properties {
                 #if HP_DEPTH_OFFSET
                     float sceneZ = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.scrPos.xy / i.scrPos.w);
                     float sceneDepth = GetEyeDepth(sceneZ);
-                    if (i.depth - sceneDepth - _SeeThroughDepthOffset < 0 || i.depth - sceneDepth > _SeeThroughMaxDepth) discard;
+                    float dd = i.depth - sceneDepth;
+                    if (dd - _SeeThroughDepthOffset < 0) discard;
+                    float fadeMul = 1.0;
+                    if (_SeeThroughMaxDepth > 0) {
+                        if (_SeeThroughFadeRange <= 0) {
+                            if (dd > _SeeThroughMaxDepth) discard;
+                        } else {
+                            fadeMul = saturate((_SeeThroughMaxDepth - dd) / _SeeThroughFadeRange);
+                        }
+                    }
                 #endif
                 #if HP_ALPHACLIP
                     fixed4 col = tex2D(_MainTex, i.uv);
                     clip(col.a - _CutOff);
                 #endif
                 fixed4 res = _SeeThroughBorderColor;
+                #if HP_DEPTH_OFFSET
+                    res.a *= fadeMul;
+                #endif
                 res.a *= _HP_Fade;
                 return res;
             }

@@ -19,6 +19,13 @@ namespace ToonyColorsPro
 			internal static bool KeyDown_H => Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame;
 			internal static bool KeyDown_R => Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame;
 
+			internal static bool KeyDown_1 => Keyboard.current != null && (Keyboard.current.digit1Key.wasPressedThisFrame || Keyboard.current.numpad1Key.wasPressedThisFrame);
+			internal static bool KeyDown_2 => Keyboard.current != null && (Keyboard.current.digit2Key.wasPressedThisFrame || Keyboard.current.numpad2Key.wasPressedThisFrame);
+			internal static bool KeyDown_3 => Keyboard.current != null && (Keyboard.current.digit3Key.wasPressedThisFrame || Keyboard.current.numpad3Key.wasPressedThisFrame);
+			internal static bool KeyDown_4 => Keyboard.current != null && (Keyboard.current.digit4Key.wasPressedThisFrame || Keyboard.current.numpad4Key.wasPressedThisFrame);
+			internal static bool KeyDown_5 => Keyboard.current != null && (Keyboard.current.digit5Key.wasPressedThisFrame || Keyboard.current.numpad5Key.wasPressedThisFrame);
+			internal static bool KeyDown_6 => Keyboard.current != null && (Keyboard.current.digit6Key.wasPressedThisFrame || Keyboard.current.numpad6Key.wasPressedThisFrame);
+
 			internal static bool Key_LeftShift => Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
 			internal static bool Key_RightShift => Keyboard.current != null && Keyboard.current.rightShiftKey.isPressed;
 

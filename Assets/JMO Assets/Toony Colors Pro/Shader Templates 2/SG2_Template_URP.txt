@@ -3134,6 +3134,16 @@ Shader "@%SHADER_NAME%@"
 			#pragma vertex ShadowDepthPassVertex
 			#pragma fragment ShadowDepthPassFragment
 
+	#if_not_empty
+			//--------------------------------------
+			// Toony Colors Pro 2 keywords
+	#start_not_empty_block
+			[[MODULE:SHADER_FEATURES_BLOCK:Wind]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Dissolve]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Vertex Displacement]]
+	#end_not_empty_block
+	#end_not_empty
+
 			ENDHLSL
 		}
 ///
@@ -3212,6 +3222,98 @@ Shader "@%SHADER_NAME%@"
 			#include "@%CURVED_WORLD_2020_INCLUDE%@/SceneSelection.cginc"
 
 			ENDCG
+		}
+/// ELSE
+		// Scene selection and picking passes
+		Pass
+		{
+			Name "SceneSelectionPass"
+			Tags
+			{
+				"LightMode" = "SceneSelectionPass"
+			}
+
+/// IF AUTO_TRANSPARENT_BLENDING
+			Cull [_Cull]
+/// ELIF CULLING
+			Cull [[VALUE:Face Culling]]
+///
+
+			HLSLPROGRAM
+			#pragma exclude_renderers gles gles3 glcore
+			#pragma target 2.0
+
+			#pragma multi_compile_instancing
+			#pragma multi_compile DEPTH_ONLY_PASS
+
+			#pragma vertex ShadowDepthPassVertex
+			#pragma fragment SceneSelectionFragment
+
+	#if_not_empty
+			//--------------------------------------
+			// Toony Colors Pro 2 keywords
+	#start_not_empty_block
+			[[MODULE:SHADER_FEATURES_BLOCK:Wind]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Dissolve]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Vertex Displacement]]
+	#end_not_empty_block
+	#end_not_empty
+
+			int _ObjectId;
+			int _PassValue;
+
+			half4 SceneSelectionFragment(Varyings input) : SV_Target
+			{
+				ShadowDepthPassFragment(input);
+				return float4(_ObjectId, _PassValue, 1, 1);
+			}
+
+			ENDHLSL
+		}
+
+		Pass
+		{
+			Name "ScenePickingPass"
+			Tags
+			{
+				"LightMode" = "Picking"
+			}
+
+/// IF AUTO_TRANSPARENT_BLENDING
+			Cull [_Cull]
+/// ELIF CULLING
+			Cull [[VALUE:Face Culling]]
+///
+
+			HLSLPROGRAM
+			#pragma exclude_renderers gles gles3 glcore
+			#pragma target 2.0
+
+			#pragma multi_compile_instancing
+			#pragma multi_compile DEPTH_ONLY_PASS
+
+			#pragma vertex ShadowDepthPassVertex
+			#pragma fragment ScenePickingFragment
+
+	#if_not_empty
+			//--------------------------------------
+			// Toony Colors Pro 2 keywords
+	#start_not_empty_block
+			[[MODULE:SHADER_FEATURES_BLOCK:Wind]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Dissolve]]
+			[[MODULE:SHADER_FEATURES_BLOCK:Vertex Displacement]]
+	#end_not_empty_block
+	#end_not_empty
+
+			float4 _SelectionID;
+
+			half4 ScenePickingFragment(Varyings input) : SV_Target
+			{
+				ShadowDepthPassFragment(input);
+				return _SelectionID;
+			}
+
+			ENDHLSL
 		}
 ///
 #------------------------------------------------------------

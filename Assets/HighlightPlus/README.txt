@@ -8,7 +8,7 @@
 Notice about Universal Rendering Pipeline
 -----------------------------------------
 This package is designed for URP.
-It requires Unity 2021.3 or later
+It requires Unity 2022.3 LTS or later, with URP 14.0 or higher.
 To install the plugin correctly:
 
 1) Make sure you have Universal Rendering Pipeline asset installed (from Package Manager).
@@ -59,7 +59,7 @@ Help & Support Forum
 Check the Documentation folder for detailed instructions:
 
 Have any question or issue?
-* Support-Web: https://kronnect.com/support
+* Support-Web: https://kronnect.com/docs/highlight-plus/
 * Support-Discord: https://discord.gg/EH2GMaM
 * Email: contact@kronnect.com
 * Twitter: @Kronnect
@@ -88,6 +88,112 @@ https://assetstore.unity.com/publishers/15018
 
 Version history
 ---------------
+
+Version 34.2.4
+- [Fix] Added compatibility with Unity 6.5 (URP)
+
+Version 34.2.3
+- Improved compatibility with dynamic resolution
+- [Fix] See-through occluders: now detects renderers on the collider's GameObject before falling back to its root (fixes objects with colliders nested under unrelated parents)
+- [Fix] See-through mask: improved depth test to avoid stencil bleeding through closer geometry
+
+Version 34.2.2
+- Removed hard dependencies on XR and 2D Unity modules
+- [Fix] Fixed submesh out of range exception when "Combine Meshes" was enabled on objects with multiple submeshes
+
+Version 34.2 B5
+- Overlay: added triplanar local space mapping, additive blend mode and texture scrolling support for triplanar
+- Label: added World Space render mode option, suitable for VR
+- Outline Independent option is now available for Sprite Renderers, allowing overlapping sprites to display individual outlines
+- [Fix] Fixed glow and outline not rendering correctly on sprites
+
+Version 34.2 B4
+- Overlay: added triplanar local space mapping, additive blend mode and texture scrolling support for triplanar
+- Label: added World Space render mode option, suitable for VR
+- [Fix] Fixed glow and outline not rendering correctly on sprites
+
+Version 34.1
+- Focus: blur and desaturation now work independently from tint color alpha
+
+Version 34.0.2
+- [Fix] Fixed highlight blockers not working when using Independent outline mode
+
+Version 34.0
+- New effect: Focus. Dims the background while keeping highlighted objects visible, with optional blur and configurable color/intensity
+- Focus: added Desaturate option
+- Added assembly definition files (Runtime, Editor, Demo)
+  Please note: if you have created your own asmdefs, remove them or remove the plugin before importing the new update
+
+Version 33.1
+- Internal optimizations
+
+Version 33.0
+- Added support for particle systems
+- Added "Vertex Transform Mode" option under Advanced settings. Allows per-object custom vertex transformations in CustomVertexTransform.cginc.
+- Include: added option to exclude objects that already have Highlight Effect
+- Revamped inspector style
+
+Version 32.6
+- Highlight Manager: added "Blocking Layer Mask" option. Objects in this layer mask will block the highlight if they are between the camera and the target.
+- [Fix] HitFX fixes
+
+Version 32.5
+- Highlight Trigger: added "Blocking Layer Mask" option. Objects in this layer mask will block the highlight if they are between the camera and the target.
+
+Version 32.4
+- See-through effect: added "Fade Range" option to Max Depth
+- [Fix] Prevents issues when rendering on depth only targets
+
+Version 32.3
+- Alpha Cut Off: added option to specify custom texture name
+- Label: added "Max Distance" and "Fade Start Distance" (distance-based visibility)
+- Label: added "Scale By Distance" with "Scale Min" and "Scale Max"
+- Label: added "Viewport Offset" option
+- Label: automatically hides when object gets outside of viewport 
+
+Version 32.2.2
+- [Fix] Fixed "Respect Other UI" when raycast source is set to camera direction
+
+Version 32.2
+- Added "Relative Alignment" to label options
+- [Fix] Fixed instanced mesh tracking usage bug
+
+Version 32.1
+- Outline & Outer Glow: added pixelization option in highest quality mode
+- [Fix] Fixed alpha cutoff issue when selecting objects using the Highlight HighlightManager
+- [Fix] Fixed console error when using a material without main texture
+
+Version 32
+- Added "Use Original Shader" option. This advanced option allows using glow/outline in highest quality using the original material shader and support advanced shaders with vertex transformations.
+- Optimization: Outer Glow / Outline in highest quality now dynamically reduce the number of blur passes based on object distance when Constant Width option is disabled
+- Highlight Effect Blocker: added options to include children
+
+Version 31.0
+- New demo scene "TargetClickExample": target over floor and objects and object instantiation
+- New demo scene "Two Managers": using two highlight managers with different settings and target layers each
+- New demo scene "Effects": showing extra stylized options
+- Target: added "Center On Hit Position" and "Align To Hit Normal" options
+- Highlight Manager/Trigger: added OnObjectClicked event
+- Label: added "Always Show In Editor Mode" option
+
+Version 30.0
+- New effect: Label -> displays a text next to the highlighted object
+- Outline: added "Stylized" (toon/charcoal style) option in highest quality mode
+- Outline: added "Dashed" style
+- Outline: added "Gradient" option to Highest Quality mode
+- Outer Glow: added "High Precision" option for smoother results
+- Inner Glow: added "Power" property
+- Icon: added option to use a prefab instead of a mesh
+- Target: added "Style" option with Texture, Frame, InwardCorners and Cross options
+- Target: added minimum opacity options
+- Target: align to ground, added Ground Min Altitude to support transparent ground surfaces
+- Overlay: added pattern option (polkadots, grid, lines, zigzag)
+- Hit FX: added trigger mode option (scripting/when highlighted)
+- Improved padding
+- Smoother outer glow
+- Added "Highlight Root" component. Can be used to specify a different root in the hierarchy when Root To Children is used.
+- Highlight Trigger & Highlight Manager: added "Unhighlight On UI" option under "Respect UI"
+- Render Feature: added option to show/hide effects in Scene View
 
 Version 22.1
 - Added "Target" option under Include

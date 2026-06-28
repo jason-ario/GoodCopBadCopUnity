@@ -1,12 +1,12 @@
-﻿using UnityEditor;
+using UnityEditor;
 using UnityEngine;
 
 namespace HighlightPlus {
     [CustomEditor(typeof(HighlightTrigger))]
     public class HighlightTriggerEditor : UnityEditor.Editor {
 
-        SerializedProperty highlightOnHover, triggerMode, raycastCamera, raycastSource, raycastLayerMask;
-        SerializedProperty minDistance, maxDistance, respectUI, volumeLayerMask;
+        SerializedProperty highlightOnHover, triggerMode, raycastCamera, raycastSource, raycastLayerMask, blockingLayerMask;
+        SerializedProperty minDistance, maxDistance, respectUI, unhighlightOnUI, volumeLayerMask;
         SerializedProperty selectOnClick, selectedProfile, selectedAndHighlightedProfile, singleSelection, toggleOnClick, keepSelection;
         HighlightTrigger trigger;
 
@@ -16,9 +16,11 @@ namespace HighlightPlus {
             raycastCamera = serializedObject.FindProperty("raycastCamera");
             raycastSource = serializedObject.FindProperty("raycastSource");
             raycastLayerMask = serializedObject.FindProperty("raycastLayerMask");
+            blockingLayerMask = serializedObject.FindProperty("blockingLayerMask");
             minDistance = serializedObject.FindProperty("minDistance");
             maxDistance = serializedObject.FindProperty("maxDistance");
             respectUI = serializedObject.FindProperty("respectUI");
+            unhighlightOnUI = serializedObject.FindProperty("unhighlightOnUI");
             volumeLayerMask = serializedObject.FindProperty("volumeLayerMask");
             selectOnClick = serializedObject.FindProperty("selectOnClick");
             selectedProfile = serializedObject.FindProperty("selectedProfile");
@@ -39,12 +41,16 @@ namespace HighlightPlus {
 					EditorGUILayout.HelpBox ("No collider found on this object or any of its children. Add colliders to allow automatic highlighting.", MessageType.Warning);
 				}
             } else {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
                 if (trigger.triggerMode == TriggerMode.ColliderEventsOnlyOnThisObject) {
                     EditorGUILayout.HelpBox("This trigger mode is not compatible with the new input system.", MessageType.Error);
                 }
 #endif
+#if HP2_PHYSICS2D
                 if (trigger.GetComponent<Collider>() == null && trigger.GetComponent<Collider2D>() == null) {
+#else
+                if (trigger.GetComponent<Collider>() == null) {
+#endif
 					EditorGUILayout.HelpBox ("No collider found on this object. Add a collider to allow automatic highlighting.", MessageType.Error);
                 }
             }
@@ -56,6 +62,7 @@ namespace HighlightPlus {
                     EditorGUILayout.PropertyField(raycastCamera);
                     EditorGUILayout.PropertyField(raycastSource);
                     EditorGUILayout.PropertyField(raycastLayerMask);
+                    EditorGUILayout.PropertyField(blockingLayerMask, new GUIContent("Blocking Layer Mask", "Objects in this layer mask will block the highlight if they are between the camera and the target."));
                     EditorGUILayout.PropertyField(minDistance);
                     EditorGUILayout.PropertyField(maxDistance);
                     EditorGUI.indentLevel--;
@@ -69,6 +76,11 @@ namespace HighlightPlus {
 
             if (trigger.triggerMode != TriggerMode.Volume) {
                 EditorGUILayout.PropertyField(respectUI);
+                if (respectUI.boolValue) {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(unhighlightOnUI);
+                    EditorGUI.indentLevel--;
+                }
             }
             EditorGUILayout.PropertyField(highlightOnHover);
             EditorGUILayout.PropertyField(selectOnClick);

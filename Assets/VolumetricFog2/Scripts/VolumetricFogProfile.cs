@@ -37,7 +37,7 @@ namespace VolumetricFogAndMist2 {
     [CreateAssetMenu(menuName = "Volumetric Fog \x8B& Mist/Fog Profile", fileName = "VolumetricFogProfile", order = 1001)]
     public class VolumetricFogProfile : ScriptableObject {
 
-        [Header("Rendering")]
+        // Rendering
         [Tooltip("The quality of the raymarching. Higher quality means more samples, which means more accurate but slower.")]
         [Range(1, 16)] public int raymarchQuality = 6;
         [Tooltip("Increases the number of samples at short distances to improve quality while allowing a lower quality at long distances.")]
@@ -53,7 +53,7 @@ namespace VolumetricFogAndMist2 {
         [Tooltip("Optional sorting order for this renderer. Used to control the order with other transparent renderers, like Sprite Renderer.")]
         public int sortingOrder;
 
-        [Header("Density")]
+        // Density
         [Tooltip("Do not use any noise at all")]
         public bool constantDensity;
         public Texture2D noiseTexture;
@@ -71,11 +71,11 @@ namespace VolumetricFogAndMist2 {
 
         public float density = 1f;
 
-        [Header("Geometry")]
+        // Geometry
         public VolumetricFogShape shape = VolumetricFogShape.Box;
         [Range(0, 1)]
         public float scaleNoiseWithHeight;
-        [Range(0, 1f)] public float border = 0.05f;
+        [Range(0, 2f)] public float border = 0.05f;
         [Tooltip("Ignores volume height and use a custom height defined by this profile")]
         public bool customHeight;
         public float height;
@@ -98,7 +98,7 @@ namespace VolumetricFogAndMist2 {
         public float terrainFogMinAltitude;
         public float terrainFogMaxAltitude = 150f;
 
-        [Header("Colors")]
+        // Colors
         [ColorUsage(showAlpha: false)]
         public Color albedo = new Color32(227, 227, 227, 255);
         public bool enableDepthGradient;
@@ -112,13 +112,13 @@ namespace VolumetricFogAndMist2 {
         [Range(0, 1f)] public float specularThreshold = 0.637f;
         [Range(0, 1f)] public float specularIntensity = 0.428f;
 
-        [Header("Animation")]
+        // Animation
         public float turbulence = 0.73f;
         public Vector3 windDirection = new Vector3(0.02f, 0, 0);
         public bool useCustomDetailNoiseWindDirection;
         public Vector3 detailNoiseWindDirection = new Vector3(0.02f, 0, 0);
 
-        [Header("Directional Light")]
+        // Directional Light
         [Tooltip("Enable to synchronize fog light intensity and color with the Sun and the Moon (must be assigned into Volumetric Fog Manager)")]
         public bool dayNightCycle = true;
         [Tooltip("When day/night cycle option is disabled, customize the direction of the Sun light.")]
@@ -130,9 +130,13 @@ namespace VolumetricFogAndMist2 {
         [Tooltip("Ambient light influence")]
         public float ambientLightMultiplier;
         public DiffusionModel lightDiffusionModel = DiffusionModel.Simple;
-        [Range(0, 256)] public float lightDiffusionPower = 32;
+        [Range(1, 256)] public float lightDiffusionPower = 32;
         public float lightDiffusionIntensity = 0.4f;
         public float lightDiffusionNearDepthAtten;
+        [Tooltip("Adds a backward scattering lobe to the Smooth/Strong diffusion. Keeps the forward sun halo and adds a silver rim/glow when looking away from the sun. 0 = forward only.")]
+        [Range(0, 1)] public float lightDiffusionBackScatter = 0.3f;
+        [Tooltip("Isotropic base brightness of the fog, independent of sun direction. 1 = evenly lit everywhere (classic). Lower values darken the fog away from the sun and concentrate light into the directional halo for more contrast.")]
+        [Range(0, 1)] public float diffusionFloor = 1f;
         public bool receiveShadows;
         [Range(0, 1)] public float shadowIntensity = 0.5f;
         [Tooltip("Removes shadowed fog")]
@@ -141,9 +145,11 @@ namespace VolumetricFogAndMist2 {
         [Tooltip("Uses the directional light cookie")]
         public bool cookie;
 
-        [Header("Distant Fog")]
+        // Distant Fog
         [Tooltip("Enables exponential distant fog. Use this option to cover horizon/sky/far distances with optimal performance")]
         public bool distantFog;
+        [Tooltip("When disabled, distant fog will only be visible in play mode")]
+        public bool distantFogShowInEditMode = true;
         public float distantFogStartDistance = 1000f;
         public float distantFogDistanceDensity = 0.5f;
         public float distantFogMaxHeight = 4000;
@@ -153,6 +159,9 @@ namespace VolumetricFogAndMist2 {
         public int distantFogRenderQueue = 2999;
         public float distantFogBaseAltitude;
         public bool distantFogSymmetrical;
+
+        [Tooltip("Enables transparency support for distant fog using depth peeling and custom depth prepass. When enabled, render queue is enforced to minimum 3001.")]
+        public bool distantFogTransparencySupport;
 
         [Tooltip("Enables noise for the distant fog")]
         public bool distantFogNoise;
@@ -240,8 +249,11 @@ namespace VolumetricFogAndMist2 {
             ambientLightMultiplier = Mathf.Max(0, ambientLightMultiplier);
             sunIntensity = Mathf.Max(0, sunIntensity);
             shadowMaxDistance = Mathf.Max(0, shadowMaxDistance);
+            lightDiffusionPower = Mathf.Max(1, lightDiffusionPower);
             lightDiffusionIntensity = Mathf.Max(0, lightDiffusionIntensity);
             lightDiffusionNearDepthAtten = Mathf.Max(0, lightDiffusionNearDepthAtten);
+            lightDiffusionBackScatter = Mathf.Clamp01(lightDiffusionBackScatter);
+            diffusionFloor = Mathf.Clamp01(diffusionFloor);
             distantFogStartDistance = Mathf.Max(0, distantFogStartDistance);
             distantFogDistanceDensity = Mathf.Max(0, distantFogDistanceDensity);
             distantFogMaxHeight = Mathf.Max(0, distantFogMaxHeight);
@@ -353,6 +365,8 @@ namespace VolumetricFogAndMist2 {
             lightDiffusionModel = t < 0.5f ? p1.lightDiffusionModel : p2.lightDiffusionModel;
             lightDiffusionPower = p1.lightDiffusionPower * t0 + p2.lightDiffusionPower * t;
             lightDiffusionIntensity = p1.lightDiffusionIntensity * t0 + p2.lightDiffusionIntensity * t;
+            lightDiffusionBackScatter = p1.lightDiffusionBackScatter * t0 + p2.lightDiffusionBackScatter * t;
+            diffusionFloor = p1.diffusionFloor * t0 + p2.diffusionFloor * t;
             receiveShadows = t < 0.5f ? p1.receiveShadows : p2.receiveShadows;
             shadowIntensity = p1.shadowIntensity * t0 + p2.shadowIntensity * t;
             shadowCancellation = t < 0.5f ? p1.shadowCancellation : p2.shadowCancellation;
@@ -370,6 +384,7 @@ namespace VolumetricFogAndMist2 {
             ambientLightMultiplier = p1.ambientLightMultiplier * t0 + p2.ambientLightMultiplier * t;
             cookie = t < 0.5f ? p1.cookie : p2.cookie;
             distantFog = t < 0.5f ? p1.distantFog : p2.distantFog;
+            distantFogShowInEditMode = t < 0.5f ? p1.distantFogShowInEditMode : p2.distantFogShowInEditMode;
             distantFogStartDistance = p1.distantFogStartDistance * t0 + p2.distantFogStartDistance * t;
             distantFogDistanceDensity = p1.distantFogDistanceDensity * t0 + p2.distantFogDistanceDensity * t;
             distantFogMaxHeight = p1.distantFogMaxHeight * t0 + p2.distantFogMaxHeight * t;
@@ -379,6 +394,7 @@ namespace VolumetricFogAndMist2 {
             distantFogBaseAltitude = p1.distantFogBaseAltitude * t0 + p2.distantFogBaseAltitude * t;
             distantFogRenderQueue = t < 0.5f ? p1.distantFogRenderQueue : p2.distantFogRenderQueue;
             distantFogSymmetrical = t < 0.5f ? p1.distantFogSymmetrical : p2.distantFogSymmetrical;
+            distantFogTransparencySupport = t < 0.5f ? p1.distantFogTransparencySupport : p2.distantFogTransparencySupport;
 
             distantFogNoise = t < 0.5f ? p1.distantFogNoise : p2.distantFogNoise;
             distantFogNoiseTexture = t < 0.5f ? p1.distantFogNoiseTexture : p2.distantFogNoiseTexture;

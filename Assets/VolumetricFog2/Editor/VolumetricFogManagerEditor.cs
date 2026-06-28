@@ -90,6 +90,11 @@ namespace VolumetricFogAndMist2 {
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.PropertyField(mainManager);
+            EditorGUI.BeginChangeCheck();
+            bool disableAutoCreation = EditorGUILayout.Toggle(new GUIContent("Disable Auto-Creation", "Editor only, project-wide. Prevents fog volumes from automatically creating a Volumetric Fog Manager when a scene is opened on its own (for example when the manager lives in a separate additive scene). Only affects Edit mode; Play mode and builds always create the manager if missing."), VolumetricFogManager.disableAutoManagerCreation);
+            if (EditorGUI.EndChangeCheck()) {
+                VolumetricFogManager.disableAutoManagerCreation = disableAutoCreation;
+            }
 
             EditorGUILayout.EndVertical();
             EditorGUILayout.Separator();
@@ -97,7 +102,7 @@ namespace VolumetricFogAndMist2 {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(new GUIContent("Custom Depth Pre-Pass", "Support for transparent or semi-transparent objects that need custom depth pass. Click help button for more info."), EditorStyles.boldLabel);
             if (GUILayout.Button(new GUIContent("Help", "Open transparency support help page in browser"), GUILayout.Width(60))) {
-                Application.OpenURL("https://kronnect.com/guides/volumetric-fog-urp-special-features/#ftoc-heading-9");
+                Application.OpenURL("https://kronnect.com/docs/volumetric-fog-urp/");
             }
             EditorGUILayout.EndHorizontal();
             int transparentLayerMask = includeTransparent.intValue;
@@ -172,7 +177,7 @@ namespace VolumetricFogAndMist2 {
             EditorGUILayout.PropertyField(blurHDR, new GUIContent("HDR"));
 
             if (EditorGUI.EndChangeCheck()) {
-                EditorApplication.delayCall += () => UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                EditorApplication.delayCall += RepaintAllViewsDelayed;
             }
             EditorGUILayout.PropertyField(ditherStrength);
 
@@ -196,9 +201,23 @@ namespace VolumetricFogAndMist2 {
                 EditorGUILayout.BeginVertical(GUI.skin.box);
             }
 
+            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button(toggleOptimizeBuild ? "Hide Shader Options" : "Shader Options", GUILayout.Width(150))) {
                 toggleOptimizeBuild = !toggleOptimizeBuild;
             }
+            if (pipe != null && GUILayout.Button("Open URP Renderer", GUILayout.Width(150))) {
+                var so = new SerializedObject(pipe);
+                var rendererDataList = so.FindProperty("m_RendererDataList");
+                if (rendererDataList != null && rendererDataList.arraySize > 0) {
+                    var defaultIndex = so.FindProperty("m_DefaultRendererIndex");
+                    int idx = defaultIndex != null ? Mathf.Clamp(defaultIndex.intValue, 0, rendererDataList.arraySize - 1) : 0;
+                    var rendererData = rendererDataList.GetArrayElementAtIndex(idx).objectReferenceValue;
+                    if (rendererData != null) {
+                        Selection.activeObject = rendererData;
+                    }
+                }
+            }
+            EditorGUILayout.EndHorizontal();
 
             if (toggleOptimizeBuild && shaderAdvancedOptionsInfo != null) {
 
@@ -299,6 +318,10 @@ namespace VolumetricFogAndMist2 {
             EditorGUILayout.EndVertical();
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        static void RepaintAllViewsDelayed () {
+            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
         }
 
         void ScanAdvancedOptions () {

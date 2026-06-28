@@ -13,6 +13,7 @@ Shader "VolumetricFog2/VolumetricFog2DURP"
 		[HideInInspector] _DeepObscurance("Deep Obscurance", Range(0, 2)) = 0.7
 		[HideInInspector] _LightColor("Light Color", Color) = (1,1,1)
 		[HideInInspector] _LightDiffusionData("Sun Diffusion Data", Vector) = (32, 0.4, 100)
+		[HideInInspector] _DiffusionFloor("Diffusion Floor", Float) = 1
 		[HideInInspector] _SunDir("Sun Direction", Vector) = (1,0,0)
 		[HideInInspector] _ShadowData("Shadow Data", Vector) = (0.5, 0, 62500)
 		[HideInInspector] _WindDirection("Wind Direction", Vector) = (1, 0, 0)
@@ -37,9 +38,10 @@ Shader "VolumetricFog2/VolumetricFog2DURP"
 		[HideInInspector] _FogOfWar("FoW Texture", 2D) = "white" {}
 		[HideInInspector] _BlueNoise("_Blue Noise Texture", 2D) = "white" {}
 		[HideInInspector] _MaxDistanceData("Max Lengh Data", Vector) = (100000, 0.00001, 0)
-		[HideInInspector] _NativeLightsMultiplier("Native Lights Multiplier", Float) = 1
+		[HideInInspector] _NativeLightsData("Native Lights Data", Vector) = (1, 1, 0, 0)
 		[HideInInspector] _APVIntensityMultiplier("APV Intensity Multiplier", Float) = 1
 		[HideInInspector] _NearStepping("Near Stepping", Float) = 8
+		[HideInInspector] _VFVolumeLayer("Volume Layer", Int) = -1
 	}
 		SubShader
 		{
@@ -137,7 +139,8 @@ Shader "VolumetricFog2/VolumetricFog2DURP"
 					UNITY_VERTEX_OUTPUT_STEREO
 				};
 
-				int _ForcedInvisible;
+					int _ForcedInvisible;
+				int _VFLayerMask;
 
 				v2f vert(appdata v)
 				{
@@ -157,7 +160,7 @@ Shader "VolumetricFog2/VolumetricFog2DURP"
 						o.pos.z = o.pos.w - 0.000005;
 					#endif
 
-					if (_ForcedInvisible == 1) {
+					if (_ForcedInvisible == 1 && (_VFVolumeLayer & _VFLayerMask) != 0) {
 						o.pos.xy = -10000;
                     }
 

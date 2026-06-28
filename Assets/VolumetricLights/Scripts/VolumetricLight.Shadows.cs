@@ -1,4 +1,4 @@
-﻿//------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------
 // Volumetric Lights
 // Created by Kronnect
 //------------------------------------------------------------------------------------------------------------------
@@ -17,7 +17,9 @@ namespace VolumetricLights {
         const string SHADOW_CAM_NAME = "OcclusionCam";
 
         Camera cam;
-        RenderTexture rt;
+        [NonSerialized] public RenderTexture rt;
+        [NonSerialized] public RTHandle occlusionDepthHandle;
+        static RenderTexture occlusionCamDummyTarget;
         int camStartFrameCount;
         Vector3 lastCamPos;
         Quaternion lastCamRot;
@@ -199,12 +201,16 @@ namespace VolumetricLights {
             fogMat.SetVector(ShaderParams.ShadowIntensity, new Vector4(shadowIntensity, 1f - shadowIntensity, 0, 0));
             fogMat.SetVector(ShaderParams.ShadowColor, shadowColor);
 
-            if ((shadowCullingMask & 2) != 0) {
+            if (!shadowIncludeTransparent && (shadowCullingMask & 2) != 0) {
                 shadowCullingMask &= ~2; // exclude transparent FX layer
             }
 
             cam.cullingMask = shadowCullingMask;
-            cam.targetTexture = rt;
+            if (occlusionCamDummyTarget == null) {
+                occlusionCamDummyTarget = new RenderTexture(1, 1, 16, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
+                occlusionCamDummyTarget.Create();
+            }
+            cam.targetTexture = occlusionCamDummyTarget;
             cam.transform.localPosition = Vector3.zero;
 
             if (enableShadows) {
@@ -255,14 +261,6 @@ namespace VolumetricLights {
         void CheckAndAssignDepthRenderer (UniversalAdditionalCameraData camData) {
             UniversalRenderPipelineAsset pipe = (UniversalRenderPipelineAsset)GraphicsSettings.currentRenderPipeline;
             if (pipe == null) return;
-
-            // Skip custom depth renderer for Forward+/Deferred+ on DX12 rendering path as it's incompatible
-            bool skipCustomRenderer = !CheckCompatiblePipelineArchitecture();
-            if (skipCustomRenderer) {
-                // Use default renderer for Forward+ to avoid shadow issues
-                camData.SetRenderer(-1); // -1 uses the default renderer
-                return;
-            }
 
             if (depthRendererData == null) {
                 depthRendererData = Resources.Load<UniversalRendererData>("Shaders/VolumetricLightsDepthRenderer");
@@ -342,12 +340,12 @@ namespace VolumetricLights {
             ComputeShadowTransform(cam.projectionMatrix, cam.worldToCameraMatrix);
 
             fogMat.SetMatrix(ShaderParams.ShadowMatrix, shadowMatrix);
-            fogMat.SetTexture(ShaderParams.ShadowTexture, cam.targetTexture, RenderTextureSubElement.Depth);
+            fogMat.SetTexture(ShaderParams.ShadowTexture, rt, RenderTextureSubElement.Depth);
             fogMat.SetTexture(ShaderParams.TranslucencyTexture, translucentMap);
 
             if (enableDustParticles && particleMaterial != null) {
                 particleMaterial.SetMatrix(ShaderParams.ShadowMatrix, shadowMatrix);
-                particleMaterial.SetTexture(ShaderParams.ShadowTexture, cam.targetTexture, RenderTextureSubElement.Depth);
+                particleMaterial.SetTexture(ShaderParams.ShadowTexture, rt, RenderTextureSubElement.Depth);
                 particleMaterial.SetVector(ShaderParams.ShadowIntensity, new Vector4(shadowIntensity, 1f - shadowIntensity, 0, 0));
                 particleMaterial.SetTexture(ShaderParams.TranslucencyTexture, translucentMap);
             }

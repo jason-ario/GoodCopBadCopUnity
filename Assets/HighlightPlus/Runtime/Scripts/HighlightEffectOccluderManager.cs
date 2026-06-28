@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -94,11 +94,11 @@ namespace HighlightPlus {
             occludersFrameCount[cam] = currentFrameCount;
 
             if (fxMatSeeThroughOccluder == null) {
-                InitMaterial(ref fxMatSeeThroughOccluder, "HighlightPlus/Geometry/SeeThroughOccluder");
+                InitMaterial(ref fxMatSeeThroughOccluder, ref shaderSeeThroughOccluder, "HighlightPlus/Geometry/SeeThroughOccluder");
                 if (fxMatSeeThroughOccluder == null) return true;
             }
             if (fxMatDepthWrite == null) {
-                InitMaterial(ref fxMatDepthWrite, "HighlightPlus/Geometry/JustDepth");
+                InitMaterial(ref fxMatDepthWrite, ref shaderDepthWrite, "HighlightPlus/Geometry/JustDepth");
                 if (fxMatDepthWrite == null) return true;
             }
 
@@ -225,7 +225,11 @@ namespace HighlightPlus {
                             float maxDistance = Vector3.Distance(pos, camPos);
                             int numOccluderHits = Physics.BoxCastNonAlloc(pos, bounds.extents * seeThroughOccluderThreshold, (camPos - pos).normalized, occluderHits, quaternionIdentity, maxDistance, seeThroughOccluderMask);
                             for (int k = 0; k < numOccluderHits; k++) {
-                                occluderHits[k].collider.transform.root.GetComponentsInChildren(tempRR);
+                                Transform hitTransform = occluderHits[k].collider.transform;
+                                hitTransform.GetComponentsInChildren(tempRR);
+                                if (tempRR.Count == 0) {
+                                    hitTransform.root.GetComponentsInChildren(tempRR);
+                                }
                                 AddWithoutRepetition(occlusionData.cachedOccluders, tempRR, seeThroughOccluderMask);
                             }
                         }
@@ -242,7 +246,11 @@ namespace HighlightPlus {
                     float maxDistance = Vector3.Distance(pos, camPos);
                     int numOccluderHits = Physics.BoxCastNonAlloc(pos, bounds.extents * seeThroughOccluderThreshold, (camPos - pos).normalized, occluderHits, quaternionIdentity, maxDistance, seeThroughOccluderMask);
                     for (int k = 0; k < numOccluderHits; k++) {
-                        occluderHits[k].collider.transform.root.GetComponentsInChildren(tempRR);
+                        Transform hitTransform = occluderHits[k].collider.transform;
+                        hitTransform.GetComponentsInChildren(tempRR);
+                        if (tempRR.Count == 0) {
+                            hitTransform.root.GetComponentsInChildren(tempRR);
+                        }
                         AddWithoutRepetition(occlusionData.cachedOccluders, tempRR, seeThroughOccluderMask);
                     }
                 }
