@@ -147,9 +147,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     private void InitializeChoices(string[] choices)
     {
-        for (var i = 0; i < choices.Length; i++)
+        for (var i = 0; i < dialogueChoices.Length; i++)
         {
-            dialogueChoices[i].SetChoiceText(choices[i]);
+            bool active = i < choices.Length;
+            dialogueChoices[i].gameObject.SetActive(active);
+            if (active)
+                dialogueChoices[i].SetChoiceText(choices[i]);
         }
     }
 
