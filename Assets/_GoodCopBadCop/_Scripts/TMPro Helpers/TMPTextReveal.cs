@@ -17,6 +17,8 @@ public class TMPTextReveal : MonoBehaviour
     [SerializeField] float revealOnEnableDelay = 0.5f;
     [SerializeField] AudioClip[] revealSounds;
 
+    private string _fullText;
+
     private void Awake()
     {
         tmp = GetComponent<TextMeshProUGUI>();
@@ -45,6 +47,7 @@ public class TMPTextReveal : MonoBehaviour
 
     public Coroutine RevealText(string text)
     {
+        _fullText = text;
         StopCurrentRoutine();
         gameObject.SetActive(true);
         revealRoutine = StartCoroutine(RevealRoutine(text));
@@ -111,6 +114,17 @@ public class TMPTextReveal : MonoBehaviour
 
     /// <summary>Returns true while a reveal coroutine is actively running.</summary>
     public bool IsRevealing => revealRoutine != null;
+
+    /// <summary>
+    /// Immediately completes the typewriter animation, showing the full text at once.
+    /// Does nothing if no reveal is in progress.
+    /// </summary>
+    public void CompleteReveal()
+    {
+        if (!IsRevealing) return;
+        StopCurrentRoutine();
+        SetTextInstant(_fullText);
+    }
 
     private void StopCurrentRoutine()
     {

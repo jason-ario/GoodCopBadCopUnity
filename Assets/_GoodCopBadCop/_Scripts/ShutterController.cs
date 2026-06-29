@@ -27,6 +27,14 @@ public class ShutterController : MonoBehaviour
     /// <summary>True while the booth window is open.</summary>
     public bool IsOpen { get; private set; }
 
+    /// <summary>
+    /// When true, <see cref="CloseShutter"/> is a no-op.
+    /// Set by scripted sequences (e.g. Day_01 Vlad arrival) to prevent
+    /// the shutter from being closed while a scripted visitor is at the window.
+    /// Cleared automatically by <see cref="ResetShutter"/>.
+    /// </summary>
+    public bool ShutterLockedOpen { get; set; }
+
     private void Awake()
     {
         Instance = this;
@@ -38,9 +46,14 @@ public class ShutterController : MonoBehaviour
         animator.SetBool("Open", true);
         audioSource.PlayOneShot(openClip);
     }
-    
+
+    /// <summary>
+    /// Closes the shutter. Has no effect when <see cref="ShutterLockedOpen"/> is true.
+    /// </summary>
     public void CloseShutter()
     {
+        if (ShutterLockedOpen) return;
+
         IsOpen = false;
         animator.SetBool("Open", false);
         audioSource.PlayOneShot(closeClip);
@@ -48,6 +61,7 @@ public class ShutterController : MonoBehaviour
 
     public void ResetShutter()
     {
+        ShutterLockedOpen = false;
         IsOpen = false;
         animator.SetBool("Open", false);
         animator.SetTrigger("Reset");

@@ -15,7 +15,17 @@ public class SpeakingInteraction : NetworkBehaviour
     [Header("Voice")]
     [SerializeField] private AudioClip[] voiceAudioClips;
     [SerializeField] private AudioSource audioSource;
-    public AudioClip[] VoiceAudioClips => voiceAudioClips;
+
+    /// <summary>
+    /// Returns the voice clips for this speaker. When a <see cref="SuspectData"/> asset is
+    /// assigned and it contains clips, those take priority over the local serialized array —
+    /// so per-suspect audio is authored entirely on the SuspectData, not here.
+    /// </summary>
+    public AudioClip[] VoiceAudioClips =>
+        suspectData != null && suspectData.voiceAudioClips != null && suspectData.voiceAudioClips.Length > 0
+            ? suspectData.voiceAudioClips
+            : voiceAudioClips;
+
     public AudioSource AudioSource => audioSource;
 
     [Header("Dialogue Choices")]
@@ -55,9 +65,10 @@ public class SpeakingInteraction : NetworkBehaviour
     {
         DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory, waitForInput);
 
-        if (voiceAudioClips != null && voiceAudioClips.Length > 0 && audioSource != null)
+        AudioClip[] clips = VoiceAudioClips;
+        if (clips != null && clips.Length > 0 && audioSource != null)
         {
-            DialogueManager.Instance.PlayDialogueAudio(dialogue, voiceAudioClips, audioSource);
+            DialogueManager.Instance.PlayDialogueAudio(dialogue, clips, audioSource);
         }
     }
 

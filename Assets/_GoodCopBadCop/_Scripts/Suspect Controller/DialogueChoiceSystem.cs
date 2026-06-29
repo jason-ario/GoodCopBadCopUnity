@@ -5,6 +5,9 @@ using UnityEngine;
 
 public class DialogueChoiceSystem : NetworkBehaviour
 {
+    /// <summary>Singleton — set automatically in Awake.</summary>
+    public static DialogueChoiceSystem Instance { get; private set; }
+
     /// <summary>
     /// Fired on the local client immediately when the local player selects a dialogue choice.
     /// Subscribe in <see cref="PlayerTalkingAnimationController"/> to trigger talking animations.
@@ -24,6 +27,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
     [SerializeField] private RectTransform subtitlesContainer;
     [SerializeField] private GameObject backButton;
 
+    // Callback set by ShowScriptedChoices — routes the player's pick to ScriptedDialogueRunner.
+    private Action<int> _scriptedChoiceCallback;
+
     /// <summary>
     /// Matches the delay in <see cref="NPCRespondToDialogueChoice"/> so the choice panel
     /// re-appears the exact moment the NPC begins their response.
@@ -32,9 +38,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     private Coroutine _reshowCoroutine;
 
+    private void Awake() => Instance = this;
+
     /// <summary>
-    /// Opens the dialogue choice UI. On the first call, enters dialogue mode: locks movement,
-    /// activates the suspect cam, and shows the back button. Safe to call if already in mode.
+    /// Opens the dialogue choice UI. On the first call, enters dialogue mode: locks movement
+    /// and activates the suspect cam. Safe to call if already in mode.
     /// </summary>
     public void StartDialogueChoices(Transform lookTarget, string[] choices)
     {
@@ -44,7 +52,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
         InitializeChoices(choices);
         dialogueChoiceContainer.SetActive(true);
-        backButton.SetActive(true);
     }
 
     private void EnterDialogueMode()
@@ -56,7 +63,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
 
         UIController.Instance.ShowCursor();
-        UIController.Instance.ShowBackButton(ExitDialogueMode);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
@@ -85,6 +91,60 @@ public class DialogueChoiceSystem : NetworkBehaviour
             SuspectController.Instance.SetSuspectCamActive(false);
     }
 
+    // -------------------------------------------------------------------------
+    // Scripted dialogue API — used by ScriptedDialogueRunner
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Enters dialogue mode for a scripted cutscene: locks player movement, activates the
+    /// suspect camera, and shows the cursor. Does not display the back button.
+    /// </summary>
+    public void EnterScriptedDialogueMode()
+    {
+        Debug.Log($"[DialogueChoiceSystem] EnterScriptedDialogueMode — IsInDialogueMode={IsInDialogueMode}, " +
+                  $"PlayerInstance={PlayerInstance.Instance != null}, " +
+                  $"SuspectController={SuspectController.Instance != null}");
+
+        if (IsInDialogueMode) return;
+
+        IsInDialogueMode = true;
+
+        var player = PlayerInstance.Instance;
+        if (player == null) return;
+
+        player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
+        player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
+        UIController.Instance.ShowCursor();
+
+        if (SuspectController.Instance != null)
+            SuspectController.Instance.SetSuspectCamActive(true);
+
+        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueMode complete — movement locked, cam activated.");
+    }
+
+    /// <summary>
+    /// Exits scripted dialogue mode, restoring player state. Delegates to the standard exit path.
+    /// </summary>
+    public void ExitScriptedDialogueMode() => ExitDialogueMode();
+
+    /// <summary>
+    /// Shows the choice panel for a scripted dialogue node.
+    /// <paramref name="onChosen"/> fires locally on the picking client when a button is clicked.
+    /// </summary>
+    public void ShowScriptedChoices(string[] choiceTexts, Action<int> onChosen)
+    {
+        _scriptedChoiceCallback = onChosen;
+        InitializeChoices(choiceTexts);
+        dialogueChoiceContainer.SetActive(true);
+    }
+
+    /// <summary>Hides the choice panel without exiting dialogue mode.</summary>
+    public void HideChoicePanel()
+    {
+        dialogueChoiceContainer.SetActive(false);
+        _scriptedChoiceCallback = null;
+    }
+
     private void InitializeChoices(string[] choices)
     {
         for (var i = 0; i < choices.Length; i++)
@@ -95,6 +155,18 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     public void ChooseDialogueChoice(int choiceIndex)
     {
+        // Scripted path: hide choices and hand off to ScriptedDialogueRunner's callback.
+        if (_scriptedChoiceCallback != null)
+        {
+            dialogueChoiceContainer.SetActive(false);
+            var callback = _scriptedChoiceCallback;
+            _scriptedChoiceCallback = null;
+            OnLocalPlayerSpoke?.Invoke();
+            callback.Invoke(choiceIndex);
+            return;
+        }
+
+        // Original interactive-dialogue path.
         // Hide the panel but stay in dialogue mode — it will re-appear once the NPC starts responding.
         dialogueChoiceContainer.SetActive(false);
         OnLocalPlayerSpoke?.Invoke();
@@ -128,6 +200,44 @@ public class DialogueChoiceSystem : NetworkBehaviour
         yield return new WaitUntil(() => !DialogueManager.Instance.HasActiveSubtitles);
 
         _reshowCoroutine = null;
+
+        if (IsInDialogueMode)
+            dialogueChoiceContainer.SetActive(true);
+    }
+
+    private void Update()
+    {
+        if (!IsInDialogueMode) return;
+        if (_reshowCoroutine == null) return;
+        if (!Input.GetMouseButtonDown(0)) return;
+
+        // Ignore clicks that land on a UI element (e.g. the Back button).
+        if (UnityEngine.EventSystems.EventSystem.current != null &&
+            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+
+        SkipNPCLine();
+    }
+
+    /// <summary>
+    /// Skips the current NPC line with two-stage behaviour:
+    /// - If the subtitle is still typing, completes the reveal instantly without skipping.
+    /// - If the text is fully revealed, stops audio, clears subtitles, and shows choices immediately.
+    /// </summary>
+    private void SkipNPCLine()
+    {
+        if (DialogueManager.Instance.IsAnySubtitleRevealing())
+        {
+            DialogueManager.Instance.CompleteCurrentReveal();
+            return;
+        }
+
+        if (_reshowCoroutine != null)
+        {
+            StopCoroutine(_reshowCoroutine);
+            _reshowCoroutine = null;
+        }
+
+        DialogueManager.Instance.SkipCurrentLine();
 
         if (IsInDialogueMode)
             dialogueChoiceContainer.SetActive(true);

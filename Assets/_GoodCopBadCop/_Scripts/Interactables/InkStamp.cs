@@ -24,11 +24,13 @@ public class InkStamp : Interactable, IPickupSlot
 
     /// <summary>
     /// Networked interactability gate for the stamp slot collider.
-    /// Defaults to false so the slot starts locked; Day_01 enables it at the stamp beat.
+    /// Defaults to true so stamps are always interactable out of the box.
+    /// Day_01's tutorial path explicitly overrides this to false and re-enables
+    /// it at the stamping beat. Any future tutorial can do the same.
     /// Applied on all clients via OnValueChanged and on late-joiners via OnNetworkSpawn.
     /// </summary>
     private NetworkVariable<bool> _slotInteractable = new NetworkVariable<bool>(
-        false,
+        true,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 

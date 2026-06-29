@@ -344,7 +344,8 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        speaking.InitiateChoices();
+        // Direct interaction no longer opens the dialogue view.
+        // Dialogue is initiated exclusively through scripted cutscenes (ScriptedDialogueRunner).
     }
 
     public void SetCanInteract(bool canInteract)
@@ -352,12 +353,12 @@ public class SuspectCharacter : Interactable
         if (interactionCollider != null)
             interactionCollider.enabled = canInteract;
     }
-    
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         if (item == null)
         {
-            speaking.InitiateChoices();
+            // Empty-hand interaction no longer opens the dialogue view.
             return;
         }
 

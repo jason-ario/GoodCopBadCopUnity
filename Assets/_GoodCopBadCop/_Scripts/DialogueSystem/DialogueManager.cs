@@ -183,6 +183,42 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Immediately stops dialogue audio on the local client.
+    /// The active subtitle is left intact and will disappear on its natural timer.
+    /// </summary>
+    public void SkipCurrentLine()
+    {
+        StopDialogueAudio();
+    }
+
+    /// <summary>
+    /// Returns true if any active subtitle is still running its typewriter reveal.
+    /// </summary>
+    public bool IsAnySubtitleRevealing()
+    {
+        foreach (Transform child in subtitlesContainer)
+        {
+            var reveal = child.GetComponentInChildren<TMPTextReveal>();
+            if (reveal != null && reveal.IsRevealing) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Immediately completes the typewriter animation on all active subtitles,
+    /// showing their full text without skipping the line entirely.
+    /// </summary>
+    public void CompleteCurrentReveal()
+    {
+        foreach (Transform child in subtitlesContainer)
+        {
+            var reveal = child.GetComponentInChildren<TMPTextReveal>();
+            if (reveal != null)
+                reveal.CompleteReveal();
+        }
+    }
+
     public void InitiateChoices(Transform lookTarget, string[] choices)
     {
         dialogueChoiceSystem.StartDialogueChoices(lookTarget,choices);

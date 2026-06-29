@@ -148,7 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2723485867
+  GlobalObjectIdHash: 2381861949
   InScenePlacedSourceGlobalObjectIdHash: 2381861949
   DeferredDespawnTick: 0
   Ownership: 1
@@ -189,12 +189,16 @@ MonoBehaviour:
   suspectCam: {fileID: 7517704889252903642}
   climbThroughTargetPos: {fileID: 8043800236130683272}
   suspectIndex:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
     m_InternalValue: -1
   couponPerfectAnomaliesBonus: 5
   couponPerCorrectAnomaly: 3
   couponPenaltyPerMissedAnomaly: 2
   couponPenaltyPerFalsePositiveAnomaly: 2
   couponBaseReward: 5
+  couponPerEvidenceItem: 3
   dailySuspectManager: {fileID: 5974956147794270995}
 --- !u!114 &5974956147794270995
 MonoBehaviour:
@@ -214,6 +218,7 @@ MonoBehaviour:
   lineupMutants: {fileID: 11400000, guid: f600e1c401f2d664983430ee1450134e, type: 2}
   mutantIntruderData: {fileID: 11400000, guid: c4c02e4ee1dcc594888335cc8c4b68c5, type: 2}
   mutantSpawnChance: 0.2
+  lineupDoppelgangers: {fileID: 0}
 --- !u!114 &1659329089007804956
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -548,7 +553,7 @@ PlayableDirector:
   - key: {fileID: 3334552225627583556, guid: d4ec1aeace4372a42a25dc6ddc52207b, type: 2}
     value: {fileID: 374046254374095282}
   - key: {fileID: -4426529828784486917, guid: d4ec1aeace4372a42a25dc6ddc52207b, type: 2}
-    value: {fileID: 6653442866534953259}
+    value: {fileID: 0}
   - key: {fileID: -7299026144440760131, guid: d4ec1aeace4372a42a25dc6ddc52207b, type: 2}
     value: {fileID: 3125496069703787105}
   - key: {fileID: -7157948019259615851, guid: d4ec1aeace4372a42a25dc6ddc52207b, type: 2}
@@ -2792,10 +2797,5 @@ Animator:
 --- !u!4 &5245292354249809387 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1561081914381700203, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
-  m_PrefabInstance: {fileID: 6728683645267333504}
-  m_PrefabAsset: {fileID: 0}
---- !u!95 &6653442866534953259 stripped
-Animator:
-  m_CorrespondingSourceObject: {fileID: 86924267707424939, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
   m_PrefabInstance: {fileID: 6728683645267333504}
   m_PrefabAsset: {fileID: 0}

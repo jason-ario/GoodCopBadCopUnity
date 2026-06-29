@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 787204351f454a94586a01bf2ac4638b, type: 3}
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
   entryReasons:
@@ -76,6 +79,20 @@ MonoBehaviour:
     - "Stamping that paper is the smartest thing you\u2019ll do all day. Don't disappoint
       me."
     - "I\u2019m going home to count what\u2019s left. Get out of my way."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -107,8 +124,19 @@ MonoBehaviour:
   killExitLines:
   - "You have no idea\u2026 what you\u2019ve\u2026 just started\u2026"
   - "Remember my face\u2026 the men who answer to me\u2026 certainly will\u2026"
-  - "Even this\u2026 is just a negotiation tactic\u2026 I\u2019ll be back at the table\u2026"
-  voiceAudioClips: []
+  - "Even this\u2026 is just a negotiation tactic\u2026 I\u2019ll be back at the
+    table\u2026"
+  voiceAudioClips:
+  - {fileID: 8300000, guid: 93563d8dcf132654cb6df83b1a4f00b9, type: 3}
+  - {fileID: 8300000, guid: 197c5b812471dfc48ad6395ef15d8ea5, type: 3}
+  - {fileID: 8300000, guid: b3110dc0f1504ec469cec51fc2c79ee0, type: 3}
+  - {fileID: 8300000, guid: c3d6feebc5bc88c4a8f0a824396f6646, type: 3}
+  - {fileID: 8300000, guid: 8fb7ddaa8f9539e4ba231f9103736a06, type: 3}
+  - {fileID: 8300000, guid: fb3722b94c81e72468f87ef4be659546, type: 3}
+  - {fileID: 8300000, guid: 21202be4e72e5e345ab285fe3ac18c28, type: 3}
+  - {fileID: 8300000, guid: 3d428ea983b8b914c9cea864387349aa, type: 3}
+  - {fileID: 8300000, guid: f4891b2d9c7a1a94ea6ba801ee21002e, type: 3}
+  - {fileID: 8300000, guid: 2bd959cca4ad2c849aa7515fa6f29923, type: 3}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The docks. Import work. Standard.
@@ -118,8 +146,11 @@ MonoBehaviour:
       paperwork. Everything above board.
     mismatchMidDaysAnswer: The office. I've always run a legitimate operation. The
       docks are not relevant to my work.
-    mismatchFinalDaysAnswer: The docks. Full access. No restrictions. Everything is
-      proceeding as normal. Nothing to report.
+    mismatchFinalDaysAnswer: The docks. Full access. No restrictions. Everything
+      is proceeding as normal. Nothing to report.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: Nothing. I'm healthy.
     midDaysAnswer: I've been coughing. The air near the docks is bad.
@@ -130,6 +161,9 @@ MonoBehaviour:
       precisely because of the air.
     mismatchFinalDaysAnswer: Nothing. Perfectly healthy. I take care of myself. No
       issues of any kind.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Colleagues. We rotate.
     midDaysAnswer: Two men. We watch each other's backs.
@@ -140,6 +174,9 @@ MonoBehaviour:
       Never have.
     mismatchFinalDaysAnswer: My wife and my sons. At home. Safe. That is not your
       concern.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Smart uniform. I hope there is a smart man wearing it.
@@ -153,4 +190,7 @@ MonoBehaviour:
     - When the dust settles, I will still be here. Will you?
     - Stamp the paper, officer. We both know who actually runs this gate.
     - I control what is left. That is not a threat. It is simply a fact.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 5025734

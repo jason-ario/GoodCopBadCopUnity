@@ -45,6 +45,21 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static System.Action InterceptNextSuspectSpawn;
 
+    /// <summary>
+    /// When true, the next suspect's entry line and bark schedule are suppressed — useful for
+    /// scripted arrivals where a <see cref="ScriptedDialogueRunner"/> takes over dialogue.
+    /// Consumed and reset to false inside <see cref="SayEntryDialogue"/>.
+    /// Set by Day_01 for Vlad's scripted Day 1 appearance.
+    /// </summary>
+    public static bool ForceNextSuspectSkipEntryDialogue = false;
+
+    /// <summary>
+    /// When true, the next suspect's entry dialogue will not trigger a paperwork hand-off,
+    /// regardless of <see cref="SuspectData.GivesPaperwork"/>. Consumed and reset to false
+    /// inside <see cref="SayEntryDialogue"/>. Set by Day_01 for Vlad's scripted Day 1 appearance.
+    /// </summary>
+    public static bool ForceNextSuspectNoPaperwork = false;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -239,6 +254,46 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Spawns the given <see cref="SuspectCharacter"/> prefab as a scripted suspect,
+    /// bypassing the <see cref="DailySuspectManager"/> lineup entirely. The character
+    /// goes through the full walk-in and arrival flow exactly as a normally-scheduled
+    /// suspect. The character is always initialized clean (no anomalies).
+    /// Pair with <see cref="ForceNextSuspectNoPaperwork"/> to suppress document hand-off.
+    /// Must only be called on the server, typically via <see cref="InterceptNextSuspectSpawn"/>.
+    /// </summary>
+    public void SpawnScriptedSuspect(SuspectCharacter prefab)
+    {
+        if (!IsServer) return;
+
+        if (prefab == null)
+        {
+            Debug.LogError("[SuspectController] SpawnScriptedSuspect: prefab is null.");
+            return;
+        }
+
+        GameObject spawnedSuspect = Instantiate(prefab.gameObject, spawnPos.position, spawnPos.rotation);
+        NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
+
+        if (netObj == null)
+        {
+            Debug.LogError($"[SuspectController] SpawnScriptedSuspect: prefab '{prefab.name}' is missing a NetworkObject component.");
+            Destroy(spawnedSuspect);
+            return;
+        }
+
+        netObj.Spawn();
+
+        suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
+        suspectCharacter.InitializeClean();
+
+        _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
+        _currentSuspectInitialized = false;
+
+        TryInitializeCurrentSuspect();
+        AssignReferencesClientRpc(netObj.NetworkObjectId);
+    }
+
+    /// <summary>
     /// Spawns a doppelganger using the target suspect's prefab and flags it via
     /// <see cref="SuspectCharacter.InitializeAsDoppelganger"/>. The prefab is the same
     /// as a normal civilian — doppelganger identity is carried by the DoppelgangerData.
@@ -336,19 +391,6 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Fired on all clients after paperwork lands on the desk.
-    /// Carries the spawned IDCard and the application form PickableObject so tutorial
-    /// systems can reference both documents without reading the server-only SpawnedDocuments list.
-    /// </summary>
-    public static event Action<IDCard, PickableObject> OnPaperworkSpawned;
-
-    /// <summary>
-    /// Fired on all clients when a suspect finishes walking to the booth window.
-    /// Carries the suspect index so listeners can distinguish first vs. subsequent suspects.
-    /// </summary>
-    public static event Action<int> OnSuspectArrived;
-
-    /// <summary>
     /// Fires on every client when a new suspect begins walking to the window.
     /// Shows the booth-waiting notification only if the local player is away from the booth.
     /// Uses <see cref="PlayerInstance.IsOutsideLocal"/> to avoid a false negative caused
@@ -360,6 +402,19 @@ public class SuspectController : NetworkBehaviour
         if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
             UIController.Instance.ShowBoothWaitingNotification();
     }
+
+    /// <summary>
+    /// Fired on all clients after paperwork lands on the desk.
+    /// Carries the spawned IDCard and the application form PickableObject so tutorial
+    /// systems can reference both documents without reading the server-only SpawnedDocuments list.
+    /// </summary>
+    public static event Action<IDCard, PickableObject> OnPaperworkSpawned;
+
+    /// <summary>
+    /// Fired on all clients when a suspect finishes walking to the booth window.
+    /// Carries the suspect index so listeners can distinguish first vs. subsequent suspects.
+    /// </summary>
+    public static event Action<int> OnSuspectArrived;
 
     private void ArrivedAtPosition()
     {
@@ -436,21 +491,23 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
-        /*
-        if (suspectCharacter.attackImmediately)
+        if (!ForceNextSuspectSkipEntryDialogue)
         {
-            suspectCharacter.AimAtPlayer();
-            return;
-        }*/
+            string entryDialogue = suspectCharacter.GetEntryDialogue();
+            DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
+            suspectCharacter.GetComponent<SuspectBarkController>()?.BeginBarkSchedule();
+        }
 
-        string entryDialogue = suspectCharacter.GetEntryDialogue();
-        DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
+        ForceNextSuspectSkipEntryDialogue = false;
 
-        suspectCharacter.GetComponent<SuspectBarkController>()?.BeginBarkSchedule();
+        // Suspect cam is no longer activated on standard arrivals.
+        // It is activated exclusively by ScriptedDialogueRunner.EnterScriptedModeClientRpc
+        // for scripted cutscene sequences.
 
-        StartCoroutine(SuspectCamSequence());
+        bool givesPaperwork = suspectCharacter.Data.GivesPaperwork && !ForceNextSuspectNoPaperwork;
+        ForceNextSuspectNoPaperwork = false;
 
-        if (suspectCharacter.Data.GivesPaperwork)
+        if (givesPaperwork)
         {
             suspectCharacter.GivePaperwork();
         }

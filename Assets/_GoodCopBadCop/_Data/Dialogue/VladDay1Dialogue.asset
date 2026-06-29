@@ -1,0 +1,101 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: VladDay1Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: So. You are the replacement.
+    animationTrigger: 
+    choices: []
+  - type: 0
+    npcLine: You look exactly like the last one. Same uniform, same nervous eyes.
+    animationTrigger: TalkCocky
+    choices: []
+  - type: 0
+    npcLine: Same face that says I have no idea what I agreed to. Good. That means
+      you are normal. For now.
+    animationTrigger: TalkDismissing
+    choices: []
+  - type: 0
+    npcLine: My name is Vladimir Syrnikov. You will call me Vlad.
+    animationTrigger: TalkBigCocky
+    choices: []
+  - type: 0
+    npcLine: Outside this booth, you will not say that name. This is not vanity.
+      It is simply how things are.
+    animationTrigger: TalkDismissing
+    choices: []
+  - type: 1
+    npcLine: Tell me. What do you know about what comes through this gate?
+    animationTrigger: TalkPoint
+    choices:
+    - playerChoiceText: Civilians, migrants, documented travelers.
+      npcResponse: Mm. The paperwork version. Cute. You are going to have a very
+        interesting first week.
+      animationTrigger: TalkDismissing
+    - playerChoiceText: Whatever the briefing didn't cover, I assume.
+      npcResponse: Ha! I like that. Pessimism and self-awareness. You may survive
+        after all. Do not get comfortable.
+      animationTrigger: ShortLaugh
+  - type: 0
+    npcLine: Most of what you will see is boring. Papers, stamps, faces, send them
+      through.
+    animationTrigger: TalkShrug
+    choices: []
+  - type: 0
+    npcLine: You will wish for something to happen. Do not. The boring days are the
+      gift.
+    animationTrigger: TalkDismissing
+    choices: []
+  - type: 1
+    npcLine: "When something wrong walks through that window \u2014 and it will \u2014
+      what is your instinct?"
+    animationTrigger: TalkLookAway
+    choices:
+    - playerChoiceText: Follow the rulebook. Document everything.
+      npcResponse: The rulebook. Yes. Good friend, the rulebook. Until it has never
+        seen what you are looking at. Then it is useless paper.
+      animationTrigger: TalkSarcasticNod
+    - playerChoiceText: Trust my gut. Make a call.
+      npcResponse: "Your gut. Good. Your gut will be smarter than you, most of the
+        time. The times it is not \u2014 those are the times that end careers. Or
+        worse."
+      animationTrigger: TalkCocky
+  - type: 0
+    npcLine: There are things coming through this gate that your training did not
+      cover.
+    animationTrigger: TalkLookAway
+    choices: []
+  - type: 0
+    npcLine: "When you encounter one \u2014 do not panic. Do your job. The paperwork
+      will lie. The face might lie."
+    animationTrigger: TalkPoint
+    choices: []
+  - type: 0
+    npcLine: But something about them will feel wrong. Trust that. It has kept me
+      alive for fifteen years.
+    animationTrigger: Talk1
+    choices: []
+  - type: 0
+    npcLine: You have questions. I can see them. Keep them for now.
+    animationTrigger: TalkShrug
+    choices: []
+  - type: 0
+    npcLine: "Do your job, stay sharp, and if you last the week \u2014 maybe I answer
+      some of them."
+    animationTrigger: 
+    choices: []
+  - type: 0
+    npcLine: Try not to disappoint me, Officer. It would be genuinely inconvenient.
+    animationTrigger: TalkBigLaugh
+    choices: []

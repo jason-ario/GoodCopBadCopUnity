@@ -43,6 +43,11 @@ public class PlayerTutorialUI : MonoBehaviour
     private void OnGameStart()
     {
         if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
+
+        // Only show the booth guidance message on Day 1 — it is a one-time orientation hint
+        // for a player's first session. On subsequent days the player already knows the drill.
+        if (CampaignManager.Instance == null || CampaignManager.Instance.CurrentDay != 1) return;
+
         gameObject.SetActive(true);
         StartCoroutine(DelayedShow("Go to the booth to start your shift.", 3f));
     }

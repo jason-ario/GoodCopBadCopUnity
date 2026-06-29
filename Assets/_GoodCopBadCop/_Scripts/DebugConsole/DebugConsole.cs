@@ -104,7 +104,7 @@ public class DebugConsole : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.F2))
         {
-            SkipToDay(2);
+            SkipToDay(1);
         }
 
         // F3 — force the next suspect to spawn as a mutant intruder.
