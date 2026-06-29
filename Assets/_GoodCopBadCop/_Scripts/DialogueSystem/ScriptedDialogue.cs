@@ -56,6 +56,14 @@ public class ScriptedDialogueNode
              "Leave empty for no animation.")]
     public string animationTrigger;
 
+    [Tooltip("Optional key matching a ScriptedCameraEntry in ScriptedDialogueRunner. " +
+             "When set, the named camera is activated before this line plays. " +
+             "Leave empty to return to the default suspect/At-Booth camera.")]
+    public string cameraTrigger;
+
+    [Tooltip("When true, the subtitle for this line plays with a vertex-wobble effect.")]
+    public bool wobbleText;
+
     [Tooltip("Player choices. Required when Type is Choice. Exactly two entries expected.")]
     public ScriptedDialogueChoice[] choices;
 }

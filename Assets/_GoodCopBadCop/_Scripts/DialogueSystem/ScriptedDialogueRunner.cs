@@ -4,8 +4,23 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
+/// Maps a string key defined in <see cref="ScriptedDialogueNode.cameraTrigger"/> to a
+/// scene <see cref="GameObject"/> that contains a Cinemachine camera.
+/// Assign entries in the Inspector on the ScriptedDialogueRunner scene object.
+/// </summary>
+[Serializable]
+public class ScriptedCameraEntry
+{
+    [Tooltip("Key referenced by ScriptedDialogueNode.cameraTrigger (case-sensitive).")]
+    public string key;
+
+    [Tooltip("The GameObject containing the CinemachineCamera to activate for this key.")]
+    public GameObject cam;
+}
+
+/// <summary>
 /// Drives a <see cref="ScriptedDialogue"/> sequence end-to-end, synchronising subtitle
-/// display, player-choice UI, and camera state across all connected clients.
+/// display, player-choice UI, camera cuts, and text effects across all connected clients.
 ///
 /// Call <see cref="PlayDialogue"/> on the server to start a sequence. The runner:
 /// <list type="bullet">
@@ -13,7 +28,12 @@ using UnityEngine;
 ///   <item>Plays each node in order using <see cref="DialogueManager"/>.</item>
 ///   <item>For Monologue nodes: waits for the player to press E or left-click to advance.</item>
 ///   <item>For Choice nodes: shows two buttons, waits for a pick, then plays the NPC reply.</item>
-///   <item>Restores all player state when the last node finishes.</item>
+///   <item>Cuts to the Cinemachine camera named by <see cref="ScriptedDialogueNode.cameraTrigger"/>
+///         before each line plays. An empty trigger deactivates any override and returns to the
+///         default suspect cam.</item>
+///   <item>Applies a vertex-wobble effect to subtitles when
+///         <see cref="ScriptedDialogueNode.wobbleText"/> is true.</item>
+///   <item>Restores all player state and camera state when the last node finishes.</item>
 /// </list>
 ///
 /// Requires a networked scene object that has this component attached. The singleton
@@ -22,6 +42,11 @@ using UnityEngine;
 public class ScriptedDialogueRunner : NetworkBehaviour
 {
     public static ScriptedDialogueRunner Instance { get; private set; }
+
+    [Header("Cutscene Cameras")]
+    [Tooltip("Maps camera trigger keys (set on ScriptedDialogueNode) to Cinemachine camera GameObjects. " +
+             "An empty trigger deactivates overrides and returns to the default suspect cam.")]
+    [SerializeField] private ScriptedCameraEntry[] _cameras;
 
     // Set true while coroutines are waiting for player E / left-click input so that
     // Update can send AdvanceDialogueServerRpc on mouse-click in addition to E key.
@@ -33,6 +58,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     // Cached per ShowChoicesClientRpc so the local-player callback can read the text.
     private string[] _currentChoiceTexts;
+
+    // Tracks the currently active override camera (client-side) so it can be deactivated
+    // when the trigger changes or the sequence ends.
+    private GameObject _activeOverrideCam;
+
+    // Tracks the last animation trigger fired on the speaker so it can be reset before the
+    // next node starts, preventing a fast-skipped trigger from replaying mid-sequence.
+    private string _lastAnimTrigger = string.Empty;
 
     private void Awake() => Instance = this;
 
@@ -94,12 +127,23 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}");
 
+        _lastAnimTrigger = string.Empty;
+
         EnterScriptedModeClientRpc();
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
         {
-            TriggerSpeakerAnimationClientRpc(speakerNetId, node.animationTrigger);
+            // Camera cut and text effect are set before the line starts so they're
+            // visible from the very first word of the subtitle.
+            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
+            SetWobbleClientRpc(node.wobbleText);
+
+            // Reset the previous trigger and force idle before firing the next animation.
+            // This prevents a skipped trigger from continuing to play into the new line.
+            ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, node.animationTrigger);
+            _lastAnimTrigger = node.animationTrigger ?? string.Empty;
+
             yield return StartCoroutine(SayAndWait(speaker, node.npcLine));
 
             if (node.type == ScriptedDialogueNodeType.Choice)
@@ -138,7 +182,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Fire the response animation, then deliver the NPC's unique reply.
         var chosen = node.choices[_pendingChoiceIndex];
-        TriggerSpeakerAnimationClientRpc(speakerNetId, chosen.animationTrigger);
+        ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
+        _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse));
     }
 
@@ -161,8 +206,64 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void ExitScriptedModeClientRpc()
     {
+        // Deactivate any override camera before restoring the default cam state.
+        DeactivateOverrideCam();
+
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
         DialogueChoiceSystem.Instance.ExitScriptedDialogueMode();
+    }
+
+    // -------------------------------------------------------------------------
+    // Client RPCs — camera
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Activates the camera mapped to <paramref name="key"/> and deactivates the previous
+    /// override. An empty key simply deactivates any active override, returning to the
+    /// default suspect cam.
+    /// </summary>
+    [ClientRpc]
+    private void SetActiveOverrideCamClientRpc(string key)
+    {
+        // Always deactivate the current override first.
+        if (_activeOverrideCam != null)
+        {
+            _activeOverrideCam.SetActive(false);
+            _activeOverrideCam = null;
+        }
+
+        if (string.IsNullOrEmpty(key)) return;
+
+        if (_cameras == null) return;
+        foreach (var entry in _cameras)
+        {
+            if (entry.key == key && entry.cam != null)
+            {
+                entry.cam.SetActive(true);
+                _activeOverrideCam = entry.cam;
+                return;
+            }
+        }
+
+        Debug.LogWarning($"[ScriptedDialogueRunner] No camera entry found for key '{key}'.");
+    }
+
+    private void DeactivateOverrideCam()
+    {
+        if (_activeOverrideCam == null) return;
+        _activeOverrideCam.SetActive(false);
+        _activeOverrideCam = null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Client RPCs — text effects
+    // -------------------------------------------------------------------------
+
+    /// <summary>Primes <see cref="DialogueManager"/> to apply a wobble effect to the next subtitle.</summary>
+    [ClientRpc]
+    private void SetWobbleClientRpc(bool wobble)
+    {
+        DialogueManager.Instance.SetNextLineWobble(wobble);
     }
 
     // -------------------------------------------------------------------------
@@ -223,20 +324,32 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fires an Animator trigger on the speaker on all clients.
-    /// No-ops when <paramref name="triggerName"/> is null or empty.
+    /// Resets <paramref name="previousTrigger"/> on the speaker's Animator (so a fast-skipped
+    /// trigger can't replay into the next line), forces the Animator back to idle via the
+    /// <c>ForceIdle</c> trigger, then — if non-empty — fires <paramref name="newTrigger"/>.
+    /// All three steps run in one RPC so they're always applied atomically on every client.
     /// </summary>
     [ClientRpc]
-    private void TriggerSpeakerAnimationClientRpc(ulong speakerNetId, string triggerName)
+    private void ResetAndTriggerAnimationClientRpc(ulong speakerNetId, string previousTrigger, string newTrigger)
     {
-        if (string.IsNullOrEmpty(triggerName)) return;
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            return;
 
-        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
-        {
-            var character = netObj.GetComponent<SuspectCharacter>();
-            if (character?.animator != null)
-                character.animator.SetTrigger(triggerName);
-        }
+        var character = netObj.GetComponent<SuspectCharacter>();
+        if (character?.animator == null) return;
+
+        var anim = character.animator;
+
+        // 1. Reset the previous trigger so it can't fire again on a state re-entry.
+        if (!string.IsNullOrEmpty(previousTrigger))
+            anim.ResetTrigger(previousTrigger);
+
+        // 2. Force return to idle — ensures a skipped animation doesn't bleed into the next line.
+        anim.SetTrigger("ForceIdle");
+
+        // 3. Set the new trigger (may be empty for lines with no specific animation).
+        if (!string.IsNullOrEmpty(newTrigger))
+            anim.SetTrigger(newTrigger);
     }
 
     private string GetLocalPlayerName()

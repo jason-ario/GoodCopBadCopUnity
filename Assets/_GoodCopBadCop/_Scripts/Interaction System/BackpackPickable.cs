@@ -104,12 +104,18 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
     }
 
     /// <summary>
-    /// E key empty-handed → extract oldest stored item and hand it to the player.
+    /// E or LMB (empty-handed) → extract the oldest stored item into the player's hands,
+    /// or pick up the backpack itself when it is empty.
     /// </summary>
     public override void InteractAlternate(PlayerInteractionController player)
     {
         if (player.pickupController.HeldObject != null) return;
-        if (_storedItems.Count == 0) return;
+        if (_storedItems.Count == 0)
+        {
+            // Nothing to extract — fall back to a standard pickup.
+            base.InteractAlternate(player);
+            return;
+        }
         ExtractItemServerRpc();
     }
 

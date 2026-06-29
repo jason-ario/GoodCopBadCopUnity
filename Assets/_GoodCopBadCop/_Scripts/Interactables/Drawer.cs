@@ -107,15 +107,15 @@ public class Drawer : Interactable, IHeldItemPassthrough
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        // Held → scrub drawer position.
-        if (Input.GetMouseButton(0))
+        // Held → scrub drawer position. Accept both LMB and E so either key can drag.
+        if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.E))
         {
             _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
             ApplyDragPosition();
         }
 
-        // Released → commit and exit.
-        if (Input.GetMouseButtonUp(0))
+        // Released → commit and exit. Fire when whichever input triggered the grab is released.
+        if (Input.GetMouseButtonUp(0) || Input.GetKeyUp(KeyCode.E))
         {
             CommitDrawer();
             _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
@@ -125,11 +125,10 @@ public class Drawer : Interactable, IHeldItemPassthrough
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Drawer interaction is LMB-only. Suppress the default E-key alternate path
-    /// so pressing E never starts the grab sequence (which would lock the player
-    /// with no LMB-up event to exit).
+    /// Both E and LMB open the drawer via the same grab sequence.
+    /// The drag loop in Update handles release for both inputs.
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player) { }
+    public override void InteractAlternate(PlayerInteractionController player) => Interact(player);
 
     public override void Interact(PlayerInteractionController player)
     {

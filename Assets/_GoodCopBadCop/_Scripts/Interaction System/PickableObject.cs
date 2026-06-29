@@ -20,6 +20,18 @@ public class PickableObject : Interactable
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
     public UnityAction OnEquip;
     public UnityAction OnUnEquip;
+
+    /// <summary>
+    /// Fired on the local client the moment this object is picked up by any player.
+    /// Safe to subscribe from tutorial systems that need to react to a specific instance being grabbed.
+    /// </summary>
+    public event Action OnPickedUpEvent;
+
+    /// <summary>
+    /// Fired on the local client the moment this object is released/dropped by any player.
+    /// Safe to subscribe from tutorial systems that need to react to a specific instance being placed.
+    /// </summary>
+    public event Action OnDroppedEvent;
     protected bool isUsing;
 
     public bool CanPickUpManually { get; set; } = true;
@@ -384,6 +396,8 @@ public class PickableObject : Interactable
 
     public virtual void OnPickedUp()
     {
+        OnPickedUpEvent?.Invoke();
+
         if (itemData != null && itemData.PickupSound != null)
         {
             SFXController.Instance.PlayAtPosition(itemData.PickupSound, transform.position);
@@ -393,6 +407,8 @@ public class PickableObject : Interactable
 
     public virtual void OnDropped()
     {
+        OnDroppedEvent?.Invoke();
+
         if (itemData != null && itemData.PickupSound != null)
         {
             SFXController.Instance.PlayAtPosition(itemData.PickupSound, transform.position);

@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,12 +15,6 @@ public class ReticleController : MonoBehaviour
     private bool canInteract = false;
     private bool isTooFar = false;
 
-    [SerializeField] private TextMeshProUGUI doText;
-    [SerializeField] private Image line;
-    [SerializeField] private Image buttonTooltip;
-    [SerializeField] private Sprite mouseButtonSprite;
-    [SerializeField] private Sprite eKeySprite;
-
     void Update()
     {
         Color targetColor = normalColor;
@@ -34,22 +27,12 @@ public class ReticleController : MonoBehaviour
         }
         else if (isTooFar)
         {
-            Debug.Log("Too far");
             targetColor = tooFarColor;
-            targetScale = interactScale; // Keep it slightly larger when hovering too far
-            doText.gameObject.SetActive(false);
-        }
-        else
-        {
-            doText.gameObject.SetActive(false);
+            targetScale = interactScale;
         }
 
-        // Smoothly change color
-        reticle.color = Color.Lerp(reticle.color, targetColor, Time.deltaTime * lerpSpeed); 
-        doText.color = Color.Lerp(doText.color, targetColor, Time.deltaTime * lerpSpeed);
-        line.color = Color.Lerp(line.color, targetColor, Time.deltaTime * lerpSpeed);
-        
-        // Smoothly change size
+        reticle.color = Color.Lerp(reticle.color, targetColor, Time.deltaTime * lerpSpeed);
+
         reticle.rectTransform.localScale = Vector3.Lerp(
             reticle.rectTransform.localScale,
             Vector3.one * targetScale,
@@ -58,56 +41,37 @@ public class ReticleController : MonoBehaviour
     }
 
     /// <summary>
-    /// Updates the interact reticle state and label.
+    /// Updates the interact reticle state. Text and tooltip parameters are kept for
+    /// call-site compatibility but are no longer rendered.
     /// </summary>
     /// <param name="state">Whether the reticle is in interact mode.</param>
-    /// <param name="text">Label to display next to the input hint.</param>
-    /// <param name="useKeyPrompt">When true, shows the E-key sprite instead of the mouse-click sprite.</param>
-    /// <param name="showButtonTooltip">When false, hides the button icon even if the label is shown.</param>
+    /// <param name="text">Unused — interact text has been removed from the reticle.</param>
+    /// <param name="useKeyPrompt">Unused — button tooltip has been removed from the reticle.</param>
+    /// <param name="showButtonTooltip">Unused — button tooltip has been removed from the reticle.</param>
     public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false, bool showButtonTooltip = true)
     {
         canInteract = state;
         if (state) isTooFar = false;
-        
-        if (state == true && text != "")
-        {
-            doText.gameObject.SetActive(true);
-            doText.text = text;
-
-            if (buttonTooltip != null)
-            {
-                bool tooltipVisible = showButtonTooltip && (useKeyPrompt ? eKeySprite != null : mouseButtonSprite != null);
-                buttonTooltip.gameObject.SetActive(tooltipVisible);
-                if (tooltipVisible)
-                    buttonTooltip.sprite = useKeyPrompt ? eKeySprite : mouseButtonSprite;
-            }
-        }
-        else
-        {
-            doText.gameObject.SetActive(false);
-
-            if (buttonTooltip != null)
-                buttonTooltip.gameObject.SetActive(false);
-        }
     }
 
+    /// <summary>Hides the reticle entirely.</summary>
     public void DisableReticle()
     {
         reticle.enabled = false;
-        doText.gameObject.SetActive(false);
-        if (buttonTooltip != null)
-            buttonTooltip.gameObject.SetActive(false);
     }
-    
+
+    /// <summary>Shows the reticle.</summary>
     public void EnableReticle()
     {
         reticle.enabled = true;
     }
 
+    /// <summary>
+    /// Marks the reticle as "target too far away", switching it to the too-far color.
+    /// </summary>
     public void SetTooFarState(bool state)
     {
         isTooFar = state;
-        // If we are setting too far to true, make sure canInteract is false
         if (state) canInteract = false;
     }
 }

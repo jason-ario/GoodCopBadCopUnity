@@ -110,22 +110,15 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
-        // Left click behaviour depends on whether the player is holding an item:
-        // - Empty hands: standard world interact (pick up or interact)
-        // - Holding item: uses the held item (item-on-item or TryUseObject), never triggers world interact
-        if (Input.GetMouseButtonDown(0))
+        // LMB and E are interchangeable — both trigger the same interaction path.
+        // Empty-handed: world interact (InteractAlternate, which falls back to Interact by default).
+        // Holding item: use the held item on a world target (item-on-item or TryUseObject).
+        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E))
         {
             if (_playerPickupController.HeldObject == null)
-                TryWorldInteract(alternate: false);
+                TryWorldInteract(alternate: true);
             else
                 TryItemUse();
-        }
-
-        // E key: always fires the alternate interaction (e.g. extract from a container),
-        // falling back to standard interact for objects that don't override InteractAlternate.
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            TryWorldInteract(alternate: true);
         }
     }
     

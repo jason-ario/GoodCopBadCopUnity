@@ -137,7 +137,7 @@ public class DialogueManager : NetworkBehaviour
 
     IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null)
     {
-        float duration = dialogue.Length * secondsPerCharacter;
+        float duration = dialogue.Length * secondsPerCharacter * 0.5f;
         float timer = 0;
         int lastClipIndex = -1;
 
@@ -242,6 +242,13 @@ public class DialogueManager : NetworkBehaviour
         Subtitles subtitles = Instantiate(isPlayer ? playerSubtitlesPrefab : NPCSubtitlesPrefab, subtitlesContainer);
 
         subtitles.SetText(text, characterName, nameColor);
+
+        // Apply wobble effect if primed for this line (NPC lines only).
+        if (!isPlayer && _nextLineWobble)
+        {
+            subtitles.SetWobble(true);
+            _nextLineWobble = false;
+        }
         subtitles.transform.SetAsLastSibling();
 
         if (waitForInput)
@@ -285,6 +292,19 @@ public class DialogueManager : NetworkBehaviour
 
     private bool _dialogueInputReceived = false;
 
+    // -------------------------------------------------------------------------
+    // Wobble text — consumed once when the next NPC subtitle is spawned.
+    // -------------------------------------------------------------------------
+
+    private bool _nextLineWobble = false;
+
+    /// <summary>
+    /// Primes the next NPC subtitle spawned via <see cref="SpawnSubtitles"/> to use the
+    /// vertex-wobble text effect. The flag is consumed and cleared on use.
+    /// Called by <see cref="ScriptedDialogueRunner"/> via ClientRpc before each line.
+    /// </summary>
+    public void SetNextLineWobble(bool wobble) => _nextLineWobble = wobble;
+
     /// <summary>
     /// Called by any client pressing Space — notifies the server to advance for everyone.
     /// </summary>
@@ -298,6 +318,7 @@ public class DialogueManager : NetworkBehaviour
     private void AdvanceDialogueClientRpc()
     {
         _dialogueInputReceived = true;
+        StopDialogueAudio();
     }
 
     public IEnumerator WaitForInputRoutine(Action onComplete = null)
