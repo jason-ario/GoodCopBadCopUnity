@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: ButcherIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: First shift at this post? I can always tell. You're deciding whether
+      to say something about the face or pretend it's completely normal. You don't
+      have to pick one.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "Meat grinder. Three years back. If you're wondering how bad \u2014
+      bad enough that the gauze is permanent. I tried going without it once. Cleared
+      the whole market row in under a minute."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Did it hurt?
+      npcResponse: Not the way you'd expect. The machine's fast. You don't really
+        feel it until an hour later, when the adrenaline drops and you look down
+        at what you're holding.
+      animationTrigger: TalkLookDown
+    - playerChoiceText: You went back to work after that?
+      npcResponse: "Next morning. My brother wanted me to take a week off. I told
+        him the cows were already dead \u2014 they weren't getting any fresher."
+      animationTrigger: TalkSmile
+  - type: 0
+    npcLine: "Pavle Asatiani. Everyone at the market calls me the Butcher, which
+      \u2014 yes, that is literally my job. It was never a very creative nickname."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: I run the stall at the end of the market row. Beef, pork, whatever the
+      distributors can still push through the gates. Business has picked up since
+      the quarantine started. People eat when they're afraid. I've stopped being
+      surprised by it.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "You'll be seeing me fairly often \u2014 late shifts, after close. You'll
+      get used to the face. Everyone does, by the third or fourth time."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I'm not bothered by it.
+      npcResponse: Good. That saves us both some time.
+      animationTrigger: TalkSmile
+    - playerChoiceText: What does your brother think?
+      npcResponse: "He cried for a week. Still tears up sometimes if the light catches
+        it wrong. I keep telling him I'm fine \u2014 I'm the one wearing it."
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: "Papers are right here. The red on the corner is from work. It's always
+      from work. Everything's in order \u2014 I'm meticulous about paperwork. You'd
+      be surprised what happens to a business when you're not."
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
