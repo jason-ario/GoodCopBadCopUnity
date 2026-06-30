@@ -43,6 +43,35 @@ public class Day_01 : DayBase
     [Tooltip("Vlad's SuspectCharacter prefab — spawned as the first visitor on Day 1 via SuspectController.")]
     [SerializeField] private SuspectCharacter _vladPrefab;
 
+    [Tooltip("Ivan's SuspectCharacter prefab — force-spawned as the second visitor after Vlad's closing cutscene.")]
+    [SerializeField] private SuspectCharacter _ivanPrefab;
+
+    [Header("Day 1 — Ivan Dialogue")]
+    [Tooltip("Scripted dialogue sequence to play once Ivan arrives at the booth window.")]
+    [SerializeField] private ScriptedDialogue _ivanDialogue;
+
+    [Tooltip("Seconds after Ivan arrives at the window before his dialogue sequence begins.")]
+    [SerializeField] private float _ivanDialogueStartDelay = 1.2f;
+
+    [Header("Day 1 — Ivan Documentation Tutorial")]
+    [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
+    [SerializeField] private string _documentationExamItemName = "Documentation Exam";
+
+    [Tooltip("Number of documentation anomalies to force-activate on Ivan for the Day 1 tutorial.")]
+    [SerializeField] private int _ivanDocumentationAnomalyCount = 2;
+
+    [Tooltip("Task text shown while the player needs to get a documentation checklist.")]
+    [SerializeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
+
+    [Tooltip("Task text shown while the player needs to check documentation anomalies and file the page.")]
+    [SerializeField] private string _taskCheckDocumentationText = "Check documentation anomalies and add the page to the folder";
+
+    [Tooltip("First megaphone scripted dialogue — plays when the player first picks up one of Ivan's documents.")]
+    [SerializeField] private ScriptedDialogue _ivanMegaphonePart1;
+
+    [Tooltip("Second megaphone scripted dialogue — plays after the player picks up the documentation checklist.")]
+    [SerializeField] private ScriptedDialogue _ivanMegaphonePart2;
+
     [Tooltip("Seconds after OnDayStart fires before the shutter opens and Vlad is triggered.")]
     [SerializeField] private float _shutterOpenDelay = 7f;
 
@@ -132,6 +161,14 @@ public class Day_01 : DayBase
     private PickableObject _vladAppForm;
     private int _docsPickedUp;
 
+    // Tracks which of Ivan's two documents have been spawned — used to wire pickup triggers.
+    private PickableObject _ivanDoc1;
+    private PickableObject _ivanDoc2;
+
+    // Active Ivan documentation tutorial tasks.
+    private TutorialTask _taskGetChecklist;
+    private TutorialTask _taskCheckDocumentation;
+
     // Tracks how many of Vlad's documents have been filed into a folder.
     private int _docsFiledCount;
 
@@ -166,7 +203,10 @@ public class Day_01 : DayBase
 
         ShiftManager.Instance.OnDayStart += OnDayStarted;
         SuspectController.OnSuspectArrived += OnVladArrivedAtWindow;
-        SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned;
+        SuspectController.OnSuspectArrived += OnRandomSuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived += OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived += OnIvanArrivedAtWindow;
+        SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned; // advances through random → doc anomaly → Ivan
         FolderController.OnDocumentAdded += OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
 
@@ -199,9 +239,18 @@ public class Day_01 : DayBase
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
+        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
+        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -212,6 +261,7 @@ public class Day_01 : DayBase
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
+        UnsubscribeIvanDocumentPickupEvents();
 
         StopAllCoroutines();
 
@@ -227,9 +277,18 @@ public class Day_01 : DayBase
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
+        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
+        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -240,6 +299,7 @@ public class Day_01 : DayBase
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
+        UnsubscribeIvanDocumentPickupEvents();
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -368,9 +428,16 @@ public class Day_01 : DayBase
     /// <summary>
     /// Fires on all clients when Vlad's paperwork spawns. Hooks OnPickedUpEvent on both
     /// documents so we can track when the local player picks them up.
+    /// Immediately swaps the subscription so the random suspect's paperwork (spawned after
+    /// Vlad leaves) is handled by <see cref="OnRandomSuspectPaperworkSpawned"/>, which in
+    /// turn swaps to <see cref="OnIvanPaperworkSpawned"/> so only Ivan (suspect index 2)
+    /// triggers the documentation tutorial.
     /// </summary>
     private void OnVladPaperworkSpawned(IDCard card, PickableObject appForm)
     {
+        // Advance the chain: random suspect's paperwork goes to the next handler, not Ivan's.
+        SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned += OnRandomSuspectPaperworkSpawned;
         _vladIDCard = card;
         _vladAppForm = appForm;
 
@@ -384,6 +451,17 @@ public class Day_01 : DayBase
         // via NotifyPaperworkSpawnedClientRpc so no extra RPC is needed.
         _taskPickUp = new TutorialTask(_taskPickUpDocs);
         GuidebookTaskRegistry.Instance.AddThreat(_taskPickUp);
+    }
+
+    /// <summary>
+    /// Fires on all clients when the random (second) suspect's paperwork spawns.
+    /// Advances the handler chain so the third suspect's (doc-anomaly) paperwork
+    /// triggers the documentation tutorial.
+    /// </summary>
+    private void OnRandomSuspectPaperworkSpawned(IDCard card, PickableObject appForm)
+    {
+        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned += OnDocAnomalySuspectPaperworkSpawned;
     }
 
     private void OnVladDocumentPickedUp()
@@ -424,6 +502,168 @@ public class Day_01 : DayBase
         {
             _vladAppForm.OnPickedUpEvent -= OnVladDocumentPickedUp;
             _vladAppForm = null;
+        }
+    }
+
+    private void UnsubscribeIvanDocumentPickupEvents()
+    {
+        if (_ivanDoc1 != null) { _ivanDoc1.OnPickedUpEvent -= OnIvanPickupTrigger; _ivanDoc1 = null; }
+        if (_ivanDoc2 != null) { _ivanDoc2.OnPickedUpEvent -= OnIvanPickupTrigger; _ivanDoc2 = null; }
+        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
+    }
+
+    // -------------------------------------------------------------------------
+    // Documentation Anomaly Suspect Paperwork & Tutorial (index 2)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when the documentation-anomaly suspect's paperwork spawns
+    /// (suspect index 2). Hooks pickup triggers on both documents and any folder equip so
+    /// that the first pickup starts the megaphone tutorial sequence.
+    /// Advances the chain to <see cref="OnIvanPaperworkSpawned"/> for Ivan's turn.
+    /// </summary>
+    private void OnDocAnomalySuspectPaperworkSpawned(IDCard card, PickableObject appForm)
+    {
+        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned += OnIvanPaperworkSpawned;
+
+        _ivanDoc1 = card;
+        _ivanDoc2 = appForm;
+
+        if (card != null)    card.OnPickedUpEvent    += OnIvanPickupTrigger;
+        if (appForm != null) appForm.OnPickedUpEvent  += OnIvanPickupTrigger;
+        FolderController.OnFolderEquipped += OnIvanPickupTrigger;
+    }
+
+    // -------------------------------------------------------------------------
+    // Ivan Paperwork (index 3)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when Ivan's paperwork spawns (suspect index 3).
+    /// The documentation tutorial was already completed on suspect index 2 — no pickup
+    /// triggers are needed here. Simply cleans up the subscription.
+    /// </summary>
+    private void OnIvanPaperworkSpawned(IDCard card, PickableObject appForm)
+    {
+        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
+    }
+
+    /// <summary>
+    /// Fires when the player picks up one of Ivan's documents or any folder.
+    /// Kicks off the documentation tutorial — subscribes for single-fire then shows the
+    /// first tutorial task and starts the megaphone bark sequence on the server.
+    /// Signature matches both <see cref="PickableObject.OnPickedUpEvent"/> (Action)
+    /// and <see cref="FolderController.OnFolderEquipped"/> (Action&lt;FolderController&gt;)
+    /// via separate adapter overloads below.
+    /// </summary>
+    private void StartIvanDocumentationTutorial()
+    {
+        // Single-fire — remove all triggers immediately.
+        UnsubscribeIvanDocumentPickupEvents();
+
+        // Task 1: shown on all clients right away.
+        _taskGetChecklist = new TutorialTask(_taskGetChecklistText);
+        GuidebookTaskRegistry.Instance.AddThreat(_taskGetChecklist);
+
+        // Subscribe completion handlers on all clients.
+        ExamNotebook.AnyExamNotebookPickedUp = false;
+        ExamNotebook.OnAnyExamNotebookPickedUp += OnIvanExamPickedUp;
+        ExamNotebook.AnyPageFiled = false;
+        ExamNotebook.OnAnyNotebookPageFiled += OnIvanPageFiled;
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            StartCoroutine(IvanDocumentationBarkRoutine());
+    }
+
+    // Parameterless adapter — used by PickableObject.OnPickedUpEvent.
+    private void OnIvanPickupTrigger() => StartIvanDocumentationTutorial();
+
+    // FolderController.OnFolderEquipped passes the instance — we ignore it.
+    private void OnIvanPickupTrigger(FolderController _) => StartIvanDocumentationTutorial();
+
+    /// <summary>
+    /// Fires on all clients when the player picks up any exam notebook.
+    /// Completes the "get checklist" task and activates the "check anomalies" task.
+    /// </summary>
+    private void OnIvanExamPickedUp()
+    {
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
+
+        if (_taskGetChecklist != null)
+        {
+            GuidebookTaskRegistry.Instance.RemoveThreat(_taskGetChecklist);
+            _taskGetChecklist = null;
+        }
+
+        _taskCheckDocumentation = new TutorialTask(_taskCheckDocumentationText);
+        GuidebookTaskRegistry.Instance.AddThreat(_taskCheckDocumentation);
+    }
+
+    /// <summary>
+    /// Fires on all clients when any exam notebook page is filed into a folder.
+    /// Completes the "check anomalies" task.
+    /// </summary>
+    private void OnIvanPageFiled()
+    {
+        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
+
+        if (_taskCheckDocumentation != null)
+        {
+            GuidebookTaskRegistry.Instance.RemoveThreat(_taskCheckDocumentation);
+            _taskCheckDocumentation = null;
+        }
+    }
+
+    /// <summary>
+    /// Server-only coroutine. Plays the documentation tutorial megaphone dialogue sequences:
+    ///   — Part 1: two lines explaining the paperwork discrepancy (clickable subtitles).
+    ///   — Makes the documentation exam free and waits for the player to pick it up.
+    ///   — Part 2: four follow-up lines explaining documentation anomalies.
+    /// Both parts are played through <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/>
+    /// so the player clicks to advance each line exactly as with character dialogue.
+    /// </summary>
+    private IEnumerator IvanDocumentationBarkRoutine()
+    {
+        var runner = ScriptedDialogueRunner.Instance;
+        var mgr = MegaphoneDialogueManager.Instance;
+        if (runner == null) yield break;
+
+        // ── Part 1: 2 intro lines ─────────────────────────────────────────────
+        if (_ivanMegaphonePart1 != null)
+        {
+            bool part1Done = false;
+            runner.PlayMegaphoneDialogue(_ivanMegaphonePart1, () => part1Done = true);
+            yield return new WaitUntil(() => part1Done);
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] _ivanMegaphonePart1 is not assigned — skipping first megaphone sequence.");
+        }
+
+        // Make the documentation exam free for this pass only.
+        if (mgr != null)
+            mgr.SetShopItemPriceOverrideSynced(_documentationExamItemName, 0);
+
+        // Wait for the player to pick up the exam (flag set on all clients via ExamNotebook.OnPickedUp).
+        yield return new WaitUntil(() => ExamNotebook.AnyExamNotebookPickedUp);
+
+        // Restore the price now that the freebie has been claimed.
+        if (mgr != null)
+            mgr.ClearShopItemPriceOverrideSynced(_documentationExamItemName);
+
+        yield return new WaitForSeconds(0.5f);
+
+        // ── Part 2: 4 follow-up lines ─────────────────────────────────────────
+        if (_ivanMegaphonePart2 != null)
+        {
+            bool part2Done = false;
+            runner.PlayMegaphoneDialogue(_ivanMegaphonePart2, () => part2Done = true);
+            yield return new WaitUntil(() => part2Done);
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] _ivanMegaphonePart2 is not assigned — skipping second megaphone sequence.");
         }
     }
 
@@ -573,13 +813,133 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called on the server once the closing scripted dialogue finishes.
-    /// Clears the verdict block and delivers any folder that was held back during the cutscene.
+    /// Suppresses Vlad's exit line, then lets a random clean suspect walk through
+    /// naturally (index 1) before Ivan arrives (index 2). The Ivan intercept is armed
+    /// by <see cref="OnRandomSuspectArrivedAtWindow"/> once that suspect reaches the window.
     /// </summary>
     private void OnClosingDialogueComplete()
     {
+        // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
+        SuspectController.ForceNextSuspectSkipExitDialogue = true;
+
+        // The next spawn slot (index 1) is a random civilian — no anomalies, normal entry
+        // dialogue and paperwork. No intercept needed; just mark them clean.
+        SuspectController.ForceNextSuspectClean = true;
+
         DeliverDeferredVerdict();
         Debug.Log("[Day_01] Closing dialogue complete — deferred verdict delivered.");
     }
+
+    // -------------------------------------------------------------------------
+    // Random Suspect (index 1) — clean civilian between Vlad and the tutorial suspects
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 1 (the random clean
+    /// civilian following Vlad). Simply unsubscribes; no intercept is needed because the
+    /// next spawn (index 2) should be a random suspect that receives documentation anomalies
+    /// when they arrive via <see cref="OnDocAnomalySuspectArrivedAtWindow"/>.
+    /// </summary>
+    private void OnRandomSuspectArrivedAtWindow(int index)
+    {
+        if (index != 1) return;
+        SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
+        Debug.Log("[Day_01] Random clean suspect (index 1) arrived — no intercept needed.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Documentation Anomaly Suspect (index 2) — teaches the exam notebook tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 2 (the random suspect
+    /// that carries a documentation anomaly). Server-side:
+    ///   — Forces documentation anomalies onto the current suspect so the player has something
+    ///     to find with the exam notebook checklist.
+    ///   — Arms the Ivan intercept so the very next spawn (index 3) delivers Ivan.
+    /// Unsubscribes itself so it only fires once per day.
+    /// </summary>
+    private void OnDocAnomalySuspectArrivedAtWindow(int index)
+    {
+        if (index != 2) return;
+        SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        // Give this random suspect a documentation anomaly for the player to detect.
+        SuspectController.Instance.CurrentSuspect?
+            .InitializeWithDocumentationAnomalies(_ivanDocumentationAnomalyCount);
+
+        // Queue Ivan for the next spawn (index 3).
+        if (_ivanPrefab != null)
+        {
+            SuspectController.InterceptNextSuspectSpawn = () =>
+            {
+                SuspectController.ForceNextSuspectSkipEntryDialogue = true;
+                SuspectController.ForceNextSuspectNoPaperwork = true;
+                SuspectController.Instance.SpawnScriptedSuspect(_ivanPrefab);
+            };
+
+            Debug.Log("[Day_01] Doc-anomaly suspect (index 2) arrived — Ivan intercept armed for next spawn.");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Ivan Scripted Dialogue (index 3)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 3 (Ivan) and —
+    /// server-only — starts his scripted dialogue after a brief settle delay.
+    /// Unsubscribes itself so it can only fire once per day.
+    /// </summary>
+    private void OnIvanArrivedAtWindow(int index)
+    {
+        if (index != 3) return;
+
+        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (_ivanDialogue == null)
+        {
+            Debug.LogWarning("[Day_01] _ivanDialogue is not assigned — skipping Ivan's scripted dialogue.");
+            // Fall back: spawn paperwork immediately so Ivan can be processed normally.
+            SuspectController.Instance?.SpawnPaperwork();
+            return;
+        }
+
+        StartCoroutine(WaitAndStartIvanDialogue());
+    }
+
+    private IEnumerator WaitAndStartIvanDialogue()
+    {
+        yield return new WaitForSeconds(_ivanDialogueStartDelay);
+
+        SuspectCharacter ivan = SuspectController.Instance?.CurrentSuspect;
+        if (ivan == null)
+        {
+            Debug.LogWarning("[Day_01] CurrentSuspect is null when trying to start Ivan's dialogue.");
+            SuspectController.Instance?.SpawnPaperwork();
+            yield break;
+        }
+
+        ScriptedDialogueRunner.Instance.PlayDialogue(ivan, _ivanDialogue, OnIvanDialogueComplete);
+    }
+
+    /// <summary>
+    /// Called on the server once Ivan's scripted dialogue finishes.
+    /// Spawns his paperwork so the player can process him normally.
+    /// </summary>
+    private void OnIvanDialogueComplete()
+    {
+        Debug.Log("[Day_01] Ivan scripted dialogue complete — spawning his paperwork.");
+        SuspectController.Instance?.SpawnPaperwork();
+    }
+
+    // -------------------------------------------------------------------------
+    // Deferred Verdict
+    // -------------------------------------------------------------------------
 
     private void DeliverDeferredVerdict()
     {

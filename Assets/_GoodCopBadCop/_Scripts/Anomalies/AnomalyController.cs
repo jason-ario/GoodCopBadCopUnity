@@ -209,6 +209,34 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
+    /// Activates exactly <paramref name="count"/> anomalies from the documentation pool only.
+    /// All other categories are fully disabled. Used for tutorial suspects (e.g. Ivan on Day 1)
+    /// that must exhibit documentation discrepancies and nothing else.
+    /// </summary>
+    public void InitializeWithDocumentationAnomalies(int count)
+    {
+        DisabledAnomalySiblingIndices.Clear();
+        activeAnomalies.Clear();
+
+        // Disable every non-documentation anomaly first.
+        var others = new System.Collections.Generic.List<Anomaly>();
+        others.AddRange(_vitalsAnomalies.Cast<Anomaly>());
+        others.AddRange(_behaviorAnomalies.Cast<Anomaly>());
+        others.AddRange(_mutationAnomalies.Cast<Anomaly>());
+        others.AddRange(_supernaturalAnomalies.Cast<Anomaly>());
+        foreach (Anomaly a in others) InitializeDisabled(a);
+
+        // Shuffle and activate the requested count from the documentation pool.
+        var docPool = _documentationAnomalies.Cast<Anomaly>().ToList();
+        ShuffleList(docPool);
+        int toActivate = Mathf.Min(count, docPool.Count);
+        for (int i = 0; i < toActivate; i++) ActivateAnomaly(docPool[i]);
+        for (int i = toActivate; i < docPool.Count; i++) InitializeDisabled(docPool[i]);
+
+        Debug.Log($"[AnomalyController] Documentation-only init: {toActivate}/{docPool.Count} anomaly/ies active.");
+    }
+
+    /// <summary>
     /// Disables every anomaly without any transition. Guarantees a clean suspect regardless
     /// of prior state.
     /// </summary>

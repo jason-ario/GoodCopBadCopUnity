@@ -60,6 +60,19 @@ public class ExamNotebook : PickableObject
     public static bool AnyPageFiled;
 
     /// <summary>
+    /// Fired on all clients when any exam notebook is picked up by a player.
+    /// Subscribe in tutorial scripts to detect when the player has acquired a checklist.
+    /// </summary>
+    public static event System.Action OnAnyExamNotebookPickedUp;
+
+    /// <summary>
+    /// Set to true on all clients the moment any exam notebook is picked up.
+    /// Reset this to false before starting any beat that gates on the player acquiring
+    /// a checklist, so an early pickup is still captured via the flag.
+    /// </summary>
+    public static bool AnyExamNotebookPickedUp;
+
+    /// <summary>
     /// Returns true when every visible checklist item on the current page is checked.
     /// Use as a <c>WaitUntil</c> condition in tutorial coroutines.
     /// </summary>
@@ -456,6 +469,9 @@ public class ExamNotebook : PickableObject
         base.OnPickedUp();
         // Always restore live pages when picked up out of a box or off the floor.
         SetPagesActive(true);
+        // Notify tutorial systems on all clients that a checklist has been acquired.
+        AnyExamNotebookPickedUp = true;
+        OnAnyExamNotebookPickedUp?.Invoke();
     }
 
     public override void OnDropped()

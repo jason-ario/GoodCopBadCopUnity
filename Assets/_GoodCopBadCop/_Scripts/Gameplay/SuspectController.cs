@@ -60,6 +60,14 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static bool ForceNextSuspectNoPaperwork = false;
 
+    /// <summary>
+    /// When true, the current suspect's exit dialogue is suppressed — no line is spoken as
+    /// they leave. Consumed and reset to false inside <see cref="PassSequence"/> immediately
+    /// before the <see cref="SayExitDialogue"/> call. Set by Day_01 after Vlad's closing
+    /// cutscene so his goodbye line does not play on top of the scripted sequence.
+    /// </summary>
+    public static bool ForceNextSuspectSkipExitDialogue = false;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -749,7 +757,12 @@ public class SuspectController : NetworkBehaviour
         }
 
         
-        if (IsServer) SayExitDialogue(thisCharacter, SuspectData.Verdict.Passed);
+        if (IsServer)
+        {
+            bool skipExit = ForceNextSuspectSkipExitDialogue;
+            ForceNextSuspectSkipExitDialogue = false;
+            if (!skipExit) SayExitDialogue(thisCharacter, SuspectData.Verdict.Passed);
+        }
 
         yield return new WaitForSeconds(2f);
 

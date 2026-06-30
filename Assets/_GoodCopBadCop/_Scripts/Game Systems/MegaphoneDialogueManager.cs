@@ -26,6 +26,12 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI _barkText;
     [SerializeField] private Animator _speakerAnimator;
 
+    [Header("Megaphone Camera")]
+    [Tooltip("The camera that frames the megaphone speaker during tutorial cutscenes. " +
+             "Assign the child 'Megaphone Camera' of this manager. " +
+             "Use SetMegaphoneCameraActive to show/hide it from server-side tutorial coroutines.")]
+    [SerializeField] private Transform _megaphoneCameraTransform;
+
     [Header("Dialogue Positioning")]
     [SerializeField] private RectTransform _megaphoneDialogueRect;
     [SerializeField] private RectTransform _dialogueTopPos;
@@ -450,6 +456,35 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// Server-only: activates or deactivates the megaphone camera on every client simultaneously.
+    /// The camera is defined by the <c>_megaphoneCameraTransform</c> field assigned in the Inspector.
+    /// Used by tutorial coroutines (e.g. Day_01) to cut to the speaker during bark sequences.
+    /// </summary>
+    public void SetMegaphoneCameraActive(bool active)
+    {
+        if (!IsServer) return;
+        if (_megaphoneCameraTransform == null)
+        {
+            Debug.LogWarning("[MegaphoneDialogueManager] SetMegaphoneCameraActive: no camera assigned.");
+            return;
+        }
+        SetGameObjectActiveSynced(_megaphoneCameraTransform, active);
+    }
+
+    /// <summary>
+    /// The audio clips used for megaphone speech.
+    /// Exposed so <see cref="ScriptedDialogueRunner"/> can route audio through the
+    /// standard dialogue audio system when playing megaphone scripted dialogue.
+    /// </summary>
+    public AudioClip[] AudioClips => _audioClips;
+
+    /// <summary>
+    /// The AudioSource used for megaphone speech playback.
+    /// Exposed so <see cref="ScriptedDialogueRunner"/> can play audio on the correct source.
+    /// </summary>
+    public AudioSource MegaphoneAudioSource => _audioSource;
 
     /// <summary>
     /// Server-only: marks the named <see cref="ShopItem"/> as available on every client and

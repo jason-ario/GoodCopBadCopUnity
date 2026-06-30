@@ -193,7 +193,21 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
-    /// Initializes the suspect with exactly <paramref name="count"/> anomalies chosen from the
+    /// Initializes this suspect with documentation-only anomalies.
+    /// All other anomaly categories are disabled. Used for scripted tutorial suspects
+    /// (e.g. Ivan on Day 1) that must exhibit paperwork discrepancies and nothing else.
+    /// Syncs disabled anomaly states to all clients.
+    /// </summary>
+    public void InitializeWithDocumentationAnomalies(int count)
+    {
+        anomalyController.InitializeWithDocumentationAnomalies(count);
+
+        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
+            SyncInitializeDisabledClientRpc(siblingIndex);
+    }
+
+    /// <summary>
+    /// Initializes this suspect with exactly <paramref name="count"/> anomalies chosen from the
     /// currently unlocked pool. The clean-chance roll is bypassed. Used for tutorial suspects
     /// that must always exhibit a specific number of anomalies.
     /// </summary>

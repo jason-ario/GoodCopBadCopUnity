@@ -48,6 +48,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
              "An empty trigger deactivates overrides and returns to the default suspect cam.")]
     [SerializeField] private ScriptedCameraEntry[] _cameras;
 
+    [Header("Megaphone Speaker")]
+    [Tooltip("Speaker name shown in subtitles when playing megaphone scripted dialogue.")]
+    [SerializeField] private string _megaphoneSpeakerName = "Megaphone";
+
+    [Tooltip("Name colour for megaphone subtitles.")]
+    [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f); // orange
+
     // Set true while coroutines are waiting for player E / left-click input so that
     // Update can send AdvanceDialogueServerRpc on mouse-click in addition to E key.
     private bool _awaitingScriptedInput;
@@ -91,6 +98,26 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         }
 
         StartCoroutine(RunDialogue(speaker, dialogue, onComplete));
+    }
+
+    /// <summary>
+    /// Plays a scripted dialogue sequence using the megaphone speaker identity (no NPC character
+    /// required). Lines are displayed with the configured megaphone name and colour, audio is
+    /// routed through <see cref="MegaphoneDialogueManager"/>, and the player can click to advance
+    /// exactly as with character dialogue. Must be called on the server.
+    /// </summary>
+    public void PlayMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete = null)
+    {
+        if (!IsServer) return;
+
+        if (dialogue == null || dialogue.nodes == null || dialogue.nodes.Length == 0)
+        {
+            Debug.LogError("[ScriptedDialogueRunner] PlayMegaphoneDialogue called with null or empty data.");
+            onComplete?.Invoke();
+            return;
+        }
+
+        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete));
     }
 
     // -------------------------------------------------------------------------
@@ -164,6 +191,56 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true);
         yield return StartCoroutine(DialogueManager.Instance.WaitForInputRoutine());
         _awaitingScriptedInput = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Megaphone sequence
+    // -------------------------------------------------------------------------
+
+    private IEnumerator RunMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete)
+    {
+        EnterScriptedModeClientRpc();
+        yield return null; // flush RPCs before the first line
+
+        foreach (var node in dialogue.nodes)
+        {
+            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
+            SetWobbleClientRpc(node.wobbleText);
+            yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine));
+        }
+
+        ExitScriptedModeClientRpc();
+        yield return null;
+
+        onComplete?.Invoke();
+        Debug.Log("[ScriptedDialogueRunner] Megaphone dialogue complete.");
+    }
+
+    private IEnumerator SayMegaphoneLineAndWait(string text)
+    {
+        _awaitingScriptedInput = true;
+        SayMegaphoneLineClientRpc(text);
+        yield return StartCoroutine(DialogueManager.Instance.WaitForInputRoutine());
+        _awaitingScriptedInput = false;
+    }
+
+    /// <summary>
+    /// Displays a subtitle line using the megaphone speaker identity and plays its audio
+    /// through <see cref="MegaphoneDialogueManager"/>. Uses the standard dialogue audio slot
+    /// so the player clicking to advance stops the audio, matching character dialogue behaviour.
+    /// </summary>
+    [ClientRpc]
+    private void SayMegaphoneLineClientRpc(string text)
+    {
+        var mgr = MegaphoneDialogueManager.Instance;
+        AudioClip[] clips = mgr != null ? mgr.AudioClips : System.Array.Empty<AudioClip>();
+        AudioSource source = mgr != null ? mgr.MegaphoneAudioSource : null;
+
+        DialogueManager.Instance.SpawnSubtitles(text, _megaphoneSpeakerName, _megaphoneSpeakerColor,
+            isPlayer: false, clearHistory: false, waitForInput: true);
+
+        if (clips.Length > 0 && source != null)
+            DialogueManager.Instance.PlayDialogueAudio(text, clips, source);
     }
 
     private IEnumerator PlayChoiceNode(SuspectCharacter speaker, ScriptedDialogueNode node, ulong speakerNetId)

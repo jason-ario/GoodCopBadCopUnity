@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: IvanDay1Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: Oh! A new face! Ha! First day, yes? I can always tell. There is a freshness
+      about you. Very wide eyes. I love wide eyes!
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Ivan Tarkov. Factory worker. Third residential block. I pass through
+      here every evening, same time, same smile. Reliable as a clock!
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: The officer before you was very observant. Very sharp. Very dedicated
+      to her work. Then one day she simply... stopped showing up. These things happen,
+      I suppose!
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: Tell me, do you enjoy meeting people in this line of work? I think it
+      is the very best part!
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: It's part of the job.
+      npcResponse: Of course! Give it time, though. You will find every face becomes
+        memorable. Some more than others. Naturally.
+      animationTrigger: TalkCocky
+    - playerChoiceText: People are interesting.
+      npcResponse: "Yes! Exactly! And the most interesting part \u2014 they rarely
+        notice when someone is paying very close attention. Ha!"
+      animationTrigger: TalkSmile
+  - type: 0
+    npcLine: You should smile more, officer. I have found that a smile makes even
+      the most guarded person feel completely at ease. It is a wonderful, wonderful
+      tool.
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: But you have work to do, and I do not want to keep you. Here are my
+      papers. Everything is in order, as always. I am a very tidy person.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
