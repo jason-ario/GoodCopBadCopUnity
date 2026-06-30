@@ -43,7 +43,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 818bfa774dbdf4740b77f7dbbba112e1, type: 3}
   CharacterPrefab: {fileID: 0}
   entryReasons:
@@ -90,6 +93,20 @@ MonoBehaviour:
       It is soon.
     - I know you. You have been here before. We have met. You waved at me once.
     - I do not need much time. I know the questions. I will answer the ones I can.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -125,6 +142,7 @@ MonoBehaviour:
   - I did not understand. I had my papers. I had everything right.
   - "Is the ceremony\u2026 will someone tell them I\u2026 tell them I tried to\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: c73bcde73ca45b24c870219573f99a55, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: Home. I was home all morning. I had to air out the dress.
@@ -138,6 +156,9 @@ MonoBehaviour:
       White and ivory.
     mismatchFinalDaysAnswer: I was at the venue. Confirming details. The ceremony
       is very soon now.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: No. I feel completely fine. I have felt fine for a long time.
     midDaysAnswer: I lose track of things sometimes. Days. Not days. Smaller things.
@@ -150,6 +171,9 @@ MonoBehaviour:
       well. No confusion at all.
     mismatchFinalDaysAnswer: I am completely fine. Very sharp. I know exactly where
       I have been and why.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Alone. For now. That will change soon.
     midDaysAnswer: Just me. I used to have a cat. She is gone now.
@@ -161,6 +185,9 @@ MonoBehaviour:
       go out much anymore.
     mismatchFinalDaysAnswer: We are both there. In the apartment. He is waiting for
       me right now. I should not be long.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - I know you are not supposed to ask about the dress. Most people do not ask.
@@ -178,4 +205,7 @@ MonoBehaviour:
     - Everyone always looks at the dress first. I understand. It is a very white
       dress.
     - I have been counting the days. I stopped when I lost count. It was a high number.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 9307225

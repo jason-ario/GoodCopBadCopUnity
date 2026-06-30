@@ -36,7 +36,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 30d9fd93b64c49a44b3167ac12e8d9fc, type: 3}
   CharacterPrefab: {fileID: 2375822077373008184, guid: e33933abdd1d70b47b6535c3b5b71a4b, type: 3}
   entryReasons:
@@ -85,6 +88,20 @@ MonoBehaviour:
       I\u2019m just very tired."
     - The light in here is very harsh. Does it bother you? I think it disrupts the
       pineal gland.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -113,12 +130,15 @@ MonoBehaviour:
   quarantineExitLines:
   - "Okay. Okay. I\u2019m trusting the process. I\u2019m trusting the process."
   - Can someone just please check on Grandma? She needs her pills at noon.
-  - "The universe has a plan. It has a plan. I\u2019m choosing to believe that right now."
+  - "The universe has a plan. It has a plan. I\u2019m choosing to believe that right
+    now."
   killExitLines:
   - "The universe was supposed to\u2026 I thought if I just\u2026 stayed aligned\u2026"
   - "Grandma\u2026 please\u2026 someone take care of\u2026 Grandma\u2026"
-  - "It\u2019s alright\u2026 it\u2019s all energy\u2026 it doesn\u2019t disappear\u2026 it just\u2026 changes\u2026"
+  - "It\u2019s alright\u2026 it\u2019s all energy\u2026 it doesn\u2019t disappear\u2026
+    it just\u2026 changes\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 33ddb359e2acbeb45bec921f11e1d7d4, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The clinic. Morning shift. Three hours, then a lecture.
@@ -130,6 +150,9 @@ MonoBehaviour:
       No shortages at all.
     mismatchFinalDaysAnswer: The pharmacy. Very easy. In and out. Nothing unusual.
       Fully stocked.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: Some fatigue. But I've been meditating more to compensate. The
       body knows what it needs.
@@ -143,6 +166,9 @@ MonoBehaviour:
       The meditation is really working.
     mismatchFinalDaysAnswer: No gaps. My memory is perfect. I can account for every
       moment. Every single one.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My grandmother, Mzia. I moved in a few months ago to help take
       care of her.
@@ -155,11 +181,15 @@ MonoBehaviour:
       Very aligned with my values.
     mismatchFinalDaysAnswer: No one. My grandmother passed some time ago. I've been
       on my own since then. It's been okay.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Good energy at this post today. I mean that literally, I can feel it.
     - Are you hydrated? You look dehydrated. The body always knows what it needs.
-    - I have been burning sage in my building. My neighbor thinks it helps. I do too. Mostly.
+    - I have been burning sage in my building. My neighbor thinks it helps. I do
+      too. Mostly.
     midDays:
     - Breathe through it, officer. That is what I keep telling my patients.
     - My hands shake a little in the mornings. Mercury retrograde, probably.
@@ -168,4 +198,7 @@ MonoBehaviour:
     - I am just trying to stay grounded. My grandmother says that a lot. It helps.
     - The frequency in this air is very strange right now. Can you feel it?
     - I am fine. I say that to everyone. I am still deciding if it is true.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 9134825

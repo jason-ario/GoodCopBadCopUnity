@@ -39,6 +39,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// </summary>
     public static bool IsAnyViewActive { get; private set; }
 
+    /// <summary>
+    /// The currently active diegetic view instance, or null if none is open.
+    /// Use <c>DiegeticViewController.Current?.Close()</c> to dismiss whichever
+    /// view is open without knowing its concrete type.
+    /// </summary>
+    public static DiegeticViewController Current { get; private set; }
+
     /// <summary>The interaction controller of the player who opened this view.</summary>
     protected PlayerInteractionController Player { get; private set; }
 
@@ -71,6 +78,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         Player = player;
         IsActive = true;
         IsAnyViewActive = true;
+        Current = this;
 
         // Activate the view camera — Cinemachine blends to it automatically.
         if (_viewCamera != null)
@@ -113,6 +121,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         if (!IsActive) return;
         IsActive = false;
         IsAnyViewActive = false;
+        Current = null;
 
         // Give subclass a chance to clean up while Player is still valid.
         OnClosed();

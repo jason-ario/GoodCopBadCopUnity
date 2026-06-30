@@ -31,7 +31,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: c0072b0f37423214fad965cf6682ff95, type: 3}
   CharacterPrefab: {fileID: 7584919870796122196, guid: 3ab329df9f896a74294f492fa0087291, type: 3}
   entryReasons:
@@ -75,6 +78,20 @@ MonoBehaviour:
     - The world is finally matching the inside of my head. I love it!
     - Can you hear the music? It sounds like everyone screaming at once.
     - "I\u2019m going home to play. There are so many toys left in the dark."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -108,6 +125,7 @@ MonoBehaviour:
   - "I\u2019ve been waiting for someone brave enough. Very good. Very good."
   - "My only regret is that I didn\u2019t get to show you\u2026 my collection\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 16a4bcba4877c85449282f6c24bf05f2, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The factory! Long shift, but a great one. Very productive.
@@ -121,6 +139,9 @@ MonoBehaviour:
       Nobody has gone missing!
     mismatchFinalDaysAnswer: Home! Very busy indoors. Extremely preoccupied with
       my hobbies. You wouldn't be interested. Trust me!
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: Me? No, no, no. I feel absolutely wonderful. Better than ever,
       actually!
@@ -133,6 +154,9 @@ MonoBehaviour:
       even! Very moist eyes! Very normal!
     mismatchFinalDaysAnswer: Actually I feel terrible! Weak, tired, barely sleeping.
       Very much not myself at all! Ha!
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Just me! I prefer it that way. More room for my hobbies.
     midDaysAnswer: Just me now. My last roommate... moved away. Suddenly.
@@ -141,13 +165,17 @@ MonoBehaviour:
       Very lively!
     mismatchMidDaysAnswer: Alexei is still there! Very quiet these days. Very still.
       But present! Definitely present!
-    mismatchFinalDaysAnswer: Just me! Always just me! I never had a roommate. I
-      wouldn't know what to do with one!
+    mismatchFinalDaysAnswer: Just me! Always just me! I never had a roommate. I wouldn't
+      know what to do with one!
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - You have a very nice neck, officer. Excellent posture. You should be proud.
     - I love this checkpoint. So many faces. I remember every single one!
-    - Do you keep a list of the people who come through here? I keep my own. Just a hobby!
+    - Do you keep a list of the people who come through here? I keep my own. Just
+      a hobby!
     midDays:
     - The alleyways at night are so quiet now, have you noticed? It is wonderful.
     - You should smile more, officer. Life is very short. Very, very short!
@@ -156,4 +184,7 @@ MonoBehaviour:
     - You are one of the last ones still at your post. I find that admirable. Truly.
     - The city is almost entirely empty now. So much more room for everyone who remains!
     - I hope we keep running into each other here, officer. While that is still possible!
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 1893438

@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: d5651fdd6900dd14fa45f1adfa3633ca, type: 3}
   CharacterPrefab: {fileID: 199770865469659255, guid: 6e920bda57f6de84eba63381a300818a, type: 3}
   entryReasons:
@@ -77,6 +80,20 @@ MonoBehaviour:
       down."
     - "I hope you\u2019re proud of your little rubber stamp. It\u2019s all you\u2019ll
       have left soon."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -102,14 +119,16 @@ MonoBehaviour:
     dialoguesFinalDays:
     - About time... someone... shut the world... up.
   quarantineExitLines:
-  - "You have GOT to be out of your mind right now, I swear!"
-  - "FINE! But I want it on the record that this is completely, absolutely wrong!"
+  - You have GOT to be out of your mind right now, I swear!
+  - FINE! But I want it on the record that this is completely, absolutely wrong!
   - "At least it\u2019ll be quieter in there than it is out here. Small mercies."
   killExitLines:
   - "Of all the small-minded, cowardly \u2014 !"
   - "You better hope\u2026 I don\u2019t come back\u2026 as a ghost\u2026 pal\u2026"
-  - "Alright\u2026 alright\u2026 I\u2019ll give you this one\u2026 but just\u2026 this once\u2026"
+  - "Alright\u2026 alright\u2026 I\u2019ll give you this one\u2026 but just\u2026
+    this once\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: a2b79f2d85f1d9744a163ff045d2e5af, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The garage. I do repairs. Slow day.
@@ -122,6 +141,9 @@ MonoBehaviour:
       in. I'm not complaining.
     mismatchFinalDaysAnswer: A fare across town. Cab's running fine. The roads are
       clear. Business is good actually.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My nose won't stop running. The fumes at the garage, probably.
     midDaysAnswer: I've been getting dizzy. Short spells. Nothing serious.
@@ -132,6 +154,9 @@ MonoBehaviour:
       things to worry about than dizziness.
     mismatchFinalDaysAnswer: Ears are completely fine. Total quiet when I want it.
       I like the silence actually.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My wife and two kids. Good family.
     midDaysAnswer: My wife. The kids are at her parents' place for now.
@@ -142,6 +167,9 @@ MonoBehaviour:
       We're all accounted for.
     mismatchFinalDaysAnswer: Just me now. She took the kids at the start of all this.
       Can't blame her I suppose.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Move it along, would you? I have been standing here twelve minutes.
@@ -149,10 +177,14 @@ MonoBehaviour:
     - Someone should sort out the roads into this district. Absolute mess.
     midDays:
     - My cab does not start anymore. Three years I kept that engine running.
-    - Half the streets are blocked now. You know that, right? Your people closed them.
+    - Half the streets are blocked now. You know that, right? Your people closed
+      them.
     - Do not look at me like that. I am just trying to get home.
     finalDays:
     - Go ahead, take your time. Not like the world is ending or anything.
     - I have nowhere to drive and nowhere to be. Happy now?
     - You are still stamping papers. Fine. Stamp the paper. I will wait.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 3442788

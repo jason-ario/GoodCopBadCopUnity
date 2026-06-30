@@ -184,6 +184,11 @@ public class InkStamp : Interactable, IPickupSlot
     /// </summary>
     public void SetSlotInteractable(bool value)
     {
+        // Guard: DayActivated can be called before NGO spawns scene NetworkObjects
+        // (e.g. during the debug skip-to-Day1 startup path). Silently ignore the call;
+        // OnDayStarted re-applies the correct state once the network is ready.
+        if (!IsSpawned) return;
+
         if (IsServer)
             _slotInteractable.Value = value;
         else

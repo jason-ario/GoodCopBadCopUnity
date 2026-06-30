@@ -114,6 +114,11 @@ public class LesionAnomaly : PhysicalAnomaly
     /// <summary>Writes _LesionStrength to every renderer via a shared MaterialPropertyBlock.</summary>
     private void ApplyStrengthToAll(float strength)
     {
+        // Lazily create the property block in case Awake hasn't fired yet
+        // (e.g. when InitializeClean is called on an inactive scene-placed suspect
+        // whose NetworkObject was pre-registered by NGO before SetActive triggers Awake).
+        _propertyBlock ??= new MaterialPropertyBlock();
+
         _propertyBlock.SetFloat(LesionStrengthId, strength);
 
         foreach (Renderer r in renderers)

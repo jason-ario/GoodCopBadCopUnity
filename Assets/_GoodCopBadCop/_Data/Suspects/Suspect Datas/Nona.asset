@@ -32,7 +32,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 0}
   CharacterPrefab: {fileID: 0}
   entryReasons:
@@ -68,14 +71,30 @@ MonoBehaviour:
     - I have all the correct papers. I filed them myself.
     - You are new here. I know the names of everyone who has worked this post.
     dialoguesMidDays:
-    - The registry has some gaps now. That happens in situations like this. I fill them.
+    - The registry has some gaps now. That happens in situations like this. I fill
+      them.
     - I keep very careful records. It helps to know who is left.
-    - Do not worry. I have been through this checkpoint thirty-one times. I know the
-      procedure.
+    - Do not worry. I have been through this checkpoint thirty-one times. I know
+      the procedure.
     dialoguesFinalDays:
-    - I counted every checkpoint visit from the beginning. You will want to record that.
+    - I counted every checkpoint visit from the beginning. You will want to record
+      that.
     - I always know when something is ending. It is a useful skill.
     - Everything in my file is accurate. I double-check.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -109,6 +128,7 @@ MonoBehaviour:
   - The record outlasts the person. That is the point of a record.
   - I knew the name of the last person who stood here. Now I will know yours.
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: d71e962d6af69bf4f8e4449472844fc2, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The census office on the third block. I file at the same time
@@ -119,8 +139,11 @@ MonoBehaviour:
       without a reason. Today there was no reason.
     mismatchMidDaysAnswer: Work. Everything normal. No unusual files. A completely
       routine day.
-    mismatchFinalDaysAnswer: Visiting a friend. She is very well. I was with her until
-      just now.
+    mismatchFinalDaysAnswer: Visiting a friend. She is very well. I was with her
+      until just now.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: No. I track my health carefully. Nothing unusual.
     midDaysAnswer: Some difficulty sleeping. But I use the time well. I review old
@@ -129,9 +152,13 @@ MonoBehaviour:
       not always comfortable.
     mismatchEarlyDaysAnswer: I feel completely fine. I always feel completely fine.
       Nothing changes in me.
-    mismatchMidDaysAnswer: No sleep issues. I sleep exactly eight hours. I track it.
+    mismatchMidDaysAnswer: No sleep issues. I sleep exactly eight hours. I track
+      it.
     mismatchFinalDaysAnswer: Nothing. My memory is normal. I do not remember more
       than I should.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Alone. I prefer it. Shared spaces complicate the records.
     midDaysAnswer: Just myself. It has been that way for a long time.
@@ -142,17 +169,25 @@ MonoBehaviour:
       much. It is fine.
     mismatchFinalDaysAnswer: Someone. They have been with me for years. You would
       know them if you saw them. Probably.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - I have recorded every resident in this district. Some of them do not know that.
     - You are the fourth officer to work this post. The third one was quieter.
-    - I keep a column for people who look right through me. It is longer than you would think.
+    - I keep a column for people who look right through me. It is longer than you
+      would think.
     midDays:
-    - The list is shorter than it was. That is normal in an emergency. I have read about this.
+    - The list is shorter than it was. That is normal in an emergency. I have read
+      about this.
     - A lot of people are getting very honest lately. It makes my job easier.
     - I wrote your name down. Do not worry. It is only for the registry.
     finalDays:
     - Almost everyone I have recorded in this district is still here. Almost everyone.
     - The numbers do not lie. People do, but numbers do not.
     - I never forget a face. It is not a skill I chose. It just happens.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 7070787

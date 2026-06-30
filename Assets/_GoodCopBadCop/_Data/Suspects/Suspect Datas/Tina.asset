@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: b95f411c45eb9a24c86202f9a0008a9f, type: 3}
   CharacterPrefab: {fileID: 1501177916931924578, guid: 572c6160c8045c14eb3dd93c39663819, type: 3}
   entryReasons:
@@ -76,6 +79,20 @@ MonoBehaviour:
     - The curtain is falling, officer. Can't you hear the applause in the wind?
     - "I\u2019ve forgotten how to blink. The mask has become quite comfortable now."
     - "I\u2019m going home to wait for my final cue. Don't miss the finale."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -109,6 +126,7 @@ MonoBehaviour:
   - "What a note to end on\u2026 Someone should have warned me\u2026 to rehearse\u2026"
   - "Pull down the lights\u2026 bring in the silence\u2026 It is time\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 5b17e3fdf6196354dad34cc70d2ac032, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The radio station. My shift just ended.
@@ -121,6 +139,9 @@ MonoBehaviour:
       has changed there. Everything is completely normal.
     mismatchFinalDaysAnswer: The radio station. Still on air. I broadcast all night.
       The signal is strong. Someone is still listening.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My voice has been hoarse. Too many hours behind the mic.
     midDaysAnswer: I've had headaches that don't respond to anything. I keep working.
@@ -128,10 +149,13 @@ MonoBehaviour:
       for my job. What job.
     mismatchEarlyDaysAnswer: My voice is clear. Strong. No hoarseness at all. The
       mic loves me right now actually.
-    mismatchMidDaysAnswer: No headaches. I feel sharp, focused. No pain. I don't know
-      how I keep going but I do.
+    mismatchMidDaysAnswer: No headaches. I feel sharp, focused. No pain. I don't
+      know how I keep going but I do.
     mismatchFinalDaysAnswer: My hearing is perfect. Full range. I can hear everything.
       Including things I probably shouldn't.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My producer and two interns. We share a flat near the station.
     midDaysAnswer: One intern left. Just me and Maka now.
@@ -142,17 +166,25 @@ MonoBehaviour:
       loud in the mornings. Nothing has changed.
     mismatchFinalDaysAnswer: My producer and Maka. Both still there. All of us at
       the flat. Everything is fine. It's fine.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - You play the stern gatekeeper very convincingly, officer. Very committed to the role.
+    - You play the stern gatekeeper very convincingly, officer. Very committed to
+      the role.
     - Is there an audience somewhere? I always perform better with an audience.
     - The mask never comes off. Please do not ask. It has come up before.
     midDays:
     - Every great act needs its second act of chaos. I believe we are in it.
     - You hold a very neutral expression, officer. Have you considered the stage?
-    - The theater basement has wonderful acoustics. I have been rehearsing the finale down there.
+    - The theater basement has wonderful acoustics. I have been rehearsing the finale
+      down there.
     finalDays:
     - The curtain is coming down. Can you feel it?
     - I have been preparing for this final act my entire life. I am ready.
     - When the last audience member leaves, the performer keeps going. For themselves.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 6703375

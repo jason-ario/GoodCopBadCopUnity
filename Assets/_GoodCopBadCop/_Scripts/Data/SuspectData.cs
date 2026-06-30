@@ -93,6 +93,12 @@ public class SuspectData : ScriptableObject
 
     public AudioClip[] voiceAudioClips;
 
+    [Header("First Encounter")]
+    [Tooltip("Scripted dialogue played automatically the very first time this suspect arrives at the booth window. " +
+             "Leave null for suspects with no special first-meeting cutscene. " +
+             "Encounter state is persisted via PlayerPrefs so this plays exactly once across all sessions.")]
+    public ScriptedDialogue introDialogue;
+
     [System.Serializable]
     public struct QuestionResponseSet
     {

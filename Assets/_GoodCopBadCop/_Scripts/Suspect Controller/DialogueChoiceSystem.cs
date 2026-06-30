@@ -58,6 +58,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         IsInDialogueMode = true;
 
+        // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
+        DiegeticViewController.Current?.Close();
+
         var player = PlayerInstance.Instance;
         player.GetComponent<PlayerMovementController>().SetCanControl(false);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
@@ -97,9 +100,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     /// <summary>
     /// Enters dialogue mode for a scripted cutscene: locks player movement, activates the
-    /// suspect camera, and shows the cursor. Does not display the back button.
+    /// suspect camera, and shows the cursor. Exits any active diegetic view and rotates the
+    /// player toward <paramref name="lookTarget"/> if provided. Does not display the back button.
     /// </summary>
-    public void EnterScriptedDialogueMode()
+    public void EnterScriptedDialogueMode(Transform lookTarget = null)
     {
         Debug.Log($"[DialogueChoiceSystem] EnterScriptedDialogueMode — IsInDialogueMode={IsInDialogueMode}, " +
                   $"PlayerInstance={PlayerInstance.Instance != null}, " +
@@ -109,12 +113,19 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         IsInDialogueMode = true;
 
+        // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
+        DiegeticViewController.Current?.Close();
+
         var player = PlayerInstance.Instance;
         if (player == null) return;
 
         player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
         UIController.Instance.ShowCursor();
+
+        // Rotate the player to face the suspect/booth before the camera cuts in.
+        if (lookTarget != null)
+            player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);

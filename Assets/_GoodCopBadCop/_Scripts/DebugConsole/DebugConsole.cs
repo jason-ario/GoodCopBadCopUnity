@@ -17,6 +17,10 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Skips the main menu, all cutscenes, and spawns the player directly in the booth with the shift switch ready. Equivalent to skipping main menu + F10.")]
     public bool skipToBoothReady;
 
+    [Tooltip("Skips the main menu and spawns the player directly in the booth at the start of Day 1, " +
+             "with Day 1 fully activated (Vlad's opening sequence fires automatically after the 7 s shutter delay).")]
+    public bool skipToDay1Booth;
+
     [Tooltip("Skips straight to after the shift ends — triggers EndShift and auto-dismisses the report, landing in the night phase with tasks assigned.")]
     public bool skipToAfterShift;
 
@@ -53,7 +57,7 @@ public class DebugConsole : MonoBehaviour
     
     private void Start()
     {
-        if (skipToBoothReady || skipToAfterShift || autoStart)
+        if (skipToBoothReady || skipToAfterShift || autoStart || skipToDay1Booth)
         {
             NetworkManager.Singleton.StartHost();
             LobbyManager.Instance.CreateLobby();

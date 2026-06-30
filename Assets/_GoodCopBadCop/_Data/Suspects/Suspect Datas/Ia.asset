@@ -31,7 +31,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: bc3f71ff4d3fec84cbcdec8d13ec171d, type: 3}
   CharacterPrefab: {fileID: 7880033083019812546, guid: 692963596e3dede499489345bf734a53, type: 3}
   entryReasons:
@@ -74,6 +77,20 @@ MonoBehaviour:
     - Why bother with the gate? The walls are already ghosts.
     - The great silence is coming to turn the final page.
     - "I\u2019ve seen your ending. It\u2019s quite dark, but very quiet."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -107,6 +124,7 @@ MonoBehaviour:
   - I saw this page coming long before you did. It reads exactly as expected.
   - "Don\u2019t feel guilty. This was always my last line."
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: a860c39d3bee20a4dbf1652f7a813971, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The library. I was returning some books to the archive.
@@ -118,6 +136,9 @@ MonoBehaviour:
       The same loaf. Very ordinary.
     mismatchFinalDaysAnswer: The library. I was there all day. Organizing the archive.
       Nothing unusual. It was a very ordinary day.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: No. Though I did dream something last night that I shouldn't
       have been able to know.
@@ -131,6 +152,9 @@ MonoBehaviour:
       know why everyone is so concerned.
     mismatchFinalDaysAnswer: Nothing unusual at all. I feel quite well. The future
       holds no particular interest for me at the moment.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: No one. Books are better company.
     midDaysAnswer: The silence. It moved in about a month ago and hasn't left.
@@ -139,14 +163,19 @@ MonoBehaviour:
       in the evenings. She is very quiet.
     mismatchMidDaysAnswer: My daughter. She has been staying since the winter. She
       is in the next room right now.
-    mismatchFinalDaysAnswer: My daughter. She would never leave me. She is still there
-      when I come home. I know she is.
+    mismatchFinalDaysAnswer: My daughter. She would never leave me. She is still
+      there when I come home. I know she is.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - You have interesting hands, officer. Very short lifeline.
-    - I read the same page three times this morning. It said something different each time.
+    - I read the same page three times this morning. It said something different
+      each time.
     - That window behind you. I would not stand so close to it.
-    - The last three people who sat where you sit did not last the week. Just something I noticed.
+    - The last three people who sat where you sit did not last the week. Just something
+      I noticed.
     midDays:
     - You look tired. Sleep while you still dream things worth dreaming.
     - I would not touch the ink today. It has a different smell than yesterday.
@@ -155,4 +184,7 @@ MonoBehaviour:
     - Your ending is very close now. It reads quite peacefully, I assure you.
     - Do not look so worried. The last chapter always comes eventually.
     - I have already read past this part. You do not need to know what happens next.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 5569992

@@ -50,15 +50,19 @@ public class Day_01 : DayBase
     [Tooltip("Vlad's SuspectCharacter prefab — spawned as the first visitor on Day 1 via SuspectController.")]
     [SerializeField] private SuspectCharacter _vladPrefab;
 
-    [Tooltip("Ivan's SuspectCharacter prefab — force-spawned as the second visitor after Vlad's closing cutscene.")]
-    [SerializeField] private SuspectCharacter _ivanPrefab;
+    [Header("Day 1 — Lineup Override (Slots 1–3)")]
+    [Tooltip("2nd suspect (index 1). When assigned, this character is force-spawned instead of a random clean " +
+             "civilian and SuspectEncounterManager plays their intro dialogue. Leave null for default random behavior.")]
+    [SerializeField] private SuspectCharacter _slot1Prefab;
 
-    [Header("Day 1 — Ivan Dialogue")]
-    [Tooltip("Scripted dialogue sequence to play once Ivan arrives at the booth window.")]
-    [SerializeField] private ScriptedDialogue _ivanDialogue;
+    [Tooltip("3rd suspect (index 2). When assigned, this character is force-spawned instead of the random " +
+             "documentation-anomaly suspect and the exam-notebook tutorial is skipped. Leave null for default " +
+             "tutorial behavior.")]
+    [SerializeField] private SuspectCharacter _slot2Prefab;
 
-    [Tooltip("Seconds after Ivan arrives at the window before his dialogue sequence begins.")]
-    [SerializeField] private float _ivanDialogueStartDelay = 1.2f;
+    [Tooltip("4th suspect (index 3). Assign any SuspectCharacter prefab — SuspectEncounterManager will " +
+             "play their intro dialogue automatically. Leave null to skip this slot.")]
+    [SerializeField] private SuspectCharacter _slot3Prefab;
 
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
@@ -229,6 +233,7 @@ public class Day_01 : DayBase
         SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned; // advances through random → doc anomaly → Ivan
         FolderController.OnDocumentAdded += OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
+        SuspectEncounterManager.OnFirstEncounterDialogueComplete += OnSuspectFirstEncounterComplete;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced += OnFolderPlacedOnDesk;
@@ -239,6 +244,13 @@ public class Day_01 : DayBase
         // Block the HandOffPoint from immediately processing the verdict on Day 1 so the
         // closing cutscene can play first. The verdict is delivered in OnClosingDialogueComplete.
         HandOffPoint.BlockVerdict = true;
+
+        // Suspects follow each other immediately on Day 1 — no 30–90 s idle gaps.
+        ShiftManager.OverrideSuspectArrivalInterval = new Vector2(0f, 0f);
+
+        // Suppress all incoming phone calls for the entire Day 1 session so nothing
+        // interrupts the scripted sequences.
+        Telephone.BlockAllCalls = true;
 
         Debug.Log("[Day_01] DayActivated.");
     }
@@ -254,6 +266,12 @@ public class Day_01 : DayBase
         // Release the shutter lock so subsequent days can control it freely.
         if (ShutterController.Instance != null)
             ShutterController.Instance.ShutterLockedOpen = false;
+
+        // Restore normal suspect arrival timing for subsequent days.
+        ShiftManager.OverrideSuspectArrivalInterval = null;
+
+        // Re-enable telephone calls.
+        Telephone.BlockAllCalls = false;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
@@ -272,6 +290,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
         ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
+        SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -297,6 +316,9 @@ public class Day_01 : DayBase
         if (ShutterController.Instance != null)
             ShutterController.Instance.ShutterLockedOpen = false;
 
+        ShiftManager.OverrideSuspectArrivalInterval = null;
+        Telephone.BlockAllCalls = false;
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
@@ -314,6 +336,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
         ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
+        SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -341,6 +364,13 @@ public class Day_01 : DayBase
         if (!NetworkManager.Singleton.IsServer) return;
         if (_dayStartedFired) return;
         _dayStartedFired = true;
+
+        // DayActivated runs before NGO spawns scene NetworkObjects on the debug-skip path,
+        // so stamp calls there are silently ignored. Re-apply the correct locked state here
+        // now that all NetworkBehaviours are guaranteed to be spawned.
+        _greenStampSlot?.SetSlotInteractable(false);
+        _yellowStampSlot?.SetSlotInteractable(false);
+        _redStampSlot?.SetSlotInteractable(false);
 
         StartCoroutine(Day1OpeningSequence());
     }
@@ -427,12 +457,19 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Server-side coroutine. Drops Vlad's papers on the desk then — after a short pause
-    /// that allows them to settle — has him deliver his bark and shows the first HUD task.
+    /// Server-side coroutine. Plays Vlad's "Give" animation on all clients, then after
+    /// a 0.5 s beat drops his papers on the desk. After a further pause he delivers his
+    /// paperwork bark and the first HUD task appears.
     /// </summary>
     private IEnumerator VladPaperworkTutorialRoutine()
     {
         yield return new WaitForSeconds(_vladPaperworkDelay);
+
+        // Play the give animation on all clients so Vlad visibly hands over the papers.
+        SuspectController.Instance?.TriggerCurrentSuspectAnimationClientRpc("Give");
+
+        // Short beat so the animation has a moment to start before the docs appear.
+        yield return new WaitForSeconds(0.5f);
 
         _docsPickedUp = 0;
         _docsFiledCount = 0;
@@ -552,6 +589,9 @@ public class Day_01 : DayBase
         SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
         SuspectController.OnPaperworkSpawned += OnIvanPaperworkSpawned;
 
+        // Wire documentation tutorial triggers for any index-2 suspect, whether they come
+        // from a specific prefab or are a random civilian. The megaphone plays after the
+        // player picks up their paperwork, which always follows their intro conversation.
         _ivanDoc1 = card;
         _ivanDoc2 = appForm;
 
@@ -841,21 +881,30 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called on the server once the closing scripted dialogue finishes.
-    /// Suppresses Vlad's exit line, then lets a random clean suspect walk through
-    /// naturally (index 1) before Ivan arrives (index 2). The Ivan intercept is armed
-    /// by <see cref="OnRandomSuspectArrivedAtWindow"/> once that suspect reaches the window.
+    /// Suppresses Vlad's exit line, then either force-spawns the configured slot 1 character
+    /// or lets a random clean civilian walk through naturally (index 1).
     /// </summary>
     private void OnClosingDialogueComplete()
     {
         // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
         SuspectController.ForceNextSuspectSkipExitDialogue = true;
 
-        // The next spawn slot (index 1) is a random civilian — no anomalies, normal entry
-        // dialogue and paperwork. No intercept needed; just mark them clean.
-        SuspectController.ForceNextSuspectClean = true;
+        if (_slot1Prefab != null)
+        {
+            // Force-spawn the configured slot 1 character — SuspectEncounterManager will
+            // intercept SayEntryDialogue and play their intro dialogue automatically.
+            SuspectController.InterceptNextSuspectSpawn = () =>
+                SuspectController.Instance.SpawnScriptedSuspect(_slot1Prefab);
+            Debug.Log($"[Day_01] Closing dialogue complete — slot 1 intercept armed for '{_slot1Prefab.name}'.");
+        }
+        else
+        {
+            // Default: next spawn slot is a random civilian with no anomalies.
+            SuspectController.ForceNextSuspectClean = true;
+            Debug.Log("[Day_01] Closing dialogue complete — slot 1 is random clean civilian.");
+        }
 
         DeliverDeferredVerdict();
-        Debug.Log("[Day_01] Closing dialogue complete — deferred verdict delivered.");
     }
 
     // -------------------------------------------------------------------------
@@ -872,7 +921,20 @@ public class Day_01 : DayBase
     {
         if (index != 1) return;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
-        Debug.Log("[Day_01] Random clean suspect (index 1) arrived — no intercept needed.");
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (_slot2Prefab != null)
+        {
+            // Arm the slot 2 intercept so the next spawn delivers the configured character.
+            SuspectController.InterceptNextSuspectSpawn = () =>
+                SuspectController.Instance.SpawnScriptedSuspect(_slot2Prefab);
+            Debug.Log($"[Day_01] Slot 1 (index 1) arrived — slot 2 intercept armed for '{_slot2Prefab.name}'.");
+        }
+        else
+        {
+            Debug.Log("[Day_01] Slot 1 (index 1) arrived — slot 2 is random doc-anomaly suspect.");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -892,35 +954,41 @@ public class Day_01 : DayBase
         if (index != 2) return;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
 
+        // Always apply documentation anomalies to the index-2 suspect, regardless of whether
+        // they come from a specific prefab or are a random civilian. The megaphone tutorial
+        // must fire after their intro conversation completes so the player learns the exam-
+        // notebook workflow on every run.
+        // Swap stamps on all clients: this suspect requires quarantine, not a pass.
+        _greenStampSlot?.SetSlotInteractable(false);
+        _yellowStampSlot?.SetSlotInteractable(true);
+
+        if (NetworkManager.Singleton.IsServer)
+        {
+            SuspectController.Instance.CurrentSuspect?
+                .InitializeWithDocumentationAnomalies(_ivanDocumentationAnomalyCount);
+        }
+
         if (!NetworkManager.Singleton.IsServer) return;
 
-        // Give this random suspect a documentation anomaly for the player to detect.
-        SuspectController.Instance.CurrentSuspect?
-            .InitializeWithDocumentationAnomalies(_ivanDocumentationAnomalyCount);
-
-        // Queue Ivan for the next spawn (index 3).
-        if (_ivanPrefab != null)
+        // Arm slot 3 if a prefab is configured — SuspectEncounterManager handles their intro.
+        if (_slot3Prefab != null)
         {
             SuspectController.InterceptNextSuspectSpawn = () =>
-            {
-                SuspectController.ForceNextSuspectSkipEntryDialogue = true;
-                SuspectController.ForceNextSuspectNoPaperwork = true;
-                SuspectController.Instance.SpawnScriptedSuspect(_ivanPrefab);
-            };
-
-            Debug.Log("[Day_01] Doc-anomaly suspect (index 2) arrived — Ivan intercept armed for next spawn.");
+                SuspectController.Instance.SpawnScriptedSuspect(_slot3Prefab);
+            Debug.Log($"[Day_01] Slot 2 (index 2) arrived — slot 3 intercept armed for '{_slot3Prefab.name}'.");
         }
     }
 
     // -------------------------------------------------------------------------
-    // Ivan Scripted Dialogue (index 3)
+    // Ivan Scripted Dialogue (index 3) — handled by SuspectEncounterManager
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fires on all clients when any suspect arrives. Reacts to index 3 (Ivan) and —
-    /// server-only — starts his scripted dialogue after a brief settle delay and arms
-    /// the Soldier trigger so his sequence fires once Ivan has been processed and leaves.
-    /// Unsubscribes itself so it can only fire once per day.
+    /// Fires on all clients when any suspect arrives. Reacts to index 3 (Ivan).
+    /// Unlocks the green stamp (re-enabling it after the quarantine tutorial locked it) and
+    /// arms the Soldier scene sequence for after Ivan is processed.
+    /// Ivan's intro dialogue and paperwork are handled automatically by
+    /// <see cref="SuspectEncounterManager"/> via his <see cref="SuspectData.introDialogue"/>.
     /// </summary>
     private void OnIvanArrivedAtWindow(int index)
     {
@@ -928,11 +996,14 @@ public class Day_01 : DayBase
 
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
 
+        // Quarantine tutorial (index 2) locked the green stamp. Unlock it now so the
+        // player can use both green and yellow stamps when processing Ivan.
+        _greenStampSlot?.SetSlotInteractable(true);
+
         if (!NetworkManager.Singleton.IsServer) return;
 
         // Arm the Soldier scene sequence: fires when SuspectController would spawn the next
-        // suspect (i.e. after Ivan has been processed and left the window). The scene-placed
-        // Soldier is already registered with NGO, so no runtime spawn is needed.
+        // suspect (i.e. after Ivan has been processed and left the window).
         if (_soldierCharacter != null)
         {
             SuspectController.InterceptNextSuspectSpawn = () =>
@@ -942,37 +1013,22 @@ public class Day_01 : DayBase
 
             Debug.Log("[Day_01] Ivan (index 3) arrived — Soldier scene sequence armed.");
         }
-
-        if (_ivanDialogue == null)
-        {
-            Debug.LogWarning("[Day_01] _ivanDialogue is not assigned — skipping Ivan's scripted dialogue.");
-            SuspectController.Instance?.SpawnPaperwork();
-            return;
-        }
-
-        StartCoroutine(WaitAndStartIvanDialogue());
     }
 
-    private IEnumerator WaitAndStartIvanDialogue()
+    /// <summary>
+    /// Fires on the server when any suspect's first-encounter intro dialogue completes.
+    /// On Day 1 this is used to react to Ivan's intro finishing (the general system
+    /// handles his dialogue and paperwork; Day_01 only needs to know when he is done
+    /// for any follow-up logic beyond what the encounter manager provides).
+    /// </summary>
+    private void OnSuspectFirstEncounterComplete(SuspectData data)
     {
-        yield return new WaitForSeconds(_ivanDialogueStartDelay);
+        if (data == null) return;
 
-        SuspectCharacter ivan = SuspectController.Instance?.CurrentSuspect;
-        if (ivan == null)
-        {
-            Debug.LogWarning("[Day_01] CurrentSuspect is null when trying to start Ivan's dialogue.");
-            SuspectController.Instance?.SpawnPaperwork();
-            yield break;
-        }
-
-        ScriptedDialogueRunner.Instance.PlayDialogue(ivan, _ivanDialogue, OnIvanDialogueComplete);
-    }
-
-    /// <summary>Called on the server once Ivan's scripted dialogue finishes.</summary>
-    private void OnIvanDialogueComplete()
-    {
-        Debug.Log("[Day_01] Ivan scripted dialogue complete — spawning his paperwork.");
-        SuspectController.Instance?.SpawnPaperwork();
+        // Currently no additional Day 1 logic is needed after Ivan's intro beyond what
+        // SuspectEncounterManager already handles (paperwork spawn + soldier arming).
+        // This hook exists as an extension point for future use.
+        Debug.Log($"[Day_01] First-encounter dialogue complete for '{data.name}'.");
     }
 
     // -------------------------------------------------------------------------
@@ -1003,6 +1059,9 @@ public class Day_01 : DayBase
 
         // Suppress generic entry bark — the scripted dialogue owns his introduction.
         SuspectController.ForceNextSuspectSkipEntryDialogue = true;
+
+        // The Soldier is purely scripted — he never hands over documents.
+        SuspectController.ForceNextSuspectNoPaperwork = true;
 
         // Subscribe before teleporting so the arrival event is never missed.
         SuspectController.OnSuspectArrived += OnSoldierArrivedAtWindow;

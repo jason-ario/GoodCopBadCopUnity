@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 0fcfca4c7492c9d498418140abe8b5dd, type: 3}
   CharacterPrefab: {fileID: 4439616193100157912, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
   entryReasons:
@@ -73,6 +76,20 @@ MonoBehaviour:
     - Here, take my papers. Sorry got a little blood on them. Comes with the profession.
     - You look like you'd make a good filet mignon.
     - Hope you're not sick of seeing me. Cause I've been dying to see you.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -106,6 +123,7 @@ MonoBehaviour:
   - "Hm. Thought it would sting more. I\u2019m almost... impressed."
   - "There\u2019s something almost poetic... about going out this cleanly..."
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 84cf4fdd911f2254099f3740d809c986, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The market. Closing the stall for the evening.
@@ -117,6 +135,9 @@ MonoBehaviour:
       unusual at all.
     mismatchFinalDaysAnswer: The shop. Long shift. Everything is running very smoothly.
       Nice and clean.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: Nothing unusual. My back hurts but it always hurts.
     midDaysAnswer: I've been sweating more than normal. And my vision goes dark sometimes
@@ -126,29 +147,41 @@ MonoBehaviour:
       been perfect. Never better. Almost suspiciously better.
     mismatchMidDaysAnswer: Nothing at all. No sweating. Vision's sharp. Honestly,
       I feel... hungry. Very, very hungry.
-    mismatchFinalDaysAnswer: My hands are perfectly still. See? Perfectly still. I've
-      always had very steady hands.
+    mismatchFinalDaysAnswer: My hands are perfectly still. See? Perfectly still.
+      I've always had very steady hands.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My brother and his family. Small place, but we manage.
     midDaysAnswer: My brother. His wife left with the kids when the quarantine started.
     finalDaysAnswer: My brother. He doesn't talk much anymore.
     mismatchEarlyDaysAnswer: Just me. Always just me. More room that way. More quiet.
       I enjoy the quiet.
-    mismatchMidDaysAnswer: My brother and his whole family. Wife, the kids, very full
-      house. Very noisy. I don't mind noise.
+    mismatchMidDaysAnswer: My brother and his whole family. Wife, the kids, very
+      full house. Very noisy. I don't mind noise.
     mismatchFinalDaysAnswer: No one. Been alone for years. My brother? No, no. I
       don't have a brother.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Careful with the permit. My hands are always a bit slick.
     - You ever notice how much quieter the streets have gotten at night? I love that.
-    - I have a special cut waiting back at the shop. Been looking forward to it all day.
+    - I have a special cut waiting back at the shop. Been looking forward to it all
+      day.
     midDays:
-    - Do you hear the grinding? It does not stop. I have stopped trying to make it stop.
-    - People bring me all sorts of things to barter now. I accept most of it. Protein is protein.
+    - Do you hear the grinding? It does not stop. I have stopped trying to make it
+      stop.
+    - People bring me all sorts of things to barter now. I accept most of it. Protein
+      is protein.
     - The hunger has gotten very specific lately. Hard to explain over a booth.
     finalDays:
     - You look like you have not slept, officer. Neither have I. I do not miss it.
     - The bandages are dry today. First time in a while. I have been testing a theory.
     - I am having a very productive week. All things considered.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 9722713

@@ -28,7 +28,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 8f8385f1646f13f4293e3177d00b5fa0, type: 3}
   CharacterPrefab: {fileID: 5692054325713852150, guid: 152c7a3af09b2704097391328df986eb, type: 3}
   entryReasons:
@@ -71,6 +74,20 @@ MonoBehaviour:
     - "I\u2019m playing hide and seek with the sun. I think I won."
     - "My dolls told me it\u2019s time to go into the big sleep."
     - Is it tomorrow yet? Or is today just going to stay forever?
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -104,6 +121,7 @@ MonoBehaviour:
   - "Is someone going to tell my mom? Can someone\u2026 tell my mom?"
   - "It\u2019s getting very dark\u2026 and I just\u2026 I just want to go home now\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: dbb49fad961c6fc499556ebf541d44f4, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The hospital. I work there. Worked there.
@@ -115,6 +133,9 @@ MonoBehaviour:
       checked.
     mismatchFinalDaysAnswer: The playground. I was looking for the other children.
       The swings were empty but I waited.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I'm exhausted. That's not unusual for this job though.
     midDaysAnswer: I've had a low fever for two weeks. I know what that means. I'm
@@ -122,10 +143,13 @@ MonoBehaviour:
     finalDaysAnswer: I try not to think about it. There are more pressing things.
     mismatchEarlyDaysAnswer: I feel really good! I slept for a very long time. I
       don't remember falling asleep.
-    mismatchMidDaysAnswer: No fever. I checked this morning with my thermometer. Completely
-      normal. I feel fine.
+    mismatchMidDaysAnswer: No fever. I checked this morning with my thermometer.
+      Completely normal. I feel fine.
     mismatchFinalDaysAnswer: I feel light. Really light. Like if I ran fast enough
       I might not come back down.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Two other nurses. We share the apartment near the hospital.
     midDaysAnswer: One nurse now. The other transferred to the eastern facility.
@@ -136,17 +160,24 @@ MonoBehaviour:
       Nobody transferred anywhere.
     mismatchFinalDaysAnswer: Two nurses. We share the apartment. Everything is the
       same as always. We had dinner together.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Your hat is very big. Does it fall over your eyes when it rains?
     - I found a shiny stone in the dirt today. Do you want to see it?
     - Is it always this loud out here? The city sounds like it is thinking very hard.
     midDays:
-    - The swings near my building move even when there is no wind. Have you seen that?
+    - The swings near my building move even when there is no wind. Have you seen
+      that?
     - Why is your shadow so much longer than you are, mister?
     - The buildings are whispering. I think they are cold. They want blankets.
     finalDays:
     - I am playing hide and seek with the sun. I think I am winning.
     - My dolls told me to be polite to the officer. So. Hello.
     - Is today going to stay forever, or is tomorrow still coming?
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 2549407

@@ -27,7 +27,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: b372d54a5d442a046b70f629ee1faac8, type: 3}
   CharacterPrefab: {fileID: 1137470412463827199, guid: 1949dc12c0f83bd4ea3dec2eec0c5cb9, type: 3}
   entryReasons:
@@ -70,6 +73,20 @@ MonoBehaviour:
     - I can hear the queen. She is... under my skin.
     - There is no more Emzar. Only... the swarm.
     - The sky is a dead eye. I am blinking.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -99,10 +116,11 @@ MonoBehaviour:
   - I will wait here. I am very good... at waiting.
   - The buzzing in my head is... quieter in here. That is... nice.
   killExitLines:
-  - "Oh. The buzzing... it is very loud... and then... it stops."
-  - "The queen... she is calling me... home..."
-  - "Everything is turning... very still... That is... okay."
+  - Oh. The buzzing... it is very loud... and then... it stops.
+  - The queen... she is calling me... home...
+  - Everything is turning... very still... That is... okay.
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 212d303125ea9c240a5729652639a37a, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: Work. Construction site on the east side of the city.
@@ -114,17 +132,23 @@ MonoBehaviour:
       Normal day. Quite... normal.
     mismatchFinalDaysAnswer: Home. I have... not left. Not in a while. The perimeter
       is inside now.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My chest has been tight. Probably the dust from the site.
     midDaysAnswer: I keep coughing up something dark. The site foreman said it was
       normal.
     finalDaysAnswer: I don't sleep much anymore. When I do I wake up drenched.
-    mismatchEarlyDaysAnswer: No tightness. My chest is... open. Very open. Like
-      something made room in there.
-    mismatchMidDaysAnswer: I do not cough. Nothing dark. My lungs are... clean.
-      Like a new comb. Empty and clean.
-    mismatchFinalDaysAnswer: I sleep... very deeply. Long sleep. I don't always
-      come back from it right away.
+    mismatchEarlyDaysAnswer: No tightness. My chest is... open. Very open. Like something
+      made room in there.
+    mismatchMidDaysAnswer: I do not cough. Nothing dark. My lungs are... clean. Like
+      a new comb. Empty and clean.
+    mismatchFinalDaysAnswer: I sleep... very deeply. Long sleep. I don't always come
+      back from it right away.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My crew. We rent rooms together. Cheaper that way.
     midDaysAnswer: Most of the crew left. Just me and Giorgi now.
@@ -135,11 +159,15 @@ MonoBehaviour:
       is still there. Giorgi is still there.
     mismatchFinalDaysAnswer: Giorgi. He is... here. He has always been here. We are
       both... fine.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - The bees are... very restless today. More than usual.
     - You smell... not like smoke. That is... unusual. In a good way.
-    - I counted the steps from the apiary to here. It is always the same number. Mostly.
+    - I counted the steps from the apiary to here. It is always the same number.
+      Mostly.
     midDays:
     - There is a buzzing in this booth. Can you hear it? It is... lower than bees.
     - The air tastes different today. Like... burnt sugar. You do not taste it?
@@ -148,4 +176,7 @@ MonoBehaviour:
     - The queen is very close now. I can feel her. Through the walls.
     - You do not need to worry about me. I am... being taken care of.
     - The swarm is coming. Not here. Somewhere better.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 6391819

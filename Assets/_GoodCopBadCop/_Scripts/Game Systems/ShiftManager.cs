@@ -175,6 +175,9 @@ public class ShiftManager : NetworkBehaviour
         if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady)
             SkipToBoothReady();
 
+        if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToDay1Booth)
+            SkipToBoothReadyOnDay(1);
+
         if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToAfterShift)
             StartCoroutine(DebugSkipToAfterShift());
     }
@@ -205,7 +208,12 @@ public class ShiftManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        if (SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
+        // Only signal clock-out when the lineup is exhausted AND no scripted intercept is
+        // waiting. An armed intercept (e.g. the Day 1 Soldier) must fire even if the
+        // random-suspect list has fewer slots than the intercept's index.
+        bool interceptPending = SuspectController.InterceptNextSuspectSpawn != null;
+        if (!interceptPending &&
+            SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
             if (_timecardMachine != null)
                 _timecardMachine.EnableClockOut();
@@ -806,13 +814,32 @@ public class ShiftManager : NetworkBehaviour
             StartCoroutine(SkipToBoothReadySequence());
     }
 
+    /// <summary>
+    /// Debug shortcut. Runs the full booth-ready setup and then immediately activates
+    /// <paramref name="targetDay"/> on the server before <see cref="OnDayStart"/> fires,
+    /// so the day's <see cref="DayBase.DayActivated"/> is subscribed in time to catch it.
+    /// </summary>
+    public void SkipToBoothReadyOnDay(int targetDay)
+    {
+        if (IsServer)
+            SkipToBoothReadyOnDayClientRpc(targetDay);
+        else
+            StartCoroutine(SkipToBoothReadySequence(targetDay));
+    }
+
     [ClientRpc]
     private void SkipToBoothReadyClientRpc()
     {
         StartCoroutine(SkipToBoothReadySequence());
     }
 
-    private IEnumerator SkipToBoothReadySequence()
+    [ClientRpc]
+    private void SkipToBoothReadyOnDayClientRpc(int targetDay)
+    {
+        StartCoroutine(SkipToBoothReadySequence(targetDay));
+    }
+
+    private IEnumerator SkipToBoothReadySequence(int targetDay = -1)
     {
         MainMenuController.Instance.TransitionToGameplay();
         AudioManager.Instance.StartAmbientAudio();
@@ -834,11 +861,19 @@ public class ShiftManager : NetworkBehaviour
         ResetEnvironment();
         SuspectController.Instance.ResetSuspects();
 
-        if (PlayerInstance.Instance != null)
-        {
-            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
-            PlayerInstance.Instance.SetIsOutside(false);
-        }
+        // Wait for a valid PlayerInstance — on repeated Play sessions without domain reload
+        // the previous session's destroyed instance lingers as null-equivalent, so a bare
+        // != null check silently skips SetPosition. WaitUntil correctly blocks until a fresh
+        // instance is available regardless of static state from the previous session.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        PlayerInstance.Instance.SetIsOutside(false);
+
+        // Jump to a specific day (server only) after the player is in position and before
+        // OnDayStart fires, so DayActivated subscribes to OnDayStart in time to catch it.
+        if (IsServer && targetDay > 0)
+            CampaignManager.Instance?.JumpToDay(targetDay);
 
         UIController.Instance.ShowPlayerUI();
         EnablePlayerControl();

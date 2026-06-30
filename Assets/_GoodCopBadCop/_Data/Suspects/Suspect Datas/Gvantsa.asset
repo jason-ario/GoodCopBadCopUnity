@@ -31,7 +31,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: c3b6bf376c66eaf45bbf9880cde396b0, type: 3}
   CharacterPrefab: {fileID: 6078421262525438805, guid: f85ba637cdbbfae47afded6b54de18ba, type: 3}
   entryReasons:
@@ -74,6 +77,20 @@ MonoBehaviour:
     - "I\u2019m going to watch the sunset. I think it\u2019s the last one."
     - Do you feel the world getting thinner? I can see right through it.
     - "The silence is beautiful. It\u2019s the most honest thing we have."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -103,10 +120,12 @@ MonoBehaviour:
   - Fine. At least in here I can keep counting without interruption.
   - "Wait \u2014 are those water stains on the ceiling? That pattern is wrong."
   killExitLines:
-  - "No \u2014 I still had variables I hadn\u2019t \u2014 I still hadn\u2019t found the \u2014"
+  - "No \u2014 I still had variables I hadn\u2019t \u2014 I still hadn\u2019t found
+    the \u2014"
   - "The pattern \u2014 there was a pattern \u2014 I almost had it \u2014"
-  - "I was so close... so close to figuring it all out..."
+  - I was so close... so close to figuring it all out...
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 814125b8ad108c143a8ceebb281d8fa3, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The school. I teach the younger children. Or I did.
@@ -118,38 +137,57 @@ MonoBehaviour:
       Everything is perfectly normal. I noticed the walls though. The color is different.
     mismatchFinalDaysAnswer: Home. I haven't left. It's safer. The patterns are smaller
       when I stay still.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I've been very tired. I thought it was the stress of work.
     midDaysAnswer: My hair has been falling out. The doctor said not to worry. I
       worry.
     finalDaysAnswer: My skin bruises very easily now. I try not to bump into things.
-    mismatchEarlyDaysAnswer: Nothing. I feel alert. Sharp. I notice things other people
-      miss. Always have. That's not a symptom, that's just how I am.
+    mismatchEarlyDaysAnswer: Nothing. I feel alert. Sharp. I notice things other
+      people miss. Always have. That's not a symptom, that's just how I am.
     mismatchMidDaysAnswer: My hair is fine. I had it cut last week. Everything is
       fine. I'm taking notes on it to be sure.
     mismatchFinalDaysAnswer: My skin is completely fine. No bruising. I check every
       morning. Very methodically. I have a chart.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My mother and my younger sister.
     midDaysAnswer: My mother. My sister went to stay with friends outside the zone.
     finalDaysAnswer: My mother. She won't leave the apartment. I don't push her anymore.
-    mismatchEarlyDaysAnswer: Alone. I moved out last year. My mother understood. She
-      knows I need to observe without interruption.
+    mismatchEarlyDaysAnswer: Alone. I moved out last year. My mother understood.
+      She knows I need to observe without interruption.
     mismatchMidDaysAnswer: My sister and I. We're both here. My mother moved out
       last spring. It was her decision.
-    mismatchFinalDaysAnswer: My mother and my sister. Both of them. All three of us.
-      Nothing has changed. I wrote it down.
+    mismatchFinalDaysAnswer: My mother and my sister. Both of them. All three of
+      us. Nothing has changed. I wrote it down.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - The paint on your booth is peeling in the top left corner. That has been wrong for weeks.
-    - The light in here flickers on a three-second interval. Has that always been the case?
-    - You processed the last person seventeen seconds faster than me. Just something I noticed.
+    - The paint on your booth is peeling in the top left corner. That has been wrong
+      for weeks.
+    - The light in here flickers on a three-second interval. Has that always been
+      the case?
+    - You processed the last person seventeen seconds faster than me. Just something
+      I noticed.
     midDays:
-    - I have been counting the people coming through here. The number is down thirty percent from last week.
-    - There is something wrong with the way the shadows fall in here today. The angle is off.
-    - The intervals are getting shorter. Something is accelerating. I have the data if you want it.
+    - I have been counting the people coming through here. The number is down thirty
+      percent from last week.
+    - There is something wrong with the way the shadows fall in here today. The angle
+      is off.
+    - The intervals are getting shorter. Something is accelerating. I have the data
+      if you want it.
     finalDays:
-    - The patterns are all converging now. I thought finding the pattern would be a relief. It is not.
+    - The patterns are all converging now. I thought finding the pattern would be
+      a relief. It is not.
     - I have filled six notebooks. I do not know who they are for anymore.
     - The numbers do not stop. Even when I close my eyes. Especially then.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 2720955

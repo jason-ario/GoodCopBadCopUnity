@@ -171,7 +171,8 @@ public class SuspectController : NetworkBehaviour
 
     IEnumerator WaitAndSpawnNextSuspect()
     {
-        yield return new WaitForSeconds(3f);
+        // No inter-suspect delay — next character spawns in the following frame.
+        yield return null;
         suspectIndex.Value += 1;
 
         if (ForceNextSuspectMutant)
@@ -482,6 +483,18 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Fires an animation trigger on the current suspect's Animator on all clients.
+    /// Use for one-shot animation cues (e.g. "Give") that need to be visible to every player.
+    /// </summary>
+    [ClientRpc]
+    public void TriggerCurrentSuspectAnimationClientRpc(string trigger)
+    {
+        if (suspectCharacter == null) return;
+        if (suspectCharacter.animator == null) return;
+        suspectCharacter.animator.SetTrigger(trigger);
+    }
+
+    /// <summary>
     /// Fired on all clients after paperwork lands on the desk.
     /// Carries the spawned IDCard and the application form PickableObject so tutorial
     /// systems can reference both documents without reading the server-only SpawnedDocuments list.
@@ -569,26 +582,35 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
-        if (!ForceNextSuspectSkipEntryDialogue)
+        bool forceSkipEntry = ForceNextSuspectSkipEntryDialogue;
+        ForceNextSuspectSkipEntryDialogue = false;
+
+        // If this is the player's first encounter with this suspect and they have an intro
+        // dialogue, hand control to SuspectEncounterManager. It will suppress the generic
+        // bark, play the scripted intro, spawn paperwork if needed, and fire
+        // OnFirstEncounterDialogueComplete when done.
+        if (!forceSkipEntry &&
+            SuspectEncounterManager.Instance != null &&
+            SuspectEncounterManager.Instance.TryInterceptForIntroDialogue(suspectCharacter))
+        {
+            ForceNextSuspectNoPaperwork = false; // consumed by the intercept
+            return;
+        }
+
+        // Suspect cam is activated exclusively by ScriptedDialogueRunner for scripted sequences.
+
+        if (!forceSkipEntry)
         {
             string entryDialogue = suspectCharacter.GetEntryDialogue();
             DialogueManager.Instance.SayDialogue(suspectCharacter, entryDialogue);
             suspectCharacter.GetComponent<SuspectBarkController>()?.BeginBarkSchedule();
         }
 
-        ForceNextSuspectSkipEntryDialogue = false;
-
-        // Suspect cam is no longer activated on standard arrivals.
-        // It is activated exclusively by ScriptedDialogueRunner.EnterScriptedModeClientRpc
-        // for scripted cutscene sequences.
-
         bool givesPaperwork = suspectCharacter.Data.GivesPaperwork && !ForceNextSuspectNoPaperwork;
         ForceNextSuspectNoPaperwork = false;
 
         if (givesPaperwork)
-        {
             suspectCharacter.GivePaperwork();
-        }
     }
 
     /// <summary>

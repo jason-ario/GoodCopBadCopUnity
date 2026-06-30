@@ -156,7 +156,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         _lastAnimTrigger = string.Empty;
 
-        EnterScriptedModeClientRpc();
+        EnterScriptedModeClientRpc(speakerNetId);
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
@@ -199,7 +199,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private IEnumerator RunMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete)
     {
-        EnterScriptedModeClientRpc();
+        EnterScriptedModeClientRpc(0UL); // no NPC speaker for megaphone dialogue
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
@@ -269,7 +269,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     [ClientRpc]
-    private void EnterScriptedModeClientRpc()
+    private void EnterScriptedModeClientRpc(ulong speakerNetId)
     {
         Debug.Log($"[ScriptedDialogueRunner] EnterScriptedModeClientRpc — " +
                   $"PlayerInstance={PlayerInstance.Instance != null}, " +
@@ -277,7 +277,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                   $"ChoiceSystemInstance={DialogueChoiceSystem.Instance != null}");
 
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
-        DialogueChoiceSystem.Instance.EnterScriptedDialogueMode();
+
+        // Resolve the speaker's transform so the player rotates to face the booth.
+        Transform lookTarget = null;
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            lookTarget = netObj.transform;
+
+        DialogueChoiceSystem.Instance.EnterScriptedDialogueMode(lookTarget);
     }
 
     [ClientRpc]

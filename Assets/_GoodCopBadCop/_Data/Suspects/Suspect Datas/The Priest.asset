@@ -30,7 +30,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 0b1c5746b5d7a0d4fa66a6451717e3c9, type: 3}
   CharacterPrefab: {fileID: 4045973627263543197, guid: 638e1c8888f13524bb3f59286c0cc230, type: 3}
   entryReasons:
@@ -79,6 +82,20 @@ MonoBehaviour:
       now.
     - "Use your stamp, brother. Let\u2019s finish this chapter so we can see what\u2019s
       on the next page."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -104,14 +121,17 @@ MonoBehaviour:
     dialoguesFinalDays:
     - The light... is finally... breaking... through...
   quarantineExitLines:
-  - "Then let this be my cell and my ministry both. There are souls here who need tending."
-  - "Brother, whatever I carry \u2014 let it stay in here with me, away from the others."
-  - "God gives us the walls we need, not the walls we want. I can work with this."
+  - Then let this be my cell and my ministry both. There are souls here who need
+    tending.
+  - "Brother, whatever I carry \u2014 let it stay in here with me, away from the
+    others."
+  - God gives us the walls we need, not the walls we want. I can work with this.
   killExitLines:
   - "I only ask\u2026 that you carry this gently\u2026 It is a heavy thing to carry\u2026"
   - "If this was your duty\u2026 then may God\u2026 grant you peace\u2026 for it\u2026"
   - "Lord\u2026 receive me\u2026 I tried\u2026 I tried to do enough\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: a2487dfb69806694d9657932307e14e3, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The cathedral on the hill. I was leading evening prayers.
@@ -119,10 +139,13 @@ MonoBehaviour:
     finalDaysAnswer: I was giving last rites. There are many to give.
     mismatchEarlyDaysAnswer: The market district. Small errands. Nothing that required
       the cloth. Just a man doing his shopping.
-    mismatchMidDaysAnswer: Home. I rested today. The parishes are managing well. They
-      don't need me for every small thing.
+    mismatchMidDaysAnswer: Home. I rested today. The parishes are managing well.
+      They don't need me for every small thing.
     mismatchFinalDaysAnswer: The cathedral. Evening prayers. A very peaceful service.
       Quiet congregation. Nothing unusual.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: The spirit is willing. The body is what it is.
     midDaysAnswer: I have a tremor in my left hand. I hide it when I can.
@@ -134,6 +157,9 @@ MonoBehaviour:
       with both every morning. No difficulty.
     mismatchFinalDaysAnswer: I feel better than I have in years. Clear and present.
       I am very much here. Very much myself.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: The seminary brothers. A full house.
     midDaysAnswer: Two brothers remain. The others have gone to serve elsewhere.
@@ -142,8 +168,11 @@ MonoBehaviour:
       I find peace in the quiet.
     mismatchMidDaysAnswer: All the brothers, still a full house. No one has left.
       We pray together every evening as always.
-    mismatchFinalDaysAnswer: The brothers are still there. A full house. Nothing has
-      changed. Father Dmitri was at breakfast this morning.
+    mismatchFinalDaysAnswer: The brothers are still there. A full house. Nothing
+      has changed. Father Dmitri was at breakfast this morning.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Hello, brother. It is a grim morning, but we are still here, are we not?
@@ -154,7 +183,12 @@ MonoBehaviour:
     - I saw the look in people's eyes today. They need more than bread right now.
     - Take the ID. I have a dozen more families to check on before curfew.
     finalDays:
-    - I am going back into the smog. There are people alone out there who need a voice.
+    - I am going back into the smog. There are people alone out there who need a
+      voice.
     - The bells are cracked but the message is the same. We are not abandoned.
-    - Use your stamp, brother. Let us finish this chapter so we can see what is on the next page.
+    - Use your stamp, brother. Let us finish this chapter so we can see what is on
+      the next page.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 6328957

@@ -12,6 +12,14 @@ public class Telephone : Interactable
     /// <summary>Fired on all clients when the phone begins ringing.</summary>
     public static event Action OnRingStarted;
 
+    /// <summary>
+    /// When true, all incoming calls are silently suppressed — <see cref="TriggerCall"/>
+    /// and <see cref="TriggerRandomCall"/> return immediately without ringing.
+    /// Set by day-specific controllers (e.g. <see cref="Day_01"/>) that need to keep
+    /// the phone quiet during scripted sequences.
+    /// </summary>
+    public static bool BlockAllCalls = false;
+
     [SerializeField] private SocketFollow handSet;
     [SerializeField] private Transform _ikTarget;
     [SerializeField] private Transform _camera;
@@ -120,6 +128,7 @@ public class Telephone : Interactable
     public void TriggerCall(int taskIndex)
     {
         if (!IsServer) return;
+        if (BlockAllCalls) return;
         if (_isRinging.Value || _isGrabbed.Value) return;
         if (_availableTasks == null || taskIndex < 0 || taskIndex >= _availableTasks.Length)
         {
@@ -158,6 +167,7 @@ public class Telephone : Interactable
     public void TriggerRandomCall()
     {
         if (!IsServer) return;
+        if (BlockAllCalls) return;
         if (_availableTasks == null || _availableTasks.Length == 0)
         {
             Debug.LogWarning("[Telephone] TriggerRandomCall: no tasks assigned.");

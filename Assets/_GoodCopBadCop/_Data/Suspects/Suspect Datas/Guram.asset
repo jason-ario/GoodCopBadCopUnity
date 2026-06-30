@@ -31,7 +31,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: f3ac43d7abe95074fb8c941b98edf4dd, type: 3}
   CharacterPrefab: {fileID: 0}
   entryReasons:
@@ -75,6 +78,20 @@ MonoBehaviour:
     - Still here. Still checking in. Some things do not change.
     - Just let me through. I have nowhere to be and I would like to get there.
     - I am not afraid of you. I am just tired.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -108,6 +125,7 @@ MonoBehaviour:
   - Twenty-two years...
   - Not how I thought it would go. But. Alright.
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: b8a5a27c7b20729498d233b872b276b0, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The parking lot on Rustaveli. Same place I have been for twenty-two
@@ -120,6 +138,9 @@ MonoBehaviour:
       actually. No problems at all.
     mismatchFinalDaysAnswer: My daughter's place. She lives close by. Normal visit.
       Nothing unusual.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My knee acts up this time of year. Nothing serious.
     midDaysAnswer: Cannot sleep well. But I never sleep well.
@@ -128,6 +149,9 @@ MonoBehaviour:
     mismatchMidDaysAnswer: No. Knee is perfect. Everything is fine. No issues at
       all.
     mismatchFinalDaysAnswer: Nothing. Sleeping fine. Clear head. No complaints.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Myself. My wife passed four years ago.
     midDaysAnswer: Just me. Got used to it.
@@ -136,6 +160,9 @@ MonoBehaviour:
     mismatchMidDaysAnswer: My daughter moved back in. Crowded, but it is fine. Better
       than being alone.
     mismatchFinalDaysAnswer: Some of the boys from the lot. We share the rent. Practical.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Twenty-two years at that lot and not one car was stolen. Think about that.
@@ -150,4 +177,7 @@ MonoBehaviour:
     - Twenty-two years and they close the lot without even telling me.
     - I have a routine. It helps when nothing makes sense anymore.
     - I just stand here. It is what I do.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 4827361

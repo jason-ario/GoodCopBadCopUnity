@@ -33,7 +33,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 0324aea82b799e44dafa8cc37b5de944, type: 3}
   CharacterPrefab: {fileID: 8357816086755924206, guid: c8d8a7a2ab2cf2044beab16196c35a18, type: 3}
   entryReasons:
@@ -76,6 +79,20 @@ MonoBehaviour:
     - They closed the mine. I don't know what I'm supposed to do now.
     - Just going home.
     - I used to know what my day was.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -109,6 +126,7 @@ MonoBehaviour:
   - Tell my wife... she knows... she always knew...
   - I thought... it would be the mine... that got me...
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 0126d7c6e9586af4b99c87708fd95382, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The mine. B shaft. Finished at six.
@@ -120,6 +138,9 @@ MonoBehaviour:
       has been bad. Nothing unusual.
     mismatchFinalDaysAnswer: The mine! B shaft. Running perfectly. Full crew. Everyone
       is there. No problems at all.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: Coal dust. Always coal dust. My lungs are fine. The doctor says
       fine.
@@ -131,6 +152,9 @@ MonoBehaviour:
       the mine, so no dust. Everything is fine.
     mismatchFinalDaysAnswer: Perfect health. Strong lungs. Clear head. I feel like
       it's my first year on the coal face.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My wife. Two sons. Top floor, east block.
     midDaysAnswer: My wife. The boys left for the west district last month. Just
@@ -142,6 +166,9 @@ MonoBehaviour:
       Nothing has changed.
     mismatchFinalDaysAnswer: My wife and both sons. We all eat together every night.
       Every night without fail.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - B shaft today. Long one.
@@ -149,10 +176,15 @@ MonoBehaviour:
     - Papers are in order. Always are.
     midDays:
     - They moved us to C shaft. Longer walk. Worse air.
-    - Three men on my crew did not show this morning. Nobody said anything about it.
+    - Three men on my crew did not show this morning. Nobody said anything about
+      it.
     - I do not complain. I just want to get through.
     finalDays:
-    - The mine is closed. First time in thirty years I have had nothing to go back to.
+    - The mine is closed. First time in thirty years I have had nothing to go back
+      to.
     - Just going home. That is all.
     - I used to know what my day was.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 3871204

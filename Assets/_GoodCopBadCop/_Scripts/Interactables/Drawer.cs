@@ -53,7 +53,7 @@ public class Drawer : Interactable, IHeldItemPassthrough
     private float _dragT = 0f;
 
     private bool _inControl = false;
-    private bool _usingRightArm = true;
+    private bool _usingRightArm = false;
     private PlayerInteractionController _currentPlayer;
     private Coroutine _exitCoroutine;
 
@@ -153,7 +153,7 @@ public class Drawer : Interactable, IHeldItemPassthrough
 
         if (rightArmBusy && leftArmBusy) return; // both arms in active use
 
-        _usingRightArm = !rightArmBusy; // prefer right, fall back to left
+        _usingRightArm = leftArmBusy; // prefer left, fall back to right
 
         // Seed _dragT from the actual current mesh position so the next grab
         // starts from wherever the drawer was left, not from a binary open/closed state.

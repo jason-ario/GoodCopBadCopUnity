@@ -28,7 +28,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 75e4f12b7b30fac48b40d9887a3301dc, type: 3}
   CharacterPrefab: {fileID: 8098034281073864286, guid: 6842ef2e3a20cb64fbb66ab4c8c42077, type: 3}
   entryReasons:
@@ -74,6 +77,20 @@ MonoBehaviour:
     - The world is putting on its pajamas. It is getting ready for a very long nap.
     - Don't be sad, officer. In the next story, maybe I will be the one holding the
       stamp.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -99,14 +116,16 @@ MonoBehaviour:
     dialoguesFinalDays:
     - The light... at the end... is finally... coming for me...
   quarantineExitLines:
-  - "A small room! My grandmother always said small rooms have the best conversations."
+  - A small room! My grandmother always said small rooms have the best conversations.
   - You know, I once waited three days in a customs hold. This will be very easy.
   - Do they have tea in there? No? Well. I suppose I can manage.
   killExitLines:
   - "Ah\u2026 the longest journey\u2026 ends the same\u2026 as all the short ones\u2026"
-  - "I always wondered\u2026 what was at the end of the road\u2026 Now I suppose\u2026 I\u2019ll see\u2026"
+  - "I always wondered\u2026 what was at the end of the road\u2026 Now I suppose\u2026
+    I\u2019ll see\u2026"
   - "Tell my son\u2026 tell him his father\u2026 had a very fine\u2026 long trip\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 577fc83f8ad13cc46b822224e7bf901e, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The tea house on Rustaveli. I go every evening.
@@ -118,6 +137,9 @@ MonoBehaviour:
       black tea today, very strong, very good. Same as always!
     mismatchFinalDaysAnswer: The market! Full of people, full of goods, full of life.
       A very fine morning. Very encouraging.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My joints ache more than they used to. Old age.
     midDaysAnswer: I forget things. Small things. I wrote them down but then I forgot
@@ -130,6 +152,9 @@ MonoBehaviour:
       Ask me anything, I'll tell you!
     mismatchFinalDaysAnswer: My heart is steady, strong as a drum. No racing, no
       fluttering. Very reliable heart, always has been.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My son and his family. Three grandchildren.
     midDaysAnswer: My son. His wife took the children to the countryside.
@@ -140,17 +165,29 @@ MonoBehaviour:
       house! Very noisy! I love it!
     mismatchFinalDaysAnswer: Alone now. My son moved abroad before all this began.
       I haven't heard from him in some time.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Merhaba, officer! A fine post for a fine day, no?
     - I found a lucky chestnut this morning. Do you want to hold it? It helps.
-    - My boots are squeaking today. I think they are trying to tell me a joke. I have not worked out the punchline.
+    - My boots are squeaking today. I think they are trying to tell me a joke. I
+      have not worked out the punchline.
     midDays:
-    - I spilled a little tea on the form. The information is all there though. I checked twice.
-    - I took a shortcut through the mist today. Ended up talking to a very polite cow. Long story.
+    - I spilled a little tea on the form. The information is all there though. I
+      checked twice.
+    - I took a shortcut through the mist today. Ended up talking to a very polite
+      cow. Long story.
     - In the bazaar we say, a cloudy sky just means better shade for the merchant.
     finalDays:
-    - In my experience, the end of one road is always the beginning of another. I believe this.
-    - Do not be sad, officer. In the next story, maybe I will be the one holding the stamp.
-    - My father lived through three disasters. He said the same thing after each one. He said, have some tea.
+    - In my experience, the end of one road is always the beginning of another. I
+      believe this.
+    - Do not be sad, officer. In the next story, maybe I will be the one holding
+      the stamp.
+    - My father lived through three disasters. He said the same thing after each
+      one. He said, have some tea.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 4118424

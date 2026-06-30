@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 0a1d83fdb3fe4574990eee09aeaac946, type: 3}
   CharacterPrefab: {fileID: 793074409391834654, guid: afd46dd979f4ef9429d317cb91da466c, type: 3}
   entryReasons:
@@ -76,6 +79,20 @@ MonoBehaviour:
     - The world is finally becoming the abstract piece I always dreamed of.
     - "I\u2019ve run out of red paint, but the sunset is providing plenty of inspiration."
     - "I\u2019m going home to finish my final canvas. The white space is almost gone."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -102,7 +119,7 @@ MonoBehaviour:
     dialoguesFinalDays:
     - Finally... the perfect... shade of... nothing.
   quarantineExitLines:
-  - "A white room? With good lighting? Fine. Absolutely fine."
+  - A white room? With good lighting? Fine. Absolutely fine.
   - "I\u2019ll need my sketchbook. The shadows in here are extraordinary."
   - Every great artist was imprisoned at some point. This is very on-brand.
   killExitLines:
@@ -110,6 +127,7 @@ MonoBehaviour:
   - "All that light and I never\u2026 I never quite\u2026 captured it\u2026"
   - "The color was right there\u2026 right there at the edge of the\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 049dc9e9130a49640a3f8a9e8eca4577, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The pharmacy. I picked up my prescription.
@@ -117,10 +135,13 @@ MonoBehaviour:
     finalDaysAnswer: I was trying to find somewhere quiet. It's hard lately.
     mismatchEarlyDaysAnswer: My studio. I've been painting for three days without
       stopping. The light keeps changing and I can't let it get away.
-    mismatchMidDaysAnswer: The pharmacy. First one I tried, still fully stocked. Easy.
-      Everything's fine there. No issue at all.
+    mismatchMidDaysAnswer: The pharmacy. First one I tried, still fully stocked.
+      Easy. Everything's fine there. No issue at all.
     mismatchFinalDaysAnswer: My studio. I haven't left in a week. The canvas is almost
       done. I need to finish it before the colours stop.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I have a condition. It's managed. I don't want to talk about
       it.
@@ -134,27 +155,41 @@ MonoBehaviour:
       feel very clear right now. Very clear.
     mismatchFinalDaysAnswer: Everything I feel is real. Vivid and sharp and completely
       real. I have never been more certain of that.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My caretaker, Tamar. She comes every morning.
     midDaysAnswer: Just me now. Tamar stopped coming. I manage on my own.
     finalDaysAnswer: No one. I'm used to it.
     mismatchEarlyDaysAnswer: Alone. I've never had a caretaker. I don't need one.
       The work keeps me grounded.
-    mismatchMidDaysAnswer: Tamar and her cousin. We've got quite a full place at the
-      moment actually. Very lively.
+    mismatchMidDaysAnswer: Tamar and her cousin. We've got quite a full place at
+      the moment actually. Very lively.
     mismatchFinalDaysAnswer: Tamar. She came again this morning. Like always. Everything
       is exactly the same as it was.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - The shadow your booth makes at this hour is really quite striking. I keep meaning to sketch it.
+    - The shadow your booth makes at this hour is really quite striking. I keep meaning
+      to sketch it.
     - You have a good face for charcoal. Very strong lines.
-    - The smog is giving everything this incredible amber quality. It is almost worth it.
+    - The smog is giving everything this incredible amber quality. It is almost worth
+      it.
     midDays:
-    - Have you looked at the sky today? That violet should not exist. I am obsessed with it.
-    - Everything is starting to look like it is being drawn in pencil. Do you feel that?
+    - Have you looked at the sky today? That violet should not exist. I am obsessed
+      with it.
+    - Everything is starting to look like it is being drawn in pencil. Do you feel
+      that?
     - I have almost run out of yellow. I do not think I need it anymore.
     finalDays:
     - I have almost run out of red. The sky keeps giving me more reference.
-    - You are the most interesting face I have had to draw in a while, officer. I hope you know that.
+    - You are the most interesting face I have had to draw in a while, officer. I
+      hope you know that.
     - The world is finally becoming the abstract piece I always dreamed of.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 9722713

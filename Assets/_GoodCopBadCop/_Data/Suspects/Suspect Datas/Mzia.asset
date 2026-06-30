@@ -30,7 +30,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 092c7c3074fc9da439cbc3acb19f7fc9, type: 3}
   CharacterPrefab: {fileID: 6847779261494379404, guid: cf59afdc9e0ffee49924ebb9a0a10e75, type: 3}
   entryReasons:
@@ -76,6 +79,20 @@ MonoBehaviour:
     - "Don't worry about the sirens, dear. It\u2019s just the world having a little
       tantrum."
     - "Everything is going to be fine once I finish the mending. You\u2019ll see."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -101,14 +118,17 @@ MonoBehaviour:
     dialoguesFinalDays:
     - "It\u2019s okay... the world... was getting... too heavy... anyway..."
   quarantineExitLines:
-  - "Oh, a rest? Well, I suppose my feet could use one."
+  - Oh, a rest? Well, I suppose my feet could use one.
   - "Will you send word to Irina? She worries when I don\u2019t come home on time."
-  - "I\u2019ll just sit and knit. That\u2019s what I do. That\u2019s what I\u2019ve always done."
+  - "I\u2019ll just sit and knit. That\u2019s what I do. That\u2019s what I\u2019ve
+    always done."
   killExitLines:
   - "Oh\u2026 I must have\u2026 dropped a stitch\u2026 somewhere\u2026"
   - "I never did finish that sweater\u2026 I had the red wool\u2026 right here\u2026"
-  - "Don\u2019t you fuss, dear\u2026 It\u2019s alright\u2026 I\u2019ve been ready\u2026 for a while\u2026"
+  - "Don\u2019t you fuss, dear\u2026 It\u2019s alright\u2026 I\u2019ve been ready\u2026
+    for a while\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: f40dee3705854904f8de5c25569623d2, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The bakery. I open early and close late.
@@ -120,6 +140,9 @@ MonoBehaviour:
       things for the shelter. It keeps the hands busy.
     mismatchFinalDaysAnswer: The market. Just picking up a few things. The bakery?
       Oh, I closed that a long time ago.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I've had a cough. The flour dust, I always say.
     midDaysAnswer: My throat has been sore for two weeks. It's not getting worse
@@ -131,6 +154,9 @@ MonoBehaviour:
       I feel quite well, thank you.
     mismatchFinalDaysAnswer: Heavy? Oh no, I feel light as a feather. I could dance
       if someone would put the music on.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My husband. He helps at the bakery on weekends.
     midDaysAnswer: My husband. He's been unwell. Staying home.
@@ -139,19 +165,27 @@ MonoBehaviour:
       keep busy. Busy hands, warm heart.
     mismatchMidDaysAnswer: My husband and I. He is perfectly well. A very healthy
       man. Strong. No illness at all.
-    mismatchFinalDaysAnswer: Alone. My husband passed two winters ago. I tend to forget
-      sometimes. Old habit, talking about him like he's still there.
+    mismatchFinalDaysAnswer: Alone. My husband passed two winters ago. I tend to
+      forget sometimes. Old habit, talking about him like he's still there.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - You look thin, dear. Are they feeding you enough at this post?
     - I brought extra soup today. There is a pot at number seven if you get a break.
-    - Your coat is not warm enough for this weather. Do you have someone looking after you?
+    - Your coat is not warm enough for this weather. Do you have someone looking
+      after you?
     midDays:
-    - There is a small tear in your collar, dear. I could fix that in five minutes if you like.
+    - There is a small tear in your collar, dear. I could fix that in five minutes
+      if you like.
     - You are doing a good job. Someone should be telling you that.
     - The sky looks very bruised today. You should go home before it gets worse.
     finalDays:
     - Keep warm out here. The cold gets into the bones if you are not careful.
     - You are still here. Good. Someone has to be.
     - My grandson would be about your age. He is in the west now. I hope.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 7802070

@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 041366a5b1a1d2b4cba16bd7f40c9cb5, type: 3}
   CharacterPrefab: {fileID: 1056441159091504059, guid: 54121aa9f487ffc41af9a7c2863302bc, type: 3}
   entryReasons:
@@ -72,6 +75,20 @@ MonoBehaviour:
     - I stopped checking the news. It wasn't helping.
     - Do you think it matters anymore? Coming through here, I mean.
     - I just want to go somewhere quiet and sit for a while.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -98,13 +115,16 @@ MonoBehaviour:
     - I knew... I always knew... it was going to end like this...
   quarantineExitLines:
   - "I \u2014 okay. Okay. It\u2019s okay. I just need a minute. Give me a minute."
-  - "I\u2019m not infected. I\u2019ve been so careful. I\u2019ve been so incredibly careful."
+  - "I\u2019m not infected. I\u2019ve been so careful. I\u2019ve been so incredibly
+    careful."
   - "Please don\u2019t tell my parents. They\u2019ll just worry more. Please."
   killExitLines:
-  - "But I hadn\u2019t \u2014 I was supposed to \u2014 I still had things \u2014 I still had things \u2014"
+  - "But I hadn\u2019t \u2014 I was supposed to \u2014 I still had things \u2014
+    I still had things \u2014"
   - "I wasn\u2019t ready\u2026 I wasn\u2019t even close to ready\u2026"
   - "I want my mom\u2026 I just\u2026 I want my mom\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: 0cd0b2982be60c644a30780b118c3dc1, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: University. I had an exam this morning.
@@ -116,6 +136,9 @@ MonoBehaviour:
       I thought it was still open.
     mismatchFinalDaysAnswer: The library. I had a full afternoon of revision. It's
       fine. Everything is going to be fine.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I've been anxious. More than usual. But everyone is.
     midDaysAnswer: I've had nosebleeds three times this week. I looked it up online
@@ -127,6 +150,9 @@ MonoBehaviour:
       I haven't been researching symptoms. I haven't.
     mismatchFinalDaysAnswer: I'm honestly good. Slept well. Ate. Everything is fine.
       It's all going to be okay. I think.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: My roommate at the university dorms. We study the same thing.
     midDaysAnswer: I've been staying with a friend. The dorms are shut.
@@ -137,17 +163,24 @@ MonoBehaviour:
       I'd know if it did.
     mismatchFinalDaysAnswer: My roommate. We're both fine. I saw him this morning.
       He looked fine. He was fine.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - Sorry — is this the right form? I filled it out twice just in case.
+    - "Sorry \u2014 is this the right form? I filled it out twice just in case."
     - It is a lot quieter on campus lately. Did you notice that from here?
     - My hands keep shaking. It is probably just the cold.
     midDays:
     - Have you heard anything about the east district? My roommate is over there.
     - I am not sleeping well. I think it shows. Sorry.
-    - Is the process taking longer than usual today? I do not mind, I am just — checking.
+    - "Is the process taking longer than usual today? I do not mind, I am just \u2014
+      checking."
     finalDays:
     - Do you think it still matters? Coming through here. I keep doing it anyway.
     - I stopped checking the news. It was not helping.
-    - Is there somewhere safer than this? Just — anywhere. I am asking everyone.
+    - "Is there somewhere safer than this? Just \u2014 anywhere. I am asking everyone."
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 5722789

@@ -29,7 +29,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: dd5af1ad80484714c878f383187e2b3a, type: 3}
   CharacterPrefab: {fileID: 1587370763167483291, guid: 2b5231f856134934a9836d09d5cc74cd, type: 3}
   entryReasons:
@@ -74,6 +77,20 @@ MonoBehaviour:
     - "I\u2019m going home to fold my hand. There\u2019s no out-bluffing the end
       of the world."
     - "Luck is a lady, but she\u2019s left town on the last bus."
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -107,6 +124,7 @@ MonoBehaviour:
   - "I miscalculated somewhere\u2026 the math\u2026 the math was wrong\u2026"
   - "House always wins in the end\u2026 I should have\u2026 bet on that\u2026"
   voiceAudioClips: []
+  introDialogue: {fileID: 11400000, guid: c454d2cbd878f6c43a1186adcbc49f01, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The card tables at the back of the Metropol. Good night.
@@ -119,17 +137,23 @@ MonoBehaviour:
       right now. I'll know when it's time again.
     mismatchFinalDaysAnswer: The Metropol. Big game tonight. Place was full. I cleaned
       them out. Great night.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: My hands sweat more than they used to. Doesn't affect my game.
     midDaysAnswer: I've had some memory lapses. Nothing serious. Cards don't lie
       though.
     finalDaysAnswer: My luck has been strange. That sounds like a joke. It isn't.
-    mismatchEarlyDaysAnswer: Dry hands actually. Steadier than ever. My read has never
-      been sharper. It's almost unsettling.
-    mismatchMidDaysAnswer: Memory is excellent. I remember every card from every hand
-      I've ever played. No lapses. Not one.
+    mismatchEarlyDaysAnswer: Dry hands actually. Steadier than ever. My read has
+      never been sharper. It's almost unsettling.
+    mismatchMidDaysAnswer: Memory is excellent. I remember every card from every
+      hand I've ever played. No lapses. Not one.
     mismatchFinalDaysAnswer: My luck is fine. On a streak, actually. The odds keep
       bending my way. I know when to be suspicious of that.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: Nobody permanent. The kind of life I lead.
     midDaysAnswer: There was a woman. She left when the odds stopped being fun for
@@ -141,11 +165,16 @@ MonoBehaviour:
       together. Cards and all.
     mismatchFinalDaysAnswer: My wife. She never left. Stuck around through the worst
       of it. Can't fold a hand like that.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - Heads or tails, officer? Just kidding. I know when the odds are against me.
-    - You have a poker face that would bankrupt me in ten minutes. I mean that as a compliment.
-    - I put everything on a quick recovery for the city. The spread looked good at the time.
+    - You have a poker face that would bankrupt me in ten minutes. I mean that as
+      a compliment.
+    - I put everything on a quick recovery for the city. The spread looked good at
+      the time.
     midDays:
     - The house always wins, does it not? And right now the house is on fire.
     - I found a four-leaf clover in the ash this morning. Taking that as a sign.
@@ -154,4 +183,7 @@ MonoBehaviour:
     - I am going home to fold my hand. There is no out-bluffing the end of the world.
     - Luck is a lady but she left on the last bus out.
     - Every player knows when to walk away from the table. I am almost there.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 3488018
