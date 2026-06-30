@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: DioniseIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: New to this post. Good. I prefer checkpoints where the officer is still
+      paying attention. Complacency tends to set in around the third week.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Dionise Chkonia. Professor at the university \u2014 philosophy and
+      epistemology, though I've been cross-listing into ethics since the situation
+      escalated. The administration finds it useful."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I've been through this gate regularly for two years. Today I'm coming
+      from the archives \u2014 there are texts I want moved offsite before the dust
+      gets worse. Some things are worth the effort to preserve."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What kind of texts?
+      npcResponse: Primary sources. First editions that exist nowhere else. History
+        has a way of surviving in single copies, and I am not prepared to let the
+        next one disappear on a shelf no one is maintaining.
+      animationTrigger: TalkIdle
+    - playerChoiceText: Is the dust getting worse?
+      npcResponse: Yes. I don't believe the official picture is complete. It rarely
+        is in situations like this. I stopped waiting for full disclosure some time
+        ago and began making my own assessments.
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: My students are anxious. Understandably. When everything outside destabilizes,
+      people look for structure wherever they can find it. I keep my lectures on
+      schedule. It isn't much, but routine is its own form of reassurance.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I have a wife and two children at home. We're managing. The university
+      has been reasonable about supplies \u2014 water filters, medical kits. We're
+      not comfortable, but we're not desperate."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: How are your children holding up?
+      npcResponse: "Better than adults, in some ways. Children adapt. What frightens
+        them most isn't the situation itself \u2014 it's watching us pretend we're
+        not frightened. So I stopped pretending. It helped."
+      animationTrigger: TalkLookDown
+    - playerChoiceText: You seem very calm about all of this.
+      npcResponse: Stoicism. It is the only rational response to circumstances you
+        cannot control. Panic distributes your energy where it does the least good.
+        I find it useful to remember that every morning.
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: My papers are here. I check them every two weeks precisely to avoid
+      holding up checkpoints. The permit runs through June. You should find everything
+      straightforward.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
