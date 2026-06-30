@@ -262,6 +262,76 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Introduces a scene-placed <see cref="SuspectCharacter"/> into the suspect flow.
+    /// If the character's GameObject is inactive (e.g. it was placed in the scene but kept
+    /// disabled until needed), this method activates it on the server and calls
+    /// <see cref="NetworkObject.Spawn"/> so NGO propagates the activation to all clients.
+    /// NGO 2.x (Unity 6) registers inactive scene NetworkObjects at scene load via
+    /// <c>FindObjectsByType(FindObjectsInactive.Include)</c>, so the client-side object is
+    /// always resolvable by its GlobalObjectIdHash when the spawn message arrives.
+    /// The character is then teleported to the spawn point and runs the standard DOTween
+    /// walk-in and arrival sequence, firing <see cref="OnSuspectArrived"/> exactly as a
+    /// normally-spawned suspect would.
+    /// Must only be called on the server, typically via <see cref="InterceptNextSuspectSpawn"/>.
+    /// </summary>
+    public void IntroduceSceneSuspect(SuspectCharacter character)
+    {
+        if (!IsServer) return;
+
+        if (character == null)
+        {
+            Debug.LogError("[SuspectController] IntroduceSceneSuspect: character is null.");
+            return;
+        }
+
+        NetworkObject netObj = character.GetComponent<NetworkObject>();
+        if (netObj == null)
+        {
+            Debug.LogError($"[SuspectController] IntroduceSceneSuspect: '{character.name}' is missing a NetworkObject component.");
+            return;
+        }
+
+        // Activate and spawn if the object was kept inactive in the scene.
+        // NGO will send a spawn message to clients; they find the scene object by
+        // GlobalObjectIdHash, activate it, and mark it as spawned on their end.
+        if (!character.gameObject.activeSelf)
+            character.gameObject.SetActive(true);
+
+        if (!netObj.IsSpawned)
+            netObj.Spawn();
+
+        // Teleport to spawn point. NetworkTransform syncs the new position to clients.
+        character.transform.position = spawnPos.position;
+        character.transform.rotation = spawnPos.rotation;
+
+        suspectCharacter = character;
+        _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
+        _currentSuspectInitialized = true;
+
+        character.InitializeClean();
+
+        // Tell clients which NetworkObject is the current suspect.
+        AssignReferencesClientRpc(netObj.NetworkObjectId);
+
+        // Run the standard walk-in (DOTween to standPos → ArrivedAtPosition → OnSuspectArrived).
+        InitiateSuspect();
+
+        Debug.Log($"[SuspectController] IntroduceSceneSuspect: '{character.name}' activated and walking to window.");
+    }
+
+    /// <summary>
+    /// Forces <see cref="suspectIndex"/> to the given value.
+    /// Debug use only — call from <see cref="DebugConsole"/> before <see cref="NextSuspect"/>
+    /// to inject a specific slot index, bypassing the normal sequential spawn chain.
+    /// </summary>
+    public void DebugSetSuspectIndex(int index)
+    {
+        if (!IsServer) return;
+        suspectIndex.Value = index;
+        Debug.Log($"[SuspectController] Debug: suspectIndex forced to {index}.");
+    }
+
+    /// <summary>
     /// Spawns the given <see cref="SuspectCharacter"/> prefab as a scripted suspect,
     /// bypassing the <see cref="DailySuspectManager"/> lineup entirely. The character
     /// goes through the full walk-in and arrival flow exactly as a normally-scheduled

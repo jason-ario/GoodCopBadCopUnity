@@ -175,6 +175,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &3564628533040780638
 GameObject:
@@ -3562,6 +3563,46 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 1545170563
       objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.1562
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.025
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.0371
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.30285862
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.21406811
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.5343277
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.7595693
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -109.715
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -179.737
+      objectReference: {fileID: 0}
+    - target: {fileID: 2999985794326471374, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 43.292007
+      objectReference: {fileID: 0}
     - target: {fileID: 3094879301807260499, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -3886,6 +3927,10 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 2922005760
       objectReference: {fileID: 0}
+    - target: {fileID: 7386951079011859476, guid: ebade61acb82e90459f9692608131115, type: 3}
+      propertyPath: rmsCount
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7472418667708267252, guid: ebade61acb82e90459f9692608131115, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 2629110101
@@ -4117,7 +4162,10 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1292574295958715148, guid: ebade61acb82e90459f9692608131115, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1750168690158537398}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2515761236222441588, guid: ebade61acb82e90459f9692608131115, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6582443236885126595}
   m_SourcePrefab: {fileID: 100100000, guid: ebade61acb82e90459f9692608131115, type: 3}
 --- !u!114 &3586901128958134434 stripped
 MonoBehaviour:
@@ -4130,6 +4178,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 445297328f07e414db6bbc1556fceee1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!1 &6042824741751437032 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2515761236222441588, guid: ebade61acb82e90459f9692608131115, type: 3}
+  m_PrefabInstance: {fileID: 8157613861083893404}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6582443236885126595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6042824741751437032}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!4 &6973137844929705360 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1292574295958715148, guid: ebade61acb82e90459f9692608131115, type: 3}

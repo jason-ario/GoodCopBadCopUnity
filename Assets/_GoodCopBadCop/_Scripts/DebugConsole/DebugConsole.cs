@@ -182,6 +182,13 @@ public class DebugConsole : MonoBehaviour
             ForceAlexeiSequenceOnNextSuspect();
         }
 
+        // F12 — skip straight to the Day 1 Soldier sequence, bypassing Vlad,
+        // the random civilian, the documentation-anomaly suspect, and Ivan.
+        if (Input.GetKeyDown(KeyCode.F12))
+        {
+            SkipToSoldierSequence();
+        }
+
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
         if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
         {
@@ -359,7 +366,49 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Forces the soldier scripted event to intercept the next suspect spawn slot,
+    /// Skips Day 1 directly to the Soldier's slot (suspect index 4), bypassing Vlad,
+    /// the random civilian, the doc-anomaly suspect, and Ivan. Calls <see cref="SkipToDay"/>
+    /// to activate Day 1, then waits a frame for <see cref="Day_01"/> to subscribe its
+    /// events before arming the Soldier intercept and triggering the next spawn slot.
+    /// </summary>
+    private void SkipToSoldierSequence()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToSoldierSequence: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(1);
+        StartCoroutine(ArmSoldierAfterDelay());
+    }
+
+    private IEnumerator ArmSoldierAfterDelay()
+    {
+        // Wait one frame for Day_01 to activate, subscribe its events, and set its Instance.
+        yield return null;
+
+        if (Day_01.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] ArmSoldierAfterDelay: Day_01.Instance not found after SkipToDay(1).");
+            yield break;
+        }
+
+        // Abort the 7 s shutter delay, open the shutter, arm the Soldier intercept.
+        Day_01.Instance.DebugSkipToSoldierSlot();
+
+        // Set suspectIndex to 3 so the next NextSuspect() increments to 4 (Soldier's slot).
+        SuspectController.Instance?.DebugSetSuspectIndex(3);
+
+        // Ensure the shift is running so SuspectController can process the next slot.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(0f, 0f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Trigger the next suspect slot immediately — this fires the Soldier intercept.
+        SuspectController.Instance?.NextSuspect();
+
+        Debug.Log("[DebugConsole] Skipped to Soldier sequence (F12).");
+    }
     /// bypassing normal character spawning and playing the mocking sequence directly.
     /// Useful for testing the soldier event without running through all preceding suspects.
     /// </summary>

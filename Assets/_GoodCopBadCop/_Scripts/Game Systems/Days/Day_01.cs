@@ -23,6 +23,13 @@ using UnityEngine;
 /// </summary>
 public class Day_01 : DayBase
 {
+    /// <summary>Singleton reference — set in Awake, cleared on destroy.</summary>
+    public static Day_01 Instance { get; private set; }
+
+    private void Awake()
+    {
+        Instance = this;
+    }
     [Header("Day 1 — Booth")]
     [Tooltip("The booth drawer the player can open freely on Day 1.")]
     [SerializeField] private Drawer _drawer;
@@ -52,6 +59,19 @@ public class Day_01 : DayBase
 
     [Tooltip("Seconds after Ivan arrives at the window before his dialogue sequence begins.")]
     [SerializeField] private float _ivanDialogueStartDelay = 1.2f;
+
+    [Header("Day 1 — Soldier")]
+    [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
+             "IMPORTANT: Must be ACTIVE in the scene at load time so NGO auto-spawns his NetworkObject. " +
+             "Position him off-screen (e.g. underground) — IntroduceSceneSuspect teleports him to " +
+             "the spawn point when his sequence fires, then he walks in like a normal suspect.")]
+    [SerializeField] private SuspectCharacter _soldierCharacter;
+
+    [Tooltip("Scripted dialogue sequence to play once the Soldier sequence begins.")]
+    [SerializeField] private ScriptedDialogue _soldierDialogue;
+
+    [Tooltip("Seconds after the Soldier sequence is triggered before his dialogue begins.")]
+    [SerializeField] private float _soldierDialogueStartDelay = 1.2f;
 
     [Header("Day 1 — Ivan Documentation Tutorial")]
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
@@ -242,6 +262,7 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
         SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
         SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
@@ -270,6 +291,9 @@ public class Day_01 : DayBase
 
     private void OnDestroy()
     {
+        if (Instance == this)
+            Instance = null;
+
         if (ShutterController.Instance != null)
             ShutterController.Instance.ShutterLockedOpen = false;
 
@@ -280,6 +304,7 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
         SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
         SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
@@ -785,6 +810,9 @@ public class Day_01 : DayBase
 
         if (!NetworkManager.Singleton.IsServer) return;
 
+        // Lock the folder immediately so the player cannot pick it back up during the cutscene.
+        item.SetInteractableNetworked(false);
+
         if (_vladClosingDialogue == null)
         {
             Debug.LogWarning("[Day_01] _vladClosingDialogue is not assigned — skipping closing dialogue.");
@@ -890,7 +918,8 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients when any suspect arrives. Reacts to index 3 (Ivan) and —
-    /// server-only — starts his scripted dialogue after a brief settle delay.
+    /// server-only — starts his scripted dialogue after a brief settle delay and arms
+    /// the Soldier trigger so his sequence fires once Ivan has been processed and leaves.
     /// Unsubscribes itself so it can only fire once per day.
     /// </summary>
     private void OnIvanArrivedAtWindow(int index)
@@ -901,10 +930,22 @@ public class Day_01 : DayBase
 
         if (!NetworkManager.Singleton.IsServer) return;
 
+        // Arm the Soldier scene sequence: fires when SuspectController would spawn the next
+        // suspect (i.e. after Ivan has been processed and left the window). The scene-placed
+        // Soldier is already registered with NGO, so no runtime spawn is needed.
+        if (_soldierCharacter != null)
+        {
+            SuspectController.InterceptNextSuspectSpawn = () =>
+            {
+                StartCoroutine(ActivateAndStartSoldierDialogue());
+            };
+
+            Debug.Log("[Day_01] Ivan (index 3) arrived — Soldier scene sequence armed.");
+        }
+
         if (_ivanDialogue == null)
         {
             Debug.LogWarning("[Day_01] _ivanDialogue is not assigned — skipping Ivan's scripted dialogue.");
-            // Fall back: spawn paperwork immediately so Ivan can be processed normally.
             SuspectController.Instance?.SpawnPaperwork();
             return;
         }
@@ -927,14 +968,138 @@ public class Day_01 : DayBase
         ScriptedDialogueRunner.Instance.PlayDialogue(ivan, _ivanDialogue, OnIvanDialogueComplete);
     }
 
-    /// <summary>
-    /// Called on the server once Ivan's scripted dialogue finishes.
-    /// Spawns his paperwork so the player can process him normally.
-    /// </summary>
+    /// <summary>Called on the server once Ivan's scripted dialogue finishes.</summary>
     private void OnIvanDialogueComplete()
     {
         Debug.Log("[Day_01] Ivan scripted dialogue complete — spawning his paperwork.");
         SuspectController.Instance?.SpawnPaperwork();
+    }
+
+    // -------------------------------------------------------------------------
+    // Soldier Scene Sequence (triggered after Ivan leaves)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-side coroutine. Suppresses the Soldier's entry line, subscribes to
+    /// <see cref="SuspectController.OnSuspectArrived"/> for his arrival, then calls
+    /// <see cref="SuspectController.IntroduceSceneSuspect"/> to teleport him to the
+    /// spawn point and kick off the standard DOTween walk-in. Dialogue starts once
+    /// <see cref="OnSoldierArrivedAtWindow"/> fires (index 4), matching the Vlad/Ivan
+    /// pattern exactly.
+    /// </summary>
+    private IEnumerator ActivateAndStartSoldierDialogue()
+    {
+        if (_soldierCharacter == null)
+        {
+            Debug.LogWarning("[Day_01] _soldierCharacter is not assigned — skipping Soldier sequence.");
+            yield break;
+        }
+
+        if (_soldierDialogue == null)
+        {
+            Debug.LogWarning("[Day_01] _soldierDialogue is not assigned — skipping Soldier sequence.");
+            yield break;
+        }
+
+        // Suppress generic entry bark — the scripted dialogue owns his introduction.
+        SuspectController.ForceNextSuspectSkipEntryDialogue = true;
+
+        // Subscribe before teleporting so the arrival event is never missed.
+        SuspectController.OnSuspectArrived += OnSoldierArrivedAtWindow;
+
+        // Teleport to spawn point and begin the walk-in. OnSuspectArrived fires when he
+        // reaches standPos, at which point OnSoldierArrivedAtWindow starts his dialogue.
+        SuspectController.Instance.IntroduceSceneSuspect(_soldierCharacter);
+
+        Debug.Log("[Day_01] Soldier walk-in initiated — awaiting arrival event (index 4).");
+        yield break;
+    }
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 4 (the Soldier).
+    /// Server-only: starts the scripted dialogue after the settle delay.
+    /// </summary>
+    private void OnSoldierArrivedAtWindow(int index)
+    {
+        if (index != 4) return;
+
+        SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        StartCoroutine(WaitAndStartSoldierDialogue());
+        Debug.Log("[Day_01] Soldier (index 4) arrived — starting dialogue after settle delay.");
+    }
+
+    private IEnumerator WaitAndStartSoldierDialogue()
+    {
+        yield return new WaitForSeconds(_soldierDialogueStartDelay);
+
+        if (_soldierCharacter == null)
+        {
+            Debug.LogWarning("[Day_01] _soldierCharacter is null when trying to start Soldier dialogue.");
+            yield break;
+        }
+
+        ScriptedDialogueRunner.Instance.PlayDialogue(_soldierCharacter, _soldierDialogue, OnSoldierDialogueComplete);
+        Debug.Log("[Day_01] Soldier scripted dialogue started.");
+    }
+
+    /// <summary>
+    /// Called on the server once the Soldier's scripted dialogue finishes.
+    /// Entry point for the mutant-attack Timeline cutscene — to be implemented.
+    /// </summary>
+    private void OnSoldierDialogueComplete()
+    {
+        Debug.Log("[Day_01] Soldier scripted dialogue complete — mutant attack sequence placeholder.");
+        // TODO: trigger mutant attack Timeline cutscene here.
+    }
+
+    // -------------------------------------------------------------------------
+    // Debug Helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Debug-only server method. Aborts the normal Day 1 opening sequence and jumps
+    /// directly to the Soldier's slot, bypassing Vlad, the random civilian, the
+    /// documentation-anomaly suspect, and Ivan entirely. Intended to be called by
+    /// <see cref="DebugConsole"/> so the Soldier sequence can be tested in isolation.
+    ///
+    /// Side effects:
+    ///   — Stops all running coroutines on this component (cancels the 7 s shutter delay).
+    ///   — Opens and locks the shutter immediately.
+    ///   — Clears <see cref="HandOffPoint.BlockVerdict"/> (Vlad's verdict will never arrive).
+    ///   — Arms <see cref="SuspectController.InterceptNextSuspectSpawn"/> with the Soldier
+    ///     scene sequence so the very next <see cref="SuspectController.NextSuspect"/> call
+    ///     triggers his walk-in.
+    /// </summary>
+    public void DebugSkipToSoldierSlot()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        // Cancel any pending Day 1 coroutines so the 7s delay can't re-arm Vlad's intercept.
+        StopAllCoroutines();
+
+        // Open and lock the shutter so the Soldier can walk up to the window.
+        ShutterController.Instance?.OpenShutter();
+        if (ShutterController.Instance != null)
+            ShutterController.Instance.ShutterLockedOpen = true;
+
+        // Vlad's closing dialogue will never play, so unblock the verdict.
+        HandOffPoint.BlockVerdict = false;
+
+        if (_soldierCharacter == null || _soldierDialogue == null)
+        {
+            Debug.LogWarning("[Day_01] DebugSkipToSoldierSlot: _soldierCharacter or _soldierDialogue not assigned — cannot arm Soldier intercept.");
+            return;
+        }
+
+        SuspectController.InterceptNextSuspectSpawn = () =>
+        {
+            StartCoroutine(ActivateAndStartSoldierDialogue());
+        };
+
+        Debug.Log("[Day_01] DebugSkipToSoldierSlot: Soldier intercept armed. Call SuspectController.NextSuspect() to trigger.");
     }
 
     // -------------------------------------------------------------------------

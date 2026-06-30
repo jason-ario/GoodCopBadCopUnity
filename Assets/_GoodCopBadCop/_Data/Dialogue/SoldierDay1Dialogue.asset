@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: SoldierDay1Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: Another new face. Third one this month. How long before you wash out?
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Three tours. Done the real thing. Every time I pass through a post like
+      this — same scene. Fresh uniform, no idea what's coming.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: What did they actually prep you for in training?
+    animationTrigger: TalkSarcasticNod
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: The basics. Enough to do the job.
+      npcResponse: The basics stop applying real fast out here. Trust me on that.
+      animationTrigger: TalkDismissing
+    - playerChoiceText: Guess we'll find out.
+      npcResponse: Ha. Honest. Doesn't mean you'll last, but at least you know it.
+      animationTrigger: TalkShrug
+  - type: 0
+    npcLine: Three days. That's my read. Most don't make it past the first week anyway.
+    animationTrigger: TalkDismissing
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Last officer they put here? Sharp guy. Two weeks in, something came through
+      that didn't add up. He flagged it. Nobody listened. Never came back.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Trust your gut. When something feels wrong, don't wait for permission.
+      By the time someone agrees with you, it's usually—
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
