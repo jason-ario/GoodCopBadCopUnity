@@ -35,22 +35,13 @@ public class SoldierMockingController : NetworkBehaviour
     [Tooltip("Off-screen despawn position the soldier walks to after mocking.")]
     [SerializeField] private Transform _despawnPos;
 
+    [Header("Dialogue")]
+    [Tooltip("ScriptedDialogue asset played through ScriptedDialogueRunner when the soldier arrives.")]
+    [SerializeField] private ScriptedDialogue _soldierDialogue;
+
     [Header("Timing")]
-    [Tooltip("Seconds between each mocking line.")]
-    [SerializeField] private float _secondsBetweenLines = 3.5f;
-
-    [Tooltip("Seconds to pause after the final line before the soldier turns and leaves.")]
+    [Tooltip("Seconds to pause after the dialogue finishes before the soldier turns and leaves.")]
     [SerializeField] private float _postLingerSeconds = 2f;
-
-    private static readonly string[] MockingLines =
-    {
-        "New face.",
-        "Let me guess — first week on the job?",
-        "I've seen fifty like you come through this booth.",
-        "Wide-eyed. Nervous. Trying to look like you know what you're doing.",
-        "You won't last a week.",
-        "None of them do.",
-    };
 
     private SuspectCharacter _spawnedSoldier;
 
@@ -94,13 +85,12 @@ public class SoldierMockingController : NetworkBehaviour
         _spawnedSoldier.transform.DORotateQuaternion(_standPos.rotation, 0.5f);
         yield return new WaitForSeconds(1f);
 
-        // Deliver mocking lines back to back with a brief pause between each one.
-        foreach (string line in MockingLines)
-        {
-            if (_spawnedSoldier == null) yield break;
-            DialogueManager.Instance.SayDialogue(_spawnedSoldier, line);
-            yield return new WaitForSeconds(_secondsBetweenLines);
-        }
+        // Play the scripted dialogue through ScriptedDialogueRunner so camera cuts,
+        // player advancement, and choice UI all work correctly.
+        bool dialogueDone = false;
+        ScriptedDialogueRunner.Instance.PlayDialogue(
+            _spawnedSoldier, _soldierDialogue, () => dialogueDone = true);
+        yield return new WaitUntil(() => dialogueDone);
 
         yield return new WaitForSeconds(_postLingerSeconds);
 

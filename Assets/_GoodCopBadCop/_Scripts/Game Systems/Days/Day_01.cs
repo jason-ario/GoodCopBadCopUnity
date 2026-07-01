@@ -1106,12 +1106,19 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called on the server once the Soldier's scripted dialogue finishes.
-    /// Entry point for the mutant-attack Timeline cutscene — to be implemented.
+    /// Hands off to <see cref="AlexeiController"/> to play the murder Timeline and then
+    /// start the mutant-shutter gameplay sequence.
     /// </summary>
     private void OnSoldierDialogueComplete()
     {
-        Debug.Log("[Day_01] Soldier scripted dialogue complete — mutant attack sequence placeholder.");
-        // TODO: trigger mutant attack Timeline cutscene here.
+        if (AlexeiController.Instance == null)
+        {
+            Debug.LogWarning("[Day_01] OnSoldierDialogueComplete: AlexeiController.Instance not found — cannot start murder cutscene.");
+            return;
+        }
+
+        Debug.Log("[Day_01] Soldier dialogue complete — triggering Alexei murder cutscene.");
+        AlexeiController.Instance.BeginSequence();
     }
 
     // -------------------------------------------------------------------------

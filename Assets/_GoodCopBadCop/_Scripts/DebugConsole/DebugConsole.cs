@@ -401,12 +401,19 @@ public class DebugConsole : MonoBehaviour
         // Abort the 7 s shutter delay, open the shutter, arm the Soldier intercept.
         Day_01.Instance.DebugSkipToSoldierSlot();
 
-        // Set suspectIndex to 3 so the next NextSuspect() increments to 4 (Soldier's slot).
-        SuspectController.Instance?.DebugSetSuspectIndex(3);
-
-        // Ensure the shift is running so SuspectController can process the next slot.
+        // Start the shift BEFORE setting the debug index. TryStartShift delivers a ClientRpc
+        // that runs OpenWindowSequence, whose first statement synchronously calls
+        // ResetSuspects() (resetting suspectIndex to -1). We yield one frame so that RPC is
+        // processed and the reset completes BEFORE we write suspectIndex = 3, otherwise the
+        // reset overwrites our value and NextSuspect() spawns slot 0 instead of slot 4,
+        // causing OnSoldierArrivedAtWindow to bail on its index check.
         ShiftManager.OverrideFirstArrivalInterval = new Vector2(0f, 0f);
         ShiftManager.Instance?.TryStartShift();
+
+        yield return null; // Let OpenWindowSequence's ResetSuspects() run first.
+
+        // Set suspectIndex to 3 so the next NextSuspect() increments to 4 (Soldier's slot).
+        SuspectController.Instance?.DebugSetSuspectIndex(3);
 
         // Trigger the next suspect slot immediately — this fires the Soldier intercept.
         SuspectController.Instance?.NextSuspect();
