@@ -77,6 +77,14 @@ public class Day_01 : DayBase
     [Tooltip("Seconds after the Soldier sequence is triggered before his dialogue begins.")]
     [SerializeField] private float _soldierDialogueStartDelay = 1.2f;
 
+    [Tooltip("Megaphone scripted dialogue that plays immediately after the Alexei murder cutscene ends. " +
+             "Typically a single instruction line, e.g. 'Use the lever to close the window shutter!'")]
+    [SerializeField] private ScriptedDialogue _leverDialogue;
+
+    [Tooltip("Custom stand position for the Soldier at the booth window. " +
+             "Overrides SuspectController's default standPos for the soldier's walk-in.")]
+    [SerializeField] private Transform _soldierBoothPos;
+
     [Header("Day 1 — Ivan Documentation Tutorial")]
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
@@ -1066,6 +1074,10 @@ public class Day_01 : DayBase
         // Subscribe before teleporting so the arrival event is never missed.
         SuspectController.OnSuspectArrived += OnSoldierArrivedAtWindow;
 
+        // Override the default standPos so the soldier walks to the cutscene-specific position.
+        if (_soldierBoothPos != null)
+            SuspectController.NextSuspectStandPosOverride = _soldierBoothPos;
+
         // Teleport to spawn point and begin the walk-in. OnSuspectArrived fires when he
         // reaches standPos, at which point OnSoldierArrivedAtWindow starts his dialogue.
         SuspectController.Instance.IntroduceSceneSuspect(_soldierCharacter);
@@ -1100,25 +1112,49 @@ public class Day_01 : DayBase
             yield break;
         }
 
-        ScriptedDialogueRunner.Instance.PlayDialogue(_soldierCharacter, _soldierDialogue, OnSoldierDialogueComplete);
+        ScriptedDialogueRunner.Instance.PlayDialogue(_soldierCharacter, _soldierDialogue,
+            OnSoldierDialogueComplete, deferExit: true);
         Debug.Log("[Day_01] Soldier scripted dialogue started.");
     }
 
     /// <summary>
     /// Called on the server once the Soldier's scripted dialogue finishes.
-    /// Hands off to <see cref="AlexeiController"/> to play the murder Timeline and then
-    /// start the mutant-shutter gameplay sequence.
+    /// Switches to the Look Up camera, plays the Alexei murder cutscene, then
+    /// plays a megaphone instruction to the player (which also exits scripted mode).
     /// </summary>
     private void OnSoldierDialogueComplete()
     {
+        Debug.Log("[Day_01] Soldier dialogue complete — starting mutant attack sequence.");
+        StartCoroutine(MutantAttackSequence());
+    }
+
+    private IEnumerator MutantAttackSequence()
+    {
+        // Deactivate any override camera so the default At Booth Cam shows during the cutscene.
+        ScriptedDialogueRunner.Instance.SwitchCamera(string.Empty);
+
         if (AlexeiController.Instance == null)
         {
-            Debug.LogWarning("[Day_01] OnSoldierDialogueComplete: AlexeiController.Instance not found — cannot start murder cutscene.");
-            return;
+            Debug.LogWarning("[Day_01] MutantAttackSequence: AlexeiController.Instance not found — skipping cutscene.");
+        }
+        else
+        {
+            bool cutsceneDone = false;
+            AlexeiController.Instance.BeginSequence(() => cutsceneDone = true);
+            yield return new WaitUntil(() => cutsceneDone);
         }
 
-        Debug.Log("[Day_01] Soldier dialogue complete — triggering Alexei murder cutscene.");
-        AlexeiController.Instance.BeginSequence();
+        Debug.Log("[Day_01] Alexei cutscene finished — playing lever megaphone dialogue.");
+
+        // PlayMegaphoneDialogue re-enters scripted mode (safe no-op if already in it),
+        // plays the instruction line, and exits scripted mode when the player advances.
+        if (_leverDialogue != null)
+            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_leverDialogue);
+        else
+        {
+            Debug.LogWarning("[Day_01] _leverDialogue is not assigned — exiting scripted mode manually.");
+            ScriptedDialogueRunner.Instance.ExitScriptedMode();
+        }
     }
 
     // -------------------------------------------------------------------------

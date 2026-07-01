@@ -68,6 +68,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static bool ForceNextSuspectSkipExitDialogue = false;
 
+    /// <summary>
+    /// When set, the next suspect's walk-in destination and arrival rotation are taken from
+    /// this Transform instead of the default <c>standPos</c>. Consumed and reset to null
+    /// inside <see cref="InitiateSuspect"/> after one use. Set by Day_01 for the Soldier.
+    /// </summary>
+    public static Transform NextSuspectStandPosOverride;
+
     [Header("Booth")]
     [SerializeField] private ShutterController shutterController;
 
@@ -76,6 +83,10 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] private Transform standPos;
     [SerializeField] private Transform despawnPos;
     [SerializeField] private Transform gatePos;
+
+    // Cached per-suspect stand position — set from NextSuspectStandPosOverride in
+    // InitiateSuspect so ArrivedAtPosition can still read it after the static is consumed.
+    private Transform _activeStandPos;
 
     [Header("Suspects")] 
     private SuspectCharacter suspectCharacter;
@@ -460,9 +471,13 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Consume the one-time override, falling back to the default stand position.
+        _activeStandPos = NextSuspectStandPosOverride != null ? NextSuspectStandPosOverride : standPos;
+        NextSuspectStandPosOverride = null;
+
         suspectCharacter.animator.SetBool("Walking", true);
         suspectCharacter.transform
-            .DOMove(standPos.position + suspectCharacter.standPosOffset, 3f)
+            .DOMove(_activeStandPos.position + suspectCharacter.standPosOffset, 3f)
             .OnComplete(ArrivedAtPosition);
 
         // Notify all clients so they can show the booth-waiting notification if needed.
@@ -519,7 +534,7 @@ public class SuspectController : NetworkBehaviour
         NotifySuspectArrivedClientRpc(suspectIndex.Value);
 
         suspectCharacter.transform
-            .DORotateQuaternion(standPos.rotation, 0.5f)
+            .DORotateQuaternion(_activeStandPos.rotation, 0.5f)
             .OnComplete(OnRotationComplete);
 
         suspectCharacter.animator.SetBool("Walking", false);

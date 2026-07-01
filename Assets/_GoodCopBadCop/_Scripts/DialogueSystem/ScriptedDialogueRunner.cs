@@ -84,8 +84,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// Plays a scripted dialogue with <paramref name="speaker"/> as the NPC.
     /// Must be called on the server. <paramref name="onComplete"/> fires on the server
     /// after the last node completes.
+    /// <para>
+    /// When <paramref name="deferExit"/> is <c>true</c>, scripted dialogue mode is NOT
+    /// exited after the last node — the caller is responsible for calling
+    /// <see cref="ExitScriptedMode"/> (or chaining <see cref="PlayMegaphoneDialogue"/>)
+    /// when the full sequence is finished.
+    /// </para>
     /// </summary>
-    public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue, Action onComplete = null)
+    public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
+        Action onComplete = null, bool deferExit = false)
     {
         if (!IsServer) return;
 
@@ -97,7 +104,29 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunDialogue(speaker, dialogue, onComplete));
+        StartCoroutine(RunDialogue(speaker, dialogue, onComplete, deferExit));
+    }
+
+    /// <summary>
+    /// Switches the active override camera to the entry matching <paramref name="key"/>.
+    /// An empty key deactivates any active override. Must be called on the server.
+    /// </summary>
+    public void SwitchCamera(string key)
+    {
+        if (!IsServer) return;
+        SetActiveOverrideCamClientRpc(key ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Manually exits scripted dialogue mode and deactivates any active override camera.
+    /// Use this when a previous <see cref="PlayDialogue"/> call was made with
+    /// <c>deferExit: true</c> and no subsequent dialogue method will end the session.
+    /// Must be called on the server.
+    /// </summary>
+    public void ExitScriptedMode()
+    {
+        if (!IsServer) return;
+        ExitScriptedModeClientRpc();
     }
 
     /// <summary>
@@ -148,11 +177,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Internal sequence
     // -------------------------------------------------------------------------
 
-    private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue, Action onComplete)
+    private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
+        Action onComplete, bool deferExit = false)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
 
-        Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}");
+        Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
         _lastAnimTrigger = string.Empty;
 
@@ -177,11 +207,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                 yield return StartCoroutine(PlayChoiceNode(speaker, node, speakerNetId));
         }
 
-        ExitScriptedModeClientRpc();
-        yield return null;
+        // When deferExit is true, scripted mode is kept active so the caller can chain
+        // further sequences (e.g. a cutscene followed by megaphone dialogue) before
+        // returning control to the player. The caller must eventually call ExitScriptedMode
+        // or PlayMegaphoneDialogue (which exits mode when it completes).
+        if (!deferExit)
+        {
+            ExitScriptedModeClientRpc();
+            yield return null;
+        }
 
         onComplete?.Invoke();
-        Debug.Log("[ScriptedDialogueRunner] Scripted dialogue complete.");
+        Debug.Log($"[ScriptedDialogueRunner] Scripted dialogue complete (deferExit={deferExit}).");
     }
 
     /// <summary>Says a line and waits for the player to press E / click before continuing.</summary>
