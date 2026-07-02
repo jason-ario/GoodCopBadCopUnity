@@ -47,6 +47,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private const float ArrivalTolerance = 0.25f;
     private const float GiveUpPauseDuration = 1f;
     private const string ClimbingAnimBool = "climbing";
+    private const string BangOnShuttersAnimBool = "BangOnShutters";
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -385,12 +386,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _animator.SetBool(ClimbingAnimBool, climbing);
     }
 
-    /// <summary>Sets the Attack animator bool on all clients. Used to drive the shutter-attack animation.</summary>
+    /// <summary>Sets the BangOnShutters animator bool on all clients. Used to drive the shutter-attack animation.</summary>
     [ClientRpc]
     private void SetAttackClientRpc(bool attacking)
     {
         if (_animator != null)
-            _animator.SetBool("Attack", attacking);
+            _animator.SetBool(BangOnShuttersAnimBool, attacking);
     }
 
     /// <summary>Fires an animator trigger on all clients.</summary>
