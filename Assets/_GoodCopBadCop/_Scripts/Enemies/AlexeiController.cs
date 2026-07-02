@@ -126,6 +126,12 @@ public class AlexeiController : NetworkBehaviour
     public Action OnMutantIdleCallback { get; set; }
 
     /// <summary>
+    /// Callback invoked on the server when the mutant has finished banging on the shutters and despawned.
+    /// Set this before the cutscene plays so Day_01 can chain the post-Alexei megaphone dialogue.
+    /// </summary>
+    public Action OnAlexeiSequenceDone { get; set; }
+
+    /// <summary>
     /// Parameterless entry point for the mutant entrance sequence intended to be wired to a
     /// Timeline SignalReceiver. Delegates to <see cref="BeginMutantEntrance"/> using
     /// <see cref="OnMutantIdleCallback"/> as the idle callback.
@@ -221,6 +227,8 @@ public class AlexeiController : NetworkBehaviour
 
         Debug.Log("[AlexeiController] Activating mutant suspect behaviour.");
 
+        msb.DespawnInsteadOfRetreat = true;
+        msb.OnSequenceComplete = _ => OnAlexeiSequenceDone?.Invoke();
         msb.BeginAtStandPos(
             _mutantData,
             _mutantBoothPos,

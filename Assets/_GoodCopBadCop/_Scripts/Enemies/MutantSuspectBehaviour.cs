@@ -43,6 +43,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     /// </summary>
     public System.Action<bool> OnSequenceComplete;
 
+    /// <summary>
+    /// When true, the mutant despawns immediately after finishing the shutter-bang sequence
+    /// instead of walking back to the despawn point. Default false.
+    /// Set this before calling BeginAtStandPos() for scripted entrances (e.g. Alexei cutscene).
+    /// </summary>
+    public bool DespawnInsteadOfRetreat { get; set; }
+
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
     private const float GiveUpPauseDuration = 1f;
@@ -217,8 +224,17 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
             if (_isDone) yield break;
 
-            // Lost interest — clear the attack state and retreat.
+            // Lost interest — clear the attack state then either despawn or retreat.
             SetAttackClientRpc(false);
+
+            if (DespawnInsteadOfRetreat)
+            {
+                _isDone = true;
+                OnSequenceComplete?.Invoke(false);
+                if (NetworkObject.IsSpawned) NetworkObject.Despawn();
+                yield break;
+            }
+
             yield return StartCoroutine(RetreatingSequence(notifyController: false));
             yield break;
         }
@@ -244,10 +260,19 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_isDone) yield break;
 
-        // Give up: brief pause, then retreat.
+        // Give up: brief pause, then either despawn or retreat.
         yield return new WaitForSeconds(GiveUpPauseDuration);
 
         if (_isDone) yield break;
+
+        if (DespawnInsteadOfRetreat)
+        {
+            _isDone = true;
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+            OnSequenceComplete?.Invoke(false);
+            if (NetworkObject.IsSpawned) NetworkObject.Despawn();
+            yield break;
+        }
 
         yield return StartCoroutine(RetreatingSequence(notifyController: true));
     }

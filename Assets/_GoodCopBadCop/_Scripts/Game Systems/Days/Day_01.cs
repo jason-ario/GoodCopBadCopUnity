@@ -81,6 +81,9 @@ public class Day_01 : DayBase
              "Typically a single instruction line, e.g. 'Use the lever to close the window shutter!'")]
     [SerializeField] private ScriptedDialogue _leverDialogue;
 
+    [Tooltip("Megaphone scripted dialogue that plays after Alexei despawns — the closing remarks for the shift.")]
+    [SerializeField] private ScriptedDialogue _postAlexeiDialogue;
+
     [Tooltip("The booth lever — animated to the open position when the shutter opens and locked " +
              "non-interactable until the megaphone instructs the player to use it.")]
     [SerializeField] private Lever _lever;
@@ -1165,6 +1168,23 @@ public class Day_01 : DayBase
             // can fire TriggerMutantEntrance mid-cutscene without needing to pass parameters.
             bool mutantIdle = false;
             AlexeiController.Instance.OnMutantIdleCallback = () => mutantIdle = true;
+            AlexeiController.Instance.OnAlexeiSequenceDone = () =>
+            {
+                if (_postAlexeiDialogue != null)
+                    ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_postAlexeiDialogue, () =>
+                    {
+                        if (ShiftManager.Instance != null)
+                            ShiftManager.Instance.EndShift();
+                        else
+                            Debug.LogWarning("[Day_01] ShiftManager.Instance not found — cannot end shift.");
+                    });
+                else
+                {
+                    Debug.LogWarning("[Day_01] _postAlexeiDialogue is not assigned — ending shift immediately.");
+                    if (ShiftManager.Instance != null)
+                        ShiftManager.Instance.EndShift();
+                }
+            };
 
             // Start the cutscene — the Timeline signal mid-playback calls TriggerMutantEntrance.
             // The cutscene runs independently; the mutant entrance timing drives the sequence.
