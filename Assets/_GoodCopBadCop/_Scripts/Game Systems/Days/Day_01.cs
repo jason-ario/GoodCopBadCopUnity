@@ -1163,14 +1163,16 @@ public class Day_01 : DayBase
         {
             // Register the idle callback before the cutscene plays so the Timeline SignalReceiver
             // can fire TriggerMutantEntrance mid-cutscene without needing to pass parameters.
-            bool cutsceneDone = false;
-            bool mutantIdle   = false;
+            bool mutantIdle = false;
             AlexeiController.Instance.OnMutantIdleCallback = () => mutantIdle = true;
-            AlexeiController.Instance.BeginSequence(() => cutsceneDone = true);
 
-            // Wait for both the cutscene and the entrance to complete — the signal fires the
-            // entrance mid-cutscene so they overlap; whichever finishes last unblocks execution.
-            yield return new WaitUntil(() => cutsceneDone && mutantIdle);
+            // Start the cutscene — the Timeline signal mid-playback calls TriggerMutantEntrance.
+            // The cutscene runs independently; the mutant entrance timing drives the sequence.
+            AlexeiController.Instance.BeginSequence();
+
+            // Dialogue fires _fallDuration + _idleAfterLandSeconds after the signal spawns Alexei
+            // (target: 3 s). The cutscene may still be playing at this point — that's intentional.
+            yield return new WaitUntil(() => mutantIdle);
         }
 
         Debug.Log("[Day_01] Mutant idling at booth — playing lever megaphone dialogue.");
