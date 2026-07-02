@@ -96,7 +96,8 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         // Show cursor so the player can point at objects.
         UIController.Instance.ShowCursor();
-        UIController.Instance.ShowBackButton(Close);
+        if (ShowBackButton)
+            UIController.Instance.ShowBackButton(Close);
 
         // Hide first-person arms so they don't occlude the view.
         _playerArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
@@ -142,7 +143,8 @@ public abstract class DiegeticViewController : MonoBehaviour
         }
 
         UIController.Instance.HideCursor();
-        UIController.Instance.HideBackButton();
+        if (ShowBackButton)
+            UIController.Instance.HideBackButton();
 
         if (_playerArms != null)
         {
@@ -205,6 +207,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// Use this to freeze the view while a popup or overlay is open.
     /// </summary>
     protected virtual bool SuppressCameraMovement => false;
+
+    /// <summary>
+    /// When overridden to return false, the back button is not shown while this view
+    /// is open. Useful for views that exit via their own input (e.g. mouse release).
+    /// Defaults to true.
+    /// </summary>
+    protected virtual bool ShowBackButton => true;
 
     /// <summary>
     /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.

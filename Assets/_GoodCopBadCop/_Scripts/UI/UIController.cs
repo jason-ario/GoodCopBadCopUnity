@@ -45,6 +45,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private ShopNotificationManager shopNotificationManager;
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
     [SerializeField] private DeathScreenUI deathScreenUI;
+    [SerializeField] private GameObject _endDayPopup;
+    [SerializeField] private EndDayPopupUI _endDayPopupUI;
 
     /// <summary>The <see cref="ScreenDamage"/> component driving the screen hurt overlay.</summary>
     public ScreenDamage ScreenDamage => _screenDamage;
@@ -441,5 +443,41 @@ public class UIController : MonoBehaviour
         if (deathScreenUI == null) return;
         StopCoroutine(nameof(ShowDeathScreenDelayed));
         deathScreenUI.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Opens the End Day confirmation popup in the ready state.
+    /// Shows "End the day?" with a Yes and No button.
+    /// </summary>
+    /// <param name="onConfirm">Callback invoked when the player confirms ending the day.</param>
+    /// <param name="onCancel">Callback invoked when the player presses the No button.</param>
+    public void OpenEndDayPopup(Action onConfirm, Action onCancel)
+    {
+        if (_endDayPopupUI != null)
+            _endDayPopupUI.Setup(onConfirm, onCancel);
+
+        if (_endDayPopup != null)
+            _endDayPopup.SetActive(true);
+    }
+
+    /// <summary>
+    /// Opens the End Day popup in the blocked state.
+    /// Shows "Can't sleep yet" with no action buttons — the Back UI is the only exit.
+    /// </summary>
+    /// <param name="onCancel">Callback invoked when the player dismisses the popup.</param>
+    public void OpenEndDayBlockedPopup(Action onCancel)
+    {
+        if (_endDayPopupUI != null)
+            _endDayPopupUI.SetupBlocked(onCancel);
+
+        if (_endDayPopup != null)
+            _endDayPopup.SetActive(true);
+    }
+
+    /// <summary>Closes the End Day confirmation popup.</summary>
+    public void CloseEndDayPopup()
+    {
+        if (_endDayPopup != null)
+            _endDayPopup.SetActive(false);
     }
 }
