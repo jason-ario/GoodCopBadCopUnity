@@ -81,6 +81,10 @@ public class Day_01 : DayBase
              "Typically a single instruction line, e.g. 'Use the lever to close the window shutter!'")]
     [SerializeField] private ScriptedDialogue _leverDialogue;
 
+    [Tooltip("The booth lever — animated to the open position when the shutter opens and locked " +
+             "non-interactable until the megaphone instructs the player to use it.")]
+    [SerializeField] private Lever _lever;
+
     [Tooltip("Custom stand position for the Soldier at the booth window. " +
              "Overrides SuspectController's default standPos for the soldier's walk-in.")]
     [SerializeField] private Transform _soldierBoothPos;
@@ -188,6 +192,10 @@ public class Day_01 : DayBase
     // Guards against OnDayStarted running more than once if OnDayStart fires twice.
     private bool _dayStartedFired = false;
 
+    // Set by DebugSkipToSoldierSlot to prevent Day1OpeningSequence from running
+    // when TryStartShift subsequently fires OnDayStart.
+    private bool _debugSkipActive = false;
+
     // Tracks which of Vlad's two documents have been picked up so far.
     private PickableObject _vladIDCard;
     private PickableObject _vladAppForm;
@@ -217,6 +225,7 @@ public class Day_01 : DayBase
         base.DayActivated();
 
         _dayStartedFired = false;
+        _debugSkipActive = false;
 
         // Drawer is unlocked so the player can grab a folder during the tutorial.
         _drawer?.SetLocked(false);
@@ -380,6 +389,14 @@ public class Day_01 : DayBase
         _yellowStampSlot?.SetSlotInteractable(false);
         _redStampSlot?.SetSlotInteractable(false);
 
+        // When a debug skip is active, the opening sequence (Vlad / civilians / Ivan) is
+        // intentionally bypassed — DebugSkipToSoldierSlot handles the shift start itself.
+        if (_debugSkipActive)
+        {
+            Debug.Log("[Day_01] OnDayStarted: debug skip active — skipping Day1OpeningSequence.");
+            return;
+        }
+
         StartCoroutine(Day1OpeningSequence());
     }
 
@@ -398,6 +415,11 @@ public class Day_01 : DayBase
         // Open and lock the shutter — it must stay open while Vlad is at the window.
         ShutterController.Instance.OpenShutter();
         ShutterController.Instance.ShutterLockedOpen = true;
+
+        // Animate the lever arm to the up/open position so it matches the shutter state,
+        // and lock it non-interactable until the megaphone instructs the player to use it.
+        _lever?.AnimateOpenServerSide(1f);
+        _lever?.SetInteractable(false);
 
         // Arm the Vlad intercept so the first suspect slot sends him to the window.
         // ForceNextSuspectNoPaperwork suppresses document hand-off for this appearance only.
@@ -1139,21 +1161,37 @@ public class Day_01 : DayBase
         }
         else
         {
+            // Register the idle callback before the cutscene plays so the Timeline SignalReceiver
+            // can fire TriggerMutantEntrance mid-cutscene without needing to pass parameters.
             bool cutsceneDone = false;
+            bool mutantIdle   = false;
+            AlexeiController.Instance.OnMutantIdleCallback = () => mutantIdle = true;
             AlexeiController.Instance.BeginSequence(() => cutsceneDone = true);
-            yield return new WaitUntil(() => cutsceneDone);
+
+            // Wait for both the cutscene and the entrance to complete — the signal fires the
+            // entrance mid-cutscene so they overlap; whichever finishes last unblocks execution.
+            yield return new WaitUntil(() => cutsceneDone && mutantIdle);
         }
 
-        Debug.Log("[Day_01] Alexei cutscene finished — playing lever megaphone dialogue.");
+        Debug.Log("[Day_01] Mutant idling at booth — playing lever megaphone dialogue.");
 
         // PlayMegaphoneDialogue re-enters scripted mode (safe no-op if already in it),
         // plays the instruction line, and exits scripted mode when the player advances.
+        // The lever is unlocked and the shutter lock released once the player has been told to use it.
         if (_leverDialogue != null)
-            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_leverDialogue);
+            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_leverDialogue, () =>
+            {
+                if (ShutterController.Instance != null)
+                    ShutterController.Instance.ShutterLockedOpen = false;
+                _lever?.SetInteractable(true);
+            });
         else
         {
             Debug.LogWarning("[Day_01] _leverDialogue is not assigned — exiting scripted mode manually.");
             ScriptedDialogueRunner.Instance.ExitScriptedMode();
+            if (ShutterController.Instance != null)
+                ShutterController.Instance.ShutterLockedOpen = false;
+            _lever?.SetInteractable(true);
         }
     }
 
@@ -1179,6 +1217,10 @@ public class Day_01 : DayBase
     {
         if (!NetworkManager.Singleton.IsServer) return;
 
+        // Prevent OnDayStarted from launching Day1OpeningSequence when TryStartShift
+        // fires OnDayStart — the entire opening sequence (Vlad, civilians, Ivan) is skipped.
+        _debugSkipActive = true;
+
         // Cancel any pending Day 1 coroutines so the 7s delay can't re-arm Vlad's intercept.
         StopAllCoroutines();
 
@@ -1186,6 +1228,11 @@ public class Day_01 : DayBase
         ShutterController.Instance?.OpenShutter();
         if (ShutterController.Instance != null)
             ShutterController.Instance.ShutterLockedOpen = true;
+
+        // Animate the lever to the open position and lock it — mirrors Day1OpeningSequence
+        // since the opening sequence is bypassed on the debug-skip path.
+        _lever?.AnimateOpenServerSide(0.3f);
+        _lever?.SetInteractable(false);
 
         // Vlad's closing dialogue will never play, so unblock the verdict.
         HandOffPoint.BlockVerdict = false;

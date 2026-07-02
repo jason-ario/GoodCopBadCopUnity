@@ -308,6 +308,65 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         }
     }
 
+    // ── Scripted Entrance ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Begins the window interaction sequence from the stand position, skipping the walk-in phase.
+    /// Use this when the mutant has already been placed at the booth window via a scripted entrance
+    /// (e.g. falling from above). Must be called on the server only, after the NetworkObject is spawned.
+    /// </summary>
+    public void BeginAtStandPos(
+        MutantIntruderData data,
+        Transform standPos,
+        Transform despawnPos,
+        Transform climbThroughTargetPos,
+        ShutterController shutterController,
+        SuspectController controller)
+    {
+        if (!IsServer) return;
+
+        _data = data;
+        _standPos = standPos;
+        _despawnPos = despawnPos;
+        _climbThroughTargetPos = climbThroughTargetPos;
+        _shutterController = shutterController;
+        _controller = controller;
+
+        _mutantEnemy?.SuspendForLineup();
+
+        StartCoroutine(AtStandPosSequence());
+    }
+
+    private IEnumerator AtStandPosSequence()
+    {
+        if (!IsServer || _isDone) yield break;
+
+        _agent.enabled = false;
+
+        // Rotate to face the booth window.
+        bool rotationDone = false;
+        _activeTween = transform
+            .DORotateQuaternion(_standPos.rotation, 0.5f)
+            .OnComplete(() => rotationDone = true);
+
+        yield return new WaitUntil(() => rotationDone);
+
+        yield return new WaitForSeconds(_data.preAttackPauseSeconds);
+
+        if (_isDone) yield break;
+
+        if (canClimb && _shutterController != null && _shutterController.IsOpen)
+            yield return StartCoroutine(ClimbThroughSequence());
+        else
+            yield return StartCoroutine(ShutterBangSequence());
+    }
+
+    /// <summary>Server-side: sets an Animator bool on all clients.</summary>
+    public void SetAnimBool(string paramName, bool value) => SetAnimBoolClientRpc(paramName, value);
+
+    /// <summary>Server-side: fires an Animator trigger on all clients.</summary>
+    public void TriggerAnim(string paramName) => TriggerAnimClientRpc(paramName);
+
     // ── ClientRpcs ─────────────────────────────────────────────────────────────
 
     /// <summary>Sets the Walking animator bool on all clients.</summary>
@@ -340,6 +399,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_animator != null && !string.IsNullOrEmpty(trigger))
             _animator.SetTrigger(trigger);
+    }
+
+    /// <summary>Sets a named Animator bool on all clients. Used for scripted-entrance animations (e.g. falling, landing).</summary>
+    [ClientRpc]
+    private void SetAnimBoolClientRpc(string paramName, bool value)
+    {
+        if (_animator != null && !string.IsNullOrEmpty(paramName))
+            _animator.SetBool(paramName, value);
     }
 
     /// <summary>Enables MutantEnemy on all clients so chase animations and logic activate.</summary>

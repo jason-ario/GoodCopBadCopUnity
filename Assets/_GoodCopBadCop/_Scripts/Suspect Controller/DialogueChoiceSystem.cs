@@ -38,7 +38,13 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     private Coroutine _reshowCoroutine;
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        Instance = this;
+        // Static state survives between Editor Play Mode sessions — reset explicitly so a
+        // session that ended mid-dialogue does not leave the guard permanently engaged.
+        IsInDialogueMode = false;
+    }
 
     /// <summary>
     /// Opens the dialogue choice UI. On the first call, enters dialogue mode: locks movement

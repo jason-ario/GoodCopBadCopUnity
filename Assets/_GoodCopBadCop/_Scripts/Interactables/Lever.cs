@@ -67,6 +67,7 @@ public class Lever : Interactable, IHeldItemPassthrough
 
     private bool _inControl = false;
     private bool _usingRightArm = true;
+    private bool _isInteractable = true;
     private PlayerInteractionController _currentPlayer;
     private Coroutine _exitCoroutine;
 
@@ -121,6 +122,7 @@ public class Lever : Interactable, IHeldItemPassthrough
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+        if (!_isInteractable) return;
         if (_inControl) return;
 
         // Stop any in-flight exit coroutine before writing new interaction state.
@@ -345,6 +347,47 @@ public class Lever : Interactable, IHeldItemPassthrough
             shutter.OpenShutter();
         else
             shutter.CloseShutter();
+    }
+
+    /// <summary>
+    /// Enables or disables player interaction with the lever on all clients.
+    /// Non-interactable levers suppress highlighting and silently reject Interact calls.
+    /// Server-only.
+    /// </summary>
+    public void SetInteractable(bool interactable)
+    {
+        if (!IsServer) return;
+        _isInteractable = interactable;
+        Highlight(false);
+        SetInteractableClientRpc(interactable);
+    }
+
+    /// <summary>
+    /// Animates the lever arm to the open (up) position over <paramref name="duration"/> seconds
+    /// and syncs the network state to open on all clients.
+    /// The NetworkVariable change propagates to all clients via OnLeverStateChanged, which
+    /// opens the shutter — so calling ShutterController.OpenShutter() separately is not required.
+    /// Server-only.
+    /// </summary>
+    public void AnimateOpenServerSide(float duration = 1f)
+    {
+        if (!IsServer) return;
+        _isUp.Value = true;
+        AnimateLeverArmClientRpc(true, duration);
+    }
+
+    [ClientRpc]
+    private void SetInteractableClientRpc(bool interactable)
+    {
+        _isInteractable = interactable;
+        Highlight(false);
+    }
+
+    [ClientRpc]
+    private void AnimateLeverArmClientRpc(bool isUp, float duration)
+    {
+        if (_leverArm == null) return;
+        _leverArm.DOLocalRotate(isUp ? _topRot : _bottomRot, duration).SetEase(Ease.InOutSine);
     }
 
     /// <summary>
