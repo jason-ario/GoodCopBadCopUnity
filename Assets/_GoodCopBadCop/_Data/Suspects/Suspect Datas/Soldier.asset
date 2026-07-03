@@ -32,7 +32,10 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
   IDPhoto: {fileID: 2800000, guid: 5f05c29b0bf5ab4418daa49fbc3ad0e2, type: 3}
   CharacterPrefab: {fileID: 2613975840466510292, guid: 34daa85d9b002634daf0d037a68a022d, type: 3}
   entryReasons:
@@ -75,6 +78,20 @@ MonoBehaviour:
     - Just do what you're supposed to do.
     - I've been through a lot of checkpoints today. This one better be fast.
     - Papers. Stamp. Done. That's all this needs to be.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -105,9 +122,18 @@ MonoBehaviour:
   - Do you have any idea what rank you are detaining right now? Any idea at all?
   killExitLines:
   - "\u2026Didn\u2019t think a post like this would actually follow through\u2026"
-  - "For the record\u2026 I still don\u2019t think\u2026 your paperwork\u2026 was in order\u2026"
+  - "For the record\u2026 I still don\u2019t think\u2026 your paperwork\u2026 was
+    in order\u2026"
   - "Carry on\u2026 You\u2019re more competent\u2026 than you look\u2026"
-  voiceAudioClips: []
+  voiceAudioClips:
+  - {fileID: 8300000, guid: b5302926c0ee68a4fbdf3c2e970e1a3b, type: 3}
+  - {fileID: 8300000, guid: e0314a5bf871e204fae9c0115d1b7a99, type: 3}
+  - {fileID: 8300000, guid: d5b9ac78744579844bd9972f6365ffa5, type: 3}
+  - {fileID: 8300000, guid: 26f995c0ca5c195458e373f1fe1f01e2, type: 3}
+  - {fileID: 8300000, guid: ecc499fb021982b44a03201cf6194eb1, type: 3}
+  - {fileID: 8300000, guid: 02019eb0a67278c44b178287d8d3758c, type: 3}
+  - {fileID: 8300000, guid: ea2da5791667b5549af6ea56bf46b340, type: 3}
+  introDialogue: {fileID: 0}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: Patrol route. Nothing that concerns you.
@@ -121,6 +147,9 @@ MonoBehaviour:
       operational. I was just there. I think I was just there.
     mismatchFinalDaysAnswer: I was... walking. The road looked right. Command said
       the road would look right and it did. That's all I know.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: No. Next question.
     midDaysAnswer: None that I'm required to disclose to civilian personnel. Move
@@ -133,6 +162,9 @@ MonoBehaviour:
       a sound sometimes but that's nothing. That's not a symptom.
     mismatchFinalDaysAnswer: "I don't feel anything. Is that strange? I used to feel
       things. It\u2019s very quiet now. Inside. Quiet."
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: That's not relevant to transit documentation. Stick to the forms.
     midDaysAnswer: Barracks. Fifteen men. Was fifteen.
@@ -143,9 +175,13 @@ MonoBehaviour:
       Very sudden. I don\u2019t know where."
     mismatchFinalDaysAnswer: I don't know. I go back there and it's dark. It's always
       dark now. I don't know if anyone else is there. I don't check.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - This checkpoint runs three seconds slower than the eastern one. I have timed it.
+    - This checkpoint runs three seconds slower than the eastern one. I have timed
+      it.
     - Civilian checkpoints waste more time than they save. Not a criticism. An observation.
     - Check the papers. That is all this needs to be.
     midDays:
@@ -156,4 +192,7 @@ MonoBehaviour:
     - Orders are still orders when the chain of command is unclear. Proceed.
     - I have been through a lot of checkpoints today. This is the last one I recognize.
     - Do your job, officer. That is all either of us can do now.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 6391819

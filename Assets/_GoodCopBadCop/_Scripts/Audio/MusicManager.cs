@@ -76,6 +76,8 @@ public class MusicManager : MonoBehaviour
 
         float fadeIn = fadeInDuration < 0f ? _defaultFadeInDuration : fadeInDuration;
 
+        Debug.Log($"[MusicManager] Play — clip: '{clip.name}', loop: {loop}, fadeIn: {fadeIn:F2}s, sourceVolume: {_source.volume:F2}, isPlaying: {_source.isPlaying}");
+
         _source.DOKill();
 
         if (_source.isPlaying)

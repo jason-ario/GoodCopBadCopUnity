@@ -580,6 +580,16 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             _speakerAnimator.SetBool(SpeakingParam, false);
     }
 
+    /// <summary>
+    /// Sets the speaker animator's Speaking bool directly.
+    /// Called by ScriptedDialogueRunner on all clients when a megaphone line starts or ends.
+    /// </summary>
+    public void SetSpeakerSpeaking(bool speaking)
+    {
+        if (_speakerAnimator != null)
+            _speakerAnimator.SetBool(SpeakingParam, speaking);
+    }
+
     // ---------------------------------------------------------------------------
     // Internal Coroutines
     // ---------------------------------------------------------------------------

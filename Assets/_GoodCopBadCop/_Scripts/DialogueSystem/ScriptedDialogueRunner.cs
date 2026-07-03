@@ -244,6 +244,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
             SetWobbleClientRpc(node.wobbleText);
             yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine));
+            SetSpeakerSpeakingClientRpc(false);
         }
 
         ExitScriptedModeClientRpc();
@@ -273,11 +274,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         AudioClip[] clips = mgr != null ? mgr.AudioClips : System.Array.Empty<AudioClip>();
         AudioSource source = mgr != null ? mgr.MegaphoneAudioSource : null;
 
+        mgr?.SetSpeakerSpeaking(true);
+
         DialogueManager.Instance.SpawnSubtitles(text, _megaphoneSpeakerName, _megaphoneSpeakerColor,
             isPlayer: false, clearHistory: false, waitForInput: true);
 
         if (clips.Length > 0 && source != null)
             DialogueManager.Instance.PlayDialogueAudio(text, clips, source);
+    }
+
+    [ClientRpc]
+    private void SetSpeakerSpeakingClientRpc(bool speaking)
+    {
+        MegaphoneDialogueManager.Instance?.SetSpeakerSpeaking(speaking);
     }
 
     private IEnumerator PlayChoiceNode(SuspectCharacter speaker, ScriptedDialogueNode node, ulong speakerNetId)

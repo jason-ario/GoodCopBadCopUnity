@@ -133,14 +133,32 @@ public class AlexeiController : NetworkBehaviour
     [ClientRpc]
     private void StartAlexeiMusicClientRpc()
     {
-        if (_alexeiMusicClip == null) return;
-        MusicManager.Instance?.Play(_alexeiMusicClip);
+        // Host already played locally — only remote clients need to act here.
+        if (IsServer) return;
+        if (_alexeiMusicClip == null)
+        {
+            Debug.LogWarning("[AlexeiController] StartAlexeiMusicClientRpc: _alexeiMusicClip is null on this client.");
+            return;
+        }
+        if (MusicManager.Instance == null)
+        {
+            Debug.LogWarning("[AlexeiController] StartAlexeiMusicClientRpc: MusicManager.Instance is null.");
+            return;
+        }
+        MusicManager.Instance.Play(_alexeiMusicClip);
     }
 
     [ClientRpc]
     private void FadeAlexeiMusicClientRpc()
     {
-        MusicManager.Instance?.FadeOut(_musicFadeOutDuration);
+        // Host already faded locally — only remote clients need to act here.
+        if (IsServer) return;
+        if (MusicManager.Instance == null)
+        {
+            Debug.LogWarning("[AlexeiController] FadeAlexeiMusicClientRpc: MusicManager.Instance is null.");
+            return;
+        }
+        MusicManager.Instance.FadeOut(_musicFadeOutDuration);
     }
 
     // ── End-of-shift setup ─────────────────────────────────────────────────────
@@ -244,8 +262,13 @@ public class AlexeiController : NetworkBehaviour
         netObj.Spawn(true);
 
         // Start the encounter music on all clients as soon as Alexei is in the world.
+        // Play locally first (works offline / host), then broadcast to remote clients.
         if (_alexeiMusicClip != null)
-            StartAlexeiMusicClientRpc();
+        {
+            MusicManager.Instance?.Play(_alexeiMusicClip);
+            if (IsSpawned)
+                StartAlexeiMusicClientRpc();
+        }
 
         // Suspend AI immediately after spawn — ChaseLoop's first frame yield means this
         // call wins the race and prevents the mutant from targeting players during the entrance.
@@ -265,8 +288,9 @@ public class AlexeiController : NetworkBehaviour
 
         yield return new WaitUntil(() => fallDone);
 
-        // Now grounded — the animator transitions from fall to land.
+        // Now grounded — the animator transitions from fall to land, then roars.
         msb?.SetAnimBool(_groundedAnimBool, true);
+        msb?.TriggerAnim("Roar");
 
         // Play the landing impact sound at the booth window position.
         if (_landingSound != null && SFXController.Instance != null)
@@ -297,7 +321,10 @@ public class AlexeiController : NetworkBehaviour
         msb.OnSequenceComplete = _ =>
         {
             OnAlexeiSequenceDone?.Invoke();
-            FadeAlexeiMusicClientRpc();
+            // Fade locally first, then broadcast to remote clients.
+            MusicManager.Instance?.FadeOut(_musicFadeOutDuration);
+            if (IsSpawned)
+                FadeAlexeiMusicClientRpc();
         };
         msb.BeginAtStandPos(
             _mutantData,
