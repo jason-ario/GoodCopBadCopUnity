@@ -1173,16 +1173,12 @@ public class Day_01 : DayBase
                 if (_postAlexeiDialogue != null)
                     ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_postAlexeiDialogue, () =>
                     {
-                        if (ShiftManager.Instance != null)
-                            ShiftManager.Instance.EndShift();
-                        else
-                            Debug.LogWarning("[Day_01] ShiftManager.Instance not found — cannot end shift.");
+                        AlexeiController.Instance?.TriggerEndOfShiftSetup();
                     });
                 else
                 {
-                    Debug.LogWarning("[Day_01] _postAlexeiDialogue is not assigned — ending shift immediately.");
-                    if (ShiftManager.Instance != null)
-                        ShiftManager.Instance.EndShift();
+                    Debug.LogWarning("[Day_01] _postAlexeiDialogue is not assigned — triggering end-of-shift setup immediately.");
+                    AlexeiController.Instance?.TriggerEndOfShiftSetup();
                 }
             };
 

@@ -52,6 +52,20 @@ public class AlexeiController : NetworkBehaviour
     [Tooltip("Animator bool parameter name for the grounded state. False = falling, True = grounded (triggers landing).")]
     [SerializeField] private string _groundedAnimBool = "Grounded";
 
+    [Header("Mutant Entrance Audio")]
+    [Tooltip("Sound played at the booth window position the moment Alexei lands.")]
+    [SerializeField] private AudioClip _landingSound;
+
+    [Tooltip("Volume of the landing impact sound.")]
+    [SerializeField] private float _landingSoundVolume = 1f;
+
+    [Header("Mutant Music")]
+    [Tooltip("Music clip that plays on all clients when Alexei spawns.")]
+    [SerializeField] private AudioClip _alexeiMusicClip;
+
+    [Tooltip("Seconds over which the music fades out after Alexei despawns.")]
+    [SerializeField] private float _musicFadeOutDuration = 3f;
+
     // Fallback timeout in case the PlayableDirector's stopped event never fires.
     private const float CutsceneTimeoutSeconds = 120f;
 
@@ -114,6 +128,50 @@ public class AlexeiController : NetworkBehaviour
     private void ActivateCutsceneClientRpc()
     {
         _cutsceneObject?.SetActive(true);
+    }
+
+    [ClientRpc]
+    private void StartAlexeiMusicClientRpc()
+    {
+        if (_alexeiMusicClip == null) return;
+        MusicManager.Instance?.Play(_alexeiMusicClip);
+    }
+
+    [ClientRpc]
+    private void FadeAlexeiMusicClientRpc()
+    {
+        MusicManager.Instance?.FadeOut(_musicFadeOutDuration);
+    }
+
+    // ── End-of-shift setup ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called on the server once the post-Alexei megaphone dialogue completes.
+    /// Enables clock-out via the normal ShiftManager path (timecard machine, fanfare, and
+    /// "clock out ready" megaphone line), and registers the TrashThreat in the
+    /// <see cref="GuidebookTaskRegistry"/> on all clients so it appears in the HUD task list.
+    /// Server-only.
+    /// </summary>
+    public void TriggerEndOfShiftSetup()
+    {
+        if (!IsServer) return;
+
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.DebugEnableClockOut();
+        else
+            Debug.LogWarning("[AlexeiController] TriggerEndOfShiftSetup: ShiftManager.Instance not found.");
+
+        RegisterTrashThreatClientRpc();
+    }
+
+    /// <summary>Adds TrashThreat to GuidebookTaskRegistry on every client so it shows in the HUD task list.</summary>
+    [ClientRpc]
+    private void RegisterTrashThreatClientRpc()
+    {
+        if (TrashThreat.Instance != null)
+            GuidebookTaskRegistry.Instance.AddThreat(TrashThreat.Instance);
+        else
+            Debug.LogWarning("[AlexeiController] RegisterTrashThreatClientRpc: TrashThreat.Instance not found.");
     }
 
     // ── Mutant Entrance ────────────────────────────────────────────────────────
@@ -185,6 +243,10 @@ public class AlexeiController : NetworkBehaviour
 
         netObj.Spawn(true);
 
+        // Start the encounter music on all clients as soon as Alexei is in the world.
+        if (_alexeiMusicClip != null)
+            StartAlexeiMusicClientRpc();
+
         // Suspend AI immediately after spawn — ChaseLoop's first frame yield means this
         // call wins the race and prevents the mutant from targeting players during the entrance.
         mutantEnemy?.SuspendForLineup();
@@ -205,6 +267,10 @@ public class AlexeiController : NetworkBehaviour
 
         // Now grounded — the animator transitions from fall to land.
         msb?.SetAnimBool(_groundedAnimBool, true);
+
+        // Play the landing impact sound at the booth window position.
+        if (_landingSound != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(_landingSound, _mutantBoothPos.position, _landingSoundVolume);
 
         // Re-enable the NavMeshAgent now that the mutant is on the ground.
         if (agent != null) agent.enabled = true;
@@ -228,7 +294,11 @@ public class AlexeiController : NetworkBehaviour
         Debug.Log("[AlexeiController] Activating mutant suspect behaviour.");
 
         msb.DespawnInsteadOfRetreat = true;
-        msb.OnSequenceComplete = _ => OnAlexeiSequenceDone?.Invoke();
+        msb.OnSequenceComplete = _ =>
+        {
+            OnAlexeiSequenceDone?.Invoke();
+            FadeAlexeiMusicClientRpc();
+        };
         msb.BeginAtStandPos(
             _mutantData,
             _mutantBoothPos,
