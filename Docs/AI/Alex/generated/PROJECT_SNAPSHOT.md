@@ -1,6 +1,6 @@
 ﻿# Project Snapshot
 
-Generated at: 2026-07-04T23:11:46.4457220+04:00
+Generated at: 2026-07-04T23:36:14.9863404+04:00
 
 ## Unity
 
@@ -161,10 +161,19 @@ Generated at: 2026-07-04T23:11:46.4457220+04:00
 
 ## Git Status
 
--  M "Assets/_GoodCopBadCop/_Fonts/My_handwriting SDF.asset"
-- ?? AGENTS.md
-- ?? Docs/
-- ?? Tools/
+-  M Docs/AI/Alex/DECISIONS.md
+-  M Docs/AI/Alex/KNOWN_RISKS.md
+-  M Docs/AI/Alex/MEMORY.md
+-  M Docs/AI/Alex/PROJECT_MAP.md
+-  M Docs/AI/Alex/README.md
+-  M Docs/AI/Alex/WORKLOG.md
+-  M Docs/AI/Alex/generated/PROJECT_SNAPSHOT.json
+-  M Docs/AI/Alex/generated/PROJECT_SNAPSHOT.md
+- ?? Docs/AI/Alex/DATA_AND_CONTENT.md
+- ?? Docs/AI/Alex/GAMEPLAY_FLOWS.md
+- ?? Docs/AI/Alex/NETCODE_NOTES.md
+- ?? Docs/AI/Alex/SYSTEMS.md
+- ?? Docs/AI/Alex/TASK_RECIPES.md
 
 ## Warnings
 
@@ -197,32 +206,32 @@ Generated at: 2026-07-04T23:11:46.4457220+04:00
 - .shadergraph: 72
 - .htm: 50
 - .lighting: 47
-- .mesh: 44
 - .playable: 44
+- .mesh: 44
 - .jpeg: 34
 - .cginc: 33
 - .dll: 31
 - .shadersubgraph: 29
-- .pdf: 27
 - .asmdef: 27
-- .md: 19
+- .pdf: 27
+- .md: 24
 - .ttf: 19
 - .renderTexture: 18
 - .overrideController: 18
 - .json: 18
-- .mp3: 17
 - .obj: 17
+- .mp3: 17
 - .bytes: 17
 - .url: 14
-- .so: 13
 - .terrainlayer: 13
 - .xml: 13
+- .so: 13
 - .signal: 11
 - .lib: 9
 - .blend: 8
+- .exp: 7
 - .zip: 7
 - .mtl: 7
-- .exp: 7
 - .ogg: 6
 - .mask: 6
 - .css: 5
@@ -230,6 +239,6 @@ Generated at: 2026-07-04T23:11:46.4457220+04:00
 - .otf: 5
 - .dds: 4
 - .bak: 4
-- .onnx: 3
 - .asmref: 3
-- .af: 2
+- .onnx: 3
+- .tcp2shader: 2

@@ -23,3 +23,9 @@
 - Decision: Do not build this framework around Bezi.
 - Reason: Alex wants a local-first Codex/MCP workflow that does not affect other contributors.
 - Consequence: Bezi can stay installed, but root instructions must not require it.
+
+## 2026-07-04 - Deep context is split by task type
+
+- Decision: Keep `PROJECT_MAP.md` as the index/overview and put deep details in `SYSTEMS.md`, `GAMEPLAY_FLOWS.md`, `NETCODE_NOTES.md`, `DATA_AND_CONTENT.md`, and `TASK_RECIPES.md`.
+- Reason: One huge project map would waste context for focused future sessions.
+- Consequence: New Codex threads should read only the deep file that matches the current task after reading the overview.
