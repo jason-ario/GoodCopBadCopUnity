@@ -35,7 +35,12 @@ DOTween = simple tween animations.
 DI = controls who can see concrete implementations.
 ```
 
-R3, UniTask, DOTween, and a DI container are architecture choices for future implementation. They are not installed in the project yet unless `Packages/manifest.json` says so.
+Selected dependencies:
+
+- R3: `com.cysharp.r3` via OpenUPM.
+- UniTask: `com.cysharp.unitask` via OpenUPM.
+- VContainer: `jp.hadashikick.vcontainer` via OpenUPM.
+- DOTween/DOTween Pro: asset-based dependency already present under `Assets/Plugins/Demigiant`, not a UPM dependency.
 
 ## Public API
 
@@ -313,7 +318,7 @@ Rules:
 - Do not register concrete models as public dependencies for unrelated systems.
 - Prefer feature/lifetime scopes for large systems.
 
-If a DI container is added from scratch, VContainer is the preferred candidate unless there is a concrete reason to choose Zenject.
+VContainer is the selected DI container for new feature architecture. Do not introduce Zenject unless Alex explicitly changes this decision.
 
 ## UniTask Rule
 

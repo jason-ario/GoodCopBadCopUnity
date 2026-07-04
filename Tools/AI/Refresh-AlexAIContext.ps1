@@ -269,6 +269,11 @@ $snapshot = [ordered]@{
     packageHighlights = [ordered]@{
         unityMcp = $dependencies["com.coplaydev.unity-mcp"]
         beziSidekickPresent = (Test-Path -LiteralPath (Join-Path $root "Packages\com.bezi.sidekick"))
+        r3 = $dependencies["com.cysharp.r3"]
+        uniTask = $dependencies["com.cysharp.unitask"]
+        vcontainer = $dependencies["jp.hadashikick.vcontainer"]
+        dotweenPresent = (Test-Path -LiteralPath (Join-Path $root "Assets\Plugins\Demigiant\DOTween"))
+        dotweenProPresent = (Test-Path -LiteralPath (Join-Path $root "Assets\Plugins\Demigiant\DOTweenPro"))
         netcode = $dependencies["com.unity.netcode.gameobjects"]
         inputSystem = $dependencies["com.unity.inputsystem"]
         urp = $dependencies["com.unity.render-pipelines.universal"]
@@ -298,7 +303,9 @@ $snapshot = [ordered]@{
 $jsonPath = Join-Path $generatedDir "PROJECT_SNAPSHOT.json"
 $markdownPath = Join-Path $generatedDir "PROJECT_SNAPSHOT.md"
 
-$snapshot | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$jsonText = (($snapshot | ConvertTo-Json -Depth 8) -join "`n") -replace "`r`n", "`n" -replace "`r", "`n"
+[System.IO.File]::WriteAllText($jsonPath, $jsonText + "`n", $utf8NoBom)
 
 $md = New-Object System.Collections.Generic.List[string]
 $md.Add("# Project Snapshot")
@@ -392,7 +399,8 @@ foreach ($entry in $extensionCounts) {
     $md.Add("- $($entry.extension): $($entry.count)")
 }
 
-$md | Set-Content -LiteralPath $markdownPath -Encoding UTF8
+$markdownText = $md -join "`n"
+[System.IO.File]::WriteAllText($markdownPath, $markdownText + "`n", $utf8NoBom)
 
 Write-Host "Wrote $markdownPath"
 Write-Host "Wrote $jsonPath"

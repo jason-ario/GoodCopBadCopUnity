@@ -1,6 +1,6 @@
-﻿# Project Snapshot
+# Project Snapshot
 
-Generated at: 2026-07-04T23:36:14.9863404+04:00
+Generated at: 2026-07-05T02:06:56.1945330+04:00
 
 ## Unity
 
@@ -16,6 +16,11 @@ Generated at: 2026-07-04T23:36:14.9863404+04:00
 
 - unityMcp: https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main
 - beziSidekickPresent: True
+- r3: 1.3.1
+- uniTask: 2.5.11
+- vcontainer: 1.19.0
+- dotweenPresent: True
+- dotweenProPresent: True
 - netcode: 2.12.0
 - inputSystem: 1.19.0
 - urp: 17.5.0
@@ -27,7 +32,7 @@ Generated at: 2026-07-04T23:36:14.9863404+04:00
 ## Counts
 
 - productScripts: 466
-- productPrefabs: 397
+- productPrefabs: 398
 - productDataAssets: 197
 - productScenes: 8
 - asmdefs: 27
@@ -161,19 +166,18 @@ Generated at: 2026-07-04T23:36:14.9863404+04:00
 
 ## Git Status
 
+-  D Assets/StreamingAssets/Phi-3-mini-4k-instruct-q4.gguf.meta
+-  M "Assets/_GoodCopBadCop/_Fonts/Kyiv Machine SDF.asset"
 -  M Docs/AI/Alex/DECISIONS.md
--  M Docs/AI/Alex/KNOWN_RISKS.md
--  M Docs/AI/Alex/MEMORY.md
--  M Docs/AI/Alex/PROJECT_MAP.md
--  M Docs/AI/Alex/README.md
+-  M Docs/AI/Alex/FEATURE_ARCHITECTURE.md
 -  M Docs/AI/Alex/WORKLOG.md
 -  M Docs/AI/Alex/generated/PROJECT_SNAPSHOT.json
 -  M Docs/AI/Alex/generated/PROJECT_SNAPSHOT.md
-- ?? Docs/AI/Alex/DATA_AND_CONTENT.md
-- ?? Docs/AI/Alex/GAMEPLAY_FLOWS.md
-- ?? Docs/AI/Alex/NETCODE_NOTES.md
-- ?? Docs/AI/Alex/SYSTEMS.md
-- ?? Docs/AI/Alex/TASK_RECIPES.md
+-  D Packages/com.bezi.sidekick/Editor/Plugins/BeziSidekickInternal.dll.meta
+-  D Packages/com.bezi.sidekick/Editor/Plugins/bezi-websocket-sharp.dll.meta
+-  M Packages/manifest.json
+-  M Packages/packages-lock.json
+-  M Tools/AI/Refresh-AlexAIContext.ps1
 
 ## Warnings
 
@@ -182,16 +186,16 @@ Generated at: 2026-07-04T23:36:14.9863404+04:00
 
 ## Extension Counts
 
-- .meta: 13776
+- .meta: 13774
 - .png: 2462
 - .mat: 2124
 - .cs: 1136
-- .prefab: 1118
+- .prefab: 1119
 - .fbx: 667
 - .asset: 611
 - (none): 444
-- .anim: 316
-- .wav: 268
+- .anim: 313
+- .wav: 269
 - .shader: 261
 - .hlsl: 234
 - .jpg: 222
@@ -201,44 +205,44 @@ Generated at: 2026-07-04T23:36:14.9863404+04:00
 - .psd: 132
 - .txt: 115
 - .exr: 90
-- .controller: 83
+- .controller: 82
 - .html: 76
 - .shadergraph: 72
 - .htm: 50
 - .lighting: 47
-- .playable: 44
 - .mesh: 44
+- .playable: 44
 - .jpeg: 34
 - .cginc: 33
 - .dll: 31
 - .shadersubgraph: 29
 - .asmdef: 27
 - .pdf: 27
-- .md: 24
+- .md: 25
 - .ttf: 19
 - .renderTexture: 18
-- .overrideController: 18
 - .json: 18
+- .overrideController: 18
 - .obj: 17
 - .mp3: 17
 - .bytes: 17
 - .url: 14
 - .terrainlayer: 13
-- .xml: 13
 - .so: 13
+- .xml: 13
 - .signal: 11
 - .lib: 9
 - .blend: 8
 - .exp: 7
-- .zip: 7
 - .mtl: 7
+- .zip: 7
 - .ogg: 6
 - .mask: 6
-- .css: 5
-- .mixer: 5
 - .otf: 5
-- .dds: 4
+- .mixer: 5
+- .css: 5
 - .bak: 4
+- .dds: 4
 - .asmref: 3
 - .onnx: 3
-- .tcp2shader: 2
+- .bundle: 2

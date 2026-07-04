@@ -41,3 +41,9 @@
 - Decision: Use DOTween for simple UI and gameplay tween animations, while keeping Animator/Timeline for authored, stateful, character, or cinematic animation.
 - Reason: Simple tweens are faster to implement and easier to keep close to views without creating unnecessary Animator complexity.
 - Consequence: Views can own simple DOTween calls, presenters can trigger view animation methods, and services should not depend on DOTween for gameplay rules.
+
+## 2026-07-05 - Use VContainer and R3 for the new feature architecture
+
+- Decision: Install `com.cysharp.r3`, `com.cysharp.unitask`, and `jp.hadashikick.vcontainer` through OpenUPM; keep using the existing asset-based DOTween/DOTween Pro installation under `Assets/Plugins/Demigiant`.
+- Reason: R3 covers reactive model state/events, UniTask covers Unity async flows, VContainer is the selected DI container, and DOTween is already present and used throughout the project.
+- Consequence: New significant features should use R3 models, UniTask async flows, and VContainer lifetime scopes/registrations. Do not add Zenject or a second DOTween package unless Alex explicitly changes the decision.

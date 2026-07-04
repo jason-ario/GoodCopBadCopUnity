@@ -37,3 +37,11 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Verified: Documentation-only change; no Unity assets, packages, or project settings intentionally modified.
 - Risks: R3, UniTask, DOTween, and DI are architectural choices only at this point; package installation and compile validation still need a separate implementation task.
 - Follow-ups: When Alex approves implementation, add packages and create the first feature module using this pattern.
+
+## 2026-07-05 - Install architecture dependencies
+
+- Goal: Install the selected architecture dependencies and update Alex's docs.
+- Changed: Added OpenUPM scoped registry plus `com.cysharp.r3`, `com.cysharp.unitask`, and `jp.hadashikick.vcontainer`; documented VContainer as the selected DI container; recorded that DOTween/DOTween Pro already exists under `Assets/Plugins/Demigiant`.
+- Verified: Manifest and lock JSON parsed successfully; package versions were checked against OpenUPM registry metadata.
+- Risks: Unity Editor was not launched to avoid touching unrelated dirty asset/meta changes, so Unity compile/package resolution should still be checked in the next editor session.
+- Follow-ups: In the first new feature module, add VContainer registration/lifetime scope code and verify R3/UniTask compile in Unity.
