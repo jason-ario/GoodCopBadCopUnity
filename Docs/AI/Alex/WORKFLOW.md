@@ -1,0 +1,44 @@
+# Alex Codex/MCP Workflow
+
+## Default Task Loop
+
+1. Restate the goal, relevant context, constraints, and done-when criteria.
+2. Run `git status --short` before edits.
+3. Read the smallest useful set of files, scenes, prefabs, or generated snapshots.
+4. Make scoped changes.
+5. Verify with the most relevant checks.
+6. Summarize changes and update `WORKLOG.md` for substantial work.
+
+## Unity MCP Loop
+
+When Unity MCP tools are available:
+
+1. Read editor state before doing Unity work.
+2. Inspect project/scene resources before mutating GameObjects, prefabs, or components.
+3. Prefer object IDs or exact asset paths over loose names.
+4. After script edits, wait for compilation to finish.
+5. Read console errors/warnings.
+6. For scene, UI, camera, or visual work, capture screenshots or run a play check when practical.
+
+## Before Editing
+
+- Check whether the target is product code under `Assets/_GoodCopBadCop` or vendor/imported code.
+- Check whether the change touches Netcode, serialized assets, scene files, prefabs, or `.meta` files.
+- If a file has unrelated user changes, preserve them and work around them.
+
+## Verification Defaults
+
+- C# logic change: Unity compile check and console check when available.
+- Netcode change: inspect server/client paths, ownership, host behavior, late join behavior, and RPC direction.
+- UI or visual change: screenshot or Play Mode check when available.
+- Data/prefab/scene change: inspect diff carefully and verify references in Unity when available.
+- Docs/tooling-only change: run the affected script and inspect generated output.
+
+## When to Pause
+
+Pause and ask Alex when:
+
+- A task requires changing vendor assets or imported packages.
+- A serialized Unity diff is unexpectedly large.
+- There are multiple plausible gameplay designs and no source-of-truth doc.
+- A dirty user change directly conflicts with the requested change.
