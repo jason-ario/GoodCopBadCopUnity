@@ -243,11 +243,11 @@ public class DialogueManager : NetworkBehaviour
 
         subtitles.SetText(text, characterName, nameColor);
 
-        // Apply wobble effect if primed for this line (NPC lines only).
-        if (!isPlayer && _nextLineWobble)
+        // Apply wobble effect to NPC lines. The profile is consumed once per subtitle spawn.
+        if (!isPlayer)
         {
-            subtitles.SetWobble(true);
-            _nextLineWobble = false;
+            subtitles.SetWobble(_nextLineWobbleProfile);
+            _nextLineWobbleProfile = null;
         }
         subtitles.transform.SetAsLastSibling();
 
@@ -296,14 +296,15 @@ public class DialogueManager : NetworkBehaviour
     // Wobble text — consumed once when the next NPC subtitle is spawned.
     // -------------------------------------------------------------------------
 
-    private bool _nextLineWobble = false;
+    private TMPWobbleProfile _nextLineWobbleProfile;
 
     /// <summary>
     /// Primes the next NPC subtitle spawned via <see cref="SpawnSubtitles"/> to use the
-    /// vertex-wobble text effect. The flag is consumed and cleared on use.
+    /// given wobble <paramref name="profile"/>. Pass <c>null</c> to suppress wobble on the
+    /// next line. The value is consumed and cleared on use.
     /// Called by <see cref="ScriptedDialogueRunner"/> via ClientRpc before each line.
     /// </summary>
-    public void SetNextLineWobble(bool wobble) => _nextLineWobble = wobble;
+    public void SetNextLineWobbleProfile(TMPWobbleProfile profile) => _nextLineWobbleProfile = profile;
 
     /// <summary>
     /// Called by any client pressing Space — notifies the server to advance for everyone.

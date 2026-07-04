@@ -61,8 +61,10 @@ public class ScriptedDialogueNode
              "Leave empty to return to the default suspect/At-Booth camera.")]
     public string cameraTrigger;
 
-    [Tooltip("When true, the subtitle for this line plays with a vertex-wobble effect.")]
-    public bool wobbleText;
+    [Tooltip("Optional wobble profile override for this line. Leave null to use the default profile " +
+             "set on ScriptedDialogueRunner. Every scripted line wobbles by default — only assign this " +
+             "if you want a different effect on this specific line.")]
+    public TMPWobbleProfile wobbleProfileOverride;
 
     [Tooltip("Player choices. Required when Type is Choice. Exactly two entries expected.")]
     public ScriptedDialogueChoice[] choices;

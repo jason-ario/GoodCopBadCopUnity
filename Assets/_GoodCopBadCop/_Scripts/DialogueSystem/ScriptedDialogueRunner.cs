@@ -55,6 +55,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [Tooltip("Name colour for megaphone subtitles.")]
     [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f); // orange
 
+    [Header("Wobble")]
+    [Tooltip("Default wobble profile applied to every scripted dialogue subtitle. " +
+             "Individual nodes can override this with a different profile via wobbleProfileOverride.")]
+    [SerializeField] private TMPWobbleProfile _defaultWobbleProfile;
+
+    [Tooltip("Additional profiles that nodes can reference as per-line overrides. " +
+             "A node's wobbleProfileOverride must appear in this list to be sent over the network. " +
+             "Index 0 here maps to RPC profile index 0 (the default is always RPC index -1).")]
+    [SerializeField] private TMPWobbleProfile[] _additionalWobbleProfiles;
+
     // Set true while coroutines are waiting for player E / left-click input so that
     // Update can send AdvanceDialogueServerRpc on mouse-click in addition to E key.
     private bool _awaitingScriptedInput;
@@ -194,7 +204,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Camera cut and text effect are set before the line starts so they're
             // visible from the very first word of the subtitle.
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
-            SetWobbleClientRpc(node.wobbleText);
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
 
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
@@ -242,7 +252,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         foreach (var node in dialogue.nodes)
         {
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
-            SetWobbleClientRpc(node.wobbleText);
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
             yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine));
             SetSpeakerSpeakingClientRpc(false);
         }
@@ -388,11 +398,56 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Client RPCs — text effects
     // -------------------------------------------------------------------------
 
-    /// <summary>Primes <see cref="DialogueManager"/> to apply a wobble effect to the next subtitle.</summary>
+    /// <summary>
+    /// Primes <see cref="DialogueManager"/> with the wobble profile to use for the next subtitle.
+    /// <paramref name="profileIndex"/> of -1 resolves to the default profile; 0+ indexes into
+    /// <see cref="_additionalWobbleProfiles"/>.
+    /// </summary>
     [ClientRpc]
-    private void SetWobbleClientRpc(bool wobble)
+    private void SetWobbleClientRpc(int profileIndex)
     {
-        DialogueManager.Instance.SetNextLineWobble(wobble);
+        DialogueManager.Instance.SetNextLineWobbleProfile(ResolveWobbleProfileByIndex(profileIndex));
+    }
+
+    /// <summary>
+    /// Server-side: maps a node's optional override profile to an RPC-safe index.
+    /// Returns -1 for the default (null or matching <see cref="_defaultWobbleProfile"/>),
+    /// or the index within <see cref="_additionalWobbleProfiles"/> for a registered override.
+    /// Logs a warning and falls back to -1 if the override is not registered.
+    /// </summary>
+    private int ResolveWobbleProfileIndex(TMPWobbleProfile overrideProfile)
+    {
+        if (overrideProfile == null || overrideProfile == _defaultWobbleProfile)
+            return -1;
+
+        if (_additionalWobbleProfiles != null)
+        {
+            for (int i = 0; i < _additionalWobbleProfiles.Length; i++)
+            {
+                if (_additionalWobbleProfiles[i] == overrideProfile)
+                    return i;
+            }
+        }
+
+        Debug.LogWarning($"[ScriptedDialogueRunner] wobbleProfileOverride '{overrideProfile.name}' is not registered " +
+                         $"in _additionalWobbleProfiles. Falling back to default profile.");
+        return -1;
+    }
+
+    /// <summary>
+    /// Client-side: resolves an RPC profile index back to the corresponding <see cref="TMPWobbleProfile"/>.
+    /// -1 returns <see cref="_defaultWobbleProfile"/>; 0+ indexes into <see cref="_additionalWobbleProfiles"/>.
+    /// </summary>
+    private TMPWobbleProfile ResolveWobbleProfileByIndex(int index)
+    {
+        if (index < 0)
+            return _defaultWobbleProfile;
+
+        if (_additionalWobbleProfiles != null && index < _additionalWobbleProfiles.Length)
+            return _additionalWobbleProfiles[index];
+
+        Debug.LogWarning($"[ScriptedDialogueRunner] Wobble profile index {index} is out of range. Falling back to default.");
+        return _defaultWobbleProfile;
     }
 
     // -------------------------------------------------------------------------

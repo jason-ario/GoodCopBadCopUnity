@@ -10,18 +10,12 @@ public class Subtitles : MonoBehaviour
     [SerializeField] private CanvasGroup continuePrompt;
 
     [Header("Wobble Effect")]
-    [Tooltip("Pixel amplitude of the per-character sine-wave displacement.")]
-    [SerializeField] private float wobbleAmount = 10f;
-
-    [Tooltip("Speed multiplier of the wobble sine wave.")]
-    [SerializeField] private float wobbleSpeed = 3f;
+    [Tooltip("TMPWobbleText component on the subtitle TMP object. Assign in the prefab.")]
+    [SerializeField] private TMPWobbleText _wobbleText;
 
     private string originalText;
     private string lastDisplayName;
     private Color lastDisplayColor;
-
-    private bool _wobbling;
-    private Coroutine _wobbleCoroutine;
 
     public bool IsPromptActive { get; private set; }
 
@@ -30,76 +24,21 @@ public class Subtitles : MonoBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Starts or stops the per-character vertex-wobble animation on the subtitle text.
-    /// Safe to call before or after <see cref="SetText"/>.
+    /// Applies the given wobble <paramref name="profile"/> to the subtitle text.
+    /// Pass <c>null</c> to stop any active wobble.
     /// </summary>
-    public void SetWobble(bool wobble)
+    public void SetWobble(TMPWobbleProfile profile)
     {
-        _wobbling = wobble;
+        if (_wobbleText == null) return;
 
-        if (wobble && _wobbleCoroutine == null)
-            _wobbleCoroutine = StartCoroutine(WobbleCoroutine());
-        else if (!wobble && _wobbleCoroutine != null)
+        if (profile != null)
         {
-            StopCoroutine(_wobbleCoroutine);
-            _wobbleCoroutine = null;
+            _wobbleText.SetProfile(profile, restartSeeds: true);
+            _wobbleText.StartWobble();
         }
-    }
-
-    private void OnDisable()
-    {
-        // Stop wobble so TMP mesh is not left in a dirty state after the GO is destroyed.
-        if (_wobbleCoroutine != null)
+        else
         {
-            StopCoroutine(_wobbleCoroutine);
-            _wobbleCoroutine = null;
-        }
-        _wobbling = false;
-    }
-
-    /// <summary>
-    /// Each frame, displaces each visible character along a sine wave to create a shaky,
-    /// angry wobble effect. Uses TMP's mesh-modification API so it works with rich text
-    /// and the typewriter reveal simultaneously.
-    /// </summary>
-    private IEnumerator WobbleCoroutine()
-    {
-        var tmp = textReveal != null ? textReveal.GetComponent<TextMeshProUGUI>() : null;
-        if (tmp == null) yield break;
-
-        while (_wobbling)
-        {
-            tmp.ForceMeshUpdate();
-            var textInfo = tmp.textInfo;
-
-            for (int i = 0; i < textInfo.characterCount; i++)
-            {
-                var charInfo = textInfo.characterInfo[i];
-                if (!charInfo.isVisible) continue;
-
-                var verts = textInfo.meshInfo[charInfo.materialReferenceIndex].vertices;
-
-                // Offset all four corners of the character quad independently so the
-                // letter itself appears to twist as well as translate.
-                for (int j = 0; j < 4; j++)
-                {
-                    int idx = charInfo.vertexIndex + j;
-                    float phase = Time.time * wobbleSpeed + i * 1.3f + j * 0.5f;
-                    verts[idx] += new Vector3(
-                        Mathf.Sin(phase)            * wobbleAmount,
-                        Mathf.Cos(phase + i * 0.9f) * wobbleAmount,
-                        0f);
-                }
-            }
-
-            for (int i = 0; i < textInfo.meshInfo.Length; i++)
-            {
-                var mesh = textInfo.meshInfo[i].mesh;
-                mesh.vertices = textInfo.meshInfo[i].vertices;
-                tmp.UpdateGeometry(mesh, i);
-            }
-
-            yield return null;
+            _wobbleText.StopWobble();
         }
     }
 

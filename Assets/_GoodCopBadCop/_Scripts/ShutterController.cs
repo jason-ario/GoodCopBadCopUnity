@@ -13,6 +13,8 @@ public class ShutterController : MonoBehaviour
     [Header("Hit Feedback")]
     [Tooltip("Sound played on all clients each time the mutant hits the shutter.")]
     [SerializeField] private AudioClip hitClip;
+    [Tooltip("Volume scale applied to the hit clip. Increase this if the sound is too quiet relative to the open/close sounds.")]
+    [SerializeField] [Range(0f, 2f)] private float hitVolume = 1f;
     [Tooltip("The shutter mesh Transform to shake. Assign a child visual so it doesn't fight the Animator root.")]
     [SerializeField] private Transform shutterVisual;
     [Tooltip("Duration of the shake in seconds.")]
@@ -74,7 +76,7 @@ public class ShutterController : MonoBehaviour
     public void OnHitByMutant()
     {
         if (hitClip != null)
-            audioSource.PlayOneShot(hitClip);
+            audioSource.PlayOneShot(hitClip, hitVolume);
 
         if (shutterVisual != null)
         {

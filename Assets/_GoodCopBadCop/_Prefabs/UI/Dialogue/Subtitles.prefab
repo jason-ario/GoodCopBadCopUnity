@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 5783034993355735723}
   - component: {fileID: 573230316302542298}
   - component: {fileID: 6312536301404610609}
+  - component: {fileID: 1257336724781513000}
   m_Layer: 5
   m_Name: Text
   m_TagString: Untagged
@@ -211,6 +212,20 @@ MonoBehaviour:
   revealOnEnable: 0
   revealOnEnableDelay: 0.5
   revealSounds: []
+--- !u!114 &1257336724781513000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3843217040498761709}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c27507d999965240b21ed05ea2189d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
+  profile: {fileID: 0}
+  playOnEnable: 0
 --- !u!1 &4440882086164474402
 GameObject:
   m_ObjectHideFlags: 0
@@ -275,6 +290,7 @@ MonoBehaviour:
   textReveal: {fileID: 6312536301404610609}
   maxCharactersPerLine: 70
   continuePrompt: {fileID: 5962076655665494463}
+  _wobbleText: {fileID: 1257336724781513000}
 --- !u!114 &6192829123893769921
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -352,7 +368,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 184.31, y: -75.14}
+  m_AnchoredPosition: {x: 149.32, y: -0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7524897960926430736
