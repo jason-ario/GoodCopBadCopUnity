@@ -222,7 +222,6 @@ GameObject:
   - component: {fileID: 7615965077667440634}
   - component: {fileID: 1196757405222666655}
   - component: {fileID: 3506152733104979044}
-  - component: {fileID: 2213061852041545339}
   m_Layer: 5
   m_Name: Selectable Text Tab 1
   m_TagString: Untagged
@@ -272,32 +271,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1523c371064838141a648065b6f68662, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  _animator: {fileID: 2213061852041545339}
   onSelected:
     m_PersistentCalls:
       m_Calls: []
---- !u!95 &2213061852041545339
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8362991225593081067}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 37ca5d33a408eae429256d8caf28e536, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!1001 &1953518778018039703
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -329,10 +305,6 @@ PrefabInstance:
     - target: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
       value: SelectableTab, Assembly-CSharp
-      objectReference: {fileID: 0}
-    - target: {fileID: 4182369838113874052, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
-      propertyPath: m_Enabled
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7293098732328177440, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_Name
@@ -424,6 +396,8 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
+    - {fileID: 3460938722161326736, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
+    - {fileID: 4182369838113874052, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
