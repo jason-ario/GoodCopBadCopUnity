@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using VContainer;
 
 public interface ISettingsMenuView
 {
@@ -25,18 +26,18 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
 
     private readonly List<ESettingsMenuTab> availableTabs = new();
 
-    private SettingsMenuModel model;
     private ISettingsMenuService service;
-    private SettingsMenuPresenter presenter;
+
+    [Inject]
+    public void Construct(ISettingsMenuService service)
+    {
+        this.service = service;
+    }
 
     private void Awake()
     {
         DisableDecorativeRaycastTargets();
         BindTabs();
-
-        model = new SettingsMenuModel();
-        service = new SettingsMenuService(model);
-        presenter = new SettingsMenuPresenter(model, this);
     }
 
     private void OnEnable()
@@ -47,8 +48,6 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
     private void OnDestroy()
     {
         UnbindTabs();
-        presenter?.Dispose();
-        model?.Dispose();
     }
 
     public void OpenGameplaySettings()

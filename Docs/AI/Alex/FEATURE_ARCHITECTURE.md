@@ -326,6 +326,29 @@ Rules:
 
 When adding DI, prefer controlled resolution over global access.
 
+For this project, default to one scene-level master scope instead of a small `LifetimeScope` per feature:
+
+```text
+MainSceneLifetimeScope / GameLifetimeScope
+  MonoBehaviour in Main.unity.
+  Registers scene-wide services and feature models/services/presenters.
+  Registers scene components from hierarchy when there is exactly one scene instance.
+  Holds serialized refs to scene components/assets only when explicit references are clearer than hierarchy search.
+```
+
+Reason:
+
+- The current Unity scene is already singleton/event-heavy.
+- The environment/UI systems are still small.
+- A `LifetimeScope` per small feature would add Unity object noise and make initialization order harder to read.
+- Use feature/local child scopes only when there is a real lifetime boundary, repeated prefab instance boundary, or multiple independent copies of the same feature.
+
+For scene views, prefer VContainer scene lookup when the feature has a single view instance:
+
+```csharp
+builder.RegisterComponentInHierarchy<ShiftView>().As<IShiftView>();
+```
+
 Expected registration shape:
 
 ```csharp
