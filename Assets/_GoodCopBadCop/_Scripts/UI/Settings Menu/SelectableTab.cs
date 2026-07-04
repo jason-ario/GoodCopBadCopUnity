@@ -1,6 +1,6 @@
+using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -16,7 +16,7 @@ public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHa
     private TextMeshProUGUI labelText;
 
     public bool IsSelected => isSelected;
-    [SerializeField] UnityEvent onSelected;
+    public event Action<SelectableTab> Selected;
 
     private void Awake()
     {
@@ -26,13 +26,7 @@ public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHa
 
     public void Select()
     {
-        SettingsMenu settingsMenu = GetComponentInParent<SettingsMenu>();
-        if (settingsMenu != null && settingsMenu.OpenSettingsForTab(this))
-        {
-            return;
-        }
-
-        onSelected?.Invoke();
+        Selected?.Invoke(this);
     }
 
     public void SetSelected(bool selected)

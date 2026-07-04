@@ -54,6 +54,29 @@ FeatureService
 FeaturePresenter / FeatureView / FeatureAdapter
 ```
 
+## File And Naming Rules
+
+Keep interfaces close to their only implementation:
+
+```text
+FeatureModel.cs
+  IFeatureModel
+  FeatureModel
+
+FeatureService.cs
+  IFeatureService
+  FeatureService
+```
+
+Rules:
+
+- If an interface has exactly one implementation, place the interface in the implementation file above the concrete class.
+- Split an interface into its own file only when there are multiple real implementations, the file becomes too large, or a clear ownership boundary requires it.
+- Name concrete classes by their architecture role: `FeatureModel`, `FeatureService`, `FeaturePresenter`, `FeatureView`, `FeatureAdapter`.
+- Prefix enum type names with `E` so the entity kind is clear at call sites, for example `ESettingsMenuTab`.
+- MonoBehaviour views should include the role keyword in the class name. Use `SettingsMenuView : ISettingsMenuView`, not `SettingsMenu : ISettingsMenuView`.
+- When renaming a Unity component script, preserve the old `.meta` GUID by renaming the `.meta` file with the script. Otherwise prefabs and scenes can lose their component reference.
+
 `IFeatureModel` contains state and read-side observable events:
 
 ```csharp
