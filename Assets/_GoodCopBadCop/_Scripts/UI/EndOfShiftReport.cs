@@ -200,7 +200,7 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     public void OnContinueButtonPressed()
     {
-        HideAll();
+        UIController.Instance.HideEndOfShiftReport();
         ShiftManager.Instance.StartInBetweenShiftSequence();
     }
     

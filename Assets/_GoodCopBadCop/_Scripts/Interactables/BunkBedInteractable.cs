@@ -144,7 +144,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         if (SFXController.Instance != null && _endDaySFX != null)
             SFXController.Instance.Play(_endDaySFX);
 
-        ShiftManager.Instance.StartInBetweenShiftSequence();
+        var reportData = ShiftManager.Instance.BuildEndOfShiftReport();
+        UIController.Instance.ShowEndShiftReport(reportData);
     }
 
     private void OnCancelEndDay()

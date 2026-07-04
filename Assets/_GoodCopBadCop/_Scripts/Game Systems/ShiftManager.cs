@@ -457,6 +457,39 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Builds the <see cref="EndOfShiftReportUI.ReportRowData"/> list for the current shift
+    /// using all tracked suspect stats and the configured reward / penalty values.
+    /// Call this before <see cref="StartInBetweenShiftSequence"/> resets the counters.
+    /// </summary>
+    public List<EndOfShiftReportUI.ReportRowData> BuildEndOfShiftReport()
+    {
+        return new List<EndOfShiftReportUI.ReportRowData>
+        {
+            new EndOfShiftReportUI.ReportRowData(
+                $"Citizens Processed: {suspectsProcessed}", 0, false, isHeader: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Correctly Passed: {suspectsPassedCorrect}",
+                suspectsPassedCorrect * rewardPerCorrectPass),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Incorrectly Passed: {suspectsPassedWrong}",
+                suspectsPassedWrong * penaltyPerWrongPass, isPenalty: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Quarantined: {suspectsQuarantined}", 0),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Correctly Eliminated: {suspectsKilledCorrect}",
+                suspectsKilledCorrect * rewardPerCorrectKill),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Wrongly Eliminated: {suspectsKilledWrong}",
+                suspectsKilledWrong * penaltyPerWrongKill, isPenalty: true),
+        };
+    }
+
+    /// <summary>
     /// Called when the player presses Continue on the end-of-shift report.
     /// Fades the screen, resets all shift state, advances to the next campaign day,
     /// and places the player back at their outside spawn so they walk into the booth
@@ -464,6 +497,7 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public void StartInBetweenShiftSequence()
     {
+        Debug.Log($"[ShiftManager] StartInBetweenShiftSequence called.\n{System.Environment.StackTrace}");
         StartCoroutine(InBetweenShiftSequence());
     }
 
@@ -538,8 +572,10 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
-        // Increment the day counter and advance the campaign — server-only; propagates to clients via NetworkVariable.
-        CompletedShift();
+        // Advance the campaign day — server-only; propagates to all clients via NetworkVariable.
+        // CampaignManager.AdvanceDay() calls ApplyDay() → SetCurrentDay() which is the single
+        // authoritative path for updating ShiftManager._currentDay. CompletedShift() is not
+        // called here to avoid double-incrementing when state is already at the correct day.
         if (IsServer)
             CampaignManager.Instance.AdvanceDay();
 
@@ -557,6 +593,7 @@ public class ShiftManager : NetworkBehaviour
 
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
+        OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
         PlayShiftStartFanfare();
     }

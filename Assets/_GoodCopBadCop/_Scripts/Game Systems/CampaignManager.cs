@@ -70,14 +70,10 @@ public class CampaignManager : NetworkBehaviour
         CollectDays();
     }
 
-    private void Start()
-    {
-        ShiftManager.Instance.OnShiftEnd += OnShiftEnded;
-    }
-    
     private void OnEnable()
     {
-        ShiftManager.Instance.OnShiftEnd += OnShiftEnded;
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnShiftEnd += OnShiftEnded;
     }
 
     private void OnDisable()
@@ -181,6 +177,8 @@ public class CampaignManager : NetworkBehaviour
             Debug.LogWarning("[CampaignManager] AdvanceDay must only be called on the server.");
             return;
         }
+
+        Debug.Log($"[CampaignManager] AdvanceDay — _currentDay={_currentDay}, will advance to {_currentDay + 1}.\n{System.Environment.StackTrace}");
 
         int nextDay = _currentDay + 1;
 
