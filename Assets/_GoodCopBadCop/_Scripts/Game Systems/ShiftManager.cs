@@ -65,6 +65,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private DoorController _doorController;
+    [SerializeField] private BunkerDoorController _bunkerDoorController;
     [SerializeField] private Lever lever;
     [SerializeField] private TimecardMachine _timecardMachine;
 
@@ -542,12 +543,12 @@ public class ShiftManager : NetworkBehaviour
         if (IsServer)
             CampaignManager.Instance.AdvanceDay();
 
-        // Teleport the local player to their outside spawn while the screen is dark.
+        // Teleport the local player to their outside-bunker spawn while the screen is dark.
         if (PlayerInstance.Instance != null)
         {
-            Transform outsideSpawn = PlayerSpawner.Instance.GetOutsideSpawnPoint(PlayerInstance.Instance.OwnerClientId);
-            PlayerInstance.Instance.SetPosition(outsideSpawn);
-            PlayerInstance.Instance.SetIsOutside(true);
+            Transform bunkerSpawn = PlayerSpawner.Instance.GetOutsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+            PlayerInstance.Instance.SetPosition(bunkerSpawn);
+            PlayerInstance.Instance.SetIsOutside(false);
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -557,6 +558,7 @@ public class ShiftManager : NetworkBehaviour
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
         OnDayStart?.Invoke();
+        PlayShiftStartFanfare();
     }
 
     [ClientRpc]
@@ -581,6 +583,7 @@ public class ShiftManager : NetworkBehaviour
         windowLampController.TurnRed();
         lever.Reset();
         _doorController?.Reset();
+        _bunkerDoorController?.Reset();
 
         if (_timecardMachine != null)
             _timecardMachine.Reset();

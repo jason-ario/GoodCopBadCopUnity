@@ -1,4 +1,5 @@
 using Unity.Cinemachine;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -22,14 +23,16 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private const string InteractTextReady    = "Sleep";
     private const string InteractTextNotReady = "Can't sleep yet";
 
-    private bool _nightPhaseReady;
     private PlayerInteractionController _interactingPlayer;
 
-    /// <summary>Returns true when the shift has ended and the player is free to sleep.</summary>
+    /// <summary>
+    /// Returns true when the shift has ended. Reads <see cref="ShiftManager.shiftStarted"/>
+    /// directly — a <see cref="NetworkVariable{T}"/> set by <see cref="ShiftManager.EndShift"/>
+    /// — so it is always reliable regardless of local event subscription state.
+    /// </summary>
     private bool CanSleep =>
         ShiftManager.Instance != null
-        && !ShiftManager.Instance.shiftStarted.Value
-        && _nightPhaseReady;
+        && !ShiftManager.Instance.shiftStarted.Value;
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -43,35 +46,41 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
             _bedCamera.gameObject.SetActive(false);
     }
 
-    private void OnEnable()
+    public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
+
+        // Subscribe here rather than OnEnable — OnNetworkSpawn is called after the network
+        // is fully initialised so ShiftManager.Instance is guaranteed to be available.
         if (ShiftManager.Instance != null)
         {
-            ShiftManager.Instance.OnShiftEnd   += HandleNightPhaseReady;
+            ShiftManager.Instance.OnShiftEnd   += HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart += HandleShiftStart;
         }
     }
 
-    private void OnDisable()
+    public override void OnNetworkDespawn()
     {
+        base.OnNetworkDespawn();
+
         if (ShiftManager.Instance != null)
         {
-            ShiftManager.Instance.OnShiftEnd   -= HandleNightPhaseReady;
+            ShiftManager.Instance.OnShiftEnd   -= HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart -= HandleShiftStart;
         }
     }
 
     // ─── Event handlers ──────────────────────────────────────────────────────
 
-    private void HandleNightPhaseReady()
+    /// <summary>Updates the hover tooltip when the shift ends.</summary>
+    private void HandleShiftEnd()
     {
-        _nightPhaseReady = true;
         interactText = InteractTextReady;
     }
 
+    /// <summary>Resets the hover tooltip when a new shift begins.</summary>
     private void HandleShiftStart()
     {
-        _nightPhaseReady = false;
         interactText = InteractTextNotReady;
     }
 

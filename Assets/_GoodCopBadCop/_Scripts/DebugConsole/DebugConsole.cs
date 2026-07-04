@@ -190,11 +190,12 @@ public class DebugConsole : MonoBehaviour
             ForceAlexeiSequenceOnNextSuspect();
         }
 
-        // F12 — skip straight to the Day 1 Soldier sequence, bypassing Vlad,
-        // the random civilian, the documentation-anomaly suspect, and Ivan.
+        // F12 — skip to the end of Day 1 with the timecard machine primed for clock-out.
+        // The shift is started, all suspects are bypassed, and the player must walk to
+        // the machine to clock out, then to bed to begin Day 2.
         if (Input.GetKeyDown(KeyCode.F12))
         {
-            SkipToSoldierSequence();
+            SkipToEndOfDay1();
         }
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.

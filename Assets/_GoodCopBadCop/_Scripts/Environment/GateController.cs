@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class GateController : Interactable, IMutantPassable, IHeldItemPassthrough
+public class GateController : Interactable, IMutantPassable, IHeldItemPassthrough, ILockable
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
         false,
@@ -18,21 +18,35 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
         NetworkVariableWritePermission.Server
     );
 
+    private NetworkVariable<bool> _isLocked = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     [SerializeField] private Animator _animator;
     private bool _beingInteractedWith = false;
     [SerializeField] private float waitDelay = .5f;
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip doorOpenClip;
     [SerializeField] private AudioClip doorCloseClip;
+    [SerializeField] private AudioClip lockedSound;
     [SerializeField] private Transform forwardMarker;
+
+    [Tooltip("The LockController padlock on this gate. Animated alongside the gate when locked.")]
+    [SerializeField] private LockController _lockController;
+
+    private const string AnimLockedShakeParam = "LockedTriedOpening";
+
     private NavMeshObstacle _navMeshObstacle;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         _navMeshObstacle = GetComponent<NavMeshObstacle>();
-        _gateOpen.OnValueChanged += OnGateStateChanged;
-        _openedIn.OnValueChanged += OnOpenDirectionChanged;
+        _gateOpen.OnValueChanged  += OnGateStateChanged;
+        _openedIn.OnValueChanged  += OnOpenDirectionChanged;
+        _isLocked.OnValueChanged  += OnIsLockedChanged;
 
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
@@ -40,12 +54,38 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
     public override void OnNetworkDespawn()
     {
-        _gateOpen.OnValueChanged -= OnGateStateChanged;
-        _openedIn.OnValueChanged -= OnOpenDirectionChanged;
+        _gateOpen.OnValueChanged  -= OnGateStateChanged;
+        _openedIn.OnValueChanged  -= OnOpenDirectionChanged;
+        _isLocked.OnValueChanged  -= OnIsLockedChanged;
+    }
+
+    // ── ILockable ─────────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public bool IsLocked => _isLocked.Value;
+
+    /// <summary>Locks the gate so it cannot be opened. Must be called on the server.</summary>
+    public void Lock()
+    {
+        if (!IsServer) return;
+        _isLocked.Value = true;
+    }
+
+    /// <summary>Unlocks the gate so players can open it. Must be called on the server.</summary>
+    public void Unlock()
+    {
+        if (!IsServer) return;
+        _isLocked.Value = false;
     }
 
     public override void Interact(PlayerInteractionController player)
     {
+        if (_isLocked.Value)
+        {
+            PlayLockedTriedOpeningServerRpc();
+            return;
+        }
+
         base.Interact(player);
 
         if (!_beingInteractedWith)
@@ -110,6 +150,25 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     {
         audioSource.PlayOneShot(opening ? doorOpenClip : doorCloseClip);
     }
+
+    /// <summary>
+    /// Broadcasts the locked-tried-opening feedback (gate shake + padlock shake + sound) to all
+    /// clients when a player attempts to open the gate while it is locked.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void PlayLockedTriedOpeningServerRpc() => PlayLockedTriedOpeningClientRpc();
+
+    [ClientRpc]
+    private void PlayLockedTriedOpeningClientRpc()
+    {
+        _animator.SetTrigger(AnimLockedShakeParam);
+        _lockController?.PlayLockedAnimation();
+
+        if (lockedSound != null)
+            audioSource.PlayOneShot(lockedSound);
+    }
+
+    private void OnIsLockedChanged(bool oldValue, bool newValue) { }
 
     private void OnGateStateChanged(bool oldValue, bool newValue)
     {

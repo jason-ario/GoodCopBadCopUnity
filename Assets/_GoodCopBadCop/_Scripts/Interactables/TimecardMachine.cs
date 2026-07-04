@@ -1,4 +1,5 @@
 using System.Collections;
+using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -33,10 +34,25 @@ public class TimecardMachine : Interactable
     private static readonly int ReadyBool    = Animator.StringToHash("Ready");
 
     private bool _clockOutReady = false;
+    private HighlightEffect _highlight;
 
     protected override void Awake()
     {
         base.Awake();
+        _highlight = GetComponent<HighlightEffect>();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        // Keep the highlight permanently on so the machine is always visible to the player.
+        if (_highlight != null) _highlight.highlighted = true;
+    }
+
+    /// <summary>The timecard machine highlight is always on — hover entry/exit does not toggle it.</summary>
+    public override void Highlight(bool highlight)
+    {
+        if (_highlight != null) _highlight.highlighted = true;
     }
 
     public override void Interact(PlayerInteractionController player)

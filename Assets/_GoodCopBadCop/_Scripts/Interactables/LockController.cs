@@ -149,6 +149,8 @@ public class LockController : Interactable
     /// Server-only: called on spawn to check whether this lock was already unlocked in a previous
     /// session. If so, silently applies the unlock to the ILockable and despawns this object
     /// without playing any animation — it simply won't appear in the world.
+    /// Otherwise ensures the ILockable is locked, so lockables that default to unlocked
+    /// (e.g. <see cref="GateController"/>) are correctly locked at startup.
     /// </summary>
     private void CheckSavedUnlockState()
     {
@@ -166,6 +168,9 @@ public class LockController : Interactable
         }
         else
         {
+            // Lock has not been unlocked — ensure the ILockable reflects the locked state.
+            // This is important for lockables like GateController that default to unlocked.
+            _lockable?.Lock();
             ApplyLockedState(_isLocked.Value);
         }
     }
