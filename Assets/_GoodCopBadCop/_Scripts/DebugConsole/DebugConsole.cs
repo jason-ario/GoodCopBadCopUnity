@@ -375,59 +375,56 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Skips Day 1 directly to the Soldier's slot (suspect index 4), bypassing Vlad,
-    /// the random civilian, the doc-anomaly suspect, and Ivan. Calls <see cref="SkipToDay"/>
-    /// to activate Day 1, then waits a frame for <see cref="Day_01"/> to subscribe its
-    /// events before arming the Soldier intercept and triggering the next spawn slot.
+    /// Skips to Day 1 in the booth with the shift already started and the timecard machine
+    /// primed for clock-out, as if all suspects had been processed. No suspects will arrive.
+    /// The player must walk to the timecard machine to clock out, then to the bed to begin Day 2.
     /// </summary>
-    private void SkipToSoldierSequence()
+    private void SkipToEndOfDay1()
     {
         if (CampaignManager.Instance == null)
         {
-            Debug.LogWarning("[DebugConsole] SkipToSoldierSequence: CampaignManager not available — start the game first.");
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay1: CampaignManager not available — start the game first.");
             return;
         }
 
         SkipToDay(1);
-        StartCoroutine(ArmSoldierAfterDelay());
+        StartCoroutine(SkipToEndOfDay1AfterDelay());
     }
 
-    private IEnumerator ArmSoldierAfterDelay()
+    private IEnumerator SkipToEndOfDay1AfterDelay()
     {
-        // Wait one frame for Day_01 to activate, subscribe its events, and set its Instance.
+        // Wait one frame for Day_01 to activate and subscribe its events.
         yield return null;
 
         if (Day_01.Instance == null)
         {
-            Debug.LogWarning("[DebugConsole] ArmSoldierAfterDelay: Day_01.Instance not found after SkipToDay(1).");
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay1: Day_01.Instance not found after SkipToDay(1).");
             yield break;
         }
 
-        // JumpToDay fires OnDayChanged which resets _introComplete on the gate.
-        // Force it back to true so interactions toggle the gate instead of opening the start-shift screen.
+        // Ensure the gate is in post-intro state so interactions toggle it correctly.
         _startShiftGate?.ForceIntroComplete();
 
-        // Abort the 7 s shutter delay, open the shutter, arm the Soldier intercept.
+        // Suppress Day1OpeningSequence (Vlad / civilians / Ivan) and open the shutter and lever.
+        // This sets _debugSkipActive on Day_01 so OnDayStarted skips the opening coroutine.
         Day_01.Instance.DebugSkipToSoldierSlot();
 
-        // Start the shift BEFORE setting the debug index. TryStartShift delivers a ClientRpc
-        // that runs OpenWindowSequence, whose first statement synchronously calls
-        // ResetSuspects() (resetting suspectIndex to -1). We yield one frame so that RPC is
-        // processed and the reset completes BEFORE we write suspectIndex = 3, otherwise the
-        // reset overwrites our value and NextSuspect() spawns slot 0 instead of slot 4,
-        // causing OnSoldierArrivedAtWindow to bail on its index check.
-        ShiftManager.OverrideFirstArrivalInterval = new Vector2(0f, 0f);
+        // Clear the soldier intercept — no suspects are running in this skip.
+        SuspectController.InterceptNextSuspectSpawn = null;
+
+        // Start the shift so shiftStarted = true (prevents bed from being usable before clock-out).
+        // Use a large first-arrival interval so no suspect can arrive before the player clocks out.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
         ShiftManager.Instance?.TryStartShift();
 
-        yield return null; // Let OpenWindowSequence's ResetSuspects() run first.
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
 
-        // Set suspectIndex to 3 so the next NextSuspect() increments to 4 (Soldier's slot).
-        SuspectController.Instance?.DebugSetSuspectIndex(3);
+        // Prime the timecard machine as if all suspects have been processed.
+        ShiftManager.Instance?.DebugEnableClockOut();
 
-        // Trigger the next suspect slot immediately — this fires the Soldier intercept.
-        SuspectController.Instance?.NextSuspect();
-
-        Debug.Log("[DebugConsole] Skipped to Soldier sequence (F12).");
+        Debug.Log("[DebugConsole] Skipped to end of Day 1 — timecard machine primed for clock-out (F12).");
     }
     /// bypassing normal character spawning and playing the mocking sequence directly.
     /// Useful for testing the soldier event without running through all preceding suspects.
