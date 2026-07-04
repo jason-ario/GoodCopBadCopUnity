@@ -13,12 +13,20 @@ No semantic database or vector index is part of v1.
 
 ## Stable Facts
 
-Store these in `PROJECT_MAP.md` or `DECISIONS.md`:
+Store high-level facts in `PROJECT_MAP.md` or `DECISIONS.md`:
 
 - Project layout and source-of-truth folders.
 - Architecture rules that Alex wants agents to follow.
 - Known gameplay system ownership and coupling.
 - Decisions that should survive across sessions.
+
+Store deeper facts in focused files:
+
+- `SYSTEMS.md` for subsystem ownership and source files.
+- `GAMEPLAY_FLOWS.md` for runtime sequences.
+- `NETCODE_NOTES.md` for multiplayer authority and verification rules.
+- `DATA_AND_CONTENT.md` for ScriptableObject, prefab, scene, and content authoring maps.
+- `TASK_RECIPES.md` for repeatable Codex/MCP task checklists.
 
 ## Generated Facts
 
