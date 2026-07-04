@@ -9,6 +9,7 @@ This folder is Alex's personal AI context layer inside the shared GoodCopBadCopU
 - `GAMEPLAY_FLOWS.md` - end-to-end runtime flows agents should understand before feature work.
 - `NETCODE_NOTES.md` - local Netcode patterns, authority rules, and multiplayer risk checks.
 - `DATA_AND_CONTENT.md` - source-of-truth content folders and ScriptableObject authoring map.
+- `FEATURE_ARCHITECTURE.md` - Alex's target model/service/reactive architecture for new significant features.
 - `TASK_RECIPES.md` - quick working recipes for common future AI tasks.
 - `WORKFLOW.md` - Alex's preferred Codex/MCP work cycle.
 - `MEMORY.md` - how local AI memory is organized.

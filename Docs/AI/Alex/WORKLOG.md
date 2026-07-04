@@ -29,3 +29,11 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Verified: Static source survey of campaign, shift, suspect, player, interaction, networking, UI, dialogue, save, shop, and threat systems; reran `Tools/AI/Refresh-AlexAIContext.ps1`.
 - Risks: Unity Editor was not launched for this survey, so scene wiring and serialized references still need Unity/MCP validation before behavior changes.
 - Follow-ups: Add targeted Unity validation scripts after the next real gameplay/networking task reveals repeat checks.
+
+## 2026-07-05 - Feature architecture decision
+
+- Goal: Record Alex's target architecture for future significant feature work before implementing packages or code changes.
+- Changed: Added `FEATURE_ARCHITECTURE.md`; linked it from `README.md`; recorded the model/service/reactive decision in `DECISIONS.md`; added DOTween guidance for simple animations.
+- Verified: Documentation-only change; no Unity assets, packages, or project settings intentionally modified.
+- Risks: R3, UniTask, DOTween, and DI are architectural choices only at this point; package installation and compile validation still need a separate implementation task.
+- Follow-ups: When Alex approves implementation, add packages and create the first feature module using this pattern.
