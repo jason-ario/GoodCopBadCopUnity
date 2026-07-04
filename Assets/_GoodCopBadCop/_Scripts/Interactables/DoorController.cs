@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class DoorController : Interactable, IMutantPassable
+public class DoorController : Interactable, IMutantPassable, IHeldItemPassthrough
 {
     private NetworkVariable<bool> _doorOpen = new NetworkVariable<bool>(
         false,
@@ -135,9 +135,7 @@ public class DoorController : Interactable, IMutantPassable
             PlayDoorSoundClientRpc(true);
         }
 
-        yield return new WaitForSeconds(waitDelay);
-
-        // Apply visuals immediately on the interacting client — no RTT wait.
+        // Apply visuals immediately on the interacting client — no pre-visual delay.
         ApplyDoorVisuals(willBeOpen, openedIn);
         if (!willBeOpen)
         {

@@ -110,13 +110,13 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
-        // LMB and E are interchangeable — both trigger the same interaction path.
-        // Empty-handed: world interact (InteractAlternate, which falls back to Interact by default).
-        // Holding item: use the held item on a world target (item-on-item or TryUseObject).
+        // LMB triggers primary interaction (Interact — pickup, use).
+        // E triggers alternate interaction (InteractAlternate — extract, secondary action).
+        // When holding an item, both keys route to TryItemUse regardless.
         if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E))
         {
             if (_playerPickupController.HeldObject == null)
-                TryWorldInteract(alternate: true);
+                TryWorldInteract(alternate: Input.GetKeyDown(KeyCode.E));
             else
                 TryItemUse();
         }
@@ -196,7 +196,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 if (inRange)
                 {
                     // When holding an item, only E triggers world interact so show [E].
-                    // When empty-handed, both LMB and E work, so show [E] as the primary hint.
+                    // When empty-handed, LMB picks up / interacts (primary) and E extracts (alternate).
                     bool isHolding = _playerPickupController.HeldObject != null;
                     bool isWorldInteract = isHolding ? interactable is not PickableObject : true;
 
@@ -205,7 +205,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     bool showButtonTooltip = interactable.itemsThatCanInteractWith.Length == 0
                         || (isHolding && interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData));
 
-                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract, showButtonTooltip);
+                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract, showButtonTooltip, interactable.ShowInteractHint);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }

@@ -1,6 +1,6 @@
 /// <summary>
 /// Lightweight <see cref="ISystemicThreat"/> implementation used to display
-/// tutorial step entries in the HUD task list via <see cref="GuidebookTaskRegistry"/>.
+/// tutorial step entries in the HUD task list via <see cref="TaskRegistry"/>.
 /// All systemic-threat members are no-ops or return neutral defaults.
 /// </summary>
 public class TutorialTask : ISystemicThreat

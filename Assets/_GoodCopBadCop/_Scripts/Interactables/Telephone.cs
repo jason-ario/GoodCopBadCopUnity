@@ -304,16 +304,16 @@ public class Telephone : Interactable
 
             if (linkedTask != null)
             {
-                // Pre-registered task (e.g. TakeOutTrashTask): reset physics + register in guidebook.
+                // Pre-registered task (e.g. TakeOutTrashTask): reset physics + register in task registry.
                 // ResetTask is server-guarded internally; calling it on all clients is safe.
                 BetweenShiftTaskManager.Instance?.ResetTaskPhysics();
-                GuidebookTaskRegistry.Instance.AddTask(linkedTask);
+                TaskRegistry.Instance.AddTask(linkedTask);
             }
             else
             {
                 // Dynamic task: create a new PhoneCallTask from the ScriptableObject data.
                 PhoneCallTask task = new PhoneCallTask(data.TaskName, data.TaskDescription, data.CouponReward);
-                GuidebookTaskRegistry.Instance.AddTask(task);
+                TaskRegistry.Instance.AddTask(task);
             }
         }
 
@@ -390,7 +390,7 @@ public class Telephone : Interactable
             DialogueManager.Instance.SpawnSubtitles(_debugVoiceLine, _hqSpeakerName, Color.white);
 
             PhoneCallTask debugTask = new PhoneCallTask(_debugTaskName, _debugTaskDescription, 0);
-            GuidebookTaskRegistry.Instance?.AddTask(debugTask);
+            TaskRegistry.Instance?.AddTask(debugTask);
 
             if (_voiceAudioSource != null && _debugVoiceAudioClips != null && _debugVoiceAudioClips.Length > 0)
             {

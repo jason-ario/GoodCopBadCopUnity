@@ -545,7 +545,7 @@ public class Day_01 : DayBase
         // Add task 1 to the HUD task list. OnPaperworkSpawned fires on all clients
         // via NotifyPaperworkSpawnedClientRpc so no extra RPC is needed.
         _taskPickUp = new TutorialTask(_taskPickUpDocs);
-        GuidebookTaskRegistry.Instance.AddThreat(_taskPickUp);
+        TaskRegistry.Instance.AddThreat(_taskPickUp);
     }
 
     /// <summary>
@@ -579,10 +579,10 @@ public class Day_01 : DayBase
 
         // Swap task 1 → task 2 locally (only the player who picked up both docs needs this).
         if (_taskPickUp != null)
-            GuidebookTaskRegistry.Instance.RemoveThreat(_taskPickUp);
+            TaskRegistry.Instance.RemoveThreat(_taskPickUp);
 
         _taskFile = new TutorialTask(_taskFileDocs);
-        GuidebookTaskRegistry.Instance.AddThreat(_taskFile);
+        TaskRegistry.Instance.AddThreat(_taskFile);
     }
 
     private void UnsubscribeDocumentPickupEvents()
@@ -662,7 +662,7 @@ public class Day_01 : DayBase
 
         // Task 1: shown on all clients right away.
         _taskGetChecklist = new TutorialTask(_taskGetChecklistText);
-        GuidebookTaskRegistry.Instance.AddThreat(_taskGetChecklist);
+        TaskRegistry.Instance.AddThreat(_taskGetChecklist);
 
         // Subscribe completion handlers on all clients.
         ExamNotebook.AnyExamNotebookPickedUp = false;
@@ -690,12 +690,12 @@ public class Day_01 : DayBase
 
         if (_taskGetChecklist != null)
         {
-            GuidebookTaskRegistry.Instance.RemoveThreat(_taskGetChecklist);
+            TaskRegistry.Instance.RemoveThreat(_taskGetChecklist);
             _taskGetChecklist = null;
         }
 
         _taskCheckDocumentation = new TutorialTask(_taskCheckDocumentationText);
-        GuidebookTaskRegistry.Instance.AddThreat(_taskCheckDocumentation);
+        TaskRegistry.Instance.AddThreat(_taskCheckDocumentation);
     }
 
     /// <summary>
@@ -708,7 +708,7 @@ public class Day_01 : DayBase
 
         if (_taskCheckDocumentation != null)
         {
-            GuidebookTaskRegistry.Instance.RemoveThreat(_taskCheckDocumentation);
+            TaskRegistry.Instance.RemoveThreat(_taskCheckDocumentation);
             _taskCheckDocumentation = null;
         }
     }
@@ -808,7 +808,7 @@ public class Day_01 : DayBase
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
 
         if (_taskFile != null)
-            GuidebookTaskRegistry.Instance.RemoveThreat(_taskFile);
+            TaskRegistry.Instance.RemoveThreat(_taskFile);
 
         StartCoroutine(VladStampPermissionRoutine());
         Debug.Log("[Day_01] Document filing tutorial complete — starting stamp permission step.");
@@ -1170,9 +1170,11 @@ public class Day_01 : DayBase
             AlexeiController.Instance.OnMutantIdleCallback = () => mutantIdle = true;
             AlexeiController.Instance.OnAlexeiSequenceDone = () =>
             {
+                Debug.Log("[Day_01] OnAlexeiSequenceDone fired.");
                 if (_postAlexeiDialogue != null)
                     ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_postAlexeiDialogue, () =>
                     {
+                        Debug.Log("[Day_01] Post-Alexei dialogue onComplete — calling TriggerEndOfShiftSetup.");
                         AlexeiController.Instance?.TriggerEndOfShiftSetup();
                     });
                 else

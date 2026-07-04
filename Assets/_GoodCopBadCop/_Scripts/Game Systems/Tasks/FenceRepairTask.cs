@@ -175,7 +175,7 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
     private void MarkCompleteClientRpc()
     {
         _isComplete = true;
-        GuidebookTaskRegistry.Instance?.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -230,9 +230,9 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
         return copy;
     }
 
-    /// <summary>Notifies the guidebook to refresh task row text whenever progress changes.</summary>
+    /// <summary>Notifies the task registry to refresh task row text whenever progress changes.</summary>
     private void OnProgressChanged(int previous, int current)
     {
-        GuidebookTaskRegistry.Instance?.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using DG.Tweening;
 using TMPro;
@@ -28,6 +29,12 @@ using UnityEngine;
 public class DumpsterInteractable : CollectableContainer
 {
     private const string ThrowAnimTrigger = "ThrowTrashBag";
+
+    /// <summary>
+    /// Fired on the server when a TrashBag is successfully deposited.
+    /// The parameter is the number of junk items that were in the bag.
+    /// </summary>
+    public static event Action<int> OnTrashBagDeposited;
 
     [Header("Throw Targets")]
     [Tooltip("Three positions inside the dumpster opening. One is chosen at random per throw.")]
@@ -128,6 +135,7 @@ public class DumpsterInteractable : CollectableContainer
 
         // ── 4. Release the bag from the player's hand ─────────────────────────
         TrashBag depositedBag = bag;
+        int junkCount = bag.JunkCount; // capture before despawn clears it
         player.pickupController.ReleaseHeldObjectForThrow();
 
         // ── 5. Windup delay before the bag visually moves ─────────────────────
@@ -143,8 +151,8 @@ public class DumpsterInteractable : CollectableContainer
         // ── 8. Despawn the bag ────────────────────────────────────────────────
         depositedBag.DespawnServerRpc();
 
-        // ── 9. Increment the fill counter on the server ───────────────────────
-        DepositBagServerRpc();
+        // ── 9. Increment the fill counter and notify task listeners ───────────
+        DepositBagServerRpc(junkCount);
 
         // ── 10. Restore player controls ───────────────────────────────────────
         movement.SetCanMove(true);
@@ -163,19 +171,21 @@ public class DumpsterInteractable : CollectableContainer
             return transform;
         }
 
-        return valid[Random.Range(0, valid.Length)];
+        return valid[UnityEngine.Random.Range(0, valid.Length)];
     }
 
     // ── Deposit ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Increments this dumpster's fill counter. Called from the local client at the end of
-    /// the throw animation. Routes to the server via CollectableContainer.PerformDeposit().
+    /// Increments this dumpster's fill counter and fires <see cref="OnTrashBagDeposited"/>
+    /// with the number of junk items that were in the deposited bag. Server-only.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void DepositBagServerRpc()
+    private void DepositBagServerRpc(int junkCount)
     {
         PerformDeposit();
+        if (junkCount > 0)
+            OnTrashBagDeposited?.Invoke(junkCount);
     }
 
     // ── NetworkVariable callbacks ─────────────────────────────────────────────

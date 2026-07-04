@@ -1,7 +1,7 @@
 /// <summary>
 /// A runtime task instance created when the player answers a phone call from HQ.
 /// Not a MonoBehaviour — instantiated directly by Telephone when a call is answered.
-/// Register via GuidebookTaskRegistry.Instance.AddTask() on all clients.
+/// Register via TaskRegistry.Instance.AddTask() on all clients.
 /// </summary>
 public class PhoneCallTask : IBetweenShiftTask
 {
@@ -25,12 +25,12 @@ public class PhoneCallTask : IBetweenShiftTask
     public void ResetTask() => _isComplete = false;
 
     /// <summary>
-    /// Marks this task complete and refreshes the guidebook task list.
+    /// Marks this task complete and refreshes the task list.
     /// </summary>
     public void Complete()
     {
         if (_isComplete) return;
         _isComplete = true;
-        GuidebookTaskRegistry.Instance?.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 }

@@ -66,6 +66,17 @@ public class AlexeiController : NetworkBehaviour
     [Tooltip("Seconds over which the music fades out after Alexei despawns.")]
     [SerializeField] private float _musicFadeOutDuration = 3f;
 
+    [Header("Dead Soldier")]
+    [Tooltip("SuspectCharacter on Suspect_Soldier (Day 1). Must have a JunkItem component attached " +
+             "and kept disabled in the Inspector — TriggerEndOfShiftSetup calls EnableJunkPickup() " +
+             "on all clients once the post-Alexei dialogue ends, making the body collectible.")]
+    [SerializeField] private SuspectCharacter _soldierBodySuspect;
+
+    [Header("Booth Door")]
+    [Tooltip("DoorController on the Booth Door (door1 child). Unlocked and forced open on all clients " +
+             "at the start of the end-of-shift setup sequence, matching the dialogue 'I'm unlocking the door for you'.")]
+    [SerializeField] private DoorController _boothDoor;
+
     // Fallback timeout in case the PlayableDirector's stopped event never fires.
     private const float CutsceneTimeoutSeconds = 120f;
 
@@ -165,31 +176,60 @@ public class AlexeiController : NetworkBehaviour
 
     /// <summary>
     /// Called on the server once the post-Alexei megaphone dialogue completes.
-    /// Enables clock-out via the normal ShiftManager path (timecard machine, fanfare, and
-    /// "clock out ready" megaphone line), and registers the TrashThreat in the
-    /// <see cref="GuidebookTaskRegistry"/> on all clients so it appears in the HUD task list.
-    /// Server-only.
+    /// Enables the soldier body as a collectible JunkItem, registers the TakeOutTrashTask in the
+    /// HUD task list, and begins tracking JunkItems in the scene. When all JunkItems are
+    /// collected, enables clock-out via <see cref="ShiftManager.DebugEnableClockOut"/>. Server-only.
     /// </summary>
     public void TriggerEndOfShiftSetup()
     {
+        Debug.Log($"[AlexeiController] TriggerEndOfShiftSetup called. IsServer={IsServer}, IsSpawned={IsSpawned}");
         if (!IsServer) return;
+        EndOfShiftSetupSequence();
+    }
 
+    private void EndOfShiftSetupSequence()
+    {
+        Debug.Log("[AlexeiController] EndOfShiftSetupSequence — beginning end-of-shift setup.");
+
+        // Enable the soldier body as collectible junk on all clients.
+        if (_soldierBodySuspect != null)
+            _soldierBodySuspect.EnableJunkPickup();
+        else
+            Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: _soldierBodySuspect is not assigned.");
+
+        // Unlock and open the booth door on all clients — matches "I'm unlocking the door for you".
+        if (_boothDoor != null)
+        {
+            _boothDoor.Unlock();
+            _boothDoor.ForceOpen();
+        }
+        else
+            Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: _boothDoor is not assigned.");
+
+        // Trigger TakeOutTrashTask to spawn all task items immediately.
+        // TriggerTask also broadcasts RegisterInTaskRegistryClientRpc to all clients.
+        if (TakeOutTrashTask.Instance != null)
+        {
+            Debug.Log($"[AlexeiController] Calling TakeOutTrashTask.TriggerTask(). IsServer={IsServer}");
+            TakeOutTrashTask.OnAllItemsDeposited += EnableClockOut;
+            TakeOutTrashTask.Instance.TriggerTask();
+        }
+        else
+            Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: TakeOutTrashTask.Instance is null.");
+    }
+
+    private void EnableClockOut()
+    {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.DebugEnableClockOut();
         else
-            Debug.LogWarning("[AlexeiController] TriggerEndOfShiftSetup: ShiftManager.Instance not found.");
-
-        RegisterTrashThreatClientRpc();
+            Debug.LogWarning("[AlexeiController] EnableClockOut: ShiftManager.Instance is null.");
     }
 
-    /// <summary>Adds TrashThreat to GuidebookTaskRegistry on every client so it shows in the HUD task list.</summary>
-    [ClientRpc]
-    private void RegisterTrashThreatClientRpc()
+    public override void OnNetworkDespawn()
     {
-        if (TrashThreat.Instance != null)
-            GuidebookTaskRegistry.Instance.AddThreat(TrashThreat.Instance);
-        else
-            Debug.LogWarning("[AlexeiController] RegisterTrashThreatClientRpc: TrashThreat.Instance not found.");
+        base.OnNetworkDespawn();
+        TakeOutTrashTask.OnAllItemsDeposited -= EnableClockOut;
     }
 
     // ── Mutant Entrance ────────────────────────────────────────────────────────

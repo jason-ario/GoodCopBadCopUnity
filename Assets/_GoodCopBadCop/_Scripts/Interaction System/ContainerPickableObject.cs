@@ -87,6 +87,9 @@ public abstract class ContainerPickableObject : PickableObject
     /// </summary>
     protected abstract string BuildInteractText(int itemsRemaining);
 
+    /// <summary>Always shows the extract hint (key icon + action text) while this container is targeted.</summary>
+    public override bool ShowInteractHint => true;
+
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>

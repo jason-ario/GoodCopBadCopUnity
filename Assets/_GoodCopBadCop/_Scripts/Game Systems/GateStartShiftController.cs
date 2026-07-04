@@ -191,4 +191,14 @@ public class GateStartShiftController : Interactable
     {
         _introComplete = true;
     }
+
+    /// <summary>
+    /// Forces the gate into post-intro state so interactions toggle it open/closed
+    /// rather than opening the start-shift screen. Use this after debug skips that
+    /// advance the day and reset <see cref="_introComplete"/>.
+    /// </summary>
+    public void ForceIntroComplete()
+    {
+        _introComplete = true;
+    }
 }

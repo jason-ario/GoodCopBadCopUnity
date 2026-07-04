@@ -1,22 +1,30 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// A junk item spawned by TrashThreat. Collected by a player who is holding a non-full
+/// A junk item spawned by TakeOutTrashTask. Collected by a player who is holding a non-full
 /// TrashBag — either by pressing E (Interact) or by left-clicking while holding the bag
 /// (InteractWithItem). Despawns on collection and fills the bag by one unit.
 ///
 /// Prefab requirements:
-///   - NetworkObject
+///   - NetworkObject (or a parent NetworkObject when used on a SuspectCharacter)
 ///   - HighlightEffect  (required by Interactable)
 ///   - Collider on the Interactable layer
 ///   - Trash Bag PickableItemData assigned to itemsThatCanInteractWith in the Inspector
-/// Must be registered as a Network Prefab in the NetworkManager.
+/// Standalone junk prefabs must be registered as Network Prefabs in the NetworkManager.
+/// When added to a SuspectCharacter, keep the component disabled — it is enabled on death.
 /// </summary>
-[RequireComponent(typeof(NetworkObject))]
 public class JunkItem : Interactable
 {
-    private const string DefaultInteractText = "Collect Junk";
+    /// <summary>Default interaction label shown when targeting a junk item.</summary>
+    public const string DefaultInteractText = "Collect Junk";
+
+    /// <summary>
+    /// Fired on the server each time a JunkItem is successfully collected and despawned.
+    /// Subscribe server-side to track how many items remain in the scene.
+    /// </summary>
+    public static event Action OnAnyJunkItemCollected;
 
     protected override void Awake()
     {
@@ -79,6 +87,7 @@ public class JunkItem : Interactable
         if (bag.IsFull) return;
 
         bag.AddJunk();
+        OnAnyJunkItemCollected?.Invoke();
         NetworkObject.Despawn(destroy: true);
     }
 }

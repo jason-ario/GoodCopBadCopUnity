@@ -38,6 +38,10 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Spawner used by O to force-spawn a guaranteed aggroed mutant.")]
     [SerializeField] private MutantSpawner _debugMutantSpawner;
 
+    [Header("Gate Debug")]
+    [Tooltip("Start Shift Gate — forced into post-intro state by the F12 skip so interactions toggle it instead of opening the start-shift screen.")]
+    [SerializeField] private GateStartShiftController _startShiftGate;
+
     [SerializeField] private MainMenuController _mainMenuController;
     [SerializeField] private GameObject mainMenuScreen;
 
@@ -302,19 +306,19 @@ public class DebugConsole : MonoBehaviour
         CampaignManager.Instance.JumpToDay(targetDay);
     }
 
-    /// <summary>Adds a one-off DebugTask to GuidebookTaskRegistry for guidebook testing.</summary>
+    /// <summary>Adds a one-off DebugTask to TaskRegistry for task testing.</summary>
     private void AddDebugTask()
     {
-        if (GuidebookTaskRegistry.Instance == null)
+        if (TaskRegistry.Instance == null)
         {
-            Debug.LogWarning("[DebugConsole] GuidebookTaskRegistry not available.");
+            Debug.LogWarning("[DebugConsole] TaskRegistry not available.");
             return;
         }
 
         if (_debugTask == null)
             _debugTask = gameObject.AddComponent<DebugTask>();
 
-        GuidebookTaskRegistry.Instance.AddThreat(_debugTask);
+        TaskRegistry.Instance.AddThreat(_debugTask);
         Debug.Log("[DebugConsole] Debug task added to registry (F6 to complete).");
     }
 
@@ -397,6 +401,10 @@ public class DebugConsole : MonoBehaviour
             Debug.LogWarning("[DebugConsole] ArmSoldierAfterDelay: Day_01.Instance not found after SkipToDay(1).");
             yield break;
         }
+
+        // JumpToDay fires OnDayChanged which resets _introComplete on the gate.
+        // Force it back to true so interactions toggle the gate instead of opening the start-shift screen.
+        _startShiftGate?.ForceIntroComplete();
 
         // Abort the 7 s shutter delay, open the shutter, arm the Soldier intercept.
         Day_01.Instance.DebugSkipToSoldierSlot();

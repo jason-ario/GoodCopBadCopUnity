@@ -185,7 +185,7 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
     {
         _isComplete = true;
         IsTaskActive = false;
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────
@@ -216,6 +216,6 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
 
     private void OnBitsDepositedChanged(int previous, int current)
     {
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 }

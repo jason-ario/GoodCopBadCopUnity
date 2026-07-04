@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Displays the active task names from <see cref="GuidebookTaskRegistry"/> as a
+/// Displays the active task names from <see cref="TaskRegistry"/> as a
 /// compact list in the player HUD. Sits below the currency display in the top-right
 /// corner. Instantiates a <see cref="_taskRowPrefab"/> per task and hides the
 /// container automatically when there are no tasks.
@@ -29,15 +29,15 @@ public class HUDTaskList : MonoBehaviour
 
     private void OnEnable()
     {
-        GuidebookTaskRegistry.OnTaskListChanged += Rebuild;
-        GuidebookTaskRegistry.OnTaskStateChanged += Rebuild;
+        TaskRegistry.OnTaskListChanged += Rebuild;
+        TaskRegistry.OnTaskStateChanged += Rebuild;
         Rebuild();
     }
 
     private void OnDisable()
     {
-        GuidebookTaskRegistry.OnTaskListChanged -= Rebuild;
-        GuidebookTaskRegistry.OnTaskStateChanged -= Rebuild;
+        TaskRegistry.OnTaskListChanged -= Rebuild;
+        TaskRegistry.OnTaskStateChanged -= Rebuild;
     }
 
     /// <summary>Clears and rebuilds all rows from the current registry state.</summary>
@@ -48,8 +48,8 @@ public class HUDTaskList : MonoBehaviour
         if (_rowContainer == null)
             return;
 
-        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance != null
-            ? GuidebookTaskRegistry.Instance.Threats
+        IReadOnlyList<ISystemicThreat> threats = TaskRegistry.Instance != null
+            ? TaskRegistry.Instance.Threats
             : System.Array.Empty<ISystemicThreat>();
 
         bool hasThreats = threats.Count > 0;
@@ -62,18 +62,23 @@ public class HUDTaskList : MonoBehaviour
             return;
 
         foreach (ISystemicThreat threat in threats)
-            SpawnRow(threat.ThreatName);
+            SpawnRow(threat);
     }
 
     /// <summary>Instantiates the task row prefab and populates its TMP label.</summary>
-    private void SpawnRow(string taskName)
+    private void SpawnRow(ISystemicThreat threat)
     {
         GameObject row = Instantiate(_taskRowPrefab, _rowContainer);
         row.name = "Task Row";
 
         TextMeshProUGUI label = row.GetComponentInChildren<TextMeshProUGUI>();
         if (label != null)
-            label.text = taskName;
+        {
+            bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
+            label.text = hasDescription
+                ? $"{threat.ThreatName} {threat.ThreatDescription}"
+                : threat.ThreatName;
+        }
         else
             Debug.LogWarning("[HUDTaskList] Task row prefab has no TextMeshProUGUI in its hierarchy.", row);
 

@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// Local manager for the systemic threat list.
 /// Starts and ends the night phase, drives the minimum night duration timer,
-/// manages the ShiftPerformanceEvaluator, and keeps GuidebookTaskRegistry in sync.
+/// manages the ShiftPerformanceEvaluator, and keeps TaskRegistry in sync.
 ///
 /// Plain MonoBehaviour — no NetworkObject required. Each client manages its own
 /// timer independently; the timer fires OnMinimumNightDurationElapsed locally
@@ -64,7 +64,7 @@ public class BetweenShiftTaskManager : MonoBehaviour
         if (_uiRefreshTimer < UIRefreshInterval) return;
 
         _uiRefreshTimer = 0f;
-        GuidebookTaskRegistry.Instance?.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 
     // ── Build ─────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ public class BetweenShiftTaskManager : MonoBehaviour
 
     /// <summary>
     /// Starts the night phase: activates threats (server only), begins performance sampling
-    /// (server only), registers threats in the guidebook (all clients), and starts the
+    /// (server only), registers tasks in the HUD task list (all clients), and starts the
     /// minimum duration timer.
     /// Called on all clients — server-only work is guarded internally.
     /// </summary>
@@ -105,7 +105,7 @@ public class BetweenShiftTaskManager : MonoBehaviour
             _performanceEvaluator?.BeginSampling(_threats);
         }
 
-        GuidebookTaskRegistry.Instance?.SetThreats(_threats);
+        TaskRegistry.Instance?.SetThreats(_threats);
 
         Debug.Log($"[BetweenShiftTaskManager] Night phase begun. {_threats.Length} threat(s) active.");
     }

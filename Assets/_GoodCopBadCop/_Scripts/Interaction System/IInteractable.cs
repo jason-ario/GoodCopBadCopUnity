@@ -33,6 +33,13 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public string interactText;
 
     /// <summary>
+    /// When true, the reticle will display an extract hint (key icon + action text)
+    /// next to the reticle while this object is targeted.
+    /// Override to true in subclasses that have a meaningful E-key action (e.g. <see cref="ContainerPickableObject"/>).
+    /// </summary>
+    public virtual bool ShowInteractHint => false;
+
+    /// <summary>
     /// Only highlight children whose names contain this string.
     /// Leave empty to disable highlighting entirely.
     /// </summary>
@@ -59,17 +66,25 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     protected virtual void Awake()
     {
         highlightEffect = GetComponent<HighlightEffect>();
-        highlightEffect.enabled = false;
-        highlightEffect.highlighted = true;
+        // ProfileLoad applies visual style settings from the profile but does not
+        // touch the 'highlighted' state, so call it first.
         highlightEffect.ProfileLoad(highlightEffect.profile);
+        // Keep the component ENABLED so that HighlightEffect.Start() runs and
+        // SetupMaterial() builds the renderer list (rms). Disabling the component
+        // here prevents Start() from ever running, leaving rms null and causing the
+        // first hover to silently fail to render. Visibility is gated by 'highlighted'.
+        highlightEffect.highlighted = false;
 
         if (!string.IsNullOrEmpty(highlightNameFilter))
             highlightEffect.effectNameFilter = highlightNameFilter;
     }
 
-    public void Highlight(bool highlight)
+    public virtual void Highlight(bool highlight)
     {
-        highlightEffect.enabled = highlight;
+        // Drive visibility through 'highlighted', not 'enabled'.
+        // Toggling 'enabled' was the cause of the broken-first-hover bug: each
+        // enable/disable cycle re-ran OnEnable before Start, leaving rms uninitialised.
+        highlightEffect.highlighted = highlight;
 
         if (highlight)
         {

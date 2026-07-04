@@ -3,8 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// Manages the bunker door's open/closed state and DOTween animation.
-/// Only the local X euler angle is driven: 0 = closed, -120 = open.
-/// Y and Z are left untouched so the door never twists.
+/// Only the local Z euler angle is driven: 0 = closed, 120 = open.
+/// X and Y are left untouched so the door never tilts or spins.
 /// </summary>
 public class BunkerDoorController : MonoBehaviour
 {
@@ -19,15 +19,15 @@ public class BunkerDoorController : MonoBehaviour
     [Tooltip("Ease curve applied to the door-open tween.")]
     [SerializeField] private Ease _openEase = Ease.InOutSine;
 
-    private const float ClosedAngleX = 0f;
-    private const float OpenAngleX   = -120f;
+    private const float ClosedAngleZ = 0f;
+    private const float OpenAngleZ   = 120f;
 
     /// <summary>Whether the bunker door is currently open.</summary>
     public bool IsOpen { get; private set; }
 
     private void Awake()
     {
-        SnapToAngle(ClosedAngleX);
+        SnapToAngle(ClosedAngleZ);
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ public class BunkerDoorController : MonoBehaviour
     {
         if (IsOpen) return;
         IsOpen = true;
-        TweenDoorX(OpenAngleX);
+        TweenDoorZ(OpenAngleZ);
     }
 
     /// <summary>Snaps the door back to its closed angle instantly.</summary>
@@ -45,22 +45,22 @@ public class BunkerDoorController : MonoBehaviour
     {
         IsOpen = false;
         if (_door != null) _door.DOKill();
-        SnapToAngle(ClosedAngleX);
+        SnapToAngle(ClosedAngleZ);
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
 
-    private void TweenDoorX(float targetX)
+    private void TweenDoorZ(float targetZ)
     {
         if (_door == null) return;
         _door.DOKill();
-        _door.DOLocalRotateQuaternion(Quaternion.Euler(targetX, 0f, 0f), _openDuration)
+        _door.DOLocalRotateQuaternion(Quaternion.Euler(0f, 0f, targetZ), _openDuration)
              .SetEase(_openEase);
     }
 
-    private void SnapToAngle(float x)
+    private void SnapToAngle(float z)
     {
         if (_door == null) return;
-        _door.localRotation = Quaternion.Euler(x, 0f, 0f);
+        _door.localRotation = Quaternion.Euler(0f, 0f, z);
     }
 }

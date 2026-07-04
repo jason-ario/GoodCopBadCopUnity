@@ -43,7 +43,7 @@ public class PhoneTaskData
 
     /// <summary>
     /// Optional pre-existing <see cref="IBetweenShiftTask"/> to reset and register when this call is answered.
-    /// When set, the phone system registers this task directly in <see cref="GuidebookTaskRegistry"/>
+    /// When set, the phone system registers this task directly in <see cref="TaskRegistry"/>
     /// instead of creating a new <see cref="PhoneCallTask"/>, preserving the existing networked
     /// completion tracking in <see cref="BetweenShiftTaskManager"/>.
     /// Returns null if <c>_linkedTaskBehaviour</c> is unassigned or does not implement <see cref="IBetweenShiftTask"/>.

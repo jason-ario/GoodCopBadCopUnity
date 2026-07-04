@@ -7,7 +7,7 @@ using UnityEngine;
 public class DebugTask : MonoBehaviour, ISystemicThreat
 {
     private const string DefaultName        = "Debug Threat";
-    private const string DefaultDescription = "A fake systemic threat for testing the guidebook task list.";
+    private const string DefaultDescription = "A fake systemic threat for testing the HUD task list.";
 
     public string ThreatName        => DefaultName;
     public string ThreatDescription => DefaultDescription;
@@ -19,7 +19,7 @@ public class DebugTask : MonoBehaviour, ISystemicThreat
     {
         ThreatLevel = 1f;
         Debug.Log("[DebugTask] Threat level set to max.");
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
     /// <summary>Resets the threat level to zero and notifies the registry.</summary>
@@ -27,7 +27,7 @@ public class DebugTask : MonoBehaviour, ISystemicThreat
     {
         ThreatLevel = 0f;
         Debug.Log("[DebugTask] Threat level reset.");
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────

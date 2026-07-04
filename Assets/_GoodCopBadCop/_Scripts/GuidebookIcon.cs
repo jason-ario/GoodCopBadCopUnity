@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// HUD icon for the guidebook. Manages a notification badge (!) that activates
 /// when new tasks are assigned — either via BetweenShiftTaskManager (night phase)
-/// or directly via GuidebookTaskRegistry (any system, any time) — and deactivates
+/// or directly via TaskRegistry (any system, any time) — and deactivates
 /// once the player views the Tasks tab.
 /// </summary>
 public class GuidebookIcon : MonoBehaviour
@@ -22,14 +22,14 @@ public class GuidebookIcon : MonoBehaviour
 
     private void OnEnable()
     {
-        GuidebookTaskRegistry.OnTasksAdded += ShowNotification;
+        TaskRegistry.OnTasksAdded += ShowNotification;
         GuidebookTabController.OnTasksTabViewed += HideNotification;
         GuidebookController.OnGuidebookOpened += HideNotification;
     }
 
     private void OnDisable()
     {
-        GuidebookTaskRegistry.OnTasksAdded -= ShowNotification;
+        TaskRegistry.OnTasksAdded -= ShowNotification;
         GuidebookTabController.OnTasksTabViewed -= HideNotification;
         GuidebookController.OnGuidebookOpened -= HideNotification;
     }

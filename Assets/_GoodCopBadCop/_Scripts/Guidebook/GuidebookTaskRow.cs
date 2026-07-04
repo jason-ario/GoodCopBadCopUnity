@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// Represents a single threat row in the guidebook task list canvas.
 /// Call Bind() to populate the row from an ISystemicThreat.
-/// The row self-manages its high-threat indicator by subscribing to GuidebookTaskRegistry.OnTaskStateChanged.
+/// The row self-manages its high-threat indicator by subscribing to TaskRegistry.OnTaskStateChanged.
 /// </summary>
 public class GuidebookTaskRow : MonoBehaviour
 {
@@ -24,7 +24,7 @@ public class GuidebookTaskRow : MonoBehaviour
 
     private void OnEnable()
     {
-        GuidebookTaskRegistry.OnTaskStateChanged += OnTaskStateChanged;
+        TaskRegistry.OnTaskStateChanged += OnTaskStateChanged;
         Debug.Log($"[GuidebookTaskRow] Subscribed to OnTaskStateChanged. Threat: {_threat?.ThreatName ?? "none"}", this);
 
         // Re-sync in case the threat level changed while the panel was closed.
@@ -34,7 +34,7 @@ public class GuidebookTaskRow : MonoBehaviour
 
     private void OnDisable()
     {
-        GuidebookTaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
+        TaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
     }
 
     /// <summary>Populates all row fields from the given threat and syncs the high-threat indicator.</summary>

@@ -1,62 +1,96 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /// <summary>
-/// Between-shift task: pick up all trash bags and deposit them in the dumpster.
+/// One-shot trash-collection task. Call <see cref="TriggerTask"/> on the server to
+/// immediately spawn a random number of trash items across the configured spawn zones.
 ///
-/// This class is obsolete. Use TrashThreat instead.
+/// Pre-existing <see cref="JunkItem"/> instances in the scene (e.g. the dead soldier body)
+/// are automatically counted toward the total so the HUD denominator is always accurate.
+///
+/// Progress is reflected via <see cref="ThreatDescription"/>: "deposited/total".
+/// <see cref="ThreatLevel"/> retains the fraction of spawned items still uncollected for
+/// backwards compatibility with ISystemicThreat, but does NOT drive HUD refreshes.
+///
+/// Scene setup:
+///   - NetworkObject on this GameObject.
+///   - Assign _trashPrefabs (all registered in NetworkManager's prefab list).
+///   - Assign _spawnZones with centre Transforms and half-extents.
+///   - Set _groundLayer to match your environment layer.
+///   - Register this component in TaskRegistry via AlexeiController.
 /// </summary>
-[System.Obsolete("Use TrashThreat instead. The between-shift task system has been replaced by the systemic threat model.")]
 [RequireComponent(typeof(NetworkObject))]
-public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
+public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
 {
     public static TakeOutTrashTask Instance { get; private set; }
 
-    [Header("Task Properties")]
-    [SerializeField] private string _taskName        = "Take Out the Trash";
-    [SerializeField] private int    _couponReward     = 10;
-    [SerializeField] private int    _totalBags        = 5;
+    [Header("Threat Properties")]
+    [SerializeField] private string _threatName = "Take out trash";
+    [SerializeField] private float _scoreWeight = 1f;
 
     [Header("Spawning")]
+    [Tooltip("Minimum number of trash items to spawn when TriggerTask is called (inclusive).")]
+    [SerializeField] private int _minSpawnCount = 8;
+
+    [Tooltip("Maximum number of trash items to spawn when TriggerTask is called (inclusive).")]
+    [SerializeField] private int _maxSpawnCount = 12;
+
     [Tooltip("Pool of trash prefabs to pick from. All must be registered as Network Prefabs in the NetworkManager.")]
     [SerializeField] private GameObject[] _trashPrefabs;
-    [Tooltip("One or more zones in which bags are randomly placed. A zone is picked at random for each bag.")]
+
+    [Tooltip("One or more zones in which items are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
-    [Tooltip("Layer(s) the downward raycast hits to land bags on the ground.")]
-    [SerializeField] private LayerMask  _groundLayer;
 
-    [Header("Dumpsters")]
-    [Tooltip("All DumpsterInteractables in the scene. Their deposit counters are reset alongside the task.")]
-    [SerializeField] private DumpsterInteractable[] _dumpsters;
+    [Tooltip("Layer(s) the downward raycast hits to land items on the ground.")]
+    [SerializeField] private LayerMask _groundLayer;
 
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
-
-    public string TaskName    => _taskName;
-    public int    CouponReward => _couponReward;
-    public bool   IsComplete   => _isComplete;
-
-    /// <summary>
-    /// Dynamic description reflects current progress.
-    /// Example: "Deposit trash bags: 2/5"
-    /// </summary>
-    public string TaskDescription =>
-        _isComplete
-            ? $"All {_totalBags} bags deposited!"
-            : $"Deposit trash bags: {_bagsDeposited.Value}/{_totalBags}";
+    [Tooltip("Extra height added above the raycast hit point so items sit on the surface rather than clipping into it.")]
+    [SerializeField] private float _spawnHeightOffset = 0.05f;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
-    private NetworkVariable<int> _bagsDeposited = new NetworkVariable<int>(
+    private readonly NetworkVariable<float> _networkThreatLevel = new(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Total junk items for this task run: spawned items + pre-existing scene JunkItems.
+    /// Set once on the server when TriggerTask runs; clients read it for HUD display.
+    /// </summary>
+    private readonly NetworkVariable<int> _totalCount = new(
         0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    // Local flag — set on all clients via MarkCompleteClientRpc.
-    private bool _isComplete;
+    /// <summary>Running count of junk items deposited in the dumpster this task run.</summary>
+    private readonly NetworkVariable<int> _depositedCount = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
-    // Server-side: tracks spawned bags so they can be cleaned up on reset.
-    private readonly List<NetworkObject> _spawnedBags = new();
+    // ── Local state (server-only) ─────────────────────────────────────────────
+
+    private readonly List<NetworkObject> _spawnedItems = new();
+    private bool _taskActive;
+
+    // ── ISystemicThreat ──────────────────────────────────────────────────────
+
+    public string ThreatName  => _threatName;
+    public float  ScoreWeight => _scoreWeight;
+    public float  ThreatLevel => _networkThreatLevel.Value;
+
+    /// <summary>
+    /// Items deposited in the dumpster so far out of the total task count.
+    /// Shown as "X/Total" in the HUD. Returns an empty string until the task starts.
+    /// </summary>
+    public string ThreatDescription =>
+        _totalCount.Value > 0
+            ? $"{Mathf.Min(_depositedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
+            : string.Empty;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -74,78 +108,147 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _bagsDeposited.OnValueChanged += OnBagsDepositedChanged;
+        // Only _depositedCount drives HUD refreshes — collecting items into a bag
+        // must not update the task display, only depositing in the dumpster should.
+        _depositedCount.OnValueChanged += OnNetworkValueChanged;
+        _totalCount.OnValueChanged     += OnNetworkValueChanged;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _bagsDeposited.OnValueChanged -= OnBagsDepositedChanged;
+        _depositedCount.OnValueChanged -= OnNetworkValueChanged;
+        _totalCount.OnValueChanged     -= OnNetworkValueChanged;
+        DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
+    }
+
+    private void OnNetworkValueChanged<T>(T previous, T current)
+    {
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
+        DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
+        OnAllItemsDeposited                       = null;
     }
 
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
+    // ── ISystemicThreat stubs ────────────────────────────────────────────────
+
+    /// <summary>No-op — this threat is triggered explicitly, not by the night phase.</summary>
+    public void BeginNightPhase() { }
+
+    /// <summary>No-op.</summary>
+    public void EndNightPhase() { }
+
+    // ── Events ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Resets task state at the start of each night phase.
-    /// Called on every client by BetweenShiftTaskManager.BeginNightPhase().
-    /// Bag spawning is server-only so only one authoritative set of bags is created.
+    /// Fired on the server when every junk item has been deposited in the dumpster.
+    /// Subscribe server-side (e.g. AlexeiController) to trigger clock-out.
     /// </summary>
-    public void ResetTask()
-    {
-        _isComplete = false;
+    public static event Action OnAllItemsDeposited;
 
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Spawns a random number of trash items (between <see cref="_minSpawnCount"/> and
+    /// <see cref="_maxSpawnCount"/>), counts any pre-existing <see cref="JunkItem"/>s
+    /// already active in the scene (e.g. the dead soldier body), and registers this task
+    /// in <see cref="TaskRegistry"/> on all clients. Server-only.
+    /// </summary>
+    public void TriggerTask()
+    {
         if (!IsServer) return;
 
-        _bagsDeposited.Value = 0;
-        DespawnExistingBags();
-        SpawnTrashBags();
-        ResetDumpsters();
+        DespawnExistingItems();
+        _taskActive = true;
+        _depositedCount.Value = 0;
+
+        // Count pre-existing JunkItems in the scene BEFORE spawning (e.g. soldier body).
+        // Uses FindObjectsInactive.Include so disabled-component JunkItems on active GameObjects
+        // are found, then filters to those that are actually enabled and active in the hierarchy.
+        var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        int preExistingCount = 0;
+        foreach (JunkItem j in existingJunk)
+        {
+            if (j.enabled && j.gameObject.activeInHierarchy)
+                preExistingCount++;
+        }
+
+        int spawnCount = Random.Range(_minSpawnCount, _maxSpawnCount + 1);
+        for (int i = 0; i < spawnCount; i++)
+            SpawnSingleItem();
+
+        // Total = actually spawned (may be less than spawnCount on error) + pre-existing.
+        _totalCount.Value = _spawnedItems.Count + preExistingCount;
+
+        UpdateThreatLevel();
+
+        JunkItem.OnAnyJunkItemCollected          += OnJunkItemCollected;
+        DumpsterInteractable.OnTrashBagDeposited += OnTrashBagDeposited;
+
+        Debug.Log($"[TakeOutTrashTask] Task triggered — spawned {_spawnedItems.Count}, " +
+                  $"pre-existing {preExistingCount}, total {_totalCount.Value}.");
+
+        RegisterInTaskRegistryClientRpc();
     }
 
-    // ── Deposit flow ─────────────────────────────────────────────────────────
+    /// <summary>Adds this task to <see cref="TaskRegistry"/> on every client so it appears in the HUD.</summary>
+    [ClientRpc]
+    private void RegisterInTaskRegistryClientRpc()
+    {
+        TaskRegistry.Instance.AddThreat(this);
+        Debug.Log("[TakeOutTrashTask] Registered in TaskRegistry.");
+    }
+
+    // ── Private ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Called by DumpsterInteractable on the local client after a bag is accepted.
-    /// Routes deposit acknowledgement to the server, which is the single authority
-    /// for the deposit counter.
+    /// Called on the server when a TrashBag is deposited in a dumpster.
+    /// Increments the deposited count by the number of junk items the bag contained.
+    /// When all items are deposited, fires <see cref="OnAllItemsDeposited"/> and removes
+    /// the task from the HUD on all clients.
     /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    public void DepositBagServerRpc()
+    private void OnTrashBagDeposited(int junkCount)
     {
-        if (_isComplete) return;
+        _depositedCount.Value = Mathf.Min(_depositedCount.Value + junkCount, _totalCount.Value);
+        Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited. " +
+                  $"Total deposited: {_depositedCount.Value}/{_totalCount.Value}");
 
-        _bagsDeposited.Value = Mathf.Clamp(_bagsDeposited.Value + 1, 0, _totalBags);
+        if (_depositedCount.Value < _totalCount.Value) return;
 
-        if (_bagsDeposited.Value >= _totalBags)
-        {
-            // Mark complete immediately on the server to guard against duplicate calls
-            // arriving before MarkCompleteClientRpc propagates.
-            _isComplete = true;
+        // All items deposited — complete the task.
+        _taskActive = false;
+        JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
+        DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
 
-            // Notify ShiftManager from the server — one authoritative call.
-            if (BetweenShiftTaskManager.Instance != null)
-                BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
-
-            // Propagate completion state and UI refresh to all clients.
-            MarkCompleteClientRpc();
-        }
+        Debug.Log("[TakeOutTrashTask] All items deposited — task complete.");
+        OnAllItemsDeposited?.Invoke();
+        RemoveFromRegistryClientRpc();
     }
 
+    /// <summary>Removes this task from the HUD task list on all clients.</summary>
     [ClientRpc]
-    private void MarkCompleteClientRpc()
+    private void RemoveFromRegistryClientRpc()
     {
-        _isComplete = true;
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.RemoveThreat(this);
+        Debug.Log("[TakeOutTrashTask] Removed from TaskRegistry.");
     }
 
-    // ── Bag spawning (server only) ────────────────────────────────────────────
+    private void OnJunkItemCollected()
+    {
+        if (!IsServer) return;
 
-    private void SpawnTrashBags()
+        PruneCollectedItems();
+        UpdateThreatLevel();
+
+        Debug.Log($"[TakeOutTrashTask] Item collected into bag — remaining spawned items: {_spawnedItems.Count}");
+    }
+
+    private void SpawnSingleItem()
     {
         if (_trashPrefabs == null || _trashPrefabs.Length == 0)
         {
@@ -153,84 +256,71 @@ public class TakeOutTrashTask : NetworkBehaviour, IBetweenShiftTask
             return;
         }
 
-        for (int i = 0; i < _totalBags; i++)
+        GameObject prefab = _trashPrefabs[Random.Range(0, _trashPrefabs.Length)];
+        if (prefab == null) return;
+
+        Vector3    spawnPos = GetRandomSpawnPosition();
+        Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+        GameObject    itemGo = Instantiate(prefab, spawnPos, spawnRot);
+        NetworkObject netObj = itemGo.GetComponent<NetworkObject>();
+
+        if (netObj == null)
         {
-            GameObject prefab = _trashPrefabs[Random.Range(0, _trashPrefabs.Length)];
-            if (prefab == null) continue;
-
-            Vector3 spawnPos = GetRandomSpawnPosition();
-            Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-
-            GameObject bagGo = Instantiate(prefab, spawnPos, spawnRot);
-            NetworkObject netObj = bagGo.GetComponent<NetworkObject>();
-
-            if (netObj == null)
-            {
-                Debug.LogError("[TakeOutTrashTask] Trash bag prefab has no NetworkObject component.");
-                Destroy(bagGo);
-                continue;
-            }
-
-            netObj.Spawn(destroyWithScene: true);
-            _spawnedBags.Add(netObj);
+            Debug.LogError("[TakeOutTrashTask] Trash prefab is missing a NetworkObject component.");
+            Destroy(itemGo);
+            return;
         }
+
+        netObj.Spawn(destroyWithScene: true);
+        _spawnedItems.Add(netObj);
     }
 
-    private void ResetDumpsters()
+    private void PruneCollectedItems()
     {
-        // ResetServerRpc has been removed from DumpsterInteractable.
-        // Dumpster resets are now handled automatically by HQPickupDispatcher.
-        Debug.LogWarning("[TakeOutTrashTask] ResetDumpsters is obsolete — dumpsters no longer support ResetServerRpc.");
+        _spawnedItems.RemoveAll(n => n == null || !n.IsSpawned);
     }
 
-    private void DespawnExistingBags()
+    private void UpdateThreatLevel()
     {
-        foreach (NetworkObject netObj in _spawnedBags)
+        int total = _totalCount.Value > 0 ? _totalCount.Value : (_minSpawnCount + _maxSpawnCount) / 2;
+        _networkThreatLevel.Value = total > 0
+            ? (float)_spawnedItems.Count / total
+            : 0f;
+    }
+
+    private void DespawnExistingItems()
+    {
+        foreach (NetworkObject netObj in _spawnedItems)
         {
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn(destroy: true);
         }
-        _spawnedBags.Clear();
+        _spawnedItems.Clear();
+        _networkThreatLevel.Value = 0f;
     }
 
-    /// <summary>
-    /// Returns a world position within a randomly chosen spawn zone, snapped to the
-    /// ground via raycast. Falls back to the zone's centre height when no ground is found.
-    /// </summary>
     private Vector3 GetRandomSpawnPosition()
     {
         if (_spawnZones == null || _spawnZones.Length == 0)
         {
-            Debug.LogWarning("[TakeOutTrashTask] No spawn zones assigned; spawning at origin.");
+            Debug.LogWarning("[TakeOutTrashTask] No spawn zones assigned — spawning at origin.");
             return Vector3.zero;
         }
 
-        // Pick a random zone, then a random point inside it.
         SpawnZone zone = _spawnZones[Random.Range(0, _spawnZones.Length)];
 
         if (zone == null)
         {
-            Debug.LogWarning("[TakeOutTrashTask] A spawn zone is null; spawning at origin.");
+            Debug.LogWarning("[TakeOutTrashTask] A spawn zone is null — spawning at origin.");
             return Vector3.zero;
         }
 
-        // Cast from above the zone downward to land on the ground.
         Vector3 castOrigin = zone.GetRandomPosition() + Vector3.up * 5f;
 
         if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer))
-            return hit.point;
+            return hit.point + Vector3.up * _spawnHeightOffset;
 
-        // Fallback: use the zone Y if no ground surface was hit.
-        return new Vector3(castOrigin.x, zone.transform.position.y, castOrigin.z);
+        return new Vector3(castOrigin.x, zone.transform.position.y + _spawnHeightOffset, castOrigin.z);
     }
-
-    // ── Progress sync ─────────────────────────────────────────────────────────
-
-    private void OnBagsDepositedChanged(int previous, int current)
-    {
-        // Refresh the guidebook task row description on all clients whenever progress changes.
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
-    }
-
-    // ── Editor gizmos removed: now handled by SpawnZone component ─────────────────
 }

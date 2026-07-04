@@ -150,21 +150,10 @@ public class ShiftManager : NetworkBehaviour
 
     private void OnEnable()
     {
-        BetweenShiftTaskManager.OnMinimumNightDurationElapsed += HandleNightPhaseReady;
     }
 
     private void OnDisable()
     {
-        BetweenShiftTaskManager.OnMinimumNightDurationElapsed -= HandleNightPhaseReady;
-    }
-
-    /// <summary>
-    /// Called on all clients when the minimum night duration has elapsed.
-    /// Fires OnShiftReady so the switch button becomes pressable.
-    /// </summary>
-    private void HandleNightPhaseReady()
-    {
-        // OnShiftReady?.Invoke();
     }
 
     public override void OnNetworkSpawn()
@@ -403,31 +392,26 @@ public class ShiftManager : NetworkBehaviour
         PauseSuspectScheduling          = false;
         _pendingNextSuspect             = false;
 
-        // Reset the shift flag immediately so the next shift can be started after the night phase.
+        // Reset the shift flag so the bed interaction becomes available.
         shiftStarted.Value = false;
 
-        // Unlock and open the booth door so the player can leave for the night phase.
+        // Open the booth door so the player can leave.
         _doorController?.ForceOpen();
 
-        // Unlock the door and announce the end of shift on all clients.
-        EndShiftAndBeginNightClientRpc();
-
-        // Begin the night phase on the server, then replicate to clients.
-        BetweenShiftTaskManager.Instance?.BeginNightPhase();
-        BeginNightPhaseClientRpc();
+        // Notify all clients: shift is over, booth door is unlocked.
+        SignalShiftEndClientRpc();
     }
 
     /// <summary>
-    /// Runs on all clients when the shift ends. Plays the end-of-shift sound, fires
-    /// <see cref="OnShiftEnd"/>, unlocks the booth door, and announces the night phase start.
+    /// Runs on all clients when the shift ends. Fires <see cref="OnShiftEnd"/> and
+    /// <see cref="OnDoorUnlock"/> so the bed becomes usable and the booth door opens.
+    /// Night phase has been removed — the player walks to bed to end the day.
     /// </summary>
     [ClientRpc]
-    private void EndShiftAndBeginNightClientRpc()
+    private void SignalShiftEndClientRpc()
     {
-        SFXController.Instance.Play(endOfLevelSound);
         OnShiftEnd?.Invoke();
         OnDoorUnlock?.Invoke();
-        OnNightPhaseBegin?.Invoke();
     }
 
     /// <summary>Records a passed suspect and updates the correct/wrong tally.</summary>
@@ -483,8 +467,8 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Registers tasks in GuidebookTaskRegistry and notifies all clients.
-    /// Called mid-shift to activate tasks in the guidebook and HUD.
+    /// Registers tasks in TaskRegistry and notifies all clients.
+    /// Called mid-shift to activate tasks in the HUD task list.
     /// </summary>
     public void TriggerAddShiftTasks()
     {
@@ -573,13 +557,6 @@ public class ShiftManager : NetworkBehaviour
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
         OnDayStart?.Invoke();
-    }
-
-    [ClientRpc]
-    private void BeginNightPhaseClientRpc()
-    {
-        if (IsServer) return; // Host already called BeginNightPhase above.
-        BetweenShiftTaskManager.Instance?.BeginNightPhase();
     }
 
     [ClientRpc]

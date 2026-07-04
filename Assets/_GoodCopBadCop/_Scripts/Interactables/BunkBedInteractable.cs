@@ -3,9 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Interactable placed on the bunk bed. Always opens the bed camera view on interact.
-/// When the shift is over and the minimum night-phase duration has elapsed, shows the
-/// "End the day?" confirmation popup. Otherwise shows "Can't sleep yet" with only the
-/// Back UI for exit. On confirmation plays a sound effect and triggers
+/// When the shift is over, shows the "End the day?" confirmation popup.
+/// Otherwise shows "Can't sleep yet" with only the Back UI for exit.
+/// On confirmation plays a sound effect and triggers
 /// <see cref="ShiftManager.StartInBetweenShiftSequence"/>.
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
@@ -25,7 +25,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private bool _nightPhaseReady;
     private PlayerInteractionController _interactingPlayer;
 
-    /// <summary>Returns true when the shift is over and the night phase minimum duration has elapsed.</summary>
+    /// <summary>Returns true when the shift has ended and the player is free to sleep.</summary>
     private bool CanSleep =>
         ShiftManager.Instance != null
         && !ShiftManager.Instance.shiftStarted.Value
@@ -45,18 +45,20 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
     private void OnEnable()
     {
-        BetweenShiftTaskManager.OnMinimumNightDurationElapsed += HandleNightPhaseReady;
-
         if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftEnd   += HandleNightPhaseReady;
             ShiftManager.Instance.OnShiftStart += HandleShiftStart;
+        }
     }
 
     private void OnDisable()
     {
-        BetweenShiftTaskManager.OnMinimumNightDurationElapsed -= HandleNightPhaseReady;
-
         if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftEnd   -= HandleNightPhaseReady;
             ShiftManager.Instance.OnShiftStart -= HandleShiftStart;
+        }
     }
 
     // ─── Event handlers ──────────────────────────────────────────────────────

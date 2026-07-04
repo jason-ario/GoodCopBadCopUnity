@@ -5053,7 +5053,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &659174290455621446
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5099,6 +5099,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -5130,7 +5131,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &856998336767212682
 GameObject:
   m_ObjectHideFlags: 0
@@ -9820,7 +9820,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &659174297213190700
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -9866,6 +9866,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -9897,7 +9898,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &1151747675086832188
 GameObject:
   m_ObjectHideFlags: 0
@@ -10789,7 +10789,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2744992905
+  GlobalObjectIdHash: 2146751676
   InScenePlacedSourceGlobalObjectIdHash: 2146751676
   DeferredDespawnTick: 0
   Ownership: 1
@@ -11212,6 +11212,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OwnerNetworkAnimator
   ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 0
+  m_Animator: {fileID: 5651200760162566270}
   TransitionStateInfoList:
   - IsCrossFadeExit: 0
     Layer: 1
@@ -11255,7 +11258,229 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: 207596745
     TransitionIndex: 0
-  m_Animator: {fileID: 5651200760162566270}
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: Grounded
+      NameHash: 862969536
+      Synchronize: 1
+      ParameterType: 4
+    - name: MoveZ
+      NameHash: -968048806
+      Synchronize: 1
+      ParameterType: 1
+    - name: MoveX
+      NameHash: 675470966
+      Synchronize: 1
+      ParameterType: 1
+    - name: Magnitude
+      NameHash: -1216938078
+      Synchronize: 1
+      ParameterType: 1
+    - name: OpenDoor
+      NameHash: 207596745
+      Synchronize: 1
+      ParameterType: 9
+    - name: Sitting
+      NameHash: 655049087
+      Synchronize: 1
+      ParameterType: 4
+    - name: UsingTool
+      NameHash: 1515455574
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingShotgun
+      NameHash: -1735445899
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingPencil
+      NameHash: 2000771275
+      Synchronize: 1
+      ParameterType: 4
+    - name: Shrug
+      NameHash: -1847043940
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingEnvelope
+      NameHash: 2105609812
+      Synchronize: 1
+      ParameterType: 4
+    - name: UsingRadio
+      NameHash: -1813992778
+      Synchronize: 1
+      ParameterType: 4
+    - name: TuningRadio
+      NameHash: -1051165828
+      Synchronize: 1
+      ParameterType: 1
+    - name: HoldingBox
+      NameHash: 1965896601
+      Synchronize: 1
+      ParameterType: 4
+    - name: Shoot
+      NameHash: -1316629574
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingThermometerGun
+      NameHash: -1299293843
+      Synchronize: 1
+      ParameterType: 4
+    - name: PressButton
+      NameHash: -2075743765
+      Synchronize: 1
+      ParameterType: 9
+    - name: OpenSwitch
+      NameHash: -425885340
+      Synchronize: 1
+      ParameterType: 9
+    - name: CloseSwitch
+      NameHash: 1325039157
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingFolder
+      NameHash: 293735821
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingBeer
+      NameHash: 391385220
+      Synchronize: 1
+      ParameterType: 4
+    - name: OpenFolder
+      NameHash: 1708573617
+      Synchronize: 1
+      ParameterType: 9
+    - name: ThrowFolder
+      NameHash: -984792713
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingFolderOpen
+      NameHash: 1890323220
+      Synchronize: 1
+      ParameterType: 4
+    - name: IsRunning
+      NameHash: -887662580
+      Synchronize: 1
+      ParameterType: 4
+    - name: GrabPhone
+      NameHash: -1713485239
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingPhone
+      NameHash: 112373191
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingIDCard
+      NameHash: 1493757193
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingPaper
+      NameHash: 216488460
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingExamNotebook
+      NameHash: -1860983943
+      Synchronize: 1
+      ParameterType: 4
+    - name: RipOutPage
+      NameHash: 1920565635
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingNewspaper
+      NameHash: -377844105
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingFlashlight
+      NameHash: -940607395
+      Synchronize: 1
+      ParameterType: 4
+    - name: TakingPill
+      NameHash: -1821811238
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingStamp
+      NameHash: 397649170
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingCigarette
+      NameHash: 1157335309
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldShovel
+      NameHash: 1500494758
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingGuidebook
+      NameHash: 589025196
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingTrashBag
+      NameHash: -1631741566
+      Synchronize: 1
+      ParameterType: 4
+    - name: ThrowTrashBag
+      NameHash: 260327873
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldingHammer
+      NameHash: 601198198
+      Synchronize: 1
+      ParameterType: 4
+    - name: Waving
+      NameHash: 635533868
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingCoin
+      NameHash: 449569140
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldKhinkali
+      NameHash: -645843444
+      Synchronize: 1
+      ParameterType: 4
+    - name: IsCrouched
+      NameHash: 1635554790
+      Synchronize: 1
+      ParameterType: 4
+    - name: Jump
+      NameHash: 125937960
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingMop
+      NameHash: 1890253974
+      Synchronize: 1
+      ParameterType: 4
+    - name: Hit
+      NameHash: 1654612129
+      Synchronize: 1
+      ParameterType: 9
+    - name: HoldCamera
+      NameHash: -1728907579
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingPolaroid
+      NameHash: -459209552
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldPistol
+      NameHash: 20919419
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingFlamethrower
+      NameHash: -513240103
+      Synchronize: 1
+      ParameterType: 4
+    - name: HoldingVaccine
+      NameHash: -771952347
+      Synchronize: 1
+      ParameterType: 4
+    - name: RightGrip
+      NameHash: 1717633781
+      Synchronize: 1
+      ParameterType: 4
+    - name: LeftGrip
+      NameHash: -1511146327
+      Synchronize: 1
+      ParameterType: 4
+  AnimatorParametersExpanded: 0
 --- !u!114 &5788097999620647467
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11451,6 +11676,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -11618,14 +11844,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5470190593194009012}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 13
   m_Type: 2
   m_Color: {r: 0.19245279, g: 0.19245279, b: 0.19245279, a: 1}
   m_Intensity: 0.43
   m_Range: 4.72
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -11670,7 +11896,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShadowRadius: 0
+  m_ShapeRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -11854,6 +12080,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -11885,7 +12112,7 @@ Transform:
   m_GameObject: {fileID: 8249481354703023807}
   serializedVersion: 2
   m_LocalRotation: {x: 0.78430074, y: 0.18308522, z: 0.31721142, w: 0.50072855}
-  m_LocalPosition: {x: -0.43970716, y: 2.02672, z: 0.68520397}
+  m_LocalPosition: {x: -0.43970716, y: 2.02672, z: 0.6852035}
   m_LocalScale: {x: 100, y: 99.999954, z: 100}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -12782,6 +13009,10 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0.0014026017
       objectReference: {fileID: 0}
+    - target: {fileID: 4206643055571672173, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: b3dd5358f3737294d94d8e067be0440c, type: 2}
     - target: {fileID: 4217020157145697754, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 3906409364
@@ -13226,6 +13457,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 189642f261280254eaa90ff435dde06a, type: 2}
+    - target: {fileID: 6247418049276667678, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: 'm_Materials.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2100000, guid: b3dd5358f3737294d94d8e067be0440c, type: 2}
     - target: {fileID: 6272940633223476190, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 847719616
@@ -13430,6 +13665,46 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 3295050686
       objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.63
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.279
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 1.148
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.3125377
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.6355219
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.22866099
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.667942
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -5.266
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -84.95
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483703454407999895, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 134.671
+      objectReference: {fileID: 0}
     - target: {fileID: 7504717090745778980, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: m_LinearDamping
       value: 0.24
@@ -13525,6 +13800,10 @@ PrefabInstance:
     - target: {fileID: 7749128895958985619, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 2055152858
+      objectReference: {fileID: 0}
+    - target: {fileID: 7822932909943823149, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7889790550015887543, guid: 6bbb0d6d43f6d39459511df2d07d9ee0, type: 3}
       propertyPath: GlobalObjectIdHash
@@ -14191,6 +14470,10 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 797029080
       objectReference: {fileID: 0}
+    - target: {fileID: 5450852723240894392, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5750615186842432595, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 3525027869
@@ -14230,6 +14513,10 @@ PrefabInstance:
     - target: {fileID: 6568683831133322366, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 4130585009
+      objectReference: {fileID: 0}
+    - target: {fileID: 6582443236885126595, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 1041210646
       objectReference: {fileID: 0}
     - target: {fileID: 6834659926468283182, guid: bb965bc3c61d1fc46be8a0ddaa39d5a2, type: 3}
       propertyPath: m_Name

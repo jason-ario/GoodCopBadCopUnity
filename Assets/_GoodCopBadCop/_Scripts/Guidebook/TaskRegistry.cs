@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Central registry for all systemic threats shown in the guidebook task list.
+/// Central registry for all active tasks shown in the HUD task list.
 /// Threats can be registered or updated at any time by any system.
 /// Self-instantiates on first access so no manual scene placement is needed.
 /// </summary>
-public class GuidebookTaskRegistry : MonoBehaviour
+public class TaskRegistry : MonoBehaviour
 {
-    public static GuidebookTaskRegistry Instance => GetOrCreate();
+    public static TaskRegistry Instance => GetOrCreate();
 
     /// <summary>Fired whenever the threat list changes (added, removed, replaced, or cleared).</summary>
     public static event Action OnTaskListChanged;
@@ -31,18 +31,18 @@ public class GuidebookTaskRegistry : MonoBehaviour
     /// <summary>Read-only snapshot of the current threat list.</summary>
     public IReadOnlyList<ISystemicThreat> Threats => _threats;
 
-    private static GuidebookTaskRegistry _instance;
+    private static TaskRegistry _instance;
 
-    private static GuidebookTaskRegistry GetOrCreate()
+    private static TaskRegistry GetOrCreate()
     {
         if (_instance != null) return _instance;
 
-        _instance = FindFirstObjectByType<GuidebookTaskRegistry>();
+        _instance = FindFirstObjectByType<TaskRegistry>();
         if (_instance != null) return _instance;
 
-        var go = new GameObject("[GuidebookTaskRegistry]");
+        var go = new GameObject("[TaskRegistry]");
         DontDestroyOnLoad(go);
-        _instance = go.AddComponent<GuidebookTaskRegistry>();
+        _instance = go.AddComponent<TaskRegistry>();
         return _instance;
     }
 
@@ -72,7 +72,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
         _threats.Add(threat);
         OnTaskListChanged?.Invoke();
         OnTasksAdded?.Invoke();
-        Debug.Log($"[GuidebookTaskRegistry] Threat added: '{threat.ThreatName}'. Total: {_threats.Count}");
+        Debug.Log($"[TaskRegistry] Threat added: '{threat.ThreatName}'. Total: {_threats.Count}");
     }
 
     /// <summary>Removes a threat from the registry and fires OnTaskListChanged.</summary>
@@ -81,7 +81,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
         if (threat == null || !_threats.Contains(threat)) return;
         _threats.Remove(threat);
         OnTaskListChanged?.Invoke();
-        Debug.Log($"[GuidebookTaskRegistry] Threat removed: '{threat.ThreatName}'. Total: {_threats.Count}");
+        Debug.Log($"[TaskRegistry] Threat removed: '{threat.ThreatName}'. Total: {_threats.Count}");
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
         if (_threats.Count > 0)
             OnTasksAdded?.Invoke();
 
-        Debug.Log($"[GuidebookTaskRegistry] Threat list set. Total: {_threats.Count}");
+        Debug.Log($"[TaskRegistry] Threat list set. Total: {_threats.Count}");
     }
 
     /// <summary>Clears all threats and fires OnTaskListChanged.</summary>
@@ -112,7 +112,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
     {
         _threats.Clear();
         OnTaskListChanged?.Invoke();
-        Debug.Log("[GuidebookTaskRegistry] Threat list cleared.");
+        Debug.Log("[TaskRegistry] Threat list cleared.");
     }
 
     /// <summary>
@@ -121,7 +121,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
     /// </summary>
     public void NotifyTaskStateChanged()
     {
-        Debug.Log($"[GuidebookTaskRegistry] NotifyTaskStateChanged fired. Subscriber count: {OnTaskStateChanged?.GetInvocationList().Length ?? 0}");
+        Debug.Log($"[TaskRegistry] NotifyTaskStateChanged fired. Subscriber count: {OnTaskStateChanged?.GetInvocationList().Length ?? 0}");
         OnTaskStateChanged?.Invoke();
     }
 
@@ -131,7 +131,7 @@ public class GuidebookTaskRegistry : MonoBehaviour
     [System.Obsolete("Use AddThreat(ISystemicThreat) instead.")]
     public void AddTask(IBetweenShiftTask task)
     {
-        Debug.LogWarning("[GuidebookTaskRegistry] AddTask is obsolete and has no effect. Use AddThreat() with ISystemicThreat.");
+        Debug.LogWarning("[TaskRegistry] AddTask is obsolete and has no effect. Use AddThreat() with ISystemicThreat.");
     }
 
     /// <summary>Obsolete. No-op stub.</summary>

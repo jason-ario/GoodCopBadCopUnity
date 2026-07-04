@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class GateController : Interactable, IMutantPassable
+public class GateController : Interactable, IMutantPassable, IHeldItemPassthrough
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
         false,
@@ -66,9 +66,7 @@ public class GateController : Interactable, IMutantPassable
         if (willBeOpen)
             PlayGateSoundClientRpc(true);
 
-        yield return new WaitForSeconds(waitDelay);
-
-        // Apply visuals immediately on the interacting client — no RTT wait.
+        // Apply visuals immediately on the interacting client — no pre-visual delay.
         ApplyGateVisuals(willBeOpen, openedIn);
         if (!willBeOpen)
             audioSource.PlayOneShot(doorCloseClip);

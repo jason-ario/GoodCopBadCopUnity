@@ -73,6 +73,15 @@ public class SuspectCharacter : Interactable
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
 
+    // ── Junk pickup (dead-body interaction) ───────────────────────────────────
+
+    /// <summary>
+    /// Optional JunkItem component on this GameObject. When present and the suspect
+    /// is killed, this is activated so the body can be collected as trash. Keep it
+    /// disabled by default in the Inspector — EnableJunkPickup() activates it on all clients.
+    /// </summary>
+    private JunkItem _junkItem;
+
     /// <summary>Raised on the server when the suspect is killed by a player melee hit.</summary>
     public static event Action<SuspectCharacter> OnSuspectKilledByPlayer;
 
@@ -113,6 +122,8 @@ public class SuspectCharacter : Interactable
             interactText = $"{suspectData.FirstName}";
 
         _health = maxHealth;
+
+        _junkItem = GetComponent<JunkItem>();
     }
 
     /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>
@@ -356,8 +367,27 @@ public class SuspectCharacter : Interactable
         anomalyController.InitializeDisabledOnArrival();
     }
 
+    /// <summary>
+    /// Only highlight when the suspect is dead and collectible as junk.
+    /// Suppresses the standard highlight effect while the suspect is alive.
+    /// </summary>
+    public override void Highlight(bool highlight)
+    {
+        if (_junkItem == null || !_junkItem.enabled)
+            return;
+
+        base.Highlight(highlight);
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
+        // Route to junk collection when the body is collectible (JunkItem enabled on death).
+        if (_junkItem != null && _junkItem.enabled)
+        {
+            _junkItem.Interact(player);
+            return;
+        }
+
         // Direct interaction no longer opens the dialogue view.
         // Dialogue is initiated exclusively through scripted cutscenes (ScriptedDialogueRunner).
     }
@@ -368,8 +398,55 @@ public class SuspectCharacter : Interactable
             interactionCollider.enabled = canInteract;
     }
 
+    /// <summary>
+    /// Activates the body as a collectible JunkItem on all clients. Call server-side when
+    /// the suspect dies and has a JunkItem component. Re-enables the interaction collider
+    /// so the body is raycasted, enables the JunkItem, and updates the interact label.
+    /// </summary>
+    public void EnableJunkPickup()
+    {
+        if (!IsServer) return;
+        if (_junkItem == null) return;
+
+        // Apply immediately on the server so TriggerTask's FindObjectsByType scan
+        // counts this body as a pre-existing JunkItem before spawning trash.
+        ApplyJunkPickupState();
+        EnableJunkPickupClientRpc();
+    }
+
+    [ClientRpc]
+    private void EnableJunkPickupClientRpc()
+    {
+        if (IsServer) return; // already applied above
+        if (_junkItem == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] EnableJunkPickupClientRpc: no JunkItem on {gameObject.name}.");
+            return;
+        }
+
+        ApplyJunkPickupState();
+    }
+
+    private void ApplyJunkPickupState()
+    {
+        _junkItem.enabled = true;
+        SetCanInteract(true);
+        interactText = JunkItem.DefaultInteractText;
+
+        // Mirror the JunkItem's compatible items onto SuspectCharacter so
+        // PlayerInteractionController.TryItemUse routes InteractWithItem correctly.
+        itemsThatCanInteractWith = _junkItem.itemsThatCanInteractWith;
+    }
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
+        // Route to junk collection when the body is collectible (JunkItem enabled on death).
+        if (_junkItem != null && _junkItem.enabled)
+        {
+            _junkItem.InteractWithItem(playerInteractionController, item);
+            return;
+        }
+
         if (item == null)
         {
             // Empty-hand interaction no longer opens the dialogue view.
@@ -454,6 +531,10 @@ public class SuspectCharacter : Interactable
         DisableInteractionClientRpc();
         // Reuse the existing networked death visuals (blood explosion + Die trigger).
         GetShotClientRpc();
+
+        // If this suspect has a JunkItem, re-enable the body as collectible trash.
+        if (_junkItem != null)
+            EnableJunkPickupClientRpc();
     }
 
     /// <summary>Disables the interaction collider on all clients so the corpse cannot be interacted with.</summary>

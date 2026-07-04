@@ -80,6 +80,35 @@ public class SaveDataManager : MonoBehaviour
         Debug.Log($"[SaveDataManager] Shop item unlocked: '{itemName}'.");
     }
 
+    // -------------------------------------------------------------------------
+    // Lock State
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns true if the lock with the given ID has been unlocked in the active slot.</summary>
+    public bool IsLockUnlocked(string lockId)
+    {
+        string[] unlocked = ActiveSlot?.UnlockedLockIds;
+        if (unlocked == null) return false;
+        return Array.IndexOf(unlocked, lockId) >= 0;
+    }
+
+    /// <summary>
+    /// Records a lock as permanently unlocked in the active slot and persists to disk.
+    /// Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void SaveUnlockedLock(string lockId)
+    {
+        if (ActiveSlot == null) return;
+        if (IsLockUnlocked(lockId)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.UnlockedLockIds ?? new string[0]);
+        list.Add(lockId);
+        ActiveSlot.UnlockedLockIds = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Lock unlocked and saved: '{lockId}'.");
+    }
+
     /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
     public int CurrentDay
     {
@@ -295,6 +324,13 @@ public class SaveSlot
     /// Items absent from this list (and with _unlockedByDefault = false) appear as '???' in the shop.
     /// </summary>
     public string[] UnlockedShopItems = new string[0];
+
+    /// <summary>
+    /// IDs of padlocks that have been permanently unlocked.
+    /// On load, any <see cref="LockController"/> whose lockId appears here is silently despawned
+    /// and its target <see cref="ILockable"/> is immediately unlocked.
+    /// </summary>
+    public string[] UnlockedLockIds = new string[0];
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,13 @@ public class ReticleController : MonoBehaviour
     public float normalScale = 1f;
     public float interactScale = 1.3f;
     public float lerpSpeed = 10f;
+
+    [Header("Extract Hint")]
+    [Tooltip("The TMP label that shows the extraction action text (child 'Do Text').")]
+    [SerializeField] private TextMeshProUGUI _hintLabel;
+
+    [Tooltip("The GameObject wrapping the key icon (child 'Button Tooltip').")]
+    [SerializeField] private GameObject _hintKeyIcon;
 
     private bool canInteract = false;
     private bool isTooFar = false;
@@ -41,23 +49,27 @@ public class ReticleController : MonoBehaviour
     }
 
     /// <summary>
-    /// Updates the interact reticle state. Text and tooltip parameters are kept for
-    /// call-site compatibility but are no longer rendered.
+    /// Updates the interact reticle state. When <paramref name="showHint"/> is true,
+    /// the extract hint (key icon + action text) is shown using <paramref name="text"/>.
+    /// All other text/tooltip parameters are kept for call-site compatibility but are not rendered.
     /// </summary>
     /// <param name="state">Whether the reticle is in interact mode.</param>
-    /// <param name="text">Unused — interact text has been removed from the reticle.</param>
-    /// <param name="useKeyPrompt">Unused — button tooltip has been removed from the reticle.</param>
-    /// <param name="showButtonTooltip">Unused — button tooltip has been removed from the reticle.</param>
-    public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false, bool showButtonTooltip = true)
+    /// <param name="text">Action label shown in the extract hint when <paramref name="showHint"/> is true.</param>
+    /// <param name="useKeyPrompt">Unused.</param>
+    /// <param name="showButtonTooltip">Unused.</param>
+    /// <param name="showHint">When true, shows the extract hint elements next to the reticle.</param>
+    public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false, bool showButtonTooltip = true, bool showHint = false)
     {
         canInteract = state;
         if (state) isTooFar = false;
+        SetHintVisible(showHint, text);
     }
 
     /// <summary>Hides the reticle entirely.</summary>
     public void DisableReticle()
     {
         reticle.enabled = false;
+        SetHintVisible(false);
     }
 
     /// <summary>Shows the reticle.</summary>
@@ -72,6 +84,25 @@ public class ReticleController : MonoBehaviour
     public void SetTooFarState(bool state)
     {
         isTooFar = state;
-        if (state) canInteract = false;
+        if (state)
+        {
+            canInteract = false;
+            SetHintVisible(false);
+        }
+    }
+
+    // ─── Private ─────────────────────────────────────────────────────────────
+
+    private void SetHintVisible(bool visible, string text = "")
+    {
+        if (_hintLabel != null)
+        {
+            _hintLabel.gameObject.SetActive(visible);
+            if (visible)
+                _hintLabel.text = text;
+        }
+
+        if (_hintKeyIcon != null)
+            _hintKeyIcon.SetActive(visible);
     }
 }

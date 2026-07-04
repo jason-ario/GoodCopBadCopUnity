@@ -611,6 +611,7 @@ GameObject:
   - component: {fileID: 5350706457408493353}
   - component: {fileID: 820681201371413921}
   - component: {fileID: 7888620099599006139}
+  - component: {fileID: 5215549252601529994}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -745,13 +746,13 @@ MonoBehaviour:
     lookWeightB: 1
     motionWeight: 0.39171878
   NoTargetHeadStops: 0
-  _editor_hideEyes: 0
-  _editor_displayName: Look Animator 2
-  _Editor_Category: 0
   _gizmosDrawMaxDist: 1
   gizmosAlpha: 0.85
   drawGizmos: 1
   _gizmosDrawingGuides: 1
+  _editor_hideEyes: 0
+  _editor_displayName: Look Animator 2
+  _Editor_Category: 0
   LeadBone: {fileID: 7643344847326886794}
   BaseTransform: {fileID: 9165884929875893673}
   FaloffValue: 0.35
@@ -865,7 +866,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 3870789545
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -987,6 +988,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
   ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 0
+  m_Animator: {fileID: 3144101779491009765}
   TransitionStateInfoList:
   - IsCrossFadeExit: 0
     Layer: 0
@@ -1114,7 +1118,121 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: 904796290
     TransitionIndex: 1
-  m_Animator: {fileID: 3144101779491009765}
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: Walking
+      NameHash: 1744665739
+      Synchronize: 1
+      ParameterType: 4
+    - name: Give
+      NameHash: 607913104
+      Synchronize: 1
+      ParameterType: 9
+    - name: ShotUp
+      NameHash: 904796290
+      Synchronize: 1
+      ParameterType: 9
+    - name: Restraining
+      NameHash: 92647627
+      Synchronize: 1
+      ParameterType: 4
+    - name: BeingRestrained
+      NameHash: -1453481290
+      Synchronize: 1
+      ParameterType: 4
+    - name: Shocked
+      NameHash: 1339033456
+      Synchronize: 1
+      ParameterType: 9
+    - name: Die
+      NameHash: 20298039
+      Synchronize: 1
+      ParameterType: 9
+    - name: Aiming Rifle
+      NameHash: 532204138
+      Synchronize: 1
+      ParameterType: 4
+    - name: FiringRifle
+      NameHash: 456538031
+      Synchronize: 1
+      ParameterType: 4
+    - name: TalkSlightSurprise
+      NameHash: 117766982
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkCocky
+      NameHash: 1652864696
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkDismissing
+      NameHash: 1247194270
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkShrug
+      NameHash: -1407593864
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkLookAway
+      NameHash: -205858835
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkPoint
+      NameHash: 1268078276
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkBigCocky
+      NameHash: 959393126
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkBigLaugh
+      NameHash: -2062647880
+      Synchronize: 1
+      ParameterType: 9
+    - name: TalkSarcasticNod
+      NameHash: 932452850
+      Synchronize: 1
+      ParameterType: 9
+    - name: OpeningDoorInwards
+      NameHash: -1234971109
+      Synchronize: 1
+      ParameterType: 4
+    - name: FakeCough
+      NameHash: -1045351539
+      Synchronize: 1
+      ParameterType: 9
+    - name: ShortLaugh
+      NameHash: -1846816292
+      Synchronize: 1
+      ParameterType: 9
+    - name: ThrowFolder
+      NameHash: -984792713
+      Synchronize: 1
+      ParameterType: 9
+    - name: RandomTwitch
+      NameHash: -750325912
+      Synchronize: 1
+      ParameterType: 3
+    - name: Talk1
+      NameHash: 506564194
+      Synchronize: 1
+      ParameterType: 9
+    - name: Talk2
+      NameHash: -2026315816
+      Synchronize: 1
+      ParameterType: 9
+    - name: Talk3
+      NameHash: -264245426
+      Synchronize: 1
+      ParameterType: 9
+    - name: Hit
+      NameHash: 1654612129
+      Synchronize: 1
+      ParameterType: 9
+    - name: ForceIdle
+      NameHash: -1151509048
+      Synchronize: 1
+      ParameterType: 9
+  AnimatorParametersExpanded: 0
 --- !u!114 &1701216653970133219
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1127,7 +1245,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HighlightPlus.HighlightEffect
-  profile: {fileID: 0}
+  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
   camerasLayerMask:
     serializedVersion: 2
@@ -1136,13 +1254,14 @@ MonoBehaviour:
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
+  excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
-  alphaCutOff: 0
-  cullBackFaces: 1
-  padding: 0
+  alphaCutOff: 0.5
+  alphaCutOffTextureName: 
+  cullBackFaces: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
   GPUInstancing: 1
@@ -1152,6 +1271,8 @@ MonoBehaviour:
   cameraDistanceFade: 0
   cameraDistanceFadeNear: 0
   cameraDistanceFadeFar: 1000
+  useOriginalShader: 0
+  customPassName: 
   normalsOption: 0
   ignore: 0
   _highlighted: 1
@@ -1162,8 +1283,11 @@ MonoBehaviour:
   extraCoveragePixels: 0
   minimumWidth: 0
   subMeshMask: -1
+  vertexTransformMode: 0
   overlay: 0
   overlayMode: 0
+  overlayPattern: 0
+  overlayPatternScrolling: {x: 0, y: 0}
   overlayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   overlayAnimationSpeed: 1
   overlayMinIntensity: 0.5
@@ -1173,8 +1297,13 @@ MonoBehaviour:
   overlayTextureScale: 1
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
-  outline: 0
-  outlineColor: {r: 0.49245283, g: 0.2139757, b: 0.121719465, a: 1}
+  overlayBlendMode: 0
+  overlayPatternScale: 10
+  overlayPatternSize: 0.15
+  overlayPatternSoftness: 0.02
+  overlayPatternRotation: 0
+  outline: 1
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -1207,23 +1336,41 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.5
-  outlineBlurPasses: 2
-  outlineQuality: 1
+  outlineWidth: 0.1
+  outlineBlurPasses: 1
+  outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
+  outlineDistanceScaleBias: 25
   outlineSharpness: 1
-  outlineDownsampling: 2
-  outlineVisibility: 0
+  outlineDownsampling: 1
+  outlineVisibility: 1
   glowBlendMode: 0
   outlineBlitDebug: 0
   outlineIndependent: 0
   outlineContourStyle: 0
   outlineMaskMode: 0
+  outlineGradientKnee: 0.4
+  outlineGradientPower: 8
+  padding: 0
+  outlinePixelation: 0
+  outlineStylized: 0
+  outlinePattern: {fileID: 0}
+  outlinePatternScale: 0.3
+  outlinePatternThreshold: 0.3
+  outlinePatternDistortionAmount: 0.5
+  outlinePatternDistortionTexture: {fileID: 0}
+  outlinePatternStopMotionScale: 5
+  outlineDashed: 0
+  outlineDashWidth: 0.5
+  outlineDashGap: 0.3
+  outlineDashSpeed: 2
   glow: 0
   glowWidth: 0.5
-  glowQuality: 1
+  glowQuality: 2
   glowBlurMethod: 0
+  glowHighPrecision: 1
+  glowDistanceScaleBias: 25
   glowDownsampling: 2
   glowHQColor: {r: 0.64, g: 1, b: 0, a: 1}
   glowDithering: 1
@@ -1248,22 +1395,38 @@ MonoBehaviour:
     alpha: 0.4
     color: {r: 0.64, g: 1, b: 0, a: 1}
   glowMaskMode: 0
+  glowPixelation: 0
   innerGlow: 0
   innerGlowWidth: 1
+  innerGlowPower: 1
   innerGlowColor: {r: 1, g: 1, b: 1, a: 1}
   innerGlowBlendMode: 0
   innerGlowVisibility: 0
+  focus: 0
+  focusColor: {r: 0, g: 0, b: 0, a: 0.9412}
+  focusBlur: 0
+  focusBlurDownsampling: 2
+  focusDesaturation: 0
   targetFX: 0
+  targetFXStyle: 0
+  targetFXFrameWidth: 0.1
+  targetFXCornerLength: 0.25
+  targetFXFrameMinOpacity: 0
+  targetFXGroundMinAltitude: -1000
   targetFXTexture: {fileID: 0}
   targetFXColor: {r: 1, g: 1, b: 1, a: 1}
   targetFXCenter: {fileID: 0}
   targetFXRotationSpeed: 50
+  targetFXRotationAngle: 0
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
   targetFXScaleToRenderBounds: 0
   targetFXUseEnclosingBounds: 0
+  targetFXSquare: 1
   targetFXAlignToGround: 0
   targetFXOffset: {x: 0, y: 0, z: 0}
+  targetFxCenterOnHitPosition: 0
+  targetFxAlignToNormal: 0
   targetFXFadePower: 32
   targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
@@ -1273,6 +1436,8 @@ MonoBehaviour:
   targetFXStayDuration: 1.5
   targetFXVisibility: 1
   iconFX: 0
+  iconFXAssetType: 0
+  iconFXPrefab: {fileID: 0}
   iconFXMesh: {fileID: 0}
   iconFXLightColor: {r: 1, g: 1, b: 1, a: 1}
   iconFXDarkColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -1286,6 +1451,28 @@ MonoBehaviour:
   iconFXOffset: {x: 0, y: 1, z: 0}
   iconFXTransitionDuration: 0.5
   iconFXStayDuration: 1.5
+  labelEnabled: 0
+  labelRenderMode: 0
+  labelText: Label
+  labelTextSize: 14
+  labelColor: {r: 1, g: 1, b: 1, a: 1}
+  labelPrefab: {fileID: 7963606135631250497, guid: 933a5612c43104c29af0a700ea5fa149, type: 3}
+  labelViewportOffset: {x: 0, y: 0}
+  labelVerticalOffset: 0
+  labelLineLength: 200
+  labelTarget: {fileID: 0}
+  labelFollowCursor: 1
+  labelMode: 0
+  labelShowInEditorMode: 1
+  labelAlignment: 0
+  labelRelativeAlignment: 0
+  labelAlignmentTransform: {fileID: 0}
+  labelMaxDistance: 250
+  labelFadeStartDistance: 200
+  labelScaleByDistance: 0
+  labelScaleMin: 1
+  labelScaleMax: 1
+  labelWorldSpaceScale: 0.01
   seeThrough: 2
   seeThroughOccluderMask:
     serializedVersion: 2
@@ -1296,6 +1483,7 @@ MonoBehaviour:
   seeThroughOccluderCheckIndividualObjects: 0
   seeThroughDepthOffset: 0
   seeThroughMaxDepth: 0
+  seeThroughFadeRange: 0
   seeThroughIntensity: 0.8
   seeThroughTintAlpha: 0.5
   seeThroughTintColor: {r: 1, g: 0, b: 0, a: 1}
@@ -1312,6 +1500,7 @@ MonoBehaviour:
   rmsCount: 5
   hitFxInitialIntensity: 0
   hitFxMode: 0
+  hitFXTriggerMode: 0
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
@@ -1402,6 +1591,23 @@ MonoBehaviour:
   dialogueChoices: []
   suspectData: {fileID: 0}
   lookTarget: {fileID: 5330771091470271895}
+--- !u!114 &5215549252601529994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d75e3eae046ed124289e7ef81dc150a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JunkItem
+  ShowTopMostFoldoutHeaderGroup: 1
+  itemsThatCanInteractWith:
+  - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
+  interactText: Dispose of Body
+  highlightNameFilter: 
 --- !u!1 &4585279910345806039
 GameObject:
   m_ObjectHideFlags: 0

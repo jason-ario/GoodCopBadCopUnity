@@ -29,7 +29,7 @@ Transform:
   m_GameObject: {fileID: 3643776296483164590}
   serializedVersion: 2
   m_LocalRotation: {x: -1, y: -0, z: -0, w: 0.0000000754979}
-  m_LocalPosition: {x: 0, y: -0.0019, z: 0}
+  m_LocalPosition: {x: 0, y: 0.00013, z: 0}
   m_LocalScale: {x: 1.0363283, y: 1.0363302, z: 1.0363299}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -90,6 +90,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!64 &539626055543193801
 MeshCollider:
@@ -126,6 +127,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
   Interactable: {fileID: 8619794937495301290}
+  ShopItem: {fileID: 0}
 --- !u!1001 &5108440955948853345
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -176,19 +178,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.0000000754979
-      objectReference: {fileID: 0}
-    - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
-      propertyPath: m_LocalRotation.x
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6663731062924620298, guid: 5b878345d24fc91478fb0ffc262dfbc4, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x

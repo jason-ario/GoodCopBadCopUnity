@@ -140,7 +140,7 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
     private void MarkCompleteClientRpc()
     {
         _isComplete = true;
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────
@@ -206,7 +206,7 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
 
     private void OnScrubbedChanged(int previous, int current)
     {
-        GuidebookTaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance.NotifyTaskStateChanged();
     }
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────

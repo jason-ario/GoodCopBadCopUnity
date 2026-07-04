@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Page content object for the Tasks tab.
-/// Reads from GuidebookTaskRegistry — threats can be registered by any system at any time.
+/// Reads from TaskRegistry — threats can be registered by any system at any time.
 /// Rebuilds rows immediately when the registry changes, and refreshes threat levels
 /// each time the tab is opened.
 /// </summary>
@@ -30,12 +30,12 @@ public class GuidebookTaskListContents : GuidebookPageContents
             Debug.LogWarning("[GuidebookTaskListContents] Row container not assigned.");
 
         // Subscribe persistently so we receive registry changes even while the guidebook is closed.
-        GuidebookTaskRegistry.OnTaskListChanged += OnTaskListChangedHandler;
+        TaskRegistry.OnTaskListChanged += OnTaskListChangedHandler;
     }
 
     private void OnDestroy()
     {
-        GuidebookTaskRegistry.OnTaskListChanged -= OnTaskListChangedHandler;
+        TaskRegistry.OnTaskListChanged -= OnTaskListChangedHandler;
     }
 
     private void OnEnable()
@@ -66,7 +66,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
     /// </summary>
     public override void Refresh()
     {
-        if (GuidebookTaskRegistry.Instance == null || GuidebookTaskRegistry.Instance.Threats.Count == 0)
+        if (TaskRegistry.Instance == null || TaskRegistry.Instance.Threats.Count == 0)
         {
             SetFallbackVisible(true);
             TriggerRenderTextureRefresh();
@@ -74,7 +74,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
         }
 
         // If row count is out of sync (e.g. tab was hidden during a registry change), rebuild first.
-        if (_rows.Count != GuidebookTaskRegistry.Instance.Threats.Count)
+        if (_rows.Count != TaskRegistry.Instance.Threats.Count)
             BuildRows();
         else
             RefreshRows();
@@ -86,9 +86,9 @@ public class GuidebookTaskListContents : GuidebookPageContents
     {
         ClearRows();
 
-        if (GuidebookTaskRegistry.Instance == null) return;
+        if (TaskRegistry.Instance == null) return;
 
-        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance.Threats;
+        IReadOnlyList<ISystemicThreat> threats = TaskRegistry.Instance.Threats;
         bool hasThreats = threats.Count > 0;
         SetFallbackVisible(!hasThreats);
 
@@ -112,7 +112,7 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
     private void RefreshRows()
     {
-        IReadOnlyList<ISystemicThreat> threats = GuidebookTaskRegistry.Instance.Threats;
+        IReadOnlyList<ISystemicThreat> threats = TaskRegistry.Instance.Threats;
         SetFallbackVisible(threats.Count == 0);
 
         for (int i = 0; i < _rows.Count; i++)
