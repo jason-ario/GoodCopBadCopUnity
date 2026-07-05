@@ -129,6 +129,8 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
             // Guard on server before the ClientRpc propagates.
             _isComplete = true;
 
+            ATM.Instance?.SpawnCoupons(_couponReward);
+
             if (BetweenShiftTaskManager.Instance != null)
                 BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
 

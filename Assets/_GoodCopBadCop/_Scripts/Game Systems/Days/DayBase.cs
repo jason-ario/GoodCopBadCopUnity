@@ -37,10 +37,6 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("Lock the exit door for the entire shift on this day. Use for tutorial days.")]
     public bool LockDoorDuringShift;
 
-    [Header("Tutorial Steps")]
-    [Tooltip("Tutorial steps fired by CampaignManager when this day activates.")]
-    public List<TutorialStep> TutorialStepsToFire;
-
     [Header("Supply Box Delivery")]
     [Tooltip("When true, a supply box delivery sequence plays at the start of this day.")]
     public bool HasSupplyBoxDelivery;

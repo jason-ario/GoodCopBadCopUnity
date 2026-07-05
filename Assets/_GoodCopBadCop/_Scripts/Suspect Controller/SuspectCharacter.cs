@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using FIMSpace.FLook;
 using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.AI;
 using Random = System.Random;
 
 
@@ -54,6 +56,113 @@ public class SuspectCharacter : Interactable
     [SerializeField] private Transform handSpawnPos;
 
     #endregion
+
+    [Header("Cameras")]
+    [Tooltip("Per-character wide-shot camera used during dialogue. When assigned, this overrides the shared " +
+             "scene-level 'At Booth Cam' for this specific character. Assign a child CinemachineCamera GameObject.")]
+    [SerializeField] private GameObject _suspectCam;
+
+    [Tooltip("Per-character close face camera. Referenced by the 'SuspectFaceCam' trigger key in " +
+             "ScriptedDialogueRunner. Assign a child CinemachineCamera GameObject.")]
+    [SerializeField] private GameObject _suspectFaceCam;
+
+    /// <summary>Per-character wide-shot camera, or null to fall back to the shared scene-level suspect cam.</summary>
+    public GameObject SuspectCam => _suspectCam;
+
+    /// <summary>Per-character close face camera. Use camera trigger key 'SuspectFaceCam' in ScriptedDialogueNode.</summary>
+    public GameObject SuspectFaceCam => _suspectFaceCam;
+
+    // ── Navigation ────────────────────────────────────────────────────────────────────────────
+
+    [Header("Navigation")]
+    [Tooltip("Movement speed passed to the NavMeshAgent. Match to the walk animation speed.")]
+    [SerializeField] private float _walkSpeed = 1.5f;
+
+    [Tooltip("Rotation speed (degrees/second) while the NavMeshAgent is moving.")]
+    [SerializeField] private float _angularSpeed = 240f;
+
+    [Tooltip("Distance from the destination at which the agent is considered to have arrived.")]
+    [SerializeField] private float _stoppingDistance = 0.1f;
+
+    private NavMeshAgent _navAgent;
+    private Coroutine _navMoveCoroutine;
+
+    /// <summary>The cached NavMeshAgent, or null if no agent is attached.</summary>
+    public NavMeshAgent NavAgent => _navAgent;
+
+    /// <summary>
+    /// Enables and configures the NavMeshAgent. Must be called server-side after the character
+    /// spawns or is placed in the scene. No-op when no NavMeshAgent component is present.
+    /// </summary>
+    public void InitNavigation()
+    {
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent == null) return;
+
+        _navAgent.speed = _walkSpeed;
+        _navAgent.angularSpeed = _angularSpeed;
+        _navAgent.stoppingDistance = _stoppingDistance;
+        _navAgent.updateRotation = false; // Manual rotation when stationary; enabled during NavigateTo.
+        _navAgent.enabled = true;
+    }
+
+    /// <summary>
+    /// Sets the NavMeshAgent destination and invokes <paramref name="onArrived"/> once the agent
+    /// stops within <see cref="_stoppingDistance"/> of the target. Server-side only.
+    /// Cancels any in-progress navigation before starting the new path.
+    /// </summary>
+    /// <param name="destination">World-space destination.</param>
+    /// <param name="onArrived">Optional callback invoked on arrival.</param>
+    public void NavigateTo(Vector3 destination, Action onArrived = null)
+    {
+        if (_navAgent == null || !_navAgent.enabled)
+        {
+            Debug.LogWarning($"[SuspectCharacter] NavigateTo called on '{name}' but NavMeshAgent is not available.");
+            onArrived?.Invoke();
+            return;
+        }
+
+        if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
+        _navMoveCoroutine = StartCoroutine(NavMoveCoroutine(destination, onArrived));
+    }
+
+    /// <summary>Stops the current navigation immediately.</summary>
+    public void StopNavigation()
+    {
+        if (_navMoveCoroutine != null)
+        {
+            StopCoroutine(_navMoveCoroutine);
+            _navMoveCoroutine = null;
+        }
+
+        if (_navAgent != null && _navAgent.enabled && _navAgent.isOnNavMesh)
+        {
+            _navAgent.isStopped = true;
+            _navAgent.updateRotation = false;
+        }
+    }
+
+    private IEnumerator NavMoveCoroutine(Vector3 destination, Action onArrived)
+    {
+        _navAgent.updateRotation = true;
+        _navAgent.isStopped = false;
+        _navAgent.SetDestination(destination);
+
+        // Wait one frame for pathfinding to initialise.
+        yield return null;
+
+        while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
+            yield return null;
+
+        if (_navAgent.enabled && _navAgent.isOnNavMesh)
+        {
+            _navAgent.isStopped = true;
+            _navAgent.updateRotation = false;
+        }
+
+        _navMoveCoroutine = null;
+        onArrived?.Invoke();
+    }
 
     private bool _facingPlayer;
 
@@ -124,6 +233,11 @@ public class SuspectCharacter : Interactable
         _health = maxHealth;
 
         _junkItem = GetComponent<JunkItem>();
+
+        // Cache and disable NavMeshAgent by default; server enables it via InitNavigation().
+        _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent != null)
+            _navAgent.enabled = false;
     }
 
     /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>

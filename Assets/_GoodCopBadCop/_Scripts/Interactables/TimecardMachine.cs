@@ -22,11 +22,6 @@ public class TimecardMachine : Interactable
     [Tooltip("Fanfare clip played when the timecard machine is primed for clock-out.")]
     [SerializeField] private AudioClip _fanfareClip;
 
-    [Header("Door")]
-    [Tooltip("Optional door to open on all clients when the player punches the timecard. " +
-             "When assigned, the door swings open as part of the clock-out interaction.")]
-    [SerializeField] private BunkerDoorController _doorToOpen;
-
     /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift.</summary>
     [SerializeField] private float _punchToReportDelay = 1.5f;
 
@@ -128,8 +123,6 @@ public class TimecardMachine : Interactable
 
         if (_animator != null)
             _animator.SetTrigger(PunchTrigger);
-
-        _doorToOpen?.Open();
     }
 
     /// <summary>Sets the 'Ready' bool on the small light animator to drive the blink animation.</summary>

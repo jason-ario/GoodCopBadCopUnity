@@ -49,6 +49,15 @@ public class DoorController : Interactable, IMutantPassable, IHeldItemPassthroug
     [Tooltip("Sound played when a mutant bangs on this door. Falls back to the locked-door shake clip if unassigned.")]
     [SerializeField] private AudioClip _mutantBangClip;
 
+    [Header("Suspect Interaction")]
+    [Tooltip("When enabled, the door automatically opens when a suspect's collider enters the trigger radius.")]
+    [SerializeField] private bool _autoOpenForSuspects = true;
+
+    [Tooltip("Distance (world units) within which a nearby suspect triggers an automatic door open.")]
+    [SerializeField] private float _suspectOpenRadius = 0.5f;
+
+    private static readonly Collider[] _suspectOverlapBuffer = new Collider[4];
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -66,6 +75,23 @@ public class DoorController : Interactable, IMutantPassable, IHeldItemPassthroug
         // Sync visual state on late join
         ApplyDoorVisuals(_doorOpen.Value, _openedIn.Value);
         ApplyLockedVisuals(_isLocked.Value);
+    }
+
+    private void Update()
+    {
+        if (!_autoOpenForSuspects) return;
+        if (_doorOpen.Value || _isLocked.Value) return;
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        int count = Physics.OverlapSphereNonAlloc(transform.position, _suspectOpenRadius, _suspectOverlapBuffer);
+        for (int i = 0; i < count; i++)
+        {
+            if (_suspectOverlapBuffer[i] != null && _suspectOverlapBuffer[i].TryGetComponent<SuspectCharacter>(out _))
+            {
+                ForceOpen();
+                return;
+            }
+        }
     }
 
     public override void OnNetworkDespawn()

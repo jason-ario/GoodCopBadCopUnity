@@ -255,6 +255,16 @@ public class Day_01 : DayBase
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete += OnSuspectFirstEncounterComplete;
 
+        // Subscribe to TutorialTaskSync events so all task transitions broadcast to every client.
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        += OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients += OnIvanTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients        += OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients               += OnExamPageFiledSync;
+
+        // Reset server-side tutorial counters when the day starts.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            TutorialTaskSync.Instance?.ResetServerState();
+
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced += OnFolderPlacedOnDesk;
 
@@ -308,9 +318,14 @@ public class Day_01 : DayBase
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
         FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
-        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
+        ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
+
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        -= OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients        -= OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients               -= OnExamPageFiledSync;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -354,9 +369,14 @@ public class Day_01 : DayBase
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
         FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
-        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
+        ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
+
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        -= OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients        -= OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients               -= OnExamPageFiledSync;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -561,12 +581,12 @@ public class Day_01 : DayBase
 
     private void OnVladDocumentPickedUp()
     {
-        _docsPickedUp++;
-        if (_docsPickedUp < 2) return;
+        // Report every pickup to the server so it can count globally across all clients.
+        TutorialTaskSync.Instance?.ReportVladDocPickedUpServerRpc();
 
-        // Both documents in hand — clean up listeners, trigger next step.
-        UnsubscribeDocumentPickupEvents();
-        StartCoroutine(VladFolderBarkRoutine());
+        _docsPickedUp++;
+        if (_docsPickedUp >= 2)
+            UnsubscribeDocumentPickupEvents();
     }
 
     private IEnumerator VladFolderBarkRoutine()
@@ -576,13 +596,6 @@ public class Day_01 : DayBase
         SuspectCharacter vlad = SuspectController.Instance?.CurrentSuspect;
         if (vlad?.Speaking != null && !string.IsNullOrEmpty(_vladFolderBark))
             vlad.Speaking.Say(_vladFolderBark);
-
-        // Swap task 1 → task 2 locally (only the player who picked up both docs needs this).
-        if (_taskPickUp != null)
-            TaskRegistry.Instance.RemoveThreat(_taskPickUp);
-
-        _taskFile = new TutorialTask(_taskFileDocs);
-        TaskRegistry.Instance.AddThreat(_taskFile);
     }
 
     private void UnsubscribeDocumentPickupEvents()
@@ -657,21 +670,11 @@ public class Day_01 : DayBase
     /// </summary>
     private void StartIvanDocumentationTutorial()
     {
-        // Single-fire — remove all triggers immediately.
+        // Single-fire — remove all triggers immediately on this client.
         UnsubscribeIvanDocumentPickupEvents();
 
-        // Task 1: shown on all clients right away.
-        _taskGetChecklist = new TutorialTask(_taskGetChecklistText);
-        TaskRegistry.Instance.AddThreat(_taskGetChecklist);
-
-        // Subscribe completion handlers on all clients.
-        ExamNotebook.AnyExamNotebookPickedUp = false;
-        ExamNotebook.OnAnyExamNotebookPickedUp += OnIvanExamPickedUp;
-        ExamNotebook.AnyPageFiled = false;
-        ExamNotebook.OnAnyNotebookPageFiled += OnIvanPageFiled;
-
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            StartCoroutine(IvanDocumentationBarkRoutine());
+        // Notify the server; it will broadcast the task start to all clients exactly once.
+        TutorialTaskSync.Instance?.ReportIvanTutorialTriggerServerRpc();
     }
 
     // Parameterless adapter — used by PickableObject.OnPickedUpEvent.
@@ -681,36 +684,21 @@ public class Day_01 : DayBase
     private void OnIvanPickupTrigger(FolderController _) => StartIvanDocumentationTutorial();
 
     /// <summary>
-    /// Fires on all clients when the player picks up any exam notebook.
-    /// Completes the "get checklist" task and activates the "check anomalies" task.
+    /// Fires on the local client when they pick up an exam notebook during the tutorial.
+    /// Reports to the server; <see cref="TutorialTaskSync"/> broadcasts the task swap to all clients.
     /// </summary>
-    private void OnIvanExamPickedUp()
+    private void OnIvanExamPickedUpLocal()
     {
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUp;
-
-        if (_taskGetChecklist != null)
-        {
-            TaskRegistry.Instance.RemoveThreat(_taskGetChecklist);
-            _taskGetChecklist = null;
-        }
-
-        _taskCheckDocumentation = new TutorialTask(_taskCheckDocumentationText);
-        TaskRegistry.Instance.AddThreat(_taskCheckDocumentation);
+        TutorialTaskSync.Instance?.ReportExamPickedUpServerRpc();
     }
 
     /// <summary>
-    /// Fires on all clients when any exam notebook page is filed into a folder.
-    /// Completes the "check anomalies" task.
+    /// Fires on the local client when an exam notebook page is filed during the tutorial.
+    /// Reports to the server; <see cref="TutorialTaskSync"/> broadcasts the task removal to all clients.
     /// </summary>
-    private void OnIvanPageFiled()
+    private void OnIvanPageFiledLocal()
     {
-        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiled;
-
-        if (_taskCheckDocumentation != null)
-        {
-            TaskRegistry.Instance.RemoveThreat(_taskCheckDocumentation);
-            _taskCheckDocumentation = null;
-        }
+        TutorialTaskSync.Instance?.ReportExamPageFiledServerRpc();
     }
 
     /// <summary>
@@ -762,6 +750,90 @@ public class Day_01 : DayBase
         else
         {
             Debug.LogWarning("[Day_01] _ivanMegaphonePart2 is not assigned — skipping second megaphone sequence.");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Tutorial task sync callbacks — fire on ALL clients via TutorialTaskSync RPCs
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients once the server confirms both Vlad documents were picked up.
+    /// Swaps the "pick up" task to the "file documents" task and starts the folder bark
+    /// on the server so it plays exactly once.
+    /// </summary>
+    private void OnVladDocsBothPickedUpSync()
+    {
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients -= OnVladDocsBothPickedUpSync;
+
+        if (_taskPickUp != null)
+            TaskRegistry.Instance.RemoveThreat(_taskPickUp);
+
+        _taskFile = new TutorialTask(_taskFileDocs);
+        TaskRegistry.Instance.AddThreat(_taskFile);
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            StartCoroutine(VladFolderBarkRoutine());
+    }
+
+    /// <summary>
+    /// Fires on all clients when the Ivan documentation tutorial begins.
+    /// Adds the checklist task, wires exam pickup/filed events locally, and starts
+    /// the megaphone bark routine on the server.
+    /// </summary>
+    private void OnIvanTutorialStartedSync()
+    {
+        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
+
+        // Clean up any remaining Ivan document pickup subscriptions on all clients.
+        UnsubscribeIvanDocumentPickupEvents();
+
+        _taskGetChecklist = new TutorialTask(_taskGetChecklistText);
+        TaskRegistry.Instance.AddThreat(_taskGetChecklist);
+
+        // Reset flags and subscribe completion handlers on every client so whoever
+        // interacts next reports back via TutorialTaskSync RPCs.
+        ExamNotebook.AnyExamNotebookPickedUp = false;
+        ExamNotebook.OnAnyExamNotebookPickedUp += OnIvanExamPickedUpLocal;
+        ExamNotebook.AnyPageFiled = false;
+        ExamNotebook.OnAnyNotebookPageFiled += OnIvanPageFiledLocal;
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            StartCoroutine(IvanDocumentationBarkRoutine());
+    }
+
+    /// <summary>
+    /// Fires on all clients when any player picks up an exam notebook during the tutorial.
+    /// Swaps the "get checklist" task to the "check anomalies" task.
+    /// </summary>
+    private void OnExamPickedUpSync()
+    {
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients -= OnExamPickedUpSync;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
+
+        if (_taskGetChecklist != null)
+        {
+            TaskRegistry.Instance.RemoveThreat(_taskGetChecklist);
+            _taskGetChecklist = null;
+        }
+
+        _taskCheckDocumentation = new TutorialTask(_taskCheckDocumentationText);
+        TaskRegistry.Instance.AddThreat(_taskCheckDocumentation);
+    }
+
+    /// <summary>
+    /// Fires on all clients when any exam notebook page is filed during the tutorial.
+    /// Removes the "check anomalies" task.
+    /// </summary>
+    private void OnExamPageFiledSync()
+    {
+        TutorialTaskSync.OnExamPageFiledAllClients -= OnExamPageFiledSync;
+        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiledLocal;
+
+        if (_taskCheckDocumentation != null)
+        {
+            TaskRegistry.Instance.RemoveThreat(_taskCheckDocumentation);
+            _taskCheckDocumentation = null;
         }
     }
 

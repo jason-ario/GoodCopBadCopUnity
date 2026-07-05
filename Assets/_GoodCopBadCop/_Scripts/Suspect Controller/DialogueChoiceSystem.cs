@@ -30,6 +30,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
     // Callback set by ShowScriptedChoices — routes the player's pick to ScriptedDialogueRunner.
     private Action<int> _scriptedChoiceCallback;
 
+    // True after the local player has submitted their scripted choice — prevents re-picks
+    // while waiting for the other player to choose.
+    private bool _localChoiceLocked;
+
+    // Cached player body mesh root — hidden while in dialogue mode, restored on exit.
+    private GameObject _playerBody;
+
+    // Cached player arms — hidden while in dialogue mode, restored on exit.
+    private GameObject _playerArms;
+
     /// <summary>
     /// Matches the delay in <see cref="NPCRespondToDialogueChoice"/> so the choice panel
     /// re-appears the exact moment the NPC begins their response.
@@ -73,6 +83,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         UIController.Instance.ShowCursor();
 
+        HidePlayerBody();
+
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
     }
@@ -95,6 +107,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
         var player = PlayerInstance.Instance;
         player.GetComponent<PlayerMovementController>().SetCanControl(true);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
+
+        ShowPlayerBody();
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(false);
@@ -133,6 +147,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (lookTarget != null)
             player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
+        HidePlayerBody();
+
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
 
@@ -151,6 +167,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void ShowScriptedChoices(string[] choiceTexts, Action<int> onChosen)
     {
         _scriptedChoiceCallback = onChosen;
+        _localChoiceLocked = false;
+        ResetChoiceHighlights();
         InitializeChoices(choiceTexts);
         dialogueChoiceContainer.SetActive(true);
     }
@@ -160,6 +178,24 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         dialogueChoiceContainer.SetActive(false);
         _scriptedChoiceCallback = null;
+        _localChoiceLocked = false;
+    }
+
+    /// <summary>
+    /// Highlights the choice at <paramref name="choiceIndex"/> with the "pending pick" visual.
+    /// Safe to call on already-highlighted choices.
+    /// </summary>
+    public void HighlightChoice(int choiceIndex)
+    {
+        if (choiceIndex >= 0 && choiceIndex < dialogueChoices.Length)
+            dialogueChoices[choiceIndex].SetPickedState(true);
+    }
+
+    /// <summary>Clears all pending-pick highlights on every choice button.</summary>
+    public void ResetChoiceHighlights()
+    {
+        foreach (var choice in dialogueChoices)
+            choice.SetPickedState(false);
     }
 
     private void InitializeChoices(string[] choices)
@@ -175,19 +211,20 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     public void ChooseDialogueChoice(int choiceIndex)
     {
-        // Scripted path: hide choices and hand off to ScriptedDialogueRunner's callback.
+        // Scripted path: highlight the pick and hand off to ScriptedDialogueRunner.
+        // Do NOT hide the panel — both players must choose before the sequence continues.
         if (_scriptedChoiceCallback != null)
         {
-            dialogueChoiceContainer.SetActive(false);
+            _localChoiceLocked = true;
             var callback = _scriptedChoiceCallback;
-            _scriptedChoiceCallback = null;
+            _scriptedChoiceCallback = null; // prevent re-pick from this client
             OnLocalPlayerSpoke?.Invoke();
             callback.Invoke(choiceIndex);
             return;
         }
 
-        // Original interactive-dialogue path.
-        // Hide the panel but stay in dialogue mode — it will re-appear once the NPC starts responding.
+        // If scripted mode is still active but this player already picked, ignore the click.
+        if (ScriptedDialogueRunner.IsScriptedModeActive) return;
         dialogueChoiceContainer.SetActive(false);
         OnLocalPlayerSpoke?.Invoke();
 
@@ -271,6 +308,42 @@ public class DialogueChoiceSystem : NetworkBehaviour
             return Steamworks.SteamClient.Name;
 
         return $"Player {Unity.Netcode.NetworkManager.Singleton.LocalClientId}";
+    }
+
+    // ─── Body mesh helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Hides the local player's body mesh root ("Art" child) while in dialogue mode
+    /// so it does not clip into the suspect camera view.
+    /// </summary>
+    private void HidePlayerBody()
+    {
+        if (PlayerInstance.Instance == null) return;
+        _playerBody = PlayerInstance.Instance.transform.Find("Art")?.gameObject;
+        if (_playerBody != null)
+            _playerBody.SetActive(false);
+
+        _playerArms = PlayerInstance.Instance.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
+        if (_playerArms != null)
+            _playerArms.SetActive(false);
+    }
+
+    /// <summary>
+    /// Restores the local player's body mesh root after dialogue mode ends.
+    /// </summary>
+    private void ShowPlayerBody()
+    {
+        if (_playerBody != null)
+        {
+            _playerBody.SetActive(true);
+            _playerBody = null;
+        }
+
+        if (_playerArms != null)
+        {
+            _playerArms.SetActive(true);
+            _playerArms = null;
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]

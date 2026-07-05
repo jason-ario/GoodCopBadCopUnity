@@ -173,6 +173,8 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
             _isComplete = true;
             IsTaskActive = false;
 
+            ATM.Instance?.SpawnCoupons(_couponReward);
+
             if (BetweenShiftTaskManager.Instance != null)
                 BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
 

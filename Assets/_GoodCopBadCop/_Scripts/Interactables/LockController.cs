@@ -109,6 +109,24 @@ public class LockController : Interactable
         UnlockServerRpc(item.NetworkObject);
     }
 
+    /// <summary>
+    /// Unlocks the padlock without requiring a physical key — intended for scripted sequences
+    /// (e.g. Vlad's Day 2 demo walk). Persists the unlock to save data when a lock ID is set.
+    /// Must be called on the server.
+    /// </summary>
+    public void ForceUnlock()
+    {
+        if (!IsServer) return;
+        if (!_isLocked.Value) return;
+
+        if (!string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
+            SaveDataManager.Instance.SaveUnlockedLock(_lockId);
+
+        _isLocked.Value = false;
+        _lockable?.Unlock();
+        Debug.Log($"[LockController] ForceUnlock — lock '{_lockId}' unlocked by scripted sequence.");
+    }
+
     // ── Server RPCs ───────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
@@ -205,7 +223,8 @@ public class LockController : Interactable
     private IEnumerator UnlockSequenceCoroutine()
     {
         yield return new WaitForSeconds(_physicsActivationDelay);
-
+        lockAnimator.enabled = false;
+        
         foreach (var rb in GetComponentsInChildren<Rigidbody>())
             rb.isKinematic = false;
 

@@ -475,10 +475,11 @@ public class SuspectController : NetworkBehaviour
         _activeStandPos = NextSuspectStandPosOverride != null ? NextSuspectStandPosOverride : standPos;
         NextSuspectStandPosOverride = null;
 
+        // Enable NavMeshAgent for this suspect now that we are server-side and about to move.
+        suspectCharacter.InitNavigation();
+
         suspectCharacter.animator.SetBool("Walking", true);
-        suspectCharacter.transform
-            .DOMove(_activeStandPos.position + suspectCharacter.standPosOffset, 3f)
-            .OnComplete(ArrivedAtPosition);
+        suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 
         // Notify all clients so they can show the booth-waiting notification if needed.
         NotifySuspectArrivingClientRpc();
@@ -685,20 +686,22 @@ public class SuspectController : NetworkBehaviour
         if (!active && DialogueChoiceSystem.IsInDialogueMode)
             return;
 
+        var cam = GetActiveSuspectCam();
+
         if (active)
         {
             // Only show the suspect cam sequence for players currently in the booth.
             if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
                 return;
 
-            suspectCam?.SetActive(true);
+            cam?.SetActive(true);
             PlayerTutorialUI.Instance?.ShowBarsOnly(SuspectCamDuration);
             PlayerInstance.Instance.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
         }
         else
         {
             // Always clean up cam and bars — player may have moved outside during the sequence.
-            suspectCam?.SetActive(false);
+            cam?.SetActive(false);
             PlayerTutorialUI.Instance?.Dismiss();
 
             // Restore player-specific state only if still a valid local in-booth player.
@@ -710,15 +713,54 @@ public class SuspectController : NetworkBehaviour
     /// <summary>
     /// Activates or deactivates the suspect cam for the local client.
     /// Called by <see cref="DialogueChoiceSystem"/> when entering or exiting dialogue mode.
+    /// Resolves the camera in priority order:
+    /// 1. Per-speaker cam from <see cref="ScriptedDialogueRunner.CurrentSpeakerNetId"/> (world NPCs).
+    /// 2. Per-booth-suspect cam from <see cref="suspectCharacter"/> (booth window suspects).
+    /// 3. Shared scene-level <see cref="suspectCam"/>.
     /// </summary>
     public void SetSuspectCamActive(bool active)
     {
-        if (suspectCam != null)
-            suspectCam.SetActive(active);
+        GameObject cam = ResolveCurrentDialogueSpeakerCam();
+        if (cam != null)
+            cam.SetActive(active);
 
         if (!active)
             PlayerTutorialUI.Instance?.Dismiss();
     }
+
+    /// <summary>
+    /// Resolves which suspect-cam to activate for the current dialogue session.
+    /// Checks the scripted dialogue runner's current speaker first so world-NPC sequences
+    /// (e.g. Vlad's Day 2 tour) use that character's per-prefab camera rather than the
+    /// shared scene-level booth cam.
+    /// </summary>
+    private GameObject ResolveCurrentDialogueSpeakerCam()
+    {
+        // 1. Per-speaker cam from the active ScriptedDialogueRunner session.
+        if (ScriptedDialogueRunner.Instance != null)
+        {
+            ulong speakerId = ScriptedDialogueRunner.Instance.CurrentSpeakerNetId;
+            if (speakerId != 0 &&
+                NetworkManager.Singleton?.SpawnManager?.SpawnedObjects
+                    .TryGetValue(speakerId, out var netObj) == true)
+            {
+                var speakerChar = netObj.GetComponent<SuspectCharacter>();
+                if (speakerChar?.SuspectCam != null)
+                    return speakerChar.SuspectCam;
+            }
+        }
+
+        // 2. Current booth suspect's own cam.
+        if (suspectCharacter?.SuspectCam != null)
+            return suspectCharacter.SuspectCam;
+
+        // 3. Shared scene-level cam.
+        return suspectCam;
+    }
+
+    /// <summary>Returns the best available suspect cam for the current booth suspect (no dialogue context).</summary>
+    private GameObject GetActiveSuspectCam()
+        => (suspectCharacter?.SuspectCam != null) ? suspectCharacter.SuspectCam : suspectCam;
 
     public void SpawnPaperwork()
     {
@@ -882,8 +924,9 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(0.5f);
 
         thisCharacter.animator.SetBool("Walking", true);
-        thisCharacter.transform.DOMove(gatePos.position, 4f);
-        yield return new WaitForSeconds(4f);
+        bool gateArrived = false;
+        thisCharacter.NavigateTo(gatePos.position, () => gateArrived = true);
+        yield return new WaitUntil(() => gateArrived);
         thisCharacter.animator.SetBool("Walking", false);
 
         if (IsServer)
@@ -895,7 +938,7 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(2f);
 
         thisCharacter.animator.SetBool("Walking", true);
-        thisCharacter.transform.DOMove(despawnPos.position, 10f).OnComplete(() =>
+        thisCharacter.NavigateTo(despawnPos.position, () =>
         {
             if (IsServer) DespawnSuspect(thisCharacter);
         });

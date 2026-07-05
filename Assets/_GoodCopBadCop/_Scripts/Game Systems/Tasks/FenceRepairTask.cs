@@ -165,6 +165,8 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
         // All broken fences have been repaired — complete the task.
         _isComplete = true;
 
+        ATM.Instance?.SpawnCoupons(_couponReward);
+
         if (BetweenShiftTaskManager.Instance != null)
             BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
 

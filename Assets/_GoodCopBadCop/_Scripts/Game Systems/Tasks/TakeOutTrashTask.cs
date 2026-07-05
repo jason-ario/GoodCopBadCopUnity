@@ -30,6 +30,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
     [Header("Threat Properties")]
     [SerializeField] private string _threatName = "Take out trash";
     [SerializeField] private float _scoreWeight = 1f;
+    [Tooltip("Number of coupons the ATM dispenses when all trash has been deposited.")]
+    [SerializeField] private int _couponReward = 10;
 
     [Header("Spawning")]
     [Tooltip("Minimum number of trash items to spawn when TriggerTask is called (inclusive).")]
@@ -69,6 +71,16 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
     /// <summary>Running count of junk items deposited in the dumpster this task run.</summary>
     private readonly NetworkVariable<int> _depositedCount = new(
         0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Whether this task is currently active and should appear in the HUD task list.
+    /// Drives TaskRegistry registration on all clients — including late joiners —
+    /// without requiring one-shot ClientRpc calls.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isActive = new(
+        false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
@@ -112,6 +124,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         // must not update the task display, only depositing in the dumpster should.
         _depositedCount.OnValueChanged += OnNetworkValueChanged;
         _totalCount.OnValueChanged     += OnNetworkValueChanged;
+        _isActive.OnValueChanged       += OnIsActiveChanged;
+
+        // Handle the initial value for late-joining clients: if the task was already
+        // active before this client connected, register it in TaskRegistry immediately.
+        if (_isActive.Value)
+            TaskRegistry.Instance?.AddThreat(this);
     }
 
     public override void OnNetworkDespawn()
@@ -119,12 +137,26 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         base.OnNetworkDespawn();
         _depositedCount.OnValueChanged -= OnNetworkValueChanged;
         _totalCount.OnValueChanged     -= OnNetworkValueChanged;
+        _isActive.OnValueChanged       -= OnIsActiveChanged;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
     }
 
     private void OnNetworkValueChanged<T>(T previous, T current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+    }
+
+    /// <summary>
+    /// Fires on all clients when <see cref="_isActive"/> changes.
+    /// Adds or removes this task from <see cref="TaskRegistry"/> so every client's HUD
+    /// stays in sync without relying on one-shot ClientRpc calls.
+    /// </summary>
+    private void OnIsActiveChanged(bool previous, bool current)
+    {
+        if (current)
+            TaskRegistry.Instance?.AddThreat(this);
+        else
+            TaskRegistry.Instance?.RemoveThreat(this);
     }
 
     private void OnDestroy()
@@ -190,18 +222,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         JunkItem.OnAnyJunkItemCollected          += OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited += OnTrashBagDeposited;
 
+        // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
+        // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
+        _isActive.Value = true;
+
         Debug.Log($"[TakeOutTrashTask] Task triggered — spawned {_spawnedItems.Count}, " +
                   $"pre-existing {preExistingCount}, total {_totalCount.Value}.");
-
-        RegisterInTaskRegistryClientRpc();
-    }
-
-    /// <summary>Adds this task to <see cref="TaskRegistry"/> on every client so it appears in the HUD.</summary>
-    [ClientRpc]
-    private void RegisterInTaskRegistryClientRpc()
-    {
-        TaskRegistry.Instance.AddThreat(this);
-        Debug.Log("[TakeOutTrashTask] Registered in TaskRegistry.");
     }
 
     // ── Private ────────────────────────────────────────────────────────────────
@@ -226,16 +252,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
 
         Debug.Log("[TakeOutTrashTask] All items deposited — task complete.");
+        ATM.Instance?.SpawnCoupons(_couponReward);
         OnAllItemsDeposited?.Invoke();
-        RemoveFromRegistryClientRpc();
-    }
 
-    /// <summary>Removes this task from the HUD task list on all clients.</summary>
-    [ClientRpc]
-    private void RemoveFromRegistryClientRpc()
-    {
-        TaskRegistry.Instance?.RemoveThreat(this);
-        Debug.Log("[TakeOutTrashTask] Removed from TaskRegistry.");
+        // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
+        _isActive.Value = false;
     }
 
     private void OnJunkItemCollected()

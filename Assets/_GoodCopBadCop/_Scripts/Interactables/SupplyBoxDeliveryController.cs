@@ -1,20 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
-using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Server-authoritative manager for the supply box delivery sequence.
+/// Server-authoritative manager for the supply box delivery.
 ///
-/// Place this on its own GameObject with a <see cref="NetworkObject"/> component, following
-/// the same pattern as <see cref="DailyPickupSpawnManager"/>. Each delivery day it:
+/// When the day starts it:
 ///   1. Despawns any box and items left over from the previous day.
 ///   2. Spawns a fresh <see cref="SupplyBox"/> instance at <see cref="_spawnPoint"/>.
 ///   3. Spawns the day's configured item prefabs as NetworkObject children of the box contents.
-///   4. Fires <see cref="TriggerDeliveryDoorClientRpc"/> so the door opens on all clients.
-///   5. DOTween-moves the box through <see cref="_waypoints"/> (A → B → C).
-///   6. Unlocks the box and its contents for normal pickup once the sequence ends.
+///   4. Immediately unlocks the box and its contents for pickup.
 /// </summary>
 public class SupplyBoxDeliveryController : NetworkBehaviour
 {
@@ -23,46 +19,25 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     [SerializeField] private GameObject _supplyBoxPrefab;
 
     [Header("Scene References")]
-    [Tooltip("Animator on the Delivery Door child of the Door prefab.")]
-    [SerializeField] private Animator _deliveryDoorAnimator;
-
-    [Tooltip("Transform where the supply box first appears, outside the delivery door.")]
+    [Tooltip("Transform where the supply box spawns at the start of the day.")]
     [SerializeField] private Transform _spawnPoint;
 
-    [Header("Waypoints (A → B → C)")]
-    [Tooltip("The box moves through these transforms in order after the door opens.")]
-    [SerializeField] private Transform[] _waypoints;
-
-    [Header("Audio")]
-    [Tooltip("AudioSource on the Delivery Door that plays the knocking sound before the door opens.")]
-    [SerializeField] private AudioSource _knockingAudioSource;
-
-    [Tooltip("AudioSource on the Delivery Door that plays when the box is delivered.")]
-    [SerializeField] private AudioSource _deliveryAudioSource;
-
     [Header("Timing")]
-    [Tooltip("Seconds to wait after the day officially starts before beginning the delivery sequence.")]
+    [Tooltip("Seconds to wait after the day officially starts before spawning the supply box.")]
     [SerializeField] private float _startDelay = 3f;
 
-    [Tooltip("Seconds to wait after the knocking sound before spawning the box and opening the door.")]
-    [SerializeField] private float _knockingDelay = 2f;
-
-    [Tooltip("Seconds to wait after triggering openDoor before the box starts moving.")]
-    [SerializeField] private float _doorOpenDelay = 1.5f;
-
-    [Tooltip("Seconds to travel between each consecutive waypoint.")]
-    [SerializeField] private float _segmentDuration = 2f;
-
-    [Tooltip("Easing applied to each movement segment.")]
-    [SerializeField] private Ease _moveEase = Ease.InOutSine;
-
     // ── Private State ─────────────────────────────────────────────────────────
-
-    private static readonly int OpenDoorTrigger = Animator.StringToHash("openDoor");
 
     private NetworkObject _activeBoxNetObj;
     private SupplyBox _activeBox;
     private readonly List<NetworkObject> _spawnedItems = new List<NetworkObject>();
+
+    /// <summary>
+    /// Optional one-time spawn point override. When set before <see cref="OnDayStart"/> fires,
+    /// the next delivery places the box at this transform instead of <see cref="_spawnPoint"/>.
+    /// Consumed and reset to null automatically after use.
+    /// </summary>
+    public Transform SpawnPointOverride { get; set; }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -75,7 +50,7 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
         if (ShiftManager.Instance != null)
         {
             ShiftManager.Instance.OnDayStart += OnDayStart;
-            Debug.Log($"[SupplyBoxDeliveryController] Subscribed to ShiftManager.OnDayStart on server. Animator assigned: {_deliveryDoorAnimator != null}", this);
+            Debug.Log("[SupplyBoxDeliveryController] Subscribed to ShiftManager.OnDayStart on server.", this);
         }
         else
         {
@@ -95,18 +70,14 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
     private void OnDayStart()
     {
-        StartCoroutine(StartDeliverySequenceWithDelay());
+        StartCoroutine(SpawnOnDayStart());
     }
 
-    private IEnumerator StartDeliverySequenceWithDelay()
+    private IEnumerator SpawnOnDayStart()
     {
-        Debug.Log($"[SupplyBoxDeliveryController] Day started. Waiting {_startDelay}s before delivery...", this);
-        
         if (_startDelay > 0)
             yield return new WaitForSeconds(_startDelay);
 
-        Debug.Log($"[SupplyBoxDeliveryController] Beginning delivery sequence. ActiveDay: {(CampaignManager.Instance?.ActiveDay != null ? CampaignManager.Instance.ActiveDay.DayNumber.ToString() : "null")}", this);
-        
         DespawnPreviousDelivery();
 
         DayBase day = CampaignManager.Instance?.ActiveDay;
@@ -122,20 +93,9 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             yield break;
         }
 
-        // Play the knocking sound on all clients, then wait before the door opens.
-        if (_knockingAudioSource != null)
-            PlayKnockingAudioClientRpc();
-
-        if (_knockingDelay > 0)
-            yield return new WaitForSeconds(_knockingDelay);
-
-        // Play delivery sound on the door's AudioSource across all clients.
-        if (_deliveryAudioSource != null)
-            PlayDeliveryAudioClientRpc();
-
         SpawnSupplyBox();
         SpawnItems(day.SupplyBoxItemPrefabs);
-        StartCoroutine(RunDeliverySequence());
+        FinalizeDelivery();
     }
 
     // ── Spawning ──────────────────────────────────────────────────────────────
@@ -148,13 +108,17 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             return;
         }
 
-        if (_spawnPoint == null)
+        // Use the one-time override if set, otherwise fall back to the default spawn point.
+        Transform spawnTransform = SpawnPointOverride != null ? SpawnPointOverride : _spawnPoint;
+        SpawnPointOverride = null;
+
+        if (spawnTransform == null)
         {
-            Debug.LogError("[SupplyBoxDeliveryController] _spawnPoint is not assigned.", this);
+            Debug.LogError("[SupplyBoxDeliveryController] No spawn point available — _spawnPoint is not assigned and no override was set.", this);
             return;
         }
 
-        GameObject instance = Instantiate(_supplyBoxPrefab, _spawnPoint.position, _spawnPoint.rotation);
+        GameObject instance = Instantiate(_supplyBoxPrefab, spawnTransform.position, spawnTransform.rotation);
         _activeBoxNetObj = instance.GetComponent<NetworkObject>();
 
         if (_activeBoxNetObj == null)
@@ -247,38 +211,11 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
         _activeBox = null;
     }
 
-    // ── Delivery Sequence ─────────────────────────────────────────────────────
+    // ── Finalize ──────────────────────────────────────────────────────────────
 
-    private IEnumerator RunDeliverySequence()
+    private void FinalizeDelivery()
     {
-        TriggerDeliveryDoorClientRpc();
-
-        yield return new WaitForSeconds(_doorOpenDelay);
-
-        if (_waypoints != null)
-        {
-            foreach (Transform waypoint in _waypoints)
-            {
-                if (waypoint == null || _activeBox == null) continue;
-
-                bool moveDone = false;
-                bool rotateDone = false;
-
-                _activeBox.transform
-                    .DOMove(waypoint.position, _segmentDuration)
-                    .SetEase(_moveEase)
-                    .OnComplete(() => moveDone = true);
-
-                _activeBox.transform
-                    .DORotateQuaternion(waypoint.rotation, _segmentDuration)
-                    .SetEase(_moveEase)
-                    .OnComplete(() => rotateDone = true);
-
-                yield return new WaitUntil(() => moveDone && rotateDone);
-            }
-        }
-
-        if (_activeBox == null) yield break;
+        if (_activeBox == null) return;
 
         _activeBox.SetCanPickUpNetworked(true);
         _activeBox.UnlockInteractableNetworked();
@@ -290,55 +227,6 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
                 pickable.UnlockInteractableNetworked();
         }
 
-        Debug.Log("[SupplyBoxDeliveryController] Delivery sequence complete.", this);
-    }
-
-    // ── ClientRpcs ────────────────────────────────────────────────────────────
-
-    /// <summary>Plays the knocking AudioSource on every client before the door opens.</summary>
-    [ClientRpc]
-    private void PlayKnockingAudioClientRpc()
-    {
-        if (_knockingAudioSource != null)
-            _knockingAudioSource.Play();
-    }
-
-    /// <summary>Plays the delivery AudioSource on the door on every client.</summary>
-    [ClientRpc]
-    private void PlayDeliveryAudioClientRpc()
-    {
-        if (_deliveryAudioSource != null)
-            _deliveryAudioSource.Play();
-    }
-
-    /// <summary>Fires the "openDoor" trigger on the delivery door animator on every client.</summary>
-    [ClientRpc]
-    private void TriggerDeliveryDoorClientRpc()
-    {
-        if (_deliveryDoorAnimator != null)
-        {
-            if (!_deliveryDoorAnimator.gameObject.activeInHierarchy)
-            {
-                Debug.LogWarning("[SupplyBoxDeliveryController] TriggerDeliveryDoorClientRpc: Animator GameObject is inactive!", this);
-                _deliveryDoorAnimator.gameObject.SetActive(true);
-            }
-
-            if (!_deliveryDoorAnimator.enabled)
-            {
-                Debug.LogWarning("[SupplyBoxDeliveryController] TriggerDeliveryDoorClientRpc: Animator component is disabled!", this);
-                _deliveryDoorAnimator.enabled = true;
-            }
-
-            // Ensure the base layer weight is 1
-            if (_deliveryDoorAnimator.layerCount > 0)
-                _deliveryDoorAnimator.SetLayerWeight(0, 1f);
-
-            _deliveryDoorAnimator.SetTrigger(OpenDoorTrigger);
-            Debug.Log($"[SupplyBoxDeliveryController] Triggered 'openDoor' on {_deliveryDoorAnimator.name}. Layer 0 weight: {_deliveryDoorAnimator.GetLayerWeight(0)}", this);
-        }
-        else
-        {
-            Debug.LogWarning("[SupplyBoxDeliveryController] TriggerDeliveryDoorClientRpc: _deliveryDoorAnimator is null on this client!", this);
-        }
+        Debug.Log("[SupplyBoxDeliveryController] Supply box spawned and ready for pickup.", this);
     }
 }

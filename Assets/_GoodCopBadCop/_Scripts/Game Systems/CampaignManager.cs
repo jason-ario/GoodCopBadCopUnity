@@ -263,9 +263,7 @@ public class CampaignManager : NetworkBehaviour
         // which automatically respects kill and quarantine-cooldown exclusions.
         if (DailySuspectManager.Instance != null && dayBase.SuspectSet != null)
             DailySuspectManager.Instance.SetSuspectSet(dayBase.SuspectSet);
-
-        // Fire tutorial steps configured on the day.
-        FireTutorialSteps(dayBase.TutorialStepsToFire);
+        
 
         // Notify the day itself, then any external listeners.
         dayBase.DayActivated();
