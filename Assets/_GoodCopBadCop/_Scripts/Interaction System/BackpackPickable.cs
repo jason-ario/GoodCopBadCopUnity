@@ -28,7 +28,7 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
     // ── Networked State ───────────────────────────────────────────────────────
 
     /// <summary>FIFO queue of items stored in this specific backpack instance.</summary>
-    private NetworkList<NetworkObjectReference> _storedItems;
+    private NetworkList<NetworkObjectReference> _storedItems = new NetworkList<NetworkObjectReference>();
 
     /// <summary>
     /// Client ID of the player currently wearing this backpack.
@@ -47,7 +47,6 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
     protected override void Awake()
     {
         base.Awake();
-        _storedItems = new NetworkList<NetworkObjectReference>();
         interactText = InteractTextEmpty;
     }
 
