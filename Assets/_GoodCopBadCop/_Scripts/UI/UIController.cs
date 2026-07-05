@@ -228,6 +228,9 @@ public class UIController : MonoBehaviour
 
     public void ShowEndShiftReport(List<EndOfShiftReportUI.ReportRowData> reportRowDatas)
     {
+        if (PlayerInstance.Instance != null)
+            PlayerInstance.Instance.CanControl = false;
+        PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(false, string.Empty);
         ShowCursor();
         endOfShiftReportUI.PlayReport(reportRowDatas);
         OnReportShown?.Invoke();
@@ -236,6 +239,7 @@ public class UIController : MonoBehaviour
     public void HideEndOfShiftReport()
     {
         endOfShiftReportUI.gameObject.SetActive(false);
+        PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(true, string.Empty);
         OnReportHidden?.Invoke();
     }
 
