@@ -45,6 +45,7 @@ public sealed class EnvironmentRenderAdapter : IInitializable, IDisposable
         if (volumetricFog != null)
         {
             volumetricFog.profile = preset.volumetricFogProfile;
+            volumetricFog.UpdateMaterialPropertiesNow();
         }
     }
 }
