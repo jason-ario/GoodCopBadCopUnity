@@ -10397,7 +10397,7 @@ MonoBehaviour:
     SplineCurvature: 0.5
   RecenteringTarget: 2
   HorizontalAxis:
-    Value: 143.579
+    Value: 143.57898
     Center: 0
     Range: {x: -180, y: 180}
     Wrap: 1
@@ -10711,6 +10711,10 @@ GameObject:
   - component: {fileID: 6508558643753476013}
   - component: {fileID: 7509013901984422632}
   - component: {fileID: 8230296262792699792}
+  - component: {fileID: 447748449045846663}
+  - component: {fileID: 103200548730608379}
+  - component: {fileID: 2050668189222405873}
+  - component: {fileID: 2194294831659451377}
   m_Layer: 14
   m_Name: Player
   m_TagString: Player
@@ -11224,6 +11228,13 @@ MonoBehaviour:
     TriggerNameHash: -1316629574
     TransitionIndex: 0
   - IsCrossFadeExit: 0
+    Layer: 1
+    OriginatingState: 69298238
+    DestinationState: 260327873
+    TransitionDuration: 0.25
+    TriggerNameHash: 260327873
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
     Layer: 2
     OriginatingState: 776543318
     DestinationState: -1628668092
@@ -11244,13 +11255,6 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: 1920565635
     TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 2
-    OriginatingState: 69298238
-    DestinationState: 260327873
-    TransitionDuration: 0.25
-    TriggerNameHash: 260327873
-    TransitionIndex: 0
   - IsCrossFadeExit: 0
     Layer: 3
     OriginatingState: 753088835
@@ -11573,6 +11577,78 @@ MonoBehaviour:
   backpackMesh: {fileID: 0}
   backpackAnchor: {fileID: 0}
   maskRadiationMultiplier: 0.2
+--- !u!114 &447748449045846663
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b06a892ac1d6c864dad7c6c575b6e640, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Dissonance.Integrations.Unity_NFGO.NfgoPlayer
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &103200548730608379
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a76c0688e4bd80499ffa3b6a2aed3f2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: DissonanceVoip::Dissonance.VoiceProximityBroadcastTrigger
+  _tokens:
+    _tokens: []
+  _range: 10
+  _roomName: GridProximityChat
+  _useTrigger: 0
+  _roomExpanded: 1
+  _metadataExpanded: 0
+  _activationModeExpanded: 0
+  _tokensExpanded: 0
+  _inputName: 
+  _mode: 1
+  _muted: 0
+  _prority: 0
+--- !u!114 &2050668189222405873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ced1b68963272494b9b3d3bed1584a33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: DissonanceVoip::Dissonance.VoiceProximityReceiptTrigger
+  _tokens:
+    _tokens: []
+  _range: 10
+  _roomName: GridProximityChat
+  _useTrigger: 0
+  _roomExpanded: 1
+  _tokensExpanded: 0
+  _colliderExpanded: 0
+--- !u!114 &2194294831659451377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d30e3aabfb27b7a419a59345a251bb9c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GoodCopBadCop.VoiceChat.PlayerVoiceChatAdapter
+  roomName: GoodCopBadCopProximity
+  fallbackProximityRange: 10
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0
