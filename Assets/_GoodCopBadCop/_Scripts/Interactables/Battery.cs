@@ -1,5 +1,4 @@
 using Unity.Netcode;
-using Unity.Netcode.Editor;
 using UnityEngine;
 
 public class Battery : PickableObject

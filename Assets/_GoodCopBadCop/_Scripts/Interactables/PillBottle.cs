@@ -6,7 +6,6 @@ public class PillBottle : PickableObject
     private const int MaxUses = 3;
 
     [SerializeField] Animator _animator;
-    private bool isUsing;
     private int _usesRemaining = MaxUses;
     [SerializeField] private AudioClip drinkSound;
 
@@ -16,10 +15,9 @@ public class PillBottle : PickableObject
     /// </summary>
     public override void OnStartUse()
     {
-        base.OnStartUse();
         if (isUsing || _usesRemaining <= 0) return;
 
-        isUsing = true;
+        base.OnStartUse();
         StartCoroutine(UsePillBottle());
     }
 

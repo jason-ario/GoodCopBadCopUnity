@@ -6,7 +6,6 @@ using UnityEngine.Animations;
 public class RadiationScanner : PickableObject
 {
     private Coroutine readingCoroutine;
-    private bool isUsing;
 
     [SerializeField] private float maxDistance = 3f;
     [SerializeField] private GeigerNeedle geigerNeedle;

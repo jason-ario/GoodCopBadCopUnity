@@ -6,7 +6,6 @@ using UnityEngine;
 [RequireComponent(typeof(InternalBattery))]
 public class Thermometer : PickableObject
 {
-    private bool isUsing;
     [SerializeField] TextMeshPro thermometerText;
     [SerializeField] private float maxDistance = 3f;
     
