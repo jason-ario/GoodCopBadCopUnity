@@ -11,9 +11,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
     public interface ISettingsMenuView
     {
         event Action<int> DisplayModeChanged;
+        event Action<int> ScreenResolutionChanged;
         event Action Closed;
         void ShowTab(ESettingsMenuTab tab);
         void SetDisplayModeValue(int value);
+        void SetScreenResolutionValue(int value);
     }
 
     public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
@@ -34,7 +36,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private enum ESettingsMenuControlOption
         {
             None,
-            DisplayMode
+            DisplayMode,
+            Resolution
         }
 
         private sealed class SettingsMenuControlDefinition
@@ -108,6 +111,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly string[] OffOnOptions = { "Off", "On" };
         private static readonly string[] HoldToggleOptions = { "Hold", "Toggle" };
         private static readonly string[] DisplayModeOptions = { "Fullscreen", "Borderless", "Windowed" };
+        private static readonly string[] ResolutionOptions = { "1920 x 1080", "1600 x 900", "1280 x 720" };
 
         private static readonly ESettingsMenuTab[] TabOrder =
         {
@@ -131,7 +135,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "Display Mode",
                 DisplayModeOptions,
                 option: ESettingsMenuControlOption.DisplayMode),
-            SettingsMenuControlDefinition.Dropdown("Resolution", new[] { "1920 x 1080", "1600 x 900", "1280 x 720" }),
+            SettingsMenuControlDefinition.Dropdown(
+                "Resolution",
+                ResolutionOptions,
+                option: ESettingsMenuControlOption.Resolution),
             SettingsMenuControlDefinition.Dropdown("VSync", OffOnOptions, defaultOptionIndex: 1),
             SettingsMenuControlDefinition.Dropdown("FPS Limit", new[] { "Unlimited", "30", "60", "120", "144" }),
             SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2),
@@ -174,8 +181,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private ISettingsMenuService service;
         private TMP_Dropdown displayModeDropdown;
+        private TMP_Dropdown screenResolutionDropdown;
 
         public event Action<int> DisplayModeChanged;
+        public event Action<int> ScreenResolutionChanged;
         public event Action Closed;
 
         [Inject]
@@ -235,6 +244,17 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             displayModeDropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, displayModeDropdown.options.Count - 1));
             displayModeDropdown.RefreshShownValue();
+        }
+
+        public void SetScreenResolutionValue(int value)
+        {
+            if (screenResolutionDropdown == null)
+            {
+                return;
+            }
+
+            screenResolutionDropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, screenResolutionDropdown.options.Count - 1));
+            screenResolutionDropdown.RefreshShownValue();
         }
 
         public void ShowTab(ESettingsMenuTab tab)
@@ -684,6 +704,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             {
                 displayModeDropdown = dropdown;
             }
+            else if (definition.Option == ESettingsMenuControlOption.Resolution)
+            {
+                screenResolutionDropdown = dropdown;
+            }
 
             dropdown.SetValueWithoutNotify(Mathf.Clamp(definition.DefaultOptionIndex, 0, definition.Options.Length - 1));
             dropdown.interactable = definition.Interactable;
@@ -692,6 +716,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             if (definition.Interactable && definition.Option == ESettingsMenuControlOption.DisplayMode)
             {
                 dropdown.onValueChanged.AddListener(value => DisplayModeChanged?.Invoke(value));
+            }
+            else if (definition.Interactable && definition.Option == ESettingsMenuControlOption.Resolution)
+            {
+                dropdown.onValueChanged.AddListener(value => ScreenResolutionChanged?.Invoke(value));
             }
 
             ConfigureDropdownSize(dropdown, definition.Options.Length);
