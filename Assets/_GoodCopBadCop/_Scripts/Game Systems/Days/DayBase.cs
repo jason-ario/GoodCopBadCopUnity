@@ -27,7 +27,10 @@ public abstract class DayBase : MonoBehaviour
     public PlayableDirector IntroCutscene;
 
     [Header("Suspects")]
-    [Tooltip("The set of suspects processed during this day's shift.")]
+    [Tooltip("Optional. When assigned, overrides the global DailySuspectManager suspect pool for this day only. " +
+             "Leave null (the default for all days) to draw randomly from the global pool, " +
+             "which respects kill and quarantine-cooldown exclusions automatically. " +
+             "Only use for fully scripted days (e.g. Day 1) that require a hand-authored lineup.")]
     public SuspectSet SuspectSet;
 
     [Header("Door")]

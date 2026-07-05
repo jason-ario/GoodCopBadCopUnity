@@ -1094,9 +1094,15 @@ public class SuspectController : NetworkBehaviour
         if (!isClient)
         {
             // Flag the record for infection score reset on the next day advance (server only).
+            // Also record the current day so DailySuspectManager can skip this suspect on the
+            // immediately following shift (one-day quarantine cooldown).
             SuspectRecord quarantineRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
             if (quarantineRecord != null)
+            {
                 quarantineRecord.pendingVaccineReset = true;
+                quarantineRecord.quarantinedOnDay = CampaignManager.Instance?.CurrentDay ?? -1;
+                SuspectRunRecords.Instance.SaveRecords();
+            }
             suspectCharacter.animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);
 
@@ -1192,7 +1198,10 @@ public class SuspectController : NetworkBehaviour
         // Permanently remove this suspect from future shifts.
         SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (killRecord != null)
+        {
             killRecord.isKilled = true;
+            SuspectRunRecords.Instance.SaveRecords();
+        }
 
         yield return new WaitForSeconds(1f);
         SuspectCharacter thisCharacter = suspectCharacter;

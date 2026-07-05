@@ -121,6 +121,47 @@ public class SaveDataManager : MonoBehaviour
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Suspect Records
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Writes the current runtime suspect state (kill flags, quarantine cooldowns, infection scores)
+    /// to the active save slot and flushes to disk.
+    /// Call this whenever any suspect record changes: on kill, quarantine, and after each day advance.
+    /// Server-only — only the host mutates suspect records.
+    /// </summary>
+    public void SaveSuspectRecords(System.Collections.Generic.List<SuspectRecord> records)
+    {
+        if (ActiveSlot == null) return;
+
+        var entries = new SuspectSaveEntry[records.Count];
+        for (int i = 0; i < records.Count; i++)
+        {
+            SuspectRecord r = records[i];
+            entries[i] = new SuspectSaveEntry
+            {
+                SuspectName     = r.SuspectData != null ? r.SuspectData.name : string.Empty,
+                IsKilled        = r.isKilled,
+                QuarantinedOnDay = r.quarantinedOnDay,
+                InfectionScore  = r.infectionScore,
+            };
+        }
+
+        ActiveSlot.SuspectRecords = entries;
+        Save();
+        Debug.Log($"[SaveDataManager] Suspect records saved ({entries.Length} entries).");
+    }
+
+    /// <summary>
+    /// Returns the persisted suspect entries for the active slot.
+    /// Returns an empty array when no slot is active or no records have been saved yet.
+    /// </summary>
+    public SuspectSaveEntry[] GetSavedSuspectRecords()
+    {
+        return ActiveSlot?.SuspectRecords ?? new SuspectSaveEntry[0];
+    }
+
     // ---------------------------------------------------------------------------
     // Unity Lifecycle
     // ---------------------------------------------------------------------------
@@ -302,6 +343,30 @@ public class SaveData
     };
 }
 
+/// <summary>
+/// Persistent state for a single suspect, serialized into the save slot.
+/// Keyed by <see cref="SuspectData.name"/> (the ScriptableObject asset name),
+/// which is the stable cross-session identifier for each character.
+/// </summary>
+[Serializable]
+public class SuspectSaveEntry
+{
+    /// <summary>Matches <see cref="SuspectData.name"/> — the ScriptableObject asset name.</summary>
+    public string SuspectName;
+
+    /// <summary>True when this suspect was permanently eliminated and must never reappear.</summary>
+    public bool IsKilled;
+
+    /// <summary>
+    /// Campaign day on which this suspect was most recently quarantined (-1 = never).
+    /// Compared against the current day to enforce the one-shift cooldown.
+    /// </summary>
+    public int QuarantinedOnDay = -1;
+
+    /// <summary>Accumulated infection score, advanced each day by <see cref="SuspectRunRecords.AdvanceDayInfection"/>.</summary>
+    public int InfectionScore;
+}
+
 [Serializable]
 public class SaveSlot
 {
@@ -331,6 +396,12 @@ public class SaveSlot
     /// and its target <see cref="ILockable"/> is immediately unlocked.
     /// </summary>
     public string[] UnlockedLockIds = new string[0];
+
+    /// <summary>
+    /// Per-suspect persistent state (kill flags, quarantine cooldowns, infection scores).
+    /// Populated and consumed by <see cref="SuspectRunRecords"/>.
+    /// </summary>
+    public SuspectSaveEntry[] SuspectRecords = new SuspectSaveEntry[0];
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

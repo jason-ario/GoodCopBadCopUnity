@@ -258,7 +258,9 @@ public class CampaignManager : NetworkBehaviour
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.SetCurrentDay(day);
 
-        // Inject this day's suspect pool.
+        // Inject this day's suspect pool only when a scripted override is configured.
+        // Most days leave SuspectSet null and draw from the global DailySuspectManager pool,
+        // which automatically respects kill and quarantine-cooldown exclusions.
         if (DailySuspectManager.Instance != null && dayBase.SuspectSet != null)
             DailySuspectManager.Instance.SetSuspectSet(dayBase.SuspectSet);
 

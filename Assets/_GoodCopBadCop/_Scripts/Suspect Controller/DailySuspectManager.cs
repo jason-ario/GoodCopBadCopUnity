@@ -336,6 +336,8 @@ public class DailySuspectManager : MonoBehaviour
         List<SuspectData> randomSuspects = new List<SuspectData>();
         List<SuspectData> availableSuspects = new List<SuspectData>();
 
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+
         foreach (SuspectData suspect in allSuspects.suspects)
         {
             if (suspect == null)
@@ -350,11 +352,19 @@ public class DailySuspectManager : MonoBehaviour
                 continue;
             }
 
-            // Exclude suspects that were killed during this run.
             SuspectRecord runRecord = SuspectRunRecords.Instance?.GetRecord(suspect);
+
+            // Permanently exclude suspects that were killed this session.
             if (runRecord != null && runRecord.isKilled)
             {
                 Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — killed.");
+                continue;
+            }
+
+            // Exclude suspects serving a one-day quarantine cooldown (quarantined yesterday).
+            if (runRecord != null && runRecord.IsOnQuarantineCooldown(currentDay))
+            {
+                Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — on quarantine cooldown (quarantined on day {runRecord.quarantinedOnDay}).");
                 continue;
             }
 

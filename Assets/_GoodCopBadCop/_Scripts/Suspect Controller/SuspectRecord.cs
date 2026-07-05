@@ -26,6 +26,23 @@ public class SuspectRecord
     /// <summary>When true the suspect was killed and will no longer appear in future shifts.</summary>
     public bool isKilled;
 
+    /// <summary>
+    /// The 1-based campaign day on which this suspect was most recently quarantined.
+    /// -1 means never quarantined this session.
+    /// DailySuspectManager uses this to skip the suspect on the shift immediately following
+    /// their quarantine: a suspect quarantined on day N is excluded from day N+1 only,
+    /// then re-enters the rotation normally from day N+2 onward.
+    /// </summary>
+    public int quarantinedOnDay = -1;
+
+    /// <summary>
+    /// Returns true if this suspect is currently serving a one-day quarantine cooldown
+    /// and should be excluded from the given day's shift pool.
+    /// </summary>
+    /// <param name="currentDay">The campaign day being populated (1-based).</param>
+    public bool IsOnQuarantineCooldown(int currentDay)
+        => quarantinedOnDay >= 0 && quarantinedOnDay == currentDay - 1;
+
     public SuspectRecord(SuspectData suspectData)
     {
         SuspectData = suspectData;
