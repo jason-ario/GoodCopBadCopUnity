@@ -14,23 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Greetings, seeker of truths! I have brought the scripts... oh, I mean,
-      my papers.
+    npcLine: "Greetings, officer. Or \u2014 Greetings, sentinel of the threshold. My papers are here. The scripts are \u2014 I mean, my documents."
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: Do you like the paint on the lips? I find it gives me much more character
-      in this light.
+    npcLine: "Tina Meskhi. Performer. Grand Theater, until recently. I specialize in commedia dell\u2019arte. My face is \u2014 well. You can see the face."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "The mask is my real face. I know that sounds like something someone says. I have been wearing it for seven years and I don\u2019t find it strange anymore."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Are you required to wear it for the show?
+      npcResponse: "There is no show without the mask. There is also no me without the mask. The distinction stopped mattering some time ago."
+      animationTrigger: TalkIdle
+    - playerChoiceText: Do you sleep in it?
+      npcResponse: "The mask protects the face beneath it. Think of it as very committed skincare. Please do not ask about the face beneath it."
+      animationTrigger: TalkCocky
+  - type: 0
+    npcLine: "I live near the station with my producer and two interns. We have been running the performances anyway. The house is empty some nights. We continue."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Even if the audience is empty, the show must go on. The play is the frame that makes the world bearable. Without the frame, everything is just gray."
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I am heading to the stage. Even if the audience is empty, the show must
-      go on.
-    animationTrigger: TalkLookAway
+    npcLine: "This checkpoint is, structurally speaking, a very good scene. High stakes, compressed time, asymmetric information. Good drama."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "You play the stern gatekeeper very convincingly, officer. Very committed to the role."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I'm just checking papers.
+      npcResponse: "Yes. That\u2019s your line. Very consistent. I respect the commitment."
+      animationTrigger: TalkCocky
+    - playerChoiceText: You see everything as a performance?
+      npcResponse: "Everything is a performance. The difference is whether you\u2019re aware of it. You have a very strong stage presence, for what it\u2019s worth."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: "My permit. December expiry. The paint on the edge of the document is mine, from rehearsal. It will not smear."
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

@@ -14,20 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Here's my ID and the form. I filled them out while waiting for bread.
+    npcLine: "Here. ID, form. I filled it out while waiting in the bread line."
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I'm just going home. The shop ran out of everything by noon anyway.
+    npcLine: "Noe Barbaqadze. I run the corner grocery on the eastern block. Or I did. We ran out of everything worth selling about three weeks ago."
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices: []
+  - type: 1
+    npcLine: "The shop is still open. I go every morning. Open the door, check the empty shelves, stand there for a while. Then close."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Why keep it open?
+      npcResponse: Force of habit, I think. The routine feels more normal than the alternative.
+      animationTrigger: TalkIdle
+    - playerChoiceText: That sounds bleak.
+      npcResponse: "Does it? I\u2019ve been standing in lines my whole life. First for bread, then for permits. This is just a new kind of line."
+      animationTrigger: TalkLookAway
   - type: 0
-    npcLine: Is your stamp working? Everything else in this city seems to be broken.
+    npcLine: "I live alone. The apartment is quiet. My neighbor stopped answering his door about two weeks ago. I haven\u2019t knocked since."
     animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I\u2019m fine. I say that to everyone. I\u2019m still deciding if it\u2019s true."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Your stamp is the same model as the one we had at the shop. They both tend to skip on the first press."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: I have nowhere urgent to be. Same as yesterday. Same as tomorrow, probably.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Does the wait bother you?
+      npcResponse: No. I have nowhere urgent to be on the other side either.
+      animationTrigger: TalkLookAway
+    - playerChoiceText: Have you always lived here?
+      npcResponse: "My whole life. Same street, same district. I thought about leaving once. The line for the exit was too long."
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: "Permit. September expiry. I think. The dates have started to blur."
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

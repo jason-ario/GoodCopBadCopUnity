@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: VladIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: "You look nervous, officer. Relax. I\u2019m just a businessman coming home."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Vladimir Syrnikov. Import and logistics. You may have heard the name. Many people have."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I own property in six districts. This one included. Which means, technically, you are standing in one of my doorways."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: This is a public checkpoint.
+      npcResponse: "Everything is someone\u2019s property, eventually. The city is reorganizing itself. I\u2019m paying attention."
+      animationTrigger: TalkIdle
+    - playerChoiceText: I don't recognize your name.
+      npcResponse: "You will. Or someone who answers to me will introduce us properly. Either way \u2014 not a concern."
+      animationTrigger: TalkCocky
+  - type: 0
+    npcLine: "I work out of the docks, primarily. Import, mostly. The nature of the imports is not relevant to your paperwork."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I have been through security checks my entire career. I know what a clean process looks like and what a slow one looks like."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "You have a difficult job. It would be a shame if something made it even harder for you."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "Here are the papers. Make sure you don\u2019t smudge the ink. I\u2019m a man who likes things clean."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I'll handle them carefully.
+      npcResponse: "Good. A man who respects documents respects the transaction. I appreciate that."
+      animationTrigger: TalkIdle
+    - playerChoiceText: I treat all documents the same.
+      npcResponse: "Of course. That\u2019s what you\u2019re supposed to say. We\u2019ll see what that costs you eventually."
+      animationTrigger: TalkCocky
+  - type: 0
+    npcLine: Permit runs to December. Everything in order. It always is.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []

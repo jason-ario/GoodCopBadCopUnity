@@ -1,5 +1,6 @@
 using Netcode.Transports.Facepunch;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using TMPro;
 
@@ -12,6 +13,7 @@ public class JoinLobbyScreen : MonoBehaviour
     private const string ErrorInvalidCode   = "INVALID JOIN CODE";
     private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
     private const string ErrorInvalidIP     = "INVALID IP ADDRESS";
+    private const string StatusLANReady     = "READY — PRESS JOIN TO CONNECT";
 
     private void Awake()
     {
@@ -22,7 +24,7 @@ public class JoinLobbyScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnJoinFailed += OnJoinFailed;
-        UpdatePlaceholder();
+        RefreshUI();
     }
 
     private void OnDisable()
@@ -33,7 +35,7 @@ public class JoinLobbyScreen : MonoBehaviour
     /// <summary>
     /// Reads the input field and joins via the active transport:
     /// FacepunchTransport — expects a 6-character join code.
-    /// UnityTransport     — expects an IPv4 address string; defaults to 127.0.0.1 if empty.
+    /// UnityTransport     — connects immediately; no code required.
     /// </summary>
     public void JoinWithCode()
     {
@@ -73,6 +75,10 @@ public class JoinLobbyScreen : MonoBehaviour
         LobbyManager.Instance.JoinLobbyByCode(code);
     }
 
+    /// <summary>
+    /// Connects to a LAN host. When UnityTransport is active the input field is hidden,
+    /// so <paramref name="raw"/> will always be empty and the default address is used.
+    /// </summary>
     private void JoinLAN(string raw)
     {
         string address = string.IsNullOrEmpty(raw) ? "127.0.0.1" : raw;
@@ -97,18 +103,37 @@ public class JoinLobbyScreen : MonoBehaviour
 
     private void ClearStatus() => statusLabel.text = string.Empty;
 
-    /// <summary>Updates the input field placeholder text to reflect the active transport.</summary>
-    private void UpdatePlaceholder()
+    /// <summary>
+    /// Refreshes the UI to match the active transport.
+    /// UnityTransport: hides the code input and shows a ready prompt.
+    /// FacepunchTransport: shows the code input with appropriate placeholder.
+    /// </summary>
+    private void RefreshUI()
     {
         if (NetworkManager.Singleton == null)
             return;
 
-        var placeholder = inviteCodeInput.placeholder as TMP_Text;
-        if (placeholder == null)
-            return;
+        bool isUnityTransport = NetworkManager.Singleton.NetworkConfig.NetworkTransport is UnityTransport;
 
-        bool isSteam = NetworkManager.Singleton.NetworkConfig.NetworkTransport is FacepunchTransport;
-        placeholder.text = isSteam ? "Enter join code (e.g. ABC123)" : "Enter host IP (default: 127.0.0.1)";
+        inviteCodeInput.gameObject.SetActive(!isUnityTransport);
+
+        if (isUnityTransport)
+        {
+            SetStatus(StatusLANReady);
+        }
+        else
+        {
+            ClearStatus();
+            UpdatePlaceholder();
+        }
+    }
+
+    /// <summary>Updates the input field placeholder text when using FacepunchTransport.</summary>
+    private void UpdatePlaceholder()
+    {
+        var placeholder = inviteCodeInput.placeholder as TMP_Text;
+        if (placeholder != null)
+            placeholder.text = "Enter join code (e.g. ABC123)";
     }
 
     private static bool IsValidIPv4(string address)

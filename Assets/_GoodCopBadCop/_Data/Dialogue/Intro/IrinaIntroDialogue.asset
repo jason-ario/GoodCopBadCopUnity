@@ -14,23 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Here are my papers. Sorry, I know I look tired. The energy in the ward
-      has been really heavy lately.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleText: 0
-    choices: []
-  - type: 0
-    npcLine: The universe keeps asking us to carry more than we think we can. I'm
-      learning to hold.
+    npcLine: Sorry. I know I look tired. The ward energy has been really heavy this week.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: Good morning. I keep my documents in my grandmother's prayer book. For
-      protection.
+    npcLine: "Irina Kakulia. Student nurse. I cover the elderly care wing, and I look after my grandmother at home."
     animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: I moved in with her a few months ago. She's on the fourth floor of the southern block. Mzia, the seamstress. You may have seen her.
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Is she doing well?
+      npcResponse: "She keeps telling me she\u2019s fine. She says it the same way she talks about her sewing, so I mostly believe her."
+      animationTrigger: TalkIdle
+    - playerChoiceText: That must be a lot to balance.
+      npcResponse: The universe keeps asking us to carry more than we think we can. I keep being surprised by how much I hold.
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: My nursing rotation is four mornings a week. I keep her medication schedule on the back of the same form. It seemed efficient.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I keep my documents in her prayer book. She said it was for protection. I didn\u2019t argue."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: My hands shake a little in the mornings. The air quality, I think. Or mercury retrograde.
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: The patients ask me what's happening. I tell them to breathe through it. Which I know sounds like nothing. But it's what I have right now.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Is that working?
+      npcResponse: "For some of them. For me... I\u2019m still deciding."
+      animationTrigger: TalkLookDown
+    - playerChoiceText: How are you holding up?
+      npcResponse: "I\u2019m aligned. Mostly. The frequency in the ward is very strange right now. I\u2019m working on adjusting."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: Papers. I keep them very organized. It's the one thing I can keep organized.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

@@ -14,21 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Move it along, officer. I've got a fare waiting and time is money.
+    npcLine: "Papers are right here. You going to look at them or just stand there?"
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: What, you need to see my teeth too? Just check the damn paper.
+    npcLine: "Lasha Gagua. I drive a taxi. Western district mostly, though half the routes are blocked now."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: Nine years I've been driving these streets. Used to know every shortcut. Before your people closed them all.
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What do you mean, our people?
+      npcResponse: "Security. Government. Whoever put up these barriers. I don\u2019t really care which box you tick."
+      animationTrigger: TalkIdle
+    - playerChoiceText: Nine years is a long time.
+      npcResponse: "Long enough to know when a city is dying and when it\u2019s just sick. This one\u2019s still sick. Salvageable."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: "I\u2019ve got a wife and two kids in the western block. They stay home. I keep working. Someone has to bring money in."
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: This town is going to hell because everyone's standing around asking
-      questions.
+    npcLine: "Half my fares are people trying to get to the exit points now. I charge double. If they don\u2019t like it, they can walk."
     animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "You\u2019re new here. Previous officer had a system. We had an understanding."
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "The kind where he checked the papers once and waved me through. Efficiency. You should try it."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I do my job the same for everyone.
+      npcResponse: "Sure you do. Well, do it fast. I\u2019ve got a fare waiting and time is still money."
+      animationTrigger: TalkCocky
+    - playerChoiceText: What kind of understanding?
+      npcResponse: "The productive kind. Respect for everyone\u2019s time. You\u2019ll learn. Or you won\u2019t."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: Papers. Permit runs to September. You can read the date yourself.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

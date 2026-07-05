@@ -14,20 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Hello. My mom said I have to show you this paper.
+    npcLine: "Hello. I have the form. I filled it out this morning."
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: It's very loud out there. Is it always going to be this loud?
+    npcLine: "Ksenia Darnik. I work at the district hospital. Children\u2019s ward, mostly."
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices: []
+  - type: 1
+    npcLine: "The hospital is very loud lately. A lot of families. I prefer the quiet shifts. The night ones, when the kids are asleep."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What do you do there?
+      npcResponse: "I check temperatures. I hold hands when they\u2019re scared. That part I\u2019m good at."
+      animationTrigger: TalkIdle
+    - playerChoiceText: Do you live nearby?
+      npcResponse: "Near enough. Two other nurses share the flat with me. They\u2019re kind."
+      animationTrigger: TalkLookAway
   - type: 0
-    npcLine: I found a shiny stone in the dirt. Do you want to see?
+    npcLine: The building across from the hospital has a crack in the east wall. It has been getting wider. I have been watching it.
     animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: I found a shiny stone on the way here today. I don't know why I picked it up. It just seemed important.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "It\u2019s very loud out there. The street. It keeps getting louder and I don\u2019t know how to make it smaller."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: Sometimes I think if I hold very still, the loud parts will just go past me.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Are you alright?
+      npcResponse: "I think so. I\u2019ve been feeling a bit... young lately. I know that sounds strange."
+      animationTrigger: TalkLookDown
+    - playerChoiceText: You can ignore the noise.
+      npcResponse: "I try. It\u2019s harder at night. During the day there\u2019s more to look at."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: My papers. They're in order. I checked three times.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

@@ -14,21 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Oh, sorry! I was miles away. Here are my documents, officer.
+    npcLine: "Sorry \u2014 I was watching the way the light hits the roof opposite. The ash gives it this amber quality. Here, my documents."
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I was just walking by the river. The way the light hits the ripples
-      is incredible.
+    npcLine: "Sandro Kakhidze. I\u2019m a mechanic. Workshop on the south row. Mostly cars, occasionally stranger things."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "The work\u2019s changed a bit. People bring me things they can\u2019t afford to replace, asking me to keep them running. I don\u2019t always have the parts."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Does that frustrate you?
+      npcResponse: "Sometimes. But there\u2019s something about fixing a thing that shouldn\u2019t work anymore. It\u2019s hopeful. Which I know sounds strange right now."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: Busy workshop?
+      npcResponse: "It comes and goes. People either bring everything in or they stop coming entirely. Not much in between lately."
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: "I live with my partner, Irakli. Six years. He works nights now so we don\u2019t overlap much. That\u2019s its own kind of strange."
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: Do you ever feel like we're all just characters in a very long novel?
+    npcLine: "I had a book in my jacket this morning. Left it on a bench somewhere. Didn\u2019t notice until I\u2019d walked ten minutes. That kind of day."
     animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Do you ever feel like you're reading the same chapter twice? The city looks different each morning but something underneath it keeps repeating.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "Same papers, different faces. Or the other way around. I\u2019ve been thinking about that a lot."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I know what you mean.
+      npcResponse: "Right. You see it in this booth. There\u2019s a poem in it somewhere. I just haven\u2019t found the last line."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: That's a poetic way to put it.
+      npcResponse: My partner says I make everything a poem. He's not wrong. Occupational habit.
+      animationTrigger: TalkSmile
+  - type: 0
+    npcLine: My papers. October expiry, I believe. Yes, October. Thank you.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

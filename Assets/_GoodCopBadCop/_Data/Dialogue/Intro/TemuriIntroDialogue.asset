@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: TemuriIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: Papers. Timber route.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Temur Gelashvili. I work the northern forest. Timber, trapping. I come into the city twice a season. It gets louder every time."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: The birds left the valley this morning. Early. That means something bad is coming from the north.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: How do you know from the birds?
+      npcResponse: "You watch something long enough, it tells you things. Birds always know before we do. Always."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: What kind of bad?
+      npcResponse: "The kind that changes the smell of the air first. You can\u2019t smell it yet. You will."
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: "I live alone. Cabin past the north gate. I don\u2019t share it. It\u2019s quieter that way."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: The trees near the eastern fence are starting to go gray. Not from the cold. From below.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I need to pick up iron traps and grain before I head back. The things moving in the mist are getting closer to my cabin."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: I have been tracking them for a week. They leave marks in the soil that don't match any animal I know.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What kind of things?
+      npcResponse: "I don\u2019t have a name for them. I\u2019ve been tracking for thirty years. These are new."
+      animationTrigger: TalkIdle
+    - playerChoiceText: Is it safe for you out there alone?
+      npcResponse: "Safe is a city word. Out there you\u2019re either watching or you\u2019re not. I watch."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: "Permit\u2019s here. November. The ink smells odd today. Just noticed."
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []

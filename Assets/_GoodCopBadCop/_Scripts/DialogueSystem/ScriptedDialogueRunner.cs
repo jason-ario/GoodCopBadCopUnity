@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -26,13 +27,16 @@ public class ScriptedCameraEntry
 /// <list type="bullet">
 ///   <item>Locks the booth player's movement and activates the suspect camera.</item>
 ///   <item>Plays each node in order using <see cref="DialogueManager"/>.</item>
-///   <item>For Monologue nodes: waits for the player to press E or left-click to advance.</item>
-///   <item>For Choice nodes: shows two buttons, waits for a pick, then plays the NPC reply.</item>
+///   <item>For Monologue nodes: waits for all connected players to press E or click before
+///         advancing. After the first advance a <see cref="_advanceTimeoutSeconds"/> countdown
+///         starts; the sequence continues automatically when the timer expires.</item>
+///   <item>For Choice nodes: collects a choice from every connected player (same timeout after
+///         the first submission). Unanimous picks win outright; conflicting picks are resolved
+///         by a random draw from the submitted options only.</item>
 ///   <item>Cuts to the Cinemachine camera named by <see cref="ScriptedDialogueNode.cameraTrigger"/>
 ///         before each line plays. An empty trigger deactivates any override and returns to the
 ///         default suspect cam.</item>
-///   <item>Applies a vertex-wobble effect to subtitles when
-///         <see cref="ScriptedDialogueNode.wobbleText"/> is true.</item>
+///   <item>Applies a vertex-wobble effect to subtitles when configured.</item>
 ///   <item>Restores all player state and camera state when the last node finishes.</item>
 /// </list>
 ///
@@ -42,6 +46,13 @@ public class ScriptedCameraEntry
 public class ScriptedDialogueRunner : NetworkBehaviour
 {
     public static ScriptedDialogueRunner Instance { get; private set; }
+
+    /// <summary>
+    /// True on all clients while a scripted dialogue sequence is active.
+    /// Used by <see cref="DialogueManager.WaitForInputRoutine"/> to route E-key advances
+    /// through <see cref="AdvanceScriptedLineServerRpc"/> instead of the standard advance RPC.
+    /// </summary>
+    public static bool IsScriptedModeActive { get; private set; }
 
     [Header("Cutscene Cameras")]
     [Tooltip("Maps camera trigger keys (set on ScriptedDialogueNode) to Cinemachine camera GameObjects. " +
@@ -53,7 +64,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [SerializeField] private string _megaphoneSpeakerName = "Megaphone";
 
     [Tooltip("Name colour for megaphone subtitles.")]
-    [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f); // orange
+    [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f);
 
     [Header("Wobble")]
     [Tooltip("Default wobble profile applied to every scripted dialogue subtitle. " +
@@ -65,15 +76,37 @@ public class ScriptedDialogueRunner : NetworkBehaviour
              "Index 0 here maps to RPC profile index 0 (the default is always RPC index -1).")]
     [SerializeField] private TMPWobbleProfile[] _additionalWobbleProfiles;
 
+    [Header("Multi-Player Advance")]
+    [Tooltip("Seconds after the first player advances (or submits a choice) before the " +
+             "sequence continues automatically without the second player's input.")]
+    [SerializeField] private float _advanceTimeoutSeconds = 3f;
+
+    // -------------------------------------------------------------------------
+    // Server-side state — advance gate
+    // -------------------------------------------------------------------------
+
+    private readonly HashSet<ulong> _advanceSet = new();
+    private bool _scriptedAdvanceReady;
+    private Coroutine _advanceTimerCoroutine;
+
+    // -------------------------------------------------------------------------
+    // Server-side state — choice gate
+    // -------------------------------------------------------------------------
+
+    private readonly Dictionary<ulong, int> _choiceSubmissions = new();
+    private bool _choiceResolved;
+    private int _resolvedChoiceIndex;
+    private Coroutine _choiceTimerCoroutine;
+
+    // -------------------------------------------------------------------------
+    // Client-side state
+    // -------------------------------------------------------------------------
+
     // Set true while coroutines are waiting for player E / left-click input so that
-    // Update can send AdvanceDialogueServerRpc on mouse-click in addition to E key.
+    // Update can route mouse-click through AdvanceScriptedLineServerRpc.
     private bool _awaitingScriptedInput;
 
-    // Choice submission state — server-side only.
-    private bool _choiceReceived;
-    private int _pendingChoiceIndex;
-
-    // Cached per ShowChoicesClientRpc so the local-player callback can read the text.
+    // Cached per ShowChoicesClientRpc so local-player callbacks can read the text.
     private string[] _currentChoiceTexts;
 
     // Tracks the currently active override camera (client-side) so it can be deactivated
@@ -174,13 +207,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (DialogueManager.Instance.IsAnySubtitleRevealing())
         {
-            // Two-stage: first click completes the typewriter without skipping the line.
+            // Two-stage: first click completes the typewriter without advancing the line.
             DialogueManager.Instance.CompleteCurrentReveal();
             return;
         }
 
-        // Second click (or first when typewriter is already done): advance the sequence.
-        DialogueManager.Instance.AdvanceDialogueServerRpc();
+        // Route through the multi-player advance gate.
+        AdvanceScriptedLineServerRpc();
     }
 
     // -------------------------------------------------------------------------
@@ -231,13 +264,73 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Debug.Log($"[ScriptedDialogueRunner] Scripted dialogue complete (deferExit={deferExit}).");
     }
 
-    /// <summary>Says a line and waits for the player to press E / click before continuing.</summary>
+    /// <summary>Says a line and waits for all connected players to advance (or the timeout to expire).</summary>
     private IEnumerator SayAndWait(SuspectCharacter speaker, string text)
     {
         _awaitingScriptedInput = true;
         DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true);
-        yield return StartCoroutine(DialogueManager.Instance.WaitForInputRoutine());
+        yield return StartCoroutine(WaitForScriptedAdvance());
         _awaitingScriptedInput = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Advance gate — server-side
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Resets the advance gate and suspends the sequence until <see cref="OpenAdvanceGate"/>
+    /// resolves it. Must run on the server.
+    /// </summary>
+    private IEnumerator WaitForScriptedAdvance()
+    {
+        _scriptedAdvanceReady = false;
+        _advanceSet.Clear();
+        yield return new WaitUntil(() => _scriptedAdvanceReady);
+    }
+
+    /// <summary>
+    /// Received from any client pressing E or clicking to advance a scripted line.
+    /// After the first submission a countdown begins; the gate opens when every connected
+    /// player has submitted or the countdown expires.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void AdvanceScriptedLineServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (!_awaitingScriptedInput || _scriptedAdvanceReady) return;
+
+        _advanceSet.Add(rpcParams.Receive.SenderClientId);
+
+        int required = NetworkManager.Singleton.ConnectedClientsIds.Count;
+
+        if (_advanceSet.Count == 1)
+            _advanceTimerCoroutine = StartCoroutine(AdvanceTimeoutCoroutine());
+
+        if (_advanceSet.Count >= required)
+            OpenAdvanceGate();
+    }
+
+    private IEnumerator AdvanceTimeoutCoroutine()
+    {
+        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds);
+        yield return new WaitForSeconds(_advanceTimeoutSeconds);
+        OpenAdvanceGate();
+    }
+
+    private void OpenAdvanceGate()
+    {
+        if (_scriptedAdvanceReady) return;
+        _scriptedAdvanceReady = true;
+
+        if (_advanceTimerCoroutine != null)
+        {
+            StopCoroutine(_advanceTimerCoroutine);
+            _advanceTimerCoroutine = null;
+        }
+
+        HideAdvanceTimerClientRpc();
+
+        // Unblocks WaitForInputRoutine on all clients so subtitles clear correctly.
+        DialogueManager.Instance.AdvanceDialogueServerRpc();
     }
 
     // -------------------------------------------------------------------------
@@ -268,7 +361,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         _awaitingScriptedInput = true;
         SayMegaphoneLineClientRpc(text);
-        yield return StartCoroutine(DialogueManager.Instance.WaitForInputRoutine());
+        yield return StartCoroutine(WaitForScriptedAdvance());
         _awaitingScriptedInput = false;
     }
 
@@ -307,14 +400,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             yield break;
         }
 
-        _choiceReceived = false;
-        _pendingChoiceIndex = -1;
+        _choiceSubmissions.Clear();
+        _choiceResolved = false;
+        _resolvedChoiceIndex = -1;
         ShowChoicesClientRpc(node.choices[0].playerChoiceText, node.choices[1].playerChoiceText);
 
-        yield return new WaitUntil(() => _choiceReceived);
+        yield return new WaitUntil(() => _choiceResolved);
 
         // Fire the response animation, then deliver the NPC's unique reply.
-        var chosen = node.choices[_pendingChoiceIndex];
+        var chosen = node.choices[_resolvedChoiceIndex];
         ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
         _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse));
@@ -327,11 +421,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void EnterScriptedModeClientRpc(ulong speakerNetId)
     {
+        IsScriptedModeActive = true;
+
         Debug.Log($"[ScriptedDialogueRunner] EnterScriptedModeClientRpc — " +
                   $"PlayerInstance={PlayerInstance.Instance != null}, " +
                   $"IsOutsideLocal={PlayerInstance.Instance?.IsOutsideLocal}, " +
                   $"ChoiceSystemInstance={DialogueChoiceSystem.Instance != null}");
 
+        // Observer clients (outside local) set IsScriptedModeActive so their E-key input
+        // routes correctly, but do not get their movement locked or camera hijacked.
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
 
         // Resolve the speaker's transform so the player rotates to face the booth.
@@ -345,11 +443,29 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void ExitScriptedModeClientRpc()
     {
+        IsScriptedModeActive = false;
+
         // Deactivate any override camera before restoring the default cam state.
         DeactivateOverrideCam();
 
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
         DialogueChoiceSystem.Instance.ExitScriptedDialogueMode();
+    }
+
+    // -------------------------------------------------------------------------
+    // Client RPCs — advance timer UI
+    // -------------------------------------------------------------------------
+
+    [ClientRpc]
+    private void ShowAdvanceTimerClientRpc(float duration)
+    {
+        DialogueAdvanceTimer.Instance?.Show(duration);
+    }
+
+    [ClientRpc]
+    private void HideAdvanceTimerClientRpc()
+    {
+        DialogueAdvanceTimer.Instance?.Hide();
     }
 
     // -------------------------------------------------------------------------
@@ -459,7 +575,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         _currentChoiceTexts = new[] { choice0, choice1 };
 
-        if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
+        // Both the booth player and any observer can submit a choice.
+        if (PlayerInstance.Instance == null) return;
 
         DialogueChoiceSystem.Instance.ShowScriptedChoices(_currentChoiceTexts, OnLocalPlayerPickedChoice);
     }
@@ -480,19 +597,74 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Sent by the local player after selecting a choice.
-    /// The server broadcasts the player's line to all other clients and advances the sequence.
+    /// Sent by a player after selecting a choice. The server collects submissions from all
+    /// connected players (with a <see cref="_advanceTimeoutSeconds"/> fallback after the first
+    /// submission). When all submissions arrive — or the timeout fires — choices resolve:
+    /// unanimous picks win outright; conflicting picks are decided by a random draw from the
+    /// submitted options only.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void SubmitScriptedChoiceServerRpc(
         int choiceIndex, string playerName, string choiceText,
         ServerRpcParams rpcParams = default)
     {
-        if (_choiceReceived) return; // only the first submission wins
+        if (_choiceResolved) return;
 
-        BroadcastPlayerChoiceClientRpc(choiceText, playerName, rpcParams.Receive.SenderClientId);
-        _pendingChoiceIndex = choiceIndex;
-        _choiceReceived = true;
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        if (_choiceSubmissions.ContainsKey(senderId)) return; // ignore re-submissions
+
+        _choiceSubmissions[senderId] = choiceIndex;
+        BroadcastPlayerChoiceClientRpc(choiceText, playerName, senderId);
+
+        int required = NetworkManager.Singleton.ConnectedClientsIds.Count;
+
+        if (_choiceSubmissions.Count == 1)
+            _choiceTimerCoroutine = StartCoroutine(ChoiceTimeoutCoroutine());
+
+        if (_choiceSubmissions.Count >= required)
+            ResolveChoices();
+    }
+
+    private IEnumerator ChoiceTimeoutCoroutine()
+    {
+        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds);
+        yield return new WaitForSeconds(_advanceTimeoutSeconds);
+        ResolveChoices();
+    }
+
+    /// <summary>
+    /// Resolves submitted choices: unanimous → that choice wins; conflicting → random pick
+    /// drawn from the submitted values only (not from all available options).
+    /// </summary>
+    private void ResolveChoices()
+    {
+        if (_choiceResolved) return;
+        _choiceResolved = true;
+
+        if (_choiceTimerCoroutine != null)
+        {
+            StopCoroutine(_choiceTimerCoroutine);
+            _choiceTimerCoroutine = null;
+        }
+
+        HideAdvanceTimerClientRpc();
+
+        var submitted = new List<int>(_choiceSubmissions.Values);
+
+        if (submitted.Count == 0)
+        {
+            _resolvedChoiceIndex = 0;
+            Debug.LogWarning("[ScriptedDialogueRunner] ResolveChoices called with no submissions. Defaulting to choice 0.");
+            return;
+        }
+
+        bool unanimous = submitted.TrueForAll(v => v == submitted[0]);
+        _resolvedChoiceIndex = unanimous
+            ? submitted[0]
+            : submitted[UnityEngine.Random.Range(0, submitted.Count)];
+
+        Debug.Log($"[ScriptedDialogueRunner] Choice resolved — index={_resolvedChoiceIndex}, " +
+                  $"unanimous={unanimous}, submissions={submitted.Count}");
     }
 
     [ClientRpc]

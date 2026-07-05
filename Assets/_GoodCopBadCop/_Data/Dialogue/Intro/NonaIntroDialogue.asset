@@ -14,20 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Good evening. Here are my documents. Everything is in order, as always.
+    npcLine: Good evening. You are new here. You are the fifth officer to work this post.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I have all the correct papers. I filed them myself.
-    animationTrigger: TalkLookDown
+    npcLine: Nona Beridze. Census recorder, district eleven. Eleven years.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: My job is to know who lives where and who has moved. In normal circumstances that is administrative. Right now it is something else.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What do you mean, something else?
+      npcResponse: "The gaps are larger now. Names that stop appearing. I cross-reference before I close a file. I always cross-reference."
+      animationTrigger: TalkIdle
+    - playerChoiceText: That sounds like difficult work.
+      npcResponse: It requires attention. I am good at attention. Most people find sustained attention uncomfortable. I have never understood why.
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: I live alone. I prefer it. Shared spaces complicate the records.
+    animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: You are new here. I know the names of everyone who has worked this post.
+    npcLine: I have been through this checkpoint thirty-one times. I know your processing time to within four seconds.
     animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: You have a good face for records. Very consistent. I note faces the way others note names.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: I noted your face the moment you sat down. It is not personal. It is simply what I do.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: You noted my face?
+      npcResponse: "I note everything. The last officer\u2019s face, too. And the ones before him. I find the continuity useful."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: That's a little unusual.
+      npcResponse: "So I\u2019ve been told. Usually by people whose names I already had written down."
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: My documents. I filed them myself. Everything is accurate. I double-check.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

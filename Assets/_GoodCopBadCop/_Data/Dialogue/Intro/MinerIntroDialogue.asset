@@ -14,14 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Long shift. Papers are in order.
+    npcLine: Papers are in order.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I know I'm dirty. The showers at the shaft were out again.
+    npcLine: "Gennady Kozlov. Coal Face B, east shaft. Twenty years underground."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I know I\u2019m dirty. The showers at the shaft have been out for three days."
     animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Do they fix things like that?
+      npcResponse: "Used to. Now they tell us to manage. We manage."
+      animationTrigger: TalkIdle
+    - playerChoiceText: That must be difficult work in this environment.
+      npcResponse: "Always been difficult. The conditions aren\u2019t worse. Just different."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: "I live with my wife. Two sons on the top floor, east block. Boys work the west district now."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: The mine runs at capacity or it doesn't run. That's how it's always been. Right now it runs.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I\u2019ve been coming through this checkpoint since the first week. Same time, same route. Some things you don\u2019t change."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: Eleven hours today. I don't complain.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: What keeps you in the city?
+      npcResponse: "My wife. The job. What else would I do? I don\u2019t know anything except coal."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: Long shifts must take a toll.
+      npcResponse: They do. But the alternative is standing still. That's harder.
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: Permit. March expiry. It's the right one.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

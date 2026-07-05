@@ -331,7 +331,12 @@ public class DialogueManager : NetworkBehaviour
         {
             if (Input.GetKeyDown(KeyCode.E) && _waitingSubtitle != null && _waitingSubtitle.IsPromptActive)
             {
-                AdvanceDialogueServerRpc();
+                // During scripted dialogue, route through the multi-player advance gate so
+                // both players must confirm (or the timeout fires) before the sequence continues.
+                if (ScriptedDialogueRunner.IsScriptedModeActive)
+                    ScriptedDialogueRunner.Instance.AdvanceScriptedLineServerRpc();
+                else
+                    AdvanceDialogueServerRpc();
             }
             yield return null;
         }

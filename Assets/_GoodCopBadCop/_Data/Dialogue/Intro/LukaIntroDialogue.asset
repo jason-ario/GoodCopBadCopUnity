@@ -14,20 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "Sorry, I have the form somewhere \u2014 I swear I had it."
+    npcLine: "Sorry \u2014 here\u2019s the form. I filled it out but I think I put the wrong date on it."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Luka Tsereteli. Student at the university. Engineering. Second year. Or I was."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "The campus is a lot emptier than it was. Most of my professors stopped scheduling lectures two weeks ago."
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Is the university still open?
+      npcResponse: "Technically. But my roommate transferred out last week and... I don\u2019t know. Going through the motions, I guess."
+      animationTrigger: TalkLookDown
+    - playerChoiceText: What do you study?
+      npcResponse: "Engineering. Structural, specifically. I spend a lot of time thinking about what holds things up. Right now everything I look at is coming down."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: "I live in the dorms. I\u2019ve been emailing my parents. The server keeps timing out and I can\u2019t tell if anything is getting through."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: I keep telling myself it's going to be fine. I've been saying that every morning. It helps for about ten minutes.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: It's a lot quieter on campus than it used to be.
-    animationTrigger: TalkLookAway
+    npcLine: "I don\u2019t sleep well. I get up and walk to the dining hall and it\u2019s always empty at three in the morning."
+    animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices: []
-  - type: 0
-    npcLine: I keep telling myself it's going to be fine. Is it going to be fine?
+  - type: 1
+    npcLine: "My hands keep shaking and I can\u2019t tell if it\u2019s the cold or something else."
     animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Is there anything that helps?
+      npcResponse: Routine. Coming through here is part of it, weirdly. At least this part is predictable.
+      animationTrigger: TalkIdle
+    - playerChoiceText: You should try to sleep.
+      npcResponse: "I know. I just... can\u2019t make my brain quiet enough. I\u2019m working on it."
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: My papers. They're fine. I double-checked after the last time I forgot them.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

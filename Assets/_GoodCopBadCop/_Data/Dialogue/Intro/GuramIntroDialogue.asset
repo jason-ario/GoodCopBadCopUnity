@@ -14,15 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Papers. Here. Long shift.
+    npcLine: Papers. Here.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 0
-    npcLine: I have been coming through this checkpoint for three months. You can
-      look it up.
+    npcLine: Guram Kopaliani. Parking lot on Rustaveli. Twenty-two years there.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: New face at the booth. The last officer was faster, but it doesn't matter.
     animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: How long have you been coming through here?
+      npcResponse: Three months. Since the first checkpoint went up. Before that there was nothing to come through.
+      animationTrigger: TalkIdle
+    - playerChoiceText: Must be a long shift.
+      npcResponse: "All my shifts are long. I don\u2019t mind long. I mind standing still."
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: The lot runs itself mostly. Arrivals, departures. Log it, close up, go home.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "My wife died four years ago. I still look at the lot when I go past. Force of habit."
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Twenty-two years. Not once late to check in.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I\u2019ll keep coming through here until there\u2019s no more lot to come back from."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: Are you worried about the lot closing?
+      npcResponse: "It will close. Everything closes. I\u2019ll find something else to stand in front of."
+      animationTrigger: TalkLookAway
+    - playerChoiceText: Do you have anyone waiting at home?
+      npcResponse: "Nobody. Got used to it. House is quieter than the lot, which is saying something."
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: "Permit\u2019s current. March expiry. I know where it is."
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleText: 0
     choices: []

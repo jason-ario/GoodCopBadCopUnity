@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: IvanIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: "What a beautiful morning! Isn\u2019t it? Here \u2014 papers, right here. Always ready!"
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "Ivan Tarkov. Factory worker, east side. Very productive place, very efficient. I love it there."
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: "I do like meeting new faces at this post. I keep a list of all the officers I\u2019ve met. Just for my own personal records."
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: That's an unusual hobby.
+      npcResponse: "Oh, I have many hobbies! Collecting things. Counting things. Arranging things very neatly. You have lovely cheekbones, by the way."
+      animationTrigger: TalkSmile
+    - playerChoiceText: What kind of list?
+      npcResponse: Names, faces, schedules. Very thorough. I am an organized person. My mother always said I paid too much attention to detail. She was right!
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: I live alone. I prefer that. More room for all my hobbies. Very quiet evenings. Very productive.
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "I always smile. Some people find it unsettling. I find people who don\u2019t smile unsettling, so I think we\u2019re even."
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: "The alleyways near the factory are so peaceful lately. Have you noticed? All that wonderful empty space."
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: I go walking there in the evenings. Sometimes I bring a bag. It's easier with a bag. You know how it is!
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: I wouldn't walk there alone.
+      npcResponse: "Oh, I never feel alone! I\u2019m very good company. Very aware of my surroundings at all times!"
+      animationTrigger: TalkSmile
+    - playerChoiceText: What do you walk for?
+      npcResponse: Fresh air! Reflection! Sometimes to see what the quiet sounds like when no one is listening. It sounds wonderful!
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: Papers! Everything is in order. As always. I am a very law-abiding citizen. I want you to know that.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
