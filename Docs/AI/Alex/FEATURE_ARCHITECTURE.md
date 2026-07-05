@@ -55,6 +55,70 @@ FeatureService
 FeaturePresenter / FeatureView / FeatureAdapter
 ```
 
+## New Feature Checklist
+
+Before implementing a new significant feature:
+
+- Confirm the feature is large enough for this pattern. Do not force it onto tiny one-off scripts.
+- Create the feature under a `GoodCopBadCop.*` namespace using block-style namespace syntax.
+- Add `FeatureModel.cs` with `IFeatureModel` plus `FeatureModel`.
+- Add `FeatureService.cs` with `IFeatureService` plus `FeatureService`.
+- Put Unity, UI, input, animation, Netcode, legacy, and content bridges into a presenter, view, or adapter.
+- Register the feature in `MainSceneLifetimeScope` using the canonical VContainer style below.
+- Add tests for important base components, pure rules, persistence, mapping, or reusable infrastructure.
+- After script changes, run Unity refresh/compile and check Console errors.
+- Update this document only when the convention changes, not for every feature.
+
+## Canonical Vertical Slice: Environment System
+
+Use the current Environment System as the reference slice for small-to-medium features:
+
+```text
+Assets/_GoodCopBadCop/_Scripts/Environment System/
+  EnvironmentModel.cs
+    IEnvironmentModel
+    EnvironmentModel
+
+  EnvironmentService.cs
+    IEnvironmentService
+    EnvironmentService
+
+  EnvironmentPreset.cs
+    ScriptableObject config/data
+
+  EnvironmentSchedule.cs
+    ScriptableObject config/data
+
+  EnvironmentRenderAdapter.cs
+    Applies model state to Unity RenderSettings and VolumetricFog.
+
+  EnvironmentCampaignAdapter.cs
+    Bridges legacy CampaignManager/ShiftManager day changes into IEnvironmentService.
+```
+
+Boundaries to copy:
+
+- Namespace: `GoodCopBadCop.EnvironmentSystem`.
+- Model exposes read-only reactive state through `IEnvironmentModel`.
+- Concrete `EnvironmentModel` exposes mutable reactive fields for `EnvironmentService`.
+- Service owns commands and validation: `ApplyDay`, `ApplyPreset`, `ApplyNext`, `ApplyPrevious`.
+- Render and campaign integration live in adapters, not in the service.
+- ScriptableObjects hold authoring/config data, not runtime state.
+- Legacy global code consumes namespaced types through explicit `using` imports.
+
+Current registration shape:
+
+```csharp
+builder.RegisterInstance(environmentSchedule);
+builder.RegisterComponentInHierarchy<VolumetricFog>();
+builder.Register<EnvironmentModel>(Lifetime.Scoped).AsSelf().As<IEnvironmentModel>();
+builder.Register<IEnvironmentService, EnvironmentService>(Lifetime.Scoped);
+builder.RegisterEntryPoint<EnvironmentRenderAdapter>(Lifetime.Scoped);
+builder.RegisterEntryPoint<EnvironmentCampaignAdapter>(Lifetime.Scoped);
+```
+
+Do not copy the environment-specific details blindly. Copy the ownership split: model state, service commands, adapters for Unity/legacy bridges, and scene-level DI wiring.
+
 ## Namespace Rules
 
 Use `GoodCopBadCop.*` namespaces for new architecture/framework code and new significant features.
@@ -73,6 +137,7 @@ GoodCopBadCop.Tests.Editor
 Rules:
 
 - New feature code should use namespaces from the start.
+- Use block-style namespaces, not file-scoped namespaces. Unity currently compiles this project as C# 9, and file-scoped namespaces produce CS8773.
 - New reusable infrastructure should live under `GoodCopBadCop.Infrastructure.*`.
 - New tests should live under `GoodCopBadCop.Tests.*`.
 - Keep legacy global-namespace code as-is unless the current task substantially rewrites that subsystem.
@@ -374,7 +439,7 @@ Rules:
 Debug editor tools:
 
 - Prefer `OdinEditorWindow` under `Assets/_GoodCopBadCop/_Scripts/Editor` over scene debug objects.
-- Use `EditorConstants.RootMenuPath` for project tools, currently `Tools/_GoodCopBadCop/`.
+- Use `EditorConstants.RootMenuPath` for project tools, currently `Tools/GoodCopBadCop/`.
 - Use `EditorConstants.RootMenuPriority` for project menu items so the project tool group stays near the top of Unity's `Tools` menu.
 - Runtime debug windows may resolve services from the active `MainSceneLifetimeScope.Container` in Play Mode.
 - Do not apply gameplay/rendering changes directly from the editor window; call the feature service.
@@ -479,9 +544,10 @@ builder.RegisterComponentInHierarchy<ShiftView>().As<IShiftView>();
 Expected registration shape:
 
 ```csharp
-builder.Register<ShiftModel>(Lifetime.Singleton);
-builder.Register<IShiftModel>(resolver => resolver.Resolve<ShiftModel>(), Lifetime.Singleton);
-builder.Register<IShiftService, ShiftService>(Lifetime.Singleton);
+builder.RegisterComponentInHierarchy<ShiftView>().As<IShiftView>();
+builder.Register<ShiftModel>(Lifetime.Scoped).AsSelf().As<IShiftModel>();
+builder.Register<IShiftService, ShiftService>(Lifetime.Scoped);
+builder.RegisterEntryPoint<ShiftPresenter>(Lifetime.Scoped);
 ```
 
 Rules:
