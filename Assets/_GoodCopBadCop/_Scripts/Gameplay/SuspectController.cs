@@ -920,8 +920,14 @@ public class SuspectController : NetworkBehaviour
             thisCharacter.lookAnimator.SetLookTarget(null);
         }
 
-        thisCharacter.transform.DORotate(gatePos.rotation.eulerAngles, 0.5f);
-        yield return new WaitForSeconds(0.5f);
+        // Open the gate before navigating so the NavMeshObstacle is disabled
+        // and the agent has a clear path to gatePos from the start.
+        if (IsServer)
+            GameManager.Instance.GateController.OpenGate();
+
+        // Two frames for the NavMeshObstacle to disable and the NavMesh surface to update.
+        yield return null;
+        yield return null;
 
         thisCharacter.animator.SetBool("Walking", true);
         bool gateArrived = false;
@@ -930,10 +936,7 @@ public class SuspectController : NetworkBehaviour
         thisCharacter.animator.SetBool("Walking", false);
 
         if (IsServer)
-        {
-            GameManager.Instance.GateController.OpenGate();
             ShiftManager.Instance.SetNextSuspectReady();
-        }
 
         yield return new WaitForSeconds(2f);
 

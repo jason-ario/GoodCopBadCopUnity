@@ -144,15 +144,49 @@ public class SuspectCharacter : Interactable
 
     private IEnumerator NavMoveCoroutine(Vector3 destination, Action onArrived)
     {
+        const float retryDelay = 0.25f;
+        const int maxRetries = 10;
+        int retries = 0;
+
         _navAgent.updateRotation = true;
         _navAgent.isStopped = false;
-        _navAgent.SetDestination(destination);
 
-        // Wait one frame for pathfinding to initialise.
-        yield return null;
+        while (_navAgent.enabled)
+        {
+            _navAgent.SetDestination(destination);
+            yield return null; // One frame for path calculation to begin.
+            while (_navAgent.pathPending) yield return null;
 
-        while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
-            yield return null;
+            if (_navAgent.pathStatus == NavMeshPathStatus.PathComplete)
+            {
+                // Full path — wait until the agent actually arrives.
+                while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
+                    yield return null;
+                break;
+            }
+
+            // Partial or invalid path — a closed gate or door is likely blocking.
+            // Let the agent walk as far as it can so the obstacle's proximity auto-open fires,
+            // then wait for the NavMesh to update and retry.
+            if (retries >= maxRetries)
+            {
+                Debug.LogWarning($"[SuspectCharacter] NavigateTo '{name}': could not reach destination after {maxRetries} retries — proceeding anyway.");
+                break;
+            }
+
+            while (_navAgent.enabled && !_navAgent.pathPending
+                   && _navAgent.remainingDistance > _navAgent.stoppingDistance
+                   && !float.IsInfinity(_navAgent.remainingDistance))
+                yield return null;
+
+            // Already close enough — treat as arrived.
+            if (Vector3.Distance(transform.position, destination) <= _navAgent.stoppingDistance + 0.05f)
+                break;
+
+            // Brief wait for the obstacle to clear and NavMesh to re-bake.
+            yield return new WaitForSeconds(retryDelay);
+            retries++;
+        }
 
         if (_navAgent.enabled && _navAgent.isOnNavMesh)
         {
@@ -163,6 +197,12 @@ public class SuspectCharacter : Interactable
         _navMoveCoroutine = null;
         onArrived?.Invoke();
     }
+
+    /// <summary>All currently active SuspectCharacter instances. Updated automatically via OnEnable/OnDisable.</summary>
+    public static readonly List<SuspectCharacter> ActiveInstances = new List<SuspectCharacter>();
+
+    private void OnEnable()  => ActiveInstances.Add(this);
+    private void OnDisable() => ActiveInstances.Remove(this);
 
     private bool _facingPlayer;
 

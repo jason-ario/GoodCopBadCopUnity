@@ -40,6 +40,19 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
     private NavMeshObstacle _navMeshObstacle;
 
+    [Header("Suspect Interaction")]
+    [Tooltip("When enabled, the gate automatically opens when a suspect's collider enters the trigger radius.")]
+    [SerializeField] private bool _autoOpenForSuspects = true;
+
+    [Tooltip("Physical proximity radius (world units). Gate opens when a suspect collider is within this distance.")]
+    [SerializeField] private float _suspectOpenRadius = 0.5f;
+
+    [Tooltip("NavMesh approach radius (world units). Gate opens when a suspect's NavMeshAgent is navigating " +
+             "toward the gate and within this distance — catches suspects blocked by the closed NavMeshObstacle.")]
+    [SerializeField] private float _suspectNavApproachRadius = 4f;
+
+    private static readonly Collider[] _suspectOverlapBuffer = new Collider[4];
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -50,6 +63,55 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
+    }
+
+    private void Update()
+    {
+        if (!_autoOpenForSuspects) return;
+        if (_gateOpen.Value || _isLocked.Value) return;
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        // Physical proximity — works when the agent can get physically close to the gate.
+        int count = Physics.OverlapSphereNonAlloc(transform.position, _suspectOpenRadius, _suspectOverlapBuffer);
+        for (int i = 0; i < count; i++)
+        {
+            if (_suspectOverlapBuffer[i] != null && _suspectOverlapBuffer[i].TryGetComponent<SuspectCharacter>(out var proxSuspect))
+            {
+                OpenForSuspect(proxSuspect);
+                return;
+            }
+        }
+
+        // NavMesh approach — catches suspects whose path is blocked by the closed NavMeshObstacle.
+        // Opens the gate as soon as their agent is navigating toward it within the approach radius,
+        // before they need to physically reach the proximity zone.
+        foreach (SuspectCharacter suspect in SuspectCharacter.ActiveInstances)
+        {
+            UnityEngine.AI.NavMeshAgent agent = suspect.NavAgent;
+            if (agent == null || !agent.enabled) continue;
+
+            float dist = Vector3.Distance(suspect.transform.position, transform.position);
+            if (dist > _suspectNavApproachRadius) continue;
+
+            Vector3 toDestination = agent.destination - suspect.transform.position;
+            if (toDestination.sqrMagnitude < 0.01f) continue;
+
+            Vector3 toGate = transform.position - suspect.transform.position;
+
+            // Open if the gate lies within a ~60° cone of the agent's travel direction.
+            if (Vector3.Dot(toDestination.normalized, toGate.normalized) > 0.5f)
+            {
+                OpenForSuspect(suspect);
+                return;
+            }
+        }
+    }
+
+    private void OpenForSuspect(SuspectCharacter suspect)
+    {
+        Vector3 toSuspect = suspect.transform.position - transform.position;
+        bool openedIn = forwardMarker != null && Vector3.Dot(forwardMarker.forward, toSuspect) > 0f;
+        ForceOpen(openedIn);
     }
 
     public override void OnNetworkDespawn()
@@ -209,6 +271,20 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
         _openedIn.Value = true;
         _gateOpen.Value = true;
         BroadcastGateStateClientRpc(true, true, ulong.MaxValue);
+    }
+
+    /// <summary>
+    /// Forces the gate open on all clients without requiring player interaction.
+    /// Must be called on the server.
+    /// </summary>
+    /// <param name="openedIn">Open direction. Defaults to inward (true), matching <see cref="OpenGate"/>.</param>
+    public void ForceOpen(bool openedIn = true)
+    {
+        if (!IsServer) return;
+        _openedIn.Value = openedIn;
+        _gateOpen.Value = true;
+        BroadcastGateStateClientRpc(true, openedIn, ulong.MaxValue);
+        PlayGateSoundClientRpc(true);
     }
 
     /// <summary>Closes the gate on all clients. Must be called on the server.</summary>

@@ -37,7 +37,7 @@ public class PlayerAppearanceController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        ApplyAppearance();
+        //ApplyAppearance();
     }
 
     /// <summary>
