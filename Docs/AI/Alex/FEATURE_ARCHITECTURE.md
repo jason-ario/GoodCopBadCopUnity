@@ -206,6 +206,52 @@ Avoid:
 commandSubject.OnNext(new EndShiftCommand());
 ```
 
+## Persistent Reactive Properties
+
+For simple local settings/preferences, use `PersistentReactiveProperty<T>` when a value should behave like an R3 `ReactiveProperty<T>` and also persist itself.
+
+Use it for independent settings values:
+
+```csharp
+public sealed class SettingsModel : ISettingsModel
+{
+    public readonly PersistentReactiveProperty<float> MouseSensitivityMutable =
+        new("settings.mouseSensitivity", 1f);
+
+    public ReadOnlyReactiveProperty<float> MouseSensitivity => MouseSensitivityMutable;
+}
+```
+
+Rules:
+
+- `PersistentReactiveProperty<T>` inherits from `ReactiveProperty<T>`.
+- Writing `Value` or calling `OnNext` updates the runtime value and saves it through `IPersistentPropertyStorage`.
+- The default storage is `PlayerPrefsPersistentPropertyStorage`.
+- Supported PlayerPrefs-backed types: `int`, `long`, `float`, `string`, `bool`, and `enum`.
+- Use explicit default values for settings. Avoid relying on `default(T)` unless `0`, `false`, or empty string is really correct.
+- Call `Flush()` when the settings menu closes, on application pause, or on application quit. Do not force `PlayerPrefs.Save()` on every slider tick.
+- Expose persistent properties through model interfaces as `ReadOnlyReactiveProperty<T>`, not as mutable persistent properties.
+
+Example service mutation:
+
+```csharp
+public void SetMouseSensitivity(float value)
+{
+    _model.MouseSensitivityMutable.Value = value;
+}
+```
+
+Storage can be swapped later:
+
+```csharp
+new PersistentReactiveProperty<float>(
+    "settings.mouseSensitivity",
+    1f,
+    jsonSettingsStorage);
+```
+
+Do not use `PersistentReactiveProperty<T>` for campaign/progression/save-slot data. Those systems need a real save layer with versioning, migrations, validation, and atomic writes.
+
 ## Observable Events
 
 Events can live in `IFeatureModel` if they are part of the feature's read-side API.
