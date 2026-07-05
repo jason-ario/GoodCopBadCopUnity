@@ -1,5 +1,6 @@
 using System;
 using GoodCopBadCop.Settings;
+using GoodCopBadCop.VoiceChat;
 using R3;
 using VContainer.Unity;
 
@@ -28,6 +29,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void Initialize()
         {
             view.DisplayModeChanged += OnDisplayModeChanged;
+            view.ScreenResolutionChanged += OnScreenResolutionChanged;
+            view.VoiceChatEnabledChanged += OnVoiceChatEnabledChanged;
+            view.VoiceChatMutedChanged += OnVoiceChatMutedChanged;
+            view.VoiceChatDeafenedChanged += OnVoiceChatDeafenedChanged;
+            view.VoiceChatInputModeChanged += OnVoiceChatInputModeChanged;
             view.Closed += OnClosed;
 
             model.SelectedTab
@@ -37,11 +43,36 @@ namespace GoodCopBadCop.UI.SettingsMenu
             settingsModel.DisplayMode
                 .Subscribe(displayMode => view.SetDisplayModeValue((int)displayMode))
                 .AddTo(ref disposables);
+
+            settingsModel.ScreenResolution
+                .Subscribe(screenResolution => view.SetScreenResolutionValue((int)screenResolution))
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatEnabled
+                .Subscribe(view.SetVoiceChatEnabledValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatMuted
+                .Subscribe(view.SetVoiceChatMutedValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatDeafened
+                .Subscribe(view.SetVoiceChatDeafenedValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatInputMode
+                .Subscribe(inputMode => view.SetVoiceChatInputModeValue((int)inputMode))
+                .AddTo(ref disposables);
         }
 
         public void Dispose()
         {
             view.DisplayModeChanged -= OnDisplayModeChanged;
+            view.ScreenResolutionChanged -= OnScreenResolutionChanged;
+            view.VoiceChatEnabledChanged -= OnVoiceChatEnabledChanged;
+            view.VoiceChatMutedChanged -= OnVoiceChatMutedChanged;
+            view.VoiceChatDeafenedChanged -= OnVoiceChatDeafenedChanged;
+            view.VoiceChatInputModeChanged -= OnVoiceChatInputModeChanged;
             view.Closed -= OnClosed;
             disposables.Dispose();
         }
@@ -56,10 +87,44 @@ namespace GoodCopBadCop.UI.SettingsMenu
             settingsService.SetDisplayMode((EDisplayMode)value);
         }
 
+        private void OnScreenResolutionChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EScreenResolution), value))
+            {
+                return;
+            }
+
+            settingsService.SetScreenResolution((EScreenResolution)value);
+        }
+
+        private void OnVoiceChatEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetVoiceChatEnabled(isEnabled);
+        }
+
+        private void OnVoiceChatMutedChanged(bool isMuted)
+        {
+            settingsService.SetVoiceChatMuted(isMuted);
+        }
+
+        private void OnVoiceChatDeafenedChanged(bool isDeafened)
+        {
+            settingsService.SetVoiceChatDeafened(isDeafened);
+        }
+
+        private void OnVoiceChatInputModeChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EVoiceChatInputMode), value))
+            {
+                return;
+            }
+
+            settingsService.SetVoiceChatInputMode((EVoiceChatInputMode)value);
+        }
+
         private void OnClosed()
         {
             settingsService.Flush();
         }
     }
-
 }

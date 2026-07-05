@@ -11,9 +11,19 @@ namespace GoodCopBadCop.UI.SettingsMenu
     public interface ISettingsMenuView
     {
         event Action<int> DisplayModeChanged;
+        event Action<int> ScreenResolutionChanged;
+        event Action<bool> VoiceChatEnabledChanged;
+        event Action<bool> VoiceChatMutedChanged;
+        event Action<bool> VoiceChatDeafenedChanged;
+        event Action<int> VoiceChatInputModeChanged;
         event Action Closed;
         void ShowTab(ESettingsMenuTab tab);
         void SetDisplayModeValue(int value);
+        void SetScreenResolutionValue(int value);
+        void SetVoiceChatEnabledValue(bool value);
+        void SetVoiceChatMutedValue(bool value);
+        void SetVoiceChatDeafenedValue(bool value);
+        void SetVoiceChatInputModeValue(int value);
     }
 
     public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
@@ -34,7 +44,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private enum ESettingsMenuControlOption
         {
             None,
-            DisplayMode
+            DisplayMode,
+            Resolution,
+            VoiceChatEnabled,
+            VoiceChatMuted,
+            VoiceChatDeafened,
+            VoiceChatInputMode
         }
 
         private sealed class SettingsMenuControlDefinition
@@ -108,6 +123,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly string[] OffOnOptions = { "Off", "On" };
         private static readonly string[] HoldToggleOptions = { "Hold", "Toggle" };
         private static readonly string[] DisplayModeOptions = { "Fullscreen", "Borderless", "Windowed" };
+        private static readonly string[] ResolutionOptions = { "1920 x 1080", "1600 x 900", "1280 x 720" };
+        private static readonly string[] VoiceChatInputModeOptions = { "Voice Activation", "Push To Talk", "Open Mic" };
 
         private static readonly ESettingsMenuTab[] TabOrder =
         {
@@ -131,7 +148,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "Display Mode",
                 DisplayModeOptions,
                 option: ESettingsMenuControlOption.DisplayMode),
-            SettingsMenuControlDefinition.Dropdown("Resolution", new[] { "1920 x 1080", "1600 x 900", "1280 x 720" }),
+            SettingsMenuControlDefinition.Dropdown(
+                "Resolution",
+                ResolutionOptions,
+                option: ESettingsMenuControlOption.Resolution),
             SettingsMenuControlDefinition.Dropdown("VSync", OffOnOptions, defaultOptionIndex: 1),
             SettingsMenuControlDefinition.Dropdown("FPS Limit", new[] { "Unlimited", "30", "60", "120", "144" }),
             SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2),
@@ -146,6 +166,23 @@ namespace GoodCopBadCop.UI.SettingsMenu
             SettingsMenuControlDefinition.Slider("Music Volume"),
             SettingsMenuControlDefinition.Slider("SFX Volume"),
             SettingsMenuControlDefinition.Slider("Voice Volume"),
+            SettingsMenuControlDefinition.Dropdown(
+                "Proximity Chat",
+                OffOnOptions,
+                defaultOptionIndex: 1,
+                option: ESettingsMenuControlOption.VoiceChatEnabled),
+            SettingsMenuControlDefinition.Dropdown(
+                "Voice Input",
+                VoiceChatInputModeOptions,
+                option: ESettingsMenuControlOption.VoiceChatInputMode),
+            SettingsMenuControlDefinition.Dropdown(
+                "Microphone Muted",
+                OffOnOptions,
+                option: ESettingsMenuControlOption.VoiceChatMuted),
+            SettingsMenuControlDefinition.Dropdown(
+                "Voice Deafened",
+                OffOnOptions,
+                option: ESettingsMenuControlOption.VoiceChatDeafened),
             SettingsMenuControlDefinition.Slider("Ambient Volume")
         };
 
@@ -174,8 +211,18 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private ISettingsMenuService service;
         private TMP_Dropdown displayModeDropdown;
+        private TMP_Dropdown screenResolutionDropdown;
+        private TMP_Dropdown voiceChatEnabledDropdown;
+        private TMP_Dropdown voiceChatMutedDropdown;
+        private TMP_Dropdown voiceChatDeafenedDropdown;
+        private TMP_Dropdown voiceChatInputModeDropdown;
 
         public event Action<int> DisplayModeChanged;
+        public event Action<int> ScreenResolutionChanged;
+        public event Action<bool> VoiceChatEnabledChanged;
+        public event Action<bool> VoiceChatMutedChanged;
+        public event Action<bool> VoiceChatDeafenedChanged;
+        public event Action<int> VoiceChatInputModeChanged;
         public event Action Closed;
 
         [Inject]
@@ -228,15 +275,33 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         public void SetDisplayModeValue(int value)
         {
-            if (displayModeDropdown == null)
-            {
-                return;
-            }
-
-            displayModeDropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, displayModeDropdown.options.Count - 1));
-            displayModeDropdown.RefreshShownValue();
+            SetDropdownValue(displayModeDropdown, value);
         }
 
+        public void SetScreenResolutionValue(int value)
+        {
+            SetDropdownValue(screenResolutionDropdown, value);
+        }
+
+        public void SetVoiceChatEnabledValue(bool value)
+        {
+            SetDropdownValue(voiceChatEnabledDropdown, value ? 1 : 0);
+        }
+
+        public void SetVoiceChatMutedValue(bool value)
+        {
+            SetDropdownValue(voiceChatMutedDropdown, value ? 1 : 0);
+        }
+
+        public void SetVoiceChatDeafenedValue(bool value)
+        {
+            SetDropdownValue(voiceChatDeafenedDropdown, value ? 1 : 0);
+        }
+
+        public void SetVoiceChatInputModeValue(int value)
+        {
+            SetDropdownValue(voiceChatInputModeDropdown, value);
+        }
         public void ShowTab(ESettingsMenuTab tab)
         {
             GameObject targetPanel = GetPanel(tab);
@@ -679,23 +744,80 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             dropdown.ClearOptions();
             dropdown.AddOptions(new List<string>(definition.Options));
-
-            if (definition.Option == ESettingsMenuControlOption.DisplayMode)
-            {
-                displayModeDropdown = dropdown;
-            }
+            AssignDropdownReference(definition.Option, dropdown);
 
             dropdown.SetValueWithoutNotify(Mathf.Clamp(definition.DefaultOptionIndex, 0, definition.Options.Length - 1));
             dropdown.interactable = definition.Interactable;
             dropdown.RefreshShownValue();
 
-            if (definition.Interactable && definition.Option == ESettingsMenuControlOption.DisplayMode)
+            if (definition.Interactable)
             {
-                dropdown.onValueChanged.AddListener(value => DisplayModeChanged?.Invoke(value));
+                AddDropdownListener(definition.Option, dropdown);
             }
 
             ConfigureDropdownSize(dropdown, definition.Options.Length);
             StyleDropdown(row, dropdown, definition.Interactable);
+        }
+
+        private void AssignDropdownReference(ESettingsMenuControlOption option, TMP_Dropdown dropdown)
+        {
+            switch (option)
+            {
+                case ESettingsMenuControlOption.DisplayMode:
+                    displayModeDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.Resolution:
+                    screenResolutionDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.VoiceChatEnabled:
+                    voiceChatEnabledDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.VoiceChatMuted:
+                    voiceChatMutedDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.VoiceChatDeafened:
+                    voiceChatDeafenedDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.VoiceChatInputMode:
+                    voiceChatInputModeDropdown = dropdown;
+                    break;
+            }
+        }
+
+        private void AddDropdownListener(ESettingsMenuControlOption option, TMP_Dropdown dropdown)
+        {
+            switch (option)
+            {
+                case ESettingsMenuControlOption.DisplayMode:
+                    dropdown.onValueChanged.AddListener(value => DisplayModeChanged?.Invoke(value));
+                    break;
+                case ESettingsMenuControlOption.Resolution:
+                    dropdown.onValueChanged.AddListener(value => ScreenResolutionChanged?.Invoke(value));
+                    break;
+                case ESettingsMenuControlOption.VoiceChatEnabled:
+                    dropdown.onValueChanged.AddListener(value => VoiceChatEnabledChanged?.Invoke(value != 0));
+                    break;
+                case ESettingsMenuControlOption.VoiceChatMuted:
+                    dropdown.onValueChanged.AddListener(value => VoiceChatMutedChanged?.Invoke(value != 0));
+                    break;
+                case ESettingsMenuControlOption.VoiceChatDeafened:
+                    dropdown.onValueChanged.AddListener(value => VoiceChatDeafenedChanged?.Invoke(value != 0));
+                    break;
+                case ESettingsMenuControlOption.VoiceChatInputMode:
+                    dropdown.onValueChanged.AddListener(value => VoiceChatInputModeChanged?.Invoke(value));
+                    break;
+            }
+        }
+
+        private static void SetDropdownValue(TMP_Dropdown dropdown, int value)
+        {
+            if (dropdown == null)
+            {
+                return;
+            }
+
+            dropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, dropdown.options.Count - 1));
+            dropdown.RefreshShownValue();
         }
 
         private static float GetDropdownPopupHeight(int optionCount)

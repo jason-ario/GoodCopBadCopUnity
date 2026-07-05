@@ -1,6 +1,7 @@
 using GoodCopBadCop.UI.SettingsMenu;
 using GoodCopBadCop.EnvironmentSystem;
 using GoodCopBadCop.Settings;
+using GoodCopBadCop.VoiceChat;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -16,7 +17,14 @@ namespace GoodCopBadCop.Infrastructure
         {
             builder.Register<SettingsModel>(Lifetime.Scoped).AsSelf().As<ISettingsModel>();
             builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
+            builder.Register<ISettingsScreenAdapter, UnitySettingsScreenAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
+
+            builder.Register<VoiceChatModel>(Lifetime.Scoped).AsSelf().As<IVoiceChatModel>();
+            builder.RegisterEntryPoint<VoiceChatCommsRuntime>(Lifetime.Scoped);
+            builder.Register<IVoiceChatService, VoiceChatService>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<VoiceChatSettingsAdapter>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<DissonanceVoiceChatAdapter>(Lifetime.Scoped);
 
             builder.RegisterComponentInHierarchy<SettingsMenuView>().As<ISettingsMenuView>();
             builder.Register<SettingsMenuModel>(Lifetime.Scoped).AsSelf().As<ISettingsMenuModel>();
@@ -31,5 +39,4 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<EnvironmentCampaignAdapter>(Lifetime.Scoped);
         }
     }
-
 }
