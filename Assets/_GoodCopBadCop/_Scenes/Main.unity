@@ -125565,87 +125565,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!1001 &7034408022387241066
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 1.501
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.55201
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -6.295
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1235952005241837154, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1929229524890232723, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: m_Name
-      value: ---Environment Manager
-      objectReference: {fileID: 0}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: _volumetricFog
-      value: 
-      objectReference: {fileID: 2094104112}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: '_environments.Array.data[0]'
-      value: 
-      objectReference: {fileID: 11400000, guid: b53f7b2048c8d914daa5820c5b4e79b2, type: 2}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: '_environments.Array.data[1]'
-      value: 
-      objectReference: {fileID: 11400000, guid: b1bc3505e46ff2640ab2236e74f625f4, type: 2}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: '_environments.Array.data[2]'
-      value: 
-      objectReference: {fileID: 11400000, guid: fe35a5db774a60e47927cea242e7c235, type: 2}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: '_environments.Array.data[3]'
-      value: 
-      objectReference: {fileID: 11400000, guid: 1b271e680a20e18449cfd2d9da5fdbae, type: 2}
-    - target: {fileID: 5562944798261268827, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
-      propertyPath: '_environments.Array.data[4]'
-      value: 
-      objectReference: {fileID: 11400000, guid: 020e3d516e984c64191db45ac00049b5, type: 2}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: d11c92c8124d07e41b848c01d7d8f9e2, type: 3}
 --- !u!1 &7086242735333498268
 GameObject:
   m_ObjectHideFlags: 0
@@ -128694,6 +128613,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9cfecba4ac3047ab89e0e7f0c1d21f43, type: 3}
   m_Name: ''
   m_EditorClassIdentifier: ''
+  environmentSchedule: {fileID: 11400000, guid: 4da37a1b37a84fd8b15d821bce9a0c83, type: 2}
   parentReference:
     TypeName: ''
   autoRun: 1
@@ -128711,7 +128631,6 @@ SceneRoots:
   - {fileID: 1580104677}
   - {fileID: 808559285800501786}
   - {fileID: 1578622558}
-  - {fileID: 7034408022387241066}
   - {fileID: 679084542}
   - {fileID: 4313349225138324011}
   - {fileID: 1709246993}

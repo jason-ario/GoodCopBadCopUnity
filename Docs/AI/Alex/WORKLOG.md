@@ -45,3 +45,11 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Verified: Manifest and lock JSON parsed successfully; package versions were checked against OpenUPM registry metadata.
 - Risks: Unity Editor was not launched to avoid touching unrelated dirty asset/meta changes, so Unity compile/package resolution should still be checked in the next editor session.
 - Follow-ups: In the first new feature module, add VContainer registration/lifetime scope code and verify R3/UniTask compile in Unity.
+
+## 2026-07-05 - Environment system architecture migration
+
+- Goal: Move fog/environment switching from legacy scene-array logic into the new model/service/adapter architecture.
+- Changed: Added EnvironmentPreset, EnvironmentSchedule, EnvironmentModel, EnvironmentService, campaign/render adapters, and MainSceneLifetimeScope registrations; added an Environment Schedule asset and wired it in Main.unity; disabled BackgroundManager's automatic first-slot apply behavior.
+- Verified: Ran static searches for old Environment type usage and `git diff --check`; no Unity compile check was available from generated project files.
+- Risks: Unity Editor compile/console validation is still needed; day 3/4/6 final color presets still need authored assets and visual QA.
+- Follow-ups: Verify in Unity, then replace placeholder schedule slots with authored orange-red, yellow, and ashy-gray presets.

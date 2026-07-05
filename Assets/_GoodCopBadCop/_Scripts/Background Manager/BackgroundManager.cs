@@ -1,26 +1,28 @@
-using System;
 using UnityEngine;
 using VolumetricFogAndMist2;
 
 public class BackgroundManager : MonoBehaviour
 {
-    [SerializeField] private Environment[] _environments;
+    [SerializeField] private EnvironmentPreset[] _environments;
     [SerializeField] private VolumetricFog _volumetricFog;
 
-    private void Start()
+    public void SetEnvironment(EnvironmentPreset environment)
     {
-        SetEnvironment(_environments[0]);
-    }
+        if (environment == null)
+        {
+            return;
+        }
 
-    public void SetEnvironment(Environment environment)
-    {
         RenderSettings.fogColor = environment.fogColor;
-        _volumetricFog.profile = environment.volumetricFogProfile;
+        if (_volumetricFog != null)
+        {
+            _volumetricFog.profile = environment.volumetricFogProfile;
+        }
+
         RenderSettings.skybox = environment.Skybox;
         RenderSettings.fogDensity = environment.fogDensity;
         RenderSettings.ambientSkyColor = environment.ambientLighting.skyColor;
         RenderSettings.ambientEquatorColor = environment.ambientLighting.equatorColor;
         RenderSettings.ambientGroundColor = environment.ambientLighting.groundColor;
-
     }
 }
