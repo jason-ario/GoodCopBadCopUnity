@@ -41,6 +41,7 @@ Selected dependencies:
 - UniTask: `com.cysharp.unitask` via OpenUPM.
 - VContainer: `jp.hadashikick.vcontainer` via OpenUPM.
 - DOTween/DOTween Pro: asset-based dependency already present under `Assets/Plugins/Demigiant`, not a UPM dependency.
+- Odin Inspector: asset-based editor/tooling dependency under `Assets/Plugins/Sirenix`.
 
 ## Public API
 
@@ -276,6 +277,62 @@ public sealed class ShiftPresenter : IDisposable
     public void Dispose()
     {
         _disposables.Dispose();
+    }
+}
+```
+
+## Inspector And Editor Interfaces
+
+Use Odin Inspector for project-specific inspector interfaces and debug tooling when it reduces custom editor code.
+
+Good Odin use cases:
+
+- Editor-only debug windows, for example next/previous environment.
+- Read-only runtime state display in the Inspector.
+- Safer ScriptableObject authoring with validation, grouping, dropdowns, and inline previews.
+- Small internal tools that would otherwise need a one-off `CustomEditor`.
+
+Rules:
+
+- Odin attributes are UI/tooling only. They must not contain gameplay rules.
+- Buttons should call existing services or adapter methods, not duplicate feature logic.
+- Keep the same architecture boundary: model owns state, service owns commands, presenter/adapter/view bridges Unity.
+- Prefer Odin for inspector tooling; use a hand-written `CustomEditor` only when Odin cannot express the workflow cleanly.
+- Do not use Odin as runtime UI. Player-facing UI still belongs in normal Unity UI views and presenters.
+- Avoid putting Odin dependencies into pure domain classes unless the class is intentionally an inspected Unity type such as a `MonoBehaviour` or `ScriptableObject`.
+
+Debug editor tools:
+
+- Prefer `OdinEditorWindow` under `Assets/_GoodCopBadCop/_Scripts/Editor` over scene debug objects.
+- Use `EditorConstants.RootMenuPath` for project tools, currently `Tools/_GoodCopBadCop/`.
+- Use `EditorConstants.RootMenuPriority` for project menu items so the project tool group stays near the top of Unity's `Tools` menu.
+- Runtime debug windows may resolve services from the active `MainSceneLifetimeScope.Container` in Play Mode.
+- Do not apply gameplay/rendering changes directly from the editor window; call the feature service.
+- Do not run scene searches or DI resolves from Odin-drawn properties, `EnableIf`, or other draw-path methods.
+- Cache resolved services/models and subscribe to model events when the window needs live state.
+- Clear cached runtime references and subscriptions on Play Mode exit and window destroy.
+
+Example:
+
+```csharp
+using Sirenix.OdinInspector;
+using Sirenix.OdinInspector.Editor;
+using UnityEditor;
+
+public sealed class EnvironmentDebugWindow : OdinEditorWindow
+{
+    private IEnvironmentService service;
+
+    [MenuItem(EditorConstants.EnvironmentDebugMenuPath)]
+    private static void Open()
+    {
+        GetWindow<EnvironmentDebugWindow>("Environment Debug").Show();
+    }
+
+    [Button]
+    private void ApplyNextEnvironment()
+    {
+        service?.ApplyNext();
     }
 }
 ```

@@ -53,3 +53,11 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Verified: Ran static searches for old Environment type usage and `git diff --check`; no Unity compile check was available from generated project files.
 - Risks: Unity Editor compile/console validation is still needed; day 3/4/6 final color presets still need authored assets and visual QA.
 - Follow-ups: Verify in Unity, then replace placeholder schedule slots with authored orange-red, yellow, and ashy-gray presets.
+
+## 2026-07-05 - Odin inspector tooling standard
+
+- Goal: Record Odin Inspector as the preferred tool for internal inspector/debug interfaces.
+- Changed: Documented Odin in `FEATURE_ARCHITECTURE.md` as an editor/tooling dependency for debug buttons, read-only runtime state, and ScriptableObject authoring helpers.
+- Verified: Static documentation update only; Odin asset import is present under `Assets/Plugins/Sirenix`.
+- Risks: Unity Editor compile/console validation is still needed after the Odin import.
+- Follow-ups: Use editor-only `OdinEditorWindow` tools under `Tools/_GoodCopBadCop/` for debug workflows.
