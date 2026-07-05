@@ -34,6 +34,10 @@ public class EndOfShiftReportUI : MonoBehaviour
     [Header("Continue")]
     [SerializeField] private GameObject continueButton;
 
+    [Header("Layout")]
+    [Tooltip("The Container child of BG that holds all report content. Deactivated on Continue so the BG remains as an overlay while the screen fades.")]
+    [SerializeField] private GameObject _contentContainer;
+
     [Header("Timing")]
     [SerializeField] private float initialDelay = 0.35f;
     [SerializeField] private float rewardRevealDelay = 0.18f;
@@ -66,6 +70,7 @@ public class EndOfShiftReportUI : MonoBehaviour
             StopCoroutine(revealRoutine);
         
         gameObject.SetActive(true);
+        _contentContainer?.SetActive(true);
 
         revealRoutine = StartCoroutine(RevealReportRoutine(reportRows));
     }
@@ -200,7 +205,14 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     public void OnContinueButtonPressed()
     {
-        UIController.Instance.HideEndOfShiftReport();
+        if (revealRoutine != null)
+        {
+            StopCoroutine(revealRoutine);
+            revealRoutine = null;
+        }
+
+        // Hide only the content — leave BG active as an overlay while the screen fades.
+        _contentContainer?.SetActive(false);
         ShiftManager.Instance.StartInBetweenShiftSequence();
     }
     

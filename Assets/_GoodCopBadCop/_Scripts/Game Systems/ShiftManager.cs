@@ -563,8 +563,18 @@ public class ShiftManager : NetworkBehaviour
         // End the previous night phase and score it before resetting the world.
         BetweenShiftTaskManager.Instance?.EndNightPhase();
 
+        // Close the bunker door immediately so it is never seen open during the transition.
+        _bunkerDoorController?.Reset();
+
         UIController.Instance.FadeIn();
-        yield return new WaitForSeconds(1.5f);
+
+        // Wait for the screen to reach full black (fade duration = 0.64s).
+        // The end-of-shift report BG stays visible as an overlay during this window
+        // so the world never flashes through before the fade completes.
+        yield return new WaitForSeconds(0.64f);
+
+        // Screen is now fully black — safe to tear down the report overlay.
+        UIController.Instance.HideEndOfShiftReport();
 
         // Reset all shift state for the new day.
         ResetShiftData();

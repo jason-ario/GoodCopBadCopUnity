@@ -239,6 +239,7 @@ public class UIController : MonoBehaviour
     public void HideEndOfShiftReport()
     {
         endOfShiftReportUI.gameObject.SetActive(false);
+        HideCursor();
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(true, string.Empty);
         OnReportHidden?.Invoke();
     }
