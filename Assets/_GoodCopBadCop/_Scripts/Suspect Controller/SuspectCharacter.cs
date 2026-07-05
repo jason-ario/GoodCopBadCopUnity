@@ -204,6 +204,44 @@ public class SuspectCharacter : Interactable
     private void OnEnable()  => ActiveInstances.Add(this);
     private void OnDisable() => ActiveInstances.Remove(this);
 
+    // ── Networked Animation Helpers ───────────────────────────────────────────
+
+    /// <summary>
+    /// Sets an animator bool parameter on the server and replicates it to all clients.
+    /// Use this instead of <c>animator.SetBool()</c> directly for any server-driven
+    /// animation state that must be visible to all players. Must be called on the server.
+    /// </summary>
+    public void SetAnimatorBool(string paramName, bool value)
+    {
+        animator.SetBool(paramName, value);
+        SyncAnimatorBoolClientRpc(paramName, value);
+    }
+
+    /// <summary>
+    /// Fires an animator trigger on the server and replicates it to all clients.
+    /// Use this instead of <c>animator.SetTrigger()</c> for server-driven one-shot
+    /// animation events. Must be called on the server.
+    /// </summary>
+    public void FireAnimatorTrigger(string triggerName)
+    {
+        animator.SetTrigger(triggerName);
+        SyncAnimatorTriggerClientRpc(triggerName);
+    }
+
+    [ClientRpc]
+    private void SyncAnimatorBoolClientRpc(string paramName, bool value)
+    {
+        if (IsServer) return;
+        animator.SetBool(paramName, value);
+    }
+
+    [ClientRpc]
+    private void SyncAnimatorTriggerClientRpc(string triggerName)
+    {
+        if (IsServer) return;
+        animator.SetTrigger(triggerName);
+    }
+
     private bool _facingPlayer;
 
     [Header("Combat")]

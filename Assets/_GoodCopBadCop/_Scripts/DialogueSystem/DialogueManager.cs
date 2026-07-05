@@ -320,6 +320,19 @@ public class DialogueManager : NetworkBehaviour
     {
         _dialogueInputReceived = true;
         StopDialogueAudio();
+
+        // WaitForInputRoutine runs only on the server (SayDialogue is always called server-side
+        // in scripted sequences), so non-host clients have no coroutine that would call
+        // ClearHistory() after this flag is set. Without this explicit clear, the final
+        // waitForInput subtitle in a session stays on screen indefinitely on client machines
+        // because there is no subsequent SpawnSubtitles call to evict it via
+        // DestroyPreviousSubtitles(). On the host, WaitForInputRoutine will also call
+        // ClearHistory() on the next frame — that second call is a safe no-op.
+        if (_waitingSubtitle != null)
+        {
+            ClearHistory();
+            _waitingSubtitle = null;
+        }
     }
 
     public IEnumerator WaitForInputRoutine(Action onComplete = null)

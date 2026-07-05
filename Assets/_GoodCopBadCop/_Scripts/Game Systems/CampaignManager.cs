@@ -125,15 +125,24 @@ public class CampaignManager : NetworkBehaviour
 
     /// <summary>
     /// Entry point called by GameManager when the game starts.
-    /// Reads CurrentDay from the active save slot and applies the correct day.
+    /// The server determines the current day from the active save slot and writes it to
+    /// <see cref="_networkCurrentDay"/>. Non-server clients always read that authoritative
+    /// value rather than their own potentially out-of-sync local save file.
     /// </summary>
     public void StartCampaign()
     {
-        int savedDay = SaveDataManager.Instance.CurrentDay;
-        _currentDay = Mathf.Max(1, savedDay);
-
         if (IsServer)
+        {
+            _currentDay = Mathf.Max(1, SaveDataManager.Instance.CurrentDay);
             _networkCurrentDay.Value = _currentDay;
+        }
+        else
+        {
+            // Clients must never use local save data to determine the day in multiplayer:
+            // each player's save file can be on a different day. Always use the server's
+            // authoritative NetworkVariable value which is synchronized before this RPC fires.
+            _currentDay = Mathf.Max(1, _networkCurrentDay.Value);
+        }
 
         ApplyDay(_currentDay);
 

@@ -1,12 +1,15 @@
 using DG.Tweening;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Manages the bunker door's open/closed state and DOTween animation.
+/// Manages the bunker door's open/closed state and DOTween animation, synced across all clients.
 /// Only the local Z euler angle is driven: 0 = closed, 120 = open.
 /// X and Y are left untouched so the door never tilts or spins.
+/// Requires a <see cref="NetworkObject"/> on this GameObject.
 /// </summary>
-public class BunkerDoorController : MonoBehaviour
+[RequireComponent(typeof(NetworkObject))]
+public class BunkerDoorController : NetworkBehaviour
 {
     [Header("Door")]
     [Tooltip("The door Transform to animate.")]
@@ -22,30 +25,91 @@ public class BunkerDoorController : MonoBehaviour
     private const float ClosedAngleZ = 0f;
     private const float OpenAngleZ   = 120f;
 
-    /// <summary>Whether the bunker door is currently open.</summary>
-    public bool IsOpen { get; private set; }
+    private readonly NetworkVariable<bool> _isOpen = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    /// <summary>Whether the bunker door is currently open (synced across all clients).</summary>
+    public bool IsOpen => _isOpen.Value;
+
+    // ─── NetworkBehaviour lifecycle ───────────────────────────────────────────
 
     private void Awake()
     {
         SnapToAngle(ClosedAngleZ);
     }
 
-    // ─── Public API ──────────────────────────────────────────────────────────
-
-    /// <summary>Tweens the door to its open angle. No-op if already open.</summary>
-    public void Open()
+    public override void OnNetworkSpawn()
     {
-        if (IsOpen) return;
-        IsOpen = true;
-        TweenDoorZ(OpenAngleZ);
+        _isOpen.OnValueChanged += OnIsOpenChanged;
+
+        // Snap to the authoritative state so late-joining clients are correct immediately.
+        SnapToAngle(_isOpen.Value ? OpenAngleZ : ClosedAngleZ);
     }
 
-    /// <summary>Snaps the door back to its closed angle instantly.</summary>
+    public override void OnNetworkDespawn()
+    {
+        _isOpen.OnValueChanged -= OnIsOpenChanged;
+    }
+
+    // ─── Public API ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Opens the bunker door. Can be called from any client; routes through the server.
+    /// No-op if already open.
+    /// </summary>
+    public void Open()
+    {
+        if (_isOpen.Value) return;
+
+        if (IsServer)
+            _isOpen.Value = true;
+        else
+            OpenServerRpc();
+    }
+
+    /// <summary>
+    /// Snaps the door back to its closed angle instantly. Can be called from any client;
+    /// routes through the server.
+    /// </summary>
     public void Reset()
     {
-        IsOpen = false;
-        if (_door != null) _door.DOKill();
-        SnapToAngle(ClosedAngleZ);
+        if (IsServer)
+            _isOpen.Value = false;
+        else
+            ResetServerRpc();
+    }
+
+    // ─── Server RPCs ──────────────────────────────────────────────────────────
+
+    [Rpc(SendTo.Server)]
+    private void OpenServerRpc()
+    {
+        if (!_isOpen.Value)
+            _isOpen.Value = true;
+    }
+
+    [Rpc(SendTo.Server)]
+    private void ResetServerRpc()
+    {
+        _isOpen.Value = false;
+    }
+
+    // ─── NetworkVariable callbacks ────────────────────────────────────────────
+
+    private void OnIsOpenChanged(bool previous, bool current)
+    {
+        if (current)
+        {
+            TweenDoorZ(OpenAngleZ);
+        }
+        else
+        {
+            if (_door != null) _door.DOKill();
+            SnapToAngle(ClosedAngleZ);
+        }
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────

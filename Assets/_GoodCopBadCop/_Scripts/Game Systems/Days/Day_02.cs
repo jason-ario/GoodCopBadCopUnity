@@ -291,7 +291,7 @@ public class Day_02 : DayBase
 
             // Perform an unlock gesture (use the existing "Give" trigger as a stand-in;
             // replace with a dedicated "Unlock" trigger once that animation is authored).
-            TriggerVladAnimationClientRpc(_vladCharacter.GetComponent<Unity.Netcode.NetworkObject>().NetworkObjectId, "Give");
+            _vladCharacter.FireAnimatorTrigger("Give");
             yield return new WaitForSeconds(_unlockGestureDuration);
 
             // Unlock the tool locker padlock.
@@ -361,13 +361,13 @@ public class Day_02 : DayBase
     {
         if (_vladCharacter == null || target == null) yield break;
 
-        _vladCharacter.animator.SetBool("Walking", true);
+        _vladCharacter.SetAnimatorBool("Walking", true);
 
         bool arrived = false;
         _vladCharacter.NavigateTo(target.position, () => arrived = true);
         yield return new WaitUntil(() => arrived);
 
-        _vladCharacter.animator.SetBool("Walking", false);
+        _vladCharacter.SetAnimatorBool("Walking", false);
 
         // Settle facing to the waypoint's exact forward direction.
         if (target.forward.sqrMagnitude > 0.01f)
@@ -404,22 +404,6 @@ public class Day_02 : DayBase
                     yield break;
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // Networked helpers
-    // -------------------------------------------------------------------------
-
-    /// <summary>Fires an animator trigger on Vlad on all clients.</summary>
-    [ClientRpc]
-    private void TriggerVladAnimationClientRpc(ulong vladNetId, string trigger)
-    {
-        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(vladNetId, out var netObj))
-            return;
-
-        var character = netObj.GetComponent<SuspectCharacter>();
-        if (character?.animator == null) return;
-        character.animator.SetTrigger(trigger);
     }
 
     // -------------------------------------------------------------------------

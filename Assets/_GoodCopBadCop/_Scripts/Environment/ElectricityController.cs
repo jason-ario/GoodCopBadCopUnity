@@ -10,6 +10,9 @@ public class ElectricityController : NetworkBehaviour
     [SerializeField] private AudioSource sfxSource;
     [SerializeField] private Vector2 powerOutageRandomTime = new Vector2(60, 120);
 
+    /// <summary>When false, the automatic power outage countdown never starts.</summary>
+    [SerializeField] private bool enablePowerOutage = false;
+
     private NetworkVariable<bool> _isPowerOn = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
@@ -62,6 +65,7 @@ public class ElectricityController : NetworkBehaviour
     private void StartCountdown()
     {
         if (!IsServer) return;
+        if (!enablePowerOutage) return;
         Debug.Log("[ElectricityController] StartCountdown called.");
         StartCoroutine(WaitAndShutDown());
     }
@@ -98,7 +102,9 @@ public class ElectricityController : NetworkBehaviour
 
         _isPowerOn.Value = true;
         PowerOnClientRpc();
-        StartCoroutine(WaitAndShutDown());
+
+        if (enablePowerOutage)
+            StartCoroutine(WaitAndShutDown());
     }
 
     // ------------------------------------------------------------------

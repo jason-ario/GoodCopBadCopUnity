@@ -77,6 +77,11 @@ public class PlayerInstance : NetworkBehaviour
 
             PlayerHealth.OnDeath += Die;
             PlayerHealth.OnRespawn += Respawn;
+
+            // Clean up any lingering death/spectator state from a previous player object
+            // (e.g. when this is a fresh spawn after the player was revived).
+            SpectateManager.Instance?.StopSpectating();
+            UIController.Instance?.HideDeathScreen();
         }
     }
 
@@ -299,31 +304,6 @@ public class PlayerInstance : NetworkBehaviour
         if (playerLight != null) playerLight.SetActive(false);
 
         Debug.Log($"[PlayerInstance] Components deactivated for corpse of player {OwnerClientId}.");
-    }
-
-    [ServerRpc]
-    public void RequestRespawnServerRpc(ulong targetClientId, NetworkObjectReference corpseRef)
-    {
-        if (!IsServer) return;
-
-        // 1. Deactivate components on the old player instance (the "corpse")
-        if (corpseRef.TryGet(out NetworkObject corpseObj))
-        {
-            var corpseInstance = corpseObj.GetComponent<PlayerInstance>();
-            if (corpseInstance != null)
-            {
-                corpseObj.RemoveOwnership(); 
-                corpseInstance.DeactivateAllComponents();
-                corpseObj.name = "Player_Corpse_" + targetClientId;
-            }
-        }
-
-        // 2. Spawn a fresh player instance for that client
-        if (PlayerSpawner.Instance != null)
-        {
-            bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
-            PlayerSpawner.Instance.SpawnPlayer(targetClientId, isSinglePlayer);
-        }
     }
 
     public void SetPosition(Transform position)

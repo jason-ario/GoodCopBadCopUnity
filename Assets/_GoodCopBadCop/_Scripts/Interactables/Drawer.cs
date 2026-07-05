@@ -37,6 +37,9 @@ public class Drawer : Interactable, IHeldItemPassthrough
     private const string RightGripBool = "RightGrip";
     private const string LeftGripBool  = "LeftGrip";
 
+    /// <summary>How often (in seconds) the dragging client pushes its position to the server.</summary>
+    private const float DragSyncInterval = 0.05f; // ~20 Hz
+
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
@@ -49,9 +52,17 @@ public class Drawer : Interactable, IHeldItemPassthrough
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>Continuous drawer position shared across the network (0 = closed, 1 = open).</summary>
+    private NetworkVariable<float> _networkDragT = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     /// <summary>Normalised drawer travel: 0 = closed, 1 = fully open.</summary>
     private float _dragT = 0f;
 
+    private float _lastDragSyncTime = -1f;
     private bool _inControl = false;
     private bool _usingRightArm = false;
     private PlayerInteractionController _currentPlayer;
@@ -89,15 +100,22 @@ public class Drawer : Interactable, IHeldItemPassthrough
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        isOpen.OnValueChanged    += OnDrawerStateChanged;
-        _isLocked.OnValueChanged += OnLockedChanged;
-        SnapDrawerMeshToState(isOpen.Value);
+        isOpen.OnValueChanged      += OnDrawerStateChanged;
+        _isLocked.OnValueChanged   += OnLockedChanged;
+        _networkDragT.OnValueChanged += OnNetworkDragTChanged;
+
+        // Use the continuous position if available, otherwise fall back to binary state.
+        if (_drawerMesh != null)
+            _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, _networkDragT.Value);
+        else
+            SnapDrawerMeshToState(isOpen.Value);
     }
 
     public override void OnNetworkDespawn()
     {
-        isOpen.OnValueChanged    -= OnDrawerStateChanged;
-        _isLocked.OnValueChanged -= OnLockedChanged;
+        isOpen.OnValueChanged      -= OnDrawerStateChanged;
+        _isLocked.OnValueChanged   -= OnLockedChanged;
+        _networkDragT.OnValueChanged -= OnNetworkDragTChanged;
     }
 
     // ── Input loop ────────────────────────────────────────────────────────────
@@ -112,6 +130,7 @@ public class Drawer : Interactable, IHeldItemPassthrough
         {
             _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
             ApplyDragPosition();
+            SyncDragTIfNeeded();
         }
 
         // Released → commit and exit. Fire when whichever input triggered the grab is released.
@@ -310,10 +329,27 @@ public class Drawer : Interactable, IHeldItemPassthrough
 
     // ── Networking ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Pushes the live drag position to the server at most once per DragSyncInterval.
+    /// </summary>
+    private void SyncDragTIfNeeded()
+    {
+        if (Time.unscaledTime - _lastDragSyncTime < DragSyncInterval) return;
+        _lastDragSyncTime = Time.unscaledTime;
+        UpdateDragTServerRpc(_dragT);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void UpdateDragTServerRpc(float dragT)
+    {
+        _networkDragT.Value = dragT;
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void SetDrawerServerRpc(bool open, ulong senderClientId)
     {
         isOpen.Value = open;
+        _networkDragT.Value = open ? 1f : 0f;
         BroadcastDrawerStateClientRpc(open, senderClientId);
     }
 
@@ -331,6 +367,16 @@ public class Drawer : Interactable, IHeldItemPassthrough
         // Catch-up for late-joining clients that missed the ClientRpc.
         SnapDrawerMeshToState(newValue, _snapDuration);
         if (newValue) OnOpened?.Invoke();
+    }
+
+    /// <summary>
+    /// Applied on all non-controlling clients every time the server updates the live drag position.
+    /// </summary>
+    private void OnNetworkDragTChanged(float oldVal, float newVal)
+    {
+        if (_inControl) return; // local player is driving — don't fight the input
+        if (_drawerMesh == null) return;
+        _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, newVal);
     }
 
     private void OnLockedChanged(bool oldValue, bool newValue) { }

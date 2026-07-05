@@ -107,11 +107,16 @@ public class AlexeiController : NetworkBehaviour
         if (director != null)
             director.stopped += OnCutsceneDirectorStopped;
 
+        // Capture the authoritative server time before activating so clients can
+        // compensate for the RPC round-trip and seek the director to the correct
+        // playback position.
+        double cutsceneStartTime = NetworkManager.ServerTime.Time;
+
         // Activate directly — this works regardless of network spawn state.
         // The ClientRpc then syncs the activation to any connected remote clients.
         _cutsceneObject?.SetActive(true);
         if (IsSpawned)
-            ActivateCutsceneClientRpc();
+            ActivateCutsceneClientRpc(cutsceneStartTime);
 
         Debug.Log($"[AlexeiController] Cutscene GO activated. Director found: {director != null}, IsSpawned: {IsSpawned}");
 
@@ -136,9 +141,34 @@ public class AlexeiController : NetworkBehaviour
     private void OnCutsceneDirectorStopped(PlayableDirector _) => _cutsceneFinished = true;
 
     [ClientRpc]
-    private void ActivateCutsceneClientRpc()
+    private void ActivateCutsceneClientRpc(double serverStartTime)
     {
+        // Host already activated locally — skip to avoid double-processing.
+        if (IsServer) return;
+
         _cutsceneObject?.SetActive(true);
+
+        // Seek the director to the current playback time so late-arriving clients
+        // stay frame-accurate despite RPC propagation delay.
+        var director = _cutsceneObject != null
+            ? _cutsceneObject.GetComponent<PlayableDirector>()
+            : null;
+
+        if (director != null)
+        {
+            double elapsed = NetworkManager.ServerTime.Time - serverStartTime;
+            if (elapsed > 0.0 && elapsed < director.duration)
+                director.time = elapsed;
+        }
+    }
+
+    [ClientRpc]
+    private void PlayLandingSoundClientRpc(Vector3 position)
+    {
+        // Host already played the sound locally — remote clients only.
+        if (IsServer) return;
+        if (_landingSound == null) return;
+        SFXController.Instance?.PlayAtPosition(_landingSound, position, _landingSoundVolume);
     }
 
     [ClientRpc]
@@ -332,9 +362,13 @@ public class AlexeiController : NetworkBehaviour
         msb?.SetAnimBool(_groundedAnimBool, true);
         msb?.TriggerAnim("Roar");
 
-        // Play the landing impact sound at the booth window position.
+        // Play the landing impact sound at the booth window position on all clients.
         if (_landingSound != null && SFXController.Instance != null)
+        {
             SFXController.Instance.PlayAtPosition(_landingSound, _mutantBoothPos.position, _landingSoundVolume);
+            if (IsSpawned)
+                PlayLandingSoundClientRpc(_mutantBoothPos.position);
+        }
 
         // Re-enable the NavMeshAgent now that the mutant is on the ground.
         if (agent != null) agent.enabled = true;

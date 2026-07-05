@@ -65,6 +65,16 @@ public class PlayerSpawner : NetworkBehaviour
         SpawnPlayerAtPoint(clientId, GetBoothSpawnPoint(clientId), isOutside: false);
     }
 
+    /// <summary>
+    /// Spawns the player prefab for the given client at the outside bunker spawn point.
+    /// Used when a dead player is revived at the start of a new day.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnPlayerAtOutsideBunker(ulong clientId)
+    {
+        SpawnPlayerAtPoint(clientId, GetOutsideBunkerSpawnPoint(clientId), isOutside: false);
+    }
+
     private void SpawnPlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside)
     {
         if (!NetworkManager.Singleton.IsServer)

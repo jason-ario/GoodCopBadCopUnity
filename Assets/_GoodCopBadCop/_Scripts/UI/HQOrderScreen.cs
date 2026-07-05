@@ -88,8 +88,9 @@ public class HQOrderScreen : MonoBehaviour
         // Attempt to deduct money from the shared pool
         GlobalHostVariables.Instance.SubtractMoneyFromClient(RespawnCost);
 
-        // Route the request through the local player instance (which is guaranteed to be spawned and owned)
-        PlayerInstance.Instance.RequestRespawnServerRpc(targetClientId, corpse.NetworkObject);
+        // Route the revive request through ReviveManager — it handles despawning the
+        // dead player object and spawning a fresh one at the lobby spawn point.
+        ReviveManager.Instance.RevivePlayer(targetClientId, isNewDay: false);
 
         HangUp();
     }
