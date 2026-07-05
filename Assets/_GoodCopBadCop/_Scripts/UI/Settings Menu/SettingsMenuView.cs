@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine.EventSystems;
@@ -7,7 +8,10 @@ using VContainer;
 
 public interface ISettingsMenuView
 {
+    event Action<int> DisplayModeChanged;
+    event Action Closed;
     void ShowTab(ESettingsMenuTab tab);
+    void SetDisplayModeValue(int value);
 }
 
 public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
@@ -25,8 +29,15 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
         Dropdown
     }
 
+    private enum ESettingsMenuControlOption
+    {
+        None,
+        DisplayMode
+    }
+
     private sealed class SettingsMenuControlDefinition
     {
+        public readonly ESettingsMenuControlOption Option;
         public readonly string Label;
         public readonly ESettingsMenuControlType ControlType;
         public readonly string[] Options;
@@ -37,6 +48,7 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
         public readonly bool Interactable;
 
         private SettingsMenuControlDefinition(
+            ESettingsMenuControlOption option,
             string label,
             ESettingsMenuControlType controlType,
             string[] options,
@@ -46,6 +58,7 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
             float sliderValue,
             bool interactable)
         {
+            Option = option;
             Label = label;
             ControlType = controlType;
             Options = options;
@@ -59,6 +72,7 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
         public static SettingsMenuControlDefinition Slider(string label, float value = 100f)
         {
             return new SettingsMenuControlDefinition(
+                ESettingsMenuControlOption.None,
                 label,
                 ESettingsMenuControlType.Slider,
                 null,
@@ -73,9 +87,11 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
             string label,
             string[] options,
             int defaultOptionIndex = 0,
-            bool interactable = true)
+            bool interactable = true,
+            ESettingsMenuControlOption option = ESettingsMenuControlOption.None)
         {
             return new SettingsMenuControlDefinition(
+                option,
                 label,
                 ESettingsMenuControlType.Dropdown,
                 options,
@@ -89,6 +105,7 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
 
     private static readonly string[] OffOnOptions = { "Off", "On" };
     private static readonly string[] HoldToggleOptions = { "Hold", "Toggle" };
+    private static readonly string[] DisplayModeOptions = { "Fullscreen", "Borderless", "Windowed" };
 
     private static readonly ESettingsMenuTab[] TabOrder =
     {
@@ -108,7 +125,10 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
 
     private static readonly SettingsMenuControlDefinition[] GraphicsControlDefinitions =
     {
-        SettingsMenuControlDefinition.Dropdown("Display Mode", new[] { "Fullscreen", "Borderless", "Windowed" }),
+        SettingsMenuControlDefinition.Dropdown(
+            "Display Mode",
+            DisplayModeOptions,
+            option: ESettingsMenuControlOption.DisplayMode),
         SettingsMenuControlDefinition.Dropdown("Resolution", new[] { "1920 x 1080", "1600 x 900", "1280 x 720" }),
         SettingsMenuControlDefinition.Dropdown("VSync", OffOnOptions, defaultOptionIndex: 1),
         SettingsMenuControlDefinition.Dropdown("FPS Limit", new[] { "Unlimited", "30", "60", "120", "144" }),
@@ -151,6 +171,10 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
     private readonly List<ESettingsMenuTab> availableTabs = new();
 
     private ISettingsMenuService service;
+    private TMP_Dropdown displayModeDropdown;
+
+    public event Action<int> DisplayModeChanged;
+    public event Action Closed;
 
     [Inject]
     public void Construct(ISettingsMenuService service)
@@ -168,6 +192,11 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
     private void OnEnable()
     {
         OpenDefaultSettings();
+    }
+
+    private void OnDisable()
+    {
+        Closed?.Invoke();
     }
 
     private void OnDestroy()
@@ -193,6 +222,17 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
     public void OpenControlSettings()
     {
         service?.SelectTab(ESettingsMenuTab.Controls);
+    }
+
+    public void SetDisplayModeValue(int value)
+    {
+        if (displayModeDropdown == null)
+        {
+            return;
+        }
+
+        displayModeDropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, displayModeDropdown.options.Count - 1));
+        displayModeDropdown.RefreshShownValue();
     }
 
     public void ShowTab(ESettingsMenuTab tab)
@@ -627,7 +667,7 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
         }
     }
 
-    private static void ConfigureDropdownRow(GameObject row, SettingsMenuControlDefinition definition)
+    private void ConfigureDropdownRow(GameObject row, SettingsMenuControlDefinition definition)
     {
         TMP_Dropdown dropdown = row.GetComponentInChildren<TMP_Dropdown>(true);
         if (dropdown == null)
@@ -637,9 +677,20 @@ public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
 
         dropdown.ClearOptions();
         dropdown.AddOptions(new List<string>(definition.Options));
-        dropdown.value = Mathf.Clamp(definition.DefaultOptionIndex, 0, definition.Options.Length - 1);
+
+        if (definition.Option == ESettingsMenuControlOption.DisplayMode)
+        {
+            displayModeDropdown = dropdown;
+        }
+
+        dropdown.SetValueWithoutNotify(Mathf.Clamp(definition.DefaultOptionIndex, 0, definition.Options.Length - 1));
         dropdown.interactable = definition.Interactable;
         dropdown.RefreshShownValue();
+
+        if (definition.Interactable && definition.Option == ESettingsMenuControlOption.DisplayMode)
+        {
+            dropdown.onValueChanged.AddListener(value => DisplayModeChanged?.Invoke(value));
+        }
 
         ConfigureDropdownSize(dropdown, definition.Options.Length);
         StyleDropdown(row, dropdown, definition.Interactable);

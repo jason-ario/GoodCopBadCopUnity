@@ -61,3 +61,10 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Verified: Static documentation update only; Odin asset import is present under `Assets/Plugins/Sirenix`.
 - Risks: Unity Editor compile/console validation is still needed after the Odin import.
 - Follow-ups: Use editor-only `OdinEditorWindow` tools under `Tools/_GoodCopBadCop/` for debug workflows.
+
+## 2026-07-05 - Settings persistent display mode
+
+- Goal: Wire Display Mode using the new persistent reactive settings architecture.
+- Changed: Added SettingsModel with PersistentReactiveProperty-backed DisplayMode, SettingsService commands, SettingsApplier Unity bridge, and SettingsMenuPresenter/View bindings for the Display Mode dropdown.
+- Verified: Ran git diff --check; searched for misplaced Unity/PlayerPrefs calls; Unity Editor log tail showed no fresh settings compile errors.
+- Risks: Only Display Mode is wired; other settings remain UI-only.

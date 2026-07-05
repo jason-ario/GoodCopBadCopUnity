@@ -1,3 +1,4 @@
+using GoodCopBadCop.Settings;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -9,6 +10,10 @@ public sealed class MainSceneLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
+        builder.Register<SettingsModel>(Lifetime.Scoped).AsSelf().As<ISettingsModel>();
+        builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
+        builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
+
         builder.RegisterComponentInHierarchy<SettingsMenuView>().As<ISettingsMenuView>();
         builder.Register<SettingsMenuModel>(Lifetime.Scoped).AsSelf().As<ISettingsMenuModel>();
         builder.Register<ISettingsMenuService, SettingsMenuService>(Lifetime.Scoped);
