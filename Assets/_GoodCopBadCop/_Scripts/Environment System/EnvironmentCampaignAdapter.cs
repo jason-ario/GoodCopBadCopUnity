@@ -1,45 +1,49 @@
 using System;
 using VContainer.Unity;
 
-public sealed class EnvironmentCampaignAdapter : IInitializable, IDisposable
+namespace GoodCopBadCop.EnvironmentSystem
 {
-    private readonly IEnvironmentService service;
-
-    public EnvironmentCampaignAdapter(IEnvironmentService service)
+    public sealed class EnvironmentCampaignAdapter : IInitializable, IDisposable
     {
-        this.service = service;
-    }
+        private readonly IEnvironmentService service;
 
-    public void Initialize()
-    {
-        CampaignManager.OnDayChanged += ApplyDay;
-        ApplyCurrentDay();
-    }
-
-    public void Dispose()
-    {
-        CampaignManager.OnDayChanged -= ApplyDay;
-    }
-
-    private void ApplyCurrentDay()
-    {
-        if (CampaignManager.Instance != null)
+        public EnvironmentCampaignAdapter(IEnvironmentService service)
         {
-            service.ApplyDay(CampaignManager.Instance.CurrentDay);
-            return;
+            this.service = service;
         }
 
-        if (ShiftManager.Instance != null)
+        public void Initialize()
         {
-            service.ApplyDay(ShiftManager.Instance.CurrentDay);
-            return;
+            CampaignManager.OnDayChanged += ApplyDay;
+            ApplyCurrentDay();
         }
 
-        service.ApplyDay(1);
+        public void Dispose()
+        {
+            CampaignManager.OnDayChanged -= ApplyDay;
+        }
+
+        private void ApplyCurrentDay()
+        {
+            if (CampaignManager.Instance != null)
+            {
+                service.ApplyDay(CampaignManager.Instance.CurrentDay);
+                return;
+            }
+
+            if (ShiftManager.Instance != null)
+            {
+                service.ApplyDay(ShiftManager.Instance.CurrentDay);
+                return;
+            }
+
+            service.ApplyDay(1);
+        }
+
+        private void ApplyDay(int day)
+        {
+            service.ApplyDay(day);
+        }
     }
 
-    private void ApplyDay(int day)
-    {
-        service.ApplyDay(day);
-    }
 }

@@ -1,33 +1,37 @@
 using System.Collections.Generic;
 
-public interface ISettingsMenuService
+namespace GoodCopBadCop.UI.SettingsMenu
 {
-    void SelectTab(ESettingsMenuTab tab);
-    void SelectDefaultTab(IReadOnlyList<ESettingsMenuTab> availableTabs);
-}
-
-public sealed class SettingsMenuService : ISettingsMenuService
-{
-    private readonly SettingsMenuModel model;
-
-    public SettingsMenuService(SettingsMenuModel model)
+    public interface ISettingsMenuService
     {
-        this.model = model;
+        void SelectTab(ESettingsMenuTab tab);
+        void SelectDefaultTab(IReadOnlyList<ESettingsMenuTab> availableTabs);
     }
 
-    public void SelectTab(ESettingsMenuTab tab)
+    public sealed class SettingsMenuService : ISettingsMenuService
     {
-        model.SelectTab(tab);
-    }
+        private readonly SettingsMenuModel model;
 
-    public void SelectDefaultTab(IReadOnlyList<ESettingsMenuTab> availableTabs)
-    {
-        if (availableTabs == null || availableTabs.Count == 0)
+        public SettingsMenuService(SettingsMenuModel model)
         {
-            SelectTab(ESettingsMenuTab.Graphics);
-            return;
+            this.model = model;
         }
 
-        SelectTab(availableTabs[0]);
+        public void SelectTab(ESettingsMenuTab tab)
+        {
+            model.SelectTab(tab);
+        }
+
+        public void SelectDefaultTab(IReadOnlyList<ESettingsMenuTab> availableTabs)
+        {
+            if (availableTabs == null || availableTabs.Count == 0)
+            {
+                SelectTab(ESettingsMenuTab.Graphics);
+                return;
+            }
+
+            SelectTab(availableTabs[0]);
+        }
     }
+
 }

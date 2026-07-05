@@ -3,59 +3,63 @@ using GoodCopBadCop.Settings;
 using R3;
 using VContainer.Unity;
 
-public sealed class SettingsMenuPresenter : IInitializable, IDisposable
+namespace GoodCopBadCop.UI.SettingsMenu
 {
-    private readonly ISettingsMenuModel model;
-    private readonly ISettingsModel settingsModel;
-    private readonly ISettingsService settingsService;
-    private readonly ISettingsMenuView view;
-    private DisposableBag disposables;
-
-    public SettingsMenuPresenter(
-        ISettingsMenuModel model,
-        ISettingsModel settingsModel,
-        ISettingsService settingsService,
-        ISettingsMenuView view)
+    public sealed class SettingsMenuPresenter : IInitializable, IDisposable
     {
-        this.model = model;
-        this.settingsModel = settingsModel;
-        this.settingsService = settingsService;
-        this.view = view;
-    }
+        private readonly ISettingsMenuModel model;
+        private readonly ISettingsModel settingsModel;
+        private readonly ISettingsService settingsService;
+        private readonly ISettingsMenuView view;
+        private DisposableBag disposables;
 
-    public void Initialize()
-    {
-        view.DisplayModeChanged += OnDisplayModeChanged;
-        view.Closed += OnClosed;
-
-        model.SelectedTab
-            .Subscribe(view.ShowTab)
-            .AddTo(ref disposables);
-
-        settingsModel.DisplayMode
-            .Subscribe(displayMode => view.SetDisplayModeValue((int)displayMode))
-            .AddTo(ref disposables);
-    }
-
-    public void Dispose()
-    {
-        view.DisplayModeChanged -= OnDisplayModeChanged;
-        view.Closed -= OnClosed;
-        disposables.Dispose();
-    }
-
-    private void OnDisplayModeChanged(int value)
-    {
-        if (!Enum.IsDefined(typeof(EDisplayMode), value))
+        public SettingsMenuPresenter(
+            ISettingsMenuModel model,
+            ISettingsModel settingsModel,
+            ISettingsService settingsService,
+            ISettingsMenuView view)
         {
-            return;
+            this.model = model;
+            this.settingsModel = settingsModel;
+            this.settingsService = settingsService;
+            this.view = view;
         }
 
-        settingsService.SetDisplayMode((EDisplayMode)value);
+        public void Initialize()
+        {
+            view.DisplayModeChanged += OnDisplayModeChanged;
+            view.Closed += OnClosed;
+
+            model.SelectedTab
+                .Subscribe(view.ShowTab)
+                .AddTo(ref disposables);
+
+            settingsModel.DisplayMode
+                .Subscribe(displayMode => view.SetDisplayModeValue((int)displayMode))
+                .AddTo(ref disposables);
+        }
+
+        public void Dispose()
+        {
+            view.DisplayModeChanged -= OnDisplayModeChanged;
+            view.Closed -= OnClosed;
+            disposables.Dispose();
+        }
+
+        private void OnDisplayModeChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EDisplayMode), value))
+            {
+                return;
+            }
+
+            settingsService.SetDisplayMode((EDisplayMode)value);
+        }
+
+        private void OnClosed()
+        {
+            settingsService.Flush();
+        }
     }
 
-    private void OnClosed()
-    {
-        settingsService.Flush();
-    }
 }

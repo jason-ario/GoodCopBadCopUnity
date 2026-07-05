@@ -1,4 +1,5 @@
 using System;
+using GoodCopBadCop.Infrastructure.Persistence;
 using R3;
 
 namespace GoodCopBadCop.Settings
@@ -17,7 +18,7 @@ namespace GoodCopBadCop.Settings
 
     public sealed class SettingsModel : ISettingsModel, IDisposable
     {
-        public readonly global::PersistentReactiveProperty<EDisplayMode> DisplayModeMutable =
+        public readonly PersistentReactiveProperty<EDisplayMode> DisplayModeMutable =
             new("settings.displayMode", EDisplayMode.Borderless);
 
         public ReadOnlyReactiveProperty<EDisplayMode> DisplayMode => DisplayModeMutable;

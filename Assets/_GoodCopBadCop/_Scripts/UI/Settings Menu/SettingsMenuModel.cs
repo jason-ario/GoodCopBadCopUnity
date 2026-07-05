@@ -1,30 +1,34 @@
 using System;
 using R3;
 
-public interface ISettingsMenuModel
+namespace GoodCopBadCop.UI.SettingsMenu
 {
-    ReadOnlyReactiveProperty<ESettingsMenuTab> SelectedTab { get; }
-}
-
-public sealed class SettingsMenuModel : ISettingsMenuModel, IDisposable
-{
-    public readonly ReactiveProperty<ESettingsMenuTab> SelectedTabMutable = new(ESettingsMenuTab.Graphics);
-
-    public ReadOnlyReactiveProperty<ESettingsMenuTab> SelectedTab => SelectedTabMutable;
-
-    public void SelectTab(ESettingsMenuTab tab)
+    public interface ISettingsMenuModel
     {
-        if (SelectedTabMutable.Value == tab)
+        ReadOnlyReactiveProperty<ESettingsMenuTab> SelectedTab { get; }
+    }
+
+    public sealed class SettingsMenuModel : ISettingsMenuModel, IDisposable
+    {
+        public readonly ReactiveProperty<ESettingsMenuTab> SelectedTabMutable = new(ESettingsMenuTab.Graphics);
+
+        public ReadOnlyReactiveProperty<ESettingsMenuTab> SelectedTab => SelectedTabMutable;
+
+        public void SelectTab(ESettingsMenuTab tab)
         {
-            SelectedTabMutable.OnNext(tab);
-            return;
+            if (SelectedTabMutable.Value == tab)
+            {
+                SelectedTabMutable.OnNext(tab);
+                return;
+            }
+
+            SelectedTabMutable.Value = tab;
         }
 
-        SelectedTabMutable.Value = tab;
+        public void Dispose()
+        {
+            SelectedTabMutable.Dispose();
+        }
     }
 
-    public void Dispose()
-    {
-        SelectedTabMutable.Dispose();
-    }
 }

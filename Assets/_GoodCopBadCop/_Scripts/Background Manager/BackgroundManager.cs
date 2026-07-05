@@ -1,3 +1,4 @@
+using GoodCopBadCop.EnvironmentSystem;
 using UnityEngine;
 using VolumetricFogAndMist2;
 

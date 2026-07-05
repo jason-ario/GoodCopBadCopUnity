@@ -1,45 +1,49 @@
 using System;
 using R3;
 
-public interface IEnvironmentModel
+namespace GoodCopBadCop.EnvironmentSystem
 {
-    ReadOnlyReactiveProperty<int> CurrentDay { get; }
-    ReadOnlyReactiveProperty<EnvironmentPreset> CurrentPreset { get; }
-}
-
-public sealed class EnvironmentModel : IEnvironmentModel, IDisposable
-{
-    public readonly ReactiveProperty<int> CurrentDayMutable = new(1);
-    public readonly ReactiveProperty<EnvironmentPreset> CurrentPresetMutable = new(null);
-
-    public ReadOnlyReactiveProperty<int> CurrentDay => CurrentDayMutable;
-    public ReadOnlyReactiveProperty<EnvironmentPreset> CurrentPreset => CurrentPresetMutable;
-
-    public void SelectDay(int day)
+    public interface IEnvironmentModel
     {
-        if (CurrentDayMutable.Value == day)
+        ReadOnlyReactiveProperty<int> CurrentDay { get; }
+        ReadOnlyReactiveProperty<EnvironmentPreset> CurrentPreset { get; }
+    }
+
+    public sealed class EnvironmentModel : IEnvironmentModel, IDisposable
+    {
+        public readonly ReactiveProperty<int> CurrentDayMutable = new(1);
+        public readonly ReactiveProperty<EnvironmentPreset> CurrentPresetMutable = new(null);
+
+        public ReadOnlyReactiveProperty<int> CurrentDay => CurrentDayMutable;
+        public ReadOnlyReactiveProperty<EnvironmentPreset> CurrentPreset => CurrentPresetMutable;
+
+        public void SelectDay(int day)
         {
-            CurrentDayMutable.OnNext(day);
-            return;
+            if (CurrentDayMutable.Value == day)
+            {
+                CurrentDayMutable.OnNext(day);
+                return;
+            }
+
+            CurrentDayMutable.Value = day;
         }
 
-        CurrentDayMutable.Value = day;
-    }
-
-    public void SelectPreset(EnvironmentPreset preset)
-    {
-        if (CurrentPresetMutable.Value == preset)
+        public void SelectPreset(EnvironmentPreset preset)
         {
-            CurrentPresetMutable.OnNext(preset);
-            return;
+            if (CurrentPresetMutable.Value == preset)
+            {
+                CurrentPresetMutable.OnNext(preset);
+                return;
+            }
+
+            CurrentPresetMutable.Value = preset;
         }
 
-        CurrentPresetMutable.Value = preset;
+        public void Dispose()
+        {
+            CurrentDayMutable.Dispose();
+            CurrentPresetMutable.Dispose();
+        }
     }
 
-    public void Dispose()
-    {
-        CurrentDayMutable.Dispose();
-        CurrentPresetMutable.Dispose();
-    }
 }

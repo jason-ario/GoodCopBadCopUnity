@@ -55,6 +55,30 @@ FeatureService
 FeaturePresenter / FeatureView / FeatureAdapter
 ```
 
+## Namespace Rules
+
+Use `GoodCopBadCop.*` namespaces for new architecture/framework code and new significant features.
+
+Recommended namespace shape:
+
+```text
+GoodCopBadCop.FeatureName
+GoodCopBadCop.Infrastructure.Persistence
+GoodCopBadCop.Settings
+GoodCopBadCop.EnvironmentSystem
+GoodCopBadCop.Editor
+GoodCopBadCop.Tests.Editor
+```
+
+Rules:
+
+- New feature code should use namespaces from the start.
+- New reusable infrastructure should live under `GoodCopBadCop.Infrastructure.*`.
+- New tests should live under `GoodCopBadCop.Tests.*`.
+- Keep legacy global-namespace code as-is unless the current task substantially rewrites that subsystem.
+- Avoid mass namespace-only refactors across prefab-heavy or scene-heavy legacy scripts.
+- When a legacy global class needs to consume namespaced new code, add an explicit `using` rather than moving the legacy class just for style.
+
 ## File And Naming Rules
 
 Keep interfaces close to their only implementation:
