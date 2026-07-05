@@ -794,15 +794,41 @@ public class SuspectController : NetworkBehaviour
     [ClientRpc]
     private void NotifyPaperworkSpawnedClientRpc(NetworkObjectReference idCardRef, NetworkObjectReference appFormRef)
     {
-        if (!idCardRef.TryGet(out NetworkObject idCardObj)) return;
+        StartCoroutine(ResolvePaperworkSpawnedRpc(idCardRef, appFormRef));
+    }
 
-        IDCard card = idCardObj.GetComponent<IDCard>();
+    /// <summary>
+    /// Resolves the <see cref="NetworkObjectReference"/>s for the spawned paperwork and fires
+    /// <see cref="OnPaperworkSpawned"/>. Retries for up to 3 frames because NGO may deliver
+    /// the spawn-object message and the ClientRpc in the same transport batch; the client can
+    /// process the RPC before it registers the spawned object, causing TryGet to return false
+    /// on the first attempt.
+    /// </summary>
+    private IEnumerator ResolvePaperworkSpawnedRpc(NetworkObjectReference idCardRef, NetworkObjectReference appFormRef)
+    {
+        const int MaxAttempts = 4;
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            if (idCardRef.TryGet(out NetworkObject idCardObj))
+            {
+                if (attempt > 0)
+                    Debug.Log($"[SuspectController] NotifyPaperworkSpawnedClientRpc: resolved IDCard after {attempt} frame(s).");
 
-        PickableObject appForm = null;
-        if (appFormRef.TryGet(out NetworkObject appFormObj))
-            appForm = appFormObj.GetComponent<PickableObject>();
+                IDCard card = idCardObj.GetComponent<IDCard>();
 
-        OnPaperworkSpawned?.Invoke(card, appForm);
+                PickableObject appForm = null;
+                if (appFormRef.TryGet(out NetworkObject appFormObj))
+                    appForm = appFormObj.GetComponent<PickableObject>();
+
+                OnPaperworkSpawned?.Invoke(card, appForm);
+                yield break;
+            }
+
+            Debug.LogWarning($"[SuspectController] NotifyPaperworkSpawnedClientRpc: TryGet failed on attempt {attempt + 1}/{MaxAttempts} — waiting a frame.");
+            yield return null;
+        }
+
+        Debug.LogError("[SuspectController] NotifyPaperworkSpawnedClientRpc: could not resolve IDCard NetworkObjectReference after max retries. OnPaperworkSpawned will NOT fire on this client.");
     }
 
     public void RespondToDialogueChoice(int choiceIndex)

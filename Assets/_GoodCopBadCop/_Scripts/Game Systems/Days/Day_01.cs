@@ -227,6 +227,8 @@ public class Day_01 : DayBase
     {
         base.DayActivated();
 
+        Debug.Log($"[Day_01] DayActivated — IsServer={NetworkManager.Singleton?.IsServer ?? false}  IsClient={NetworkManager.Singleton?.IsClient ?? false}");
+
         _dayStartedFired = false;
         _debugSkipActive = false;
 
@@ -550,6 +552,8 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnVladPaperworkSpawned(IDCard card, PickableObject appForm)
     {
+        Debug.Log($"[Day_01] OnVladPaperworkSpawned — card={card}, appForm={appForm}  IsServer={NetworkManager.Singleton?.IsServer ?? false}");
+
         // Advance the chain: random suspect's paperwork goes to the next handler, not Ivan's.
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
         SuspectController.OnPaperworkSpawned += OnRandomSuspectPaperworkSpawned;

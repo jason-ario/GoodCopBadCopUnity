@@ -82,7 +82,53 @@ public class AlexeiController : NetworkBehaviour
 
     private bool _cutsceneFinished;
 
+    // ── Network state ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set to true by the server the moment the cutscene is triggered.
+    /// NGO replicates this as part of the NetworkObject spawn payload, so clients
+    /// that are already connected receive it on the next network tick and late-joining
+    /// clients receive it the instant the NetworkObject spawns for them — no missed-window
+    /// race condition possible.
+    /// </summary>
+    private readonly NetworkVariable<bool> _cutsceneActive = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Authoritative server time (NetworkManager.ServerTime.Time) recorded at the moment
+    /// the cutscene was triggered. Clients use this to seek the PlayableDirector forward by
+    /// the propagation delay so all machines stay frame-accurate.
+    /// </summary>
+    private readonly NetworkVariable<double> _cutsceneStartServerTime = new(
+        0.0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
+
     private void Awake() => Instance = this;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _cutsceneActive.OnValueChanged += OnCutsceneActiveChanged;
+
+        // Late-joiner / reconnect catch-up: if the cutscene was already triggered
+        // before this client spawned the NetworkObject, activate immediately.
+        if (_cutsceneActive.Value)
+            ActivateCutsceneLocally(_cutsceneStartServerTime.Value);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _cutsceneActive.OnValueChanged -= OnCutsceneActiveChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= EnableClockOut;
+    }
+
+    // ── Murder Cutscene ────────────────────────────────────────────────────────
 
     /// <summary>
     /// Activates the cutscene GameObject on all clients, triggering Play On Awake.
@@ -98,6 +144,7 @@ public class AlexeiController : NetworkBehaviour
     private IEnumerator CutsceneSequence(Action onCutsceneDone)
     {
         // Grab the director before activating so we can subscribe to stopped first.
+        // GetComponent works on inactive GameObjects.
         var director = _cutsceneObject != null
             ? _cutsceneObject.GetComponent<PlayableDirector>()
             : null;
@@ -107,18 +154,15 @@ public class AlexeiController : NetworkBehaviour
         if (director != null)
             director.stopped += OnCutsceneDirectorStopped;
 
-        // Capture the authoritative server time before activating so clients can
-        // compensate for the RPC round-trip and seek the director to the correct
-        // playback position.
-        double cutsceneStartTime = NetworkManager.ServerTime.Time;
+        // Record the server time first, then flip the active flag.
+        // On the server, OnCutsceneActiveChanged fires synchronously (same frame),
+        // so _cutsceneStartServerTime is already set when ActivateCutsceneLocally runs.
+        // On clients, both NetworkVariable updates travel in the same network message
+        // and are applied before OnValueChanged fires.
+        _cutsceneStartServerTime.Value = NetworkManager.ServerTime.Time;
+        _cutsceneActive.Value = true;
 
-        // Activate directly — this works regardless of network spawn state.
-        // The ClientRpc then syncs the activation to any connected remote clients.
-        _cutsceneObject?.SetActive(true);
-        if (IsSpawned)
-            ActivateCutsceneClientRpc(cutsceneStartTime);
-
-        Debug.Log($"[AlexeiController] Cutscene GO activated. Director found: {director != null}, IsSpawned: {IsSpawned}");
+        Debug.Log($"[AlexeiController] Cutscene triggered. Director found: {director != null}, IsSpawned: {IsSpawned}");
 
         float elapsed = 0f;
         while (!_cutsceneFinished && elapsed < CutsceneTimeoutSeconds)
@@ -140,27 +184,45 @@ public class AlexeiController : NetworkBehaviour
 
     private void OnCutsceneDirectorStopped(PlayableDirector _) => _cutsceneFinished = true;
 
-    [ClientRpc]
-    private void ActivateCutsceneClientRpc(double serverStartTime)
+    private void OnCutsceneActiveChanged(bool previous, bool current)
     {
-        // Host already activated locally — skip to avoid double-processing.
-        if (IsServer) return;
-
-        _cutsceneObject?.SetActive(true);
-
-        // Seek the director to the current playback time so late-arriving clients
-        // stay frame-accurate despite RPC propagation delay.
-        var director = _cutsceneObject != null
-            ? _cutsceneObject.GetComponent<PlayableDirector>()
-            : null;
-
-        if (director != null)
-        {
-            double elapsed = NetworkManager.ServerTime.Time - serverStartTime;
-            if (elapsed > 0.0 && elapsed < director.duration)
-                director.time = elapsed;
-        }
+        if (!current) return;
+        ActivateCutsceneLocally(_cutsceneStartServerTime.Value);
     }
+
+    /// <summary>
+    /// Activates the cutscene GameObject locally and — on clients — seeks the
+    /// PlayableDirector forward by the network propagation delay so all machines
+    /// stay frame-accurate with the server's timeline.
+    /// </summary>
+    private void ActivateCutsceneLocally(double serverStartTime)
+    {
+        if (_cutsceneObject == null)
+        {
+            Debug.LogWarning("[AlexeiController] ActivateCutsceneLocally: _cutsceneObject is not assigned.");
+            return;
+        }
+
+        _cutsceneObject.SetActive(true);
+
+        // Clients seek the director to compensate for propagation delay.
+        // The server's director is at time 0 when this fires (OnNetworkSpawn callback
+        // also runs after SetActive, so playOnAwake has not yet started).
+        if (!IsServer)
+        {
+            var director = _cutsceneObject.GetComponent<PlayableDirector>();
+            if (director != null)
+            {
+                double elapsed = NetworkManager.ServerTime.Time - serverStartTime;
+                if (elapsed > 0.0 && elapsed < director.duration)
+                    director.time = elapsed;
+            }
+        }
+
+        Debug.Log($"[AlexeiController] ActivateCutsceneLocally complete — IsServer={IsServer}");
+    }
+
+    // ── Music / SFX client RPCs ────────────────────────────────────────────────
 
     [ClientRpc]
     private void PlayLandingSoundClientRpc(Vector3 position)
@@ -256,12 +318,6 @@ public class AlexeiController : NetworkBehaviour
             Debug.LogWarning("[AlexeiController] EnableClockOut: ShiftManager.Instance is null.");
     }
 
-    public override void OnNetworkDespawn()
-    {
-        base.OnNetworkDespawn();
-        TakeOutTrashTask.OnAllItemsDeposited -= EnableClockOut;
-    }
-
     // ── Mutant Entrance ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -320,9 +376,9 @@ public class AlexeiController : NetworkBehaviour
             yield break;
         }
 
-        NavMeshAgent agent     = instance.GetComponent<NavMeshAgent>();
-        MutantSuspectBehaviour msb = instance.GetComponent<MutantSuspectBehaviour>();
-        MutantEnemy mutantEnemy    = instance.GetComponent<MutantEnemy>();
+        NavMeshAgent agent          = instance.GetComponent<NavMeshAgent>();
+        MutantSuspectBehaviour msb  = instance.GetComponent<MutantSuspectBehaviour>();
+        MutantEnemy mutantEnemy     = instance.GetComponent<MutantEnemy>();
 
         // The NavMeshAgent snaps to the nearest NavMesh surface during Awake (inside Instantiate).
         // Disable it immediately and restore the intended aerial position before spawning.

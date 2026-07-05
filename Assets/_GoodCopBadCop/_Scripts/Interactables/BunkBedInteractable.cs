@@ -72,16 +72,18 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
     // ─── Event handlers ──────────────────────────────────────────────────────
 
-    /// <summary>Updates the hover tooltip when the shift ends.</summary>
+    /// <summary>Updates the hover tooltip when the shift ends and queues the go-to-bed task on the HUD.</summary>
     private void HandleShiftEnd()
     {
         interactText = InteractTextReady;
+        GoToBunkerTask.CreateAndRegister();
     }
 
-    /// <summary>Resets the hover tooltip when a new shift begins.</summary>
+    /// <summary>Resets the hover tooltip when a new shift begins and cleans up any leftover go-to-bed task.</summary>
     private void HandleShiftStart()
     {
         interactText = InteractTextNotReady;
+        GoToBunkerTask.CompleteAndRemove();
     }
 
     // ─── IInteractable ───────────────────────────────────────────────────────
@@ -140,6 +142,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private void OnConfirmEndDay()
     {
         CloseBedView();
+
+        GoToBunkerTask.CompleteAndRemove();
 
         if (SFXController.Instance != null && _endDaySFX != null)
             SFXController.Instance.Play(_endDaySFX);
