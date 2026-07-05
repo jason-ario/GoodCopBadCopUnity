@@ -3,6 +3,10 @@
 Last deep survey: 2026-07-04.
 Scope: static source inspection; validate in Unity before relying on exact scene object wiring.
 
+## When To Read
+
+Read this when behavior depends on runtime ordering: menu to lobby, campaign start, day activation, shift flow, suspect spawn/verdict, day advance, or late join. For ownership and source-file map only, use `SYSTEMS.md`.
+
 ## 1. Menu to Gameplay
 
 Primary files:

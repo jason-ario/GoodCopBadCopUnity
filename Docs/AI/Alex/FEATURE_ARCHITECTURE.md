@@ -5,6 +5,10 @@ Last updated: 2026-07-05.
 This is Alex's target architecture for new significant gameplay/UI/networking features.
 Apply it to new modules first. Do not refactor old systems into this shape unless the current task needs it.
 
+## When To Read
+
+Read this when planning or implementing a new significant feature, adding DI/model/service code, changing architecture conventions, or writing foundational tests. Skip it for small one-line fixes unless the fix touches the new architecture layer.
+
 ## Summary
 
 Use this feature shape:

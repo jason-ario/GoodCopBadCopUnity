@@ -68,3 +68,9 @@ This log is for Alex's AI-assisted development sessions. Keep entries short and 
 - Changed: Added SettingsModel with PersistentReactiveProperty-backed DisplayMode, SettingsService commands, SettingsApplier Unity bridge, and SettingsMenuPresenter/View bindings for the Display Mode dropdown.
 - Verified: Ran git diff --check; searched for misplaced Unity/PlayerPrefs calls; Unity Editor log tail showed no fresh settings compile errors.
 - Risks: Only Display Mode is wired; other settings remain UI-only.
+## 2026-07-05 - AI docs context routing
+
+- Goal: Reduce context bloat in Alex's AI docs while preserving deep project knowledge.
+- Changed: Added `SESSION_START.md`, changed `README.md` into a task router, added context-budget rules to `MEMORY.md`, and added `When To Read` headers to large reference docs.
+- Verified: Documentation-only change; inspect diff and markdown files before committing.
+- Risks: Routing quality should be adjusted after a few real new-thread sessions.

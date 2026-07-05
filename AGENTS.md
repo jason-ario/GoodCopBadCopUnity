@@ -5,7 +5,16 @@
 - This is a Unity project. Main product content lives under `Assets/_GoodCopBadCop`.
 - Treat other top-level `Assets/*` folders as vendor, imported package, demo, or support content unless the task explicitly targets them.
 - Bezi Sidekick may be installed in this repo, but these instructions do not require Bezi and should not change Bezi users' workflow.
-- For Alex-specific AI context, read `Docs/AI/Alex/README.md` before planning or editing Alex's tasks.
+
+## Alex AI Context
+
+For Alex-specific tasks:
+
+- Read `Docs/AI/Alex/README.md`.
+- Read `Docs/AI/Alex/SESSION_START.md`.
+- Do not read every file in `Docs/AI/Alex` by default.
+- Use the routing table in `README.md` to choose only task-relevant deeper docs.
+- Inspect actual source files before making code changes.
 
 ## Working Pattern
 

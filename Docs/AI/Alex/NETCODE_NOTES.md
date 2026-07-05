@@ -2,6 +2,10 @@
 
 Last deep survey: 2026-07-04.
 
+## When To Read
+
+Read this before changing any `NetworkBehaviour`, `NetworkVariable`, RPC, spawned prefab, lobby/session path, player ownership path, or gameplay state that can differ between host and client.
+
 ## Baseline
 
 This project uses Unity Netcode for GameObjects heavily. A static survey found more than a thousand occurrences of Netcode concepts across product scripts: `NetworkBehaviour`, `NetworkVariable`, `ServerRpc`, `ClientRpc`, `NetworkObjectReference`, and `NetworkObject`.

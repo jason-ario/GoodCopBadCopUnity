@@ -3,6 +3,10 @@
 Last deep survey: 2026-07-04.
 Scope: static source inspection under `Assets/_GoodCopBadCop/_Scripts`; no Unity Editor run.
 
+## When To Read
+
+Read this when the task needs ownership, coupling, or likely source files for an existing gameplay/UI/player/content subsystem. For exact runtime ordering, use `GAMEPLAY_FLOWS.md`; for new feature architecture, use `FEATURE_ARCHITECTURE.md`.
+
 ## Mental Model
 
 The project is a networked Unity gameplay project built around scene singletons and server-authoritative state. The main runtime chain is:

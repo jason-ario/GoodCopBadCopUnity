@@ -2,6 +2,10 @@
 
 Last deep survey: 2026-07-04.
 
+## When To Read
+
+Read this before changing ScriptableObjects, prefabs, scenes, authored content, suspect data, dialogue, environments, weapons, pickups, or content folder structure.
+
 ## Source-of-Truth Folders
 
 Primary product folders:

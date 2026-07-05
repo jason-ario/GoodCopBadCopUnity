@@ -16,6 +16,8 @@ Survey method: filesystem and source-code inspection only; Unity Editor was not 
 
 ## Deep Context Files
 
+Use this list as a router. Open only the deeper file that matches the current task.
+
 - `SYSTEMS.md` - subsystem ownership and main source files.
 - `GAMEPLAY_FLOWS.md` - runtime flow from menu, lobby, campaign, shift, suspect, verdict, and day advance.
 - `NETCODE_NOTES.md` - multiplayer authority and common Netcode failure modes.

@@ -11,6 +11,15 @@ This project uses hybrid local memory:
 
 No semantic database or vector index is part of v1.
 
+## Context Budget Rules
+
+- Keep `AGENTS.md`, `README.md`, and `SESSION_START.md` short enough to load at the start of most Alex tasks.
+- Treat deep docs as demand-loaded references, not automatic context.
+- Add `When To Read` and short summary sections to large docs instead of expecting agents to read the entire file.
+- Prefer focused source inspection over copying large docs into the prompt.
+- Use `generated/PROJECT_SNAPSHOT.md` for quick human project facts; reserve `generated/PROJECT_SNAPSHOT.json` for scripts and tools.
+- If a doc grows beyond quick scan size, split by task area or add a smaller routing section at the top.
+
 ## Stable Facts
 
 Store high-level facts in `PROJECT_MAP.md` or `DECISIONS.md`:
