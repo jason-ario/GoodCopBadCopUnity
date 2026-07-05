@@ -6,6 +6,8 @@ namespace GoodCopBadCop.Settings
     {
         void SetDisplayMode(EDisplayMode displayMode);
         void SetScreenResolution(EScreenResolution screenResolution);
+        void SetVSyncEnabled(bool isEnabled);
+        void SetFpsLimit(EFpsLimit fpsLimit);
         void SetVoiceChatEnabled(bool isEnabled);
         void SetVoiceChatMuted(bool isMuted);
         void SetVoiceChatDeafened(bool isDeafened);
@@ -32,6 +34,26 @@ namespace GoodCopBadCop.Settings
         public void SetScreenResolution(EScreenResolution screenResolution)
         {
             model.ScreenResolutionMutable.Value = screenResolution;
+        }
+
+        public void SetVSyncEnabled(bool isEnabled)
+        {
+            model.VSyncEnabledMutable.Value = isEnabled;
+
+            if (isEnabled)
+            {
+                model.FpsLimitMutable.Value = EFpsLimit.Unlimited;
+            }
+        }
+
+        public void SetFpsLimit(EFpsLimit fpsLimit)
+        {
+            model.FpsLimitMutable.Value = fpsLimit;
+
+            if (fpsLimit != EFpsLimit.Unlimited)
+            {
+                model.VSyncEnabledMutable.Value = false;
+            }
         }
 
         public void SetVoiceChatEnabled(bool isEnabled)

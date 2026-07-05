@@ -19,10 +19,21 @@ namespace GoodCopBadCop.Settings
         R1280x720
     }
 
+    public enum EFpsLimit
+    {
+        Unlimited,
+        Fps30,
+        Fps60,
+        Fps120,
+        Fps144
+    }
+
     public interface ISettingsModel
     {
         ReadOnlyReactiveProperty<EDisplayMode> DisplayMode { get; }
         ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution { get; }
+        ReadOnlyReactiveProperty<bool> VSyncEnabled { get; }
+        ReadOnlyReactiveProperty<EFpsLimit> FpsLimit { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatEnabled { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatMuted { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatDeafened { get; }
@@ -38,6 +49,12 @@ namespace GoodCopBadCop.Settings
 
         public readonly PersistentReactiveProperty<EScreenResolution> ScreenResolutionMutable =
             new("settings.screenResolution", EScreenResolution.R1920x1080);
+
+        public readonly PersistentReactiveProperty<bool> VSyncEnabledMutable =
+            new("settings.vSync.enabled", true);
+
+        public readonly PersistentReactiveProperty<EFpsLimit> FpsLimitMutable =
+            new("settings.fpsLimit", EFpsLimit.Unlimited);
 
         public readonly PersistentReactiveProperty<bool> VoiceChatEnabledMutable =
             new("settings.voiceChat.enabled", true);
@@ -59,6 +76,8 @@ namespace GoodCopBadCop.Settings
 
         public ReadOnlyReactiveProperty<EDisplayMode> DisplayMode => DisplayModeMutable;
         public ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution => ScreenResolutionMutable;
+        public ReadOnlyReactiveProperty<bool> VSyncEnabled => VSyncEnabledMutable;
+        public ReadOnlyReactiveProperty<EFpsLimit> FpsLimit => FpsLimitMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatEnabled => VoiceChatEnabledMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatMuted => VoiceChatMutedMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatDeafened => VoiceChatDeafenedMutable;
@@ -70,6 +89,8 @@ namespace GoodCopBadCop.Settings
         {
             DisplayModeMutable.Flush();
             ScreenResolutionMutable.Flush();
+            VSyncEnabledMutable.Flush();
+            FpsLimitMutable.Flush();
             VoiceChatEnabledMutable.Flush();
             VoiceChatMutedMutable.Flush();
             VoiceChatDeafenedMutable.Flush();
@@ -82,6 +103,8 @@ namespace GoodCopBadCop.Settings
         {
             DisplayModeMutable.Dispose();
             ScreenResolutionMutable.Dispose();
+            VSyncEnabledMutable.Dispose();
+            FpsLimitMutable.Dispose();
             VoiceChatEnabledMutable.Dispose();
             VoiceChatMutedMutable.Dispose();
             VoiceChatDeafenedMutable.Dispose();

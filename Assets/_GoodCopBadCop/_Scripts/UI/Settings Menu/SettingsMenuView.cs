@@ -12,6 +12,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
     {
         event Action<int> DisplayModeChanged;
         event Action<int> ScreenResolutionChanged;
+        event Action<bool> VSyncChanged;
+        event Action<int> FpsLimitChanged;
         event Action<bool> VoiceChatEnabledChanged;
         event Action<bool> VoiceChatMutedChanged;
         event Action<bool> VoiceChatDeafenedChanged;
@@ -20,6 +22,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void ShowTab(ESettingsMenuTab tab);
         void SetDisplayModeValue(int value);
         void SetScreenResolutionValue(int value);
+        void SetVSyncValue(bool value);
+        void SetFpsLimitValue(int value);
         void SetVoiceChatEnabledValue(bool value);
         void SetVoiceChatMutedValue(bool value);
         void SetVoiceChatDeafenedValue(bool value);
@@ -46,6 +50,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             None,
             DisplayMode,
             Resolution,
+            VSync,
+            FpsLimit,
             VoiceChatEnabled,
             VoiceChatMuted,
             VoiceChatDeafened,
@@ -124,6 +130,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly string[] HoldToggleOptions = { "Hold", "Toggle" };
         private static readonly string[] DisplayModeOptions = { "Fullscreen", "Borderless", "Windowed" };
         private static readonly string[] ResolutionOptions = { "1920 x 1080", "1600 x 900", "1280 x 720" };
+        private static readonly string[] FpsLimitOptions = { "Unlimited", "30", "60", "120", "144" };
         private static readonly string[] VoiceChatInputModeOptions = { "Voice Activation", "Push To Talk", "Open Mic" };
 
         private static readonly ESettingsMenuTab[] TabOrder =
@@ -152,8 +159,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "Resolution",
                 ResolutionOptions,
                 option: ESettingsMenuControlOption.Resolution),
-            SettingsMenuControlDefinition.Dropdown("VSync", OffOnOptions, defaultOptionIndex: 1),
-            SettingsMenuControlDefinition.Dropdown("FPS Limit", new[] { "Unlimited", "30", "60", "120", "144" }),
+            SettingsMenuControlDefinition.Dropdown(
+                "VSync",
+                OffOnOptions,
+                defaultOptionIndex: 1,
+                option: ESettingsMenuControlOption.VSync),
+            SettingsMenuControlDefinition.Dropdown(
+                "FPS Limit",
+                FpsLimitOptions,
+                option: ESettingsMenuControlOption.FpsLimit),
             SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2),
             SettingsMenuControlDefinition.Slider("Brightness", 50f),
             SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1),
@@ -212,6 +226,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private ISettingsMenuService service;
         private TMP_Dropdown displayModeDropdown;
         private TMP_Dropdown screenResolutionDropdown;
+        private TMP_Dropdown vSyncDropdown;
+        private TMP_Dropdown fpsLimitDropdown;
         private TMP_Dropdown voiceChatEnabledDropdown;
         private TMP_Dropdown voiceChatMutedDropdown;
         private TMP_Dropdown voiceChatDeafenedDropdown;
@@ -219,6 +235,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         public event Action<int> DisplayModeChanged;
         public event Action<int> ScreenResolutionChanged;
+        public event Action<bool> VSyncChanged;
+        public event Action<int> FpsLimitChanged;
         public event Action<bool> VoiceChatEnabledChanged;
         public event Action<bool> VoiceChatMutedChanged;
         public event Action<bool> VoiceChatDeafenedChanged;
@@ -281,6 +299,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetScreenResolutionValue(int value)
         {
             SetDropdownValue(screenResolutionDropdown, value);
+        }
+
+        public void SetVSyncValue(bool value)
+        {
+            SetDropdownValue(vSyncDropdown, value ? 1 : 0);
+        }
+
+        public void SetFpsLimitValue(int value)
+        {
+            SetDropdownValue(fpsLimitDropdown, value);
         }
 
         public void SetVoiceChatEnabledValue(bool value)
@@ -769,6 +797,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case ESettingsMenuControlOption.Resolution:
                     screenResolutionDropdown = dropdown;
                     break;
+                case ESettingsMenuControlOption.VSync:
+                    vSyncDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.FpsLimit:
+                    fpsLimitDropdown = dropdown;
+                    break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     voiceChatEnabledDropdown = dropdown;
                     break;
@@ -793,6 +827,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     break;
                 case ESettingsMenuControlOption.Resolution:
                     dropdown.onValueChanged.AddListener(value => ScreenResolutionChanged?.Invoke(value));
+                    break;
+                case ESettingsMenuControlOption.VSync:
+                    dropdown.onValueChanged.AddListener(value => VSyncChanged?.Invoke(value != 0));
+                    break;
+                case ESettingsMenuControlOption.FpsLimit:
+                    dropdown.onValueChanged.AddListener(value => FpsLimitChanged?.Invoke(value));
                     break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     dropdown.onValueChanged.AddListener(value => VoiceChatEnabledChanged?.Invoke(value != 0));

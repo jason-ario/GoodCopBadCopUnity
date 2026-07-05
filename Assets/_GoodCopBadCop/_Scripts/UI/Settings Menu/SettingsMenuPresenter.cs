@@ -30,6 +30,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             view.DisplayModeChanged += OnDisplayModeChanged;
             view.ScreenResolutionChanged += OnScreenResolutionChanged;
+            view.VSyncChanged += OnVSyncChanged;
+            view.FpsLimitChanged += OnFpsLimitChanged;
             view.VoiceChatEnabledChanged += OnVoiceChatEnabledChanged;
             view.VoiceChatMutedChanged += OnVoiceChatMutedChanged;
             view.VoiceChatDeafenedChanged += OnVoiceChatDeafenedChanged;
@@ -46,6 +48,14 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.ScreenResolution
                 .Subscribe(screenResolution => view.SetScreenResolutionValue((int)screenResolution))
+                .AddTo(ref disposables);
+
+            settingsModel.VSyncEnabled
+                .Subscribe(view.SetVSyncValue)
+                .AddTo(ref disposables);
+
+            settingsModel.FpsLimit
+                .Subscribe(fpsLimit => view.SetFpsLimitValue((int)fpsLimit))
                 .AddTo(ref disposables);
 
             settingsModel.VoiceChatEnabled
@@ -69,6 +79,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             view.DisplayModeChanged -= OnDisplayModeChanged;
             view.ScreenResolutionChanged -= OnScreenResolutionChanged;
+            view.VSyncChanged -= OnVSyncChanged;
+            view.FpsLimitChanged -= OnFpsLimitChanged;
             view.VoiceChatEnabledChanged -= OnVoiceChatEnabledChanged;
             view.VoiceChatMutedChanged -= OnVoiceChatMutedChanged;
             view.VoiceChatDeafenedChanged -= OnVoiceChatDeafenedChanged;
@@ -95,6 +107,21 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetScreenResolution((EScreenResolution)value);
+        }
+
+        private void OnVSyncChanged(bool isEnabled)
+        {
+            settingsService.SetVSyncEnabled(isEnabled);
+        }
+
+        private void OnFpsLimitChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EFpsLimit), value))
+            {
+                return;
+            }
+
+            settingsService.SetFpsLimit((EFpsLimit)value);
         }
 
         private void OnVoiceChatEnabledChanged(bool isEnabled)
