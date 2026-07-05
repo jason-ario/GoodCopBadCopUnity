@@ -34,6 +34,39 @@ When Unity MCP tools are available:
 - Data/prefab/scene change: inspect diff carefully and verify references in Unity when available.
 - Docs/tooling-only change: run the affected script and inspect generated output.
 
+## Testing Rules
+
+Use Unity Test Framework with NUnit for project tests.
+
+Current test locations:
+
+- EditMode tests: `Assets/_GoodCopBadCop/_Scripts/Editor/Tests`.
+- PlayMode tests: create `Assets/_GoodCopBadCop/_Tests/PlayMode` with a dedicated test asmdef when the first real PlayMode test is needed.
+- Do not put project tests in vendor/imported asset folders.
+
+Default choice:
+
+- Use EditMode `NUnit.Framework` tests for pure C# behavior, models, services, storage, persistence, small adapters, and architecture/framework utilities.
+- Use `[Test]` for synchronous tests.
+- Use `[UnityTest]` only when the test needs frames, coroutines, scene lifecycle, or Unity runtime waiting.
+- Use PlayMode tests only when Unity scene lifecycle, physics, UI interaction, Netcode behavior, or runtime object wiring is the point of the test.
+
+Write focused tests for important base components and reusable infrastructure. Prioritize tests when a component is:
+
+- Used by multiple features or systems.
+- Part of the AI/framework layer, DI setup, persistence, storage, or architecture glue.
+- Hard to validate manually every time.
+- Likely to break silently during refactors.
+- Small enough to test without heavy scene setup.
+
+Naming:
+
+- Test files/classes: `ComponentNameTests`.
+- Test methods: `Scenario_ExpectedResult` or `Method_Scenario_ExpectedResult`.
+- Keep test fake/stub classes inside the test file unless shared by multiple test files.
+
+For new foundational components, add at least a smoke-level test for the contract before building more features on top of it.
+
 ## Commit Naming
 
 Use a lightweight Conventional Commits style:

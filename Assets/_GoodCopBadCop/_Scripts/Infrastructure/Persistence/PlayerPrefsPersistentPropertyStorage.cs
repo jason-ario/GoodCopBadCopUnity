@@ -91,10 +91,26 @@ public sealed class PlayerPrefsPersistentPropertyStorage : IPersistentPropertySt
     {
         string raw = PlayerPrefs.GetString(key, defaultValue.ToString());
 
-        if (Enum.TryParse(typeof(T), raw, true, out object value))
-            return (T)value;
+        try
+        {
+            object value = Enum.Parse(typeof(T), raw, true);
 
-        throw new NotSupportedException($"Failed to convert stored value '{raw}' for key '{key}' to {typeof(T).Name}.");
+            if (Enum.IsDefined(typeof(T), value))
+                return (T)value;
+        }
+        catch (Exception exception) when (exception is ArgumentException || exception is OverflowException)
+        {
+            throw CreateLoadEnumException<T>(key, raw, exception);
+        }
+
+        throw CreateLoadEnumException<T>(key, raw);
+    }
+
+    private static NotSupportedException CreateLoadEnumException<T>(string key, string raw, Exception innerException = null)
+    {
+        return new NotSupportedException(
+            $"Failed to convert stored value '{raw}' for key '{key}' to {typeof(T).Name}.",
+            innerException);
     }
 
     private static void ValidateKey(string key)
