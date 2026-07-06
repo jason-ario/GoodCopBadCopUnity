@@ -8,13 +8,12 @@
 
 ## Project AI Context
 
-For Codex project coding tasks:
+For AI-assisted project coding tasks:
 
-- Read `Docs/AI/README.md`.
-- Read `Docs/AI/SESSION_START.md`.
+- Read `Docs/AI/README.md` and follow its routing.
 - Do not read every file in `Docs/AI` by default.
-- If deeper project context is needed, read `Docs/AI/Codex/README.md` and use its routing table.
 - Inspect actual source files before making code changes.
+- Tool-specific context may exist under `Docs/AI/<ToolName>`; use it only when it matches the current tool/task.
 
 ## Working Pattern
 
