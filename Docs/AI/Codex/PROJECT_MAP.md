@@ -27,7 +27,7 @@ Use this list as a router. Open only the deeper file that matches the current ta
 ## Important Packages
 
 - Unity MCP: `com.coplaydev.unity-mcp`
-- Bezi Sidekick package is present locally, but Alex's workflow should stay local-first.
+- Bezi Sidekick package is present locally, but this Codex context does not require Bezi or change Bezi users' workflow.
 - Netcode for GameObjects: `com.unity.netcode.gameobjects`
 - Multiplayer Play Mode: `com.unity.multiplayer.playmode`
 - Input System: `com.unity.inputsystem`
