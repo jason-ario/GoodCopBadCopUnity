@@ -57,13 +57,19 @@ public class CheatConsoleUI : MonoBehaviour
     {
         _cheats.Add(("Skip to Day 1 — Booth Start", () =>
         {
-            DebugConsole.Instance.SkipToDay(1);
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay(1));
+            SetVisible(false);
+        }));
+
+        _cheats.Add(("Skip to Day 1 — Soldier / Alexei Cutscene", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToSoldierSlot());
             SetVisible(false);
         }));
 
         _cheats.Add(("Skip to End of Day 1", () =>
         {
-            DebugConsole.Instance.SkipToEndOfDay1();
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay1());
             SetVisible(false);
         }));
     }

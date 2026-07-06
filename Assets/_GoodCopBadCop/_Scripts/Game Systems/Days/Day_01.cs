@@ -1193,14 +1193,17 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnSoldierArrivedAtWindow(int index)
     {
-        if (index != 4) return;
+        // In normal play the soldier is always suspect index 4.
+        // When _debugSkipActive is true he is the only suspect spawned (index 0), so accept
+        // any index on the debug-skip path to avoid the guard blocking his dialogue.
+        if (!_debugSkipActive && index != 4) return;
 
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
 
         if (!NetworkManager.Singleton.IsServer) return;
 
         StartCoroutine(WaitAndStartSoldierDialogue());
-        Debug.Log("[Day_01] Soldier (index 4) arrived — starting dialogue after settle delay.");
+        Debug.Log($"[Day_01] Soldier (index {index}) arrived — starting dialogue after settle delay.");
     }
 
     private IEnumerator WaitAndStartSoldierDialogue()
@@ -1272,27 +1275,43 @@ public class Day_01 : DayBase
 
         Debug.Log("[Day_01] Mutant idling at booth — playing lever megaphone dialogue.");
 
-        // PlayMegaphoneDialogue re-enters scripted mode (safe no-op if already in it),
-        // plays the instruction line, and exits scripted mode when the player advances.
-        // The lever is unlocked and the shutter lock released once the player has been told to use it.
+        // Deactivate the shaky booth cam now that the cinematic phase is over.
+        // This must happen before ExitScriptedMode so the cam is gone by the time
+        // the player regains camera control.
+        AlexeiController.Instance?.EndCinematicPhase();
+
+        // Release the player before the lever dialogue so they can move to the lever
+        // and use their own camera while listening to the instruction.
+        ScriptedDialogueRunner.Instance.ExitScriptedMode();
+
+        // Play the lever instruction as an unlocked megaphone line — the player stays
+        // free to move while listening. Yield until the dialogue is dismissed before
+        // activating the attack so Alexei only starts climbing after the player has been told.
         if (_leverDialogue != null)
-            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_leverDialogue, () =>
-            {
-                // Scripted mode has just exited — now it is safe to start the attack timer.
-                AlexeiController.Instance?.ActivateAttackBehaviour();
-                if (ShutterController.Instance != null)
-                    ShutterController.Instance.ShutterLockedOpen = false;
-                _lever?.SetInteractable(true);
-            });
+        {
+            bool leverDialogueDone = false;
+            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
+                _leverDialogue,
+                () => leverDialogueDone = true,
+                unlocked: true);
+            yield return new WaitUntil(() => leverDialogueDone);
+        }
         else
         {
-            Debug.LogWarning("[Day_01] _leverDialogue is not assigned — exiting scripted mode manually.");
-            ScriptedDialogueRunner.Instance.ExitScriptedMode();
-            AlexeiController.Instance?.ActivateAttackBehaviour();
-            if (ShutterController.Instance != null)
-                ShutterController.Instance.ShutterLockedOpen = false;
-            _lever?.SetInteractable(true);
+            Debug.LogWarning("[Day_01] _leverDialogue is not assigned — activating attack behaviour immediately.");
         }
+
+        // Unlock the lever and shutter immediately once the dialogue ends so the
+        // player can act straight away — before Alexei's approach delay expires.
+        if (ShutterController.Instance != null)
+            ShutterController.Instance.ShutterLockedOpen = false;
+        _lever?.SetInteractable(true);
+
+        // Give the player a moment to react before Alexei begins climbing.
+        if (AlexeiController.Instance != null)
+            yield return new WaitForSeconds(AlexeiController.Instance.BehaviourActivationDelay);
+
+        AlexeiController.Instance?.ActivateAttackBehaviour();
     }
 
     // -------------------------------------------------------------------------
@@ -1323,6 +1342,14 @@ public class Day_01 : DayBase
 
         // Cancel any pending Day 1 coroutines so the 7s delay can't re-arm Vlad's intercept.
         StopAllCoroutines();
+
+        // Unsubscribe all early-day arrival handlers so none of them fire when the soldier
+        // arrives. Without this, OnVladArrivedAtWindow fires for index 0 and plays
+        // _vladDialogue on the soldier character.
+        SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
 
         // Open and lock the shutter so the Soldier can walk up to the window.
         ShutterController.Instance?.OpenShutter();

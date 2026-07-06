@@ -239,8 +239,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// required). Lines are displayed with the configured megaphone name and colour, audio is
     /// routed through <see cref="MegaphoneDialogueManager"/>, and the player can click to advance
     /// exactly as with character dialogue. Must be called on the server.
+    /// <para>
+    /// When <paramref name="unlocked"/> is <c>true</c>, the sequence plays without locking player
+    /// movement or activating the suspect camera — the player remains free to move and look around
+    /// while the megaphone line plays. Use this for instructional lines that require the player to
+    /// physically interact with something (e.g. the lever close-shutter instruction on Day 1).
+    /// The advance gate and cam cleanup still run normally.
+    /// </para>
     /// </summary>
-    public void PlayMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete = null)
+    public void PlayMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete = null, bool unlocked = false)
     {
         if (!IsServer) return;
 
@@ -251,7 +258,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete));
+        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked));
     }
 
     // -------------------------------------------------------------------------
@@ -540,9 +547,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Megaphone sequence
     // -------------------------------------------------------------------------
 
-    private IEnumerator RunMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete)
+    private IEnumerator RunMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete, bool unlocked = false)
     {
-        EnterScriptedModeClientRpc(0UL); // no NPC speaker for megaphone dialogue
+        // When unlocked, the player is already free (caller called ExitScriptedMode first).
+        // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
+        // so the player can reach whatever the instruction is asking them to do.
+        if (!unlocked)
+            EnterScriptedModeClientRpc(0UL);
+
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)

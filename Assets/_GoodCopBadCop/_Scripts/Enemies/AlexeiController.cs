@@ -19,6 +19,11 @@ public class AlexeiController : NetworkBehaviour
     [Tooltip("The GameObject that holds the PlayableDirector. Starts inactive; activating it triggers Play On Awake.")]
     [SerializeField] private GameObject _cutsceneObject;
 
+    [Tooltip("The At Booth Cam (Shaky) CinemachineCamera (child of ---Suspect Controller). " +
+             "Activated on all clients when the cutscene starts and deactivated once the director " +
+             "stops (by which point the lever megaphone cam has taken over).")]
+    [SerializeField] private GameObject _boothShakyCam;
+
     [Header("Mutant Entrance")]
     [Tooltip("Networked Mutant_Alexei prefab to spawn. Must be registered in the NetworkManager's prefab list.")]
     [SerializeField] private GameObject _mutantPrefab;
@@ -47,6 +52,10 @@ public class AlexeiController : NetworkBehaviour
 
     [Tooltip("Seconds between the onMutantIdle callback (megaphone dialogue) and activating MutantSuspectBehaviour.")]
     [SerializeField] private float _behaviourActivationDelay = 3f;
+    public float BehaviourActivationDelay => _behaviourActivationDelay;
+
+    [Tooltip("Seconds between roar taunts while Alexei is idling at the booth window.")]
+    [SerializeField] private float _roarInterval = 4f;
 
     [Header("Mutant Entrance Animations")]
     [Tooltip("Animator bool parameter name for the grounded state. False = falling, True = grounded (triggers landing).")]
@@ -150,6 +159,19 @@ public class AlexeiController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Ends the cinematic phase of the Alexei sequence on all clients: deactivates the shaky
+    /// booth camera and resets the cutscene flag. Call this as soon as the scripted action phase
+    /// begins (e.g. when the mutant idles and the player is released to pull the lever), rather
+    /// than waiting for the PlayableDirector to stop. Server-only.
+    /// </summary>
+    public void EndCinematicPhase()
+    {
+        if (!IsServer) return;
+        if (_cutsceneActive.Value)
+            _cutsceneActive.Value = false;
+    }
+
+    /// <summary>
     /// Activates the cutscene GameObject on all clients, triggering Play On Awake.
     /// <paramref name="onCutsceneDone"/> fires on the server when the director stops.
     /// Server-only.
@@ -198,6 +220,11 @@ public class AlexeiController : NetworkBehaviour
         else
             Debug.Log($"[AlexeiController] Cutscene finished after {elapsed:F2}s.");
 
+        // Reset the flag so OnCutsceneActiveChanged(_, false) fires on all clients,
+        // deactivating _boothShakyCam. By this point the lever megaphone dialogue's
+        // camera has already taken over, so the visual transition is seamless.
+        _cutsceneActive.Value = false;
+
         onCutsceneDone?.Invoke();
     }
 
@@ -205,8 +232,10 @@ public class AlexeiController : NetworkBehaviour
 
     private void OnCutsceneActiveChanged(bool previous, bool current)
     {
-        if (!current) return;
-        ActivateCutsceneLocally(_cutsceneStartServerTime.Value);
+        if (current)
+            ActivateCutsceneLocally(_cutsceneStartServerTime.Value);
+        else
+            _boothShakyCam?.SetActive(false);
     }
 
     /// <summary>
@@ -223,6 +252,7 @@ public class AlexeiController : NetworkBehaviour
         }
 
         _cutsceneObject.SetActive(true);
+        _boothShakyCam?.SetActive(true);
 
         // Clients seek the director to compensate for propagation delay.
         // The server's director is at time 0 when this fires (OnNetworkSpawn callback
@@ -457,8 +487,18 @@ public class AlexeiController : NetworkBehaviour
         onMutantIdle?.Invoke();
 
         // Wait for Day_01 to confirm the player has finished the lever dialogue before
-        // starting the attack, so Alexei only begins climbing after the player has been told.
-        yield return new WaitUntil(() => _attackBehaviourRequested);
+        // starting the attack, roaring periodically to taunt the players.
+        float roarTimer = _roarInterval;
+        while (!_attackBehaviourRequested)
+        {
+            roarTimer -= Time.deltaTime;
+            if (roarTimer <= 0f)
+            {
+                msb?.TriggerAnim("Roar");
+                roarTimer = _roarInterval;
+            }
+            yield return null;
+        }
 
         if (msb == null || _mutantData == null)
         {

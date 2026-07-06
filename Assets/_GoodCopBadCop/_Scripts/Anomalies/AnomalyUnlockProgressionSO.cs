@@ -86,6 +86,43 @@ public class AnomalyUnlockProgressionSO : ScriptableObject
     }
 
     /// <summary>
+    /// Returns the anomaly type names that are newly unlocked on the given <paramref name="day"/>.
+    /// For scripted days, returns the explicitly configured list.
+    /// For post-scripted days, computes one deterministic pick per active category — identical
+    /// to the logic in <see cref="AnomalyUnlockManager"/>, so results always match.
+    /// </summary>
+    public string[] GetNewUnlocksForDay(int day)
+    {
+        int lastScripted = LastScriptedDay;
+
+        if (day <= lastScripted)
+            return GetScriptedUnlocksForDay(day);
+
+        // Build the cumulative set for all days up to (day - 1).
+        var cumulative = new HashSet<string>(StringComparer.Ordinal);
+
+        for (int d = 1; d <= lastScripted; d++)
+            foreach (string name in GetScriptedUnlocksForDay(d))
+                if (!string.IsNullOrEmpty(name)) cumulative.Add(name);
+
+        for (int d = lastScripted + 1; d < day; d++)
+            foreach (var category in _allCategories)
+            {
+                string pick = GetRandomLockedAnomaly(category, d, cumulative);
+                if (pick != null) cumulative.Add(pick);
+            }
+
+        // Now collect what's newly added on this specific day.
+        var newUnlocks = new List<string>();
+        foreach (var category in _allCategories)
+        {
+            string pick = GetRandomLockedAnomaly(category, day, cumulative);
+            if (pick != null) newUnlocks.Add(pick);
+        }
+        return newUnlocks.ToArray();
+    }
+
+    /// <summary>
     /// Returns the next anomaly to unlock for <paramref name="category"/> on the given
     /// post-scripted <paramref name="day"/>. Selection is deterministic: remaining locked
     /// anomalies are hashed with the day number so the result is consistent across sessions

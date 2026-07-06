@@ -727,10 +727,18 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>Plays the bell and shows the day number banner at the start of a shift.</summary>
+    /// <summary>
+    /// Set to true before a debug skip to prevent the day-number overlay from appearing.
+    /// Automatically cleared after the first call to <see cref="PlayShiftStartFanfare"/>.
+    /// </summary>
+    public static bool SuppressFanfare;
+
     private void PlayShiftStartFanfare()
     {
         bellSound.Play();
-        _startShiftScreen.ShowDayNumber(_currentDay);
+        if (!SuppressFanfare)
+            _startShiftScreen.ShowDayNumber(_currentDay);
+        SuppressFanfare = false;
     }
 
     /// <summary>Restores full player control.</summary>

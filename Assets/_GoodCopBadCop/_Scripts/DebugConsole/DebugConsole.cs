@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 
 
 public class DebugConsole : MonoBehaviour
@@ -223,6 +224,32 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Executes <paramref name="onReady"/> immediately if the game is already running,
+    /// otherwise bootstraps a host session and defers the callback until
+    /// <see cref="GameManager.OnGameStart"/> fires and the player is fully spawned.
+    /// </summary>
+    public void EnsureGameStartedThen(Action onReady)
+    {
+        if (GameManager.Instance.HasGameStarted)
+        {
+            onReady();
+            return;
+        }
+
+        NetworkManager.Singleton.StartHost();
+        LobbyManager.Instance.CreateLobby();
+        GameManager.Instance.TryStartGame(true);
+
+        UnityAction handler = null;
+        handler = () =>
+        {
+            GameManager.Instance.OnGameStart -= handler;
+            onReady();
+        };
+        GameManager.Instance.OnGameStart += handler;
+    }
+
+    /// <summary>
     /// Called once by <see cref="GameManager.OnGameStart"/> after the lobby join sequence
     /// completes and the player is fully spawned. Starts the shift and unsubscribes immediately.
     /// </summary>
@@ -297,6 +324,7 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
+        ShiftManager.SuppressFanfare = true;
         ShiftManager.Instance.SkipToBoothReady();
         CampaignManager.Instance.JumpToDay(targetDay);
     }
@@ -366,6 +394,50 @@ public class DebugConsole : MonoBehaviour
 
         PlayerInstance.Instance.PlayerHealth.TakeDamage(999f);
         Debug.Log("[DebugConsole] Local player killed (K).");
+    }
+
+    /// <summary>
+    /// Skips to Day 1 in the booth with the shift started and the next suspect slot
+    /// intercepted to spawn the soldier, triggering the Alexei cutscene sequence.
+    /// The soldier arrives after a short delay once the shift is running.
+    /// </summary>
+    public void SkipToSoldierSlot()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToSoldierSlot: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(1);
+        StartCoroutine(SkipToSoldierSlotAfterDelay());
+    }
+
+    private IEnumerator SkipToSoldierSlotAfterDelay()
+    {
+        // Wait one frame for Day_01 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_01.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToSoldierSlot: Day_01.Instance not found after SkipToDay(1).");
+            yield break;
+        }
+
+        // Put the gate in post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Set up booth state (shutter open/locked, lever) and arm the soldier intercept on the
+        // next suspect slot. Unlike SkipToEndOfDay1, we intentionally leave the intercept set
+        // so the soldier actually spawns.
+        Day_01.Instance.DebugSkipToSoldierSlot();
+
+        // Short first-arrival window so the soldier appears a couple of seconds after loading in.
+        const float SoldierArrivalDelay = 2f;
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(SoldierArrivalDelay, SoldierArrivalDelay);
+        ShiftManager.Instance?.TryStartShift();
+
+        Debug.Log("[DebugConsole] Skipped to soldier slot — soldier will arrive in ~2 s.");
     }
 
     /// <summary>
