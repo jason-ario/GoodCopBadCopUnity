@@ -61,7 +61,7 @@ public class DailyFaxContentsController : MonoBehaviour
         dateText.text = date;
 
         headerText.text = "DAILY INTELLIGENCE BRIEFING";
-        subheaderText.text = $"DAY {day} — NEWLY CLASSIFIED THREATS";
+        subheaderText.text = "NEWLY CLASSIFIED THREATS";
 
         string[] newUnlocks = _unlockProgression != null
             ? _unlockProgression.GetNewUnlocksForDay(day)
