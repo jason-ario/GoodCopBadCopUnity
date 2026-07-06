@@ -44,6 +44,7 @@ public class BunkerDoorController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         _isOpen.OnValueChanged += OnIsOpenChanged;
+        CampaignManager.OnDayChanged += OnDayChanged;
 
         // Snap to the authoritative state so late-joining clients are correct immediately.
         SnapToAngle(_isOpen.Value ? OpenAngleZ : ClosedAngleZ);
@@ -52,6 +53,7 @@ public class BunkerDoorController : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         _isOpen.OnValueChanged -= OnIsOpenChanged;
+        CampaignManager.OnDayChanged -= OnDayChanged;
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -94,6 +96,18 @@ public class BunkerDoorController : NetworkBehaviour
     [Rpc(SendTo.Server)]
     private void ResetServerRpc()
     {
+        _isOpen.Value = false;
+    }
+
+    // ─── Day-change callback ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Resets the door to closed at the start of each new day.
+    /// Only the server writes the NetworkVariable; clients receive the state via OnIsOpenChanged.
+    /// </summary>
+    private void OnDayChanged(int day)
+    {
+        if (!IsServer) return;
         _isOpen.Value = false;
     }
 

@@ -278,6 +278,10 @@ public class CampaignManager : NetworkBehaviour
         dayBase.DayActivated();
         OnDayChanged?.Invoke(day);
 
+        // Fully heal all players at the start of every new day.
+        if (IsServer)
+            ResetAllPlayersHealth();
+
         // Lock the door before the shift starts on days 2+ so pre-shift content can play
         // while the room is secured. The door unlocks when the switch button starts the shift.
         if (IsServer && day > 1 && ShiftManager.Instance != null)
@@ -295,6 +299,24 @@ public class CampaignManager : NetworkBehaviour
             if (step == TutorialStep.None) continue;
             OnTutorialStepRequested?.Invoke(step);
             Debug.Log($"[CampaignManager] Tutorial step requested: {step}");
+        }
+    }
+
+    /// <summary>
+    /// Resets every connected player's health to max at the start of a new day.
+    /// Server-only; <see cref="PlayerHealth.ResetHealth"/> propagates state to clients via NetworkVariable.
+    /// </summary>
+    private void ResetAllPlayersHealth()
+    {
+        foreach (var client in NetworkManager.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
+            if (playerHealth == null) continue;
+
+            playerHealth.ResetHealth();
+            Debug.Log($"[CampaignManager] Reset health for client {client.ClientId}.");
         }
     }
 }

@@ -61,6 +61,9 @@ public class AnomalyController : MonoBehaviour
     ///   randomly within their pool and the count scales proportionally with the score, with
     ///   a minimum of 1 per active category.
     ///
+    /// Only anomalies whose type name is unlocked in <see cref="AnomalyUnlockManager"/> are
+    /// eligible for selection; locked anomalies are silently disabled and excluded from the pool.
+    ///
     /// Score 0 delegates to <see cref="InitializeClean"/>.
     /// </summary>
     public void InitializeByInfectionScore(int infectionScore)
@@ -74,30 +77,28 @@ public class AnomalyController : MonoBehaviour
         DisabledAnomalySiblingIndices.Clear();
         activeAnomalies.Clear();
 
-        // Build a list of non-empty category pools. Characters without anomalies in a
-        // given category simply have an empty list; excluding them keeps the maths correct.
+        // Build category pools and immediately filter out locked anomalies.
+        // FilterToUnlocked calls InitializeDisabled on each locked entry so
+        // they are both visually reset and recorded for client replication.
         var categoryPools = new List<List<Anomaly>>
         {
-            _documentationAnomalies.Cast<Anomaly>().ToList(),
-            _vitalsAnomalies.Cast<Anomaly>().ToList(),
-            _behaviorAnomalies.Cast<Anomaly>().ToList(),
-            _mutationAnomalies.Cast<Anomaly>().ToList(),
-            _supernaturalAnomalies.Cast<Anomaly>().ToList(),
+            FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_vitalsAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_behaviorAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_mutationAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_supernaturalAnomalies.Cast<Anomaly>().ToList()),
         };
         categoryPools.RemoveAll(p => p.Count == 0);
 
         if (categoryPools.Count == 0)
         {
-            Debug.LogWarning("[AnomalyController] No anomalies configured — nothing to activate.");
+            Debug.LogWarning("[AnomalyController] No unlocked anomalies available — suspect spawns clean.");
             return;
         }
 
         bool fullyMutated = infectionScore >= FULLY_MUTATED_THRESHOLD;
 
         // ── Dimension 1: randomly choose which categories are active ──────────
-        // Shuffle the pool list so the first N entries are the "active" ones.
-        // Below the threshold exactly CATEGORY_CAP_BELOW_THRESHOLD categories are active;
-        // at/above it every populated category is active.
         ShuffleList(categoryPools);
         int activeCategoryCount = fullyMutated
             ? categoryPools.Count
@@ -112,14 +113,11 @@ public class AnomalyController : MonoBehaviour
 
             if (c >= activeCategoryCount)
             {
-                // This category is inactive for this spawn — disable all its anomalies.
                 foreach (Anomaly a in pool)
                     InitializeDisabled(a);
                 continue;
             }
 
-            // Shuffle anomalies within the category so the active subset is random,
-            // not biased toward Inspector list order.
             ShuffleList(pool);
 
             int countInCategory = fullyMutated
@@ -186,6 +184,7 @@ public class AnomalyController : MonoBehaviour
     /// <summary>
     /// Forces exactly <paramref name="count"/> anomalies chosen at random from all pools.
     /// Bypasses score logic entirely. Use for tutorial suspects that must exhibit a specific count.
+    /// Only anomalies unlocked in <see cref="AnomalyUnlockManager"/> are eligible.
     /// </summary>
     public void InitializeWithExactAnomalyCount(int count)
     {
@@ -193,10 +192,10 @@ public class AnomalyController : MonoBehaviour
         activeAnomalies.Clear();
 
         Anomaly[] all = CollectAllAnomalies();
-        int clamped = Mathf.Min(count, all.Length);
+        List<Anomaly> pool = FilterToUnlocked(new List<Anomaly>(all));
+        int clamped = Mathf.Min(count, pool.Count);
 
         // Fisher-Yates partial shuffle to pick `clamped` unique anomalies.
-        List<Anomaly> pool = new List<Anomaly>(all);
         for (int i = 0; i < clamped; i++)
         {
             int j = Random.Range(i, pool.Count);
@@ -212,6 +211,7 @@ public class AnomalyController : MonoBehaviour
     /// Activates exactly <paramref name="count"/> anomalies from the documentation pool only.
     /// All other categories are fully disabled. Used for tutorial suspects (e.g. Ivan on Day 1)
     /// that must exhibit documentation discrepancies and nothing else.
+    /// Only unlocked documentation anomalies are eligible for selection.
     /// </summary>
     public void InitializeWithDocumentationAnomalies(int count)
     {
@@ -219,21 +219,21 @@ public class AnomalyController : MonoBehaviour
         activeAnomalies.Clear();
 
         // Disable every non-documentation anomaly first.
-        var others = new System.Collections.Generic.List<Anomaly>();
+        var others = new List<Anomaly>();
         others.AddRange(_vitalsAnomalies.Cast<Anomaly>());
         others.AddRange(_behaviorAnomalies.Cast<Anomaly>());
         others.AddRange(_mutationAnomalies.Cast<Anomaly>());
         others.AddRange(_supernaturalAnomalies.Cast<Anomaly>());
         foreach (Anomaly a in others) InitializeDisabled(a);
 
-        // Shuffle and activate the requested count from the documentation pool.
-        var docPool = _documentationAnomalies.Cast<Anomaly>().ToList();
+        // Filter to unlocked documentation anomalies, then shuffle and activate.
+        var docPool = FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList());
         ShuffleList(docPool);
         int toActivate = Mathf.Min(count, docPool.Count);
         for (int i = 0; i < toActivate; i++) ActivateAnomaly(docPool[i]);
         for (int i = toActivate; i < docPool.Count; i++) InitializeDisabled(docPool[i]);
 
-        Debug.Log($"[AnomalyController] Documentation-only init: {toActivate}/{docPool.Count} anomaly/ies active.");
+        Debug.Log($"[AnomalyController] Documentation-only init: {toActivate}/{docPool.Count} unlocked anomaly/ies active.");
     }
 
     /// <summary>
@@ -338,6 +338,32 @@ public class AnomalyController : MonoBehaviour
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a new list containing only the anomalies whose C# type name is currently
+    /// unlocked according to <see cref="AnomalyUnlockManager"/>. Anomalies that are filtered
+    /// out are immediately passed to <see cref="InitializeDisabled"/> so they are visually
+    /// reset and their sibling indices are recorded for client replication.
+    /// When <see cref="AnomalyUnlockManager.Instance"/> is null (e.g. during tests), the
+    /// full pool is returned unchanged.
+    /// </summary>
+    private List<Anomaly> FilterToUnlocked(List<Anomaly> pool)
+    {
+        AnomalyUnlockManager unlockManager = AnomalyUnlockManager.Instance;
+        if (unlockManager == null) return pool;
+
+        var unlocked = new List<Anomaly>(pool.Count);
+        foreach (Anomaly a in pool)
+        {
+            if (a == null) continue;
+
+            if (unlockManager.IsAnomalyUnlocked(a.GetType().Name))
+                unlocked.Add(a);
+            else
+                InitializeDisabled(a);
+        }
+        return unlocked;
+    }
 
     /// <summary>
     /// Collects all anomaly components from all five category lists.

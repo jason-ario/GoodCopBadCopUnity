@@ -1231,8 +1231,9 @@ public class Day_01 : DayBase
 
     private IEnumerator MutantAttackSequence()
     {
-        // Deactivate any override camera so the default At Booth Cam shows during the cutscene.
-        ScriptedDialogueRunner.Instance.SwitchCamera(string.Empty);
+        // Deactivate the SuspectCam and any override camera while keeping scripted mode active
+        // so the player stays locked throughout the cutscene and megaphone lever dialogue.
+        ScriptedDialogueRunner.Instance.ClearCamerasKeepMode();
 
         if (AlexeiController.Instance == null)
         {
@@ -1277,6 +1278,8 @@ public class Day_01 : DayBase
         if (_leverDialogue != null)
             ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_leverDialogue, () =>
             {
+                // Scripted mode has just exited — now it is safe to start the attack timer.
+                AlexeiController.Instance?.ActivateAttackBehaviour();
                 if (ShutterController.Instance != null)
                     ShutterController.Instance.ShutterLockedOpen = false;
                 _lever?.SetInteractable(true);
@@ -1285,6 +1288,7 @@ public class Day_01 : DayBase
         {
             Debug.LogWarning("[Day_01] _leverDialogue is not assigned — exiting scripted mode manually.");
             ScriptedDialogueRunner.Instance.ExitScriptedMode();
+            AlexeiController.Instance?.ActivateAttackBehaviour();
             if (ShutterController.Instance != null)
                 ShutterController.Instance.ShutterLockedOpen = false;
             _lever?.SetInteractable(true);

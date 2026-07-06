@@ -190,13 +190,7 @@ public class DebugConsole : MonoBehaviour
             ForceAlexeiSequenceOnNextSuspect();
         }
 
-        // F12 — skip to the end of Day 1 with the timecard machine primed for clock-out.
-        // The shift is started, all suspects are bypassed, and the player must walk to
-        // the machine to clock out, then to bed to begin Day 2.
-        if (Input.GetKeyDown(KeyCode.F12))
-        {
-            SkipToEndOfDay1();
-        }
+        // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
         if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
@@ -295,7 +289,7 @@ public class DebugConsole : MonoBehaviour
     /// Runs SkipToBoothReady first if the game is not yet in the shift, then applies
     /// the target day on top. Server-only.
     /// </summary>
-    private void SkipToDay(int targetDay)
+    public void SkipToDay(int targetDay)
     {
         if (CampaignManager.Instance == null)
         {
@@ -379,7 +373,7 @@ public class DebugConsole : MonoBehaviour
     /// primed for clock-out, as if all suspects had been processed. No suspects will arrive.
     /// The player must walk to the timecard machine to clock out, then to the bed to begin Day 2.
     /// </summary>
-    private void SkipToEndOfDay1()
+    public void SkipToEndOfDay1()
     {
         if (CampaignManager.Instance == null)
         {

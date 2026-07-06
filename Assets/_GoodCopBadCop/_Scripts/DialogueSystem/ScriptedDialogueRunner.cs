@@ -216,6 +216,25 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Deactivates the active suspect camera and any override camera without exiting scripted
+    /// mode. Use when transitioning to a cinematic or neutral-camera phase mid-session while
+    /// keeping the player locked in scripted mode (e.g. before a cutscene plays mid-sequence).
+    /// Must be called on the server.
+    /// </summary>
+    public void ClearCamerasKeepMode()
+    {
+        if (!IsServer) return;
+        ClearCamerasKeepModeClientRpc();
+    }
+
+    [ClientRpc]
+    private void ClearCamerasKeepModeClientRpc()
+    {
+        DeactivateOverrideCam();
+        SuspectController.Instance?.SetSuspectCamActive(false);
+    }
+
+    /// <summary>
     /// Plays a scripted dialogue sequence using the megaphone speaker identity (no NPC character
     /// required). Lines are displayed with the configured megaphone name and colour, audio is
     /// routed through <see cref="MegaphoneDialogueManager"/>, and the player can click to advance

@@ -8,9 +8,17 @@ public class ChecklistItem : MonoBehaviour
     [SerializeField] private SpriteRenderer sr;
     [SerializeField] private GameObject container;
 
+    /// <summary>
+    /// Optional overlay shown when this item's anomaly has not been unlocked yet.
+    /// Assign a child GameObject (e.g. a dark-tinted SpriteRenderer or a "???" label)
+    /// in the prefab Inspector. Hidden when the anomaly is unlocked.
+    /// </summary>
+    [SerializeField] private GameObject lockedVisual;
+
     // Assigned automatically by ExamPage.InitializeChecklistIndices() at OnNetworkSpawn
     // so it always matches the item's position in the _checklistItems array.
     private int index;
+    private bool _isLocked;
 
     public bool IsChecking => examPage.IsChecking;
 
@@ -27,6 +35,9 @@ public class ChecklistItem : MonoBehaviour
     public string AnomalyTypeName => anomalyTypeName;
 
     public bool IsChecked => checkbox.IsChecked;
+
+    /// <summary>True when this item's anomaly has not been unlocked yet and cannot be checked.</summary>
+    public bool IsLocked => _isLocked;
 
     /// <summary>
     /// Fired locally on the client that clicked the checkbox, the moment any checklist item
@@ -83,7 +94,8 @@ public class ChecklistItem : MonoBehaviour
 
     public void SetInteractable(bool value)
     {
-        checkbox.SetInteractable(value);
+        // Locked items can never become interactable, even when the exam is active.
+        checkbox.SetInteractable(_isLocked ? false : value);
     }
 
     /// <summary>Called by ExamPage.OnNetworkSpawn to set the array position of this item.</summary>
@@ -107,11 +119,16 @@ public class ChecklistItem : MonoBehaviour
     }
 
     /// <summary>
-    /// Shows or hides the container GameObject for this checklist item.
-    /// Called by ExamPage when the anomaly's lock state is evaluated.
+    /// Applies the locked/unlocked state to this checklist item.
+    /// When locked: hides the container so the row is invisible, and blocks checkbox interaction.
+    /// When unlocked: shows the container and restores normal interaction rules.
+    /// After calling this, invoke <see cref="SetInteractable"/> to apply the exam's
+    /// current interactable state with the new lock guard in effect.
     /// </summary>
     public void ApplyLockState(bool locked)
     {
+        _isLocked = locked;
+
         if (container != null)
             container.SetActive(!locked);
     }

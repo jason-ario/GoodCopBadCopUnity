@@ -38,8 +38,33 @@ public class SaveDataManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Anomaly Category Unlocks — removed; all categories are unlocked by default.
+    // Anomaly Unlocks
     // -------------------------------------------------------------------------
+
+    /// <summary>Returns true if the anomaly with the given C# type name has been unlocked for the active slot.</summary>
+    public bool IsAnomalyUnlocked(string typeName)
+    {
+        string[] unlocked = ActiveSlot?.UnlockedAnomalyTypeNames;
+        if (unlocked == null) return false;
+        return Array.IndexOf(unlocked, typeName) >= 0;
+    }
+
+    /// <summary>
+    /// Marks the anomaly type name as unlocked in the active slot and persists to disk.
+    /// Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void UnlockAnomaly(string typeName)
+    {
+        if (ActiveSlot == null) return;
+        if (IsAnomalyUnlocked(typeName)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.UnlockedAnomalyTypeNames ?? new string[0]);
+        list.Add(typeName);
+        ActiveSlot.UnlockedAnomalyTypeNames = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Anomaly unlocked: '{typeName}'.");
+    }
 
     /// <summary>
     /// True once the player has completed the full Day 1 tutorial sequence (including tool locker refill).
@@ -376,7 +401,12 @@ public class SaveSlot
     public int CurrentDay;
     public int TotalCashEarned;
 
-    // Anomaly category unlock flags removed — all categories are unlocked by default.
+    /// <summary>
+    /// C# type names of anomalies the player has explicitly unlocked through progression.
+    /// Anomalies absent from this list and not in the default-unlocked set on
+    /// <see cref="AnomalyUnlockManager"/> are shown as locked on exam page checklists.
+    /// </summary>
+    public string[] UnlockedAnomalyTypeNames = new string[0];
 
     /// <summary>
     /// Set to true once the player completes the Day 1 tutorial sequence (tool locker refill).

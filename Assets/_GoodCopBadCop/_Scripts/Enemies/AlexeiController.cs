@@ -128,7 +128,26 @@ public class AlexeiController : NetworkBehaviour
         TakeOutTrashTask.OnAllItemsDeposited -= EnableClockOut;
     }
 
-    // ── Murder Cutscene ────────────────────────────────────────────────────────
+    // ── Attack behaviour gate ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set to true by <see cref="ActivateAttackBehaviour"/> once the player has dismissed
+    /// the lever-megaphone dialogue. <see cref="MutantEntranceSequence"/> waits on this before
+    /// starting <see cref="MutantSuspectBehaviour"/> so the attack only begins after the player
+    /// has been instructed to use the lever.
+    /// </summary>
+    private bool _attackBehaviourRequested;
+
+    /// <summary>
+    /// Signals the mutant entrance sequence to activate attack behaviour. Call this from the
+    /// lever-megaphone dialogue's onComplete so Alexei only starts climbing after the player
+    /// has finished reading the instruction. Server-only.
+    /// </summary>
+    public void ActivateAttackBehaviour()
+    {
+        if (!IsServer) return;
+        _attackBehaviourRequested = true;
+    }
 
     /// <summary>
     /// Activates the cutscene GameObject on all clients, triggering Play On Awake.
@@ -434,10 +453,12 @@ public class AlexeiController : NetworkBehaviour
         yield return new WaitForSeconds(_idleAfterLandSeconds);
 
         // Notify Day_01 to play the lever megaphone dialogue.
+        _attackBehaviourRequested = false;
         onMutantIdle?.Invoke();
 
-        // Pause before activating the attack threat so players have time to react to the dialogue.
-        yield return new WaitForSeconds(_behaviourActivationDelay);
+        // Wait for Day_01 to confirm the player has finished the lever dialogue before
+        // starting the attack, so Alexei only begins climbing after the player has been told.
+        yield return new WaitUntil(() => _attackBehaviourRequested);
 
         if (msb == null || _mutantData == null)
         {

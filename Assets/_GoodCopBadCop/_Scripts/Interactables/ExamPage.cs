@@ -1,4 +1,5 @@
 using Unity.Netcode;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ExamPage : FolderItem
@@ -43,12 +44,20 @@ public class ExamPage : FolderItem
     private RenderTexture _renderTexture;
     private Material _paperMaterialInstance;
     private Coroutine _snapshotCoroutine;
+
+    /// <summary>
+    /// Original local positions of each checklist item captured at Awake.
+    /// Used as the position pool when re-sorting by lock state so repeated
+    /// calls to RefreshLockStates always produce a consistent result.
+    /// </summary>
+    private Vector3[] _originalItemPositions;
     // ─────────────────────────────────────────────────────────────────────────
 
     protected override void Awake()
     {
         base.Awake();
         CacheVisualItems();
+        CacheOriginalItemPositions();
         SetupRenderTexture();
     }
 
@@ -69,6 +78,27 @@ public class ExamPage : FolderItem
         {
             if (_checklistItems[i] != null)
                 _visualItems[i] = _checklistItems[i].GetComponent<ChecklistVisual>();
+        }
+    }
+
+    /// <summary>
+    /// Snapshots the initial local positions of all checklist items so that
+    /// RefreshLockStates can always sort from a consistent baseline rather than
+    /// operating on already-sorted positions from a previous call.
+    /// </summary>
+    private void CacheOriginalItemPositions()
+    {
+        if (_checklistItems == null)
+        {
+            _originalItemPositions = System.Array.Empty<Vector3>();
+            return;
+        }
+
+        _originalItemPositions = new Vector3[_checklistItems.Length];
+        for (int i = 0; i < _checklistItems.Length; i++)
+        {
+            if (_checklistItems[i] != null)
+                _originalItemPositions[i] = _checklistItems[i].transform.localPosition;
         }
     }
 
@@ -135,6 +165,22 @@ public class ExamPage : FolderItem
         _snapshotCoroutine = null;
     }
 
+    private void OnEnable()
+    {
+        AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
+    }
+
+    private void OnDisable()
+    {
+        AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
+    }
+
+    private void OnAnomalyUnlocked(string typeName)
+    {
+        // Re-evaluate all lock states and re-sort; at least one item may have changed.
+        RefreshLockStates();
+    }
+
     private void OnDestroy()
     {
         if (_renderTexture != null)
@@ -147,8 +193,88 @@ public class ExamPage : FolderItem
             Destroy(_paperMaterialInstance);
     }
 
-    public override void OnNetworkSpawn()
+    // ── Lock-state management ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Queries <see cref="AnomalyUnlockManager"/> for every checklist item, applies the
+    /// locked/unlocked visual state, re-sorts positions so locked items appear at the bottom,
+    /// and re-applies the current exam interactable state so newly-unlocked items become
+    /// clickable immediately when the exam is already active.
+    /// Called on network spawn and whenever <see cref="AnomalyUnlockManager.OnAnomalyUnlocked"/> fires.
+    /// </summary>
+    public void RefreshLockStates()
     {
+        if (_checklistItems == null || _checklistItems.Length == 0) return;
+
+        bool[] lockedStates = new bool[_checklistItems.Length];
+        for (int i = 0; i < _checklistItems.Length; i++)
+        {
+            if (_checklistItems[i] == null) continue;
+
+            bool locked = AnomalyUnlockManager.Instance != null
+                && !AnomalyUnlockManager.Instance.IsAnomalyUnlocked(_checklistItems[i].AnomalyTypeName);
+
+            lockedStates[i] = locked;
+            _checklistItems[i].ApplyLockState(locked);
+        }
+
+        SortChecklistByLockState(lockedStates);
+
+        // Re-sync interactable state so newly-unlocked items can be clicked
+        // if the exam is already open, and locked items remain blocked.
+        SetChecklistInteractable(IsChecking);
+
+        SnapshotChecklist();
+    }
+
+    /// <summary>
+    /// Redistributes checklist item positions so unlocked items occupy the top slots
+    /// and locked items occupy the bottom slots, preserving relative order within each group.
+    /// Uses <see cref="_originalItemPositions"/> as the authoritative slot pool so repeated
+    /// calls always produce a consistent layout.
+    /// </summary>
+    private void SortChecklistByLockState(bool[] lockedStates)
+    {
+        if (_originalItemPositions == null || _originalItemPositions.Length != _checklistItems.Length)
+            return;
+
+        // Collect slot Y values from the original positions, sorted top-to-bottom (descending).
+        float[] slotYValues = new float[_checklistItems.Length];
+        for (int i = 0; i < _checklistItems.Length; i++)
+            slotYValues[i] = _originalItemPositions[i].y;
+
+        System.Array.Sort(slotYValues, (a, b) => b.CompareTo(a));
+
+        // Build ordered lists: unlocked items first (preserving their original relative order),
+        // then locked items.
+        var unlockedIndices = new List<int>(_checklistItems.Length);
+        var lockedIndices   = new List<int>(_checklistItems.Length);
+
+        for (int i = 0; i < _checklistItems.Length; i++)
+        {
+            if (lockedStates[i]) lockedIndices.Add(i);
+            else unlockedIndices.Add(i);
+        }
+
+        // Assign slots: unlocked get the top positions, locked get the bottom positions.
+        int slot = 0;
+        foreach (int idx in unlockedIndices)
+            AssignSlotY(idx, slotYValues[slot++]);
+        foreach (int idx in lockedIndices)
+            AssignSlotY(idx, slotYValues[slot++]);
+    }
+
+    private void AssignSlotY(int itemIndex, float y)
+    {
+        if (_checklistItems[itemIndex] == null) return;
+        Vector3 pos = _checklistItems[itemIndex].transform.localPosition;
+        pos.y = y;
+        _checklistItems[itemIndex].transform.localPosition = pos;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()    {
         base.OnNetworkSpawn();
 
         // PickableObject.OnNetworkSpawn calls SetInteractable(true) when no one holds the object,
@@ -169,6 +295,7 @@ public class ExamPage : FolderItem
     /// <summary>
     /// Called by ExamNotebook.OnNetworkSpawn to assign each checklist item its array index
     /// and record which page slot this page occupies within the notebook.
+    /// Also applies initial lock states and sorts items so locked rows appear at the bottom.
     /// </summary>
     public void InitializeChecklistIndices()
     {
@@ -181,6 +308,8 @@ public class ExamPage : FolderItem
             else
                 Debug.LogWarning($"[ExamPage] InitializeChecklistIndices: _checklistItems[{i}] is null on '{name}'. Check the prefab's serialized array for missing references.");
         }
+
+        RefreshLockStates();
     }
 
     /// <summary>Sets which page slot this page occupies, so clicks reference the correct bitmask.</summary>
