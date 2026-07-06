@@ -84,6 +84,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         UIController.Instance.ShowCursor();
 
         HidePlayerBody();
+        player.SetPlayerLightActive(false);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
@@ -109,6 +110,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
         ShowPlayerBody();
+        player.SetPlayerLightActive(true);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(false);
@@ -148,6 +150,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
             player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
         HidePlayerBody();
+        player.SetPlayerLightActive(false);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
@@ -177,14 +180,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (player == null) return;
 
         player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
+        player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
         UIController.Instance.ShowCursor();
 
         if (lookTarget != null)
             player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
         HidePlayerBody();
+        player.SetPlayerLightActive(false);
 
-        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueModeOutside — movement locked, no booth cam.");
+        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueModeOutside — movement locked, interaction disabled, light off.");
     }
 
     /// <summary>
@@ -204,9 +209,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (player == null) return;
 
         player.GetComponent<PlayerMovementController>()?.SetCanControl(true);
-        ShowPlayerBody();
+        player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
-        Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored.");
+        ShowPlayerBody();
+        player.SetPlayerLightActive(true);
+
+        Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored, interaction enabled, light on.");
     }
 
     /// <summary>

@@ -97,10 +97,10 @@ public class Day_02 : DayBase
 
     [Header("Day 2 — Timing")]
     [Tooltip("Radius (world units) within which a player triggers Vlad's intro dialogue.")]
-    [SerializeField] private float _introProximityRadius = 3.5f;
+    [SerializeField] private float _introProximityRadius = 35f;
 
     [Tooltip("Radius within which a player triggers the tool locker dialogue at the final waypoint.")]
-    [SerializeField] private float _toolLockerProximityRadius = 3.5f;
+    [SerializeField] private float _toolLockerProximityRadius = 35f;
 
     [Tooltip("Seconds Vlad pauses after performing the unlock gesture before the lock triggers.")]
     [SerializeField] private float _unlockGestureDuration = 1.5f;
@@ -150,6 +150,9 @@ public class Day_02 : DayBase
     [Tooltip("Transform used to determine the direction Vlad rotates toward when pointing at the dead animal.")]
     [SerializeField] private Transform _deadAnimalFacingTarget;
 
+    [Tooltip("Root GameObject of the dead animal prop. Disabled by default; activated at the start of the out-back sequence.")]
+    [SerializeField] private GameObject _deadAnimalObject;
+
     [Header("Day 2 — Post-Shift Scripted Dialogues")]
     [Tooltip("Brief intro dialogue played when the player first approaches Vlad outside.")]
     [SerializeField] private ScriptedDialogue _vladOutBackIntroDialogue;
@@ -164,7 +167,7 @@ public class Day_02 : DayBase
 
     [Header("Day 2 — Post-Shift Timing")]
     [Tooltip("Radius (world units) within which a player triggers Vlad's out-back intro dialogue.")]
-    [SerializeField] private float _outBackProximityRadius = 3.5f;
+    [SerializeField] private float _outBackProximityRadius = 35f;
 
     [Tooltip("Seconds Vlad pauses after the Give gesture before the lock and gate respond.")]
     [SerializeField] private float _outBackUnlockGestureDuration = 1.5f;
@@ -724,6 +727,9 @@ public class Day_02 : DayBase
             Debug.LogWarning("[Day_02] _spawnedVladOutBack is null — skipping post-shift sequence.");
             yield break;
         }
+
+        // Reveal the dead animal prop as soon as the out-back sequence begins.
+        _deadAnimalObject?.SetActive(true);
 
         // ── Phase 1: wait for player to approach Vlad outside ─────────────────
         yield return StartCoroutine(WaitForPlayerProximity(_spawnedVladOutBack.transform, _outBackProximityRadius));

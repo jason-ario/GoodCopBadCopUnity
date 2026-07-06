@@ -47,6 +47,12 @@ public class PlayerInstance : NetworkBehaviour
     /// <summary>The CinemachineCamera transform managed by PlayerMovementController.</summary>
     public Transform CameraTransform => _playerMovementController?.CameraTransform;
 
+    /// <summary>
+    /// Toggles the local player's point light. Called by the dialogue system to hide the
+    /// light during cutscenes so it does not bleed into scripted camera shots.
+    /// </summary>
+    public void SetPlayerLightActive(bool active) => playerLight?.SetActive(active);
+
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();

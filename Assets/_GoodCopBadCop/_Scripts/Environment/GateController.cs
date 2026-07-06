@@ -69,6 +69,12 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     {
         if (!_autoOpenForSuspects) return;
         if (_gateOpen.Value || _isLocked.Value) return;
+
+        // Also block auto-open while the physical padlock is locked, even if the gate's
+        // own _isLocked NetworkVariable hasn't been driven by the lock controller yet
+        // (e.g. lockableTarget not wired in the Inspector).
+        if (_lockController != null && _lockController.IsLocked) return;
+
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
         // Physical proximity — works when the agent can get physically close to the gate.
