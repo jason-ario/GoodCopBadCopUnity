@@ -63,6 +63,6 @@ public class NewspaperContentsController : MonoBehaviour
         yield return new WaitForEndOfFrame();
         camera.SetActive(true);
         yield return new WaitForEndOfFrame();
-        camera.SetActive(true);
+        camera.SetActive(false);
     }
 }

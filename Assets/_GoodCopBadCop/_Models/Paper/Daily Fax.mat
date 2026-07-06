@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Fake Newspaper 2
+  m_Name: Daily Fax
   m_Shader: {fileID: 4800000, guid: e0973393781f3e64982e723704b48e94, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -30,6 +30,7 @@ Material:
   m_InvalidKeywords:
   - TCP2_UV_NORMALS_FULL
   - _INVERTZCLIP_ON
+  - _OVERLAYFLIPY_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -43,7 +44,7 @@ Material:
     m_TexEnvs:
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: 4f45fbe8e51278e439f6ad5131e3f849, type: 3}
-        m_Scale: {x: 1, y: -1}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 0}
@@ -90,8 +91,8 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OverlayMap:
-        m_Texture: {fileID: 8400000, guid: 8b35fd7396092e4459d45b650320e44b, type: 2}
-        m_Scale: {x: 1, y: -1}
+        m_Texture: {fileID: 8400000, guid: b8917c5a95e74ae43b1508e903a070eb, type: 2}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _ParallaxMap:
         m_Texture: {fileID: 0}
@@ -179,7 +180,7 @@ Material:
     - _OutlineTextureType: 0
     - _OutlineWidth: 1
     - _OverlayFlipX: 0
-    - _OverlayFlipY: 0
+    - _OverlayFlipY: 1
     - _OverlayOpacity: 1
     - _Parallax: 0.02
     - _QueueControl: 0
