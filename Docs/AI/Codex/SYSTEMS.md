@@ -5,7 +5,7 @@ Scope: static source inspection under `Assets/_GoodCopBadCop/_Scripts`; no Unity
 
 ## When To Read
 
-Read this when the task needs ownership, coupling, or likely source files for an existing gameplay/UI/player/content subsystem. For exact runtime ordering, use `GAMEPLAY_FLOWS.md`; for new feature architecture, use `FEATURE_ARCHITECTURE.md`.
+Read this when the task needs ownership, coupling, or likely source files for an existing gameplay/UI/player/content subsystem. For exact runtime ordering, use `GAMEPLAY_FLOWS.md`; for new feature architecture, use `Docs/AI/ARCHITECTURE.md`.
 
 ## Mental Model
 

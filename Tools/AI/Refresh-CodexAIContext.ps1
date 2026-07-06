@@ -238,7 +238,7 @@ function Get-Warnings {
 }
 
 $root = (Resolve-Path $ProjectRoot).Path
-$generatedDir = Join-Path $root "Docs\AI\Alex\generated"
+$generatedDir = Join-Path $root "Docs\AI\Codex\generated"
 New-Item -ItemType Directory -Force -Path $generatedDir | Out-Null
 
 $manifest = Read-JsonFile -Path (Join-Path $root "Packages\manifest.json")

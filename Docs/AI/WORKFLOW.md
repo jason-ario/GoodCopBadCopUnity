@@ -1,13 +1,13 @@
-# Alex Codex/MCP Workflow
+# AI Workflow
 
 ## Default Task Loop
 
-1. Restate the goal, relevant context, constraints, and done-when criteria.
+1. Identify the goal, relevant context, constraints, and done-when criteria.
 2. Run `git status --short` before edits.
 3. Read the smallest useful set of files, scenes, prefabs, or generated snapshots.
 4. Make scoped changes.
 5. Verify with the most relevant checks.
-6. Summarize changes and update `WORKLOG.md` for substantial work.
+6. Summarize changes and call out anything not verified.
 
 ## Unity MCP Loop
 
@@ -110,7 +110,7 @@ Rules:
 
 ## When to Pause
 
-Pause and ask Alex when:
+Pause and ask the task owner when:
 
 - A task requires changing vendor assets or imported packages.
 - A serialized Unity diff is unexpectedly large.

@@ -1,8 +1,8 @@
-# Feature Architecture
+# Architecture
 
 Last updated: 2026-07-05.
 
-This is Alex's target architecture for new significant gameplay/UI/networking features.
+This is the project target architecture for new significant gameplay/UI/networking features.
 Apply it to new modules first. Do not refactor old systems into this shape unless the current task needs it.
 
 ## When To Read
@@ -561,7 +561,7 @@ Rules:
 - Do not register concrete models as public dependencies for unrelated systems.
 - Prefer feature/lifetime scopes for large systems.
 
-VContainer is the selected DI container for new feature architecture. Do not introduce Zenject unless Alex explicitly changes this decision.
+VContainer is the selected DI container for new feature architecture. Do not introduce Zenject unless the project direction changes explicitly.
 
 ## UniTask Rule
 

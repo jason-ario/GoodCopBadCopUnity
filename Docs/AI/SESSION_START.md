@@ -1,13 +1,12 @@
-# Alex Session Start
+# AI Session Start
 
-This is the compact context packet for new Alex/Codex sessions. Keep it short. Open deeper docs only when the current task needs them.
+Compact context packet for new AI/MCP sessions. Keep it short and open deeper docs only when the current task needs them.
 
 ## Read Strategy
 
-- Start from `AGENTS.md`, `Docs/AI/Alex/README.md`, then this file.
+- Start from `AGENTS.md`, `Docs/AI/README.md`, then this file.
 - Run `git status --short` before edits.
-- Do not read all Alex docs by default.
-- Do not read `generated/PROJECT_SNAPSHOT.json` unless machine-readable data is needed.
+- Do not read all AI docs by default.
 - Prefer direct source inspection over stale memory when behavior matters.
 
 ## Project Snapshot
@@ -43,11 +42,11 @@ Selected tools:
 
 Do not mass-refactor legacy systems into the new shape. Apply this to new modules first, or to old code only when the current task already requires touching that area.
 
-## Naming and Code Shape
+## Code Shape
 
 - Use `GoodCopBadCop.*` namespaces for new feature/framework code.
 - Use block-style namespaces, not file-scoped namespaces, because this Unity project currently rejects C# 9 file-scoped syntax.
-- Prefer public concrete model/service classes plus public interfaces when the service is the only consumer of mutable model members through DI.
+- Prefer public concrete model/service classes plus public interfaces when the service is the only intended consumer of mutable model members through DI.
 - Register feature dependencies in `MainSceneLifetimeScope` using the current VContainer style.
 
 ## Existing Project Reality
@@ -63,15 +62,3 @@ Do not mass-refactor legacy systems into the new shape. Apply this to new module
 - For Netcode changes, check host, client, server ownership, RPC direction, and late-join behavior.
 - For UI/visual/scene/prefab work, use screenshots, play checks, or Unity inspection when practical.
 - For docs-only work, inspect diffs and keep docs scoped.
-
-## Open Deeper Docs When Needed
-
-- New architecture or feature module: `FEATURE_ARCHITECTURE.md`.
-- Subsystem ownership: `SYSTEMS.md`.
-- Runtime sequences: `GAMEPLAY_FLOWS.md`.
-- Multiplayer authority: `NETCODE_NOTES.md`.
-- Content/data/ScriptableObjects: `DATA_AND_CONTENT.md`.
-- Repeatable task checklists: `TASK_RECIPES.md`.
-- Process, tests, and commit naming: `WORKFLOW.md`.
-- Durable decisions: `DECISIONS.md`.
-- Risks before risky edits: `KNOWN_RISKS.md`.

@@ -1,6 +1,6 @@
 # Task Recipes
 
-These are quick-start recipes for future Alex/Codex sessions. Use them after reading `AGENTS.md` and `Docs/AI/Alex/README.md`.
+These are quick-start recipes for future Codex sessions. Use them after reading `AGENTS.md` and `Docs/AI/Codex/README.md`.
 
 ## Standard Broad Task
 
@@ -15,7 +15,7 @@ These are quick-start recipes for future Alex/Codex sessions. Use them after rea
 5. Plan the smallest change.
 6. Edit code/docs with narrow scope.
 7. Verify with compile/tests/Unity/MCP where available.
-8. Update `WORKLOG.md` if the session discovered durable facts or changed docs.
+8. Update the relevant Codex context doc only when the session discovered durable project facts.
 
 ## Gameplay Bug in Suspect Flow
 
@@ -191,13 +191,13 @@ Where to write:
 - Runtime sequence facts: `GAMEPLAY_FLOWS.md`.
 - Multiplayer patterns: `NETCODE_NOTES.md`.
 - Data/content authoring: `DATA_AND_CONTENT.md`.
-- Work performed: `WORKLOG.md`.
-- Durable decisions: `DECISIONS.md`.
+- Work performed: summarize in the chat or commit message, not in Codex index files.
+- Durable architecture/process decisions: update the relevant shared doc in `Docs/AI` only when needed.
 - Risks: `KNOWN_RISKS.md`.
 
 Do not hand-edit:
 
-- `Docs/AI/Alex/generated/PROJECT_SNAPSHOT.md`
-- `Docs/AI/Alex/generated/PROJECT_SNAPSHOT.json`
+- `Docs/AI/Codex/generated/PROJECT_SNAPSHOT.md`
+- `Docs/AI/Codex/generated/PROJECT_SNAPSHOT.json`
 
 Refresh generated files instead.

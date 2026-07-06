@@ -6,15 +6,14 @@
 - Treat other top-level `Assets/*` folders as vendor, imported package, demo, or support content unless the task explicitly targets them.
 - Bezi Sidekick may be installed in this repo, but these instructions do not require Bezi and should not change Bezi users' workflow.
 
-## Alex AI Context
+## Project AI Context
 
-For Alex-specific tasks:
+For AI-assisted project coding tasks:
 
-- Read `Docs/AI/Alex/README.md`.
-- Read `Docs/AI/Alex/SESSION_START.md`.
-- Do not read every file in `Docs/AI/Alex` by default.
-- Use the routing table in `README.md` to choose only task-relevant deeper docs.
+- Read `Docs/AI/README.md` and follow its routing.
+- Do not read every file in `Docs/AI` by default.
 - Inspect actual source files before making code changes.
+- Tool-specific context may exist under `Docs/AI/<ToolName>`; use it only when it matches the current tool/task.
 
 ## Working Pattern
 
