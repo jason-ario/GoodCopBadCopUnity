@@ -119,9 +119,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Transform of the current NPC speaker — used for server-side proximity checks.
     private Transform _currentSpeakerTransform;
 
-    // Throttle for the per-frame proximity scan (runs every ProximityCheckInterval seconds).
-    private float _proximityCheckTimer;
-    private const float ProximityCheckInterval = 0.5f;
+    // Throttle for the per-frame proximity scan — removed; cost is negligible for 2 players.
 
     // -------------------------------------------------------------------------
     // Client-side state
@@ -269,15 +267,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         // Server: detect players who have walked into proximity of the active speaker and
         // late-join them so they are counted in the advance / choice gates going forward.
+        // For a 2-player session with a single distance check per non-participant this is
+        // negligible per-frame cost, so no throttle is needed.
         if (IsServer && IsScriptedModeActive && _currentSpeakerTransform != null)
-        {
-            _proximityCheckTimer -= Time.deltaTime;
-            if (_proximityCheckTimer <= 0f)
-            {
-                _proximityCheckTimer = ProximityCheckInterval;
-                CheckProximityJoins();
-            }
-        }
+            CheckProximityJoins();
 
         // _clientIsWaitingForInput is set on ALL clients via ClientRpc, so both the
         // host and non-host clients can skip reveals and advance the dialogue gate.
@@ -320,7 +313,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Seed the participant set before broadcasting EnterScriptedMode so the advance
         // gate is correct from the very first line.
         _currentSpeakerTransform = speaker.transform;
-        _proximityCheckTimer = 0f;
         SeedParticipants();
 
         EnterScriptedModeClientRpc(speakerNetId);
@@ -480,7 +472,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// Checks every non-participant connected client against the join radius. Players who
     /// have walked close enough are added to <see cref="_participants"/> and receive a
     /// targeted <see cref="LateJoinClientRpc"/> to lock their controls and activate the
-    /// suspect camera. Runs on the server at <see cref="ProximityCheckInterval"/> intervals.
+    /// suspect camera. Called every frame on the server while a dialogue is active.
     /// </summary>
     private void CheckProximityJoins()
     {
