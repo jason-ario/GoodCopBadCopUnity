@@ -63,11 +63,17 @@ public class FaxMachine : NetworkBehaviour
         _machineShake.enabled = true;
         faxAudioSource.PlayOneShot(faxClip);
         yield return new WaitForSeconds(4);
+
         networkObject.Spawn(true);
-        networkObject.GetComponent<PickableObject>().SetParent(newspaperSpawnPoint);
+        PickableObject pickable = networkObject.GetComponent<PickableObject>();
+        pickable.SetParent(newspaperSpawnPoint);
+        pickable.LockInteractableNetworked();
+
         _animator.enabled = true;
         yield return new WaitForSeconds(2);
         _machineShake.enabled = false;
+
+        pickable.UnlockInteractableNetworked();
     }
 
     /// <summary>
@@ -110,10 +116,16 @@ public class FaxMachine : NetworkBehaviour
         _machineShake.enabled = true;
         faxAudioSource.PlayOneShot(faxClip);
         yield return new WaitForSeconds(4);
+
         networkObject.Spawn(true);
-        networkObject.GetComponent<PickableObject>().SetParent(spawnPoint);
+        PickableObject pickable = networkObject.GetComponent<PickableObject>();
+        pickable.SetParent(spawnPoint);
+        pickable.LockInteractableNetworked();
+
         _animator.enabled = true;
         yield return new WaitForSeconds(2);
         _machineShake.enabled = false;
+
+        pickable.UnlockInteractableNetworked();
     }
 }
