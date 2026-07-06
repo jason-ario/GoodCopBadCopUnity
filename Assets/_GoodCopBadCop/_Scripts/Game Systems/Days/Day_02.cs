@@ -26,6 +26,10 @@ using UnityEngine;
 /// </summary>
 public class Day_02 : DayBase
 {
+    public static Day_02 Instance { get; private set; }
+
+    private void Awake() => Instance = this;
+
     // -------------------------------------------------------------------------
     // Day 2 Tutorial (existing)
     // -------------------------------------------------------------------------
@@ -49,9 +53,11 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
 
     [Header("Day 2 — Vlad Opening Sequence")]
-    [Tooltip("Vlad's SuspectCharacter placed in the scene. He starts at _vladSpawnPos and walks the player " +
-             "through the booth when approached.")]
+    [Tooltip("Vlad's SuspectCharacter prefab. Instantiated at day start and destroyed after the opening sequence.")]
     [SerializeField] private SuspectCharacter _vladCharacter;
+
+    // Runtime instance spawned from the prefab. Null when not in-world.
+    private SuspectCharacter _spawnedVlad;
 
     [Tooltip("Where Vlad stands at the start of Day 2. He waits here until a player approaches.")]
     [SerializeField] private Transform _vladSpawnPos;
@@ -106,6 +112,73 @@ public class Day_02 : DayBase
     private bool _introDialogueTriggered;
     private bool _toolLockerDialogueTriggered;
 
+    // Set by DebugSkipOpening to bypass Day2OpeningSequence entirely.
+    private bool _debugSkipOpening;
+
+    // -------------------------------------------------------------------------
+    // Day 2 Post-Shift Vlad Sequence (Out Back)
+    // -------------------------------------------------------------------------
+
+    [Header("Day 2 — Post-Shift Vlad (Out Back)")]
+    [Tooltip("Vlad's SuspectCharacter prefab for the out-back sequence. Instantiated when the shift ends and destroyed after the sequence.")]
+    [SerializeField] private SuspectCharacter _vladOutBackCharacter;
+
+    // Runtime instance spawned from the prefab. Null when not in-world.
+    private SuspectCharacter _spawnedVladOutBack;
+
+    [Tooltip("Where Vlad stands when waiting out back. He teleports here when the shift ends.")]
+    [SerializeField] private Transform _vladOutBackSpawnPos;
+
+    [Tooltip("Vlad walks here first — in front of the exterior gate.")]
+    [SerializeField] private Transform _vladGateWaypoint;
+
+    [Tooltip("Vlad walks here second — beside the dead animal.")]
+    [SerializeField] private Transform _vladDeadAnimalWaypoint;
+
+    [Tooltip("Vlad's final standing position before he despawns.")]
+    [SerializeField] private Transform _vladOutBackFinalWaypoint;
+
+    [Tooltip("Vlad walks here to exit/despawn after the dead animal dialogue.")]
+    [SerializeField] private Transform _vladOutBackDespawnWaypoint;
+
+    [Tooltip("The padlock on the exterior gate. Vlad unlocks it with the Give gesture.")]
+    [SerializeField] private LockController _exteriorLock;
+
+    [Tooltip("The exterior gate that opens after Vlad unlocks the padlock.")]
+    [SerializeField] private GateController _exteriorGate;
+
+    [Tooltip("Transform used to determine the direction Vlad rotates toward when pointing at the dead animal.")]
+    [SerializeField] private Transform _deadAnimalFacingTarget;
+
+    [Header("Day 2 — Post-Shift Scripted Dialogues")]
+    [Tooltip("Brief intro dialogue played when the player first approaches Vlad outside.")]
+    [SerializeField] private ScriptedDialogue _vladOutBackIntroDialogue;
+
+    [Tooltip("First part of the dead animal dialogue — one node: 'There's been a lot of these...'. " +
+             "Set cameraTrigger to your DeadAnimal camera key. Vlad rotates toward the animal before this plays.")]
+    [SerializeField] private ScriptedDialogue _vladDeadAnimalPart1Dialogue;
+
+    [Tooltip("Second part of the dead animal dialogue — flashlight UV mode, blood trails, follow the trail, gun, good luck. " +
+             "Set cameraTrigger to your Gun camera key on the gun-related nodes.")]
+    [SerializeField] private ScriptedDialogue _vladDeadAnimalPart2Dialogue;
+
+    [Header("Day 2 — Post-Shift Timing")]
+    [Tooltip("Radius (world units) within which a player triggers Vlad's out-back intro dialogue.")]
+    [SerializeField] private float _outBackProximityRadius = 3.5f;
+
+    [Tooltip("Seconds Vlad pauses after the Give gesture before the lock and gate respond.")]
+    [SerializeField] private float _outBackUnlockGestureDuration = 1.5f;
+
+    [Tooltip("Seconds between the dead animal dialogue completing and Vlad starting to walk away.")]
+    [SerializeField] private float _outBackVladExitDelay = 1.5f;
+
+    [Tooltip("Seconds for DOTween rotation when Vlad turns to face the dead animal (and back).")]
+    [SerializeField] private float _vladAnimalFacingTweenDuration = 0.5f;
+
+    // Post-shift guards.
+    private bool _outBackIntroDialogueTriggered;
+    private bool _outBackAnimalDialogueTriggered;
+
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
     // -------------------------------------------------------------------------
@@ -137,35 +210,13 @@ public class Day_02 : DayBase
 
         // ── Opening Sequence Setup ──────────────────────────────────────────────
 
-        _introDialogueTriggered       = false;
-        _toolLockerDialogueTriggered  = false;
+        _introDialogueTriggered      = false;
+        _toolLockerDialogueTriggered = false;
+        _debugSkipOpening            = false;
+        _spawnedVlad                 = null;
 
-        // Activate and spawn Vlad on the server — NGO propagates to all clients.
-        // Uses the same pattern as SuspectController.IntroduceSceneSuspect for scene objects.
-        if (NetworkManager.Singleton.IsServer && _vladCharacter != null)
-        {
-            NetworkObject vladNetObj = _vladCharacter.GetComponent<NetworkObject>();
-            if (vladNetObj == null)
-            {
-                Debug.LogError("[Day_02] _vladCharacter is missing a NetworkObject component — opening sequence will be skipped.", this);
-            }
-            else
-            {
-                if (!_vladCharacter.gameObject.activeSelf)
-                    _vladCharacter.gameObject.SetActive(true);
-
-                if (!vladNetObj.IsSpawned)
-                    vladNetObj.Spawn();
-
-                if (_vladSpawnPos != null)
-                {
-                    _vladCharacter.transform.position = _vladSpawnPos.position;
-                    _vladCharacter.transform.rotation = _vladSpawnPos.rotation;
-                }
-
-                _vladCharacter.InitNavigation();
-            }
-        }
+        if (_vladCharacter == null)
+            Debug.LogWarning("[Day_02] _vladCharacter prefab not assigned — opening sequence will be skipped.", this);
 
         // Redirect the supply box delivery to the Day 2 unique position.
         // SupplyBoxDeliveryController will consume the override when OnDayStart fires.
@@ -195,11 +246,36 @@ public class Day_02 : DayBase
         if (_supplyBoxDelivery != null)
             _supplyBoxDelivery.SpawnPointOverride = null;
 
+        // Clear the trail destination override so other days use default behaviour.
+        if (FollowTrailThreat.Instance != null)
+            FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = null;
+
+        // Clear all out-back task NetworkVariables so every client's HUD is clean.
+        // The NetworkVariable setters are server-only; clients have their own local TaskRegistry
+        // copies that will update when the NetworkVariable changes propagate.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer
+            && FollowTrailThreat.Instance != null)
+        {
+            FollowTrailThreat.Instance.SetMeetVladActive(false);
+            FollowTrailThreat.Instance.SetFollowTrailTaskActive(false);
+            FollowTrailThreat.Instance.SetKillMutantActive(false);
+        }
+
+        // Local fallback — if the NetworkVariable propagation hasn't fired yet on this client,
+        // remove any lingering task objects directly. Safe to call when Current is already null.
+        MeetVladOutBackTask.CompleteAndRemove();
+        KillMutantTask.CompleteAndRemove();
+
+        // Destroy any Vlad instances that are still in-world (e.g. day skipped mid-sequence).
+        DespawnVladInstance(ref _spawnedVlad);
+        DespawnVladInstance(ref _spawnedVladOutBack);
+
         StopAllCoroutines();
     }
 
     private void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
 
@@ -207,9 +283,36 @@ public class Day_02 : DayBase
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
     }
 
-    public override void ShiftEnded()        => base.ShiftEnded();
+    public override void ShiftEnded()
+    {
+        base.ShiftEnded();
+        if (!NetworkManager.Singleton.IsServer) return;
+        StartCoroutine(PostShiftSetupSequence());
+    }
+
     public override void NightPhaseStarted() => base.NightPhaseStarted();
     public override void DayCompleted()      => base.DayCompleted();
+
+    // -------------------------------------------------------------------------
+    // Debug / Skip helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Suppresses the Day 2 opening Vlad sequence so it can be skipped by the F12 cheat menu.
+    /// Also unlocks the tool locker (which Vlad would normally unlock mid-sequence) to keep
+    /// game state consistent. Server-only; call before TryStartShift.
+    /// </summary>
+    public void DebugSkipOpening()
+    {
+        _debugSkipOpening            = true;
+        _introDialogueTriggered      = true;
+        _toolLockerDialogueTriggered = true;
+
+        // Unlock the tool locker so it isn't still padlocked when the player is in-world.
+        _toolLockerLock?.ForceUnlock();
+
+        Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked.");
+    }
 
     // -------------------------------------------------------------------------
     // Day 2 Opening Sequence
@@ -219,6 +322,7 @@ public class Day_02 : DayBase
     {
         if (!NetworkManager.Singleton.IsServer) return;
         ShiftManager.Instance.OnDayStart -= OnDay2Started;
+        if (_debugSkipOpening) return;
         StartCoroutine(Day2OpeningSequence());
     }
 
@@ -231,12 +335,29 @@ public class Day_02 : DayBase
     {
         if (_vladCharacter == null)
         {
-            Debug.LogWarning("[Day_02] _vladCharacter is not assigned — skipping opening sequence.");
+            Debug.LogWarning("[Day_02] _vladCharacter prefab not assigned — skipping opening sequence.");
             yield break;
         }
 
+        // Instantiate Vlad from the prefab and network-spawn him at the opening position.
+        Vector3    spawnPos = _vladSpawnPos != null ? _vladSpawnPos.position : Vector3.zero;
+        Quaternion spawnRot = _vladSpawnPos != null ? _vladSpawnPos.rotation : Quaternion.identity;
+        _spawnedVlad = Instantiate(_vladCharacter, spawnPos, spawnRot);
+
+        NetworkObject vladNetObj = _spawnedVlad.GetComponent<NetworkObject>();
+        if (vladNetObj == null)
+        {
+            Debug.LogError("[Day_02] Vlad prefab is missing a NetworkObject — opening sequence aborted.", this);
+            Destroy(_spawnedVlad.gameObject);
+            _spawnedVlad = null;
+            yield break;
+        }
+
+        vladNetObj.Spawn(destroyWithScene: true);
+        _spawnedVlad.InitNavigation();
+
         // ── Phase 1: wait for a player to walk up to Vlad ──────────────────────
-        yield return StartCoroutine(WaitForPlayerProximity(_vladCharacter.transform, _introProximityRadius));
+        yield return StartCoroutine(WaitForPlayerProximity(_spawnedVlad.transform, _introProximityRadius));
 
         if (_introDialogueTriggered) yield break;
         _introDialogueTriggered = true;
@@ -253,7 +374,7 @@ public class Day_02 : DayBase
         {
             bool introDone = false;
             ScriptedDialogueRunner.Instance.PlayDialogue(
-                _vladCharacter,
+                _spawnedVlad,
                 _vladIntroDialogue,
                 () => introDone = true);
             yield return new WaitUntil(() => introDone);
@@ -291,7 +412,7 @@ public class Day_02 : DayBase
 
             // Perform an unlock gesture (use the existing "Give" trigger as a stand-in;
             // replace with a dedicated "Unlock" trigger once that animation is authored).
-            _vladCharacter.FireAnimatorTrigger("Give");
+            _spawnedVlad.FireAnimatorTrigger("Give");
             yield return new WaitForSeconds(_unlockGestureDuration);
 
             // Unlock the tool locker padlock.
@@ -302,11 +423,11 @@ public class Day_02 : DayBase
         // ── Rotate toward final waypoint and wait ───────────────────────────────
         if (_vladFinalWaypoint != null)
         {
-            Vector3 dir = _vladFinalWaypoint.position - _vladCharacter.transform.position;
+            Vector3 dir = _vladFinalWaypoint.position - _spawnedVlad.transform.position;
             if (dir.sqrMagnitude > 0.01f)
             {
                 bool rotDone = false;
-                _vladCharacter.transform
+                _spawnedVlad.transform
                     .DORotateQuaternion(Quaternion.LookRotation(dir.normalized), 0.4f)
                     .OnComplete(() => rotDone = true);
                 yield return new WaitUntil(() => rotDone);
@@ -314,7 +435,7 @@ public class Day_02 : DayBase
         }
 
         // ── Phase 4: wait for a player to approach, then play tool locker dialogue ──
-        yield return StartCoroutine(WaitForPlayerProximity(_vladCharacter.transform, _toolLockerProximityRadius));
+        yield return StartCoroutine(WaitForPlayerProximity(_spawnedVlad.transform, _toolLockerProximityRadius));
 
         if (_toolLockerDialogueTriggered) yield break;
         _toolLockerDialogueTriggered = true;
@@ -325,7 +446,7 @@ public class Day_02 : DayBase
         {
             bool lockerDone = false;
             ScriptedDialogueRunner.Instance.PlayDialogue(
-                _vladCharacter,
+                _spawnedVlad,
                 _vladToolLockerDialogue,
                 () => lockerDone = true);
             yield return new WaitUntil(() => lockerDone);
@@ -337,14 +458,8 @@ public class Day_02 : DayBase
         if (_vladDespawnWaypoint != null)
             yield return StartCoroutine(WalkVladTo(_vladDespawnWaypoint));
 
-        // Despawn Vlad via NGO so all clients deactivate him.
-        // destroyGameObject: false — the scene object is preserved so it can be re-spawned later.
-        if (_vladCharacter != null)
-        {
-            NetworkObject vladNetObj = _vladCharacter.GetComponent<NetworkObject>();
-            if (vladNetObj != null && vladNetObj.IsSpawned)
-                vladNetObj.Despawn(false);
-        }
+        // Despawn and destroy the runtime instance — it was created from a prefab.
+        DespawnVladInstance(ref _spawnedVlad);
 
         Debug.Log("[Day_02] Opening sequence complete — Vlad has left.");
     }
@@ -354,26 +469,35 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Walks Vlad to <paramref name="target"/> using the NavMeshAgent, then settles his
-    /// facing to match the waypoint's forward direction. Server-side.
+    /// Walks the opening-sequence Vlad instance to <paramref name="target"/>. Delegates to the
+    /// generic overload so both sequences share the same movement logic.
     /// </summary>
     private IEnumerator WalkVladTo(Transform target)
     {
-        if (_vladCharacter == null || target == null) yield break;
+        yield return StartCoroutine(WalkVladTo(_spawnedVlad, target));
+    }
 
-        _vladCharacter.SetAnimatorBool("Walking", true);
+    /// <summary>
+    /// Walks any <see cref="SuspectCharacter"/> to <paramref name="target"/> using the NavMeshAgent,
+    /// then settles facing to the waypoint's forward direction. Server-side.
+    /// </summary>
+    private IEnumerator WalkVladTo(SuspectCharacter character, Transform target)
+    {
+        if (character == null || target == null) yield break;
+
+        character.SetAnimatorBool("Walking", true);
 
         bool arrived = false;
-        _vladCharacter.NavigateTo(target.position, () => arrived = true);
+        character.NavigateTo(target.position, () => arrived = true);
         yield return new WaitUntil(() => arrived);
 
-        _vladCharacter.SetAnimatorBool("Walking", false);
+        character.SetAnimatorBool("Walking", false);
 
         // Settle facing to the waypoint's exact forward direction.
         if (target.forward.sqrMagnitude > 0.01f)
         {
             bool rotDone = false;
-            _vladCharacter.transform
+            character.transform
                 .DORotateQuaternion(target.rotation, 0.3f)
                 .OnComplete(() => rotDone = true);
             yield return new WaitUntil(() => rotDone);
@@ -383,6 +507,23 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
     // Proximity check
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Despawns a runtime Vlad prefab instance (destroyGameObject: true) and clears the ref.
+    /// Safe to call when the instance is null or already despawned.
+    /// </summary>
+    private static void DespawnVladInstance(ref SuspectCharacter instance)
+    {
+        if (instance == null) return;
+
+        NetworkObject netObj = instance.GetComponent<NetworkObject>();
+        if (netObj != null && netObj.IsSpawned)
+            netObj.Despawn(true);
+        else if (instance.gameObject != null)
+            UnityEngine.Object.Destroy(instance.gameObject);
+
+        instance = null;
+    }
 
     /// <summary>
     /// Polls every 0.5 s until any connected player's object is within <paramref name="radius"/>
@@ -524,5 +665,237 @@ public class Day_02 : DayBase
         MegaphoneDialogueManager.Instance.ShowDialogueSynced(line);
         yield return null;
         yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+    }
+
+    // =========================================================================
+    // Post-Shift Vlad Out-Back Sequence
+    // =========================================================================
+
+    /// <summary>
+    /// Entry point called from <see cref="ShiftEnded"/>. Registers the "Meet Vlad" task,
+    /// plays the megaphone bark, spawns Vlad outside, then hands off to the main coroutine.
+    /// Server-side only.
+    /// </summary>
+    private IEnumerator PostShiftSetupSequence()
+    {
+        // Register the HUD task and bark simultaneously.
+        // SetMeetVladActive sets a NetworkVariable on FollowTrailThreat → fires on all clients.
+        FollowTrailThreat.Instance?.SetMeetVladActive(true);
+
+        yield return ShowAndWait("Good work today. Meet me out back by the bunker. I have a special task for you.");
+
+        // Instantiate Vlad from the prefab at the out-back spawn position and network-spawn him.
+        if (_vladOutBackCharacter == null)
+        {
+            Debug.LogError("[Day_02] _vladOutBackCharacter prefab not assigned — post-shift sequence aborted.", this);
+            yield break;
+        }
+
+        Vector3    spawnPos = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.position : Vector3.zero;
+        Quaternion spawnRot = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.rotation : Quaternion.identity;
+        _spawnedVladOutBack = Instantiate(_vladOutBackCharacter, spawnPos, spawnRot);
+
+        NetworkObject vladNetObj = _spawnedVladOutBack.GetComponent<NetworkObject>();
+        if (vladNetObj == null)
+        {
+            Debug.LogError("[Day_02] _vladOutBackCharacter prefab is missing a NetworkObject — post-shift sequence aborted.", this);
+            Destroy(_spawnedVladOutBack.gameObject);
+            _spawnedVladOutBack = null;
+            yield break;
+        }
+
+        vladNetObj.Spawn(destroyWithScene: true);
+        _spawnedVladOutBack.InitNavigation();
+
+        _outBackIntroDialogueTriggered  = false;
+        _outBackAnimalDialogueTriggered = false;
+
+        StartCoroutine(PostShiftVladSequence());
+    }
+
+    /// <summary>
+    /// Drives Vlad through the full out-back sequence: intro approach → gate unlock → dead animal
+    /// dialogue → despawn → trail event handoff. Server-side only.
+    /// </summary>
+    private IEnumerator PostShiftVladSequence()
+    {
+        if (_spawnedVladOutBack == null)
+        {
+            Debug.LogWarning("[Day_02] _spawnedVladOutBack is null — skipping post-shift sequence.");
+            yield break;
+        }
+
+        // ── Phase 1: wait for player to approach Vlad outside ─────────────────
+        yield return StartCoroutine(WaitForPlayerProximity(_spawnedVladOutBack.transform, _outBackProximityRadius));
+
+        if (_outBackIntroDialogueTriggered) yield break;
+        _outBackIntroDialogueTriggered = true;
+
+        // Remove the "Meet Vlad" HUD task on all clients via the NetworkVariable.
+        FollowTrailThreat.Instance?.SetMeetVladActive(false);
+
+        yield return new WaitForSeconds(0.5f);
+
+        // ── Phase 2: intro scripted dialogue ──────────────────────────────────
+        if (_vladOutBackIntroDialogue != null)
+        {
+            bool introDone = false;
+            ScriptedDialogueRunner.Instance.PlayDialogue(
+                _spawnedVladOutBack,
+                _vladOutBackIntroDialogue,
+                () => introDone = true,
+                lockOutsidePlayers: true);
+            yield return new WaitUntil(() => introDone);
+        }
+
+        yield return new WaitForSeconds(0.5f);
+
+        // ── Phase 3: Vlad walks to gate, unlocks padlock, opens gate ──────────
+        if (_vladGateWaypoint != null)
+            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladGateWaypoint));
+
+        // Give animation (stand-in for unlock gesture; swap trigger name when dedicated anim exists).
+        _spawnedVladOutBack.FireAnimatorTrigger("Give");
+        yield return new WaitForSeconds(_outBackUnlockGestureDuration);
+
+        // Unlock padlock and open gate.
+        _exteriorLock?.ForceUnlock();
+        yield return new WaitForSeconds(0.3f);
+        _exteriorGate?.ForceOpen(openedIn: false);
+
+        yield return new WaitForSeconds(0.5f);
+
+        // ── Phase 4: Vlad walks to dead animal waypoint ───────────────────────
+        if (_vladDeadAnimalWaypoint != null)
+            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladDeadAnimalWaypoint));
+
+        // ── Phase 5: wait for player to approach Vlad at the dead animal ──────
+        yield return StartCoroutine(WaitForPlayerProximity(_spawnedVladOutBack.transform, _outBackProximityRadius));
+
+        if (_outBackAnimalDialogueTriggered) yield break;
+        _outBackAnimalDialogueTriggered = true;
+
+        yield return new WaitForSeconds(0.3f);
+
+        // ── Phase 6: dead animal dialogue — Part 1 ────────────────────────────
+        // Capture Vlad's current facing so we can restore it after Part 1.
+        Quaternion vladFacingBeforeAnimal = _spawnedVladOutBack.transform.rotation;
+
+        // Rotate Vlad toward the dead animal on the Y axis.
+        if (_deadAnimalFacingTarget != null)
+        {
+            Vector3 toAnimal = _deadAnimalFacingTarget.position - _spawnedVladOutBack.transform.position;
+            toAnimal.y = 0f;
+            if (toAnimal.sqrMagnitude > 0.01f)
+            {
+                bool rotDone = false;
+                _spawnedVladOutBack.transform
+                    .DORotateQuaternion(Quaternion.LookRotation(toAnimal.normalized), _vladAnimalFacingTweenDuration)
+                    .OnComplete(() => rotDone = true);
+                yield return new WaitUntil(() => rotDone);
+            }
+        }
+
+        // Play part 1 — "There's been a lot of these popping up since the incident."
+        // Node should have cameraTrigger set to your DeadAnimal camera key.
+        if (_vladDeadAnimalPart1Dialogue != null)
+        {
+            bool part1Done = false;
+            ScriptedDialogueRunner.Instance.PlayDialogue(
+                _spawnedVladOutBack,
+                _vladDeadAnimalPart1Dialogue,
+                () => part1Done = true,
+                lockOutsidePlayers: true);
+            yield return new WaitUntil(() => part1Done);
+        }
+
+        // ── Phase 7: rotate Vlad back to his original facing ──────────────────
+        {
+            bool rotBackDone = false;
+            _spawnedVladOutBack.transform
+                .DORotateQuaternion(vladFacingBeforeAnimal, _vladAnimalFacingTweenDuration)
+                .OnComplete(() => rotBackDone = true);
+            yield return new WaitUntil(() => rotBackDone);
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        // ── Phase 8: dead animal dialogue — Part 2 ────────────────────────────
+        // Nodes cover: flashlight UV mode, blood trails, follow the trail,
+        // camera pan to gun (cameraTrigger "Gun"), "Take that gun", "Good luck!".
+        if (_vladDeadAnimalPart2Dialogue != null)
+        {
+            bool part2Done = false;
+            ScriptedDialogueRunner.Instance.PlayDialogue(
+                _spawnedVladOutBack,
+                _vladDeadAnimalPart2Dialogue,
+                () => part2Done = true,
+                lockOutsidePlayers: true);
+            yield return new WaitUntil(() => part2Done);
+        }
+
+        // ── Phase 9: Vlad exits ───────────────────────────────────────────────
+        yield return new WaitForSeconds(_outBackVladExitDelay);
+
+        if (_vladOutBackFinalWaypoint != null)
+            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladOutBackFinalWaypoint));
+
+        if (_vladOutBackDespawnWaypoint != null)
+            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladOutBackDespawnWaypoint));
+
+        // Despawn and destroy the runtime instance — it was created from a prefab.
+        DespawnVladInstance(ref _spawnedVladOutBack);
+
+        Debug.Log("[Day_02] Post-shift Vlad sequence complete — Vlad has left.");
+
+        // ── Phase 10: spawn the UV blood trail and register Follow Trail task ──
+        yield return new WaitForSeconds(0.5f);
+
+        // SetFollowTrailTaskActive fires the NetworkVariable → all clients add FollowTrailThreat
+        // to their local TaskRegistry, showing "Follow the trail" in the HUD everywhere.
+        FollowTrailThreat.Instance?.SetFollowTrailTaskActive(true);
+
+        // Set the Day 2 override so FollowTrailThreat hands resolution back to us
+        // instead of calling HandleNightPhaseReady() immediately.
+        if (FollowTrailThreat.Instance != null)
+        {
+            FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = () =>
+            {
+                // Trail reached — show Kill Mutant task on all clients via NetworkVariable.
+                FollowTrailThreat.Instance.SetKillMutantActive(true);
+                StartCoroutine(KillMutantSequence());
+            };
+        }
+
+        FollowTrailThreat.Instance?.TriggerTrailEvent();
+    }
+
+    /// <summary>
+    /// Waits for <see cref="KillMutantTask.OnKillMutantTaskCompleted"/> then advances the night
+    /// phase. The Kill Mutant task itself was registered on all clients by the
+    /// <see cref="FollowTrailThreat"/> NetworkVariable in the destination discovered callback.
+    /// Server-side only.
+    /// </summary>
+    private IEnumerator KillMutantSequence()
+    {
+        bool mutantKilled = false;
+        KillMutantTask.OnKillMutantTaskCompleted += OnDay2MutantKilled;
+
+        void OnDay2MutantKilled()
+        {
+            KillMutantTask.OnKillMutantTaskCompleted -= OnDay2MutantKilled;
+            mutantKilled = true;
+        }
+
+        yield return new WaitUntil(() => mutantKilled);
+
+        // Clear the trail override so future days use default behaviour.
+        if (FollowTrailThreat.Instance != null)
+            FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = null;
+
+        // Advance the night phase — lights up the "start next shift" button.
+        BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+
+        Debug.Log("[Day_02] Mutant killed — night phase ready.");
     }
 }

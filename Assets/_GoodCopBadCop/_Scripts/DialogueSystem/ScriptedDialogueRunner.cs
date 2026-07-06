@@ -174,7 +174,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
-        Action onComplete = null, bool deferExit = false)
+        Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false)
     {
         if (!IsServer) return;
 
@@ -186,7 +186,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunDialogue(speaker, dialogue, onComplete, deferExit));
+        StartCoroutine(RunDialogue(speaker, dialogue, onComplete, deferExit, lockOutsidePlayers));
     }
 
     /// <summary>
@@ -302,7 +302,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
-        Action onComplete, bool deferExit = false)
+        Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
 
@@ -315,7 +315,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _currentSpeakerTransform = speaker.transform;
         SeedParticipants();
 
-        EnterScriptedModeClientRpc(speakerNetId);
+        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers);
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
@@ -344,7 +344,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             _currentSpeakerTransform = null;
             _participants.Clear();
-            ExitScriptedModeClientRpc();
+            ExitScriptedModeClientRpc(lockOutsidePlayers);
             yield return null;
         }
 
@@ -633,7 +633,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     [ClientRpc]
-    private void EnterScriptedModeClientRpc(ulong speakerNetId)
+    private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false)
     {
         IsScriptedModeActive = true;
 
@@ -646,20 +646,27 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                   $"IsOutsideLocal={PlayerInstance.Instance?.IsOutsideLocal}, " +
                   $"ChoiceSystemInstance={DialogueChoiceSystem.Instance != null}");
 
-        // Observer clients (outside local) set IsScriptedModeActive so their E-key input
-        // routes correctly, but do not get their movement locked or camera hijacked.
-        if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal) return;
+        if (PlayerInstance.Instance == null) return;
 
-        // Resolve the speaker's transform so the player rotates to face the booth.
+        // Resolve the speaker's transform so the player can rotate to face them.
         Transform lookTarget = null;
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
             lookTarget = netObj.transform;
+
+        if (PlayerInstance.Instance.IsOutsideLocal)
+        {
+            // Outside players get movement-locked when explicitly requested, but never get the
+            // booth suspect-cam activated — camera cuts are handled by SetActiveOverrideCamClientRpc.
+            if (lockOutsidePlayers)
+                DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget);
+            return;
+        }
 
         DialogueChoiceSystem.Instance.EnterScriptedDialogueMode(lookTarget);
     }
 
     [ClientRpc]
-    private void ExitScriptedModeClientRpc()
+    private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false)
     {
         IsScriptedModeActive = false;
 
@@ -668,6 +675,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
         {
+            if (lockOutsidePlayers && PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+                DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
+
             _clientSpeakerNetId = 0;
             return;
         }
@@ -715,14 +725,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     /// <summary>
     /// Activates the camera mapped to <paramref name="key"/> and deactivates the previous
-    /// override. An empty key simply deactivates any active override, returning to the
-    /// default suspect cam.
+    /// override. An empty key defaults to the current speaker's <c>SuspectCam</c> if one is
+    /// active; if there is no speaker it simply deactivates any active override.
     /// <para>
-    /// Two well-known keys are resolved dynamically from the current dialogue speaker rather
+    /// Three well-known keys are resolved dynamically from the current dialogue speaker rather
     /// than the static <see cref="_cameras"/> registry:
     /// <list type="bullet">
     ///   <item><term>SuspectCam</term><description>The speaker's <see cref="SuspectCharacter.SuspectCam"/>.</description></item>
-    ///   <item><term>SuspectFaceCam</term><description>The speaker's <see cref="SuspectCharacter.SuspectFaceCam"/>.</description></item>
+    ///   <item><term>SuspectFaceCam / suspect face</term><description>The speaker's <see cref="SuspectCharacter.SuspectFaceCam"/> close-up.</description></item>
     /// </list>
     /// </para>
     /// </summary>
@@ -736,10 +746,25 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _activeOverrideCam = null;
         }
 
-        if (string.IsNullOrEmpty(key)) return;
+        // Empty trigger: default to the speaker's SuspectCam so dialogue nodes without an
+        // explicit cameraTrigger still cut to the character rather than showing nothing.
+        if (string.IsNullOrEmpty(key))
+        {
+            if (_clientSpeakerNetId != 0)
+            {
+                GameObject defaultCam = ResolveSpeakerCamera("SuspectCam");
+                if (defaultCam != null)
+                {
+                    defaultCam.SetActive(true);
+                    _activeOverrideCam = defaultCam;
+                }
+            }
+            return;
+        }
 
         // Resolve per-speaker cameras by well-known keys — no static registry entry needed.
-        if (key == "SuspectCam" || key == "SuspectFaceCam")
+        // "suspect face" is an alias for SuspectFaceCam (close-up shot of the current speaker).
+        if (key == "SuspectCam" || key == "SuspectFaceCam" || key == "suspect face")
         {
             GameObject speakerCam = ResolveSpeakerCamera(key);
             if (speakerCam != null)
@@ -784,7 +809,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         var character = netObj.GetComponent<SuspectCharacter>();
         if (character == null) return null;
 
-        return key == "SuspectFaceCam" ? character.SuspectFaceCam : character.SuspectCam;
+        return (key == "SuspectFaceCam" || key == "suspect face") ? character.SuspectFaceCam : character.SuspectCam;
     }
 
     private void DeactivateOverrideCam()

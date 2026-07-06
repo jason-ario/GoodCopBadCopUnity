@@ -492,6 +492,54 @@ public class DebugConsole : MonoBehaviour
 
         Debug.Log("[DebugConsole] Skipped to end of Day 1 — timecard machine primed for clock-out (F12).");
     }
+    /// <summary>
+    /// Skips to Day 2 in the booth with the opening Vlad sequence suppressed and the shift
+    /// immediately ended, dropping the player straight into the post-shift Vlad out-back cutscene.
+    /// </summary>
+    public void SkipToEndOfDay2()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay2: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(2);
+        StartCoroutine(SkipToEndOfDay2AfterDelay());
+    }
+
+    private IEnumerator SkipToEndOfDay2AfterDelay()
+    {
+        // Wait one frame for Day_02 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_02.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay2: Day_02.Instance not found after SkipToDay(2).");
+            yield break;
+        }
+
+        // Put the start-shift gate in post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Suppress the opening Vlad sequence and unlock the tool locker.
+        Day_02.Instance.DebugSkipOpening();
+
+        // Start the shift with a huge first-arrival window — no suspects will arrive.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
+
+        // End the shift immediately — this fires ShiftEnded() on Day_02 and begins
+        // PostShiftSetupSequence() (megaphone bark → Vlad spawns out back).
+        ShiftManager.Instance?.EndShift();
+
+        Debug.Log("[DebugConsole] Skipped to end of Day 2 — post-shift Vlad cutscene starting.");
+    }
+
     /// bypassing normal character spawning and playing the mocking sequence directly.
     /// Useful for testing the soldier event without running through all preceding suspects.
     /// </summary>

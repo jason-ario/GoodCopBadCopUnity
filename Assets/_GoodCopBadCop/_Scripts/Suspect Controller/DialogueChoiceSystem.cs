@@ -161,6 +161,55 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void ExitScriptedDialogueMode() => ExitDialogueMode();
 
     /// <summary>
+    /// Enters scripted dialogue mode for outside-world cutscenes. Locks player movement and
+    /// shows the cursor but does NOT activate the booth suspect camera. Use for NPC dialogues
+    /// that occur outside the interrogation booth (e.g. Vlad out-back sequence).
+    /// </summary>
+    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null)
+    {
+        if (IsInDialogueMode) return;
+
+        IsInDialogueMode = true;
+
+        DiegeticViewController.Current?.Close();
+
+        var player = PlayerInstance.Instance;
+        if (player == null) return;
+
+        player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
+        UIController.Instance.ShowCursor();
+
+        if (lookTarget != null)
+            player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
+
+        HidePlayerBody();
+
+        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueModeOutside — movement locked, no booth cam.");
+    }
+
+    /// <summary>
+    /// Exits the outside scripted dialogue mode, restoring player movement and hiding the cursor.
+    /// The complement to <see cref="EnterScriptedDialogueModeOutside"/>. Does not touch the
+    /// booth suspect camera because it was never activated.
+    /// </summary>
+    public void ExitScriptedDialogueModeOutside()
+    {
+        if (!IsInDialogueMode) return;
+
+        IsInDialogueMode = false;
+
+        UIController.Instance.HideCursor();
+
+        var player = PlayerInstance.Instance;
+        if (player == null) return;
+
+        player.GetComponent<PlayerMovementController>()?.SetCanControl(true);
+        ShowPlayerBody();
+
+        Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored.");
+    }
+
+    /// <summary>
     /// Shows the choice panel for a scripted dialogue node.
     /// <paramref name="onChosen"/> fires locally on the picking client when a button is clicked.
     /// </summary>

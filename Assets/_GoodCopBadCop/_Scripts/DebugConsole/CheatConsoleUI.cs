@@ -72,6 +72,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay1());
             SetVisible(false);
         }));
+
+        _cheats.Add(("Skip to Day 2 — Vlad Out Back Cutscene", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay2());
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

@@ -8,6 +8,11 @@ using UnityEngine;
 /// A grotesque corpse appears at the start of the day, leading to an invisible trail
 /// of particles only visible under UV light. Investigating the final destination
 /// resolves the threat.
+///
+/// Also acts as the central network-sync hub for the post-shift Vlad Out-Back sequence:
+/// three NetworkVariables (<see cref="_meetVladActive"/>, <see cref="_followTrailActive"/>,
+/// <see cref="_killMutantActive"/>) drive TaskRegistry registration on ALL clients so the HUD
+/// stays in sync without requiring Day_02 to be a NetworkBehaviour itself.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
@@ -46,6 +51,33 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// When true, the "Meet Vlad out back" task appears in every client's HUD.
+    /// Set via <see cref="SetMeetVladActive"/>; cleared when the player approaches Vlad.
+    /// </summary>
+    private readonly NetworkVariable<bool> _meetVladActive = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// When true, the "Follow the trail" task (this object) appears in every client's HUD.
+    /// Set via <see cref="SetFollowTrailTaskActive"/>; cleared when the trail destination is found.
+    /// </summary>
+    private readonly NetworkVariable<bool> _followTrailActive = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// When true, the "Kill the mutant" task appears in every client's HUD.
+    /// Set via <see cref="SetKillMutantActive"/>; cleared when a mutant is killed while active.
+    /// </summary>
+    private readonly NetworkVariable<bool> _killMutantActive = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // ── Local state ──────────────────────────────────────────────────────────
 
     private GameObject _spawnedCorpse;
@@ -58,8 +90,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
     public float  ScoreWeight       => _scoreWeight;
     public float  ThreatLevel       => _networkThreatLevel.Value;
 
-    public string ThreatDescription => _isDiscovered.Value 
-        ? "Trail investigated." 
+    public string ThreatDescription => _isDiscovered.Value
+        ? "Trail investigated."
         : (_networkThreatLevel.Value > 0 ? "Grotesque corpse found. Follow the residue." : "No active trail.");
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -77,11 +109,24 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        _meetVladActive.OnValueChanged    += OnMeetVladActiveChanged;
+        _followTrailActive.OnValueChanged += OnFollowTrailActiveChanged;
+        _killMutantActive.OnValueChanged  += OnKillMutantActiveChanged;
+
+        // Apply initial values for late-joining clients so they see any already-active tasks.
+        if (_meetVladActive.Value)    MeetVladOutBackTask.CreateAndRegister();
+        if (_followTrailActive.Value) TaskRegistry.Instance?.AddThreat(this);
+        if (_killMutantActive.Value)  KillMutantTask.CreateAndRegister();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+
+        _meetVladActive.OnValueChanged    -= OnMeetVladActiveChanged;
+        _followTrailActive.OnValueChanged -= OnFollowTrailActiveChanged;
+        _killMutantActive.OnValueChanged  -= OnKillMutantActiveChanged;
     }
 
     private void OnDestroy()
@@ -89,20 +134,75 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
         if (Instance == this) Instance = null;
     }
 
-    // ── ISystemicThreat ──────────────────────────────────────────────────────
+    // ── NetworkVariable callbacks — fire on ALL clients ───────────────────────
 
-    public void BeginNightPhase()
+    private void OnMeetVladActiveChanged(bool previous, bool current)
     {
-        // Logic starts at day start, but we can use this to ensure visibility or status if needed.
-        // For this specific threat, it persists from day into night.
+        if (current) MeetVladOutBackTask.CreateAndRegister();
+        else         MeetVladOutBackTask.CompleteAndRemove();
     }
 
-    public void EndNightPhase()
+    private void OnFollowTrailActiveChanged(bool previous, bool current)
     {
-        // Clean up or lock state.
+        if (current) TaskRegistry.Instance?.AddThreat(this);
+        else         TaskRegistry.Instance?.RemoveThreat(this);
+    }
+
+    private void OnKillMutantActiveChanged(bool previous, bool current)
+    {
+        if (current) KillMutantTask.CreateAndRegister();
+        else         KillMutantTask.CompleteAndRemove();
+    }
+
+    // ── ISystemicThreat ──────────────────────────────────────────────────────
+
+    public void BeginNightPhase() { }
+    public void EndNightPhase()   { }
+
+    // ── Public API — task visibility setters (server only) ────────────────────
+
+    /// <summary>Shows or hides the "Meet Vlad out back" HUD task on all clients. Server only.</summary>
+    public void SetMeetVladActive(bool active)
+    {
+        if (!IsServer) return;
+        _meetVladActive.Value = active;
+    }
+
+    /// <summary>Shows or hides the "Follow the trail" HUD task on all clients. Server only.</summary>
+    public void SetFollowTrailTaskActive(bool active)
+    {
+        if (!IsServer) return;
+        _followTrailActive.Value = active;
+    }
+
+    /// <summary>Shows or hides the "Kill the mutant" HUD task on all clients. Server only.</summary>
+    public void SetKillMutantActive(bool active)
+    {
+        if (!IsServer) return;
+        _killMutantActive.Value = active;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Optional server-side callback injected by a day script (e.g. Day_02) to intercept trail
+    /// resolution. When assigned, called in place of <see cref="BetweenShiftTaskManager.HandleNightPhaseReady"/>
+    /// when the player reaches the trail destination. The day script is then responsible for
+    /// advancing the night phase (e.g. after the Kill Mutant task is completed).
+    /// Set to null to restore default behaviour.
+    /// </summary>
+    public Action OnDestinationDiscoveredOverride;
+
+    /// <summary>
+    /// Manually spawns the trail event from an external system (e.g. Day_02 post-shift).
+    /// Server only. Safe to call when CanFollowTrailEvent is false on DayBase.
+    /// </summary>
+    public void TriggerTrailEvent()
+    {
+        if (!IsServer) return;
+        Cleanup();
+        SpawnEvent();
+    }
 
     /// <summary>
     /// Called by TrailDestinationInteractable when the player interacts with the final point.
@@ -117,11 +217,19 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
 
         if (_isDiscovered.Value) return;
 
-        _isDiscovered.Value = true;
+        _isDiscovered.Value       = true;
         _networkThreatLevel.Value = 0f;
-        
-        BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
-        
+
+        // Remove the "Follow the trail" HUD task from all clients.
+        _followTrailActive.Value = false;
+
+        // If a day script has registered a custom override, delegate resolution to it.
+        // Otherwise fall back to the default: immediately advance the night phase timer.
+        if (OnDestinationDiscoveredOverride != null)
+            OnDestinationDiscoveredOverride.Invoke();
+        else
+            BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+
         Debug.Log("[FollowTrailThreat] Destination discovered. Threat resolved.");
     }
 
@@ -139,10 +247,15 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
 
         Cleanup();
 
+        // Reset all task visibility flags for the new day.
+        _meetVladActive.Value    = false;
+        _followTrailActive.Value = false;
+        _killMutantActive.Value  = false;
+
         if (CampaignManager.Instance?.ActiveDay == null || !CampaignManager.Instance.ActiveDay.CanFollowTrailEvent)
         {
             _networkThreatLevel.Value = 0f;
-            _isDiscovered.Value = false;
+            _isDiscovered.Value       = false;
             return;
         }
 
@@ -159,21 +272,18 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
 
         FollowTrailLocation location = _possibleLocations[UnityEngine.Random.Range(0, _possibleLocations.Count)];
 
-        // Spawn Corpse
         if (_corpsePrefab != null && location.CorpsePoint != null)
         {
             _spawnedCorpse = Instantiate(_corpsePrefab, location.CorpsePoint.position, location.CorpsePoint.rotation);
             _spawnedCorpse.GetComponent<NetworkObject>().Spawn(true);
         }
 
-        // Spawn Destination
         if (_destinationPrefab != null && location.DestinationPoint != null)
         {
             _spawnedDestination = Instantiate(_destinationPrefab, location.DestinationPoint.position, location.DestinationPoint.rotation);
             _spawnedDestination.GetComponent<NetworkObject>().Spawn(true);
         }
 
-        // Spawn Trail Particles
         if (_trailParticlesPrefab != null && location.TrailPath != null)
         {
             foreach (Transform p in location.TrailPath)
@@ -186,8 +296,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
         }
 
         _networkThreatLevel.Value = 1.0f;
-        _isDiscovered.Value = false;
-        
+        _isDiscovered.Value       = false;
+
         Debug.Log("[FollowTrailThreat] Event spawned.");
     }
 
@@ -208,9 +318,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
         foreach (GameObject trail in _spawnedTrailParticles)
         {
             if (trail != null)
-            {
                 trail.GetComponent<NetworkObject>().Despawn(true);
-            }
         }
         _spawnedTrailParticles.Clear();
     }

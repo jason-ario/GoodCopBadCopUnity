@@ -14,6 +14,15 @@ public enum DeathBehaviour { Destroy, PlayAnimation }
 [RequireComponent(typeof(NavMeshAgent))]
 public class MutantEnemy : NetworkBehaviour
 {
+    // ── Static events ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired on the server when any <see cref="MutantEnemy"/> instance dies.
+    /// <see cref="KillMutantTask"/> and other systems subscribe to this to detect scripted
+    /// mutant kills without needing a direct reference to the instance.
+    /// </summary>
+    public static event Action OnAnyMutantKilled;
+
     // ── Configuration ─────────────────────────────────────────────────────────
 
     [SerializeField] private MutantEnemyData data;
@@ -799,6 +808,9 @@ public class MutantEnemy : NetworkBehaviour
         _agent.ResetPath();
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
+
+        // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
+        OnAnyMutantKilled?.Invoke();
 
         // Attempt to drop a MutantBit if the night phase is active.
         MutantThreat.Instance?.TryDropBitAt(transform.position);
