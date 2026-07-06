@@ -42,6 +42,7 @@ public class PlayerInstance : NetworkBehaviour
     public PlayerRadiation PlayerRadiation { get; set; }
     public PlayerHealth PlayerHealth { get; set; }
     public PlayerAnimationController PlayerAnimationController { get; private set; }
+    public PlayerPickupController PlayerPickupController { get; private set; }
 
     /// <summary>The CinemachineCamera transform managed by PlayerMovementController.</summary>
     public Transform CameraTransform => _playerMovementController?.CameraTransform;
@@ -55,6 +56,7 @@ public class PlayerInstance : NetworkBehaviour
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
         PlayerAnimationController = GetComponent<PlayerAnimationController>();
+        PlayerPickupController = GetComponent<PlayerPickupController>();
     }
 
     public override void OnNetworkSpawn()

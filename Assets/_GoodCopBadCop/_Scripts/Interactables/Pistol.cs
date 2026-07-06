@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Cinemachine;
@@ -27,7 +28,7 @@ using UnityEngine;
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class Pistol : PickableObject
+public class Pistol : PickableObject, IAmmoProvider
 {
     /// <summary>Maximum number of rounds the pistol can hold.</summary>
     public const int MaxRounds = 30;
@@ -44,6 +45,9 @@ public class Pistol : PickableObject
 
     [Tooltip("Duration the muzzle flash light stays on, in seconds.")]
     [SerializeField] private float _lightOnTime = 0.08f;
+
+    [Tooltip("Cosmetic bullet prefab spawned locally on every shot. Requires a BulletVisual component.")]
+    [SerializeField] private GameObject _bulletVisualPrefab;
 
     [Header("Pistol — Combat")]
     [Tooltip("Damage dealt to a MutantEnemy per bullet.")]
@@ -71,6 +75,12 @@ public class Pistol : PickableObject
 
     /// <summary>Current number of rounds loaded in the pistol.</summary>
     public int RoundsRemaining => _roundsRemaining.Value;
+
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _roundsRemaining.Value;
+    public float MaxAmmo => MaxRounds;
+    public event Action OnAmmoChanged;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -111,6 +121,7 @@ public class Pistol : PickableObject
     private void OnRoundsChanged(int previous, int current)
     {
         UpdateInteractText(current);
+        OnAmmoChanged?.Invoke();
 
         if (current > previous && _reloadSound != null)
             SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
@@ -138,14 +149,14 @@ public class Pistol : PickableObject
             return;
         }
 
-        PlayShootFX();
+        Camera cam = Camera.main;
+        PlayShootFX(cam.transform.forward);
         playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
         _cinemachineImpulseSource?.GenerateImpulse();
 
         PlayerMovementController movement = playerPickupController.GetComponent<PlayerMovementController>();
         movement?.ApplyRecoil();
 
-        Camera cam = Camera.main;
         FireServerRpc(cam.transform.position, cam.transform.forward);
     }
 
@@ -157,7 +168,7 @@ public class Pistol : PickableObject
     /// </summary>
     public override void OnBodyStartUse() { }
 
-    private void PlayShootFX()
+    private void PlayShootFX(Vector3 direction)
     {
         if (_shootVFX != null)
         {
@@ -170,6 +181,13 @@ public class Pistol : PickableObject
 
         if (_muzzleFlashLight != null)
             StartCoroutine(MuzzleFlashCoroutine());
+
+        if (_bulletVisualPrefab != null)
+        {
+            Vector3 muzzlePos = _shootVFX != null ? _shootVFX.transform.position : transform.position;
+            BulletVisual bullet = Instantiate(_bulletVisualPrefab).GetComponent<BulletVisual>();
+            bullet?.Initialize(muzzlePos, direction);
+        }
     }
 
     private IEnumerator MuzzleFlashCoroutine()
@@ -220,7 +238,7 @@ public class Pistol : PickableObject
 
         if (others.Count > 0)
         {
-            PlayShootFXClientRpc(new ClientRpcParams
+            PlayShootFXClientRpc(rayDirection, new ClientRpcParams
             {
                 Send = new ClientRpcSendParams { TargetClientIds = others }
             });
@@ -232,9 +250,9 @@ public class Pistol : PickableObject
     /// (the active, networked object) so the effect always originates from the correct instance.
     /// </summary>
     [ClientRpc]
-    private void PlayShootFXClientRpc(ClientRpcParams clientRpcParams = default)
+    private void PlayShootFXClientRpc(Vector3 direction, ClientRpcParams clientRpcParams = default)
     {
-        PlayShootFX();
+        PlayShootFX(direction);
         _cinemachineImpulseSource?.GenerateImpulse();
     }
 

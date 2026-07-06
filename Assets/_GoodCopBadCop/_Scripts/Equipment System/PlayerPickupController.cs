@@ -58,6 +58,12 @@ public class PlayerPickupController : NetworkBehaviour
 
     public UnityAction OnPlaceObject;
 
+    /// <summary>
+    /// Fired on the local owner client whenever the held item changes.
+    /// Passes the new <see cref="PickableObject"/>, or <c>null</c> when the hand is empty.
+    /// </summary>
+    public event Action<PickableObject> OnHeldObjectChanged;
+
     [SerializeField] Transform leftHandSocket;
     public Transform LeftHandSocket => leftHandSocket;
     
@@ -635,6 +641,7 @@ public class PlayerPickupController : NetworkBehaviour
 
         pickableObject.OnPickedUp();
         _heldObjectRef.Value = new NetworkObjectReference(pickableObject.NetworkObject);
+        OnHeldObjectChanged?.Invoke(_heldObject);
 
         // Disable NetworkTransform while held — ParentConstraint drives position on all
         // clients (camera arm for the owner, body arm for observers), so interpolation
@@ -694,6 +701,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
+        OnHeldObjectChanged?.Invoke(null);
 
         ObjectPlacer.Instance.DeactivatePlacer();
 
@@ -727,6 +735,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
+        OnHeldObjectChanged?.Invoke(null);
 
         ObjectPlacer.Instance.DeactivatePlacer();
     }
@@ -823,6 +832,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
         _playerAnimationController.DisableRightArmMask();
+        OnHeldObjectChanged?.Invoke(null);
         
         ObjectPlacer.Instance.DeactivatePlacer();
     }
@@ -1041,6 +1051,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject = null;
         _heldObjectRef.Value = default;
         itemEquippedIndex.Value = -1;
+        OnHeldObjectChanged?.Invoke(null);
 
         DisableArmIKs(heldObject);
         _playerAnimationController.DisableRightArmMask();

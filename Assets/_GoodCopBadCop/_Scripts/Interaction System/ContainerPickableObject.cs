@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -16,7 +17,7 @@ using UnityEngine;
 ///   <see cref="TrashBagRoll"/> — holds trash bags, extracted while the roll sits in the world.
 ///   (future) CigaretteCarton — holds cigarettes, carried in hand and extracted on demand.
 /// </summary>
-public abstract class ContainerPickableObject : PickableObject
+public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
 {
     private const int DefaultCapacity = 5;
 
@@ -42,6 +43,12 @@ public abstract class ContainerPickableObject : PickableObject
 
     /// <summary>True when all items have been extracted.</summary>
     public bool IsEmpty => _itemsRemaining.Value <= 0;
+
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _itemsRemaining.Value;
+    public float MaxAmmo => _capacity;
+    public event Action OnAmmoChanged;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -76,6 +83,7 @@ public abstract class ContainerPickableObject : PickableObject
     private void OnItemsRemainingChanged(int previous, int current)
     {
         interactText = BuildInteractText(current);
+        OnAmmoChanged?.Invoke();
 
         if (current < previous && _extractSound != null)
             SFXController.Instance.PlayAtPosition(_extractSound, transform.position);

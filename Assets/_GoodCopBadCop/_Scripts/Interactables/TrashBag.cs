@@ -1,3 +1,4 @@
+using System;
 using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
@@ -20,7 +21,7 @@ using UnityEngine;
 ///   - PickableItemData ScriptableObject assigned in the "Item Data" field
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
-public class TrashBag : PickableObject
+public class TrashBag : PickableObject, IAmmoProvider
 {
     private const string JunkBlendShapeName = "Key 1";
     private const int    BlendShapeNotFound  = -1;
@@ -55,6 +56,12 @@ public class TrashBag : PickableObject
 
     /// <summary>Maximum junk items this bag can hold (inspector-configurable).</summary>
     public int MaxJunkCapacity => _maxJunkCapacity;
+
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _junkCount.Value;
+    public float MaxAmmo => _maxJunkCapacity;
+    public event Action OnAmmoChanged;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -113,7 +120,11 @@ public class TrashBag : PickableObject
         }
     }
 
-    private void OnJunkCountChanged(int previous, int current) => UpdateBlendShapeSmooth(current);
+    private void OnJunkCountChanged(int previous, int current)
+    {
+        OnAmmoChanged?.Invoke();
+        UpdateBlendShapeSmooth(current);
+    }
 
     /// <summary>
     /// Snaps the "Key 1" blend shape to the correct weight for <paramref name="junkCount"/>

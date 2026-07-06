@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -21,7 +22,7 @@ using UnityEngine;
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class Flamethrower : PickableObject
+public class Flamethrower : PickableObject, IAmmoProvider
 {
     /// <summary>Maximum fuel the tank can hold.</summary>
     public const float MaxFuel = 100f;
@@ -66,6 +67,12 @@ public class Flamethrower : PickableObject
 
     /// <summary>Current fuel level [0, <see cref="MaxFuel"/>].</summary>
     public float Fuel => _fuel.Value;
+
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _fuel.Value;
+    public float MaxAmmo => MaxFuel;
+    public event Action OnAmmoChanged;
 
     // ── Hit check throttle (owner only) ───────────────────────────────────────
 
@@ -146,6 +153,7 @@ public class Flamethrower : PickableObject
     private void OnFuelChanged(float previous, float current)
     {
         UpdateInteractText(current);
+        OnAmmoChanged?.Invoke();
 
         // Scale particle stream length and density to reflect remaining fuel.
         // Called here (on NetworkVariable change) rather than every Update frame

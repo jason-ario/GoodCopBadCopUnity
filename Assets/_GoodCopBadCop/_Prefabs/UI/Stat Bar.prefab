@@ -112,8 +112,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 28.8, y: 0}
-  m_SizeDelta: {x: 415.8098, y: 30.9181}
+  m_AnchoredPosition: {x: 28.8, y: -9.1493}
+  m_SizeDelta: {x: 415.8098, y: 51.6617}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4077146848193493360
 CanvasRenderer:
@@ -130,7 +130,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 352485966060888300}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -320,7 +320,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HealthBar
   fillImage: {fileID: 7361073414911861675}
   glowRect: {fileID: 8872643524254160201}
+  glowEnabled: 1
   glowLingerDuration: 0.5
+  glowOnDecrease: 0
+  glowRateThreshold: 0.1
 --- !u!1 &7711954523684128596
 GameObject:
   m_ObjectHideFlags: 0
@@ -355,8 +358,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 3.1299133, y: -3}
-  m_SizeDelta: {x: 409.8248, y: 25.231}
+  m_AnchoredPosition: {x: 3.1299, y: -3}
+  m_SizeDelta: {x: 409.8248, y: 48.662}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &6745307813940171533
 CanvasRenderer:

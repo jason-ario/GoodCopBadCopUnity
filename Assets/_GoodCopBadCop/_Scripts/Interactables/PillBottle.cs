@@ -1,13 +1,20 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
-public class PillBottle : PickableObject
+public class PillBottle : PickableObject, IAmmoProvider
 {
     private const int MaxUses = 3;
 
     [SerializeField] Animator _animator;
     private int _usesRemaining = MaxUses;
     [SerializeField] private AudioClip drinkSound;
+
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _usesRemaining;
+    public float MaxAmmo => MaxUses;
+    public event Action OnAmmoChanged;
 
     /// <summary>
     /// Initiates a pill use if the bottle still has doses and is not already in use.
@@ -33,6 +40,7 @@ public class PillBottle : PickableObject
         _animator.SetBool("TakePill", false);
 
         _usesRemaining--;
+        OnAmmoChanged?.Invoke();
 
         if (_usesRemaining <= 0)
         {
