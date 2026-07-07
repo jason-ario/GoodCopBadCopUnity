@@ -325,6 +325,58 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Spawns a pack of <paramref name="count"/> mutants in a burst centred on
+    /// <paramref name="center"/> rather than this spawner's own position.
+    /// Enemies are scattered using the same <see cref="spawnBoxHalfExtents"/> box and
+    /// added to the active-enemy list. Optionally aggros all of them toward
+    /// <paramref name="packAggroTarget"/>. SERVER ONLY.
+    /// </summary>
+    public void SpawnPackAt(Vector3 center, int count, Transform packAggroTarget = null)
+    {
+        if (!IsServer) return;
+        StartCoroutine(SpawnPackAtCoroutine(center, count, packAggroTarget));
+    }
+
+    private IEnumerator SpawnPackAtCoroutine(Vector3 center, int count, Transform packAggroTarget)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 offset = new Vector3(
+                Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
+                0f,
+                Random.Range(-spawnBoxHalfExtents.z, spawnBoxHalfExtents.z)
+            );
+
+            Vector3    spawnPos = center + offset;
+            Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+            GameObject prefab   = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+            GameObject instance = Instantiate(prefab, spawnPos, spawnRot);
+            NetworkObject netObj = instance.GetComponent<NetworkObject>();
+
+            if (netObj == null)
+            {
+                Debug.LogError("[MutantSpawner] Pack prefab is missing a NetworkObject — skipping.", this);
+                Destroy(instance);
+                continue;
+            }
+
+            MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
+            if (packAggroTarget != null)
+                enemy?.SetAggroTarget(packAggroTarget);
+            enemy?.SetForceAggro(packAggroTarget != null);
+
+            netObj.Spawn(true);
+            _activeEnemies.Add(netObj);
+
+            if (i < count - 1)
+                yield return new WaitForSeconds(burstSpawnDelay);
+        }
+
+        Debug.Log($"[MutantSpawner] Pack of {count} spawned at {center}.", this);
+    }
+
+    /// <summary>
     /// Stops the spawner loop. Existing enemies remain active. SERVER ONLY.
     /// </summary>
     public void StopSpawning()

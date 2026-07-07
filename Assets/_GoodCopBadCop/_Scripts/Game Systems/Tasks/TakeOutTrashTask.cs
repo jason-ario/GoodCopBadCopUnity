@@ -23,7 +23,7 @@ using Random = UnityEngine.Random;
 ///   - Register this component in TaskRegistry via AlexeiController.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
+public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 {
     public static TakeOutTrashTask Instance { get; private set; }
 
@@ -32,6 +32,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
     [SerializeField] private float _scoreWeight = 1f;
     [Tooltip("Number of coupons the ATM dispenses when all trash has been deposited.")]
     [SerializeField] private int _couponReward = 10;
+
+    [Header("Daily Task")]
+    [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
+    [SerializeField] private string _dailyTaskId = "TakeOutTrash";
 
     [Header("Spawning")]
     [Tooltip("Minimum number of trash items to spawn when TriggerTask is called (inclusive).")]
@@ -103,6 +107,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         _totalCount.Value > 0
             ? $"{Mathf.Min(_depositedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
             : string.Empty;
+
+    // ── IDailyTask ───────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public string DailyTaskId => _dailyTaskId;
+
+    /// <summary>
+    /// Triggers this task as the randomly-selected daily task. Delegates to <see cref="TriggerTask"/>.
+    /// Server-only; <see cref="TriggerTask"/> enforces the IsServer guard internally.
+    /// </summary>
+    public void TriggerDailyTask() => TriggerTask();
+
+    /// <inheritdoc/>
+    public event Action OnDailyTaskCompleted;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -254,6 +272,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat
         Debug.Log("[TakeOutTrashTask] All items deposited — task complete.");
         ATM.Instance?.SpawnCoupons(_couponReward);
         OnAllItemsDeposited?.Invoke();
+        OnDailyTaskCompleted?.Invoke();
 
         // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
         _isActive.Value = false;

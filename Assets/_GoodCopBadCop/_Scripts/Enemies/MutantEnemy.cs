@@ -30,6 +30,7 @@ public class MutantEnemy : NetworkBehaviour
     [Header("Animation (optional)")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParameterName = "Speed";
+    [SerializeField] private string groundedParameterName = "Grounded";
     [SerializeField] private string attackBoolName = "Attack";
     [SerializeField] private string deathBoolName = "Death";
 
@@ -105,6 +106,13 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    // Synced animator grounded state so non-owners see the correct grounded blend
+    private readonly NetworkVariable<bool> _networkGrounded = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -121,15 +129,19 @@ public class MutantEnemy : NetworkBehaviour
             InitialiseServer();
         }
 
-        // All clients track the synced speed for animation
+        // All clients track the synced speed and grounded state for animation
         _networkSpeed.OnValueChanged += OnNetworkSpeedChanged;
         ApplyAnimatorSpeed(_networkSpeed.Value);
+
+        _networkGrounded.OnValueChanged += OnNetworkGroundedChanged;
+        ApplyAnimatorGrounded(_networkGrounded.Value);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
+        _networkGrounded.OnValueChanged -= OnNetworkGroundedChanged;
     }
 
     /// <summary>
@@ -499,6 +511,7 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         _networkSpeed.Value = _agent.velocity.magnitude;
+        _networkGrounded.Value = _agent.isOnNavMesh;
     }
 
     // ── Targeting ──────────────────────────────────────────────────────────────
@@ -865,5 +878,16 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (animator != null && !string.IsNullOrEmpty(speedParameterName))
             animator.SetFloat(speedParameterName, speed);
+    }
+
+    private void OnNetworkGroundedChanged(bool oldValue, bool newValue)
+    {
+        ApplyAnimatorGrounded(newValue);
+    }
+
+    private void ApplyAnimatorGrounded(bool grounded)
+    {
+        if (animator != null && !string.IsNullOrEmpty(groundedParameterName))
+            animator.SetBool(groundedParameterName, grounded);
     }
 }

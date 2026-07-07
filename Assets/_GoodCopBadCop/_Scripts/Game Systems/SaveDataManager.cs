@@ -38,6 +38,41 @@ public class SaveDataManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // Daily Task Unlocks
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns the persisted daily task IDs that have been unlocked for the active slot.</summary>
+    public string[] GetUnlockedDailyTaskIds()
+    {
+        return ActiveSlot?.UnlockedDailyTaskIds ?? new string[0];
+    }
+
+    /// <summary>Returns true if the daily task with the given ID has been unlocked for the active slot.</summary>
+    public bool IsDailyTaskUnlocked(string taskId)
+    {
+        string[] unlocked = ActiveSlot?.UnlockedDailyTaskIds;
+        if (unlocked == null) return false;
+        return Array.IndexOf(unlocked, taskId) >= 0;
+    }
+
+    /// <summary>
+    /// Marks the daily task ID as unlocked in the active slot and persists to disk.
+    /// Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void UnlockDailyTask(string taskId)
+    {
+        if (ActiveSlot == null) return;
+        if (IsDailyTaskUnlocked(taskId)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.UnlockedDailyTaskIds ?? new string[0]);
+        list.Add(taskId);
+        ActiveSlot.UnlockedDailyTaskIds = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Daily task unlocked: '{taskId}'.");
+    }
+
+    // -------------------------------------------------------------------------
     // Anomaly Unlocks
     // -------------------------------------------------------------------------
 
@@ -426,6 +461,12 @@ public class SaveSlot
     /// and its target <see cref="ILockable"/> is immediately unlocked.
     /// </summary>
     public string[] UnlockedLockIds = new string[0];
+
+    /// <summary>
+    /// Stable task IDs (matching <see cref="IDailyTask.DailyTaskId"/>) that have been unlocked
+    /// through gameplay progression and are eligible for selection by <see cref="DailyTaskScheduler"/>.
+    /// </summary>
+    public string[] UnlockedDailyTaskIds = new string[0];
 
     /// <summary>
     /// Per-suspect persistent state (kill flags, quarantine cooldowns, infection scores).

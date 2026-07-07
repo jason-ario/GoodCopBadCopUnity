@@ -145,6 +145,7 @@ GameObject:
   - component: {fileID: 4700978623447278918}
   - component: {fileID: -1946918825076805320}
   - component: {fileID: 8952666811533099273}
+  - component: {fileID: 2877230616751033339}
   m_Layer: 0
   m_Name: Mutant
   m_TagString: Enemy
@@ -182,7 +183,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1986712750
+  GlobalObjectIdHash: 3107953825
   InScenePlacedSourceGlobalObjectIdHash: 3107953825
   DeferredDespawnTick: 0
   Ownership: 1
@@ -233,6 +234,7 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: 0cb5dddba4895be4abc732a2837c36ec, type: 2}
   animator: {fileID: 386687839824223625}
   speedParameterName: Speed
+  groundedParameterName: Grounded
   attackBoolName: Attack
   deathBoolName: Death
   attackHitbox: {fileID: 291297765939751491}
@@ -344,6 +346,29 @@ MonoBehaviour:
   maxFireInstances: 8
   burnDuration: 5
   fireDamagePerTick: 5
+--- !u!136 &2877230616751033339
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7307716854411765365}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 1.38
+  m_Height: 3.33
+  m_Direction: 1
+  m_Center: {x: 0, y: 1.67, z: 0}
 --- !u!1 &7932345873243114423
 GameObject:
   m_ObjectHideFlags: 0

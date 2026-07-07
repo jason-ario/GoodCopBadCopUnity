@@ -156,7 +156,8 @@ public class Day_02 : DayBase
     [Header("Day 2 — Trail Event")]
     [Tooltip("Index into FollowTrailThreat._possibleLocations to use for the Day 2 trail. " +
              "That location's TrailController should have its first waypoint placed at the dead animal. " +
-             "Leave CorpsePoint unassigned on that entry — _deadAnimalObject already serves as the corpse.")]
+             "Leave CorpsePoint unassigned — _deadAnimalObject already serves as the corpse. " +
+             "Set PackSpawner and PackSize on the location to configure the enemy pack.")]
     [SerializeField] private int _day2TrailLocationIndex = 0;
 
     [Header("Day 2 — Post-Shift Scripted Dialogues")]
@@ -882,11 +883,11 @@ public class Day_02 : DayBase
         // Show "Follow the trail" in every client's HUD via the NetworkVariable.
         FollowTrailThreat.Instance.SetFollowTrailTaskActive(true);
 
-        // Intercept trail resolution so we can chain into the Kill Mutant task
-        // rather than advancing the night phase immediately.
+        // Pack spawning and kill task activation are handled by FollowTrailThreat when the
+        // destination is discovered, using PackSpawner/PackSize on the FollowTrailLocation.
+        // The override just needs to start KillMutantSequence to wait for all kills.
         FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = () =>
         {
-            FollowTrailThreat.Instance.SetKillMutantActive(true);
             StartCoroutine(KillMutantSequence());
         };
 
