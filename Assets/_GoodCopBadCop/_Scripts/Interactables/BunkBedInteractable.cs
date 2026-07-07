@@ -26,13 +26,38 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private PlayerInteractionController _interactingPlayer;
 
     /// <summary>
-    /// Returns true when the shift has ended. Reads <see cref="ShiftManager.shiftStarted"/>
-    /// directly — a <see cref="NetworkVariable{T}"/> set by <see cref="ShiftManager.EndShift"/>
-    /// — so it is always reliable regardless of local event subscription state.
+    /// Returns true when the shift has ended AND all completable tasks are finished.
+    /// Reads <see cref="ShiftManager.shiftStarted"/> directly — a <see cref="NetworkVariable{T}"/>
+    /// set by <see cref="ShiftManager.EndShift"/> — so it is always reliable regardless of local
+    /// event subscription state.
     /// </summary>
     private bool CanSleep =>
         ShiftManager.Instance != null
-        && !ShiftManager.Instance.shiftStarted.Value;
+        && !ShiftManager.Instance.shiftStarted.Value
+        && AllTasksComplete();
+
+    /// <summary>
+    /// Returns true when every <see cref="IBetweenShiftTask"/> registered in the
+    /// <see cref="TaskRegistry"/> reports <c>IsComplete</c>.
+    /// Navigation-only entries such as <see cref="GoToBunkerTask"/> are excluded.
+    /// Returns true when no completable tasks are present (e.g. early in the night phase).
+    /// </summary>
+    private bool AllTasksComplete()
+    {
+        if (TaskRegistry.Instance == null) return true;
+
+        foreach (ISystemicThreat threat in TaskRegistry.Instance.Threats)
+        {
+            if (threat is GoToBunkerTask) continue;
+
+#pragma warning disable CS0618
+            if (threat is IBetweenShiftTask task && !task.IsComplete)
+                return false;
+#pragma warning restore CS0618
+        }
+
+        return true;
+    }
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -57,6 +82,10 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
             ShiftManager.Instance.OnShiftEnd   += HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart += HandleShiftStart;
         }
+
+        // Keep the interact label in sync whenever task state changes.
+        TaskRegistry.OnTaskListChanged  += UpdateInteractText;
+        TaskRegistry.OnTaskStateChanged += UpdateInteractText;
     }
 
     public override void OnNetworkDespawn()
@@ -68,22 +97,35 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
             ShiftManager.Instance.OnShiftEnd   -= HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart -= HandleShiftStart;
         }
+
+        TaskRegistry.OnTaskListChanged  -= UpdateInteractText;
+        TaskRegistry.OnTaskStateChanged -= UpdateInteractText;
     }
 
     // ─── Event handlers ──────────────────────────────────────────────────────
 
-    /// <summary>Updates the hover tooltip when the shift ends and queues the go-to-bed task on the HUD.</summary>
+    /// <summary>Queues the go-to-bed task on the HUD and refreshes the hover label when the shift ends.</summary>
     private void HandleShiftEnd()
     {
-        interactText = InteractTextReady;
         GoToBunkerTask.CreateAndRegister();
+        UpdateInteractText();
     }
 
-    /// <summary>Resets the hover tooltip when a new shift begins and cleans up any leftover go-to-bed task.</summary>
+    /// <summary>Resets the hover label when a new shift begins and cleans up any leftover go-to-bed task.</summary>
     private void HandleShiftStart()
     {
-        interactText = InteractTextNotReady;
         GoToBunkerTask.CompleteAndRemove();
+        interactText = InteractTextNotReady;
+    }
+
+    /// <summary>
+    /// Syncs <see cref="Interactable.interactText"/> with the current <see cref="CanSleep"/> state.
+    /// Called on shift-end and whenever <see cref="TaskRegistry"/> reports a state change so the
+    /// tooltip updates as tasks are completed during the night phase.
+    /// </summary>
+    private void UpdateInteractText()
+    {
+        interactText = CanSleep ? InteractTextReady : InteractTextNotReady;
     }
 
     // ─── IInteractable ───────────────────────────────────────────────────────

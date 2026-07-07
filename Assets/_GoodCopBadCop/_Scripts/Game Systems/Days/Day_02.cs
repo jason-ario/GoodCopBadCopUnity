@@ -153,6 +153,12 @@ public class Day_02 : DayBase
     [Tooltip("Root GameObject of the dead animal prop. Disabled by default; activated at the start of the out-back sequence.")]
     [SerializeField] private GameObject _deadAnimalObject;
 
+    [Header("Day 2 — Trail Event")]
+    [Tooltip("Index into FollowTrailThreat._possibleLocations to use for the Day 2 trail. " +
+             "That location's TrailController should have its first waypoint placed at the dead animal. " +
+             "Leave CorpsePoint unassigned on that entry — _deadAnimalObject already serves as the corpse.")]
+    [SerializeField] private int _day2TrailLocationIndex = 0;
+
     [Header("Day 2 — Post-Shift Scripted Dialogues")]
     [Tooltip("Brief intro dialogue played when the player first approaches Vlad outside.")]
     [SerializeField] private ScriptedDialogue _vladOutBackIntroDialogue;
@@ -840,7 +846,12 @@ public class Day_02 : DayBase
             yield return new WaitUntil(() => part2Done);
         }
 
-        // ── Phase 9: Vlad exits ───────────────────────────────────────────────
+        // ── Phase 9: activate trail immediately after Vlad's last line ────────
+        // This fires before Vlad walks away so the task is live even if
+        // his exit navigation stalls.
+        ActivateDay2TrailEvent();
+
+        // ── Phase 10: Vlad exits ──────────────────────────────────────────────
         yield return new WaitForSeconds(_outBackVladExitDelay);
 
         if (_vladOutBackFinalWaypoint != null)
@@ -853,27 +864,36 @@ public class Day_02 : DayBase
         DespawnVladInstance(ref _spawnedVladOutBack);
 
         Debug.Log("[Day_02] Post-shift Vlad sequence complete — Vlad has left.");
+    }
 
-        // ── Phase 10: spawn the UV blood trail and register Follow Trail task ──
-        yield return new WaitForSeconds(0.5f);
-
-        // SetFollowTrailTaskActive fires the NetworkVariable → all clients add FollowTrailThreat
-        // to their local TaskRegistry, showing "Follow the trail" in the HUD everywhere.
-        FollowTrailThreat.Instance?.SetFollowTrailTaskActive(true);
-
-        // Set the Day 2 override so FollowTrailThreat hands resolution back to us
-        // instead of calling HandleNightPhaseReady() immediately.
-        if (FollowTrailThreat.Instance != null)
+    /// <summary>
+    /// Registers the Follow Trail HUD task on all clients, sets the Day 2 resolution override,
+    /// and spawns the UV blood trail. Called immediately after Vlad's last dialogue line so the
+    /// task is live regardless of what happens during his exit walk. Server only.
+    /// </summary>
+    private void ActivateDay2TrailEvent()
+    {
+        if (FollowTrailThreat.Instance == null)
         {
-            FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = () =>
-            {
-                // Trail reached — show Kill Mutant task on all clients via NetworkVariable.
-                FollowTrailThreat.Instance.SetKillMutantActive(true);
-                StartCoroutine(KillMutantSequence());
-            };
+            Debug.LogError("[Day_02] FollowTrailThreat.Instance is null — trail event cannot be activated.", this);
+            return;
         }
 
-        FollowTrailThreat.Instance?.TriggerTrailEvent();
+        // Show "Follow the trail" in every client's HUD via the NetworkVariable.
+        FollowTrailThreat.Instance.SetFollowTrailTaskActive(true);
+
+        // Intercept trail resolution so we can chain into the Kill Mutant task
+        // rather than advancing the night phase immediately.
+        FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = () =>
+        {
+            FollowTrailThreat.Instance.SetKillMutantActive(true);
+            StartCoroutine(KillMutantSequence());
+        };
+
+        // Spawn corpse (if assigned), trail particles, and destination interactable.
+        FollowTrailThreat.Instance.TriggerTrailEvent(_day2TrailLocationIndex);
+
+        Debug.Log("[Day_02] Trail event activated.");
     }
 
     /// <summary>

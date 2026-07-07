@@ -22,9 +22,12 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
     [Serializable]
     public struct FollowTrailLocation
     {
-        public Transform CorpsePoint;
-        public Transform DestinationPoint;
-        public Transform[] TrailPath;
+        public Transform       CorpsePoint;
+        public Transform       DestinationPoint;
+        /// <summary>
+        /// Spline-based trail. Spawn count and jitter are configured on the TrailController itself.
+        /// </summary>
+        public TrailController Trail;
     }
 
     [Header("Threat Properties")]
@@ -38,6 +41,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
 
     [Header("Spawn Locations")]
     [SerializeField] private List<FollowTrailLocation> _possibleLocations;
+
+    [Header("Trail Placement")]
+    [Tooltip("Layers to hit when snapping particles to the terrain. Set to your terrain/ground layer for best results.")]
+    [SerializeField] private LayerMask _terrainLayerMask = Physics.AllLayers;
+
+    [Tooltip("Y offset above the terrain surface applied to every spawned blood particle.")]
+    [SerializeField] private float _trailGroundOffset = 0.05f;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -196,12 +206,34 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
     /// <summary>
     /// Manually spawns the trail event from an external system (e.g. Day_02 post-shift).
     /// Server only. Safe to call when CanFollowTrailEvent is false on DayBase.
+    /// Picks a location randomly from <see cref="_possibleLocations"/>.
     /// </summary>
     public void TriggerTrailEvent()
     {
         if (!IsServer) return;
         Cleanup();
         SpawnEvent();
+    }
+
+    /// <summary>
+    /// Manually spawns the trail event at a specific location index.
+    /// Use this when a day script needs a deterministic trail start point
+    /// (e.g. Day 2 always starts from the dead animal).
+    /// Server only.
+    /// </summary>
+    public void TriggerTrailEvent(int locationIndex)
+    {
+        if (!IsServer) return;
+
+        if (_possibleLocations == null || locationIndex < 0 || locationIndex >= _possibleLocations.Count)
+        {
+            Debug.LogWarning($"[FollowTrailThreat] Location index {locationIndex} is out of range — falling back to random.", this);
+            TriggerTrailEvent();
+            return;
+        }
+
+        Cleanup();
+        SpawnEvent(_possibleLocations[locationIndex]);
     }
 
     /// <summary>
@@ -270,8 +302,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
             return;
         }
 
-        FollowTrailLocation location = _possibleLocations[UnityEngine.Random.Range(0, _possibleLocations.Count)];
+        SpawnEvent(_possibleLocations[UnityEngine.Random.Range(0, _possibleLocations.Count)]);
+    }
 
+    private void SpawnEvent(FollowTrailLocation location)
+    {
         if (_corpsePrefab != null && location.CorpsePoint != null)
         {
             _spawnedCorpse = Instantiate(_corpsePrefab, location.CorpsePoint.position, location.CorpsePoint.rotation);
@@ -284,15 +319,21 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
             _spawnedDestination.GetComponent<NetworkObject>().Spawn(true);
         }
 
-        if (_trailParticlesPrefab != null && location.TrailPath != null)
+        if (_trailParticlesPrefab == null)
         {
-            foreach (Transform p in location.TrailPath)
-            {
-                if (p == null) continue;
-                GameObject trail = Instantiate(_trailParticlesPrefab, p.position, p.rotation);
-                trail.GetComponent<NetworkObject>().Spawn(true);
-                _spawnedTrailParticles.Add(trail);
-            }
+            Debug.LogWarning("[FollowTrailThreat] _trailParticlesPrefab is not assigned — no blood trail will spawn.", this);
+        }
+        else if (location.Trail == null)
+        {
+            Debug.LogWarning("[FollowTrailThreat] location.Trail (TrailController) is not assigned on this FollowTrailLocation — no blood trail will spawn.", this);
+        }
+        else
+        {
+            List<Vector3> spawnPositions = location.Trail.GetSpawnPositions();
+            for (int i = 0; i < spawnPositions.Count; i++)
+                spawnPositions[i] = SnapToTerrain(spawnPositions[i], _trailGroundOffset);
+            Debug.Log($"[FollowTrailThreat] Spawning {spawnPositions.Count} trail particles.", this);
+            SpawnTrailParticlesClientRpc(spawnPositions.ToArray());
         }
 
         _networkThreatLevel.Value = 1.0f;
@@ -315,11 +356,57 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat
             _spawnedDestination = null;
         }
 
-        foreach (GameObject trail in _spawnedTrailParticles)
+        // Trail particles are local instances on each client — clean up via ClientRpc.
+        if (IsSpawned)
+            CleanupTrailParticlesClientRpc();
+        else
         {
-            if (trail != null)
-                trail.GetComponent<NetworkObject>().Despawn(true);
+            foreach (GameObject trail in _spawnedTrailParticles)
+                if (trail != null) Destroy(trail);
+            _spawnedTrailParticles.Clear();
         }
+    }
+
+    /// <summary>
+    /// Casts downward from above <paramref name="position"/> to find the terrain surface,
+    /// then applies <paramref name="yOffset"/>. Falls back to the original position + offset
+    /// if nothing is hit.
+    /// </summary>
+    private Vector3 SnapToTerrain(Vector3 position, float yOffset)
+    {
+        const float castOriginHeight = 50f;
+        const float castDistance     = 100f;
+
+        Vector3 origin = new Vector3(position.x, position.y + castOriginHeight, position.z);
+
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, castDistance, _terrainLayerMask))
+            return hit.point + Vector3.up * yOffset;
+
+        return new Vector3(position.x, position.y + yOffset, position.z);
+    }
+
+    /// <summary>
+    /// Instantiates the blood-particle prefab at each position on every client.
+    /// Trail particles are purely visual so they don't need a NetworkObject.
+    /// </summary>
+    [ClientRpc]
+    private void SpawnTrailParticlesClientRpc(Vector3[] positions)
+    {
+        foreach (Vector3 pos in positions)
+        {
+            GameObject trail = Instantiate(_trailParticlesPrefab, pos, Quaternion.identity);
+            _spawnedTrailParticles.Add(trail);
+        }
+    }
+
+    /// <summary>
+    /// Destroys all locally-instantiated trail particle objects on every client.
+    /// </summary>
+    [ClientRpc]
+    private void CleanupTrailParticlesClientRpc()
+    {
+        foreach (GameObject trail in _spawnedTrailParticles)
+            if (trail != null) Destroy(trail);
         _spawnedTrailParticles.Clear();
     }
 }
