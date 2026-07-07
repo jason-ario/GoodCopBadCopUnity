@@ -18,17 +18,17 @@ public class DeadSilenceAnomaly : SupernaturalAnomaly
             return;
         }
 
-        audioService.SetDeadSilence(true);
+        audioService.SetDeadSilence(this, true);
     }
 
     public override void DeactivateAnomaly()
     {
         base.DeactivateAnomaly();
-        audioService?.SetDeadSilence(false);
+        audioService?.SetDeadSilence(this, false);
     }
 
     public override void InitializeDisabled()
     {
-        audioService?.SetDeadSilence(false);
+        audioService?.SetDeadSilence(this, false);
     }
 }

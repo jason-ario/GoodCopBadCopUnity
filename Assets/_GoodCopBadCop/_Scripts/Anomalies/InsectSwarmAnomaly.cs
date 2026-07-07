@@ -60,7 +60,7 @@ public class InsectSwarmAnomaly : SupernaturalAnomaly
         yield return new WaitForSeconds(Random.Range(_minDelay, _maxDelay));
         if (roomService != null)
         {
-            roomService.StartInsectSwarm();
+            roomService.StartInsectSwarm(this);
         }
         else
         {
@@ -82,7 +82,7 @@ public class InsectSwarmAnomaly : SupernaturalAnomaly
 
         if (roomService != null)
         {
-            roomService.StopInsectSwarm();
+            roomService.StopInsectSwarm(this);
         }
         else
         {

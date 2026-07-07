@@ -20,7 +20,7 @@ public class FlickeringLightsAnomaly : SupernaturalAnomaly
 
         if (roomService != null)
         {
-            roomService.StartFlickeringLights();
+            roomService.StartFlickeringLights(this);
             return;
         }
 
@@ -38,7 +38,7 @@ public class FlickeringLightsAnomaly : SupernaturalAnomaly
         base.DeactivateAnomaly();
         if (roomService != null)
         {
-            roomService.StopFlickeringLights();
+            roomService.StopFlickeringLights(this);
         }
         else
         {

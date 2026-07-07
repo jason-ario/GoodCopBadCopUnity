@@ -7,14 +7,16 @@ namespace GoodCopBadCop.CameraSystem
     public interface ICameraService
     {
         void ShakeLocalPlayer();
-        void SetCaptureVisibility(global::SuspectCharacter suspect, bool visible);
-        bool IsCaptureVisible(global::SuspectCharacter suspect);
+        void HideFromCapture(object source, global::SuspectCharacter suspect);
+        void ShowInCapture(object source, global::SuspectCharacter suspect);
+        bool IsVisibleInCapture(global::SuspectCharacter suspect);
     }
 
     public sealed class CameraService : ICameraService
     {
         private readonly IPlayerRuntimeModel playerRuntimeModel;
-        private readonly HashSet<global::SuspectCharacter> hiddenCaptureSuspects = new();
+        private readonly Dictionary<global::SuspectCharacter, HashSet<object>> hiddenCaptureSourcesBySuspect =
+            new Dictionary<global::SuspectCharacter, HashSet<object>>();
 
         public CameraService(IPlayerRuntimeModel playerRuntimeModel)
         {
@@ -39,26 +41,67 @@ namespace GoodCopBadCop.CameraSystem
             cameraController.TriggerHitImpulse();
         }
 
-        public void SetCaptureVisibility(global::SuspectCharacter suspect, bool visible)
+        public void HideFromCapture(object source, global::SuspectCharacter suspect)
         {
-            if (suspect == null)
+            if (!CanChangeCaptureVisibility(source, suspect))
             {
                 return;
             }
 
-            if (visible)
-            {
-                hiddenCaptureSuspects.Remove(suspect);
-            }
-            else
-            {
-                hiddenCaptureSuspects.Add(suspect);
-            }
+            AddCaptureHideSource(source, suspect);
         }
 
-        public bool IsCaptureVisible(global::SuspectCharacter suspect)
+        public void ShowInCapture(object source, global::SuspectCharacter suspect)
         {
-            return suspect == null || !hiddenCaptureSuspects.Contains(suspect);
+            if (!CanChangeCaptureVisibility(source, suspect))
+            {
+                return;
+            }
+
+            RemoveCaptureHideSource(source, suspect);
+        }
+
+        public bool IsVisibleInCapture(global::SuspectCharacter suspect)
+        {
+            return suspect == null ||
+                   !hiddenCaptureSourcesBySuspect.TryGetValue(suspect, out HashSet<object> sources) ||
+                   sources.Count == 0;
+        }
+
+        private static bool CanChangeCaptureVisibility(object source, global::SuspectCharacter suspect)
+        {
+            if (source == null)
+            {
+                Debug.LogWarning("[CameraService] Capture visibility source cannot be null.");
+                return false;
+            }
+
+            return suspect != null;
+        }
+
+        private void AddCaptureHideSource(object source, global::SuspectCharacter suspect)
+        {
+            if (!hiddenCaptureSourcesBySuspect.TryGetValue(suspect, out HashSet<object> sources))
+            {
+                sources = new HashSet<object>();
+                hiddenCaptureSourcesBySuspect.Add(suspect, sources);
+            }
+
+            sources.Add(source);
+        }
+
+        private void RemoveCaptureHideSource(object source, global::SuspectCharacter suspect)
+        {
+            if (!hiddenCaptureSourcesBySuspect.TryGetValue(suspect, out HashSet<object> sources))
+            {
+                return;
+            }
+
+            sources.Remove(source);
+            if (sources.Count == 0)
+            {
+                hiddenCaptureSourcesBySuspect.Remove(suspect);
+            }
         }
     }
 }

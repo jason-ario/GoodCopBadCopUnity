@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoodCopBadCop.RoomSystem
@@ -5,49 +6,134 @@ namespace GoodCopBadCop.RoomSystem
     public interface IRoomService
     {
         float TemperatureOffset { get; }
-        void SetTemperatureOffset(float offset);
-        void ResetTemperatureOffset();
-        void StartFlickeringLights();
-        void StopFlickeringLights();
-        void StartInsectSwarm();
-        void StopInsectSwarm();
+        void SetTemperatureOffset(object source, float offset);
+        void ResetTemperatureOffset(object source);
+        void StartFlickeringLights(object source);
+        void StopFlickeringLights(object source);
+        void StartInsectSwarm(object source);
+        void StopInsectSwarm(object source);
     }
 
     public sealed class RoomService : IRoomService
     {
+        private readonly Dictionary<object, float> temperatureOffsets = new Dictionary<object, float>();
+        private readonly HashSet<object> flickeringLightSources = new HashSet<object>();
+        private readonly HashSet<object> insectSwarmSources = new HashSet<object>();
+
         private global::BoothFlickeringLightsController lightsController;
         private global::CockroachSpawner cockroachSpawner;
 
         public float TemperatureOffset { get; private set; }
 
-        public void SetTemperatureOffset(float offset)
+        public void SetTemperatureOffset(object source, float offset)
         {
-            TemperatureOffset = offset;
+            if (source == null)
+            {
+                Debug.LogWarning("[RoomService] Temperature offset source cannot be null.");
+                return;
+            }
+
+            temperatureOffsets[source] = offset;
+            RecalculateTemperatureOffset();
         }
 
-        public void ResetTemperatureOffset()
+        public void ResetTemperatureOffset(object source)
         {
-            TemperatureOffset = 0f;
+            if (source == null)
+            {
+                Debug.LogWarning("[RoomService] Temperature offset source cannot be null.");
+                return;
+            }
+
+            if (temperatureOffsets.Remove(source))
+            {
+                RecalculateTemperatureOffset();
+            }
         }
 
-        public void StartFlickeringLights()
+        public void StartFlickeringLights(object source)
         {
-            ResolveLightsController(warnIfMissing: true)?.StartFlickering();
+            if (!AddSource(flickeringLightSources, source, "[RoomService] Flickering lights source cannot be null."))
+            {
+                return;
+            }
+
+            if (flickeringLightSources.Count == 1)
+            {
+                ResolveLightsController(warnIfMissing: true)?.StartFlickering();
+            }
         }
 
-        public void StopFlickeringLights()
+        public void StopFlickeringLights(object source)
         {
-            ResolveLightsController(warnIfMissing: false)?.StopFlickering();
+            if (!RemoveSource(flickeringLightSources, source, "[RoomService] Flickering lights source cannot be null."))
+            {
+                return;
+            }
+
+            if (flickeringLightSources.Count == 0)
+            {
+                ResolveLightsController(warnIfMissing: false)?.StopFlickering();
+            }
         }
 
-        public void StartInsectSwarm()
+        public void StartInsectSwarm(object source)
         {
-            ResolveCockroachSpawner(warnIfMissing: true)?.StartSwarm();
+            if (!AddSource(insectSwarmSources, source, "[RoomService] Insect swarm source cannot be null."))
+            {
+                return;
+            }
+
+            if (insectSwarmSources.Count == 1)
+            {
+                ResolveCockroachSpawner(warnIfMissing: true)?.StartSwarm();
+            }
         }
 
-        public void StopInsectSwarm()
+        public void StopInsectSwarm(object source)
         {
-            ResolveCockroachSpawner(warnIfMissing: false)?.StopSwarm();
+            if (!RemoveSource(insectSwarmSources, source, "[RoomService] Insect swarm source cannot be null."))
+            {
+                return;
+            }
+
+            if (insectSwarmSources.Count == 0)
+            {
+                ResolveCockroachSpawner(warnIfMissing: false)?.StopSwarm();
+            }
+        }
+
+        private void RecalculateTemperatureOffset()
+        {
+            var total = 0f;
+            foreach (var offset in temperatureOffsets.Values)
+            {
+                total += offset;
+            }
+
+            TemperatureOffset = total;
+        }
+
+        private static bool AddSource(HashSet<object> sources, object source, string nullSourceWarning)
+        {
+            if (source == null)
+            {
+                Debug.LogWarning(nullSourceWarning);
+                return false;
+            }
+
+            return sources.Add(source);
+        }
+
+        private static bool RemoveSource(HashSet<object> sources, object source, string nullSourceWarning)
+        {
+            if (source == null)
+            {
+                Debug.LogWarning(nullSourceWarning);
+                return false;
+            }
+
+            return sources.Remove(source);
         }
 
         private global::BoothFlickeringLightsController ResolveLightsController(bool warnIfMissing)

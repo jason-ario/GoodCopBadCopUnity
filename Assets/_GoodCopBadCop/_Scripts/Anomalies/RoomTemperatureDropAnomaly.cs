@@ -20,17 +20,17 @@ public class RoomTemperatureDropAnomaly : SupernaturalAnomaly
             return;
         }
 
-        roomService.SetTemperatureOffset(temperatureOffset);
+        roomService.SetTemperatureOffset(this, temperatureOffset);
     }
 
     public override void DeactivateAnomaly()
     {
         base.DeactivateAnomaly();
-        roomService?.ResetTemperatureOffset();
+        roomService?.ResetTemperatureOffset(this);
     }
 
     public override void InitializeDisabled()
     {
-        roomService?.ResetTemperatureOffset();
+        roomService?.ResetTemperatureOffset(this);
     }
 }
