@@ -172,7 +172,11 @@ public class PlayerMovementController : NetworkBehaviour
         base.OnNetworkSpawn();
         if (!IsLocalPlayer)
         {
+            // Deactivate the VCam so it doesn't influence any client's CinemachineBrain.
             cameraTransform.gameObject.SetActive(false);
+            // Deactivate the Unity Camera (CinemachineBrain + AudioListener) so remote
+            // players don't produce extra render passes or duplicate AudioListener warnings.
+            if (camera != null) camera.gameObject.SetActive(false);
         }
     }
     

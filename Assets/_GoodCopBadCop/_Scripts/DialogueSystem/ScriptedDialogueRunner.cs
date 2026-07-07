@@ -79,7 +79,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [Header("Multi-Player Advance")]
     [Tooltip("Seconds after the first player advances (or submits a choice) before the " +
              "sequence continues automatically without the second player's input.")]
-    [SerializeField] private float _advanceTimeoutSeconds = 3f;
+    [SerializeField] private float _advanceTimeoutSeconds = 1.5f;
 
     [Header("Proximity Join")]
     [Tooltip("Distance (world units) from the speaker within which a player is automatically " +
@@ -402,7 +402,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         int required = Mathf.Max(1, _participants.Count);
 
-        if (_advanceSet.Count == 1)
+        if (_advanceSet.Count == 1 && _advanceTimerCoroutine == null)
             _advanceTimerCoroutine = StartCoroutine(AdvanceTimeoutCoroutine());
 
         if (_advanceSet.Count >= required)
