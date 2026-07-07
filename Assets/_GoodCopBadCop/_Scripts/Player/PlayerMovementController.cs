@@ -1,13 +1,19 @@
 using System;
 using DG.Tweening;
+using GoodCopBadCop.Settings;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.Cursor;
 
+public interface IPlayerControlsSettingsReceiver
+{
+    void ApplyControlSettings(PlayerControlSettings settings);
+}
+
 [RequireComponent(typeof(CharacterController))]
-public class PlayerMovementController : NetworkBehaviour
+public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSettingsReceiver
 {
     private CharacterController _characterController;
     [SerializeField] private float characterSpeed;
@@ -39,6 +45,12 @@ public class PlayerMovementController : NetworkBehaviour
     private float _smoothedMouseX;
     private float _smoothedMouseY;
     private float _verticalVelocity;
+    private float _baseMouseSensitivity;
+    private float _settingsMouseSensitivity = 50f;
+    private bool _invertYAxis;
+    private EInputActivationMode _crouchMode = EInputActivationMode.Hold;
+    private EInputActivationMode _sprintMode = EInputActivationMode.Hold;
+    private bool _sprintToggleActive;
 
     [Header("Gravity Settings")]
     [SerializeField] private float gravity = -20f;
@@ -153,6 +165,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         _standingControllerHeight = _characterController.height;
         _standingControllerCenterY = _characterController.center.y;
+        _baseMouseSensitivity = mouseSensitivity;
     }
 
     private void Start()
@@ -194,11 +207,7 @@ public class PlayerMovementController : NetworkBehaviour
 
         if (!_isSitting && CanMove)
         {
-            bool crouchHeld = Input.GetKey(KeyCode.LeftControl);
-            if (crouchHeld && !_isCrouching)
-                SetCrouching(true);
-            else if (!crouchHeld && _isCrouching)
-                SetCrouching(false);
+            UpdateCrouchInput();
         }
 
         if (_isSitting && _canSitOrStand)
@@ -218,8 +227,13 @@ public class PlayerMovementController : NetworkBehaviour
         float MoveX = Input.GetAxis("Horizontal");
         float MoveZ = Input.GetAxis("Vertical");
 
-        // Check run input — blocked while crouching
-        bool isRunning = !_isCrouching && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+        // Check run input - blocked while crouching
+        if (_isCrouching)
+        {
+            _sprintToggleActive = false;
+        }
+
+        bool isRunning = !_isCrouching && IsSprintInputActive();
         IsRunning = isRunning;
 
         // Pick speed
@@ -283,8 +297,10 @@ public class PlayerMovementController : NetworkBehaviour
 
     void Rotate()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+        float appliedMouseSensitivity = _baseMouseSensitivity * (_settingsMouseSensitivity / 50f);
+        float verticalDirection = _invertYAxis ? -1f : 1f;
+        float mouseX = Input.GetAxis("Mouse X") * appliedMouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * appliedMouseSensitivity * verticalDirection;
 
         // Smooth the raw mouse input
         _smoothedMouseX = Mathf.Lerp(_smoothedMouseX, mouseX, mouseSmoothing * Time.deltaTime);
@@ -333,6 +349,22 @@ public class PlayerMovementController : NetworkBehaviour
         cameraTransform.DOPunchPosition(new Vector3(0, 0, -0.05f), recoilKickDuration + recoilRecoverDuration, 2, 0.5f);
     }
 
+    public void ApplyControlSettings(PlayerControlSettings settings)
+    {
+        _settingsMouseSensitivity = Mathf.Clamp(
+            settings.MouseSensitivity,
+            SettingsService.MinimumMouseSensitivity,
+            SettingsService.MaximumMouseSensitivity);
+        _invertYAxis = settings.InvertYAxis;
+        _crouchMode = settings.CrouchMode;
+        _sprintMode = settings.SprintMode;
+
+        if (_sprintMode == EInputActivationMode.Hold)
+        {
+            _sprintToggleActive = false;
+        }
+    }
+
     public void SetCanControl(bool value)
     {
         CanControl = value;
@@ -349,6 +381,7 @@ public class PlayerMovementController : NetworkBehaviour
             MoveXRaw = 0f;
             MoveZRaw = 0f;
             IsRunning = false;
+            _sprintToggleActive = false;
         }
     }
 
@@ -446,6 +479,42 @@ public class PlayerMovementController : NetworkBehaviour
             cameraTransform.DOLocalMove(targetPos, duration).OnComplete(() =>  callback?.Invoke());
             cameraTransform.DOLocalRotate(targetLookEuler, duration);
         }
+    }
+
+    private void UpdateCrouchInput()
+    {
+        if (_crouchMode == EInputActivationMode.Toggle)
+        {
+            if (Input.GetKeyDown(KeyCode.LeftControl))
+            {
+                SetCrouching(!_isCrouching);
+            }
+
+            return;
+        }
+
+        bool crouchHeld = Input.GetKey(KeyCode.LeftControl);
+        if (crouchHeld && !_isCrouching)
+            SetCrouching(true);
+        else if (!crouchHeld && _isCrouching)
+            SetCrouching(false);
+    }
+
+    private bool IsSprintInputActive()
+    {
+        bool sprintHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        if (_sprintMode == EInputActivationMode.Hold)
+        {
+            return sprintHeld;
+        }
+
+        bool sprintPressed = Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift);
+        if (sprintPressed)
+        {
+            _sprintToggleActive = !_sprintToggleActive;
+        }
+
+        return _sprintToggleActive;
     }
 
     /// <summary>

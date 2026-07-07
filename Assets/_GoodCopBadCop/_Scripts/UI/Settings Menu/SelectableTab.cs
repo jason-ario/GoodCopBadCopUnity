@@ -1,4 +1,4 @@
-using System;
+using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -14,9 +14,10 @@ public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHa
     private bool isSelected = false;
     private Image backgroundImage;
     private TextMeshProUGUI labelText;
+    private readonly Subject<SelectableTab> selected = new();
 
     public bool IsSelected => isSelected;
-    public event Action<SelectableTab> Selected;
+    public Observable<SelectableTab> Selected => selected;
 
     private void Awake()
     {
@@ -26,7 +27,7 @@ public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHa
 
     public void Select()
     {
-        Selected?.Invoke(this);
+        selected.OnNext(this);
     }
 
     public void SetSelected(bool selected)

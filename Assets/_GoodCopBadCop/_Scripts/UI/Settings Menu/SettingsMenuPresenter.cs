@@ -11,6 +11,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly ISettingsMenuModel model;
         private readonly ISettingsModel settingsModel;
         private readonly ISettingsService settingsService;
+        private readonly ISettingsMenuService menuService;
         private readonly ISettingsMenuView view;
         private DisposableBag disposables;
 
@@ -18,25 +19,32 @@ namespace GoodCopBadCop.UI.SettingsMenu
             ISettingsMenuModel model,
             ISettingsModel settingsModel,
             ISettingsService settingsService,
+            ISettingsMenuService menuService,
             ISettingsMenuView view)
         {
             this.model = model;
             this.settingsModel = settingsModel;
             this.settingsService = settingsService;
+            this.menuService = menuService;
             this.view = view;
         }
 
         public void Initialize()
         {
-            view.DisplayModeChanged += OnDisplayModeChanged;
-            view.ScreenResolutionChanged += OnScreenResolutionChanged;
-            view.VSyncChanged += OnVSyncChanged;
-            view.FpsLimitChanged += OnFpsLimitChanged;
-            view.VoiceChatEnabledChanged += OnVoiceChatEnabledChanged;
-            view.VoiceChatMutedChanged += OnVoiceChatMutedChanged;
-            view.VoiceChatDeafenedChanged += OnVoiceChatDeafenedChanged;
-            view.VoiceChatInputModeChanged += OnVoiceChatInputModeChanged;
-            view.Closed += OnClosed;
+            view.TabSelected.Subscribe(OnTabSelected).AddTo(ref disposables);
+            view.DisplayModeChanged.Subscribe(OnDisplayModeChanged).AddTo(ref disposables);
+            view.ScreenResolutionChanged.Subscribe(OnScreenResolutionChanged).AddTo(ref disposables);
+            view.VSyncChanged.Subscribe(OnVSyncChanged).AddTo(ref disposables);
+            view.FpsLimitChanged.Subscribe(OnFpsLimitChanged).AddTo(ref disposables);
+            view.MouseSensitivityChanged.Subscribe(OnMouseSensitivityChanged).AddTo(ref disposables);
+            view.InvertYAxisChanged.Subscribe(OnInvertYAxisChanged).AddTo(ref disposables);
+            view.CrouchModeChanged.Subscribe(OnCrouchModeChanged).AddTo(ref disposables);
+            view.SprintModeChanged.Subscribe(OnSprintModeChanged).AddTo(ref disposables);
+            view.VoiceChatEnabledChanged.Subscribe(OnVoiceChatEnabledChanged).AddTo(ref disposables);
+            view.VoiceChatMutedChanged.Subscribe(OnVoiceChatMutedChanged).AddTo(ref disposables);
+            view.VoiceChatDeafenedChanged.Subscribe(OnVoiceChatDeafenedChanged).AddTo(ref disposables);
+            view.VoiceChatInputModeChanged.Subscribe(OnVoiceChatInputModeChanged).AddTo(ref disposables);
+            view.Closed.Subscribe(_ => OnClosed()).AddTo(ref disposables);
 
             model.SelectedTab
                 .Subscribe(view.ShowTab)
@@ -58,6 +66,22 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 .Subscribe(fpsLimit => view.SetFpsLimitValue((int)fpsLimit))
                 .AddTo(ref disposables);
 
+            settingsModel.MouseSensitivity
+                .Subscribe(view.SetMouseSensitivityValue)
+                .AddTo(ref disposables);
+
+            settingsModel.InvertYAxis
+                .Subscribe(view.SetInvertYAxisValue)
+                .AddTo(ref disposables);
+
+            settingsModel.CrouchMode
+                .Subscribe(crouchMode => view.SetCrouchModeValue((int)crouchMode))
+                .AddTo(ref disposables);
+
+            settingsModel.SprintMode
+                .Subscribe(sprintMode => view.SetSprintModeValue((int)sprintMode))
+                .AddTo(ref disposables);
+
             settingsModel.VoiceChatEnabled
                 .Subscribe(view.SetVoiceChatEnabledValue)
                 .AddTo(ref disposables);
@@ -77,16 +101,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         public void Dispose()
         {
-            view.DisplayModeChanged -= OnDisplayModeChanged;
-            view.ScreenResolutionChanged -= OnScreenResolutionChanged;
-            view.VSyncChanged -= OnVSyncChanged;
-            view.FpsLimitChanged -= OnFpsLimitChanged;
-            view.VoiceChatEnabledChanged -= OnVoiceChatEnabledChanged;
-            view.VoiceChatMutedChanged -= OnVoiceChatMutedChanged;
-            view.VoiceChatDeafenedChanged -= OnVoiceChatDeafenedChanged;
-            view.VoiceChatInputModeChanged -= OnVoiceChatInputModeChanged;
-            view.Closed -= OnClosed;
             disposables.Dispose();
+        }
+
+        private void OnTabSelected(ESettingsMenuTab tab)
+        {
+            menuService.SelectTab(tab);
         }
 
         private void OnDisplayModeChanged(int value)
@@ -122,6 +142,36 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetFpsLimit((EFpsLimit)value);
+        }
+
+        private void OnMouseSensitivityChanged(float value)
+        {
+            settingsService.SetMouseSensitivity(value);
+        }
+
+        private void OnInvertYAxisChanged(bool isInverted)
+        {
+            settingsService.SetInvertYAxis(isInverted);
+        }
+
+        private void OnCrouchModeChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EInputActivationMode), value))
+            {
+                return;
+            }
+
+            settingsService.SetCrouchMode((EInputActivationMode)value);
+        }
+
+        private void OnSprintModeChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EInputActivationMode), value))
+            {
+                return;
+            }
+
+            settingsService.SetSprintMode((EInputActivationMode)value);
         }
 
         private void OnVoiceChatEnabledChanged(bool isEnabled)

@@ -1,5 +1,6 @@
 using GoodCopBadCop.UI.SettingsMenu;
 using GoodCopBadCop.EnvironmentSystem;
+using GoodCopBadCop.Player;
 using GoodCopBadCop.Settings;
 using GoodCopBadCop.VoiceChat;
 using UnityEngine;
@@ -19,6 +20,10 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
             builder.Register<ISettingsScreenAdapter, UnitySettingsScreenAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
+            builder.Register<PlayerRuntimeModel>(Lifetime.Scoped).AsSelf().As<IPlayerRuntimeModel>();
+            builder.Register<IPlayerRuntimeService, PlayerRuntimeService>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<PlayerRuntimeAdapter>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<PlayerControlsSettingsAdapter>(Lifetime.Scoped);
 
             builder.Register<VoiceChatModel>(Lifetime.Scoped).AsSelf().As<IVoiceChatModel>();
             builder.RegisterEntryPoint<VoiceChatCommsRuntime>(Lifetime.Scoped);
@@ -27,6 +32,8 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<DissonanceVoiceChatAdapter>(Lifetime.Scoped);
 
             builder.RegisterComponentInHierarchy<SettingsMenuView>().As<ISettingsMenuView>();
+            builder.RegisterComponentInHierarchy<MainMenuController>();
+            builder.RegisterComponentInHierarchy<PauseMenuController>();
             builder.Register<SettingsMenuModel>(Lifetime.Scoped).AsSelf().As<ISettingsMenuModel>();
             builder.Register<ISettingsMenuService, SettingsMenuService>(Lifetime.Scoped);
             builder.RegisterEntryPoint<SettingsMenuPresenter>(Lifetime.Scoped);

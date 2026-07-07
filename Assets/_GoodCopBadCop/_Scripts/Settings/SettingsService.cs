@@ -8,6 +8,10 @@ namespace GoodCopBadCop.Settings
         void SetScreenResolution(EScreenResolution screenResolution);
         void SetVSyncEnabled(bool isEnabled);
         void SetFpsLimit(EFpsLimit fpsLimit);
+        void SetMouseSensitivity(float value);
+        void SetInvertYAxis(bool isInverted);
+        void SetCrouchMode(EInputActivationMode mode);
+        void SetSprintMode(EInputActivationMode mode);
         void SetVoiceChatEnabled(bool isEnabled);
         void SetVoiceChatMuted(bool isMuted);
         void SetVoiceChatDeafened(bool isDeafened);
@@ -19,6 +23,9 @@ namespace GoodCopBadCop.Settings
 
     public sealed class SettingsService : ISettingsService
     {
+        public const float MinimumMouseSensitivity = 1f;
+        public const float MaximumMouseSensitivity = 100f;
+
         private readonly SettingsModel model;
 
         public SettingsService(SettingsModel model)
@@ -54,6 +61,29 @@ namespace GoodCopBadCop.Settings
             {
                 model.VSyncEnabledMutable.Value = false;
             }
+        }
+
+        public void SetMouseSensitivity(float value)
+        {
+            model.MouseSensitivityMutable.Value = UnityEngine.Mathf.Clamp(
+                value,
+                MinimumMouseSensitivity,
+                MaximumMouseSensitivity);
+        }
+
+        public void SetInvertYAxis(bool isInverted)
+        {
+            model.InvertYAxisMutable.Value = isInverted;
+        }
+
+        public void SetCrouchMode(EInputActivationMode mode)
+        {
+            model.CrouchModeMutable.Value = mode;
+        }
+
+        public void SetSprintMode(EInputActivationMode mode)
+        {
+            model.SprintModeMutable.Value = mode;
         }
 
         public void SetVoiceChatEnabled(bool isEnabled)

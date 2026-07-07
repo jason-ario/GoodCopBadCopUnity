@@ -1,13 +1,14 @@
-using System;
+using GoodCopBadCop.UI.SettingsMenu;
 using JetBrains.Annotations;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using R3;
+using VContainer;
 
 public class PauseMenuController : MonoBehaviour
 {
     [SerializeField] private GameObject mainMenu;
-    [SerializeField] private GameObject settingsMenu;
     [SerializeField] private GameObject areYouSureQuitMenu;
     [SerializeField] private GameObject areYouSureMainMenu;
     [SerializeField] private TextButton[] _textButtons;
@@ -16,9 +17,25 @@ public class PauseMenuController : MonoBehaviour
 
     private const string LobbyCodePrefix = "LOBBY CODE: ";
 
+    private ISettingsMenuView settingsMenuView;
+    private DisposableBag settingsDisposables;
+    private bool isSettingsOpen;
+
+    [Inject]
+    public void Construct(ISettingsMenuView settingsMenuView)
+    {
+        this.settingsMenuView = settingsMenuView;
+        settingsMenuView.BackRequested.Subscribe(_ => CloseSettingsMenu()).AddTo(ref settingsDisposables);
+    }
+
     public void ResumeGame()
     {
         UIController.Instance.ClosePauseMenu();
+    }
+
+    private void OnDestroy()
+    {
+        settingsDisposables.Dispose();
     }
 
     private void OnEnable()
@@ -51,7 +68,6 @@ public class PauseMenuController : MonoBehaviour
     public void ShowAreYouSureMainMenu()
     {
         mainMenu.SetActive(true);
-        settingsMenu.SetActive(false);
         areYouSureQuitMenu.SetActive(false);
         areYouSureMainMenu.SetActive(false);
     }
@@ -59,7 +75,10 @@ public class PauseMenuController : MonoBehaviour
     public void ShowSettingsMenu()
     {
         mainMenu.SetActive(false);
-        settingsMenu.SetActive(true);
+        areYouSureQuitMenu.SetActive(false);
+        areYouSureMainMenu.SetActive(false);
+        isSettingsOpen = true;
+        settingsMenuView?.SetVisible(true);
     }
     
     public void ShowAreYouSureQuitMenu()
@@ -70,9 +89,20 @@ public class PauseMenuController : MonoBehaviour
     
     public void BackToMainMenu()
     {
+        isSettingsOpen = false;
+        settingsMenuView?.SetVisible(false);
         mainMenu.SetActive(true);
-        settingsMenu.SetActive(false);
         areYouSureQuitMenu.SetActive(false);
         areYouSureMainMenu.SetActive(false);
+    }
+
+    private void CloseSettingsMenu()
+    {
+        if (!isSettingsOpen)
+        {
+            return;
+        }
+
+        BackToMainMenu();
     }
 }

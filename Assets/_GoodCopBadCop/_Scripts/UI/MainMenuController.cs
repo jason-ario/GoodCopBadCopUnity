@@ -2,9 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
+using GoodCopBadCop.UI.SettingsMenu;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Playables;
+using R3;
+using VContainer;
 
 public class MainMenuController : MonoBehaviour
 {
@@ -17,7 +20,6 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private GameObject multiplayerScreen;
     [SerializeField] private GameObject joinGameScreen;
     [SerializeField] private GameObject preGameLobbyScreen;
-    [SerializeField] private GameObject settingsScreen;
     [SerializeField] private Animator screenFade;
 
     [Header("Screen Controllers")]
@@ -47,10 +49,20 @@ public class MainMenuController : MonoBehaviour
     private GameObject _currentScreen;
     private List<GameObject> _allScreens;
     private bool _buttonGroupFaded;
+    private ISettingsMenuView settingsMenuView;
+    private DisposableBag settingsDisposables;
+    private bool isSettingsOpen;
 
     // ---------------------------------------------------------------------------
     // Unity Lifecycle
     // ---------------------------------------------------------------------------
+
+    [Inject]
+    public void Construct(ISettingsMenuView settingsMenuView)
+    {
+        this.settingsMenuView = settingsMenuView;
+        settingsMenuView.BackRequested.Subscribe(_ => CloseSettingsScreen()).AddTo(ref settingsDisposables);
+    }
 
     private void Awake()
     {
@@ -68,14 +80,19 @@ public class MainMenuController : MonoBehaviour
             campaignScreen,
             multiplayerScreen,
             joinGameScreen,
-            preGameLobbyScreen,
-            settingsScreen
+            preGameLobbyScreen
         };
+    }
+
+    private void OnDestroy()
+    {
+        settingsDisposables.Dispose();
     }
 
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
+        settingsMenuView?.SetVisible(false);
 
 #if UNITY_EDITOR
         if (_debugSkipToGame)
@@ -98,18 +115,34 @@ public class MainMenuController : MonoBehaviour
         if (target == null)
             return;
 
-        // Swap the button group to the fast animator on the first navigation away from the home screen.
-        if (!_buttonGroupFaded && target != homeScreen)
+        if (target != homeScreen)
         {
-            _buttonGroupFaded = true;
-            if (buttonGroupAnimator != null && buttonGroupFastController != null)
-                buttonGroupAnimator.runtimeAnimatorController = buttonGroupFastController;
+            EnsureButtonGroupFastController();
         }
 
         foreach (var screen in _allScreens)
-            screen.SetActive(screen == target);
+        {
+            if (screen != null)
+            {
+                screen.SetActive(screen == target);
+            }
+        }
 
         _currentScreen = target;
+    }
+
+    private void EnsureButtonGroupFastController()
+    {
+        if (_buttonGroupFaded)
+        {
+            return;
+        }
+
+        _buttonGroupFaded = true;
+        if (buttonGroupAnimator != null && buttonGroupFastController != null)
+        {
+            buttonGroupAnimator.runtimeAnimatorController = buttonGroupFastController;
+        }
     }
 
     /// <summary>Opens the campaign slot-selection screen.</summary>
@@ -125,12 +158,29 @@ public class MainMenuController : MonoBehaviour
         SwitchToScreen(joinGameScreen);
 
     /// <summary>Opens the settings screen.</summary>
-    public void OpenSettingsScreen() =>
-        SwitchToScreen(settingsScreen);
+    public void OpenSettingsScreen()
+    {
+        EnsureButtonGroupFastController();
+        HideAllMenus();
+        isSettingsOpen = true;
+        settingsMenuView?.SetVisible(true);
+    }
 
     /// <summary>Returns to the home screen from any screen.</summary>
     public void BackToHomeScreen() =>
         SwitchToScreen(homeScreen);
+
+    private void CloseSettingsScreen()
+    {
+        if (!isSettingsOpen)
+        {
+            return;
+        }
+
+        isSettingsOpen = false;
+        settingsMenuView?.SetVisible(false);
+        BackToHomeScreen();
+    }
 
     /// <summary>Returns to the multiplayer hub from the join screen.</summary>
     public void BackToMultiplayerScreen() =>
@@ -250,7 +300,12 @@ public class MainMenuController : MonoBehaviour
     public void HideAllMenus()
     {
         foreach (var screen in _allScreens)
-            screen.SetActive(false);
+        {
+            if (screen != null)
+            {
+                screen.SetActive(false);
+            }
+        }
     }
 
     public void TransitionToGameplay()

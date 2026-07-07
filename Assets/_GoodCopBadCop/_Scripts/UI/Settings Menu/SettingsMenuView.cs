@@ -1,29 +1,39 @@
-using System;
 using System.Collections.Generic;
 using TMPro;
+using R3;
 using UnityEngine.EventSystems;
 using UnityEngine;
 using UnityEngine.UI;
-using VContainer;
 
 namespace GoodCopBadCop.UI.SettingsMenu
 {
     public interface ISettingsMenuView
     {
-        event Action<int> DisplayModeChanged;
-        event Action<int> ScreenResolutionChanged;
-        event Action<bool> VSyncChanged;
-        event Action<int> FpsLimitChanged;
-        event Action<bool> VoiceChatEnabledChanged;
-        event Action<bool> VoiceChatMutedChanged;
-        event Action<bool> VoiceChatDeafenedChanged;
-        event Action<int> VoiceChatInputModeChanged;
-        event Action Closed;
+        Observable<int> DisplayModeChanged { get; }
+        Observable<int> ScreenResolutionChanged { get; }
+        Observable<bool> VSyncChanged { get; }
+        Observable<int> FpsLimitChanged { get; }
+        Observable<float> MouseSensitivityChanged { get; }
+        Observable<bool> InvertYAxisChanged { get; }
+        Observable<int> CrouchModeChanged { get; }
+        Observable<int> SprintModeChanged { get; }
+        Observable<bool> VoiceChatEnabledChanged { get; }
+        Observable<bool> VoiceChatMutedChanged { get; }
+        Observable<bool> VoiceChatDeafenedChanged { get; }
+        Observable<int> VoiceChatInputModeChanged { get; }
+        Observable<ESettingsMenuTab> TabSelected { get; }
+        Observable<Unit> BackRequested { get; }
+        Observable<Unit> Closed { get; }
+        void SetVisible(bool isVisible);
         void ShowTab(ESettingsMenuTab tab);
         void SetDisplayModeValue(int value);
         void SetScreenResolutionValue(int value);
         void SetVSyncValue(bool value);
         void SetFpsLimitValue(int value);
+        void SetMouseSensitivityValue(float value);
+        void SetInvertYAxisValue(bool value);
+        void SetCrouchModeValue(int value);
+        void SetSprintModeValue(int value);
         void SetVoiceChatEnabledValue(bool value);
         void SetVoiceChatMutedValue(bool value);
         void SetVoiceChatDeafenedValue(bool value);
@@ -52,6 +62,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             Resolution,
             VSync,
             FpsLimit,
+            MouseSensitivity,
+            InvertYAxis,
+            CrouchMode,
+            SprintMode,
             VoiceChatEnabled,
             VoiceChatMuted,
             VoiceChatDeafened,
@@ -92,18 +106,24 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Interactable = interactable;
             }
 
-            public static SettingsMenuControlDefinition Slider(string label, float value = 100f)
+            public static SettingsMenuControlDefinition Slider(
+                string label,
+                float value = 100f,
+                float minValue = 0f,
+                float maxValue = 100f,
+                bool interactable = true,
+                ESettingsMenuControlOption option = ESettingsMenuControlOption.None)
             {
                 return new SettingsMenuControlDefinition(
-                    ESettingsMenuControlOption.None,
+                    option,
                     label,
                     ESettingsMenuControlType.Slider,
                     null,
                     0,
-                    0f,
-                    100f,
+                    minValue,
+                    maxValue,
                     value,
-                    true);
+                    interactable);
             }
 
             public static SettingsMenuControlDefinition Dropdown(
@@ -202,15 +222,28 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly SettingsMenuControlDefinition[] ControlsControlDefinitions =
         {
-            SettingsMenuControlDefinition.Slider("Mouse Sensitivity", 50f),
-            SettingsMenuControlDefinition.Dropdown("Invert Y Axis", OffOnOptions),
-            SettingsMenuControlDefinition.Dropdown("Crouch Mode", HoldToggleOptions),
-            SettingsMenuControlDefinition.Dropdown("Sprint Mode", HoldToggleOptions),
-            SettingsMenuControlDefinition.Dropdown("Move Forward", new[] { "W" }),
-            SettingsMenuControlDefinition.Dropdown("Move Backward", new[] { "S" }),
-            SettingsMenuControlDefinition.Dropdown("Move Left", new[] { "A" }),
-            SettingsMenuControlDefinition.Dropdown("Move Right", new[] { "D" }),
-            SettingsMenuControlDefinition.Dropdown("Jump", new[] { "Space" }),
+            SettingsMenuControlDefinition.Slider(
+                "Mouse Sensitivity",
+                50f,
+                minValue: 1f,
+                option: ESettingsMenuControlOption.MouseSensitivity),
+            SettingsMenuControlDefinition.Dropdown(
+                "Invert Y Axis",
+                OffOnOptions,
+                option: ESettingsMenuControlOption.InvertYAxis),
+            SettingsMenuControlDefinition.Dropdown(
+                "Crouch Mode",
+                HoldToggleOptions,
+                option: ESettingsMenuControlOption.CrouchMode),
+            SettingsMenuControlDefinition.Dropdown(
+                "Sprint Mode",
+                HoldToggleOptions,
+                option: ESettingsMenuControlOption.SprintMode),
+            SettingsMenuControlDefinition.Dropdown("Move Forward", new[] { "W" }, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Move Backward", new[] { "S" }, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Move Left", new[] { "A" }, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Move Right", new[] { "D" }, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Jump", new[] { "Space" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Interact", new[] { "E" }),
             SettingsMenuControlDefinition.Dropdown("Pause", new[] { "Esc" })
         };
@@ -223,37 +256,59 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private readonly List<ESettingsMenuTab> availableTabs = new();
 
-        private ISettingsMenuService service;
         private TMP_Dropdown displayModeDropdown;
         private TMP_Dropdown screenResolutionDropdown;
         private TMP_Dropdown vSyncDropdown;
         private TMP_Dropdown fpsLimitDropdown;
+        private Slider mouseSensitivitySlider;
+        private GameObject mouseSensitivityRow;
+        private TMP_Dropdown invertYAxisDropdown;
+        private TMP_Dropdown crouchModeDropdown;
+        private TMP_Dropdown sprintModeDropdown;
         private TMP_Dropdown voiceChatEnabledDropdown;
         private TMP_Dropdown voiceChatMutedDropdown;
         private TMP_Dropdown voiceChatDeafenedDropdown;
         private TMP_Dropdown voiceChatInputModeDropdown;
 
-        public event Action<int> DisplayModeChanged;
-        public event Action<int> ScreenResolutionChanged;
-        public event Action<bool> VSyncChanged;
-        public event Action<int> FpsLimitChanged;
-        public event Action<bool> VoiceChatEnabledChanged;
-        public event Action<bool> VoiceChatMutedChanged;
-        public event Action<bool> VoiceChatDeafenedChanged;
-        public event Action<int> VoiceChatInputModeChanged;
-        public event Action Closed;
+        private readonly Subject<int> displayModeChanged = new();
+        private readonly Subject<int> screenResolutionChanged = new();
+        private readonly Subject<bool> vSyncChanged = new();
+        private readonly Subject<int> fpsLimitChanged = new();
+        private readonly Subject<float> mouseSensitivityChanged = new();
+        private readonly Subject<bool> invertYAxisChanged = new();
+        private readonly Subject<int> crouchModeChanged = new();
+        private readonly Subject<int> sprintModeChanged = new();
+        private readonly Subject<bool> voiceChatEnabledChanged = new();
+        private readonly Subject<bool> voiceChatMutedChanged = new();
+        private readonly Subject<bool> voiceChatDeafenedChanged = new();
+        private readonly Subject<int> voiceChatInputModeChanged = new();
+        private readonly Subject<ESettingsMenuTab> tabSelected = new();
+        private readonly Subject<Unit> backRequested = new();
+        private readonly Subject<Unit> closed = new();
+        private DisposableBag tabDisposables;
 
-        [Inject]
-        public void Construct(ISettingsMenuService service)
-        {
-            this.service = service;
-        }
+        public Observable<int> DisplayModeChanged => displayModeChanged;
+        public Observable<int> ScreenResolutionChanged => screenResolutionChanged;
+        public Observable<bool> VSyncChanged => vSyncChanged;
+        public Observable<int> FpsLimitChanged => fpsLimitChanged;
+        public Observable<float> MouseSensitivityChanged => mouseSensitivityChanged;
+        public Observable<bool> InvertYAxisChanged => invertYAxisChanged;
+        public Observable<int> CrouchModeChanged => crouchModeChanged;
+        public Observable<int> SprintModeChanged => sprintModeChanged;
+        public Observable<bool> VoiceChatEnabledChanged => voiceChatEnabledChanged;
+        public Observable<bool> VoiceChatMutedChanged => voiceChatMutedChanged;
+        public Observable<bool> VoiceChatDeafenedChanged => voiceChatDeafenedChanged;
+        public Observable<int> VoiceChatInputModeChanged => voiceChatInputModeChanged;
+        public Observable<ESettingsMenuTab> TabSelected => tabSelected;
+        public Observable<Unit> BackRequested => backRequested;
+        public Observable<Unit> Closed => closed;
 
         private void Awake()
         {
             DisableDecorativeRaycastTargets();
             BuildSettingsContent();
             BindTabs();
+            BindBackButton();
         }
 
         private void OnEnable()
@@ -263,32 +318,43 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private void OnDisable()
         {
-            Closed?.Invoke();
+            closed.OnNext(Unit.Default);
         }
 
         private void OnDestroy()
         {
             UnbindTabs();
+            UnbindBackButton();
+        }
+
+        public void SetVisible(bool isVisible)
+        {
+            gameObject.SetActive(isVisible);
+        }
+
+        public void RequestBack()
+        {
+            backRequested.OnNext(Unit.Default);
         }
 
         public void OpenGameplaySettings()
         {
-            service?.SelectTab(ESettingsMenuTab.Gameplay);
+            tabSelected.OnNext(ESettingsMenuTab.Gameplay);
         }
 
         public void OpenGraphicsSettings()
         {
-            service?.SelectTab(ESettingsMenuTab.Graphics);
+            tabSelected.OnNext(ESettingsMenuTab.Graphics);
         }
 
         public void OpenAudioSettings()
         {
-            service?.SelectTab(ESettingsMenuTab.Audio);
+            tabSelected.OnNext(ESettingsMenuTab.Audio);
         }
 
         public void OpenControlSettings()
         {
-            service?.SelectTab(ESettingsMenuTab.Controls);
+            tabSelected.OnNext(ESettingsMenuTab.Controls);
         }
 
         public void SetDisplayModeValue(int value)
@@ -309,6 +375,26 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetFpsLimitValue(int value)
         {
             SetDropdownValue(fpsLimitDropdown, value);
+        }
+
+        public void SetMouseSensitivityValue(float value)
+        {
+            SetSliderValue(mouseSensitivitySlider, mouseSensitivityRow, value);
+        }
+
+        public void SetInvertYAxisValue(bool value)
+        {
+            SetDropdownValue(invertYAxisDropdown, value ? 1 : 0);
+        }
+
+        public void SetCrouchModeValue(int value)
+        {
+            SetDropdownValue(crouchModeDropdown, value);
+        }
+
+        public void SetSprintModeValue(int value)
+        {
+            SetDropdownValue(sprintModeDropdown, value);
         }
 
         public void SetVoiceChatEnabledValue(bool value)
@@ -364,7 +450,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 }
             }
 
-            service?.SelectDefaultTab(availableTabs);
+            ESettingsMenuTab defaultTab = availableTabs.Contains(ESettingsMenuTab.Graphics)
+                ? ESettingsMenuTab.Graphics
+                : availableTabs.Count > 0
+                    ? availableTabs[0]
+                    : ESettingsMenuTab.Graphics;
+
+            tabSelected.OnNext(defaultTab);
         }
 
         private void BindTabs()
@@ -376,21 +468,45 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     continue;
                 }
 
-                selectableTab.Selected += SelectTabForButton;
+                selectableTab.Selected.Subscribe(SelectTabForButton).AddTo(ref tabDisposables);
             }
         }
 
         private void UnbindTabs()
         {
-            foreach (SelectableTab selectableTab in selectableTabs)
-            {
-                if (selectableTab == null)
-                {
-                    continue;
-                }
+            tabDisposables.Dispose();
+        }
 
-                selectableTab.Selected -= SelectTabForButton;
+        private void BindBackButton()
+        {
+            Button backButton = FindBackButton();
+            if (backButton != null)
+            {
+                backButton.onClick.AddListener(RequestBack);
             }
+        }
+
+        private void UnbindBackButton()
+        {
+            Button backButton = FindBackButton();
+            if (backButton != null)
+            {
+                backButton.onClick.RemoveListener(RequestBack);
+            }
+        }
+
+        private Button FindBackButton()
+        {
+            Button[] buttons = GetComponentsInChildren<Button>(true);
+            foreach (Button button in buttons)
+            {
+                if (button.name == "Back Button")
+                {
+                    return button;
+                }
+            }
+
+            return null;
         }
 
         private void SelectTabForButton(SelectableTab selectableTab)
@@ -402,7 +518,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     continue;
                 }
 
-                service?.SelectTab(GetTabAtIndex(i));
+                tabSelected.OnNext(GetTabAtIndex(i));
                 return;
             }
         }
@@ -733,7 +849,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             return texts.Length > 0 ? texts[0] : null;
         }
 
-        private static void ConfigureSliderRow(GameObject row, SettingsMenuControlDefinition definition)
+        private void ConfigureSliderRow(GameObject row, SettingsMenuControlDefinition definition)
         {
             Slider slider = row.GetComponentInChildren<Slider>(true);
             if (slider == null)
@@ -744,13 +860,49 @@ namespace GoodCopBadCop.UI.SettingsMenu
             slider.minValue = definition.SliderMinValue;
             slider.maxValue = definition.SliderMaxValue;
             slider.wholeNumbers = true;
-            slider.value = definition.SliderValue;
+            slider.SetValueWithoutNotify(Mathf.Clamp(definition.SliderValue, definition.SliderMinValue, definition.SliderMaxValue));
             slider.interactable = definition.Interactable;
-            SetSliderValueText(row, definition.SliderValue);
+            AssignSliderReference(definition.Option, slider, row);
+            SetSliderValueText(row, slider.value);
+
+            if (definition.Interactable)
+            {
+                AddSliderListener(definition.Option, slider, row);
+            }
+        }
+
+        private void AssignSliderReference(ESettingsMenuControlOption option, Slider slider, GameObject row)
+        {
+            switch (option)
+            {
+                case ESettingsMenuControlOption.MouseSensitivity:
+                    mouseSensitivitySlider = slider;
+                    mouseSensitivityRow = row;
+                    break;
+            }
+        }
+
+        private void AddSliderListener(ESettingsMenuControlOption option, Slider slider, GameObject row)
+        {
+            switch (option)
+            {
+                case ESettingsMenuControlOption.MouseSensitivity:
+                    slider.onValueChanged.AddListener(value =>
+                    {
+                        SetSliderValueText(row, value);
+                        mouseSensitivityChanged.OnNext(value);
+                    });
+                    break;
+            }
         }
 
         private static void SetSliderValueText(GameObject row, float value)
         {
+            if (row == null)
+            {
+                return;
+            }
+
             TMP_Text[] texts = row.GetComponentsInChildren<TMP_Text>(true);
             foreach (TMP_Text text in texts)
             {
@@ -803,6 +955,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case ESettingsMenuControlOption.FpsLimit:
                     fpsLimitDropdown = dropdown;
                     break;
+                case ESettingsMenuControlOption.InvertYAxis:
+                    invertYAxisDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.CrouchMode:
+                    crouchModeDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.SprintMode:
+                    sprintModeDropdown = dropdown;
+                    break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     voiceChatEnabledDropdown = dropdown;
                     break;
@@ -823,28 +984,37 @@ namespace GoodCopBadCop.UI.SettingsMenu
             switch (option)
             {
                 case ESettingsMenuControlOption.DisplayMode:
-                    dropdown.onValueChanged.AddListener(value => DisplayModeChanged?.Invoke(value));
+                    dropdown.onValueChanged.AddListener(value => displayModeChanged.OnNext(value));
                     break;
                 case ESettingsMenuControlOption.Resolution:
-                    dropdown.onValueChanged.AddListener(value => ScreenResolutionChanged?.Invoke(value));
+                    dropdown.onValueChanged.AddListener(value => screenResolutionChanged.OnNext(value));
                     break;
                 case ESettingsMenuControlOption.VSync:
-                    dropdown.onValueChanged.AddListener(value => VSyncChanged?.Invoke(value != 0));
+                    dropdown.onValueChanged.AddListener(value => vSyncChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.FpsLimit:
-                    dropdown.onValueChanged.AddListener(value => FpsLimitChanged?.Invoke(value));
+                    dropdown.onValueChanged.AddListener(value => fpsLimitChanged.OnNext(value));
+                    break;
+                case ESettingsMenuControlOption.InvertYAxis:
+                    dropdown.onValueChanged.AddListener(value => invertYAxisChanged.OnNext(value != 0));
+                    break;
+                case ESettingsMenuControlOption.CrouchMode:
+                    dropdown.onValueChanged.AddListener(value => crouchModeChanged.OnNext(value));
+                    break;
+                case ESettingsMenuControlOption.SprintMode:
+                    dropdown.onValueChanged.AddListener(value => sprintModeChanged.OnNext(value));
                     break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
-                    dropdown.onValueChanged.AddListener(value => VoiceChatEnabledChanged?.Invoke(value != 0));
+                    dropdown.onValueChanged.AddListener(value => voiceChatEnabledChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.VoiceChatMuted:
-                    dropdown.onValueChanged.AddListener(value => VoiceChatMutedChanged?.Invoke(value != 0));
+                    dropdown.onValueChanged.AddListener(value => voiceChatMutedChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.VoiceChatDeafened:
-                    dropdown.onValueChanged.AddListener(value => VoiceChatDeafenedChanged?.Invoke(value != 0));
+                    dropdown.onValueChanged.AddListener(value => voiceChatDeafenedChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.VoiceChatInputMode:
-                    dropdown.onValueChanged.AddListener(value => VoiceChatInputModeChanged?.Invoke(value));
+                    dropdown.onValueChanged.AddListener(value => voiceChatInputModeChanged.OnNext(value));
                     break;
             }
         }
@@ -858,6 +1028,18 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             dropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, dropdown.options.Count - 1));
             dropdown.RefreshShownValue();
+        }
+
+        private static void SetSliderValue(Slider slider, GameObject row, float value)
+        {
+            if (slider == null)
+            {
+                return;
+            }
+
+            float clampedValue = Mathf.Clamp(value, slider.minValue, slider.maxValue);
+            slider.SetValueWithoutNotify(clampedValue);
+            SetSliderValueText(row, clampedValue);
         }
 
         private static float GetDropdownPopupHeight(int optionCount)

@@ -28,12 +28,22 @@ namespace GoodCopBadCop.Settings
         Fps144
     }
 
+    public enum EInputActivationMode
+    {
+        Hold,
+        Toggle
+    }
+
     public interface ISettingsModel
     {
         ReadOnlyReactiveProperty<EDisplayMode> DisplayMode { get; }
         ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution { get; }
         ReadOnlyReactiveProperty<bool> VSyncEnabled { get; }
         ReadOnlyReactiveProperty<EFpsLimit> FpsLimit { get; }
+        ReadOnlyReactiveProperty<float> MouseSensitivity { get; }
+        ReadOnlyReactiveProperty<bool> InvertYAxis { get; }
+        ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode { get; }
+        ReadOnlyReactiveProperty<EInputActivationMode> SprintMode { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatEnabled { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatMuted { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatDeafened { get; }
@@ -55,6 +65,18 @@ namespace GoodCopBadCop.Settings
 
         public readonly PersistentReactiveProperty<EFpsLimit> FpsLimitMutable =
             new("settings.fpsLimit", EFpsLimit.Unlimited);
+
+        public readonly PersistentReactiveProperty<float> MouseSensitivityMutable =
+            new("settings.controls.mouseSensitivity", 50f);
+
+        public readonly PersistentReactiveProperty<bool> InvertYAxisMutable =
+            new("settings.controls.invertYAxis", false);
+
+        public readonly PersistentReactiveProperty<EInputActivationMode> CrouchModeMutable =
+            new("settings.controls.crouchMode", EInputActivationMode.Hold);
+
+        public readonly PersistentReactiveProperty<EInputActivationMode> SprintModeMutable =
+            new("settings.controls.sprintMode", EInputActivationMode.Hold);
 
         public readonly PersistentReactiveProperty<bool> VoiceChatEnabledMutable =
             new("settings.voiceChat.enabled", true);
@@ -78,6 +100,10 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution => ScreenResolutionMutable;
         public ReadOnlyReactiveProperty<bool> VSyncEnabled => VSyncEnabledMutable;
         public ReadOnlyReactiveProperty<EFpsLimit> FpsLimit => FpsLimitMutable;
+        public ReadOnlyReactiveProperty<float> MouseSensitivity => MouseSensitivityMutable;
+        public ReadOnlyReactiveProperty<bool> InvertYAxis => InvertYAxisMutable;
+        public ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode => CrouchModeMutable;
+        public ReadOnlyReactiveProperty<EInputActivationMode> SprintMode => SprintModeMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatEnabled => VoiceChatEnabledMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatMuted => VoiceChatMutedMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatDeafened => VoiceChatDeafenedMutable;
@@ -91,6 +117,10 @@ namespace GoodCopBadCop.Settings
             ScreenResolutionMutable.Flush();
             VSyncEnabledMutable.Flush();
             FpsLimitMutable.Flush();
+            MouseSensitivityMutable.Flush();
+            InvertYAxisMutable.Flush();
+            CrouchModeMutable.Flush();
+            SprintModeMutable.Flush();
             VoiceChatEnabledMutable.Flush();
             VoiceChatMutedMutable.Flush();
             VoiceChatDeafenedMutable.Flush();
@@ -105,6 +135,10 @@ namespace GoodCopBadCop.Settings
             ScreenResolutionMutable.Dispose();
             VSyncEnabledMutable.Dispose();
             FpsLimitMutable.Dispose();
+            MouseSensitivityMutable.Dispose();
+            InvertYAxisMutable.Dispose();
+            CrouchModeMutable.Dispose();
+            SprintModeMutable.Dispose();
             VoiceChatEnabledMutable.Dispose();
             VoiceChatMutedMutable.Dispose();
             VoiceChatDeafenedMutable.Dispose();

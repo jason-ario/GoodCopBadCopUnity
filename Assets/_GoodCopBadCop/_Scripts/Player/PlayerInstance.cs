@@ -103,10 +103,18 @@ public class PlayerInstance : NetworkBehaviour
             PlayerHealth.OnRespawn -= OnAnyPlayerRespawn;
         }
 
-        if (IsLocalPlayer && PlayerHealth != null)
+        if (IsLocalPlayer)
         {
-            PlayerHealth.OnDeath -= Die;
-            PlayerHealth.OnRespawn -= Respawn;
+            if (PlayerHealth != null)
+            {
+                PlayerHealth.OnDeath -= Die;
+                PlayerHealth.OnRespawn -= Respawn;
+            }
+
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
     }
 
