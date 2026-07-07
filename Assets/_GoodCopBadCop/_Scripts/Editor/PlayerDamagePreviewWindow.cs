@@ -8,25 +8,23 @@ namespace GoodCopBadCop.Editor
         private readonly struct DamagePreviewOption
         {
             public readonly string Label;
-            public readonly string Description;
             public readonly float DamageAmount;
 
-            public DamagePreviewOption(string label, string description, float damageAmount)
+            public DamagePreviewOption(string label, float damageAmount)
             {
                 Label = label;
-                Description = description;
                 DamageAmount = damageAmount;
             }
         }
 
         private static readonly DamagePreviewOption[] DamageOptions =
         {
-            new DamagePreviewOption("Mutant Melee", "Standard mutant attack hit feedback.", 10f),
-            new DamagePreviewOption("Bear Trap", "Heavy trap snap damage feedback.", 50f),
-            new DamagePreviewOption("Friendly Fire / Melee", "Player melee weapon friendly-fire feedback.", 25f),
-            new DamagePreviewOption("Radiation Tick", "Small radiation health tick feedback.", 5f),
-            new DamagePreviewOption("Scripted Rifle", "Repeated rifle chip damage feedback.", 1f),
-            new DamagePreviewOption("Debug Hit", "Matches the existing H-key local hit test.", 10f),
+            new DamagePreviewOption("Mutant Melee", 10f),
+            new DamagePreviewOption("Bear Trap", 50f),
+            new DamagePreviewOption("Friendly Fire / Melee", 25f),
+            new DamagePreviewOption("Radiation Tick", 5f),
+            new DamagePreviewOption("Scripted Rifle", 1f),
+            new DamagePreviewOption("Debug Hit", 10f),
         };
 
         private PlayerInstance player;
@@ -89,7 +87,6 @@ namespace GoodCopBadCop.Editor
         private void DrawHeader()
         {
             EditorGUILayout.LabelField("Player Damage Preview", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Preview local hurt feedback without changing HP. Dead applies real lethal damage.", EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.Space(6f);
             if (GUILayout.Button("Refresh", GUILayout.Height(24f)))
@@ -98,27 +95,16 @@ namespace GoodCopBadCop.Editor
 
         private void DrawStatus()
         {
-            MessageType messageType = status == "Ready." ? MessageType.Info : MessageType.Warning;
-            EditorGUILayout.HelpBox(status, messageType);
-
-            if (playerHealth == null)
+            if (status == "Ready.")
                 return;
 
-            EditorGUILayout.LabelField("Health", $"{playerHealth.Health:0.#} / {playerHealth.MaxHealth:0.#}");
-            EditorGUILayout.LabelField("Dead", playerHealth.IsDead ? "Yes" : "No");
+            EditorGUILayout.HelpBox(status, MessageType.Warning);
         }
 
         private void DrawDamageOption(DamagePreviewOption option)
         {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(option.Label, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(option.Description, EditorStyles.wordWrappedMiniLabel);
-            EditorGUILayout.LabelField("Preview damage", option.DamageAmount.ToString("0.#"));
-
-            if (GUILayout.Button($"Preview {option.Label}", GUILayout.Height(28f)))
+            if (GUILayout.Button($"Preview {option.Label}", GUILayout.Height(30f)))
                 PreviewDamage(option);
-
-            EditorGUILayout.EndVertical();
         }
 
         private void DrawDeathControls()
