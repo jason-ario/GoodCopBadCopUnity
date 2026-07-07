@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using GoodCopBadCop.RoomSystem;
 using TMPro;
 using UnityEngine;
 
@@ -20,6 +21,8 @@ public class Thermometer : PickableObject
     [SerializeField] private Color normalColor;
     [SerializeField] private Color idleColor;
     private InternalBattery internalBattery;
+
+    [VContainer.Inject] private IRoomService roomService;
     protected override void Awake()
     {
         base.Awake();
@@ -165,7 +168,7 @@ public class Thermometer : PickableObject
                     // Resolve temperature target from the anomaly component if present and active.
                     HighTemperatureAnomaly tempAnomaly = suspect.GetComponentInChildren<HighTemperatureAnomaly>();
                     bool hasAnomaly = tempAnomaly != null && tempAnomaly.IsActive;
-                    float targetTemp  = hasAnomaly ? tempAnomaly.ElevatedTemperature : NormalBaseTemp;
+                    float targetTemp  = (hasAnomaly ? tempAnomaly.ElevatedTemperature : NormalBaseTemp) + GetRoomTemperatureOffset();
                     float jitterRange = hasAnomaly ? tempAnomaly.JitterRange : NormalJitterRange;
 
                     // Initial Ramp up
@@ -211,9 +214,16 @@ public class Thermometer : PickableObject
             }
             else
             {
-                thermometerText.text = "0°";
+                float roomTemp = 22f + GetRoomTemperatureOffset();
+                thermometerText.text = Mathf.RoundToInt(roomTemp).ToString() + "°";
+                SetColorFromTemp(roomTemp);
             }
             yield return new WaitForSeconds(0.1f);
         }
+    }
+
+    private float GetRoomTemperatureOffset()
+    {
+        return roomService?.TemperatureOffset ?? 0f;
     }
 }

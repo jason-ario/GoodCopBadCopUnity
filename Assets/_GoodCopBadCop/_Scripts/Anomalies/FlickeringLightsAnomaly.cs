@@ -1,3 +1,4 @@
+using GoodCopBadCop.RoomSystem;
 using UnityEngine;
 
 /// <summary>
@@ -11,13 +12,21 @@ public class FlickeringLightsAnomaly : SupernaturalAnomaly
     [Tooltip("Scene-level controller that owns the booth lights and drives the flicker sequence.")]
     [SerializeField] private BoothFlickeringLightsController lightsController;
 
+    [VContainer.Inject] private IRoomService roomService;
+
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
 
+        if (roomService != null)
+        {
+            roomService.StartFlickeringLights();
+            return;
+        }
+
         if (lightsController == null)
         {
-            Debug.LogWarning($"[FlickeringLightsAnomaly] lightsController is not assigned on '{gameObject.name}'.", this);
+            Debug.LogWarning($"[FlickeringLightsAnomaly] RoomService was not injected and lightsController is not assigned on '{gameObject.name}'.", this);
             return;
         }
 
@@ -27,7 +36,14 @@ public class FlickeringLightsAnomaly : SupernaturalAnomaly
     public override void DeactivateAnomaly()
     {
         base.DeactivateAnomaly();
-        lightsController?.StopFlickering();
+        if (roomService != null)
+        {
+            roomService.StopFlickeringLights();
+        }
+        else
+        {
+            lightsController?.StopFlickering();
+        }
     }
 
     [ContextMenu("Activate Anomaly")]

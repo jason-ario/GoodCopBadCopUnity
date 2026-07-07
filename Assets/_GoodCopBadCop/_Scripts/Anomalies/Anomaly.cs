@@ -20,7 +20,7 @@ public class Anomaly : MonoBehaviour
     public virtual void InitializeDisabled() { }
 }
 
-// MutationAnomaly, BehaviorAnomaly, DocumentationAnomaly, VitalsAnomaly, and SupernaturalAnomaly
+// PhysicalAnomaly, BehaviorAnomaly, DocumentationAnomaly, VitalsAnomaly, and SupernaturalAnomaly
 // are each defined in their own .cs files so Unity's MonoScript.GetClass() resolves correctly
 // for checklist item anomalyTypeReference wiring.
 

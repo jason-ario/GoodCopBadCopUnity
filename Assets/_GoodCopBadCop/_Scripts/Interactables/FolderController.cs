@@ -1143,7 +1143,7 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
-    /// Returns the set of category type names (e.g. "MutationAnomaly") for every checked
+    /// Returns the set of category type names (e.g. "PhysicalAnomaly") for every checked
     /// checkbox across all exam pages in this folder. Used by the verdict scoring system
     /// to determine which categories the player identified.
     /// </summary>
@@ -1177,8 +1177,8 @@ public class FolderController : PickableObject
             foreach (ChecklistItem item in checklistItems)
             {
                 // Walk the anomaly's type hierarchy so that a category-level reference
-                // (e.g. AnomalyTypeName = "MutationAnomaly") matches any subclass
-                // (e.g. BlueVeinsAnomaly : MutationAnomaly).
+                // (e.g. AnomalyTypeName = "PhysicalAnomaly") matches any subclass
+                // (e.g. BlueVeinsAnomaly : PhysicalAnomaly).
                 System.Type t = anomaly.GetType();
                 while (t != null)
                 {

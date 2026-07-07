@@ -1,4 +1,5 @@
 using System.Collections;
+using GoodCopBadCop.RoomSystem;
 using UnityEngine;
 
 /// <summary>
@@ -19,15 +20,17 @@ public class InsectSwarmAnomaly : SupernaturalAnomaly
     [Tooltip("Maximum seconds after the suspect arrives at the booth before the swarm triggers.")]
     [SerializeField] private float _maxDelay = 40f;
 
+    [VContainer.Inject] private IRoomService roomService;
+
     private Coroutine _swarmCoroutine;
 
     public override void ActivateAnomaly()
     {
         base.ActivateAnomaly();
 
-        if (_cockroachSpawner == null)
+        if (roomService == null && _cockroachSpawner == null)
         {
-            Debug.LogWarning("[InsectSwarmAnomaly] CockroachSpawner is not assigned.", this);
+            Debug.LogWarning("[InsectSwarmAnomaly] RoomService was not injected and CockroachSpawner is not assigned.", this);
             return;
         }
 
@@ -55,7 +58,15 @@ public class InsectSwarmAnomaly : SupernaturalAnomaly
     private IEnumerator TriggerSwarmAfterDelay()
     {
         yield return new WaitForSeconds(Random.Range(_minDelay, _maxDelay));
-        _cockroachSpawner.StartSwarm();
+        if (roomService != null)
+        {
+            roomService.StartInsectSwarm();
+        }
+        else
+        {
+            _cockroachSpawner.StartSwarm();
+        }
+
         _swarmCoroutine = null;
     }
 
@@ -69,7 +80,14 @@ public class InsectSwarmAnomaly : SupernaturalAnomaly
             _swarmCoroutine = null;
         }
 
-        _cockroachSpawner?.StopSwarm();
+        if (roomService != null)
+        {
+            roomService.StopInsectSwarm();
+        }
+        else
+        {
+            _cockroachSpawner?.StopSwarm();
+        }
     }
 
     [ContextMenu("Activate Anomaly")]

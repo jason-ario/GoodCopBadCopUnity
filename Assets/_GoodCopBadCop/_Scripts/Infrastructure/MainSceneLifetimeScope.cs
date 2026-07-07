@@ -1,6 +1,9 @@
+using GoodCopBadCop.CameraSystem;
 using GoodCopBadCop.UI.SettingsMenu;
 using GoodCopBadCop.EnvironmentSystem;
+using GoodCopBadCop.Audio;
 using GoodCopBadCop.Player;
+using GoodCopBadCop.RoomSystem;
 using GoodCopBadCop.Settings;
 using GoodCopBadCop.VoiceChat;
 using UnityEngine;
@@ -20,6 +23,13 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
             builder.Register<ISettingsScreenAdapter, UnitySettingsScreenAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
+            builder.Register<ILegacyGameObjectInjector, LegacyGameObjectInjector>(Lifetime.Scoped);
+            builder.Register<ICameraService, CameraService>(Lifetime.Scoped);
+            builder.Register<IAudioService, AudioService>(Lifetime.Scoped);
+            builder.Register<IRoomService, RoomService>(Lifetime.Scoped);
+            builder.RegisterComponentInHierarchy<global::SuspectController>();
+            builder.RegisterComponentInHierarchy<global::Thermometer>();
+
             builder.Register<PlayerRuntimeModel>(Lifetime.Scoped).AsSelf().As<IPlayerRuntimeModel>();
             builder.Register<IPlayerRuntimeService, PlayerRuntimeService>(Lifetime.Scoped);
             builder.RegisterEntryPoint<PlayerRuntimeAdapter>(Lifetime.Scoped);

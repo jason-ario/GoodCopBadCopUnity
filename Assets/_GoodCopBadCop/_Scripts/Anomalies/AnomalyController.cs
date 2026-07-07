@@ -164,7 +164,7 @@ public class AnomalyController : MonoBehaviour
             if (_documentationAnomalies.Count > 0 && !HasActiveAnomalyOfCategory("DocumentationAnomaly")) return false;
             if (_vitalsAnomalies.Count      > 0 && !HasActiveAnomalyOfCategory("VitalsAnomaly"))        return false;
             if (_behaviorAnomalies.Count    > 0 && !HasActiveAnomalyOfCategory("BehaviorAnomaly"))      return false;
-            if (_mutationAnomalies.Count    > 0 && !HasActiveAnomalyOfCategory("MutationAnomaly"))      return false;
+            if (_mutationAnomalies.Count    > 0 && !HasActiveAnomalyOfCategory("PhysicalAnomaly"))      return false;
             if (_supernaturalAnomalies.Count > 0 && !HasActiveAnomalyOfCategory("SupernaturalAnomaly")) return false;
             return true;
         }
@@ -320,7 +320,7 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// Returns true if any currently active anomaly is an instance of (or inherits from) the
-    /// category class named <paramref name="categoryTypeName"/> (e.g. "MutationAnomaly").
+    /// category class named <paramref name="categoryTypeName"/> (e.g. "PhysicalAnomaly").
     /// Walks the full type hierarchy so concrete subclasses are matched by their category base.
     /// </summary>
     public bool HasActiveAnomalyOfCategory(string categoryTypeName)

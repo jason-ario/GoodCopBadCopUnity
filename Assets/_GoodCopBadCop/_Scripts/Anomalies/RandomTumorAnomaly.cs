@@ -57,10 +57,32 @@ public class RandomTumorAnomaly : PhysicalAnomaly
 
     private void ApplyActiveIndices(int[] activeIndices)
     {
+        SetTumorsActive(false);
+
         foreach (int index in activeIndices)
         {
-            if (index >= 0 && index < tumors.Length)
+            if (index >= 0 && index < tumors.Length && tumors[index] != null)
                 tumors[index].SetActive(true);
+        }
+    }
+
+    public override void DeactivateAnomaly()
+    {
+        base.DeactivateAnomaly();
+        InitializeDisabled();
+    }
+
+    public override void InitializeDisabled()
+    {
+        SetTumorsActive(false);
+    }
+
+    private void SetTumorsActive(bool active)
+    {
+        foreach (GameObject tumor in tumors)
+        {
+            if (tumor != null)
+                tumor.SetActive(active);
         }
     }
 

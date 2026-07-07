@@ -7,6 +7,7 @@ namespace GoodCopBadCop.Editor
 
         public const string EnvironmentDebugMenuPath = RootMenuPath + "Environment Debug";
         public const string PlayerDamagePreviewMenuPath = RootMenuPath + "Player Damage Preview";
+        public const string AnomalyPreviewMenuPath = RootMenuPath + "Anomaly Preview";
     }
 
 }

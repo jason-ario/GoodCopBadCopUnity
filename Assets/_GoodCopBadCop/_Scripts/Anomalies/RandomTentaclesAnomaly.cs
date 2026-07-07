@@ -53,10 +53,32 @@ public class RandomTentacleAnomaly : PhysicalAnomaly
 
     private void ApplyActiveIndices(int[] activeIndices)
     {
+        SetTentaclesActive(false);
+
         foreach (int index in activeIndices)
         {
-            if (index >= 0 && index < tentacles.Length)
+            if (index >= 0 && index < tentacles.Length && tentacles[index] != null)
                 tentacles[index].SetActive(true);
+        }
+    }
+
+    public override void DeactivateAnomaly()
+    {
+        base.DeactivateAnomaly();
+        InitializeDisabled();
+    }
+
+    public override void InitializeDisabled()
+    {
+        SetTentaclesActive(false);
+    }
+
+    private void SetTentaclesActive(bool active)
+    {
+        foreach (GameObject tentacle in tentacles)
+        {
+            if (tentacle != null)
+                tentacle.SetActive(active);
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using GoodCopBadCop.Infrastructure;
 using DG.Tweening;
 using Unity.Netcode;
 using Unity.VisualScripting;
@@ -12,6 +13,8 @@ using UnityEngine.Serialization;
 public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
+
+    [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
 
     /// <summary>
     /// When true, the next suspect to spawn is initialized with no anomalies.
@@ -137,7 +140,7 @@ public class SuspectController : NetworkBehaviour
     private int _totalActiveCategories = 0;   // categories that have at least one active anomaly
 
     /// <summary>
-    /// Type-name strings (e.g. "MutationAnomaly") for every category the player correctly identified.
+    /// Type-name strings (e.g. "PhysicalAnomaly") for every category the player correctly identified.
     /// Populated by CalculateCategoryScores; used by PayOutResults to gate evidence bonuses.
     /// </summary>
     private readonly HashSet<string> _correctCategoryTypeNames = new HashSet<string>();
@@ -237,6 +240,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
+        InjectLegacyDependencies(spawnedSuspect);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
 
         if (netObj == null)
@@ -296,6 +300,7 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        InjectLegacyDependencies(character.gameObject);
         NetworkObject netObj = character.GetComponent<NetworkObject>();
         if (netObj == null)
         {
@@ -362,6 +367,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         GameObject spawnedSuspect = Instantiate(prefab.gameObject, spawnPos.position, spawnPos.rotation);
+        InjectLegacyDependencies(spawnedSuspect);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
 
         if (netObj == null)
@@ -402,6 +408,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
+        InjectLegacyDependencies(spawnedSuspect);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
 
         if (netObj == null)
@@ -421,6 +428,17 @@ public class SuspectController : NetworkBehaviour
 
         TryInitializeCurrentSuspect();
         AssignReferencesClientRpc(netObj.NetworkObjectId);
+    }
+
+    private void InjectLegacyDependencies(GameObject root)
+    {
+        if (legacyGameObjectInjector == null)
+        {
+            Debug.LogWarning("[SuspectController] LegacyGameObjectInjector was not injected; spawned suspect services will be unavailable.", this);
+            return;
+        }
+
+        legacyGameObjectInjector.Inject(root);
     }
 
     [ClientRpc]
@@ -1007,7 +1025,7 @@ public class SuspectController : NetworkBehaviour
             "DocumentationAnomaly",
             "VitalsAnomaly",
             "BehaviorAnomaly",
-            "MutationAnomaly",
+            "PhysicalAnomaly",
             "SupernaturalAnomaly"
         };
 
