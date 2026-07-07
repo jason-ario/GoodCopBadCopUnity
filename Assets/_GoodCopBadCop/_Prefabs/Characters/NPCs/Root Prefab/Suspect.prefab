@@ -613,6 +613,7 @@ GameObject:
   - component: {fileID: 7888620099599006139}
   - component: {fileID: 5215549252601529994}
   - component: {fileID: 3045864538941643365}
+  - component: {fileID: 1968658739754850925}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -641,6 +642,7 @@ Transform:
   - {fileID: 6975137538311554872}
   - {fileID: 6537442541130980856}
   - {fileID: 3388929027781793393}
+  - {fileID: 1104635056292787089}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!114 &253971976340002767
@@ -869,7 +871,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3615840691
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1459154539
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1639,6 +1641,41 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
+--- !u!114 &1968658739754850925
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 559d6397ce011ef41bbde97105bfa39e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectFootstepsAudio
+  audioSource: {fileID: 9147458000845177390}
+  outsideFootstepClips:
+  - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
+  - {fileID: 8300000, guid: b5415257ad22548479f1a90f63a64471, type: 3}
+  - {fileID: 8300000, guid: 67f459d44640b944b948a170b424f802, type: 3}
+  - {fileID: 8300000, guid: ed08dcd489d312f4da7bfcef6834eb0a, type: 3}
+  - {fileID: 8300000, guid: 294b4c999f0f65e4ca28a10ea323363d, type: 3}
+  insideFootstepClips:
+  - {fileID: 8300000, guid: a42fc632b28f4f24ca796f3bdcdb24c8, type: 3}
+  - {fileID: 8300000, guid: 732bb2f088072634ebf8ac37d0188980, type: 3}
+  - {fileID: 8300000, guid: 8d482751fe186e54fb4cb8e183c3e1e8, type: 3}
+  - {fileID: 8300000, guid: 7438a7e4556e87648be2feaa579b742b, type: 3}
+  - {fileID: 8300000, guid: 848b7e71509dc844fb6d76bb74abef47, type: 3}
+  - {fileID: 8300000, guid: 6bb2841b50aec23418234cb0618ad288, type: 3}
+  - {fileID: 8300000, guid: bd7a80d0edf7b564587af3bcab30cb21, type: 3}
+  - {fileID: 8300000, guid: ebe591a58c0a61445aaf94738c0c3152, type: 3}
+  - {fileID: 8300000, guid: 4a42c9dde9cbb5a489395f79a7426762, type: 3}
+  - {fileID: 8300000, guid: 531613071b1ef9b4793e07bab8acce9c, type: 3}
+  - {fileID: 8300000, guid: 625053f3e04f5274e93163b6e1c27b55, type: 3}
+  pitchRandomness: 0.1
+  walkStepInterval: 0.5
+  movementThreshold: 0.1
+  IsOutside: 1
 --- !u!1 &4585279910345806039
 GameObject:
   m_ObjectHideFlags: 0
@@ -2255,6 +2292,135 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BlueVeinsAnomaly
   renderers: []
   _previewInEditor: 1
+--- !u!1 &9210434822996015810
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1104635056292787089}
+  - component: {fileID: 9147458000845177390}
+  m_Layer: 0
+  m_Name: Footsteps Audio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1104635056292787089
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9210434822996015810}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9165884929875893673}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &9147458000845177390
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9210434822996015810}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 20
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1001 &560751498284347426
 PrefabInstance:
   m_ObjectHideFlags: 0
