@@ -153,6 +153,31 @@ public class Day_02 : DayBase
     [Tooltip("Root GameObject of the dead animal prop. Disabled by default; activated at the start of the out-back sequence.")]
     [SerializeField] private GameObject _deadAnimalObject;
 
+    [Header("Day 2 — Ocho")]
+    [Tooltip("Ocho prefab. Must contain a NetworkObject and OchoWatcherBehaviour. " +
+             "Must be registered in NetworkManager's Network Prefabs list.")]
+    [SerializeField] private GameObject _ochoPrefab;
+
+    [Tooltip("Where Ocho spawns — position him deep in the tree line near the power plant, " +
+             "far enough to read as a distant silhouette.")]
+    [SerializeField] private Transform _ochoSpawnPoint;
+
+    [Tooltip("Transform Ocho runs toward when fleeing. Place this off-screen behind the tree line " +
+             "at a point that sits on the NavMesh.")]
+    [SerializeField] private Transform _ochoFleeDestination;
+
+    [Tooltip("Distance (metres) at which any player triggers Ocho to flee.")]
+    [SerializeField] private float _ochoFleeRadius = 8f;
+
+    [Tooltip("NavMeshAgent speed while Ocho is fleeing.")]
+    [SerializeField] private float _ochoFleeSpeed = 20f;
+
+    [Tooltip("Degrees-per-second at which Ocho rotates to face the nearest player while watching.")]
+    [SerializeField] private float _ochoWatchRotateSpeed = 60f;
+
+    // Runtime Ocho instance. Tracked so DayDeactivated can clean up mid-sequence.
+    private NetworkObject _spawnedOcho;
+
     [Header("Day 2 — Trail Event")]
     [Tooltip("Index into FollowTrailThreat._possibleLocations to use for the Day 2 trail. " +
              "That location's TrailController should have its first waypoint placed at the dead animal. " +
@@ -279,6 +304,9 @@ public class Day_02 : DayBase
         // Destroy any Vlad instances that are still in-world (e.g. day skipped mid-sequence).
         DespawnVladInstance(ref _spawnedVlad);
         DespawnVladInstance(ref _spawnedVladOutBack);
+
+        // Despawn Ocho if still present (e.g. player never approached him).
+        DespawnOcho();
 
         StopAllCoroutines();
     }
@@ -894,6 +922,9 @@ public class Day_02 : DayBase
         // Spawn corpse (if assigned), trail particles, and destination interactable.
         FollowTrailThreat.Instance.TriggerTrailEvent(_day2TrailLocationIndex);
 
+        // Spawn Ocho in the tree line as soon as the trail task goes live.
+        SpawnOcho();
+
         Debug.Log("[Day_02] Trail event activated.");
     }
 
@@ -924,5 +955,67 @@ public class Day_02 : DayBase
         BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
 
         Debug.Log("[Day_02] Mutant killed — night phase ready.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Ocho
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Instantiates and network-spawns Ocho at <see cref="_ochoSpawnPoint"/>.
+    /// Ocho's <see cref="OchoWatcherBehaviour"/> handles proximity detection, fleeing,
+    /// and self-despawn — no further orchestration is needed here.
+    /// Server only.
+    /// </summary>
+    private void SpawnOcho()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (_ochoPrefab == null)
+        {
+            Debug.LogWarning("[Day_02] _ochoPrefab is not assigned — Ocho sighting skipped.", this);
+            return;
+        }
+
+        Vector3    spawnPos = _ochoSpawnPoint != null ? _ochoSpawnPoint.position : transform.position;
+        Quaternion spawnRot = _ochoSpawnPoint != null ? _ochoSpawnPoint.rotation : Quaternion.identity;
+
+        GameObject instance = Instantiate(_ochoPrefab, spawnPos, spawnRot);
+        NetworkObject netObj = instance.GetComponent<NetworkObject>();
+
+        if (netObj == null)
+        {
+            Debug.LogError("[Day_02] _ochoPrefab is missing a NetworkObject — Ocho not spawned.", this);
+            Destroy(instance);
+            return;
+        }
+
+        // Add OchoWatcherBehaviour at runtime and configure it with scene-owned values
+        // before Spawn() fires OnNetworkSpawn. AddComponent is used so the prefab stays
+        // clean — no need to bake the component onto the asset.
+        OchoWatcherBehaviour ochoWatcher = instance.AddComponent<OchoWatcherBehaviour>();
+        ochoWatcher.Initialise(
+            fleeDestination:  _ochoFleeDestination,
+            fleeRadius:       _ochoFleeRadius,
+            fleeSpeed:        _ochoFleeSpeed,
+            watchRotateSpeed: _ochoWatchRotateSpeed
+        );
+
+        netObj.Spawn(destroyWithScene: true);
+        _spawnedOcho = netObj;
+
+        Debug.Log("[Day_02] Ocho spawned.", this);
+    }
+
+    /// <summary>
+    /// Despawns the Ocho instance if it is still live.
+    /// Safe to call when no instance exists.
+    /// </summary>
+    private void DespawnOcho()
+    {
+        if (_spawnedOcho != null && _spawnedOcho.IsSpawned)
+            _spawnedOcho.Despawn(destroy: true);
+
+        _spawnedOcho = null;
     }
 }

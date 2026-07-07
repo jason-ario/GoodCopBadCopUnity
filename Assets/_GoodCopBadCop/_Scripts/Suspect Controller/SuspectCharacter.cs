@@ -260,6 +260,9 @@ public class SuspectCharacter : Interactable
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
 
+    /// <summary>Fired on the server whenever this suspect takes damage (before death check).</summary>
+    public event Action OnHit;
+
     // ── Junk pickup (dead-body interaction) ───────────────────────────────────
 
     /// <summary>
@@ -695,6 +698,7 @@ public class SuspectCharacter : Interactable
 
         _health -= amount;
         SpawnHitParticleClientRpc(hitPoint);
+        OnHit?.Invoke();
 
         if (_health <= 0f)
             KillSuspect();

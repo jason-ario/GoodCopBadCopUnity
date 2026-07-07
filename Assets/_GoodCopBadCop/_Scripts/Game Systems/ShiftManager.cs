@@ -555,6 +555,60 @@ public class ShiftManager : NetworkBehaviour
         AllTasksCompleteClientRpc();
     }
 
+    /// <summary>
+    /// Called by any client when a player confirms going to bed.
+    /// Broadcasts the end-of-shift report to all clients so both players see it simultaneously.
+    /// The six tracked counters are passed as ints (NGO-serializable); each client rebuilds
+    /// the report rows using its own reward config, which is identical on all clients.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void TriggerEndOfShiftReportServerRpc()
+    {
+        ShowEndOfShiftReportClientRpc(
+            suspectsProcessed,
+            suspectsPassedCorrect,
+            suspectsPassedWrong,
+            suspectsQuarantined,
+            suspectsKilledCorrect,
+            suspectsKilledWrong);
+    }
+
+    /// <summary>
+    /// Runs on all clients to display the end-of-shift report UI built from the provided counters.
+    /// </summary>
+    [ClientRpc]
+    private void ShowEndOfShiftReportClientRpc(
+        int processed, int passedCorrect, int passedWrong,
+        int quarantined, int killedCorrect, int killedWrong)
+    {
+        var reportData = new List<EndOfShiftReportUI.ReportRowData>
+        {
+            new EndOfShiftReportUI.ReportRowData(
+                $"Citizens Processed: {processed}", 0, false, isHeader: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Correctly Passed: {passedCorrect}",
+                passedCorrect * rewardPerCorrectPass),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Incorrectly Passed: {passedWrong}",
+                passedWrong * penaltyPerWrongPass, isPenalty: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Quarantined: {quarantined}", 0),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Correctly Eliminated: {killedCorrect}",
+                killedCorrect * rewardPerCorrectKill),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Wrongly Eliminated: {killedWrong}",
+                killedWrong * penaltyPerWrongKill, isPenalty: true),
+        };
+
+        UIController.Instance.ShowEndShiftReport(reportData);
+    }
+
     private IEnumerator InBetweenShiftSequence()
     {
         // End the previous night phase and score it before resetting the world.

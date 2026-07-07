@@ -29,7 +29,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     [Header("Threat Properties")]
     [SerializeField] private string _threatName = "Take out trash";
-    [SerializeField] private float _scoreWeight = 1f;
     [Tooltip("Number of coupons the ATM dispenses when all trash has been deposited.")]
     [SerializeField] private int _couponReward = 10;
 
@@ -96,7 +95,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _threatName;
-    public float  ScoreWeight => _scoreWeight;
+    public float  ScoreWeight => 1f;
     public float  ThreatLevel => _networkThreatLevel.Value;
 
     /// <summary>

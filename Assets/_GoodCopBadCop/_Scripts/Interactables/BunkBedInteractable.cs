@@ -190,8 +190,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         if (SFXController.Instance != null && _endDaySFX != null)
             SFXController.Instance.Play(_endDaySFX);
 
-        var reportData = ShiftManager.Instance.BuildEndOfShiftReport();
-        UIController.Instance.ShowEndShiftReport(reportData);
+        // Route through the server so the end-of-shift report is shown on ALL clients.
+        ShiftManager.Instance.TriggerEndOfShiftReportServerRpc();
     }
 
     private void OnCancelEndDay()

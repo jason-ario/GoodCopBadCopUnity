@@ -37,7 +37,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     [Header("Threat Properties")]
     [SerializeField] private string _threatName = "Follow the Trail";
-    [SerializeField] private float _scoreWeight = 1.5f;
+    [Tooltip("Number of coupons the ATM dispenses when the trail destination is discovered.")]
+    [SerializeField] private int _couponReward = 10;
 
     [Header("Daily Task")]
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
@@ -107,7 +108,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName        => _threatName;
-    public float  ScoreWeight       => _scoreWeight;
+    public float  ScoreWeight       => 1f;
     public float  ThreatLevel       => _networkThreatLevel.Value;
 
     public string ThreatDescription => _isDiscovered.Value
@@ -317,8 +318,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _networkThreatLevel.Value = 0f;
         _followTrailActive.Value  = false;
 
-        // Spawn the pack and activate the kill task now that the destination has been reached.
-        int packSize = SpawnPack();
+        // Register the kill task now that the destination has been reached.
+        // The pack was physically spawned at trail start; only the HUD task activates here.
+        ActivateKillTask();
+        int packSize = _currentLocation.PackSize;
 
         if (OnDestinationDiscoveredOverride != null)
         {
@@ -326,7 +329,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
         else if (packSize == 0)
         {
-            // No enemies — advance the night phase immediately.
+            // No enemies configured — advance the night phase immediately.
             BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
         }
         else
@@ -337,6 +340,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Notify DailyTaskScheduler that this task has been completed so it can
         // unlock the task for future days (when UnlockOnFirstCompletion is enabled).
+        ATM.Instance?.SpawnCoupons(_couponReward);
         OnDailyTaskCompleted?.Invoke();
 
         Debug.Log($"[FollowTrailThreat] Destination discovered. Pack size: {packSize}.");
@@ -462,12 +466,16 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _networkThreatLevel.Value = 1.0f;
         _isDiscovered.Value       = false;
 
+        // Spawn the enemy pack immediately so mutants are present from the moment the trail starts.
+        SpawnPack();
+
         Debug.Log("[FollowTrailThreat] Trail event spawned.", this);
     }
 
     /// <summary>
-    /// Spawns the pack defined on <see cref="_currentLocation"/> at the destination point.
-    /// Returns the number of enemies requested (PackSize), or 0 if no pack is configured.
+    /// Physically spawns the enemy pack defined on <see cref="_currentLocation"/> at the destination point.
+    /// Does NOT register the kill task — call <see cref="ActivateKillTask"/> for that.
+    /// Returns the configured PackSize, or 0 if no pack is configured.
     /// </summary>
     private int SpawnPack()
     {
@@ -478,10 +486,20 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         Vector3 spawnCenter = center != null ? center.position : transform.position;
 
         _currentLocation.PackSpawner.SpawnPackAt(spawnCenter, _currentLocation.PackSize);
-        _killMutantCount.Value = _currentLocation.PackSize;
 
         Debug.Log($"[FollowTrailThreat] Spawned pack of {_currentLocation.PackSize} at {spawnCenter}.", this);
         return _currentLocation.PackSize;
+    }
+
+    /// <summary>
+    /// Activates the kill-mutant task on all clients by setting <see cref="_killMutantCount"/>.
+    /// Called once the destination is discovered so the HUD task registers at trail completion.
+    /// Server only.
+    /// </summary>
+    private void ActivateKillTask()
+    {
+        if (_currentLocation.PackSize <= 0) return;
+        _killMutantCount.Value = _currentLocation.PackSize;
     }
 
     private void Cleanup()
@@ -490,6 +508,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             StopCoroutine(_proximityCoroutine);
             _proximityCoroutine = null;
+        }
+
+        // Reset discovery state so the next SpawnEvent can be discovered normally.
+        if (IsServer)
+        {
+            _isDiscovered.Value       = false;
+            _networkThreatLevel.Value = 0f;
         }
 
         if (_spawnedCorpse != null)
