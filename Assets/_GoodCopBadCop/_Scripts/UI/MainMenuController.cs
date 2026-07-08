@@ -92,7 +92,7 @@ public class MainMenuController : MonoBehaviour
     private void Start()
     {
         UIController.Instance.ClosePlayerUI();
-        settingsMenuView?.SetVisible(false);
+        settingsMenuView.SetVisible(false);
 
 #if UNITY_EDITOR
         if (_debugSkipToGame)
@@ -163,7 +163,7 @@ public class MainMenuController : MonoBehaviour
         EnsureButtonGroupFastController();
         HideAllMenus();
         isSettingsOpen = true;
-        settingsMenuView?.SetVisible(true);
+        settingsMenuView.SetVisible(true);
     }
 
     /// <summary>Returns to the home screen from any screen.</summary>
@@ -178,7 +178,7 @@ public class MainMenuController : MonoBehaviour
         }
 
         isSettingsOpen = false;
-        settingsMenuView?.SetVisible(false);
+        settingsMenuView.SetVisible(false);
         BackToHomeScreen();
     }
 
