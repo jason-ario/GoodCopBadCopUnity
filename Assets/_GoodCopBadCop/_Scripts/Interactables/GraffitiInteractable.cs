@@ -50,6 +50,16 @@ public class GraffitiInteractable : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // ── Scrub completion callback ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Optional server-side callback fired when this piece is fully scrubbed.
+    /// When assigned, this fires instead of the default <see cref="GraffitiThreat.OnGraffitiScrubbed"/> call,
+    /// allowing non-threat systems (e.g. CleanBoothMessTask) to own their own blood splatters.
+    /// Set this immediately after spawning the object on the server.
+    /// </summary>
+    [System.NonSerialized] public System.Action OnScrubCompleted;
+
     // ── Server-only state ──────────────────────────────────────────────────────
 
     private int _activeScrubbers;
@@ -124,7 +134,12 @@ public class GraffitiInteractable : NetworkBehaviour
         }
 
         _progressCoroutine = null;
-        GraffitiThreat.Instance?.OnGraffitiScrubbed();
+
+        if (OnScrubCompleted != null)
+            OnScrubCompleted.Invoke();
+        else
+            GraffitiThreat.Instance?.OnGraffitiScrubbed();
+
         NetworkObject.Despawn(destroy: true);
     }
 
