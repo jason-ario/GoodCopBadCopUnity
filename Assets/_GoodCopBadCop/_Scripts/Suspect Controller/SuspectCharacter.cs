@@ -300,9 +300,9 @@ public class SuspectCharacter : Interactable
     protected override void Awake()
     {
         base.Awake();
-        handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand); 
-        suspectRecordViewer = GetComponent<SuspectRecordViewer>(); 
-        
+        handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
+        suspectRecordViewer = GetComponent<SuspectRecordViewer>();
+
         if (folderGivingAnimationDatas != null && folderGivingAnimationDatas.Length > 0)
         {
             _folderGivingAnimationData = folderGivingAnimationDatas[0];
@@ -346,14 +346,7 @@ public class SuspectCharacter : Interactable
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
 
-        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
-            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        foreach (var kvp in anomalyController.TumorAnomalyIndices)
-            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
 
         drunkBehaviour?.TryActivate();
 
@@ -380,20 +373,7 @@ public class SuspectCharacter : Interactable
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
 
-        // Relay server-chosen tentacle indices to clients so they show the same
-        // tentacles without running independent RNG.
-        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
-            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        // Relay server-chosen tumor indices to clients so they show the same
-        // tumors without running independent RNG.
-        foreach (var kvp in anomalyController.TumorAnomalyIndices)
-            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        // Relay InitializeDisabled calls to clients for shader-driven anomalies
-        // (e.g. lesions, black eyes, blue veins) that don't carry index data.
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
 
         drunkBehaviour?.TryActivate();
     }
@@ -408,8 +388,8 @@ public class SuspectCharacter : Interactable
     {
         anomalyController.InitializeWithDocumentationAnomalies(count);
 
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
+
     }
 
     /// <summary>
@@ -432,16 +412,7 @@ public class SuspectCharacter : Interactable
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
 
-        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
-            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        foreach (var kvp in anomalyController.TumorAnomalyIndices)
-            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        // Relay InitializeDisabled calls to clients for shader-driven anomalies
-        // (e.g. lesions, black eyes, blue veins) that don't carry index data.
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
 
         drunkBehaviour?.TryActivate();
     }
@@ -468,14 +439,7 @@ public class SuspectCharacter : Interactable
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
 
-        foreach (var kvp in anomalyController.TentacleAnomalyIndices)
-            SyncTentacleAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        foreach (var kvp in anomalyController.TumorAnomalyIndices)
-            SyncTumorAnomalyClientRpc(kvp.Key, kvp.Value);
-
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
 
         drunkBehaviour?.TryActivate();
 
@@ -500,47 +464,101 @@ public class SuspectCharacter : Interactable
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
         ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
         ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
-
-        // Relay InitializeDisabled calls to clients for all anomalies (suspect is clean).
-        foreach (int siblingIndex in anomalyController.DisabledAnomalySiblingIndices)
-            SyncInitializeDisabledClientRpc(siblingIndex);
+        SyncAnomalySnapshot();
 
         drunkBehaviour?.TryActivate();
     }
 
-    /// <summary>
-    /// Tells clients which tentacle indices the server activated for a specific
-    /// RandomTentacleAnomaly, identified by its sibling index in the hierarchy.
-    /// </summary>
-    [ClientRpc]
-    private void SyncTentacleAnomalyClientRpc(int siblingIndex, int[] activeIndices)
+    private void SyncAnomalySnapshot()
     {
-        if (IsServer) return;
-        anomalyController.ApplyTentacleIndicesOnClient(siblingIndex, activeIndices);
+        if (anomalyController == null)
+            return;
+
+        anomalyController.BuildSnapshot(
+            out int[] activeAnomalyIds,
+            out int[] disabledAnomalyIds,
+            out int[] tentacleAnomalyIds,
+            out int[] tentacleCounts,
+            out int[] tentacleFlatIndices,
+            out int[] tumorAnomalyIds,
+            out int[] tumorCounts,
+            out int[] tumorFlatIndices);
+
+        SyncAnomalySnapshotClientRpc(
+            activeAnomalyIds,
+            disabledAnomalyIds,
+            tentacleAnomalyIds,
+            tentacleCounts,
+            tentacleFlatIndices,
+            tumorAnomalyIds,
+            tumorCounts,
+            tumorFlatIndices);
     }
 
-    /// <summary>
-    /// Tells clients which tumor indices the server activated for a specific
-    /// RandomTumorAnomaly, identified by its sibling index in the hierarchy.
-    /// </summary>
     [ClientRpc]
-    private void SyncTumorAnomalyClientRpc(int siblingIndex, int[] activeIndices)
+    private void SyncAnomalySnapshotClientRpc(
+        int[] activeAnomalyIds,
+        int[] disabledAnomalyIds,
+        int[] tentacleAnomalyIds,
+        int[] tentacleCounts,
+        int[] tentacleFlatIndices,
+        int[] tumorAnomalyIds,
+        int[] tumorCounts,
+        int[] tumorFlatIndices)
     {
-        if (IsServer) return;
-        anomalyController.ApplyTumorIndicesOnClient(siblingIndex, activeIndices);
+        if (IsServer)
+            return;
+
+        StartCoroutine(ApplyAnomalySnapshotWhenReady(
+            activeAnomalyIds,
+            disabledAnomalyIds,
+            tentacleAnomalyIds,
+            tentacleCounts,
+            tentacleFlatIndices,
+            tumorAnomalyIds,
+            tumorCounts,
+            tumorFlatIndices));
     }
 
-    /// <summary>
-    /// Tells clients to call InitializeDisabled on the anomaly at the given sibling index.
-    /// Used for shader-driven anomalies (e.g. lesions, black eyes, blue veins) that were
-    /// not selected and need their shader state cleared on all clients.
-    /// </summary>
-    [ClientRpc]
-    private void SyncInitializeDisabledClientRpc(int siblingIndex)
+    private IEnumerator ApplyAnomalySnapshotWhenReady(
+        int[] activeAnomalyIds,
+        int[] disabledAnomalyIds,
+        int[] tentacleAnomalyIds,
+        int[] tentacleCounts,
+        int[] tentacleFlatIndices,
+        int[] tumorAnomalyIds,
+        int[] tumorCounts,
+        int[] tumorFlatIndices)
     {
-        if (IsServer) return;
-        anomalyController.ApplyInitializeDisabledOnClient(siblingIndex);
+        const int maxFramesToWait = 60;
+        int framesWaited = 0;
+
+        while (SuspectController.Instance == null && framesWaited < maxFramesToWait)
+        {
+            framesWaited++;
+            yield return null;
+        }
+
+        if (SuspectController.Instance != null)
+        {
+            SuspectController.Instance.InjectLegacyDependencies(gameObject);
+        }
+        else
+        {
+            Debug.LogWarning($"[SuspectCharacter] Could not inject anomaly dependencies before snapshot apply on '{gameObject.name}'.", this);
+        }
+
+        anomalyController?.ApplySnapshot(
+            activeAnomalyIds,
+            disabledAnomalyIds,
+            tentacleAnomalyIds,
+            tentacleCounts,
+            tentacleFlatIndices,
+            tumorAnomalyIds,
+            tumorCounts,
+            tumorFlatIndices);
     }
+
 
     /// <summary>
     /// Calls InitializeDisabled on all non-active anomalies across every category and
@@ -670,17 +688,17 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void ReceiveVaccineServerRpc()
     {
-        int siblingIndex = anomalyController.RemoveRandomActiveAnomaly();
-        if (siblingIndex >= 0)
-            ReceiveVaccineClientRpc(siblingIndex);
+        int anomalyId = anomalyController.RemoveRandomActiveAnomaly();
+        if (anomalyId >= 0)
+            ReceiveVaccineClientRpc(anomalyId);
     }
 
     /// <summary>Replicates the server's anomaly removal choice to all non-server clients.</summary>
     [ClientRpc]
-    private void ReceiveVaccineClientRpc(int siblingIndex)
+    private void ReceiveVaccineClientRpc(int anomalyId)
     {
         if (IsServer) return;
-        anomalyController.RemoveAnomalyBySiblingIndex(siblingIndex);
+        anomalyController.RemoveAnomalyById(anomalyId);
     }
 
     // ── Combat ────────────────────────────────────────────────────────────────
@@ -810,19 +828,19 @@ public class SuspectCharacter : Interactable
             transform.LookAt(targetPosition);
         }
     }
-    
+
     public void GivePaperwork()
     {
         StartCoroutine(GivePaperworkCoroutine());
     }
-    
+
     IEnumerator GivePaperworkCoroutine()
     {
         animator.SetTrigger(_folderGivingAnimationData.animationTriggerName);
         yield return new WaitForSeconds(1f);
         SuspectController.Instance.SpawnPaperwork();
     }
-    
+
     public void SetFolderGivingAnimation(FolderGivingAnimation folderGivingAnimation)
     {
         foreach (var folderGivingAnimationData in folderGivingAnimationDatas)
@@ -835,7 +853,7 @@ public class SuspectCharacter : Interactable
             }
         }
     }
-    
+
     public string GetEntryDialogue()
     {
         if (drunkBehaviour != null && drunkBehaviour.IsDrunk)

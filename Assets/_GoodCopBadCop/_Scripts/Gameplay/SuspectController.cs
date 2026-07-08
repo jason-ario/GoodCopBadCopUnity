@@ -430,7 +430,7 @@ public class SuspectController : NetworkBehaviour
         AssignReferencesClientRpc(netObj.NetworkObjectId);
     }
 
-    private void InjectLegacyDependencies(GameObject root)
+    public void InjectLegacyDependencies(GameObject root)
     {
         if (legacyGameObjectInjector == null)
         {

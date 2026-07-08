@@ -30,22 +30,22 @@ public class AnomalyController : MonoBehaviour
     public List<Anomaly> activeAnomalies = new List<Anomaly>();
 
     /// <summary>
-    /// Deterministic active indices per RandomTentacleAnomaly, keyed by sibling index.
+    /// Deterministic active indices per RandomTentacleAnomaly, keyed by anomaly id.
     /// Used by SuspectCharacter to relay server selections to clients.
     /// </summary>
     public Dictionary<int, int[]> TentacleAnomalyIndices { get; } = new Dictionary<int, int[]>();
 
     /// <summary>
-    /// Deterministic active indices per RandomTumorAnomaly, keyed by sibling index.
+    /// Deterministic active indices per RandomTumorAnomaly, keyed by anomaly id.
     /// Used by SuspectCharacter to relay server selections to clients.
     /// </summary>
     public Dictionary<int, int[]> TumorAnomalyIndices { get; } = new Dictionary<int, int[]>();
 
     /// <summary>
-    /// Sibling indices of every anomaly that had InitializeDisabled called on it.
+    /// Stable anomaly ids of every anomaly that had InitializeDisabled called on it.
     /// Used by SuspectCharacter to relay the call to clients.
     /// </summary>
-    public List<int> DisabledAnomalySiblingIndices { get; } = new List<int>();
+    public List<int> DisabledAnomalyIds { get; } = new List<int>();
 
     // ── Primary Score-Based API ───────────────────────────────────────────────
 
@@ -74,8 +74,7 @@ public class AnomalyController : MonoBehaviour
             return;
         }
 
-        DisabledAnomalySiblingIndices.Clear();
-        activeAnomalies.Clear();
+        ClearInitializationState(deactivateActive: true);
 
         // Build category pools and immediately filter out locked anomalies.
         // FilterToUnlocked calls InitializeDisabled on each locked entry so
@@ -188,8 +187,7 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public void InitializeWithExactAnomalyCount(int count)
     {
-        DisabledAnomalySiblingIndices.Clear();
-        activeAnomalies.Clear();
+        ClearInitializationState(deactivateActive: true);
 
         Anomaly[] all = CollectAllAnomalies();
         List<Anomaly> pool = FilterToUnlocked(new List<Anomaly>(all));
@@ -215,8 +213,7 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public void InitializeWithDocumentationAnomalies(int count)
     {
-        DisabledAnomalySiblingIndices.Clear();
-        activeAnomalies.Clear();
+        ClearInitializationState(deactivateActive: true);
 
         // Disable every non-documentation anomaly first.
         var others = new List<Anomaly>();
@@ -242,8 +239,7 @@ public class AnomalyController : MonoBehaviour
     /// </summary>
     public void InitializeClean()
     {
-        DisabledAnomalySiblingIndices.Clear();
-        activeAnomalies.Clear();
+        ClearInitializationState(deactivateActive: true);
 
         foreach (Anomaly anomaly in CollectAllAnomalies())
             InitializeDisabled(anomaly);
@@ -251,51 +247,238 @@ public class AnomalyController : MonoBehaviour
         Debug.Log("[AnomalyController] Suspect forced clean — all anomalies disabled.");
     }
 
-    // ── Client Sync Helpers ───────────────────────────────────────────────────
+    /// <summary>
+    /// Builds a deterministic network snapshot of the anomaly state selected on the server.
+    /// Arrays are used directly as ClientRpc parameters to avoid relying on per-anomaly RPC ordering.
+    /// </summary>
+    public void BuildSnapshot(
+        out int[] activeAnomalyIds,
+        out int[] disabledAnomalyIds,
+        out int[] tentacleAnomalyIds,
+        out int[] tentacleCounts,
+        out int[] tentacleFlatIndices,
+        out int[] tumorAnomalyIds,
+        out int[] tumorCounts,
+        out int[] tumorFlatIndices)
+    {
+        activeAnomalyIds = activeAnomalies
+            .Where(anomaly => anomaly != null)
+            .Select(GetAnomalyId)
+            .Where(id => id >= 0)
+            .ToArray();
+
+        disabledAnomalyIds = DisabledAnomalyIds.ToArray();
+
+        BuildFlattenedIndexSnapshot(
+            TentacleAnomalyIndices,
+            out tentacleAnomalyIds,
+            out tentacleCounts,
+            out tentacleFlatIndices);
+
+        BuildFlattenedIndexSnapshot(
+            TumorAnomalyIndices,
+            out tumorAnomalyIds,
+            out tumorCounts,
+            out tumorFlatIndices);
+    }
 
     /// <summary>
-    /// Applies tentacle indices chosen on the server to the matching anomaly on this client.
+    /// Applies the server-selected anomaly state on a client. Dependencies must be injected before this method is called.
     /// </summary>
-    public void ApplyTentacleIndicesOnClient(int siblingIndex, int[] indices)
+    public void ApplySnapshot(
+        int[] activeAnomalyIds,
+        int[] disabledAnomalyIds,
+        int[] tentacleAnomalyIds,
+        int[] tentacleCounts,
+        int[] tentacleFlatIndices,
+        int[] tumorAnomalyIds,
+        int[] tumorCounts,
+        int[] tumorFlatIndices)
     {
-        RandomTentacleAnomaly tentacleAnomaly = GetComponentsInChildren<RandomTentacleAnomaly>(true)
-            .FirstOrDefault(t => t.transform.GetSiblingIndex() == siblingIndex);
+        ResetLocalAnomalyState();
+        ClearInitializationState();
 
-        if (tentacleAnomaly != null)
+        if (disabledAnomalyIds != null)
+        {
+            foreach (int anomalyId in disabledAnomalyIds)
+            {
+                Anomaly anomaly = FindAnomalyById(anomalyId);
+                if (anomaly == null)
+                {
+                    Debug.LogWarning($"[AnomalyController] Snapshot disabled anomaly not found at anomaly id {anomalyId}.", this);
+                    continue;
+                }
+
+                anomaly.InitializeDisabled();
+                DisabledAnomalyIds.Add(anomalyId);
+            }
+        }
+
+        if (activeAnomalyIds == null)
+            return;
+
+        foreach (int anomalyId in activeAnomalyIds)
+        {
+            Anomaly anomaly = FindAnomalyById(anomalyId);
+            if (anomaly == null)
+            {
+                Debug.LogWarning($"[AnomalyController] Snapshot active anomaly not found at anomaly id {anomalyId}.", this);
+                continue;
+            }
+
+            ApplyActiveAnomalyFromSnapshot(
+                anomaly,
+                tentacleAnomalyIds,
+                tentacleCounts,
+                tentacleFlatIndices,
+                tumorAnomalyIds,
+                tumorCounts,
+                tumorFlatIndices);
+        }
+    }
+
+    private void ResetLocalAnomalyState()
+    {
+        foreach (Anomaly anomaly in activeAnomalies.ToArray())
+        {
+            if (anomaly != null)
+                anomaly.DeactivateAnomaly();
+        }
+    }
+
+    private void ClearInitializationState(bool deactivateActive = false)
+    {
+        if (deactivateActive)
+            ResetLocalAnomalyState();
+
+        DisabledAnomalyIds.Clear();
+        activeAnomalies.Clear();
+        TentacleAnomalyIndices.Clear();
+        TumorAnomalyIndices.Clear();
+    }
+
+    private void ApplyActiveAnomalyFromSnapshot(
+        Anomaly anomaly,
+        int[] tentacleAnomalyIds,
+        int[] tentacleCounts,
+        int[] tentacleFlatIndices,
+        int[] tumorAnomalyIds,
+        int[] tumorCounts,
+        int[] tumorFlatIndices)
+    {
+        if (anomaly == null || activeAnomalies.Contains(anomaly))
+            return;
+
+        int anomalyId = GetAnomalyId(anomaly);
+        if (anomalyId < 0)
+            return;
+
+        activeAnomalies.Add(anomaly);
+
+        if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
+        {
+            int[] indices = TryGetFlattenedIndices(anomalyId, tentacleAnomalyIds, tentacleCounts, tentacleFlatIndices);
+            TentacleAnomalyIndices[anomalyId] = indices;
             tentacleAnomaly.ActivateWithIndices(indices);
-        else
-            Debug.LogWarning($"[AnomalyController] No RandomTentacleAnomaly at sibling index {siblingIndex}.");
-    }
+            return;
+        }
 
-    /// <summary>
-    /// Applies tumor indices chosen on the server to the matching anomaly on this client.
-    /// </summary>
-    public void ApplyTumorIndicesOnClient(int siblingIndex, int[] indices)
-    {
-        RandomTumorAnomaly tumorAnomaly = GetComponentsInChildren<RandomTumorAnomaly>(true)
-            .FirstOrDefault(t => t.transform.GetSiblingIndex() == siblingIndex);
-
-        if (tumorAnomaly != null)
+        if (anomaly is RandomTumorAnomaly tumorAnomaly)
+        {
+            int[] indices = TryGetFlattenedIndices(anomalyId, tumorAnomalyIds, tumorCounts, tumorFlatIndices);
+            TumorAnomalyIndices[anomalyId] = indices;
             tumorAnomaly.ActivateWithIndices(indices);
-        else
-            Debug.LogWarning($"[AnomalyController] No RandomTumorAnomaly at sibling index {siblingIndex}.");
+            return;
+        }
+
+        anomaly.ActivateAnomaly();
     }
 
-    /// <summary>
-    /// Calls InitializeDisabled on the anomaly at <paramref name="siblingIndex"/>.
-    /// Invoked on clients after receiving SyncInitializeDisabledClientRpc.
-    /// </summary>
-    public void ApplyInitializeDisabledOnClient(int siblingIndex)
+    private Anomaly FindAnomalyById(int anomalyId)
     {
-        Anomaly anomaly = GetComponentsInChildren<Anomaly>(true)
-            .FirstOrDefault(a => a.transform.GetSiblingIndex() == siblingIndex);
+        Anomaly[] allAnomalies = CollectAllAnomalies();
+        if (anomalyId < 0 || anomalyId >= allAnomalies.Length)
+            return null;
 
-        if (anomaly != null)
-            anomaly.InitializeDisabled();
-        else
-            Debug.LogWarning($"[AnomalyController] No Anomaly at sibling index {siblingIndex} for InitializeDisabled.");
+        return allAnomalies[anomalyId];
     }
 
+    private int GetAnomalyId(Anomaly anomaly)
+    {
+        if (anomaly == null)
+            return -1;
+
+        Anomaly[] allAnomalies = CollectAllAnomalies();
+        for (int i = 0; i < allAnomalies.Length; i++)
+        {
+            if (ReferenceEquals(allAnomalies[i], anomaly))
+                return i;
+        }
+
+        Debug.LogWarning($"[AnomalyController] Anomaly '{anomaly.name}' is not present in serialized anomaly lists.", this);
+        return -1;
+    }
+
+    private static void BuildFlattenedIndexSnapshot(
+        Dictionary<int, int[]> source,
+        out int[] anomalyIds,
+        out int[] counts,
+        out int[] flatIndices)
+    {
+        if (source == null || source.Count == 0)
+        {
+            anomalyIds = System.Array.Empty<int>();
+            counts = System.Array.Empty<int>();
+            flatIndices = System.Array.Empty<int>();
+            return;
+        }
+
+        var ordered = source.OrderBy(kvp => kvp.Key).ToArray();
+        anomalyIds = new int[ordered.Length];
+        counts = new int[ordered.Length];
+
+        int totalCount = 0;
+        for (int i = 0; i < ordered.Length; i++)
+        {
+            anomalyIds[i] = ordered[i].Key;
+            counts[i] = ordered[i].Value?.Length ?? 0;
+            totalCount += counts[i];
+        }
+
+        flatIndices = new int[totalCount];
+        int writeIndex = 0;
+        foreach (var kvp in ordered)
+        {
+            if (kvp.Value == null)
+                continue;
+
+            foreach (int index in kvp.Value)
+                flatIndices[writeIndex++] = index;
+        }
+    }
+
+    private static int[] TryGetFlattenedIndices(int anomalyId, int[] anomalyIds, int[] counts, int[] flatIndices)
+    {
+        if (anomalyIds == null || counts == null || flatIndices == null)
+            return System.Array.Empty<int>();
+
+        int flatOffset = 0;
+        for (int i = 0; i < anomalyIds.Length && i < counts.Length; i++)
+        {
+            int count = Mathf.Max(0, counts[i]);
+            if (anomalyIds[i] == anomalyId)
+            {
+                int safeCount = Mathf.Min(count, Mathf.Max(0, flatIndices.Length - flatOffset));
+                int[] result = new int[safeCount];
+                System.Array.Copy(flatIndices, flatOffset, result, 0, safeCount);
+                return result;
+            }
+
+            flatOffset += count;
+        }
+
+        return System.Array.Empty<int>();
+    }
     /// <summary>
     /// Re-applies InitializeDisabled on every non-active anomaly.
     /// Call on suspect arrival to ensure shader states are clean for locked-category anomalies.
@@ -343,7 +526,7 @@ public class AnomalyController : MonoBehaviour
     /// Returns a new list containing only the anomalies whose C# type name is currently
     /// unlocked according to <see cref="AnomalyUnlockManager"/>. Anomalies that are filtered
     /// out are immediately passed to <see cref="InitializeDisabled"/> so they are visually
-    /// reset and their sibling indices are recorded for client replication.
+    /// reset and their anomaly ids are recorded for client replication.
     /// When <see cref="AnomalyUnlockManager.Instance"/> is null (e.g. during tests), the
     /// full pool is returned unchanged.
     /// </summary>
@@ -392,7 +575,7 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// Picks a random anomaly from the active list, deactivates it, and removes it.
-    /// Returns the sibling index of the removed anomaly for client replication,
+    /// Returns the anomaly id of the removed anomaly for client replication,
     /// or -1 if there are no active anomalies.
     /// </summary>
     public int RemoveRandomActiveAnomaly()
@@ -401,35 +584,27 @@ public class AnomalyController : MonoBehaviour
 
         int index = Random.Range(0, activeAnomalies.Count);
         Anomaly anomaly = activeAnomalies[index];
-        int siblingIndex = anomaly.transform.GetSiblingIndex();
+        int anomalyId = GetAnomalyId(anomaly);
 
         anomaly.DeactivateAnomaly();
         activeAnomalies.RemoveAt(index);
 
-        Debug.Log($"[AnomalyController] Vaccine applied — deactivated '{anomaly.name}' (siblingIndex {siblingIndex}). " +
+        Debug.Log($"[AnomalyController] Vaccine applied — deactivated '{anomaly.name}' (anomalyId {anomalyId}). " +
                   $"{activeAnomalies.Count} anomaly/ies remaining.");
-        return siblingIndex;
+        return anomalyId;
     }
 
     /// <summary>
-    /// Deactivates and removes the anomaly that has the given sibling index in the hierarchy.
+    /// Deactivates and removes the anomaly with the given deterministic anomaly id.
     /// Used on non-server clients to replicate a server-chosen anomaly removal.
     /// </summary>
-    public void RemoveAnomalyBySiblingIndex(int siblingIndex)
+    public void RemoveAnomalyById(int anomalyId)
     {
-        Anomaly target = null;
-        foreach (Anomaly a in CollectAllAnomalies())
-        {
-            if (a.transform.GetSiblingIndex() == siblingIndex)
-            {
-                target = a;
-                break;
-            }
-        }
+        Anomaly target = FindAnomalyById(anomalyId);
 
         if (target == null)
         {
-            Debug.LogWarning($"[AnomalyController] RemoveAnomalyBySiblingIndex: no anomaly at sibling index {siblingIndex}.");
+            Debug.LogWarning($"[AnomalyController] RemoveAnomalyById: no anomaly at anomaly id {anomalyId}.");
             return;
         }
 
@@ -449,14 +624,18 @@ public class AnomalyController : MonoBehaviour
 
         if (anomaly is RandomTentacleAnomaly tentacleAnomaly)
         {
+            int anomalyId = GetAnomalyId(anomaly);
             int[] indices = tentacleAnomaly.PickActiveIndices();
-            TentacleAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+            if (anomalyId >= 0)
+                TentacleAnomalyIndices[anomalyId] = indices;
             tentacleAnomaly.ActivateWithIndices(indices);
         }
         else if (anomaly is RandomTumorAnomaly tumorAnomaly)
         {
+            int anomalyId = GetAnomalyId(anomaly);
             int[] indices = tumorAnomaly.PickActiveIndices();
-            TumorAnomalyIndices[anomaly.transform.GetSiblingIndex()] = indices;
+            if (anomalyId >= 0)
+                TumorAnomalyIndices[anomalyId] = indices;
             tumorAnomaly.ActivateWithIndices(indices);
         }
         else
@@ -466,11 +645,14 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
-    /// Calls InitializeDisabled on an anomaly and records its sibling index for client replication.
+    /// Calls InitializeDisabled on an anomaly and records its anomaly id for client replication.
     /// </summary>
     private void InitializeDisabled(Anomaly anomaly)
     {
         anomaly.InitializeDisabled();
-        DisabledAnomalySiblingIndices.Add(anomaly.transform.GetSiblingIndex());
+
+        int anomalyId = GetAnomalyId(anomaly);
+        if (anomalyId >= 0)
+            DisabledAnomalyIds.Add(anomalyId);
     }
 }
