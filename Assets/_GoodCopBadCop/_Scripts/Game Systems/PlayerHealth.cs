@@ -1,3 +1,5 @@
+using GoodCopBadCop.Effects;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine.Events;
 
@@ -9,13 +11,13 @@ using UnityEngine.Events;
 /// </summary>
 public class PlayerHealth : NetworkBehaviour
 {
-    // ── Configuration ─────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Configuration в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private const float DefaultMaxHealth = 100f;
 
     public float MaxHealth => DefaultMaxHealth;
 
-    // ── Events ─────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Events в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>Fired on every client whenever health changes.</summary>
     public UnityAction OnHealthChanged;
@@ -26,7 +28,7 @@ public class PlayerHealth : NetworkBehaviour
     /// <summary>Fired on every client when health is reset and the player is no longer dead.</summary>
     public UnityAction OnRespawn;
 
-    // ── Networked State ────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Networked State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private readonly NetworkVariable<float> _networkHealth = new NetworkVariable<float>(
         DefaultMaxHealth,
@@ -38,7 +40,12 @@ public class PlayerHealth : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    // ── Local accessors ────────────────────────────────────────────────────────
+    private readonly NetworkVariable<FixedString64Bytes> _lastHealthEffectKey = new NetworkVariable<FixedString64Bytes>(
+        EffectKeys.DefaultPlayerDamage,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    // в”Ђв”Ђ Local accessors в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>Current health, readable on all clients.</summary>
     public float Health => _networkHealth.Value;
@@ -46,10 +53,13 @@ public class PlayerHealth : NetworkBehaviour
     /// <summary>Whether this player is dead, readable on all clients.</summary>
     public bool IsDead => _networkIsDead.Value;
 
+    /// <summary>The gameplay effect key associated with the latest health mutation.</summary>
+    public string LastHealthEffectKey => _lastHealthEffectKey.Value.ToString();
+
     /// <summary>When true, all incoming damage is ignored. Server-side only.</summary>
     public bool IsInvincible { get; set; }
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Lifecycle в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     public override void OnNetworkSpawn()
     {
@@ -70,27 +80,37 @@ public class PlayerHealth : NetworkBehaviour
         _networkIsDead.OnValueChanged -= HandleDeadChanged;
     }
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Public API в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Reduces health by the given amount.
-    /// Can be called from any client — routes through a ServerRpc when not on the server.
+    /// Can be called from any client вЂ” routes through a ServerRpc when not on the server.
     /// </summary>
     public void TakeDamage(float damage)
     {
+        TakeDamage(damage, EffectKeys.DefaultPlayerDamage);
+    }
+
+    public void TakeDamage(float damage, string effectKey)
+    {
         if (IsServer)
-            ApplyDamageServer(damage);
+            ApplyDamageServer(damage, effectKey);
         else
-            TakeDamageServerRpc(damage);
+            TakeDamageServerRpc(damage, effectKey);
     }
 
     /// <summary>Restores health by the given amount. Has no effect while the player is dead.</summary>
     public void Heal(float healAmount)
     {
+        Heal(healAmount, EffectKeys.PlayerHeal);
+    }
+
+    public void Heal(float healAmount, string effectKey)
+    {
         if (IsServer)
-            ApplyHealServer(healAmount);
+            ApplyHealServer(healAmount, effectKey);
         else
-            HealServerRpc(healAmount);
+            HealServerRpc(healAmount, effectKey);
     }
 
     /// <summary>Resets health to max and clears the dead state.</summary>
@@ -102,18 +122,18 @@ public class PlayerHealth : NetworkBehaviour
             ResetHealthServerRpc();
     }
 
-    // ── ServerRpcs ─────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ ServerRpcs в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [ServerRpc(RequireOwnership = false)]
-    private void TakeDamageServerRpc(float damage)
+    private void TakeDamageServerRpc(float damage, FixedString64Bytes effectKey)
     {
-        ApplyDamageServer(damage);
+        ApplyDamageServer(damage, effectKey.ToString());
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void HealServerRpc(float healAmount)
+    private void HealServerRpc(float healAmount, FixedString64Bytes effectKey)
     {
-        ApplyHealServer(healAmount);
+        ApplyHealServer(healAmount, effectKey.ToString());
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -122,9 +142,9 @@ public class PlayerHealth : NetworkBehaviour
         ApplyResetServer();
     }
 
-    // ── Server-only logic ──────────────────────────────────────────────────────
+    // в”Ђв”Ђ Server-only logic в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
-    private void ApplyDamageServer(float damage)
+    private void ApplyDamageServer(float damage, string effectKey)
     {
         if (_networkIsDead.Value)
             return;
@@ -132,27 +152,36 @@ public class PlayerHealth : NetworkBehaviour
         if (IsInvincible)
             return;
 
+        _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage);
         _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value - damage, 0f, DefaultMaxHealth);
 
         if (_networkHealth.Value <= 0f)
             _networkIsDead.Value = true;
     }
 
-    private void ApplyHealServer(float healAmount)
+    private void ApplyHealServer(float healAmount, string effectKey)
     {
         if (_networkIsDead.Value)
             return;
 
+        _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.PlayerHeal);
         _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value + healAmount, 0f, DefaultMaxHealth);
     }
 
     private void ApplyResetServer()
     {
         _networkIsDead.Value = false;
+        _lastHealthEffectKey.Value = EffectKeys.PlayerHeal;
         _networkHealth.Value = DefaultMaxHealth;
     }
 
-    // ── NetworkVariable callbacks ──────────────────────────────────────────────
+    private static FixedString64Bytes ToNetworkEffectKey(string effectKey, string fallback)
+    {
+        string safeKey = string.IsNullOrWhiteSpace(effectKey) ? fallback : effectKey;
+        return safeKey.Length > 63 ? safeKey.Substring(0, 63) : safeKey;
+    }
+
+    // в”Ђв”Ђ NetworkVariable callbacks в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private void HandleHealthChanged(float previousValue, float newValue)
     {

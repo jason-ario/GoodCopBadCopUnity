@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -72,7 +73,7 @@ public class SuspectCharacter : Interactable
     /// <summary>Per-character close face camera. Use camera trigger key 'SuspectFaceCam' in ScriptedDialogueNode.</summary>
     public GameObject SuspectFaceCam => _suspectFaceCam;
 
-    // ── Navigation ────────────────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Navigation в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [Header("Navigation")]
     [Tooltip("Movement speed passed to the NavMeshAgent. Match to the walk animation speed.")]
@@ -159,18 +160,18 @@ public class SuspectCharacter : Interactable
 
             if (_navAgent.pathStatus == NavMeshPathStatus.PathComplete)
             {
-                // Full path — wait until the agent actually arrives.
+                // Full path вЂ” wait until the agent actually arrives.
                 while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
                     yield return null;
                 break;
             }
 
-            // Partial or invalid path — a closed gate or door is likely blocking.
+            // Partial or invalid path вЂ” a closed gate or door is likely blocking.
             // Let the agent walk as far as it can so the obstacle's proximity auto-open fires,
             // then wait for the NavMesh to update and retry.
             if (retries >= maxRetries)
             {
-                Debug.LogWarning($"[SuspectCharacter] NavigateTo '{name}': could not reach destination after {maxRetries} retries — proceeding anyway.");
+                Debug.LogWarning($"[SuspectCharacter] NavigateTo '{name}': could not reach destination after {maxRetries} retries вЂ” proceeding anyway.");
                 break;
             }
 
@@ -179,7 +180,7 @@ public class SuspectCharacter : Interactable
                    && !float.IsInfinity(_navAgent.remainingDistance))
                 yield return null;
 
-            // Already close enough — treat as arrived.
+            // Already close enough вЂ” treat as arrived.
             if (Vector3.Distance(transform.position, destination) <= _navAgent.stoppingDistance + 0.05f)
                 break;
 
@@ -204,7 +205,7 @@ public class SuspectCharacter : Interactable
     private void OnEnable()  => ActiveInstances.Add(this);
     private void OnDisable() => ActiveInstances.Remove(this);
 
-    // ── Networked Animation Helpers ───────────────────────────────────────────
+    // в”Ђв”Ђ Networked Animation Helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Sets an animator bool parameter on the server and replicates it to all clients.
@@ -263,12 +264,12 @@ public class SuspectCharacter : Interactable
     /// <summary>Fired on the server whenever this suspect takes damage (before death check).</summary>
     public event Action OnHit;
 
-    // ── Junk pickup (dead-body interaction) ───────────────────────────────────
+    // в”Ђв”Ђ Junk pickup (dead-body interaction) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Optional JunkItem component on this GameObject. When present and the suspect
     /// is killed, this is activated so the body can be collected as trash. Keep it
-    /// disabled by default in the Inspector — EnableJunkPickup() activates it on all clients.
+    /// disabled by default in the Inspector вЂ” EnableJunkPickup() activates it on all clients.
     /// </summary>
     private JunkItem _junkItem;
 
@@ -334,7 +335,7 @@ public class SuspectCharacter : Interactable
 
         if (record == null)
         {
-            Debug.LogWarning($"[SuspectCharacter] No record found for '{suspectData.name}' — falling back to clean initialization.");
+            Debug.LogWarning($"[SuspectCharacter] No record found for '{suspectData.name}' вЂ” falling back to clean initialization.");
             InitializeClean();
             return;
         }
@@ -425,7 +426,7 @@ public class SuspectCharacter : Interactable
     /// <param name="data">The DoppelgangerData driving anomaly count and visual overrides.</param>
     public void InitializeAsDoppelganger(DoppelgangerData data)
     {
-        // Anomaly initialization — full doppelganger loadout will be wired here
+        // Anomaly initialization вЂ” full doppelganger loadout will be wired here
         // once AnomalyController.InitializeAsDoppelganger is implemented.
         anomalyController.Initialize();
 
@@ -701,7 +702,7 @@ public class SuspectCharacter : Interactable
         anomalyController.RemoveAnomalyById(anomalyId);
     }
 
-    // ── Combat ────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Combat в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Applies damage to this suspect. Server-only. Triggers a hit reaction and,
@@ -814,7 +815,7 @@ public class SuspectCharacter : Interactable
 
         while (true)
         {
-            PlayerInstance.Instance.PlayerHealth.TakeDamage(1f);
+            PlayerInstance.Instance.PlayerHealth.TakeDamage(1f, EffectKeys.ScriptedRifleDamage);
             yield return new WaitForSeconds(.5f);
         }
     }

@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using UnityEngine;
 
 public class Cigarette : PickableObject
@@ -24,7 +25,7 @@ public class Cigarette : PickableObject
       base.OnEquipped(player);
       particles.SetActive(true);
    }
-   
+
    public override void OnUnequip(PlayerPickupController player)
    {
       base.OnUnequip(player);
@@ -35,23 +36,23 @@ public class Cigarette : PickableObject
    void Update()
    {
       if (!isUsing) return;
-      
-      PlayerInstance.Instance.Heal(healAmount);
+
+      PlayerInstance.Instance.Heal(healAmount, EffectKeys.CigaretteHeal);
       PlayerInstance.Instance.PlayerRadiation.AddRadiation(radiationAmount);
       float blendShapeWeight = _skinnedMeshRenderer.GetBlendShapeWeight(0) + reductionAmountPerFrame * Time.deltaTime;
-         
+
       if (blendShapeWeight >= 100)
       {
          StopSmokingSound();
          playerPickupController.DestroyEquippedItem();
          return;
       }
-      
+
       _skinnedMeshRenderer.SetBlendShapeWeight(0, blendShapeWeight);
-         
+
       particles.transform.position = Vector3.Lerp(particlePos1.position, particlePos2.position, (100 / blendShapeWeight));
    }
-   
+
    public override void OnStopUse()
    {
       base.OnStopUse();

@@ -7,6 +7,7 @@ namespace GoodCopBadCop.CameraSystem
     public interface ICameraService
     {
         void ShakeLocalPlayer();
+        void PlayLocalImpulse(CameraImpulseSettings settings);
         void HideFromCapture(object source, global::SuspectCharacter suspect);
         void ShowInCapture(object source, global::SuspectCharacter suspect);
         bool IsVisibleInCapture(global::SuspectCharacter suspect);
@@ -25,6 +26,14 @@ namespace GoodCopBadCop.CameraSystem
 
         public void ShakeLocalPlayer()
         {
+            PlayLocalImpulse(CameraImpulseSettings.DefaultHit());
+        }
+
+        public void PlayLocalImpulse(CameraImpulseSettings settings)
+        {
+            if (settings == null || !settings.Enabled)
+                return;
+
             global::PlayerInstance player = playerRuntimeModel.LocalPlayer.CurrentValue;
             if (player == null)
             {
@@ -38,7 +47,7 @@ namespace GoodCopBadCop.CameraSystem
                 return;
             }
 
-            cameraController.TriggerHitImpulse();
+            cameraController.PlayImpulse(settings);
         }
 
         public void HideFromCapture(object source, global::SuspectCharacter suspect)

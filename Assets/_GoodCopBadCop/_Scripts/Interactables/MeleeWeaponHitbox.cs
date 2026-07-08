@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using System;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -14,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public class MeleeWeaponHitbox : NetworkBehaviour
 {
-    // ── Configuration ─────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Configuration в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [Tooltip("Radius of the OverlapSphere centered on this transform.")]
     [SerializeField] private float hitRadius = 0.8f;
@@ -28,7 +29,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
     private const string PlayerTag = "Player";
 
-    // ── Events ─────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Events в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Fired on the owning client when the overlap successfully finds an enemy.
@@ -40,7 +41,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     /// </summary>
     public event Action OnEnvironmentHit;
 
-    // ── Internal ───────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Internal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private static readonly Collider[] OverlapBuffer = new Collider[16];
 
@@ -61,7 +62,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             _ownColliders.Add(col);
     }
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Public API в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Called on the local client (or server). Forwards the overlap check to the server
@@ -81,7 +82,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         }
     }
 
-    // ── Server ─────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Server в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [ServerRpc(RequireOwnership = false)]
     private void PerformHitScanServerRpc(Vector3 attackOrigin, float damage, ServerRpcParams rpcParams = default)
@@ -102,7 +103,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             Physics.AllLayers,
             QueryTriggerInteraction.Collide);
 
-        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} — {hitCount} colliders. Sender={senderClientId}", this);
+        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} вЂ” {hitCount} colliders. Sender={senderClientId}", this);
 
         ClientRpcParams ownerParams = new ClientRpcParams
         {
@@ -140,7 +141,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                     continue;
 
                 anyNonSelfHit = true;
-                playerHealth.TakeDamage(damage);
+                playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage);
                 Debug.Log($"[MeleeWeaponHitbox] Friendly fire: hit player '{root.name}' for {damage} damage.", this);
                 NotifyHitClientRpc(col.ClosestPoint(attackOrigin), ownerParams);
                 return;
@@ -154,7 +155,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
-            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter — no tag dependency.
+            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter вЂ” no tag dependency.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
 
@@ -184,7 +185,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             NotifyEnvironmentHitClientRpc(firstNonSelfHitPosition, ownerParams);
     }
 
-    // ── Client ─────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Client в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [ClientRpc]
     private void NotifyHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
@@ -200,7 +201,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         OnEnvironmentHit?.Invoke();
     }
 
-    // ── Effects ────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Effects в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Instantiates <paramref name="prefab"/> at <paramref name="position"/> and destroys it

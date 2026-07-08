@@ -1,6 +1,8 @@
+using System;
 using GoodCopBadCop.CameraSystem;
 using GoodCopBadCop.UI.SettingsMenu;
 using GoodCopBadCop.EnvironmentSystem;
+using GoodCopBadCop.Effects;
 using GoodCopBadCop.Audio;
 using GoodCopBadCop.Player;
 using GoodCopBadCop.RoomSystem;
@@ -16,9 +18,15 @@ namespace GoodCopBadCop.Infrastructure
     public sealed class MainSceneLifetimeScope : LifetimeScope
     {
         [SerializeField] private EnvironmentSchedule environmentSchedule;
+        [SerializeField] private EffectCatalog effectCatalog;
 
         protected override void Configure(IContainerBuilder builder)
         {
+            if (effectCatalog == null)
+            {
+                throw new InvalidOperationException("Effect catalog is not assigned in MainSceneLifetimeScope.");
+            }
+
             builder.Register<SettingsModel>(Lifetime.Scoped).AsSelf().As<ISettingsModel>();
             builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
             builder.Register<ISettingsScreenAdapter, UnitySettingsScreenAdapter>(Lifetime.Scoped);
@@ -27,6 +35,10 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<ICameraService, CameraService>(Lifetime.Scoped);
             builder.Register<IAudioService, AudioService>(Lifetime.Scoped);
             builder.Register<IRoomService, RoomService>(Lifetime.Scoped);
+            builder.RegisterInstance(effectCatalog).As<IEffectCatalog>();
+            builder.Register<IFullscreenEffectService, FullscreenEffectService>(Lifetime.Scoped);
+            builder.Register<IEffectService, EffectService>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<PlayerHealthEffectsAdapter>(Lifetime.Scoped);
             builder.RegisterComponentInHierarchy<global::SuspectController>();
             builder.RegisterComponentInHierarchy<global::Thermometer>();
 

@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
@@ -14,7 +15,7 @@ public class PlayerRadiation : NetworkBehaviour
     [SerializeField] private float pillReductionDuration = 6f;
 
     [Header("Radiation Damage")]
-    [Tooltip("Radiation level (0–1) above which the player starts taking damage.")]
+    [Tooltip("Radiation level (0вЂ“1) above which the player starts taking damage.")]
     [SerializeField] private float radiationDamageThreshold = 0.75f;
     [Tooltip("Maximum health damage per second dealt at 100% radiation.")]
     [SerializeField] private float maxRadiationDamagePerSecond = 5f;
@@ -44,7 +45,7 @@ public class PlayerRadiation : NetworkBehaviour
     /// <summary>
     /// Scales all incoming radiation accumulation (passive and hotspot).
     /// Set to a value less than 1 to slow radiation build-up (e.g. 0.2 while wearing the mask).
-    /// Server-side only — only meaningful on the host since radiation runs there.
+    /// Server-side only вЂ” only meaningful on the host since radiation runs there.
     /// </summary>
     public float RadiationMultiplier { get; set; } = 1f;
 
@@ -91,7 +92,7 @@ public class PlayerRadiation : NetworkBehaviour
         // Remap normalized radiation from [threshold, 1] to [0, 1].
         float damageScale = (Normalized - radiationDamageThreshold) / (1f - radiationDamageThreshold);
         float damage = maxRadiationDamagePerSecond * damageScale * Time.deltaTime;
-        playerHealth.TakeDamage(damage);
+        playerHealth.TakeDamage(damage, EffectKeys.RadiationTickDamage);
     }
 
     public void AddRadiation(float amount)

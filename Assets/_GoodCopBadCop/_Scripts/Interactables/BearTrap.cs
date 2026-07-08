@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -7,8 +8,8 @@ using UnityEngine;
 /// A placeable bear trap that inherits from <see cref="PickableObject"/>.
 ///
 /// Interaction model (when placed in the world, not held):
-///   LMB  → picks the trap up (auto-disarms if armed).
-///   E    → arms the trap; triggers the "BearTrapSet" animator bool and
+///   LMB  в†’ picks the trap up (auto-disarms if armed).
+///   E    в†’ arms the trap; triggers the "BearTrapSet" animator bool and
 ///           activates the two trigger colliders so victims can be caught.
 ///
 /// Two separate trigger zones handle player vs. enemy detection independently:
@@ -34,12 +35,12 @@ using UnityEngine;
 /// </summary>
 public class BearTrap : PickableObject
 {
-    // ── Constants ──────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Constants в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private const string UnarmedInteractText = "Arm Trap";
     private const string ArmedInteractText = "Pick Up";
 
-    // ── Inspector ──────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Inspector в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     [Header("Bear Trap")]
     [Tooltip("Animator on the trap mesh. Must expose the bool defined in Bear Trap Set Bool.")]
@@ -72,14 +73,14 @@ public class BearTrap : PickableObject
     [Tooltip("Sound played on all clients when the trap snaps shut.")]
     [SerializeField] private AudioClip _snapSound;
 
-    // ── Networked State ────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Networked State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private readonly NetworkVariable<bool> _isArmed = new(
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    // ── Local State ────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Local State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>True between the moment a victim enters and the moment they are released.</summary>
     private bool _isTriggered;
@@ -114,7 +115,7 @@ public class BearTrap : PickableObject
         }
     }
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Lifecycle в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     public override void OnNetworkSpawn()
     {
@@ -129,7 +130,7 @@ public class BearTrap : PickableObject
         _isArmed.OnValueChanged -= OnArmedStateChanged;
     }
 
-    // ── Interaction Overrides ──────────────────────────────────────────────────
+    // в”Ђв”Ђ Interaction Overrides в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// E key: arms the trap when it is placed and not yet armed.
@@ -155,7 +156,7 @@ public class BearTrap : PickableObject
             DisarmServerRpc();
     }
 
-    // ── Trigger Zone Callbacks (called by BearTrapTrigger children) ────────────
+    // в”Ђв”Ђ Trigger Zone Callbacks (called by BearTrapTrigger children) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Invoked by a <see cref="BearTrapTrigger"/> child when a relevant collider
@@ -192,7 +193,7 @@ public class BearTrap : PickableObject
         _ignoredOnArm.Remove(other);
     }
 
-    // ── Server Helpers ─────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Server Helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Received from any client that detected a victim entering a trigger zone.
@@ -201,7 +202,7 @@ public class BearTrap : PickableObject
     [ServerRpc(RequireOwnership = false)]
     private void ReportVictimServerRpc(NetworkObjectReference victimRef, bool isPlayer)
     {
-        // Double-entry guard — multiple clients (or a late physics tick) may report
+        // Double-entry guard вЂ” multiple clients (or a late physics tick) may report
         // the same victim before _isArmed propagates back to false.
         if (!_isArmed.Value || _isTriggered) return;
         if (!victimRef.TryGet(out NetworkObject victimObj)) return;
@@ -213,7 +214,7 @@ public class BearTrap : PickableObject
 
             SnapShut();
 
-            victimObj.GetComponent<PlayerHealth>()?.TakeDamage(_trapDamage);
+            victimObj.GetComponent<PlayerHealth>()?.TakeDamage(_trapDamage, EffectKeys.BearTrapDamage);
             TrapPlayerClientRpc(victimObj);
             StartCoroutine(ReleasePlayerCoroutine(victimObj, _trapDuration));
         }
@@ -271,7 +272,7 @@ public class BearTrap : PickableObject
         SetPickupAllowedClientRpc(true);
     }
 
-    // ── Client RPCs ────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Client RPCs в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Received on all clients. Only the matching local player freezes their
@@ -331,7 +332,7 @@ public class BearTrap : PickableObject
         CanPickUpManually = allowed;
     }
 
-    // ── Visuals / State ────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Visuals / State в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private void OnArmedStateChanged(bool previous, bool current)
     {
@@ -344,8 +345,8 @@ public class BearTrap : PickableObject
     }
 
     /// <summary>
-    /// Uses <see cref="Physics.OverlapBox"/> on each trigger zone — while the
-    /// colliders are still disabled — to snapshot who is already inside the volume.
+    /// Uses <see cref="Physics.OverlapBox"/> on each trigger zone вЂ” while the
+    /// colliders are still disabled вЂ” to snapshot who is already inside the volume.
     /// Those colliders are added to <see cref="_ignoredOnArm"/> so they cannot
     /// instantly trigger the trap just by being present when it arms.
     /// </summary>

@@ -1,16 +1,17 @@
+using GoodCopBadCop.Effects;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 public class Khinkali : PickableObject
 {
-    // ── Eat ───────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Eat в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private const float HealAmount = 100f;
 
     [SerializeField] private float eatDuration = 1f;
 
-    // ── Spoilage ──────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Spoilage в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// How close (in world units) the Khinkali must be to a MiniFridge centre for it
@@ -31,7 +32,7 @@ public class Khinkali : PickableObject
 
     public bool IsSpoiled => _isSpoiled.Value;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Lifecycle в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     protected override void Awake()
     {
@@ -64,7 +65,7 @@ public class Khinkali : PickableObject
             ShiftManager.Instance.OnShiftEnd -= OnShiftEnded;
     }
 
-    // ── Eat ───────────────────────────────────────────────────────────────────
+    // в”Ђв”Ђ Eat в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Begins the eat sequence if not already in use. Sets the "UsingTool" anim bool,
@@ -86,12 +87,12 @@ public class Khinkali : PickableObject
         yield return new WaitForSeconds(eatDuration);
 
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
-        PlayerInstance.Instance.Heal(HealAmount);
+        PlayerInstance.Instance.Heal(HealAmount, EffectKeys.FoodHeal);
 
         playerPickupController.DestroyEquippedItem();
     }
 
-    // ── Spoilage — server only ────────────────────────────────────────────────
+    // в”Ђв”Ђ Spoilage вЂ” server only в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     /// <summary>
     /// Called on the server when the shift ends. Spoils the Khinkali if it is not
@@ -128,7 +129,7 @@ public class Khinkali : PickableObject
         _isSpoiled.Value = true;
     }
 
-    // ── Visuals — all clients ─────────────────────────────────────────────────
+    // в”Ђв”Ђ Visuals вЂ” all clients в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     private void OnSpoiledChanged(bool previous, bool current)
     {

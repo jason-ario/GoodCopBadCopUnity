@@ -1,36 +1,20 @@
+using System;
+using System.Collections.Generic;
+using GoodCopBadCop.Effects;
+using GoodCopBadCop.Infrastructure;
 using UnityEditor;
 using UnityEngine;
+using VContainer;
 
 namespace GoodCopBadCop.Editor
 {
     public sealed class PlayerDamagePreviewWindow : EditorWindow
     {
-        private readonly struct DamagePreviewOption
-        {
-            public readonly string Label;
-            public readonly float DamageAmount;
-
-            public DamagePreviewOption(string label, float damageAmount)
-            {
-                Label = label;
-                DamageAmount = damageAmount;
-            }
-        }
-
-        private static readonly DamagePreviewOption[] DamageOptions =
-        {
-            new DamagePreviewOption("Mutant Melee", 10f),
-            new DamagePreviewOption("Bear Trap", 50f),
-            new DamagePreviewOption("Friendly Fire / Melee", 25f),
-            new DamagePreviewOption("Radiation Tick", 5f),
-            new DamagePreviewOption("Scripted Rifle", 1f),
-            new DamagePreviewOption("Debug Hit", 10f),
-        };
-
+        private readonly List<EffectPreset> previewPresets = new List<EffectPreset>();
         private PlayerInstance player;
         private PlayerHealth playerHealth;
-        private HurtVFXController hurtVFX;
-        private ScreenDamage screenDamage;
+        private IEffectService effectService;
+        private IEffectCatalog effectCatalog;
         private string status = "Not connected.";
         private Vector2 scrollPosition;
 
@@ -38,7 +22,7 @@ namespace GoodCopBadCop.Editor
         private static void Open()
         {
             PlayerDamagePreviewWindow window = GetWindow<PlayerDamagePreviewWindow>();
-            window.titleContent = new GUIContent("Player Damage Preview");
+            window.titleContent = new GUIContent("Player Effects Preview");
             window.minSize = new Vector2(360f, 320f);
             window.Show();
         }
@@ -59,7 +43,7 @@ namespace GoodCopBadCop.Editor
             if (!EditorApplication.isPlaying)
                 return;
 
-            if (!CanPreviewDamage() && !CanKillPlayer())
+            if (!CanPreviewEffect() && !CanKillPlayer())
                 RefreshRuntimeReferences();
 
             Repaint();
@@ -72,11 +56,11 @@ namespace GoodCopBadCop.Editor
 
             EditorGUILayout.Space(8f);
 
-            using (new EditorGUI.DisabledScope(!CanPreviewDamage()))
+            using (new EditorGUI.DisabledScope(!CanPreviewEffect()))
             {
                 scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-                foreach (DamagePreviewOption option in DamageOptions)
-                    DrawDamageOption(option);
+                foreach (EffectPreset preset in previewPresets)
+                    DrawEffectOption(preset);
                 EditorGUILayout.EndScrollView();
             }
 
@@ -86,7 +70,7 @@ namespace GoodCopBadCop.Editor
 
         private void DrawHeader()
         {
-            EditorGUILayout.LabelField("Player Damage Preview", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Player Effects Preview", EditorStyles.boldLabel);
 
             EditorGUILayout.Space(6f);
             if (GUILayout.Button("Refresh", GUILayout.Height(24f)))
@@ -101,10 +85,13 @@ namespace GoodCopBadCop.Editor
             EditorGUILayout.HelpBox(status, MessageType.Warning);
         }
 
-        private void DrawDamageOption(DamagePreviewOption option)
+        private void DrawEffectOption(EffectPreset preset)
         {
-            if (GUILayout.Button($"Preview {option.Label}", GUILayout.Height(30f)))
-                PreviewDamage(option);
+            if (preset == null || preset.Key == EffectKeys.PlayerDeath)
+                return;
+
+            if (GUILayout.Button($"Preview {preset.DisplayName}", GUILayout.Height(30f)))
+                PreviewEffect(preset);
         }
 
         private void DrawDeathControls()
@@ -118,17 +105,17 @@ namespace GoodCopBadCop.Editor
             }
         }
 
-        private void PreviewDamage(DamagePreviewOption option)
+        private void PreviewEffect(EffectPreset preset)
         {
             RefreshRuntimeReferences();
 
-            if (!CanPreviewDamage())
+            if (!CanPreviewEffect())
             {
-                Debug.LogWarning($"[PlayerDamagePreviewWindow] Cannot preview '{option.Label}': {status}");
+                Debug.LogWarning($"[PlayerDamagePreviewWindow] Cannot preview '{preset.DisplayName}': {status}");
                 return;
             }
 
-            hurtVFX.PreviewDamageFeedback(option.DamageAmount, option.Label);
+            effectService.Play(preset, new EffectContext(player.gameObject, player.transform.position));
             Repaint();
         }
 
@@ -142,7 +129,7 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
-            playerHealth.TakeDamage(999f);
+            playerHealth.TakeDamage(999f, EffectKeys.PlayerDeath);
             Debug.Log("[PlayerDamagePreviewWindow] Applied lethal damage to the local player.");
             Repaint();
         }
@@ -152,7 +139,7 @@ namespace GoodCopBadCop.Editor
             if (stateChange == PlayModeStateChange.EnteredPlayMode)
                 EditorApplication.delayCall += RefreshRuntimeReferences;
             else if (stateChange == PlayModeStateChange.ExitingPlayMode || stateChange == PlayModeStateChange.EnteredEditMode)
-                ClearRuntimeReferences("Enter Play Mode to preview player damage feedback.");
+                ClearRuntimeReferences("Enter Play Mode to preview player effects.");
 
             Repaint();
         }
@@ -161,12 +148,13 @@ namespace GoodCopBadCop.Editor
         {
             player = null;
             playerHealth = null;
-            hurtVFX = null;
-            screenDamage = null;
+            effectService = null;
+            effectCatalog = null;
+            previewPresets.Clear();
 
             if (!EditorApplication.isPlaying)
             {
-                status = "Enter Play Mode to preview player damage feedback.";
+                status = "Enter Play Mode to preview player effects.";
                 return;
             }
 
@@ -184,39 +172,65 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
-            hurtVFX = player.GetComponent<HurtVFXController>();
-            if (hurtVFX == null)
-            {
-                status = "Local player does not have a HurtVFXController component.";
+            if (!TryResolveEffects())
                 return;
+
+            foreach (EffectPreset preset in effectCatalog.Presets)
+            {
+                if (preset != null && preset.Key != EffectKeys.PlayerDeath)
+                    previewPresets.Add(preset);
             }
 
-            screenDamage = UIController.Instance != null ? UIController.Instance.ScreenDamage : null;
-            if (screenDamage == null)
+            status = previewPresets.Count > 0
+                ? "Ready."
+                : "Effect catalog has no preview presets.";
+        }
+
+        private bool TryResolveEffects()
+        {
+            MainSceneLifetimeScope scope = UnityEngine.Object.FindFirstObjectByType<MainSceneLifetimeScope>();
+            if (scope == null || scope.Container == null)
             {
-                status = "UIController.ScreenDamage was not found. Hurt audio and camera impulse may still work, but screen overlay cannot be previewed.";
-                return;
+                status = "MainSceneLifetimeScope container was not found.";
+                return false;
             }
 
-            status = "Ready.";
+            try
+            {
+                effectService = scope.Container.Resolve<IEffectService>();
+                effectCatalog = scope.Container.Resolve<IEffectCatalog>();
+            }
+            catch (Exception exception)
+            {
+                status = $"Effects services were not resolved: {exception.Message}";
+                return false;
+            }
+
+            if (effectService == null || effectCatalog == null)
+            {
+                status = "Effects services are not registered.";
+                return false;
+            }
+
+            return true;
         }
 
         private void ClearRuntimeReferences(string newStatus)
         {
             player = null;
             playerHealth = null;
-            hurtVFX = null;
-            screenDamage = null;
+            effectService = null;
+            effectCatalog = null;
+            previewPresets.Clear();
             status = newStatus;
         }
 
-        private bool CanPreviewDamage()
+        private bool CanPreviewEffect()
         {
             return EditorApplication.isPlaying
                    && player != null
                    && playerHealth != null
-                   && hurtVFX != null
-                   && screenDamage != null
+                   && effectService != null
                    && !playerHealth.IsDead;
         }
 

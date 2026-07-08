@@ -3,10 +3,8 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Keeps <see cref="UIController.ScreenDamage"/> in sync with <see cref="PlayerHealth"/>
-/// and plays a random hurt sound whenever the local owner takes damage.
-/// Also triggers a Cinemachine impulse shake via <see cref="PlayerCameraController"/>.
-/// Only reacts on the owning client; non-owners are ignored entirely.
+/// Temporary legacy audio bridge for local player hurt clips.
+/// Fullscreen and camera damage feedback now flow through GoodCopBadCop.Effects.
 /// </summary>
 public class HurtVFXController : NetworkBehaviour
 {
@@ -38,12 +36,8 @@ public class HurtVFXController : NetworkBehaviour
             return;
         }
 
-        _cameraController = GetComponentInChildren<PlayerCameraController>();
-        if (_cameraController == null)
-            Debug.LogWarning("[HurtVFXController] PlayerCameraController not found - hit impulse will be skipped.", this);
-
-        // Defer subscription until after all Start() calls have run so ScreenDamage
-        // is fully initialised (its animator field is assigned in Start()).
+        // Defer subscription until after all Start() calls have run so PlayerHealth
+        // has completed its initial network spawn notifications.
         StartCoroutine(InitAfterStart());
     }
 
@@ -52,16 +46,8 @@ public class HurtVFXController : NetworkBehaviour
         // Wait one frame so every MonoBehaviour's Start() has executed.
         yield return null;
 
-        if (UIController.Instance == null || UIController.Instance.ScreenDamage == null)
-        {
-            Debug.LogError("[HurtVFXController] UIController.Instance or its ScreenDamage is not available.", this);
-            yield break;
-        }
-
-        _screenDamage = UIController.Instance.ScreenDamage;
+        _screenDamage = UIController.Instance != null ? UIController.Instance.ScreenDamage : null;
         _previousHealth = _playerHealth.Health;
-        _screenDamage.CurrentHealth = _previousHealth;
-
         _playerHealth.OnHealthChanged += HandleHealthChanged;
     }
 
@@ -115,18 +101,13 @@ public class HurtVFXController : NetworkBehaviour
             Debug.Log($"[HurtVFXController] Previewed damage feedback: {sourceLabel} ({damageAmount}).", this);
     }
 
-    /// <summary>Syncs screen damage and plays audio when the owner's health decreases.</summary>
+    /// <summary>Plays legacy hurt audio when the owner's health decreases.</summary>
     private void HandleHealthChanged()
     {
         float currentHealth = _playerHealth.Health;
 
-        _screenDamage.CurrentHealth = currentHealth;
-
-        if (currentHealth < _previousHealth)
-        {
+        if (currentHealth < _previousHealth && currentHealth > 0f)
             PlayHurtAudio();
-            _cameraController?.TriggerHitImpulse();
-        }
 
         _previousHealth = currentHealth;
     }

@@ -1,3 +1,4 @@
+using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -345,6 +346,11 @@ public class PlayerInstance : NetworkBehaviour
 
     public void Heal(float healAmount)
     {
-        PlayerHealth.Heal(healAmount);
+        Heal(healAmount, EffectKeys.PlayerHeal);
+    }
+
+    public void Heal(float healAmount, string effectKey)
+    {
+        PlayerHealth.Heal(healAmount, effectKey);
     }
 }

@@ -1,3 +1,4 @@
+using GoodCopBadCop.CameraSystem;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -28,9 +29,9 @@ public class PlayerCameraController : MonoBehaviour
         cinemachineBasicMultiChannelPerlin.NoiseProfile = rumbleNoiseSettings;
         cinemachineBasicMultiChannelPerlin.AmplitudeGain = amplitudeGainRumble;
         cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainRumble;
-        
+
     }
-    
+
     public void TurnOffRumble()
     {
         CinemachineBasicMultiChannelPerlin cinemachineBasicMultiChannelPerlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
@@ -42,12 +43,33 @@ public class PlayerCameraController : MonoBehaviour
     /// <summary>Fires a one-shot Cinemachine impulse to simulate a camera hit shake.</summary>
     public void TriggerHitImpulse()
     {
+        PlayImpulse(CameraImpulseSettings.DefaultHit());
+    }
+
+    public void PlayImpulse(CameraImpulseSettings settings)
+    {
         if (_hitImpulseSource == null)
         {
             Debug.LogWarning("[PlayerCameraController] Hit impulse source is not assigned.", this);
             return;
         }
 
-        _hitImpulseSource.GenerateImpulse();
+        if (settings == null || !settings.Enabled)
+        {
+            return;
+        }
+
+        switch (settings.Mode)
+        {
+            case ECameraImpulseMode.Force:
+                _hitImpulseSource.GenerateImpulseWithForce(settings.Force);
+                break;
+            case ECameraImpulseMode.Velocity:
+                _hitImpulseSource.GenerateImpulseWithVelocity(settings.Velocity);
+                break;
+            default:
+                _hitImpulseSource.GenerateImpulse();
+                break;
+        }
     }
 }
