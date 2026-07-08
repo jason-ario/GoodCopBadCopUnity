@@ -78,7 +78,7 @@ public class PauseMenuController : MonoBehaviour
         areYouSureQuitMenu.SetActive(false);
         areYouSureMainMenu.SetActive(false);
         isSettingsOpen = true;
-        settingsMenuView?.SetVisible(true);
+        settingsMenuView.SetVisible(true);
     }
     
     public void ShowAreYouSureQuitMenu()
@@ -90,7 +90,7 @@ public class PauseMenuController : MonoBehaviour
     public void BackToMainMenu()
     {
         isSettingsOpen = false;
-        settingsMenuView?.SetVisible(false);
+        settingsMenuView.SetVisible(false);
         mainMenu.SetActive(true);
         areYouSureQuitMenu.SetActive(false);
         areYouSureMainMenu.SetActive(false);
