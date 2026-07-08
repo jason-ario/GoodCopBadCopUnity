@@ -43,16 +43,19 @@ namespace GoodCopBadCop.Effects
     {
         [SerializeField] private bool enabled = true;
         [SerializeField] private CameraImpulseSettings localImpulse = CameraImpulseSettings.DefaultHit();
+        [SerializeField] private CameraSwaySettings localSway = CameraSwaySettings.Disabled();
 
         public bool Enabled => enabled;
         public CameraImpulseSettings LocalImpulse => localImpulse;
+        public CameraSwaySettings LocalSway => localSway;
 
         public static CameraEffectSettings LocalPlayerShake()
         {
             return new CameraEffectSettings
             {
                 enabled = true,
-                localImpulse = CameraImpulseSettings.DefaultHit()
+                localImpulse = CameraImpulseSettings.DefaultHit(),
+                localSway = CameraSwaySettings.Disabled()
             };
         }
 
@@ -61,7 +64,8 @@ namespace GoodCopBadCop.Effects
             return new CameraEffectSettings
             {
                 enabled = true,
-                localImpulse = CameraImpulseSettings.WithForce(force)
+                localImpulse = CameraImpulseSettings.WithForce(force),
+                localSway = CameraSwaySettings.Disabled()
             };
         }
 
@@ -70,7 +74,8 @@ namespace GoodCopBadCop.Effects
             return new CameraEffectSettings
             {
                 enabled = impulse != null && impulse.Enabled,
-                localImpulse = impulse ?? CameraImpulseSettings.Disabled()
+                localImpulse = impulse ?? CameraImpulseSettings.Disabled(),
+                localSway = CameraSwaySettings.Disabled()
             };
         }
 
@@ -79,7 +84,8 @@ namespace GoodCopBadCop.Effects
             return new CameraEffectSettings
             {
                 enabled = false,
-                localImpulse = CameraImpulseSettings.Disabled()
+                localImpulse = CameraImpulseSettings.Disabled(),
+                localSway = CameraSwaySettings.Disabled()
             };
         }
     }

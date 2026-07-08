@@ -18,7 +18,7 @@ MonoBehaviour:
   fullscreen:
     enabled: 1
     mode: 0
-    overlaySprite: {fileID: 21300000, guid: fd431674f57b425f92e97c60ca809031, type: 3}
+    overlaySprite: {fileID: 21300000, guid: af8003d89f7d8fd4690dff88faae44e0, type: 3}
     tint: {r: 1, g: 1, b: 1, a: 1}
     opacity: 0.65
     duration: 0.9
@@ -49,10 +49,65 @@ MonoBehaviour:
   camera:
     enabled: 1
     localImpulse:
-      enabled: 1
+      enabled: 0
       mode: 2
-      force: 0.13
-      velocity: {x: 0.03, y: 0.12, z: 0.04}
+      force: 0.035
+      velocity: {x: 0.015, y: 0.03, z: 0.01}
+      shape: 3
+      impulseDuration: 0.75
+      attackTime: 0.18
+      sustainTime: 0.25
+      decayTime: 0.8
+      scaleEnvelopeWithImpact: 0
+      amplitudeGain: 0.08
+      frequencyGain: 0.16
+    localSway:
+      enabled: 1
+      duration: 1.2
+      cycles: 0.85
+      eulerAmplitude: {x: 0.15, y: 0.35, z: 0.9}
+      envelope:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.15
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.85
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
   audio:
     enabled: 0
     clips: []

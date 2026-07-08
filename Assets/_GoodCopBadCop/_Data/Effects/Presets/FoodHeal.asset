@@ -49,10 +49,65 @@ MonoBehaviour:
   camera:
     enabled: 1
     localImpulse:
-      enabled: 1
+      enabled: 0
       mode: 2
-      force: 0.228035
-      velocity: {x: 0, y: 0.22, z: 0.06}
+      force: 0.075
+      velocity: {x: 0, y: 0.06, z: 0.02}
+      shape: 3
+      impulseDuration: 0.6
+      attackTime: 0.12
+      sustainTime: 0.2
+      decayTime: 0.7
+      scaleEnvelopeWithImpact: 0
+      amplitudeGain: 0.16
+      frequencyGain: 0.24
+    localSway:
+      enabled: 1
+      duration: 1.05
+      cycles: 1.25
+      eulerAmplitude: {x: 0.35, y: 1.15, z: 3.4}
+      envelope:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.15
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.85
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
   audio:
     enabled: 0
     clips: []

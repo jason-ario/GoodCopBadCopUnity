@@ -51,8 +51,63 @@ MonoBehaviour:
     localImpulse:
       enabled: 1
       mode: 2
-      force: 0.31496
-      velocity: {x: 0.12, y: -0.28, z: 0.08}
+      force: 0.08
+      velocity: {x: 0.03, y: -0.07, z: 0.02}
+      shape: 3
+      impulseDuration: 0.45
+      attackTime: 0.08
+      sustainTime: 0.12
+      decayTime: 0.45
+      scaleEnvelopeWithImpact: 0
+      amplitudeGain: 0.12
+      frequencyGain: 0.35
+    localSway:
+      enabled: 0
+      duration: 0.8
+      cycles: 1.5
+      eulerAmplitude: {x: 0, y: 0, z: 0}
+      envelope:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.15
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 0.85
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 0
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
   audio:
     enabled: 0
     clips: []

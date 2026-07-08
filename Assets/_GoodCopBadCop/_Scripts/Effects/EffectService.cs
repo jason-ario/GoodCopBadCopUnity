@@ -94,6 +94,7 @@ namespace GoodCopBadCop.Effects
                 return;
 
             cameraService.PlayLocalImpulse(settings.LocalImpulse);
+            cameraService.PlayLocalSway(settings.LocalSway);
         }
 
         private void PlayAudio(AudioEffectSettings settings, EffectContext context)
