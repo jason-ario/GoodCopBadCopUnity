@@ -1,6 +1,6 @@
-using System.Linq;
-using HighlightPlus;
+using GoodCopBadCop.SuspectPaperwork;
 using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -12,202 +12,149 @@ public class ApplicationLetter : FolderItem
     [SerializeField] private TextMeshPro reasonForEntryText;
     [SerializeField] private TextMeshPro idNumberText;
 
-    /// <summary>
-    /// Populates the letter locally (host/server) then broadcasts the final display strings —
-    /// including any server-side anomaly mutations — to all clients.
-    /// Must be called after Spawn() so the ClientRpc can be delivered.
-    /// </summary>
+    private readonly NetworkVariable<FixedString512Bytes> syncedFullName = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<FixedString512Bytes> syncedSex = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<FixedString512Bytes> syncedIdNumber = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<FixedString512Bytes> syncedEntryReason = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<bool> syncedVisible = new(true);
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        syncedFullName.OnValueChanged += OnFullNameChanged;
+        syncedBirthDate.OnValueChanged += OnBirthDateChanged;
+        syncedSex.OnValueChanged += OnSexChanged;
+        syncedIdNumber.OnValueChanged += OnIdNumberChanged;
+        syncedEntryReason.OnValueChanged += OnEntryReasonChanged;
+        syncedVisible.OnValueChanged += OnVisibleChanged;
+
+        ApplySyncedState();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        syncedFullName.OnValueChanged -= OnFullNameChanged;
+        syncedBirthDate.OnValueChanged -= OnBirthDateChanged;
+        syncedSex.OnValueChanged -= OnSexChanged;
+        syncedIdNumber.OnValueChanged -= OnIdNumberChanged;
+        syncedEntryReason.OnValueChanged -= OnEntryReasonChanged;
+        syncedVisible.OnValueChanged -= OnVisibleChanged;
+
+        base.OnNetworkDespawn();
+    }
+
     public void SetInfo(SuspectCharacter suspectCharacter)
     {
         SuspectData suspectData = suspectCharacter.Data;
-        nameText.text = suspectData.FirstName + " " + suspectData.LastName;
-        birthDateText.text = suspectData.DateOfBirth;
-        sexText.text = suspectData.Sex;
-        idNumberText.text = suspectData.IDNumber;
+        SetPaperworkState(
+            new SuspectPaperworkState(
+                suspectData.FirstName + " " + suspectData.LastName,
+                suspectData.DateOfBirth,
+                suspectData.Sex,
+                suspectData.IDNumber,
+                suspectData.FirstName + " " + suspectData.LastName,
+                suspectData.DateOfBirth,
+                suspectData.Sex,
+                suspectData.IDNumber,
+                string.Empty,
+                suspectData.EntryPermitExpiryDate,
+                suspectData.IsResident,
+                true,
+                suspectData.IDPhoto),
+            suspectData);
+    }
 
-        int dayNo = ShiftManager.Instance.CurrentDay;
-        string[] possibleReasons;
+    public void SetPaperworkState(SuspectPaperworkState state, SuspectData suspectData)
+    {
+        if (!IsServer)
+            return;
 
-        if (dayNo < 11)
-        {
-            possibleReasons = suspectData.entryReasons.earlyDaysReasons;
-        }
-        else if (dayNo < 21)
-        {
-            possibleReasons = suspectData.entryReasons.midDaysReasons;
-        }
-        else
-        {
-            possibleReasons = suspectData.entryReasons.finalDaysReasons;
-        }
+        syncedFullName.Value = ToFixedString(state.ApplicationFullName);
+        syncedBirthDate.Value = ToFixedString(state.ApplicationBirthDate);
+        syncedSex.Value = ToFixedString(state.ApplicationSex);
+        syncedIdNumber.Value = ToFixedString(state.ApplicationIdNumber);
+        syncedEntryReason.Value = ToFixedString(state.EntryReason);
+        syncedVisible.Value = state.ApplicationVisible;
 
-        int chosenReason = suspectCharacter.ChosenEntryReasonIndex;
-        reasonForEntryText.text = possibleReasons[chosenReason];
+        ApplySyncedState();
+        ApplyFonts(suspectData);
+    }
 
-        // Anomaly mutations use Random — run on server only and ship final strings.
-        CheckAnomalies(suspectCharacter);
+    public void ApplyPreviewState(SuspectPaperworkState state, SuspectData suspectData)
+    {
+        ApplyState(state);
+        ApplyFonts(suspectData);
+    }
 
-        // Change fonts
+    private void ApplySyncedState()
+    {
+        ApplyState(new SuspectPaperworkState(
+            syncedFullName.Value.ToString(),
+            syncedBirthDate.Value.ToString(),
+            syncedSex.Value.ToString(),
+            syncedIdNumber.Value.ToString(),
+            syncedFullName.Value.ToString(),
+            syncedBirthDate.Value.ToString(),
+            syncedSex.Value.ToString(),
+            syncedIdNumber.Value.ToString(),
+            syncedEntryReason.Value.ToString(),
+            string.Empty,
+            false,
+            syncedVisible.Value,
+            null));
+    }
+
+    private void ApplyState(SuspectPaperworkState state)
+    {
+        nameText.text = state.ApplicationFullName;
+        birthDateText.text = state.ApplicationBirthDate;
+        sexText.text = state.ApplicationSex;
+        idNumberText.text = state.ApplicationIdNumber;
+        reasonForEntryText.text = state.EntryReason;
+        SetDocumentVisible(state.ApplicationVisible);
+    }
+
+    private void ApplyFonts(SuspectData suspectData)
+    {
+        if (suspectData == null || suspectData.handwritingFont == null)
+            return;
+
         nameText.font = suspectData.handwritingFont;
         reasonForEntryText.font = suspectData.handwritingFont;
         birthDateText.font = suspectData.handwritingFont;
         sexText.font = suspectData.handwritingFont;
-
-        // Broadcast the final (post-anomaly) display strings to clients.
-        SyncToClientsClientRpc(
-            nameText.text,
-            birthDateText.text,
-            sexText.text,
-            idNumberText.text,
-            reasonForEntryText.text
-        );
     }
 
-    /// <summary>Applies all pre-computed display strings sent from the server.</summary>
-    [ClientRpc]
-    private void SyncToClientsClientRpc(string name, string dob, string sex, string idNumber, string entryReason)
+    private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
+    private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
+    private void OnSexChanged(FixedString512Bytes previous, FixedString512Bytes current) => sexText.text = current.ToString();
+    private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNumberText.text = current.ToString();
+    private void OnEntryReasonChanged(FixedString512Bytes previous, FixedString512Bytes current) => reasonForEntryText.text = current.ToString();
+    private void OnVisibleChanged(bool previous, bool current)
     {
-        // Host already applied values in SetInfo; skip to avoid double-apply.
-        if (IsServer) return;
-        nameText.text = name;
-        birthDateText.text = dob;
-        sexText.text = sex;
-        idNumberText.text = idNumber;
-        reasonForEntryText.text = entryReason;
+        SetDocumentVisible(current);
     }
 
-    void CheckAnomalies(SuspectCharacter suspectCharacter)
+    private void SetDocumentVisible(bool visible)
     {
-        if (suspectCharacter.AnomalyController.activeAnomalies.OfType<NameWrong>().Any())
+        foreach (Renderer documentRenderer in GetComponentsInChildren<Renderer>(true))
         {
-            SetNameWrong();
+            documentRenderer.enabled = visible;
         }
-        
-        if (suspectCharacter.AnomalyController.activeAnomalies.OfType<BirthDateWrong>().Any())
-        {
-            SetBirthDateWrong();
-        }
-        
-        if (suspectCharacter.AnomalyController.activeAnomalies.OfType<InvalidEntryReason>().Any())
-        {
-            SetInvalidEntryReason(suspectCharacter.Data);
-        }
-        
-        if (suspectCharacter.AnomalyController.activeAnomalies.OfType<IDNumberWrong>().Any())
-        {
-            SetIDNumberWrong(suspectCharacter);
-        }
+
+        SetInteractable(visible);
     }
 
-    private void SetIDNumberWrong(SuspectCharacter suspectCharacter)
+    private static FixedString512Bytes ToFixedString(string value)
     {
-        string originalIDNumber = suspectCharacter.Data.IDNumber; // Assuming this property exists
-    
-        if (string.IsNullOrEmpty(originalIDNumber) || originalIDNumber.Length != 7)
-        {
-            Debug.LogWarning("Invalid ID number format");
-            return;
-        }
-    
-        // Convert to char array to modify
-        char[] idChars = originalIDNumber.ToCharArray();
-    
-        // Randomly select a position to change (0-6)
-        int positionToChange = UnityEngine.Random.Range(0, 7);
-    
-        // Generate a different digit (0-9) that's not the current one
-        int currentDigit = int.Parse(idChars[positionToChange].ToString());
-        int newDigit = UnityEngine.Random.Range(0, 10);
-    
-        // Keep generating until we get a different digit
-        while (newDigit == currentDigit)
-        {
-            newDigit = UnityEngine.Random.Range(0, 10);
-        }
-    
-        idChars[positionToChange] = newDigit.ToString()[0];
-    
-        string wrongIDNumber = new string(idChars);
-    
-        // Set the wrong ID number (you may need to adjust this based on your data structure)
-        idNumberText.text = wrongIDNumber;
-    }
+        const int maxCharacters = 120;
+        string safeValue = value ?? string.Empty;
+        if (safeValue.Length > maxCharacters)
+            safeValue = safeValue.Substring(0, maxCharacters);
 
-    private void SetInvalidEntryReason(SuspectData suspectData)
-    {
-        // Randomly decide: either use an invalid reason or leave it blank
-        if (UnityEngine.Random.value > 0.5f)
-        {
-            // Leave it blank
-            reasonForEntryText.text = "";
-        }
-        else
-        {
-            int dayNo = ShiftManager.Instance.CurrentDay;
-            string[] possibleReasons;
-            
-            if (dayNo < 11)
-            {
-                possibleReasons = suspectData.invalidEntryReasons.earlyDaysReasons;
-            } else if (dayNo < 21)
-            {
-                possibleReasons = suspectData.invalidEntryReasons.midDaysReasons;
-            }
-            else
-            {
-                possibleReasons = suspectData.invalidEntryReasons.finalDaysReasons;
-            }
-
-            reasonForEntryText.text = possibleReasons[UnityEngine.Random.Range(0, possibleReasons.Length)];
-        }
-    }
-    
-    private void SetNameWrong()
-    {
-        string currentName = nameText.text;
-        char[] nameChars = currentName.ToCharArray();
-    
-        // Determine how many characters to mess up (1-3 random characters)
-        int charactersToMessUp = UnityEngine.Random.Range(1, Mathf.Min(4, nameChars.Length));
-    
-        for (int i = 0; i < charactersToMessUp; i++)
-        {
-            // Pick a random character position (excluding spaces)
-            int randomIndex;
-            do
-            {
-                randomIndex = UnityEngine.Random.Range(0, nameChars.Length);
-            } while (nameChars[randomIndex] == ' ');
-        
-            // Replace with a random letter
-            nameChars[randomIndex] = (char)UnityEngine.Random.Range('a', 'z' + 1);
-        }
-    
-        nameText.text = new string(nameChars);
-    }
-
-    private void SetBirthDateWrong()
-    {
-        string currentDate = birthDateText.text;
-        char[] dateChars = currentDate.ToCharArray();
-    
-        // Randomly pick 1 or 2 characters to mess up
-        int charactersToMessUp = UnityEngine.Random.Range(1, 3);
-    
-        for (int i = 0; i < charactersToMessUp; i++)
-        {
-            // Pick a random digit position (only mess with numbers, not slashes)
-            int randomIndex;
-            do
-            {
-                randomIndex = UnityEngine.Random.Range(0, dateChars.Length);
-            } while (dateChars[randomIndex] == '/');
-        
-            // Replace with a random digit
-            dateChars[randomIndex] = (char)UnityEngine.Random.Range('0', '9' + 1);
-        }
-    
-        birthDateText.text = new string(dateChars);
+        return new FixedString512Bytes(safeValue);
     }
     
     public void SetInsideFolder(FolderController folder)

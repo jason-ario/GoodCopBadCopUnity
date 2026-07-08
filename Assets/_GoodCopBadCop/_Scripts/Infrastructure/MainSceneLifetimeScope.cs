@@ -7,6 +7,7 @@ using GoodCopBadCop.Audio;
 using GoodCopBadCop.Player;
 using GoodCopBadCop.RoomSystem;
 using GoodCopBadCop.Settings;
+using GoodCopBadCop.SuspectPaperwork;
 using GoodCopBadCop.VoiceChat;
 using UnityEngine;
 using VContainer;
@@ -35,6 +36,8 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<ICameraService, CameraService>(Lifetime.Scoped);
             builder.Register<IAudioService, AudioService>(Lifetime.Scoped);
             builder.Register<IRoomService, RoomService>(Lifetime.Scoped);
+            builder.Register<SuspectPaperworkModel>(Lifetime.Scoped).AsSelf().As<ISuspectPaperworkModel>();
+            builder.Register<ISuspectPaperworkService, SuspectPaperworkService>(Lifetime.Scoped);
             builder.RegisterInstance(effectCatalog).As<IEffectCatalog>();
             builder.Register<IFullscreenEffectService, FullscreenEffectService>(Lifetime.Scoped);
             builder.Register<IEffectService, EffectService>(Lifetime.Scoped);

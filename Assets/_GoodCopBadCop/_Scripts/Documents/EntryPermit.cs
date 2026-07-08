@@ -1,3 +1,4 @@
+using GoodCopBadCop.SuspectPaperwork;
 using TMPro;
 using UnityEngine;
 
@@ -14,5 +15,10 @@ public class EntryPermit : MonoBehaviour
         reasonText.text = "<b>" + reason + "</b>";
         expirationDateText.text = "<b>" + expirationDate + "</b>";
         seal.SetActive(sealActive);
+    }
+
+    public void ApplyPreviewState(SuspectPaperworkState state)
+    {
+        SetEntryPermit(state.FullName, state.EntryReason, state.ExpirationDate, state.IsResident);
     }
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using TMPro;
+using GoodCopBadCop.SuspectPaperwork;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -75,6 +75,8 @@ namespace GoodCopBadCop.Editor
         private GameObject targetRoot;
         private GameObject previewRoot;
         private GameObject previewDocumentRoot;
+        private readonly SuspectPaperworkModel paperworkModel = new();
+        private ISuspectPaperworkService paperworkService;
         private readonly List<Anomaly> anomalies = new();
         private readonly List<ActiveState> activeStates = new();
         private readonly List<RendererState> rendererStates = new();
@@ -494,7 +496,6 @@ namespace GoodCopBadCop.Editor
                 SetHideFlagsRecursive(document, HideFlags.None);
 
                 previewDocuments.Add(document);
-                PopulatePreviewDocument(document, data);
             }
 
             ApplyPreviewDocumentState();
@@ -541,23 +542,19 @@ namespace GoodCopBadCop.Editor
                 return;
 
             global::SuspectData data = GetPreviewSuspectData();
-            bool missingDocumentActive = IsAnomalyTypeActive<MissingDocumentAnomaly>();
+            SuspectPaperworkState paperworkState = BuildPreviewPaperworkState(data);
 
             foreach (GameObject document in previewDocuments.ToArray())
             {
                 if (document == null)
                     continue;
 
-                PopulatePreviewDocument(document, data);
-
-                if (document.name.Contains("Application Paper"))
-                    document.SetActive(!missingDocumentActive);
-                else
-                    document.SetActive(true);
+                document.SetActive(true);
+                PopulatePreviewDocument(document, data, paperworkState);
             }
         }
 
-        private void PopulatePreviewDocument(GameObject document, global::SuspectData data)
+        private void PopulatePreviewDocument(GameObject document, global::SuspectData data, SuspectPaperworkState paperworkState)
         {
             if (document == null || data == null)
                 return;
@@ -567,127 +564,30 @@ namespace GoodCopBadCop.Editor
                 if (component == null)
                     continue;
 
-                if (component is IDCard)
-                    ApplyIdCardPreview(component, data);
-                else if (component is ApplicationLetter)
-                    ApplyApplicationLetterPreview(component, data);
-                else if (component is EntryPermit)
-                    ApplyEntryPermitPreview(component, data);
+                if (component is IDCard idCard)
+                    idCard.ApplyPreviewState(paperworkState);
+                else if (component is ApplicationLetter applicationLetter)
+                    applicationLetter.ApplyPreviewState(paperworkState, data);
+                else if (component is EntryPermit entryPermit)
+                    entryPermit.ApplyPreviewState(paperworkState);
             }
         }
 
-        private void ApplyIdCardPreview(MonoBehaviour component, global::SuspectData data)
+        private SuspectPaperworkState BuildPreviewPaperworkState(global::SuspectData data)
         {
-            SetTextField(component, "nameText", GetDocumentName(data));
-            SetTextField(component, "birthDateText", GetDocumentBirthDate(data));
-            SetTextField(component, "expDateText", GetDocumentExpirationDate(data));
-            SetTextField(component, "idNoText", GetDocumentIdNumber(data));
-            SetTextField(component, "residentText", data.IsResident ? "* Resident of Saplavi *" : "Non-Resident");
-            SetObjectActiveField(component, "seal", data.IsResident);
-            SetRendererTextureField(component, "idPhoto", data.IDPhoto);
-        }
+            paperworkService ??= new SuspectPaperworkService(paperworkModel);
 
-        private void ApplyApplicationLetterPreview(MonoBehaviour component, global::SuspectData data)
-        {
-            string reason = GetDocumentEntryReason(data);
-            SetTextField(component, "nameText", GetDocumentName(data));
-            SetTextField(component, "birthDateText", GetDocumentBirthDate(data));
-            SetTextField(component, "sexText", GetDocumentSex(data));
-            SetTextField(component, "reasonForEntryText", reason);
-            SetTextField(component, "idNumberText", GetDocumentIdNumber(data));
+            IEnumerable<string> activeAnomalyTypeNames = anomalies
+                .Where(IsAnomalyActive)
+                .Select(anomaly => anomaly.GetType().Name);
 
-            SetTextFont(component, "nameText", data.handwritingFont);
-            SetTextFont(component, "birthDateText", data.handwritingFont);
-            SetTextFont(component, "sexText", data.handwritingFont);
-            SetTextFont(component, "reasonForEntryText", data.handwritingFont);
-        }
+            global::SuspectCharacter previewSuspect = GetPreviewSuspect();
+            Texture idPhoto = previewSuspect != null && previewSuspect.IDPhoto != null
+                ? previewSuspect.IDPhoto
+                : data != null ? data.IDPhoto : null;
 
-        private void ApplyEntryPermitPreview(MonoBehaviour component, global::SuspectData data)
-        {
-            SetTextField(component, "nameText", "<b>" + GetDocumentName(data) + "</b>");
-            SetTextField(component, "reasonText", "<b>" + GetDocumentEntryReason(data) + "</b>");
-            SetTextField(component, "expirationDateText", "<b>" + GetDocumentExpirationDate(data) + "</b>");
-            SetObjectActiveField(component, "seal", data.IsResident);
-        }
-
-        private string GetDocumentName(global::SuspectData data)
-        {
-            string name = $"{data.FirstName} {data.LastName}".Trim();
-            if (!IsAnomalyTypeActive<NameWrong>())
-                return name;
-
-            return string.IsNullOrWhiteSpace(name) ? "WRONG NAME" : name + "?";
-        }
-
-        private string GetDocumentBirthDate(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<BirthDateWrong>())
-                return data.DateOfBirth;
-
-            return string.IsNullOrWhiteSpace(data.DateOfBirth) ? "00/00/0000" : data.DateOfBirth + "?";
-        }
-
-        private string GetDocumentIdNumber(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<IDNumberWrong>() && !IsAnomalyTypeActive<FakeIdAnomaly>())
-                return data.IDNumber;
-
-            if (string.IsNullOrWhiteSpace(data.IDNumber))
-                return "0000000";
-
-            char[] chars = data.IDNumber.ToCharArray();
-            for (int i = chars.Length - 1; i >= 0; i--)
-            {
-                if (!char.IsDigit(chars[i]))
-                    continue;
-
-                chars[i] = chars[i] == '9' ? '0' : (char)(chars[i] + 1);
-                return new string(chars);
-            }
-
-            return data.IDNumber + "?";
-        }
-
-        private string GetDocumentSex(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<SexWrong>())
-                return data.Sex;
-
-            if (string.Equals(data.Sex, "Male", StringComparison.OrdinalIgnoreCase)) return "Female";
-            if (string.Equals(data.Sex, "Female", StringComparison.OrdinalIgnoreCase)) return "Male";
-            return string.IsNullOrWhiteSpace(data.Sex) ? "Unknown" : data.Sex + "?";
-        }
-
-        private string GetDocumentExpirationDate(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<ExpirationDateAnomaly>())
-                return data.EntryPermitExpiryDate;
-
-            return string.IsNullOrWhiteSpace(data.EntryPermitExpiryDate) ? "EXPIRED" : "EXPIRED " + data.EntryPermitExpiryDate;
-        }
-
-        private string GetDocumentEntryReason(global::SuspectData data)
-        {
-            global::SuspectData.EntryReasonSet reasonSet = IsAnomalyTypeActive<InvalidEntryReason>()
-                ? data.invalidEntryReasons
-                : data.entryReasons;
-
-            string reason = GetFirstAvailableReason(reasonSet.earlyDaysReasons)
-                ?? GetFirstAvailableReason(reasonSet.midDaysReasons)
-                ?? GetFirstAvailableReason(reasonSet.finalDaysReasons);
-
-            if (!string.IsNullOrWhiteSpace(reason))
-                return reason;
-
-            return IsAnomalyTypeActive<InvalidEntryReason>() ? "" : "Entry";
-        }
-
-        private static string GetFirstAvailableReason(string[] reasons)
-        {
-            if (reasons == null)
-                return null;
-
-            return reasons.FirstOrDefault(reason => !string.IsNullOrWhiteSpace(reason));
+            int currentDay = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 1;
+            return paperworkService.BuildForPreview(data, idPhoto, activeAnomalyTypeNames, currentDay, selectedSuspectIndex);
         }
 
         private global::SuspectData GetPreviewSuspectData()
@@ -852,41 +752,6 @@ namespace GoodCopBadCop.Editor
             return true;
         }
 
-        private static void SetTextField(object target, string fieldName, string value)
-        {
-            TextMeshPro text = GetFieldValue<TextMeshPro>(target, fieldName);
-            if (text != null)
-                text.text = value;
-        }
-
-        private static void SetTextFont(object target, string fieldName, TMP_FontAsset font)
-        {
-            if (font == null)
-                return;
-
-            TextMeshPro text = GetFieldValue<TextMeshPro>(target, fieldName);
-            if (text != null)
-                text.font = font;
-        }
-
-        private static void SetObjectActiveField(object target, string fieldName, bool active)
-        {
-            GameObject gameObject = GetFieldValue<GameObject>(target, fieldName);
-            if (gameObject != null)
-                gameObject.SetActive(active);
-        }
-
-        private static void SetRendererTextureField(object target, string fieldName, Texture texture)
-        {
-            Renderer renderer = GetFieldValue<Renderer>(target, fieldName);
-            if (renderer == null || texture == null)
-                return;
-
-            MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetTexture("_MainTex", texture);
-            renderer.SetPropertyBlock(propertyBlock);
-        }
         private void StartPlaymodePreview(GameObject prefab)
         {
             if (prefab == null)

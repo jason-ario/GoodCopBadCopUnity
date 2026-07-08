@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using GoodCopBadCop.Infrastructure;
+using GoodCopBadCop.SuspectPaperwork;
 using DG.Tweening;
 using Unity.Netcode;
 using Unity.VisualScripting;
@@ -15,6 +16,7 @@ public class SuspectController : NetworkBehaviour
     public static SuspectController Instance;
 
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
+    [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
 
     /// <summary>
     /// When true, the next suspect to spawn is initialized with no anomalies.
@@ -789,24 +791,38 @@ public class SuspectController : NetworkBehaviour
         if (!IsServer) return;
         if (suspectCharacter == null) return;
         if (!suspectCharacter.Data.GivesPaperwork) return;
+
+        SuspectPaperworkState paperworkState = BuildPaperworkState();
         
         Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newIDCard = Instantiate(idCard, randomPos, Quaternion.identity) as NetworkObject;
         newIDCard.Spawn();
-        newIDCard.GetComponent<IDCard>().SetInfo(suspectCharacter);
+        newIDCard.GetComponent<IDCard>().SetPaperworkState(paperworkState, suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
         randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
         newApplicationForm.Spawn();
-        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
+        newApplicationForm.GetComponent<ApplicationLetter>().SetPaperworkState(paperworkState, suspectCharacter.Data);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
 
         NotifyPaperworkSpawnedClientRpc(
             new NetworkObjectReference(newIDCard),
             new NetworkObjectReference(newApplicationForm));
+    }
+
+    private SuspectPaperworkState BuildPaperworkState()
+    {
+        if (suspectPaperworkService != null)
+            return suspectPaperworkService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+
+        SuspectPaperworkModel fallbackModel = new SuspectPaperworkModel();
+        SuspectPaperworkService fallbackService = new SuspectPaperworkService(fallbackModel);
+        SuspectPaperworkState state = fallbackService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+        fallbackModel.Dispose();
+        return state;
     }
 
     /// <summary>
