@@ -31,7 +31,7 @@ namespace GoodCopBadCop.VoiceChat
             broadcastTrigger = GetComponent<VoiceProximityBroadcastTrigger>();
             receiptTrigger = GetComponent<VoiceProximityReceiptTrigger>();
             proximityRange = fallbackProximityRange;
-            ApplyToTriggers();
+            SetTriggersEnabled(false);
         }
 
         private void OnEnable()
@@ -119,8 +119,20 @@ namespace GoodCopBadCop.VoiceChat
             receiptTrigger.UseColliderTrigger = false;
             broadcastTrigger.Mode = ToDissonanceMode(inputMode);
             broadcastTrigger.IsMuted = !isEnabled || isMuted;
-            broadcastTrigger.enabled = isEnabled && isActiveAndEnabled;
-            receiptTrigger.enabled = isEnabled && isActiveAndEnabled;
+            SetTriggersEnabled(isEnabled && isActiveAndEnabled);
+        }
+
+        private void SetTriggersEnabled(bool enabled)
+        {
+            if (broadcastTrigger != null)
+            {
+                broadcastTrigger.enabled = enabled;
+            }
+
+            if (receiptTrigger != null)
+            {
+                receiptTrigger.enabled = enabled;
+            }
         }
 
         private static CommActivationMode ToDissonanceMode(EVoiceChatInputMode mode)

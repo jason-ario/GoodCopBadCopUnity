@@ -34,6 +34,7 @@ namespace GoodCopBadCop.VoiceChat
 
             PlayerVoiceChatAdapter.Registered += OnPlayerAdapterRegistered;
             PlayerVoiceChatAdapter.Unregistered += OnPlayerAdapterUnregistered;
+            RegisterExistingPlayerAdapters();
 
             model.IsEnabled.Subscribe(_ => ApplySettings()).AddTo(ref disposables);
             model.IsMuted.Subscribe(_ => ApplySettings()).AddTo(ref disposables);
@@ -64,6 +65,17 @@ namespace GoodCopBadCop.VoiceChat
 
             disposables.Dispose();
             playerAdapters.Clear();
+        }
+
+        private void RegisterExistingPlayerAdapters()
+        {
+            PlayerVoiceChatAdapter[] existingAdapters = UnityEngine.Object.FindObjectsByType<PlayerVoiceChatAdapter>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+            foreach (PlayerVoiceChatAdapter existingAdapter in existingAdapters)
+            {
+                OnPlayerAdapterRegistered(existingAdapter);
+            }
         }
 
         private void OnPlayerAdapterRegistered(PlayerVoiceChatAdapter playerAdapter)

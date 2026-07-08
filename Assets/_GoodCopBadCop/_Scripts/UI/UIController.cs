@@ -209,6 +209,7 @@ public class UIController : MonoBehaviour
         foreach (var canvasGroup in canvasGroups)
         {
             canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
         }
     }
     

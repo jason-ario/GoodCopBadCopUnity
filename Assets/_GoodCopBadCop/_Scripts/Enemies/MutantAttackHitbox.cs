@@ -10,7 +10,8 @@ using UnityEngine;
 /// </summary>
 public class MutantAttackHitbox : MonoBehaviour
 {
-    // в”Ђв”Ђ Configuration в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Configuration
 
     [Tooltip("Radius of the overlap sphere used to detect players on attack.")]
     [SerializeField] private float sphereRadius = 0.8f;
@@ -21,7 +22,8 @@ public class MutantAttackHitbox : MonoBehaviour
     [Tooltip("Damage dealt per successful melee hit. Overrides MutantEnemyData when set > 0; otherwise MutantEnemy passes the data value.")]
     [SerializeField] private float damageOverride = 0f;
 
-    // в”Ђв”Ђ Internal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Internal
 
     private MutantEnemy _owner;
 
@@ -32,7 +34,8 @@ public class MutantAttackHitbox : MonoBehaviour
         _owner = GetComponentInParent<MutantEnemy>();
     }
 
-    // в”Ђв”Ђ Public API в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Public API
 
     /// <summary>
     /// Runs an OverlapSphere from this transform and damages any player found.
@@ -56,7 +59,7 @@ public class MutantAttackHitbox : MonoBehaviour
             Physics.AllLayers,
             QueryTriggerInteraction.Ignore);
 
-        Debug.Log($"[MutantAttackHitbox] PerformHitScan at {transform.position} radius={sphereRadius} вЂ” {hitCount} colliders overlapped.", this);
+        Debug.Log($"[MutantAttackHitbox] PerformHitScan at {transform.position} radius={sphereRadius} - {hitCount} colliders overlapped.", this);
 
         for (int i = 0; i < hitCount; i++)
         {

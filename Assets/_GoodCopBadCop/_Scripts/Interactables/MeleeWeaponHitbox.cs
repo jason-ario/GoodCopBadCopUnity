@@ -15,7 +15,8 @@ using UnityEngine;
 /// </summary>
 public class MeleeWeaponHitbox : NetworkBehaviour
 {
-    // в”Ђв”Ђ Configuration в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Configuration
 
     [Tooltip("Radius of the OverlapSphere centered on this transform.")]
     [SerializeField] private float hitRadius = 0.8f;
@@ -29,7 +30,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
     private const string PlayerTag = "Player";
 
-    // в”Ђв”Ђ Events в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Events
 
     /// <summary>
     /// Fired on the owning client when the overlap successfully finds an enemy.
@@ -41,7 +43,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     /// </summary>
     public event Action OnEnvironmentHit;
 
-    // в”Ђв”Ђ Internal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Internal
 
     private static readonly Collider[] OverlapBuffer = new Collider[16];
 
@@ -62,7 +65,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             _ownColliders.Add(col);
     }
 
-    // в”Ђв”Ђ Public API в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Public API
 
     /// <summary>
     /// Called on the local client (or server). Forwards the overlap check to the server
@@ -82,7 +86,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         }
     }
 
-    // в”Ђв”Ђ Server в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Server
 
     [ServerRpc(RequireOwnership = false)]
     private void PerformHitScanServerRpc(Vector3 attackOrigin, float damage, ServerRpcParams rpcParams = default)
@@ -103,7 +108,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             Physics.AllLayers,
             QueryTriggerInteraction.Collide);
 
-        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} вЂ” {hitCount} colliders. Sender={senderClientId}", this);
+        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} - {hitCount} colliders. Sender={senderClientId}", this);
 
         ClientRpcParams ownerParams = new ClientRpcParams
         {
@@ -155,7 +160,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
-            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter вЂ” no tag dependency.
+            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter - no tag dependency.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
 
@@ -185,7 +190,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             NotifyEnvironmentHitClientRpc(firstNonSelfHitPosition, ownerParams);
     }
 
-    // в”Ђв”Ђ Client в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Client
 
     [ClientRpc]
     private void NotifyHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
@@ -201,7 +207,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         OnEnvironmentHit?.Invoke();
     }
 
-    // в”Ђв”Ђ Effects в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+    // Effects
 
     /// <summary>
     /// Instantiates <paramref name="prefab"/> at <paramref name="position"/> and destroys it

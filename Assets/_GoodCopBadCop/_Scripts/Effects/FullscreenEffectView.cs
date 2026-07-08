@@ -20,13 +20,13 @@ namespace GoodCopBadCop.Effects
             canvas.sortingOrder = short.MaxValue;
 
             canvasObject.AddComponent<CanvasScaler>();
-            canvasObject.AddComponent<GraphicRaycaster>();
 
             var imageObject = new GameObject("Overlay");
             imageObject.transform.SetParent(canvasObject.transform, false);
 
             var image = imageObject.AddComponent<Image>();
             image.enabled = false;
+            image.preserveAspect = false;
             image.raycastTarget = false;
 
             RectTransform rectTransform = image.rectTransform;

@@ -16,6 +16,11 @@ public class PlayerCameraController : MonoBehaviour
     [Tooltip("Impulse source used when the player takes damage.")]
     [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
 
+    private void Awake()
+    {
+        EnsureHitImpulseSource();
+    }
+
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>
     public void SetCameraActive(bool active)
     {
@@ -48,14 +53,14 @@ public class PlayerCameraController : MonoBehaviour
 
     public void PlayImpulse(CameraImpulseSettings settings)
     {
-        if (_hitImpulseSource == null)
+        if (settings == null || !settings.Enabled)
         {
-            Debug.LogWarning("[PlayerCameraController] Hit impulse source is not assigned.", this);
             return;
         }
 
-        if (settings == null || !settings.Enabled)
+        if (!EnsureHitImpulseSource())
         {
+            Debug.LogWarning("[PlayerCameraController] Hit impulse source is not available.", this);
             return;
         }
 
@@ -71,5 +76,38 @@ public class PlayerCameraController : MonoBehaviour
                 _hitImpulseSource.GenerateImpulse();
                 break;
         }
+    }
+
+    private static void ConfigureDefaultHitImpulseSource(CinemachineImpulseSource impulseSource)
+    {
+        if (impulseSource == null)
+            return;
+
+        impulseSource.DefaultVelocity = Vector3.down;
+        impulseSource.ImpulseDefinition = new CinemachineImpulseDefinition
+        {
+            ImpulseChannel = 1,
+            ImpulseShape = CinemachineImpulseDefinition.ImpulseShapes.Bump,
+            CustomImpulseShape = new AnimationCurve(),
+            ImpulseDuration = 0.2f,
+            ImpulseType = CinemachineImpulseDefinition.ImpulseTypes.Uniform,
+            DissipationDistance = 100f,
+            DissipationRate = 0.25f,
+            PropagationSpeed = 343f
+        };
+    }
+
+    private bool EnsureHitImpulseSource()
+    {
+        if (_hitImpulseSource != null)
+            return true;
+
+        _hitImpulseSource = GetComponent<CinemachineImpulseSource>();
+        if (_hitImpulseSource != null)
+            return true;
+
+        _hitImpulseSource = gameObject.AddComponent<CinemachineImpulseSource>();
+        ConfigureDefaultHitImpulseSource(_hitImpulseSource);
+        return _hitImpulseSource != null;
     }
 }

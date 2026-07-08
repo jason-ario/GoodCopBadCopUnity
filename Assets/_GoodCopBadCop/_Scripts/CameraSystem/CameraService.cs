@@ -34,9 +34,10 @@ namespace GoodCopBadCop.CameraSystem
             if (settings == null || !settings.Enabled)
                 return;
 
-            global::PlayerInstance player = playerRuntimeModel.LocalPlayer.CurrentValue;
+            global::PlayerInstance player = FindLocalPlayer();
             if (player == null)
             {
+                Debug.LogWarning("[CameraService] Local player was not found.");
                 return;
             }
 
@@ -48,6 +49,29 @@ namespace GoodCopBadCop.CameraSystem
             }
 
             cameraController.PlayImpulse(settings);
+        }
+
+        private global::PlayerInstance FindLocalPlayer()
+        {
+            global::PlayerInstance player = playerRuntimeModel.LocalPlayer.CurrentValue;
+            if (player != null)
+                return player;
+
+            player = global::PlayerInstance.Instance;
+            if (player != null)
+                return player;
+
+            global::PlayerInstance[] players = Object.FindObjectsByType<global::PlayerInstance>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+
+            foreach (global::PlayerInstance candidate in players)
+            {
+                if (candidate != null && candidate.IsOwner)
+                    return candidate;
+            }
+
+            return players.Length > 0 ? players[0] : null;
         }
 
         public void HideFromCapture(object source, global::SuspectCharacter suspect)

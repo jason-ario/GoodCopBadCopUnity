@@ -10,7 +10,10 @@ namespace GoodCopBadCop.Editor
 {
     public sealed class PlayerDamagePreviewWindow : EditorWindow
     {
+        private const string EffectCatalogAssetPath = "Assets/_GoodCopBadCop/_Data/Effects/EffectCatalog.asset";
+
         private readonly List<EffectPreset> previewPresets = new List<EffectPreset>();
+        private readonly FullscreenEffectService fallbackFullscreenEffectService = new FullscreenEffectService();
         private PlayerInstance player;
         private PlayerHealth playerHealth;
         private IEffectService effectService;
@@ -40,12 +43,7 @@ namespace GoodCopBadCop.Editor
 
         private void OnInspectorUpdate()
         {
-            if (!EditorApplication.isPlaying)
-                return;
-
-            if (!CanPreviewEffect() && !CanKillPlayer())
-                RefreshRuntimeReferences();
-
+            RefreshRuntimeReferences();
             Repaint();
         }
 
@@ -56,12 +54,11 @@ namespace GoodCopBadCop.Editor
 
             EditorGUILayout.Space(8f);
 
-            using (new EditorGUI.DisabledScope(!CanPreviewEffect()))
+            using (EditorGUILayout.ScrollViewScope scrollView = new EditorGUILayout.ScrollViewScope(scrollPosition))
             {
-                scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-                foreach (EffectPreset preset in previewPresets)
+                scrollPosition = scrollView.scrollPosition;
+                foreach (EffectPreset preset in previewPresets.ToArray())
                     DrawEffectOption(preset);
-                EditorGUILayout.EndScrollView();
             }
 
             EditorGUILayout.Space(8f);
@@ -90,8 +87,11 @@ namespace GoodCopBadCop.Editor
             if (preset == null || preset.Key == EffectKeys.PlayerDeath)
                 return;
 
-            if (GUILayout.Button($"Preview {preset.DisplayName}", GUILayout.Height(30f)))
-                PreviewEffect(preset);
+            using (new EditorGUI.DisabledScope(!CanPreviewEffect(preset)))
+            {
+                if (GUILayout.Button($"Preview {preset.DisplayName}", GUILayout.Height(30f)))
+                    PreviewEffect(preset);
+            }
         }
 
         private void DrawDeathControls()
@@ -109,13 +109,25 @@ namespace GoodCopBadCop.Editor
         {
             RefreshRuntimeReferences();
 
-            if (!CanPreviewEffect())
+            if (!CanPreviewEffect(preset))
             {
                 Debug.LogWarning($"[PlayerDamagePreviewWindow] Cannot preview '{preset.DisplayName}': {status}");
                 return;
             }
 
-            effectService.Play(preset, new EffectContext(player.gameObject, player.transform.position));
+            EffectContext context = player != null
+                ? new EffectContext(player.gameObject, player.transform.position)
+                : EffectContext.Default;
+
+            if (effectService != null)
+            {
+                effectService.Play(preset, context);
+            }
+            else
+            {
+                fallbackFullscreenEffectService.Play(preset.Fullscreen, context);
+            }
+
             Repaint();
         }
 
@@ -129,6 +141,16 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
+            EffectContext context = new EffectContext(player.gameObject, player.transform.position);
+            if (effectService != null)
+            {
+                effectService.PlayByKey(EffectKeys.PlayerDeath, context);
+            }
+            else if (effectCatalog != null && effectCatalog.TryGet(EffectKeys.PlayerDeath, out EffectPreset deathPreset))
+            {
+                fallbackFullscreenEffectService.Play(deathPreset.Fullscreen, context);
+            }
+
             playerHealth.TakeDamage(999f, EffectKeys.PlayerDeath);
             Debug.Log("[PlayerDamagePreviewWindow] Applied lethal damage to the local player.");
             Repaint();
@@ -136,10 +158,8 @@ namespace GoodCopBadCop.Editor
 
         private void HandlePlayModeStateChanged(PlayModeStateChange stateChange)
         {
-            if (stateChange == PlayModeStateChange.EnteredPlayMode)
+            if (stateChange == PlayModeStateChange.EnteredPlayMode || stateChange == PlayModeStateChange.EnteredEditMode)
                 EditorApplication.delayCall += RefreshRuntimeReferences;
-            else if (stateChange == PlayModeStateChange.ExitingPlayMode || stateChange == PlayModeStateChange.EnteredEditMode)
-                ClearRuntimeReferences("Enter Play Mode to preview player effects.");
 
             Repaint();
         }
@@ -149,30 +169,27 @@ namespace GoodCopBadCop.Editor
             player = null;
             playerHealth = null;
             effectService = null;
-            effectCatalog = null;
+            effectCatalog = LoadEffectCatalogAsset();
             previewPresets.Clear();
 
-            if (!EditorApplication.isPlaying)
+            if (EditorApplication.isPlaying)
             {
-                status = "Enter Play Mode to preview player effects.";
-                return;
+                TryResolveEffects();
+                TryResolvePlayer();
             }
 
-            player = PlayerInstance.Instance;
-            if (player == null)
-            {
-                status = "PlayerInstance.Instance was not found. Start or join a game and wait for the local player to spawn.";
-                return;
-            }
+            PopulatePreviewPresets();
+            UpdateStatus();
+        }
 
-            playerHealth = player.PlayerHealth != null ? player.PlayerHealth : player.GetComponent<PlayerHealth>();
-            if (playerHealth == null)
-            {
-                status = "Local player does not have a PlayerHealth component.";
-                return;
-            }
+        private EffectCatalog LoadEffectCatalogAsset()
+        {
+            return AssetDatabase.LoadAssetAtPath<EffectCatalog>(EffectCatalogAssetPath);
+        }
 
-            if (!TryResolveEffects())
+        private void PopulatePreviewPresets()
+        {
+            if (effectCatalog == null)
                 return;
 
             foreach (EffectPreset preset in effectCatalog.Presets)
@@ -180,58 +197,93 @@ namespace GoodCopBadCop.Editor
                 if (preset != null && preset.Key != EffectKeys.PlayerDeath)
                     previewPresets.Add(preset);
             }
-
-            status = previewPresets.Count > 0
-                ? "Ready."
-                : "Effect catalog has no preview presets.";
         }
 
-        private bool TryResolveEffects()
+        private void TryResolvePlayer()
         {
-            MainSceneLifetimeScope scope = UnityEngine.Object.FindFirstObjectByType<MainSceneLifetimeScope>();
-            if (scope == null || scope.Container == null)
+            player = PlayerInstance.Instance;
+            if (player == null)
             {
-                status = "MainSceneLifetimeScope container was not found.";
-                return false;
+                PlayerInstance[] players = UnityEngine.Object.FindObjectsByType<PlayerInstance>(
+                    FindObjectsInactive.Exclude,
+                    FindObjectsSortMode.None);
+                foreach (PlayerInstance candidate in players)
+                {
+                    if (candidate != null && candidate.IsOwner)
+                    {
+                        player = candidate;
+                        break;
+                    }
+                }
+
+                if (player == null && players.Length > 0)
+                    player = players[0];
             }
+
+            if (player != null)
+                playerHealth = player.PlayerHealth != null ? player.PlayerHealth : player.GetComponent<PlayerHealth>();
+        }
+
+        private void TryResolveEffects()
+        {
+            MainSceneLifetimeScope scope = UnityEngine.Object.FindAnyObjectByType<MainSceneLifetimeScope>();
+            if (scope == null || scope.Container == null)
+                return;
 
             try
             {
                 effectService = scope.Container.Resolve<IEffectService>();
-                effectCatalog = scope.Container.Resolve<IEffectCatalog>();
+                effectCatalog = scope.Container.Resolve<IEffectCatalog>() ?? effectCatalog;
             }
             catch (Exception exception)
             {
-                status = $"Effects services were not resolved: {exception.Message}";
-                return false;
+                Debug.LogWarning($"[PlayerDamagePreviewWindow] Effects services were not resolved: {exception.Message}");
             }
-
-            if (effectService == null || effectCatalog == null)
-            {
-                status = "Effects services are not registered.";
-                return false;
-            }
-
-            return true;
         }
 
-        private void ClearRuntimeReferences(string newStatus)
+        private void UpdateStatus()
         {
-            player = null;
-            playerHealth = null;
-            effectService = null;
-            effectCatalog = null;
-            previewPresets.Clear();
-            status = newStatus;
+            if (effectCatalog == null)
+            {
+                status = $"Effect catalog was not found at '{EffectCatalogAssetPath}'.";
+                return;
+            }
+
+            if (previewPresets.Count == 0)
+            {
+                status = "Effect catalog has no preview presets.";
+                return;
+            }
+
+            if (!EditorApplication.isPlaying)
+            {
+                status = "Enter Play Mode to preview player effects.";
+                return;
+            }
+
+            if (effectService == null)
+            {
+                status = playerHealth == null
+                    ? "Effects service and local player were not found. Preview uses fullscreen fallback only; Dead is disabled."
+                    : "Effects service was not found. Preview uses fullscreen fallback only.";
+                return;
+            }
+
+            if (playerHealth == null)
+            {
+                status = "Local player was not found. Preview works; Dead is disabled.";
+                return;
+            }
+
+            status = "Ready.";
         }
 
-        private bool CanPreviewEffect()
+        private bool CanPreviewEffect(EffectPreset preset)
         {
             return EditorApplication.isPlaying
-                   && player != null
-                   && playerHealth != null
-                   && effectService != null
-                   && !playerHealth.IsDead;
+                   && effectCatalog != null
+                   && preset != null
+                   && (effectService != null || (preset.Fullscreen != null && preset.Fullscreen.Enabled));
         }
 
         private bool CanKillPlayer()

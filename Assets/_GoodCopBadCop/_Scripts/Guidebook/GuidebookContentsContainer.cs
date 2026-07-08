@@ -26,8 +26,17 @@ public class GuidebookContentsContainer : MonoBehaviour
         Instance = this;
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
     private IEnumerator Start()
     {
+        if (_contents == null)
+            yield break;
+
         _contents.SetActive(true);
         yield return new WaitForEndOfFrame();
         _contents.SetActive(false);
@@ -41,7 +50,7 @@ public class GuidebookContentsContainer : MonoBehaviour
     /// </summary>
     public void TriggerRender()
     {
-        if (_contents == null || _isRefreshing) return;
+        if (this == null || !isActiveAndEnabled || _contents == null || _isRefreshing) return;
         if (_refreshCoroutine != null)
             StopCoroutine(_refreshCoroutine);
         _refreshCoroutine = StartCoroutine(RenderCoroutine());

@@ -57,7 +57,9 @@ public class GuidebookTaskListContents : GuidebookPageContents
 
     private void TriggerRenderTextureRefresh()
     {
-        GuidebookContentsContainer.Instance?.TriggerRender();
+        GuidebookContentsContainer container = GuidebookContentsContainer.Instance;
+        if (container != null)
+            container.TriggerRender();
     }
 
     /// <summary>
