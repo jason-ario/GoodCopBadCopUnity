@@ -251,11 +251,13 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
             return;
         }
 
-        foreach (Transform point in _junkSpawnPoints)
+        for (int i = 0; i < _junkSpawnPoints.Length; i++)
         {
+            Transform point = _junkSpawnPoints[i];
             if (point == null) continue;
 
-            GameObject prefab = _junkPrefabs[Random.Range(0, _junkPrefabs.Length)];
+            // Round-robin through prefabs so each type appears an equal number of times.
+            GameObject prefab = _junkPrefabs[i % _junkPrefabs.Length];
 
             // Randomize Y rotation while preserving the spawn point's X/Z tilt.
             Vector3 euler = point.eulerAngles;
