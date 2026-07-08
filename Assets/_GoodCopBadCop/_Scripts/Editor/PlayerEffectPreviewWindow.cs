@@ -8,7 +8,7 @@ using VContainer;
 
 namespace GoodCopBadCop.Editor
 {
-    public sealed class PlayerDamagePreviewWindow : EditorWindow
+    public sealed class PlayerEffectPreviewWindow : EditorWindow
     {
         private const string EffectCatalogAssetPath = "Assets/_GoodCopBadCop/_Data/Effects/EffectCatalog.asset";
 
@@ -21,10 +21,10 @@ namespace GoodCopBadCop.Editor
         private string status = "Not connected.";
         private Vector2 scrollPosition;
 
-        [MenuItem(EditorConstants.PlayerDamagePreviewMenuPath, false, EditorConstants.RootMenuPriority + 1)]
+        [MenuItem(EditorConstants.PlayerEffectPreviewMenuPath, false, EditorConstants.RootMenuPriority + 1)]
         private static void Open()
         {
-            PlayerDamagePreviewWindow window = GetWindow<PlayerDamagePreviewWindow>();
+            PlayerEffectPreviewWindow window = GetWindow<PlayerEffectPreviewWindow>();
             window.titleContent = new GUIContent("Player Effects Preview");
             window.minSize = new Vector2(360f, 320f);
             window.Show();
@@ -111,7 +111,7 @@ namespace GoodCopBadCop.Editor
 
             if (!CanPreviewEffect(preset))
             {
-                Debug.LogWarning($"[PlayerDamagePreviewWindow] Cannot preview '{preset.DisplayName}': {status}");
+                Debug.LogWarning($"[PlayerEffectPreviewWindow] Cannot preview '{preset.DisplayName}': {status}");
                 return;
             }
 
@@ -137,7 +137,7 @@ namespace GoodCopBadCop.Editor
 
             if (!CanKillPlayer())
             {
-                Debug.LogWarning($"[PlayerDamagePreviewWindow] Cannot kill player: {status}");
+                Debug.LogWarning($"[PlayerEffectPreviewWindow] Cannot kill player: {status}");
                 return;
             }
 
@@ -152,7 +152,7 @@ namespace GoodCopBadCop.Editor
             }
 
             playerHealth.TakeDamage(999f, EffectKeys.PlayerDeath);
-            Debug.Log("[PlayerDamagePreviewWindow] Applied lethal damage to the local player.");
+            Debug.Log("[PlayerEffectPreviewWindow] Applied lethal damage to the local player.");
             Repaint();
         }
 
@@ -237,7 +237,7 @@ namespace GoodCopBadCop.Editor
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[PlayerDamagePreviewWindow] Effects services were not resolved: {exception.Message}");
+                Debug.LogWarning($"[PlayerEffectPreviewWindow] Effects services were not resolved: {exception.Message}");
             }
         }
 

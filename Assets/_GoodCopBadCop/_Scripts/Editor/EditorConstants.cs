@@ -6,7 +6,7 @@ namespace GoodCopBadCop.Editor
         public const int RootMenuPriority = -1000;
 
         public const string EnvironmentDebugMenuPath = RootMenuPath + "Environment Debug";
-        public const string PlayerDamagePreviewMenuPath = RootMenuPath + "Player Damage Preview";
+        public const string PlayerEffectPreviewMenuPath = RootMenuPath + "Player Effect Preview";
         public const string AnomalyPreviewMenuPath = RootMenuPath + "Anomaly Preview";
     }
 
