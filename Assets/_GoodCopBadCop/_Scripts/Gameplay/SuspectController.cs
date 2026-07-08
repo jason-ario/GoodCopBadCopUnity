@@ -265,6 +265,10 @@ public class SuspectController : NetworkBehaviour
             ForceNextSuspectAnomalyCount = -1;
             suspectCharacter.InitializeWithExactAnomalyCount(count);
         }
+        else if (dailySuspectManager.IsReplacementSlot(lineupIndex))
+        {
+            suspectCharacter.InitializeAsReplacement();
+        }
         else
         {
             suspectCharacter.InitializeByInfectionStage();
@@ -1289,7 +1293,8 @@ public class SuspectController : NetworkBehaviour
         SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (killRecord != null)
         {
-            killRecord.isKilled = true;
+            killRecord.isKilled    = true;
+            killRecord.killedOnDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
             SuspectRunRecords.Instance.SaveRecords();
         }
 

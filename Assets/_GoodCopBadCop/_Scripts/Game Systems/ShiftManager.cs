@@ -296,33 +296,8 @@ public class ShiftManager : NetworkBehaviour
         if (!IsServer) return;
         if (shiftStarted.Value) return;
 
-        if (!AreAllPlayersInsideBooth())
-        {
-            NotifyNotAllInsideClientRpc(new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { requestingClientId } }
-            });
-            return;
-        }
-
         shiftStarted.Value = true;
         StartShiftClientRpc();
-    }
-
-    /// <summary>Returns true when every connected player has IsOutside == false.</summary>
-    private bool AreAllPlayersInsideBooth()
-    {
-        foreach (var player in FindObjectsByType<PlayerInstance>(FindObjectsSortMode.None))
-        {
-            if (player.IsOutside) return false;
-        }
-        return true;
-    }
-
-    [ClientRpc]
-    private void NotifyNotAllInsideClientRpc(ClientRpcParams rpcParams = default)
-    {
-        MegaphoneDialogueManager.Instance.SayNotAllInside();
     }
 
     [ClientRpc]
@@ -348,10 +323,6 @@ public class ShiftManager : NetworkBehaviour
 
         PlayBuzzerSound();
         windowLampController.TurnGreen();
-
-        // Unlock the pre-shift door lock on days 2+ now that the shift is starting.
-        if (_currentDay > 1)
-            OnDoorUnlock?.Invoke();
 
 
         yield return new WaitForSeconds(3f);
@@ -789,10 +760,57 @@ public class ShiftManager : NetworkBehaviour
 
     private void PlayShiftStartFanfare()
     {
-        bellSound.Play();
+        if (_currentDay == 3)
+            StartCoroutine(PlayCreepyBell());
+        else
+            bellSound.Play();
+
         if (!SuppressFanfare)
             _startShiftScreen.ShowDayNumber(_currentDay);
         SuppressFanfare = false;
+    }
+
+    /// <summary>Plays the bell with a creepy, unstable pitch shift for Day 3.</summary>
+    private IEnumerator PlayCreepyBell()
+    {
+        const float driftDelay   = 2f;
+        const float sinkSpeed    = 0.20f;  // semitone descent rate (pitch units per second)
+        const float sinkFloor    = 0.42f;  // lowest pitch before it bottoms out
+        const float wobbleSpeed  = 1.1f;   // slow, low-frequency irregularity
+        const float wobbleAmount = 0.05f;  // subtle so it doesn't fight the downward pull
+        const float reverseSpeed = -3f;    // negative pitch = backwards; magnitude sets playback speed
+
+        bellSound.pitch = 1f;
+        bellSound.Play();
+
+        // Phase 1: normal ring for the first 2 seconds
+        float elapsed = 0f;
+        while (bellSound.isPlaying && elapsed < driftDelay)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Phase 2: pitch steadily sinks with a slow, uneasy low-frequency wobble
+        float sinkElapsed = 0f;
+        while (bellSound.isPlaying)
+        {
+            sinkElapsed += Time.deltaTime;
+            float sink   = Mathf.Max(sinkFloor, 1f - sinkElapsed * sinkSpeed);
+            float wobble = Mathf.Sin(sinkElapsed * wobbleSpeed)        * wobbleAmount
+                         + Mathf.Sin(sinkElapsed * wobbleSpeed * 1.6f) * (wobbleAmount * 0.5f);
+            bellSound.pitch = sink + wobble;
+            yield return null;
+        }
+
+        // Phase 3: rapidly play the clip backwards (negative pitch, seeded from end of clip)
+        bellSound.timeSamples = bellSound.clip.samples - 1;
+        bellSound.pitch = reverseSpeed;
+        bellSound.Play();
+        while (bellSound.isPlaying)
+            yield return null;
+
+        bellSound.pitch = 1f;
     }
 
     /// <summary>Restores full player control.</summary>
@@ -913,6 +931,22 @@ public class ShiftManager : NetworkBehaviour
             StartCoroutine(SkipToBoothReadySequence(targetDay));
     }
 
+    /// <summary>
+    /// Debug shortcut. Runs the full environment-reset setup and places the player at the
+    /// outside-bunker spawn point instead of the booth — simulating the start of a new day
+    /// from outside the bunker. Call <see cref="CampaignManager.JumpToDay"/> before this so
+    /// the NetworkVariable propagates to all clients before <see cref="PlayShiftStartFanfare"/>
+    /// fires (mirrors the <see cref="SkipToBoothReady"/> / <see cref="DebugConsole.SkipToDay"/>
+    /// pattern).
+    /// </summary>
+    public void SkipToOutsideBunker()
+    {
+        if (IsServer)
+            SkipToOutsideBunkerClientRpc();
+        else
+            StartCoroutine(SkipToOutsideBunkerSequence());
+    }
+
     [ClientRpc]
     private void SkipToBoothReadyClientRpc()
     {
@@ -923,6 +957,49 @@ public class ShiftManager : NetworkBehaviour
     private void SkipToBoothReadyOnDayClientRpc(int targetDay)
     {
         StartCoroutine(SkipToBoothReadySequence(targetDay));
+    }
+
+    [ClientRpc]
+    private void SkipToOutsideBunkerClientRpc()
+    {
+        StartCoroutine(SkipToOutsideBunkerSequence());
+    }
+
+    private IEnumerator SkipToOutsideBunkerSequence()
+    {
+        MainMenuController.Instance.TransitionToGameplay();
+        AudioManager.Instance.StartAmbientAudio();
+
+        yield return new WaitForEndOfFrame();
+
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
+
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        ResetEnvironment();
+        SuspectController.Instance.ResetSuspects();
+
+        // Wait for a valid PlayerInstance — same guard as SkipToBoothReadySequence.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        Transform bunkerSpawn = PlayerSpawner.Instance.GetOutsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        PlayerInstance.Instance.SetPosition(bunkerSpawn);
+        PlayerInstance.Instance.SetIsOutside(false);
+
+        UIController.Instance.ShowPlayerUI();
+        EnablePlayerControl();
+        GameManager.Instance.OnGameStart?.Invoke();
+        OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
+        PlayShiftStartFanfare();
     }
 
     private IEnumerator SkipToBoothReadySequence(int targetDay = -1)

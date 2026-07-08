@@ -540,6 +540,25 @@ public class DebugConsole : MonoBehaviour
         Debug.Log("[DebugConsole] Skipped to end of Day 2 — post-shift Vlad cutscene starting.");
     }
 
+    /// <summary>
+    /// Skips to the start of Day 3 with the player positioned in front of the bunker,
+    /// matching the natural wake-up spawn before the player walks in to begin their shift.
+    /// JumpToDay is called first so the day NetworkVariable propagates to all clients
+    /// before PlayShiftStartFanfare fires — this ensures the correct sky colour and
+    /// Day 3 title card are shown (mirrors the SkipToDay / SkipToBoothReady pattern).
+    /// </summary>
+    public void SkipToStartOfDay3()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToStartOfDay3: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        CampaignManager.Instance.JumpToDay(3);
+        ShiftManager.Instance.SkipToOutsideBunker();
+    }
+
     /// bypassing normal character spawning and playing the mocking sequence directly.
     /// Useful for testing the soldier event without running through all preceding suspects.
     /// </summary>

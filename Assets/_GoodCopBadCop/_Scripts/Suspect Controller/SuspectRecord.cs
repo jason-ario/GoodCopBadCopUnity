@@ -27,6 +27,20 @@ public class SuspectRecord
     public bool isKilled;
 
     /// <summary>
+    /// The 1-based campaign day on which this suspect was killed. -1 means never killed.
+    /// Used to calculate when the replacement version of this suspect should activate.
+    /// </summary>
+    public int killedOnDay = -1;
+
+    /// <summary>
+    /// When true, this suspect has been "replaced" — they were killed, enough time has passed,
+    /// and an uncanny replacement version of them should now re-enter the shift pool.
+    /// The replacement is spawned via DoppelgangerData (InitializeAsDoppelganger) using the
+    /// replacementConfig defined on the suspect's SuspectData asset.
+    /// </summary>
+    public bool isReplacement;
+
+    /// <summary>
     /// The 1-based campaign day on which this suspect was most recently quarantined.
     /// -1 means never quarantined this session.
     /// DailySuspectManager uses this to skip the suspect on the shift immediately following

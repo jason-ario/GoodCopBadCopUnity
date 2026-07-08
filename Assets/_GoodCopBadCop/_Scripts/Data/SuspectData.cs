@@ -34,6 +34,11 @@ public class SuspectData : ScriptableObject
     [Tooltip("Authored note on expected behavior, shown on the terminal.")]
     public string normalBehaviorNotes;
 
+    [Header("Replacement System")]
+    [Tooltip("Face photo used when this suspect returns as an uncanny replacement after being killed. " +
+             "Leave null to disable replacement for this character.")]
+    public Texture2D replacementIDPhoto;
+
     public Texture2D IDPhoto;
     public SuspectCharacter CharacterPrefab;
 

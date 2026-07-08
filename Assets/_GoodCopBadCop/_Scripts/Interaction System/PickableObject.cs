@@ -32,6 +32,14 @@ public class PickableObject : Interactable
     /// Safe to subscribe from tutorial systems that need to react to a specific instance being placed.
     /// </summary>
     public event Action OnDroppedEvent;
+
+    /// <summary>
+    /// Fired on ALL instances (clients AND server) the moment this object is picked up by any player.
+    /// Driven by the server-authoritative <see cref="_holdingClientId"/> NetworkVariable, so it
+    /// fires on the server's instance even when a remote client does the pickup — unlike
+    /// <see cref="OnEquip"/> which only fires on the local client.
+    /// </summary>
+    public event Action OnPickedUpNetworked;
     protected bool isUsing;
 
     public bool CanPickUpManually { get; set; } = true;
@@ -111,6 +119,10 @@ public class PickableObject : Interactable
         // Only apply holder-based logic when no tutorial override is active.
         if (_networkInteractableOverride.Value == -1)
             SetInteractable(current == ulong.MaxValue);
+
+        // Notify all instances (including server) when this object transitions to being held.
+        if (previous == ulong.MaxValue && current != ulong.MaxValue)
+            OnPickedUpNetworked?.Invoke();
     }
 
     private void OnNetworkInteractableOverrideChanged(int previous, int current)

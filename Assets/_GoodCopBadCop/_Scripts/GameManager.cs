@@ -135,29 +135,32 @@ public class GameManager : NetworkBehaviour
     /// <summary>
     /// Runs the lobby transition sequence for a single client that joined while the host
     /// is already waiting in the lobby (game not yet started). SERVER ONLY.
+    /// Pass <paramref name="gameAlreadyStarted"/> = true when the game has already begun
+    /// (e.g. host started before this client connected) so the client bootstraps the
+    /// current day immediately rather than waiting for StartGameClientRpc.
     /// </summary>
-    public void InitializeLobbyJoinClient(ulong clientId)
+    public void InitializeLobbyJoinClient(ulong clientId, bool gameAlreadyStarted = false)
     {
         if (!IsServer) return;
 
-        Debug.Log($"[GameManager] InitializeLobbyJoinClient sending RPC to clientId={clientId}");
+        Debug.Log($"[GameManager] InitializeLobbyJoinClient sending RPC to clientId={clientId} gameAlreadyStarted={gameAlreadyStarted}");
 
         ClientRpcParams rpcParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
         };
 
-        InitializeLobbyJoinClientRpc(rpcParams);
+        InitializeLobbyJoinClientRpc(gameAlreadyStarted, rpcParams);
     }
 
     [ClientRpc]
-    private void InitializeLobbyJoinClientRpc(ClientRpcParams clientRpcParams = default)
+    private void InitializeLobbyJoinClientRpc(bool gameAlreadyStarted, ClientRpcParams clientRpcParams = default)
     {
-        Debug.Log("[GameManager] InitializeLobbyJoinClientRpc received — starting lobby join sequence");
-        StartCoroutine(LobbyJoinClientSequence());
+        Debug.Log($"[GameManager] InitializeLobbyJoinClientRpc received — starting lobby join sequence (gameAlreadyStarted={gameAlreadyStarted})");
+        StartCoroutine(LobbyJoinClientSequence(gameAlreadyStarted));
     }
 
-    private IEnumerator LobbyJoinClientSequence()
+    private IEnumerator LobbyJoinClientSequence(bool gameAlreadyStarted)
     {
         Debug.Log("[GameManager] LobbyJoinClientSequence: fading in");
         UIController.Instance.FadeIn();
@@ -170,6 +173,12 @@ public class GameManager : NetworkBehaviour
         UIController.Instance.ShowPlayerUI();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
+
+        // If the game was already running when this client joined (missed StartGameClientRpc),
+        // bootstrap the current day so DayActivated() fires and all tutorial subscriptions are set up.
+        if (gameAlreadyStarted)
+            CampaignManager.Instance.StartCampaign();
+
         OnGameStart?.Invoke();
     }
 
@@ -179,6 +188,9 @@ public class GameManager : NetworkBehaviour
         ShiftManager.Instance.StopIntroCutscene();
         UIController.Instance.ShowPlayerUI();
         MainMenuController.Instance.TransitionToGameplay();
+        // Bootstrap the current day on this client — it joined after StartGameClientRpc was
+        // already sent, so DayActivated() was never called and no tutorial state was set up.
+        CampaignManager.Instance.StartCampaign();
     }
 
     [ClientRpc]

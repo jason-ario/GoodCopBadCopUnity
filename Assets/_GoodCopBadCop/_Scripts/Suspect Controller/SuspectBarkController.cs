@@ -84,12 +84,36 @@ public class SuspectBarkController : NetworkBehaviour
 
         string[] lines;
 
-        if (ShiftManager.Instance.IsEarlyDays)
-            lines = _suspect.Data.idleBarks.earlyDays;
-        else if (ShiftManager.Instance.IsMidDays)
-            lines = _suspect.Data.idleBarks.midDays;
+        // Replacements always use the uncanny bark pool when authored.
+        if (_suspect.IsReplacement)
+        {
+            if (ShiftManager.Instance.IsEarlyDays)
+                lines = _suspect.Data.idleBarks.uncannyEarlyDays;
+            else if (ShiftManager.Instance.IsMidDays)
+                lines = _suspect.Data.idleBarks.uncannyMidDays;
+            else
+                lines = _suspect.Data.idleBarks.uncannyFinalDays;
+
+            // Fall back to normal barks if uncanny pool is empty.
+            if (lines == null || lines.Length == 0)
+            {
+                if (ShiftManager.Instance.IsEarlyDays)
+                    lines = _suspect.Data.idleBarks.earlyDays;
+                else if (ShiftManager.Instance.IsMidDays)
+                    lines = _suspect.Data.idleBarks.midDays;
+                else
+                    lines = _suspect.Data.idleBarks.finalDays;
+            }
+        }
         else
-            lines = _suspect.Data.idleBarks.finalDays;
+        {
+            if (ShiftManager.Instance.IsEarlyDays)
+                lines = _suspect.Data.idleBarks.earlyDays;
+            else if (ShiftManager.Instance.IsMidDays)
+                lines = _suspect.Data.idleBarks.midDays;
+            else
+                lines = _suspect.Data.idleBarks.finalDays;
+        }
 
         if (lines == null || lines.Length == 0) return null;
 

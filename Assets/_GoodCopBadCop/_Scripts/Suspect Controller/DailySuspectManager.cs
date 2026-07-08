@@ -22,6 +22,13 @@ public class DailySuspectManager : MonoBehaviour
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
 
     /// <summary>
+    /// Tracks which lineup slot indices are replacement suspects (killed civilians that have
+    /// re-activated after their replacement window elapsed). These suspects spawn normally
+    /// but are initialized via InitializeAsReplacement on SuspectCharacter.
+    /// </summary>
+    private readonly HashSet<int> _replacementSlotIndices = new HashSet<int>();
+
+    /// <summary>
     /// When assigned, replaces the default random population logic entirely.
     /// The delegate is responsible for populating <see cref="shiftSuspects"/> directly.
     /// Set by a day subclass (e.g. Day_01) and cleared when that day deactivates.
@@ -107,7 +114,17 @@ public class DailySuspectManager : MonoBehaviour
         List<SuspectData> randomSuspects = GetRandomSuspects(suspectAmount);
         foreach (SuspectData suspectData in randomSuspects)
         {
+            int slotIndex = shiftSuspects.Count;
             shiftSuspects.Add(suspectData);
+
+            // If this suspect is a replacement, register their slot so SuspectController
+            // can call InitializeAsReplacement instead of the normal init path.
+            SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+            if (record != null && record.isReplacement)
+            {
+                _replacementSlotIndices.Add(slotIndex);
+                Debug.Log($"[DailySuspectManager] '{suspectData.name}' replacement slot registered at index {slotIndex}.");
+            }
         }
 
         InjectMutantSlots();
@@ -155,6 +172,8 @@ public class DailySuspectManager : MonoBehaviour
             // Shift any previously recorded mutant indices at or above the insertion point,
             // excluding the one we just added.
             ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
+            ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+            ShiftReplacementSlotsAfterInsert(insertIndex);
         }
 
         Debug.Log($"[DailySuspectManager] Lineup: {normalCount} suspect(s) + {mutantCount} mutant intruder(s) = {shiftSuspects.Count} total slot(s).");
@@ -213,6 +232,7 @@ public class DailySuspectManager : MonoBehaviour
         // Shift all existing mutant and doppelganger slot indices that sit at or above the insertion point.
         ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
         ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+        ShiftReplacementSlotsAfterInsert(insertIndex);
 
         _doppelgangerSlots[insertIndex] = doppelgangerData;
 
@@ -260,11 +280,21 @@ public class DailySuspectManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Shifts all replacement slot indices that are >= insertIndex up by one.
+    /// Called after a mutant or doppelganger is inserted ahead of existing replacement slots.
+    /// </summary>
+    private void ShiftReplacementSlotsAfterInsert(int insertIndex)
+    {
+        ShiftHashSetIndicesAfterInsert(insertIndex, _replacementSlotIndices);
+    }
+
     /// <summary>Clears all slot index tracking for the new shift.</summary>
     private void ResetSlotTracking()
     {
         _mutantSlotIndices.Clear();
         _doppelgangerSlots.Clear();
+        _replacementSlotIndices.Clear();
     }
 
     /// <summary>
@@ -331,6 +361,16 @@ public class DailySuspectManager : MonoBehaviour
         return _doppelgangerSlots.TryGetValue(lineupIndex, out data);
     }
 
+    /// <summary>
+    /// Returns true if the given lineup index is a replacement slot — a killed suspect
+    /// whose replacement version has activated after the replacement window elapsed.
+    /// These are spawned normally but initialized via SuspectCharacter.InitializeAsReplacement.
+    /// </summary>
+    public bool IsReplacementSlot(int lineupIndex)
+    {
+        return _replacementSlotIndices.Contains(lineupIndex);
+    }
+
     private List<SuspectData> GetRandomSuspects(int amount)
     {
         List<SuspectData> randomSuspects = new List<SuspectData>();
@@ -354,11 +394,20 @@ public class DailySuspectManager : MonoBehaviour
 
             SuspectRecord runRecord = SuspectRunRecords.Instance?.GetRecord(suspect);
 
-            // Permanently exclude suspects that were killed this session.
+            // Permanently exclude suspects that were killed this session — UNLESS their
+            // replacement has activated, in which case they re-enter the pool.
             if (runRecord != null && runRecord.isKilled)
             {
-                Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — killed.");
-                continue;
+                if (runRecord.isReplacement)
+                {
+                    Debug.Log($"[DailySuspectManager] '{suspect.name}' re-entering pool as replacement.");
+                    // Fall through — included as an available suspect.
+                }
+                else
+                {
+                    Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — killed.");
+                    continue;
+                }
             }
 
             // Exclude suspects serving a one-day quarantine cooldown (quarantined yesterday).
