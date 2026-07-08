@@ -27,6 +27,7 @@ For AI-assisted project coding tasks:
 - Do not edit `Library`, `Temp`, `Obj`, `Logs`, `UserSettings`, or generated Unity cache folders.
 - Do not modify imported/vendor assets unless the user explicitly asks.
 - Be careful with scene, prefab, `.asset`, and `.meta` files; they can carry large serialized changes.
+- Do not create or hand-edit Unity `.meta` files manually. Let Unity generate/import them, and use Unity/AssetDatabase tooling when metadata must change.
 - For Netcode changes, check ownership, host/client/server paths, RPC direction, and late-join behavior.
 
 ## Verification
