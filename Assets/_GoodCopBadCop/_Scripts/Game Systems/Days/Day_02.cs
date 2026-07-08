@@ -175,6 +175,9 @@ public class Day_02 : DayBase
     [Tooltip("Degrees-per-second at which Ocho rotates to face the nearest player while watching.")]
     [SerializeField] private float _ochoWatchRotateSpeed = 60f;
 
+    [Tooltip("Stinger sound effect played on all clients the moment Ocho begins fleeing.")]
+    [SerializeField] private AudioClip _ochoFleeStinger;
+
     // Runtime Ocho instance. Tracked so DayDeactivated can clean up mid-sequence.
     private NetworkObject _spawnedOcho;
 
@@ -993,12 +996,18 @@ public class Day_02 : DayBase
         // Add OchoWatcherBehaviour at runtime and configure it with scene-owned values
         // before Spawn() fires OnNetworkSpawn. AddComponent is used so the prefab stays
         // clean — no need to bake the component onto the asset.
+        AudioSource ochoAudio = instance.AddComponent<AudioSource>();
+        ochoAudio.playOnAwake   = false;
+        ochoAudio.spatialBlend  = 0f; // 2D — stinger plays flat on all clients
+
         OchoWatcherBehaviour ochoWatcher = instance.AddComponent<OchoWatcherBehaviour>();
         ochoWatcher.Initialise(
             fleeDestination:  _ochoFleeDestination,
             fleeRadius:       _ochoFleeRadius,
             fleeSpeed:        _ochoFleeSpeed,
-            watchRotateSpeed: _ochoWatchRotateSpeed
+            watchRotateSpeed: _ochoWatchRotateSpeed,
+            audioSource:      ochoAudio,
+            fleeSound:        _ochoFleeStinger
         );
 
         netObj.Spawn(destroyWithScene: true);

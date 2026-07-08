@@ -23,6 +23,14 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public static event Action OnAnyMutantKilled;
 
+    /// <summary>
+    /// Fired on the server the first time any <see cref="MutantEnemy"/> instance acquires a
+    /// player target (i.e. transitions from idle/patrol to actively chasing).
+    /// <see cref="FollowTrailThreat"/> subscribes while the follow-trail task is active so that
+    /// encountering a pack mutant early skips straight to the kill-mutants task.
+    /// </summary>
+    public static event Action OnAnyMutantSpottedPlayer;
+
     // ── Configuration ─────────────────────────────────────────────────────────
 
     [SerializeField] private MutantEnemyData data;
@@ -201,6 +209,9 @@ public class MutantEnemy : NetworkBehaviour
 
             bool wasChasing = _currentTarget != null;
             _currentTarget = FindNearestLivingPlayer();
+
+            if (!wasChasing && _currentTarget != null)
+                OnAnyMutantSpottedPlayer?.Invoke();
 
             if (_currentTarget != null)
             {

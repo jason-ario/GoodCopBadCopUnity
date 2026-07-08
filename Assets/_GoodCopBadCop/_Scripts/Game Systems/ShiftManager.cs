@@ -106,6 +106,14 @@ public class ShiftManager : NetworkBehaviour
     public Action OnShiftStart { get; set; }
     public Action OnShiftEnd { get; set; }
     public Action OnShiftReady { get; set; }
+
+    /// <summary>
+    /// Fired on the server immediately after the last suspect for the current shift is
+    /// processed and before clock-out is enabled.
+    /// Subscribe in day-specific classes (e.g. Day_03) to trigger end-of-shift events
+    /// that should occur right after the final visitor walks away.
+    /// </summary>
+    public static event Action OnLastSuspectProcessed;
     /// <summary>
     /// Fired once per workday when the player enters the booth and the day officially starts
     /// (after the intro cutscene or between-shift transition). Use this for day-start effects
@@ -205,6 +213,8 @@ public class ShiftManager : NetworkBehaviour
         if (!interceptPending &&
             SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
+            OnLastSuspectProcessed?.Invoke();
+
             if (_timecardMachine != null)
                 _timecardMachine.EnableClockOut();
 

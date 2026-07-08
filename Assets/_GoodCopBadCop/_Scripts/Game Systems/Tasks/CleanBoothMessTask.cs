@@ -59,12 +59,20 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    private readonly NetworkVariable<int> _networkRemainingBlood = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<int> _networkRemainingJunk = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // ── Server-only state ────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedSplatters = new();
     private readonly List<NetworkObject> _spawnedJunk      = new();
-    private int _remainingBlood;
-    private int _remainingJunk;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
@@ -73,8 +81,8 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     public float  ThreatLevel => _networkThreatLevel.Value;
 
     public string ThreatDescription =>
-        (_remainingBlood + _remainingJunk) > 0
-            ? $"Blood to scrub: {_remainingBlood}  |  Junk to bag: {_remainingJunk}"
+        (_networkRemainingBlood.Value + _networkRemainingJunk.Value) > 0
+            ? $"Blood to scrub: {_networkRemainingBlood.Value}  |  Junk to bag: {_networkRemainingJunk.Value}"
             : "Booth cleaned!";
 
     /// <summary>Not used — this is a day-start task, not a night-phase threat.</summary>
@@ -86,7 +94,9 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (!IsServer) return;
         DespawnExistingSplatters();
         DespawnExistingJunk();
-        _networkThreatLevel.Value = 0f;
+        _networkThreatLevel.Value       = 0f;
+        _networkRemainingBlood.Value    = 0;
+        _networkRemainingJunk.Value     = 0;
         _isActive.Value = false;
     }
 
@@ -146,7 +156,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         UpdateThreatLevel();
         RegisterClientRpc();
 
-        Debug.Log($"[CleanBoothMessTask] Task triggered. {_remainingBlood} splatter(s), {_remainingJunk} junk item(s) spawned.");
+        Debug.Log($"[CleanBoothMessTask] Task triggered. {_networkRemainingBlood.Value} splatter(s), {_networkRemainingJunk.Value} junk item(s) spawned.");
     }
 
     // ── Callbacks ────────────────────────────────────────────────────────────
@@ -155,7 +165,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     public void OnBloodScrubbed()
     {
         if (!IsServer) return;
-        _remainingBlood = Mathf.Max(0, _remainingBlood - 1);
+        _networkRemainingBlood.Value = Mathf.Max(0, _networkRemainingBlood.Value - 1);
         UpdateThreatLevel();
         CheckCompletion();
     }
@@ -164,7 +174,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     public void OnJunkCollected()
     {
         if (!IsServer) return;
-        _remainingJunk = Mathf.Max(0, _remainingJunk - 1);
+        _networkRemainingJunk.Value = Mathf.Max(0, _networkRemainingJunk.Value - 1);
         UpdateThreatLevel();
         CheckCompletion();
     }
@@ -175,7 +185,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
 
-        if (_remainingBlood > 0 || _remainingJunk > 0) return;
+        if (_networkRemainingBlood.Value > 0 || _networkRemainingJunk.Value > 0) return;
 
         _networkThreatLevel.Value = 0f;
         _isActive.Value = false;
@@ -188,7 +198,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
 
     private void SpawnAllSplatters()
     {
-        _remainingBlood = 0;
+        _networkRemainingBlood.Value = 0;
 
         if (_bloodSplatterPrefabs == null || _bloodSplatterPrefabs.Length == 0 ||
             _bloodSpawnPoints == null || _bloodSpawnPoints.Length == 0)
@@ -217,7 +227,6 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
             if (interactable != null)
                 interactable.OnScrubCompleted += OnBloodScrubbed;
 
-            // Enable and trigger the BloodTextureRandomizer so each splatter gets a unique texture.
             BloodTextureRandomizer randomizer = go.GetComponent<BloodTextureRandomizer>();
             if (randomizer != null)
             {
@@ -227,13 +236,13 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
 
             netObj.Spawn(destroyWithScene: true);
             _spawnedSplatters.Add(netObj);
-            _remainingBlood++;
+            _networkRemainingBlood.Value++;
         }
     }
 
     private void SpawnAllJunk()
     {
-        _remainingJunk = 0;
+        _networkRemainingJunk.Value = 0;
 
         if (_junkPrefabs == null || _junkPrefabs.Length == 0 ||
             _junkSpawnPoints == null || _junkSpawnPoints.Length == 0)
@@ -247,7 +256,12 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
             if (point == null) continue;
 
             GameObject prefab = _junkPrefabs[Random.Range(0, _junkPrefabs.Length)];
-            GameObject go     = Instantiate(prefab, point.position, point.rotation);
+
+            // Randomize Y rotation while preserving the spawn point's X/Z tilt.
+            Vector3 euler = point.eulerAngles;
+            Quaternion rotation = Quaternion.Euler(euler.x, Random.Range(0f, 360f), euler.z);
+
+            GameObject go = Instantiate(prefab, point.position, rotation);
             go.transform.localScale = point.localScale;
 
             NetworkObject netObj = go.GetComponent<NetworkObject>();
@@ -264,7 +278,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
 
             netObj.Spawn(destroyWithScene: true);
             _spawnedJunk.Add(netObj);
-            _remainingJunk++;
+            _networkRemainingJunk.Value++;
         }
     }
 
@@ -276,7 +290,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
                 netObj.Despawn(destroy: true);
         }
         _spawnedSplatters.Clear();
-        _remainingBlood = 0;
+        _networkRemainingBlood.Value = 0;
     }
 
     private void DespawnExistingJunk()
@@ -287,15 +301,15 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
                 netObj.Despawn(destroy: true);
         }
         _spawnedJunk.Clear();
-        _remainingJunk = 0;
+        _networkRemainingJunk.Value = 0;
     }
 
     // ── Threat level ──────────────────────────────────────────────────────────
 
     private void UpdateThreatLevel()
     {
-        int total = (_bloodSpawnPoints?.Length ?? 0) + (_junkSpawnPoints?.Length ?? 0);
-        int remaining = _remainingBlood + _remainingJunk;
+        int total     = (_bloodSpawnPoints?.Length ?? 0) + (_junkSpawnPoints?.Length ?? 0);
+        int remaining = _networkRemainingBlood.Value + _networkRemainingJunk.Value;
         _networkThreatLevel.Value = total > 0 ? (float)remaining / total : 0f;
     }
 

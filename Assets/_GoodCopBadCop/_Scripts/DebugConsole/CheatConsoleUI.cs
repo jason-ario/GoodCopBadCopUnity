@@ -88,6 +88,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToStartOfDay3());
             SetVisible(false);
         }));
+
+        _cheats.Add(("Skip to Day 3 — Power Outage + Phone Call", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay3PowerOutage());
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

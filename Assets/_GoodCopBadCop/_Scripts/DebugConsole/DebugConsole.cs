@@ -559,6 +559,50 @@ public class DebugConsole : MonoBehaviour
         ShiftManager.Instance.SkipToOutsideBunker();
     }
 
+    /// <summary>
+    /// Skips to Day 3 with the players placed in booth positions and the shift immediately
+    /// started, then forces the power-outage sequence — the lights cut, the phone rings,
+    /// and picking it up plays the scripted dialogue and registers the Repair Power task.
+    /// </summary>
+    public void SkipToDay3PowerOutage()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay3PowerOutage: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(3);
+        StartCoroutine(SkipToDay3PowerOutageAfterDelay());
+    }
+
+    private IEnumerator SkipToDay3PowerOutageAfterDelay()
+    {
+        // Wait one frame for Day_03 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_03.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay3PowerOutage: Day_03.Instance not found after SkipToDay(3).");
+            yield break;
+        }
+
+        _startShiftGate?.ForceIntroComplete();
+
+        // Start the shift with a large first-arrival window — no suspects will arrive.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
+
+        // Force the power outage sequence immediately (bypasses the normal last-suspect gate).
+        Day_03.Instance.DebugTriggerPowerOutage();
+
+        Debug.Log("[DebugConsole] Skipped to Day 3 — power outage sequence starting.");
+    }
+
     /// bypassing normal character spawning and playing the mocking sequence directly.
     /// Useful for testing the soldier event without running through all preceding suspects.
     /// </summary>

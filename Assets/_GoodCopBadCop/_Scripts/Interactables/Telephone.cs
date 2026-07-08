@@ -9,8 +9,15 @@ public class Telephone : Interactable
 {
     public static Telephone Instance { get; private set; }
 
-    /// <summary>Fired on all clients when the phone begins ringing.</summary>
+    /// <summary>Fired on all clients when a ring.</summary>
     public static event Action OnRingStarted;
+
+    /// <summary>
+    /// Fired on ALL clients (via ClientRpc) when a scripted call started with
+    /// <see cref="TriggerScriptedCall"/> is answered. Use this to register tasks or
+    /// trigger any per-client setup that should happen the moment the handset is lifted.
+    /// </summary>
+    public static event Action OnScriptedCallAnsweredAllClients;
 
     /// <summary>
     /// When true, all incoming calls are silently suppressed — <see cref="TriggerCall"/>
@@ -84,6 +91,10 @@ public class Telephone : Interactable
     private int _pendingTaskIndex = -1;
     private Coroutine _ringTimeoutCoroutine;
 
+    // Server-only: scripted call state. Set by TriggerScriptedCall.
+    private bool _isScriptedCall = false;
+    private Action _scriptedCallAnsweredCallback;
+
     // Client-only: drives the ring cycle (animation + one-shot audio).
     private Coroutine _ringCycleCoroutine;
 
@@ -137,6 +148,29 @@ public class Telephone : Interactable
         }
 
         _pendingTaskIndex = taskIndex;
+        _isRinging.Value = true;
+
+        StartRingingClientRpc();
+        _ringTimeoutCoroutine = StartCoroutine(RingTimeoutRoutine());
+    }
+
+    /// <summary>
+    /// Server-only. Triggers an incoming phone call for a scripted sequence.
+    /// The normal task and voice-line delivery are suppressed — <paramref name="onAnswered"/>
+    /// fires on the server as soon as the player picks up the handset.
+    /// Callers should wait ~1.5 s inside <paramref name="onAnswered"/> before starting any
+    /// <see cref="ScriptedDialogueRunner"/> sequence so the grab animation can finish first.
+    /// Does nothing if the phone is already ringing or currently grabbed.
+    /// </summary>
+    public void TriggerScriptedCall(Action onAnswered)
+    {
+        if (!IsServer) return;
+        if (BlockAllCalls) return;
+        if (_isRinging.Value || _isGrabbed.Value) return;
+
+        _isScriptedCall = true;
+        _scriptedCallAnsweredCallback = onAnswered;
+        _pendingTaskIndex = -2; // sentinel: scripted call — no task or debug voice delivered
         _isRinging.Value = true;
 
         StartRingingClientRpc();
@@ -218,7 +252,17 @@ public class Telephone : Interactable
         int taskIndex = _pendingTaskIndex;
         _pendingTaskIndex = -1;
 
+        // Capture and clear scripted-call state before the RPC so callers
+        // can safely re-trigger a call inside the callback without collision.
+        bool wasScriptedCall = _isScriptedCall;
+        Action scriptedCallback = _scriptedCallAnsweredCallback;
+        _isScriptedCall = false;
+        _scriptedCallAnsweredCallback = null;
+
         PhoneAnsweredClientRpc(clientId, taskIndex);
+
+        if (wasScriptedCall)
+            scriptedCallback?.Invoke();
     }
 
     private IEnumerator RingTimeoutRoutine()
@@ -229,6 +273,8 @@ public class Telephone : Interactable
         {
             _isRinging.Value = false;
             _pendingTaskIndex = -1;
+            _isScriptedCall = false;
+            _scriptedCallAnsweredCallback = null;
             StopRingingClientRpc();
             Debug.Log("[Telephone] Call missed — no one answered in time.");
         }
@@ -316,6 +362,16 @@ public class Telephone : Interactable
                 TaskRegistry.Instance.AddTask(task);
             }
         }
+        else if (taskIndex == -1)
+        {
+            // Debug call: register a placeholder task on all clients.
+            PhoneCallTask debugTask = new PhoneCallTask(_debugTaskName, _debugTaskDescription, 0);
+            TaskRegistry.Instance?.AddTask(debugTask);
+        }
+        // taskIndex == -2: scripted call — task and voice are handled externally by the caller.
+        // Notify all clients so they can register their own tasks for this scripted call.
+        if (taskIndex == -2)
+            OnScriptedCallAnsweredAllClients?.Invoke();
 
         // Determine ownership before lookup. For the answering client, use LocalClient.PlayerObject
         // directly — ConnectedClientsList is only fully populated on the server/host, so iterating
@@ -384,13 +440,10 @@ public class Telephone : Interactable
                 DialogueManager.Instance.PlayDialogueAudio(data.VoiceLine, data.VoiceAudioClips, _voiceAudioSource);
             }
         }
-        else if (taskIndex < 0)
+        else if (taskIndex == -1)
         {
-            // Debug call — show the hardcoded line and add a placeholder task.
+            // Debug call — show the hardcoded line and play debug audio.
             DialogueManager.Instance.SpawnSubtitles(_debugVoiceLine, _hqSpeakerName, Color.white);
-
-            PhoneCallTask debugTask = new PhoneCallTask(_debugTaskName, _debugTaskDescription, 0);
-            TaskRegistry.Instance?.AddTask(debugTask);
 
             if (_voiceAudioSource != null && _debugVoiceAudioClips != null && _debugVoiceAudioClips.Length > 0)
             {
@@ -398,8 +451,13 @@ public class Telephone : Interactable
                     _debugVoiceLine, _debugVoiceAudioClips, _voiceAudioSource);
             }
         }
-        // Control returns to the player immediately after voice starts.
-        // The player hangs up by interacting with the phone again.
+        // taskIndex == -2: scripted call — voice/subtitles handled by ScriptedDialogueRunner.
+        // Show only a hang-up back button so the player can put the phone down when done.
+        if (taskIndex == -2)
+        {
+            ulong localClientId = NetworkManager.Singleton.LocalClientId;
+            UIController.Instance?.ShowBackButton(() => HangUp(localClientId));
+        }
     }
 
     private void StopRingEffects()
@@ -566,6 +624,8 @@ public class Telephone : Interactable
         yield return new WaitForSeconds(.25f);
 
         UIController.Instance.CloseHQOrderScreen();
+        // Always hide the back button — it may have been shown for a scripted call hang-up.
+        UIController.Instance?.HideBackButton();
         player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);

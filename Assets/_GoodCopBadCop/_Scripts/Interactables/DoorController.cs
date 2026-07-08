@@ -24,6 +24,12 @@ public class DoorController : Interactable, IMutantPassable, IHeldItemPassthroug
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>
+    /// Fired on all clients when this door opens (transitions from closed to open).
+    /// Unsubscribe after the first use if you only want a one-shot trigger.
+    /// </summary>
+    public event System.Action OnDoorOpened;
+
     [SerializeField] private Animator _animator;
     private bool _beingInteractedWith = false;
     [SerializeField] private float waitDelay = .5f;
@@ -210,6 +216,9 @@ public class DoorController : Interactable, IMutantPassable, IHeldItemPassthroug
     private void PlayDoorSoundClientRpc(bool opening)
     {
         audioSource.PlayOneShot(opening ? doorOpenClip : doorCloseClip);
+
+        if (opening)
+            OnDoorOpened?.Invoke();
     }
 
     private void OnDoorStateChanged(bool oldValue, bool newValue)
