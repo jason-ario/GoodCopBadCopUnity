@@ -49,6 +49,9 @@ public class ATM : MonoBehaviour
     [Tooltip("MachineShake component that runs while the ATM is dispensing. Disable the component in the Inspector; it will be toggled on/off automatically.")]
     [SerializeField] private MachineShake _machineShake;
 
+    [Tooltip("Screen controller that flashes the payment amount on the ATM display.")]
+    [SerializeField] private ATMScreenController _screenController;
+
     [Header("Debug")]
     [Tooltip("Number of coupons to dispense when pressing M in a development build or the editor.")]
     [SerializeField] private int _debugDispenseAmount = 5;
@@ -94,6 +97,7 @@ public class ATM : MonoBehaviour
         if (amount <= 0) return;
 
         PlayDispenseSound();
+        _screenController?.ShowPayment(amount);
         StartCoroutine(SpawnCouponsRoutine(amount));
     }
 

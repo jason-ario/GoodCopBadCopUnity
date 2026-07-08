@@ -7,18 +7,19 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ATM
-  m_Shader: {fileID: -6465566751694194690, guid: df5bb027d94a6c44bb32b3c31ec1303f, type: 3}
+  m_Name: ATM Text Screen
+  m_Shader: {fileID: 4800000, guid: e0973393781f3e64982e723704b48e94, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - TCP2_REFLECTIONS_FRESNEL
   - TCP2_RIM_LIGHTING_LIGHTMASK
   - TCP2_SHADOW_LIGHT_COLOR
-  - TCP2_UV_NORMALS_FULL
-  - _NORMALMAP
+  - TCP2_SPECULAR
   m_InvalidKeywords:
   - TCP2_NORMAL_MAP
+  - TCP2_UV_NORMALS_FULL
+  - _GEOREFRACTIONS
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -31,11 +32,11 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: f24b6e8a403e6cd438a5c3aa2c5d6109, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 2800000, guid: f5dd60e6ad7b03046b2589af55d712fa, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -58,6 +59,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: f24b6e8a403e6cd438a5c3aa2c5d6109, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _MaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MatCapMask:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -74,6 +79,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _OverlayMap:
+        m_Texture: {fileID: 8400000, guid: 9b3b40eef7f048049a065a92c9fc9baf, type: 2}
+        m_Scale: {x: 0.5, y: 0.21}
+        m_Offset: {x: 0.23, y: 0.4}
     - _ParallaxMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -119,8 +128,10 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
+    - _ApplyNormal: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
+    - _BumpRefraction: 0.1
     - _BumpScale: 0.1721
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
@@ -132,14 +143,22 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EmissionChannel: 4
+    - _EnableBaseMap: 0
+    - _EnableGeoRefr: 1
+    - _EnableMaskMap: 0
+    - _EnableScreenEdgeFade: 0
     - _EnvironmentReflections: 1
+    - _ExcludeForeground: 0
+    - _FinalAlpha: 0.5
     - _FresnelMax: 1.5
     - _FresnelMin: 0
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _IOR: 1.33
     - _IndirectIntensity: 1
     - _IndirectIntensityOutline: 0
+    - _IsThinShell: 0
     - _MatCapMaskChannel: 0
     - _MatCapType: 0
     - _Metallic: 0
@@ -156,7 +175,11 @@ Material:
     - _OutlineTextureLOD: 5
     - _OutlineTextureType: 0
     - _OutlineWidth: 0.5
+    - _OverlayFlipX: 0
+    - _OverlayFlipY: 0
+    - _OverlayOpacity: 1
     - _Parallax: 0.02
+    - _Power: 0.952
     - _QueueOffset: 0
     - _RampBands: 4
     - _RampBandsSmoothing: 0.1
@@ -165,26 +188,39 @@ Material:
     - _RampSmoothing: 0.057
     - _RampThreshold: 0.479
     - _RampType: 0
+    - _ReadMask: 255
     - _ReceiveShadows: 1
     - _ReceiveShadowsOff: 1
     - _ReflectionMapType: 0
     - _ReflectionSmoothness: 0.5
     - _RenderingMode: 0
+    - _Rim: 0
+    - _RimFrequency: 0
     - _RimMax: 1
     - _RimMin: 0.5
+    - _RimMinPower: 1
+    - _RimPerPositionFrequency: 1
+    - _RimPower: 2
+    - _ScreenEdgeFade: 8
     - _ShadowColorLightAtten: 1
     - _SingleIndirectColor: 0
     - _SketchTexture_OffsetSpeed: 120
-    - _Smoothness: 0
+    - _Smoothness: 0.159
+    - _SmoothnessBase: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SpecularMapType: 0
-    - _SpecularRoughness: 0.118
+    - _SpecularRoughness: 0.379
     - _SpecularToonSize: 0.25
     - _SpecularToonSmoothness: 0.05
     - _SpecularType: 0
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
+    - _Stencil: 0
+    - _StencilComp: 8
+    - _StencilFail: 0
+    - _StencilOp: 0
+    - _StencilZFail: 0
     - _Surface: 0
     - _UVSec: 0
     - _UseAlphaTest: 0
@@ -193,32 +229,34 @@ Material:
     - _UseMatCap: 0
     - _UseMatCapMask: 0
     - _UseMobileMode: 0
-    - _UseNormalMap: 1
+    - _UseNormalMap: 0
     - _UseOcclusion: 0
-    - _UseOutline: 1
+    - _UseOutline: 0
     - _UseReflections: 0
     - _UseRim: 0
     - _UseRimLightMask: 1
     - _UseShadowTexture: 0
     - _UseSketch: 0
-    - _UseSpecular: 0
+    - _UseSpecular: 1
     - _WorkflowMode: 1
+    - _WriteMask: 255
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     - __dummy__: 0
     - _faceCulling: 2
     m_Colors:
-    - _BaseColor: {r: 1, g: 0.9259691, b: 0.84339625, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
-    - _HColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 1, g: 0.8380207, b: 0, a: 1}
+    - _EmissionColor: {r: 0.12499998, g: 0.04166665, b: 0, a: 1}
+    - _HColor: {r: 1, g: 1, b: 1, a: 1}
     - _MatCapColor: {r: 1, g: 1, b: 1, a: 1}
     - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     - _OutlineColorVertex: {r: 0, g: 0, b: 0, a: 1}
     - _ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - _RimColor: {r: 0.8, g: 0.8, b: 0.8, a: 0.5}
-    - _SColor: {r: 0, g: 0, b: 0, a: 1}
+    - _SColor: {r: 1, g: 1, b: 1, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _SpecColorBase: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _SpecularColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

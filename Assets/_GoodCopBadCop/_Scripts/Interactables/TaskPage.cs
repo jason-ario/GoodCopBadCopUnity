@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,15 +7,19 @@ using UnityEngine;
 /// Rows are instantiated from a prefab and parented to a container inside Task Page Contents.
 /// Row layout is handled by a Vertical Layout Group on the container.
 /// Tasks removed from the registry are kept with a strikethrough to show completion.
-/// Tutorial tasks are excluded. The render camera stays permanently active so all content
-/// (including the static Header) is always captured without timing issues.
+/// Tutorial tasks are excluded.
+///
+/// Follows the same stateless snapshot pattern as DailyFaxContentsController and ATMScreenController:
+/// no render texture or material instances are created at runtime. The camera's targetTexture
+/// and the paper mesh material are pre-wired directly to Task Checklist.renderTexture in the
+/// scene, so the only runtime work is spawning rows and toggling the camera for one frame.
 ///
 /// Scene setup:
-///   - Assign _taskRowPrefab         → Task Item prefab (has TaskPageRow component)
-///   - Assign _rowContainer          → Task Page Contents/Contents/Task Rows (Transform, has Vertical Layout Group)
-///   - Assign _renderCamera          → Task Page Contents/Camera (1)
-///   - Assign _paperRenderer         → root/GLTF_SceneRootNode/Cube.001_1/Object_6 (MeshRenderer)
-///   - Assign _renderTextureTemplate → Assets/_GoodCopBadCop/_Textures/Render Textures/Task Checklist.renderTexture
+///   - Camera (1).targetTexture       → Task Checklist.renderTexture  (set in Inspector)
+///   - Task List.mat._OverlayMap      → Task Checklist.renderTexture  (set in material)
+///   - Assign _taskRowPrefab          → Task Item prefab (has TaskPageRow component)
+///   - Assign _rowContainer           → Task Page Contents/Canvas/Tasks (Transform)
+///   - Assign _renderCamera           → Task Page Contents/Camera (1)  (disabled by default)
 /// </summary>
 public class TaskPage : MonoBehaviour
 {
@@ -26,19 +31,8 @@ public class TaskPage : MonoBehaviour
     [SerializeField] private Transform _rowContainer;
 
     [Header("Render Texture")]
-    [Tooltip("Orthographic camera inside Task Page Contents that renders all content into the render texture.")]
+    [Tooltip("Orthographic camera inside Task Page Contents. targetTexture must be Task Checklist.renderTexture. Disabled by default.")]
     [SerializeField] private Camera _renderCamera;
-
-    [Tooltip("MeshRenderer on the paper mesh whose material exposes _OverlayMap.")]
-    [SerializeField] private MeshRenderer _paperRenderer;
-
-    [Tooltip("Project-asset RenderTexture used as a descriptor template. A runtime clone is created per instance.")]
-    [SerializeField] private RenderTexture _renderTextureTemplate;
-
-    private static readonly int OverlayMapProperty = Shader.PropertyToID("_OverlayMap");
-
-    private RenderTexture _renderTexture;
-    private Material _paperMaterialInstance;
 
     private readonly List<TaskPageRow> _rows = new();
 
@@ -49,11 +43,6 @@ public class TaskPage : MonoBehaviour
     private readonly List<(ISystemicThreat threat, bool completed)> _knownTasks = new();
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
-
-    private void Awake()
-    {
-        SetupRenderTexture();
-    }
 
     private void OnEnable()
     {
@@ -66,57 +55,6 @@ public class TaskPage : MonoBehaviour
     {
         TaskRegistry.OnTaskListChanged  -= OnTaskListChanged;
         TaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
-    }
-
-    private void OnDestroy()
-    {
-        if (_renderTexture != null)
-        {
-            _renderTexture.Release();
-            Destroy(_renderTexture);
-        }
-
-        if (_paperMaterialInstance != null)
-            Destroy(_paperMaterialInstance);
-    }
-
-    // ── Render texture setup ──────────────────────────────────────────────────
-
-    /// <summary>
-    /// Clones the RT template, assigns it to the render camera, and stamps it onto a
-    /// per-instance material. The camera stays active so all TMP content is always captured.
-    /// </summary>
-    private void SetupRenderTexture()
-    {
-        if (_renderCamera == null || _paperRenderer == null)
-        {
-            Debug.LogWarning("[TaskPage] Render camera or paper renderer not assigned.", this);
-            return;
-        }
-
-        RenderTextureDescriptor desc = _renderTextureTemplate != null
-            ? _renderTextureTemplate.descriptor
-            : new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.Default, 24);
-
-        _renderTexture = new RenderTexture(desc)
-        {
-            name       = "TaskPageRT",
-            wrapMode   = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear
-        };
-        _renderTexture.Create();
-
-        _renderCamera.targetTexture = _renderTexture;
-
-        _paperMaterialInstance = new Material(_paperRenderer.sharedMaterial);
-        _paperMaterialInstance.SetTexture(OverlayMapProperty, _renderTexture);
-
-        Material[] slots = new Material[_paperRenderer.sharedMaterials.Length];
-        for (int i = 0; i < slots.Length; i++)
-            slots[i] = _paperMaterialInstance;
-        _paperRenderer.materials = slots;
-
-        _renderCamera.gameObject.SetActive(true);
     }
 
     // ── TaskRegistry event handlers ───────────────────────────────────────────
@@ -169,7 +107,9 @@ public class TaskPage : MonoBehaviour
     // ── Row spawning ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Destroys all existing row instances and respawns them from _knownTasks.
+    /// Destroys all existing row instances and respawns them from _knownTasks,
+    /// then fires a camera snapshot so the render texture is captured after TMP
+    /// has fully submitted its mesh geometry.
     /// Layout is handled by the Vertical Layout Group on _rowContainer.
     /// </summary>
     private void RebuildRows()
@@ -192,6 +132,8 @@ public class TaskPage : MonoBehaviour
             row.Bind(threat, completed);
             _rows.Add(row);
         }
+
+        StartCoroutine(CameraSnapshot());
     }
 
     /// <summary>Destroys all instantiated row GameObjects and clears the row list.</summary>
@@ -203,5 +145,21 @@ public class TaskPage : MonoBehaviour
                 Destroy(row.gameObject);
         }
         _rows.Clear();
+    }
+
+    // ── Snapshot ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Activates the render camera for exactly one frame after TMP geometry has been submitted.
+    /// Identical to DailyFaxContentsController.CameraSnapshot().
+    /// </summary>
+    private IEnumerator CameraSnapshot()
+    {
+        if (_renderCamera == null) yield break;
+
+        yield return new WaitForEndOfFrame();
+        _renderCamera.gameObject.SetActive(true);
+        yield return new WaitForEndOfFrame();
+        _renderCamera.gameObject.SetActive(false);
     }
 }
