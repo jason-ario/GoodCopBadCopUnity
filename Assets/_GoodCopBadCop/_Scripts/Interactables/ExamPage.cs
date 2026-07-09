@@ -147,8 +147,10 @@ public class ExamPage : FolderItem
     /// <summary>
     /// Enables the checklist camera for one frame so it writes the current visual state
     /// into the RenderTexture, then deactivates it. Restarts if called while already running.
+    /// Called by ExamNotebook after SetPagesActive(true) so the RT is populated on every
+    /// client that just activated the page (e.g. picked up from a supply box).
     /// </summary>
-    private void SnapshotChecklist()
+    public void SnapshotChecklist()
     {
         if (_checklistCamera == null) return;
 

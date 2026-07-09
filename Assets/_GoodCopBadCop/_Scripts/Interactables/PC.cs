@@ -135,9 +135,21 @@ public class PC : Interactable
 
         CloseAllScreens();
         profilePage.gameObject.SetActive(true);
-        profilePage.SetProfileData(suspectData);
 
-        UpdateProfileNavigationUI(); // 🔥 IMPORTANT
+        // Resolve the status stamp shown on the profile from the runtime suspect record.
+        string status = string.Empty;
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null)
+        {
+            if (record.isReplacement)
+                status = "REPLACED";
+            else if (record.isKilled)
+                status = "DECEASED";
+        }
+
+        profilePage.SetProfileData(suspectData, status: status);
+
+        UpdateProfileNavigationUI();
 
         StartCoroutine(WaitAndRefreshMouse());
     }
@@ -295,7 +307,14 @@ public class PC : Interactable
 
     public void OpenDeceased()
     {
+        // Filter to suspects that have been killed this run.
         _currentBaseList = _suspectSet.suspects
+            .Where(s =>
+            {
+                if (s == null) return false;
+                SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(s);
+                return record != null && record.isKilled;
+            })
             .OrderBy(s => s.LastName)
             .ThenBy(s => s.FirstName)
             .ToList();

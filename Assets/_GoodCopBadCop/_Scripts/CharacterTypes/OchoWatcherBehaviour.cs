@@ -29,7 +29,7 @@ public class OchoWatcherBehaviour : NetworkBehaviour
 
     [Header("Proximity")]
     [Tooltip("Distance at which any player triggers Ocho to flee.")]
-    [SerializeField] private float _fleeRadius = 20f;
+    [SerializeField] private float _fleeRadius = 40f;
 
     [Tooltip("How frequently (seconds) the server checks player distances and updates watch rotation.")]
     [SerializeField] private float _tickInterval = 0.25f;
@@ -64,6 +64,8 @@ public class OchoWatcherBehaviour : NetworkBehaviour
     [Header("Animation (optional)")]
     [Tooltip("Trigger parameter fired on all clients when Ocho begins fleeing.")]
     [SerializeField] private string _fleeTriggerName = "Flee";
+    [Tooltip("Bool parameter set to true while Ocho is fleeing.")]
+    [SerializeField] private string _walkingBoolName = "Walking";
     [Tooltip("Float parameter driven by movement speed (blend tree).")]
     [SerializeField] private string _speedParamName  = "Speed";
     [Tooltip("Idle animation state name played on spawn.")]
@@ -147,15 +149,20 @@ public class OchoWatcherBehaviour : NetworkBehaviour
     /// Mirrors the SetAggroTarget / SetForceAggro pattern used in MutantSpawner.
     /// </summary>
     public void Initialise(
-        Transform fleeDestination,
-        float     fleeRadius       = 8f,
-        float     fleeSpeed        = 20f,
-        float     watchRotateSpeed = 60f)
+        Transform   fleeDestination,
+        float       fleeRadius       = 8f,
+        float       fleeSpeed        = 20f,
+        float       watchRotateSpeed = 60f,
+        AudioSource audioSource      = null,
+        AudioClip   fleeSound        = null)
     {
         _fleeDestination  = fleeDestination;
         _fleeRadius       = fleeRadius;
         _fleeSpeed        = fleeSpeed;
         _watchRotateSpeed = watchRotateSpeed;
+
+        if (audioSource != null) _audioSource = audioSource;
+        if (fleeSound   != null) _fleeSound   = fleeSound;
     }
 
     // ── Server loop ────────────────────────────────────────────────────────────
@@ -280,10 +287,20 @@ public class OchoWatcherBehaviour : NetworkBehaviour
     {
         if (_animator == null) return;
 
-        if (current && !string.IsNullOrEmpty(_fleeTriggerName))
-            _animator.SetTrigger(_fleeTriggerName);
-        else if (!current && !string.IsNullOrEmpty(_idleStateName))
-            _animator.Play(_idleStateName);
+        if (current)
+        {
+            if (!string.IsNullOrEmpty(_fleeTriggerName))
+                _animator.SetTrigger(_fleeTriggerName);
+            if (!string.IsNullOrEmpty(_walkingBoolName))
+                _animator.SetBool(_walkingBoolName, true);
+        }
+        else
+        {
+            if (!string.IsNullOrEmpty(_walkingBoolName))
+                _animator.SetBool(_walkingBoolName, false);
+            if (!string.IsNullOrEmpty(_idleStateName))
+                _animator.Play(_idleStateName);
+        }
     }
 
     // Drives the Speed blend-tree parameter on all clients.

@@ -314,6 +314,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _proximityCoroutine = null;
         }
 
+        // Destination reached — no longer need the early-encounter shortcut.
+        MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
+
         _isDiscovered.Value       = true;
         _networkThreatLevel.Value = 0f;
         _followTrailActive.Value  = false;
@@ -469,6 +472,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Spawn the enemy pack immediately so mutants are present from the moment the trail starts.
         SpawnPack();
 
+        // If a pack was configured, listen for the first player encounter so we can skip
+        // straight to the kill-mutants task without requiring the trail to be fully followed.
+        if (_currentLocation.PackSize > 0)
+            MutantEnemy.OnAnyMutantSpottedPlayer += OnPackMutantEncountered;
+
         Debug.Log("[FollowTrailThreat] Trail event spawned.", this);
     }
 
@@ -502,6 +510,51 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _killMutantCount.Value = _currentLocation.PackSize;
     }
 
+    /// <summary>
+    /// Server-only. Called when any mutant first spots a player while the follow-trail task is
+    /// still active. Ends the trail task immediately and activates the kill-mutants task, exactly
+    /// as if the destination had been reached — but without the coupon reward since the destination
+    /// itself was never investigated.
+    /// </summary>
+    private void OnPackMutantEncountered()
+    {
+        if (!IsServer || _isDiscovered.Value || !_followTrailActive.Value) return;
+
+        // Unsubscribe immediately — only the first encounter matters.
+        MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
+
+        // Stop the proximity check — we're skipping the destination entirely.
+        if (_proximityCoroutine != null)
+        {
+            StopCoroutine(_proximityCoroutine);
+            _proximityCoroutine = null;
+        }
+
+        _isDiscovered.Value       = true;
+        _networkThreatLevel.Value = 0f;
+        _followTrailActive.Value  = false;
+
+        ActivateKillTask();
+
+        if (OnDestinationDiscoveredOverride != null)
+        {
+            OnDestinationDiscoveredOverride.Invoke();
+        }
+        else if (_currentLocation.PackSize > 0)
+        {
+            KillMutantTask.OnKillMutantTaskCompleted += OnDefaultPackKillComplete;
+        }
+        else
+        {
+            BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+        }
+
+        // Mark the daily task complete so DailyTaskScheduler can unlock it for future days.
+        OnDailyTaskCompleted?.Invoke();
+
+        Debug.Log("[FollowTrailThreat] Pack mutant encountered before destination — skipping to kill-mutants task.", this);
+    }
+
     private void Cleanup()
     {
         if (_proximityCoroutine != null)
@@ -509,6 +562,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             StopCoroutine(_proximityCoroutine);
             _proximityCoroutine = null;
         }
+
+        // Always clear the encounter listener — it may have been subscribed by SpawnEvent.
+        MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
 
         // Reset discovery state so the next SpawnEvent can be discovered normally.
         if (IsServer)

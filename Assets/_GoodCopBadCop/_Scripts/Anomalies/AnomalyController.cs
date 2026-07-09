@@ -563,6 +563,35 @@ public class AnomalyController : MonoBehaviour
         return all.ToArray();
     }
 
+    // ── Debug API ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns all anomaly components across all five category lists.
+    /// Intended for debug / editor tooling only — not for gameplay logic.
+    /// </summary>
+    public Anomaly[] GetAllAnomaliesDebug() => CollectAllAnomalies();
+
+    /// <summary>
+    /// Toggles a single anomaly on or off for in-editor debug purposes.
+    /// Does not issue any network RPCs — local only.
+    /// </summary>
+    public void DebugToggleAnomaly(Anomaly anomaly)
+    {
+        if (anomaly == null) return;
+
+        if (activeAnomalies.Contains(anomaly))
+        {
+            anomaly.DeactivateAnomaly();
+            activeAnomalies.Remove(anomaly);
+            Debug.Log($"[AnomalyController] Debug: deactivated '{anomaly.GetType().Name}'.");
+        }
+        else
+        {
+            ActivateAnomaly(anomaly);
+            Debug.Log($"[AnomalyController] Debug: activated '{anomaly.GetType().Name}'.");
+        }
+    }
+
     /// <summary>Fisher-Yates in-place shuffle using Unity's Random.</summary>
     private static void ShuffleList<T>(List<T> list)
     {

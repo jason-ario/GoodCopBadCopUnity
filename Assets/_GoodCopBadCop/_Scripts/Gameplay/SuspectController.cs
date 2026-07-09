@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using GoodCopBadCop.Infrastructure;
+using GoodCopBadCop.SuspectPaperwork;
 using DG.Tweening;
 using Unity.Netcode;
 using Unity.VisualScripting;
@@ -15,6 +16,7 @@ public class SuspectController : NetworkBehaviour
     public static SuspectController Instance;
 
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
+    [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
 
     /// <summary>
     /// When true, the next suspect to spawn is initialized with no anomalies.
@@ -148,10 +150,8 @@ public class SuspectController : NetworkBehaviour
     [Header("Coupon Payouts")]
     [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
-    [Tooltip("Coupons earned per correctly identified category.")]
-    [SerializeField] int couponPerCorrectAnomaly = 5;
-    [Tooltip("Coupons deducted per active category the player failed to identify.")]
-    [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
+    [Tooltip("Maximum bonus coupons awarded when 100% of anomaly categories are identified. Scales linearly with percent caught (0% = 0 bonus, 100% = full bonus).")]
+    [SerializeField] int couponMaxPercentBonus = 20;
     [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
     /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
@@ -264,6 +264,10 @@ public class SuspectController : NetworkBehaviour
             int count = ForceNextSuspectAnomalyCount;
             ForceNextSuspectAnomalyCount = -1;
             suspectCharacter.InitializeWithExactAnomalyCount(count);
+        }
+        else if (dailySuspectManager.IsReplacementSlot(lineupIndex))
+        {
+            suspectCharacter.InitializeAsReplacement();
         }
         else
         {
@@ -541,6 +545,18 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static event Action<int> OnSuspectArrived;
 
+    /// <summary>
+    /// Fired on the server when a suspect is waiting at the booth but no player is inside.
+    /// Used by <see cref="TableBell"/> to begin periodic ringing.
+    /// </summary>
+    public static event Action OnSuspectWaitingAtBooth;
+
+    /// <summary>
+    /// Fired on the server when the booth becomes ready — a player has entered and the
+    /// suspect can begin their dialogue. Used by <see cref="TableBell"/> to stop ringing.
+    /// </summary>
+    public static event Action OnBoothBecameReady;
+
     private void ArrivedAtPosition()
     {
         if (suspectCharacter == null) return;
@@ -603,12 +619,18 @@ public class SuspectController : NetworkBehaviour
     /// <summary>
     /// Polls every half-second until at least one player is inside the booth
     /// and the shutter is open, then triggers the entry dialogue.
+    /// Fires <see cref="OnSuspectWaitingAtBooth"/> when no player is in the booth at the
+    /// start of the wait, and <see cref="OnBoothBecameReady"/> when the condition is met.
     /// </summary>
     private IEnumerator WaitForBoothReady()
     {
+        if (!IsAnyPlayerInsideBooth())
+            OnSuspectWaitingAtBooth?.Invoke();
+
         while (!IsAnyPlayerInsideBooth() || !IsShutterOpen())
             yield return new WaitForSeconds(0.5f);
 
+        OnBoothBecameReady?.Invoke();
         SayEntryDialogue();
     }
 
@@ -785,24 +807,40 @@ public class SuspectController : NetworkBehaviour
         if (!IsServer) return;
         if (suspectCharacter == null) return;
         if (!suspectCharacter.Data.GivesPaperwork) return;
+
+        SuspectPaperworkState paperworkState = BuildPaperworkState();
+        if (!paperworkState.DocumentsVisible)
+            return;
         
         Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newIDCard = Instantiate(idCard, randomPos, Quaternion.identity) as NetworkObject;
         newIDCard.Spawn();
-        newIDCard.GetComponent<IDCard>().SetInfo(suspectCharacter);
+        newIDCard.GetComponent<IDCard>().SetPaperworkState(paperworkState, suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
         randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
         newApplicationForm.Spawn();
-        newApplicationForm.GetComponent<ApplicationLetter>().SetInfo(suspectCharacter);
+        newApplicationForm.GetComponent<ApplicationLetter>().SetPaperworkState(paperworkState, suspectCharacter.Data);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
 
         NotifyPaperworkSpawnedClientRpc(
             new NetworkObjectReference(newIDCard),
             new NetworkObjectReference(newApplicationForm));
+    }
+
+    private SuspectPaperworkState BuildPaperworkState()
+    {
+        if (suspectPaperworkService != null)
+            return suspectPaperworkService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+
+        SuspectPaperworkModel fallbackModel = new SuspectPaperworkModel();
+        SuspectPaperworkService fallbackService = new SuspectPaperworkService(fallbackModel);
+        SuspectPaperworkState state = fallbackService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+        fallbackModel.Dispose();
+        return state;
     }
 
     /// <summary>
@@ -1062,17 +1100,24 @@ public class SuspectController : NetworkBehaviour
     /// Calculates coupons from the category scoring fields, spawns them at the ATM,
     /// and broadcasts popup notifications to every connected client.
     /// Must only be called on the server after CalculateCategoryScores has run.
+    /// The percent-based reward scales linearly from 0 to couponMaxPercentBonus depending on
+    /// the fraction of active anomaly categories the player correctly identified.
     /// totalBonusAmount consolidates the perfect-identification bonus and the evidence bonus.
     /// </summary>
     private void PayOutResults()
     {
         if (!IsServer) return;
 
-        // Reward for each correctly identified category.
-        int categoryReward = _categoriesCorrect * couponPerCorrectAnomaly;
+        // Compute percent of active anomaly categories correctly identified (0.0 – 1.0).
+        // A clean suspect (no active categories) counts as 100% if no false positives were made.
+        float percentCaught = _totalActiveCategories > 0
+            ? (float)_categoriesCorrect / _totalActiveCategories
+            : (_categoriesFalsePositive == 0 ? 1f : 0f);
 
-        // Penalties for missed and falsely claimed categories.
-        int missedPenalty = _categoriesMissed * couponPenaltyPerMissedAnomaly;
+        // Reward scales linearly from 0 to couponMaxPercentBonus based on percent caught.
+        int percentReward = Mathf.RoundToInt(percentCaught * couponMaxPercentBonus);
+
+        // Penalty for falsely claimed categories (checking a box when there is no anomaly there).
         int falsePenalty = _categoriesFalsePositive * couponPenaltyPerFalsePositiveAnomaly;
 
         // Perfect bonus: every active category found and no false positives.
@@ -1098,7 +1143,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         int totalCoupons = Mathf.Max(0,
-            couponBaseReward + categoryReward - missedPenalty - falsePenalty + perfectBonusAmount + evidenceBonus);
+            couponBaseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
 
         if (ATM.Instance != null)
             ATM.Instance.SpawnCoupons(totalCoupons);
@@ -1107,13 +1152,13 @@ public class SuspectController : NetworkBehaviour
 
         Debug.Log(
             $"Payout — Correct categories: {_categoriesCorrect}/{_totalActiveCategories}, " +
-            $"Missed: {_categoriesMissed}, False positives: {_categoriesFalsePositive}, " +
-            $"Base: +{couponBaseReward}, Category reward: +{categoryReward}, " +
-            $"Missed penalty: -{missedPenalty}, False penalty: -{falsePenalty}, " +
-            $"Perfect bonus: +{perfectBonusAmount}, Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
+            $"Percent caught: {percentCaught:P0}, False positives: {_categoriesFalsePositive}, " +
+            $"Base: +{couponBaseReward}, Percent reward: +{percentReward}, " +
+            $"False penalty: -{falsePenalty}, Perfect bonus: +{perfectBonusAmount}, " +
+            $"Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
 
         ShowScoringResultsClientRpc(
-            categoryReward,
+            percentReward,
             _categoriesCorrect,
             _totalActiveCategories,
             perfectBonusAmount + evidenceBonus,
@@ -1289,7 +1334,8 @@ public class SuspectController : NetworkBehaviour
         SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (killRecord != null)
         {
-            killRecord.isKilled = true;
+            killRecord.isKilled    = true;
+            killRecord.killedOnDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
             SuspectRunRecords.Instance.SaveRecords();
         }
 

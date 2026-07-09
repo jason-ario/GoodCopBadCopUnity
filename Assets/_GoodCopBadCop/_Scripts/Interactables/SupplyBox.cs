@@ -108,7 +108,7 @@ public class SupplyBox : PickableObject
     /// <summary>
     /// Registers a spawned item so the box can manage its interactability.
     /// When the item is picked up by a player it automatically unregisters itself
-    /// via <see cref="UnregisterItemServerRpc"/> so closing the box never re-locks it.
+    /// on the server so closing the box never re-locks it.
     /// </summary>
     public void RegisterItem(PickableObject item)
     {
@@ -117,24 +117,16 @@ public class SupplyBox : PickableObject
         _hasHadItems = true;
         if (IsServer) _networkIsEmpty.Value = false;
 
-        // Once the item is equipped by a player, release it from box management.
-        item.OnEquip += () =>
+        // Use OnPickedUpNetworked (driven by the server-authoritative _holdingClientId
+        // NetworkVariable) so the server's instance is notified when any client picks up
+        // the item. OnEquip only fires on the local picking client — silent no-op on server
+        // in multiplayer, which would leave _networkIsEmpty permanently false.
+        item.OnPickedUpNetworked += () =>
         {
-            _registeredItems.Remove(item); // local removal (client that did the pickup)
-            if (IsSpawned && item.IsSpawned)
-                UnregisterItemServerRpc(new NetworkObjectReference(item.NetworkObject));
-        };
-    }
-
-    /// <summary>Removes an item from the managed list on the server so close never re-locks it.</summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void UnregisterItemServerRpc(NetworkObjectReference itemRef)
-    {
-        if (itemRef.TryGet(out NetworkObject netObj) && netObj.TryGetComponent(out PickableObject pickable))
-        {
-            _registeredItems.Remove(pickable);
+            if (!IsServer) return;
+            _registeredItems.Remove(item);
             _networkIsEmpty.Value = _hasHadItems && _registeredItems.Count == 0;
-        }
+        };
     }
 
     /// <summary>Clears all registered items, e.g. when the box is despawned for a new delivery.</summary>

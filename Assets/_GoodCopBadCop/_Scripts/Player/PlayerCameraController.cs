@@ -1,4 +1,5 @@
 using GoodCopBadCop.CameraSystem;
+using DG.Tweening;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -12,18 +13,29 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float amplitudeGainRumble;
     [SerializeField] private float frequencyGainRumble;
 
-    [Header("Hit Impulse")]
-    [Tooltip("Impulse source used when the player takes damage.")]
-    [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
+    private CinemachineCameraFeedbackExtension _cameraFeedbackExtension;
+    private Sequence _swaySequence;
+    private Sequence _cameraKickSequence;
+    private Vector3 _swayEulerOffset;
+    private Vector3 _cameraKickEulerOffset;
+    private float _swayFieldOfViewOffset;
+    private float _cameraKickFieldOfViewOffset;
 
-    private void Awake()
+    private void OnDisable()
     {
-        EnsureHitImpulseSource();
+        StopSway();
+        StopCameraKick();
     }
 
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>
     public void SetCameraActive(bool active)
     {
+        if (!active)
+        {
+            StopSway();
+            StopCameraKick();
+        }
+
         if (camera != null)
             camera.gameObject.SetActive(active);
     }
@@ -34,7 +46,6 @@ public class PlayerCameraController : MonoBehaviour
         cinemachineBasicMultiChannelPerlin.NoiseProfile = rumbleNoiseSettings;
         cinemachineBasicMultiChannelPerlin.AmplitudeGain = amplitudeGainRumble;
         cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainRumble;
-
     }
 
     public void TurnOffRumble()
@@ -45,69 +56,211 @@ public class PlayerCameraController : MonoBehaviour
         cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainNormal;
     }
 
-    /// <summary>Fires a one-shot Cinemachine impulse to simulate a camera hit shake.</summary>
-    public void TriggerHitImpulse()
+    public void PlaySway(CameraSwaySettings settings)
     {
-        PlayImpulse(CameraImpulseSettings.DefaultHit());
+        if (settings == null || !settings.Enabled || camera == null || !EnsureCameraFeedbackExtension(true))
+            return;
+
+        StopSway();
+
+        _swaySequence = CreateSwaySequence(settings)
+            .OnComplete(ResetSwayOffsets)
+            .OnKill(() => _swaySequence = null);
     }
 
-    public void PlayImpulse(CameraImpulseSettings settings)
+    public void PlayCameraKick(CameraKickSettings settings)
     {
-        if (settings == null || !settings.Enabled)
-        {
+        if (settings == null || !settings.Enabled || camera == null || !EnsureCameraFeedbackExtension(true))
             return;
+
+        StopCameraKick();
+
+        _cameraKickSequence = CreateCameraKickSequence(settings)
+            .OnComplete(ResetCameraKickOffsets)
+            .OnKill(() => _cameraKickSequence = null);
+    }
+
+    private void StopSway()
+    {
+        if (_swaySequence != null)
+        {
+            _swaySequence.Kill(false);
+            _swaySequence = null;
         }
 
-        if (!EnsureHitImpulseSource())
+        ResetSwayOffsets();
+    }
+
+    private void StopCameraKick()
+    {
+        if (_cameraKickSequence != null)
         {
-            Debug.LogWarning("[PlayerCameraController] Hit impulse source is not available.", this);
-            return;
+            _cameraKickSequence.Kill(false);
+            _cameraKickSequence = null;
         }
 
-        switch (settings.Mode)
+        ResetCameraKickOffsets();
+    }
+
+    private Sequence CreateSwaySequence(CameraSwaySettings settings)
+    {
+        float duration = Mathf.Max(0.01f, settings.Duration);
+        Vector3 amplitude = settings.EulerAmplitude;
+        float fieldOfViewOffset = settings.FieldOfViewOffset;
+
+        Sequence sequence = DOTween.Sequence()
+            .SetUpdate(true)
+            .SetTarget(this);
+
+        switch (settings.Motion)
         {
-            case ECameraImpulseMode.Force:
-                _hitImpulseSource.GenerateImpulseWithForce(settings.Force);
-                break;
-            case ECameraImpulseMode.Velocity:
-                _hitImpulseSource.GenerateImpulseWithVelocity(settings.Velocity);
-                break;
+            case ECameraSwayMotion.CigaretteDrag:
+                return BuildCigaretteDragSequence(sequence, duration, amplitude);
+            case ECameraSwayMotion.HealRush:
+                return BuildHealRushSequence(sequence, duration, amplitude, fieldOfViewOffset);
             default:
-                _hitImpulseSource.GenerateImpulse();
-                break;
+                return BuildHeadSwaySequence(sequence, duration, amplitude);
         }
     }
 
-    private static void ConfigureDefaultHitImpulseSource(CinemachineImpulseSource impulseSource)
+    private Sequence CreateCameraKickSequence(CameraKickSettings settings)
     {
-        if (impulseSource == null)
-            return;
+        float duration = Mathf.Max(0.01f, settings.Duration);
+        float impactDuration = duration * 0.22f;
+        float counterDuration = duration * 0.24f;
+        float settleDuration = Mathf.Max(0.01f, duration - impactDuration - counterDuration);
+        Vector3 kick = settings.EulerKick;
+        Vector3 counterKick = new Vector3(-kick.x * 0.18f, -kick.y * 0.2f, -kick.z * 0.24f);
+        float fieldOfViewKick = settings.FieldOfViewKick;
 
-        impulseSource.DefaultVelocity = Vector3.down;
-        impulseSource.ImpulseDefinition = new CinemachineImpulseDefinition
-        {
-            ImpulseChannel = 1,
-            ImpulseShape = CinemachineImpulseDefinition.ImpulseShapes.Bump,
-            CustomImpulseShape = new AnimationCurve(),
-            ImpulseDuration = 0.2f,
-            ImpulseType = CinemachineImpulseDefinition.ImpulseTypes.Uniform,
-            DissipationDistance = 100f,
-            DissipationRate = 0.25f,
-            PropagationSpeed = 343f
-        };
+        return DOTween.Sequence()
+            .SetUpdate(true)
+            .SetTarget(this)
+            .Append(DOTween.To(() => _cameraKickEulerOffset, SetCameraKickEulerOffset, kick, impactDuration)
+                .SetEase(Ease.OutCubic))
+            .Join(DOTween.To(() => _cameraKickFieldOfViewOffset, SetCameraKickFieldOfViewOffset, fieldOfViewKick, impactDuration)
+                .SetEase(Ease.OutCubic))
+            .Append(DOTween.To(() => _cameraKickEulerOffset, SetCameraKickEulerOffset, counterKick, counterDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _cameraKickEulerOffset, SetCameraKickEulerOffset, Vector3.zero, settleDuration)
+                .SetEase(Ease.OutSine))
+            .Insert(impactDuration, DOTween.To(() => _cameraKickFieldOfViewOffset, SetCameraKickFieldOfViewOffset, 0f, counterDuration + settleDuration)
+                .SetEase(Ease.OutSine));
     }
 
-    private bool EnsureHitImpulseSource()
+    private Sequence BuildHeadSwaySequence(Sequence sequence, float duration, Vector3 amplitude)
     {
-        if (_hitImpulseSource != null)
+        float leanInDuration = duration * 0.3f;
+        float swingDuration = duration * 0.4f;
+        float settleDuration = Mathf.Max(0.01f, duration - leanInDuration - swingDuration);
+
+        return sequence
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, amplitude, leanInDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, -amplitude * 0.65f, swingDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, settleDuration)
+                .SetEase(Ease.OutSine));
+    }
+
+    private Sequence BuildCigaretteDragSequence(Sequence sequence, float duration, Vector3 amplitude)
+    {
+        float inhaleDuration = duration * 0.38f;
+        float liftDuration = duration * 0.24f;
+        float exhaleDuration = Mathf.Max(0.01f, duration - inhaleDuration - liftDuration);
+        Vector3 inhale = new Vector3(-Mathf.Abs(amplitude.x), amplitude.y * 0.35f, amplitude.z * 0.25f);
+        Vector3 lift = new Vector3(Mathf.Abs(amplitude.x) * 0.55f, -amplitude.y * 0.2f, -amplitude.z * 0.15f);
+
+        return sequence
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, inhale, inhaleDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, lift, liftDuration)
+                .SetEase(Ease.OutSine))
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, exhaleDuration)
+                .SetEase(Ease.InOutSine));
+    }
+
+    private Sequence BuildHealRushSequence(Sequence sequence, float duration, Vector3 amplitude, float fieldOfViewOffset)
+    {
+        float pushDuration = duration * 0.32f;
+        float holdDuration = duration * 0.08f;
+        float releaseDuration = duration * 0.24f;
+        float settleDuration = Mathf.Max(0.01f, duration - pushDuration - holdDuration - releaseDuration);
+        float resetStartTime = pushDuration + holdDuration;
+        Vector3 push = new Vector3(-Mathf.Abs(amplitude.x), amplitude.y, amplitude.z);
+        Vector3 release = new Vector3(Mathf.Abs(amplitude.x) * 0.18f, -amplitude.y * 0.18f, -amplitude.z * 0.15f);
+
+        return sequence
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, push, pushDuration)
+                .SetEase(Ease.InOutSine))
+            .Join(DOTween.To(() => _swayFieldOfViewOffset, SetSwayFieldOfViewOffset, fieldOfViewOffset, pushDuration)
+                .SetEase(Ease.InOutSine))
+            .AppendInterval(holdDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, release, releaseDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, settleDuration)
+                .SetEase(Ease.InOutSine))
+            .Insert(resetStartTime, DOTween.To(() => _swayFieldOfViewOffset, SetSwayFieldOfViewOffset, 0f, releaseDuration + settleDuration)
+                .SetEase(Ease.InOutSine));
+    }
+
+    private void SetSwayEulerOffset(Vector3 offset)
+    {
+        _swayEulerOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void SetCameraKickEulerOffset(Vector3 offset)
+    {
+        _cameraKickEulerOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void SetSwayFieldOfViewOffset(float offset)
+    {
+        _swayFieldOfViewOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void SetCameraKickFieldOfViewOffset(float offset)
+    {
+        _cameraKickFieldOfViewOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void ResetSwayOffsets()
+    {
+        SetSwayEulerOffset(Vector3.zero);
+        SetSwayFieldOfViewOffset(0f);
+    }
+
+    private void ResetCameraKickOffsets()
+    {
+        SetCameraKickEulerOffset(Vector3.zero);
+        SetCameraKickFieldOfViewOffset(0f);
+    }
+
+    private void ApplyCameraFeedbackOffsets()
+    {
+        if (!EnsureCameraFeedbackExtension(false))
+            return;
+
+        _cameraFeedbackExtension.EulerOffset = _swayEulerOffset + _cameraKickEulerOffset;
+        _cameraFeedbackExtension.FieldOfViewOffset = _swayFieldOfViewOffset + _cameraKickFieldOfViewOffset;
+    }
+
+    private bool EnsureCameraFeedbackExtension(bool createIfMissing)
+    {
+        if (_cameraFeedbackExtension != null)
             return true;
 
-        _hitImpulseSource = GetComponent<CinemachineImpulseSource>();
-        if (_hitImpulseSource != null)
-            return true;
+        if (camera == null)
+            return false;
 
-        _hitImpulseSource = gameObject.AddComponent<CinemachineImpulseSource>();
-        ConfigureDefaultHitImpulseSource(_hitImpulseSource);
-        return _hitImpulseSource != null;
+        _cameraFeedbackExtension = camera.GetComponent<CinemachineCameraFeedbackExtension>();
+        if (_cameraFeedbackExtension == null && createIfMissing)
+            _cameraFeedbackExtension = camera.gameObject.AddComponent<CinemachineCameraFeedbackExtension>();
+
+        return _cameraFeedbackExtension != null;
     }
 }

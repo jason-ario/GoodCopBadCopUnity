@@ -48,11 +48,15 @@ MonoBehaviour:
       m_RotationOrder: 4
   camera:
     enabled: 1
-    localImpulse:
+    localSway:
+      enabled: 0
+      duration: 0.8
+      eulerAmplitude: {x: 0, y: 0, z: 0}
+    localCameraKick:
       enabled: 1
-      mode: 2
-      force: 1.465435
-      velocity: {x: -0.45, y: -1.35, z: 0.35}
+      duration: 0.3
+      eulerKick: {x: -1.2, y: -2.4, z: 1.8}
+      fieldOfViewKick: 1.0
   audio:
     enabled: 0
     clips: []

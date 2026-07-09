@@ -73,12 +73,18 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void EnterDialogueMode()
     {
         IsInDialogueMode = true;
+        PlayerInstance.Instance?.SetIsInCutscene(true);
 
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
 
+        // Break the player out of any ongoing held-item activity (e.g. mopping) so the
+        // use animation and coroutine don't persist through the cutscene.
+        ForceStopHeldObjectUse();
+
         var player = PlayerInstance.Instance;
         player.GetComponent<PlayerMovementController>().SetCanControl(false);
+        player.GetComponent<PlayerMovementController>().SetCanLook(false);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
 
         UIController.Instance.ShowCursor();
@@ -93,6 +99,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void ExitDialogueMode()
     {
         IsInDialogueMode = false;
+        PlayerInstance.Instance?.SetIsInCutscene(false);
 
         if (_reshowCoroutine != null)
         {
@@ -106,6 +113,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
         UIController.Instance.HideBackButton();
 
         var player = PlayerInstance.Instance;
+        // Restore look before restoring control so the CanControl setter can re-lock the cursor.
+        player.GetComponent<PlayerMovementController>().SetCanLook(true);
         player.GetComponent<PlayerMovementController>().SetCanControl(true);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
@@ -134,14 +143,20 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (IsInDialogueMode) return;
 
         IsInDialogueMode = true;
+        PlayerInstance.Instance?.SetIsInCutscene(true);
 
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
+
+        // Break the player out of any ongoing held-item activity (e.g. mopping) so the
+        // use animation and coroutine don't persist through the cutscene.
+        ForceStopHeldObjectUse();
 
         var player = PlayerInstance.Instance;
         if (player == null) return;
 
         player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
+        player.GetComponent<PlayerMovementController>()?.SetCanLook(false);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
         UIController.Instance.ShowCursor();
 
@@ -173,13 +188,19 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (IsInDialogueMode) return;
 
         IsInDialogueMode = true;
+        PlayerInstance.Instance?.SetIsInCutscene(true);
 
         DiegeticViewController.Current?.Close();
+
+        // Break the player out of any ongoing held-item activity (e.g. mopping) so the
+        // use animation and coroutine don't persist through the cutscene.
+        ForceStopHeldObjectUse();
 
         var player = PlayerInstance.Instance;
         if (player == null) return;
 
         player.GetComponent<PlayerMovementController>()?.SetCanControl(false);
+        player.GetComponent<PlayerMovementController>()?.SetCanLook(false);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
         UIController.Instance.ShowCursor();
 
@@ -202,12 +223,15 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (!IsInDialogueMode) return;
 
         IsInDialogueMode = false;
+        PlayerInstance.Instance?.SetIsInCutscene(false);
 
         UIController.Instance.HideCursor();
 
         var player = PlayerInstance.Instance;
         if (player == null) return;
 
+        // Restore look before restoring control so the CanControl setter can re-lock the cursor.
+        player.GetComponent<PlayerMovementController>()?.SetCanLook(true);
         player.GetComponent<PlayerMovementController>()?.SetCanControl(true);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
@@ -379,28 +403,70 @@ public class DialogueChoiceSystem : NetworkBehaviour
         _playerBody = PlayerInstance.Instance.transform.Find("Art")?.gameObject;
         if (_playerBody != null)
             _playerBody.SetActive(false);
+        else
+            Debug.LogWarning("[DialogueChoiceSystem] HidePlayerBody: could not find 'Art' child on player root — body will remain visible.");
 
         _playerArms = PlayerInstance.Instance.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
         if (_playerArms != null)
             _playerArms.SetActive(false);
+        else
+            Debug.LogWarning("[DialogueChoiceSystem] HidePlayerBody: could not find 'CinemachineCamera/Arms_Socket/Player_Arms' — arms will remain visible.");
     }
 
     /// <summary>
     /// Restores the local player's body mesh root after dialogue mode ends.
+    /// Re-applies the held item's animator bool after the arms GameObject is re-enabled
+    /// because Unity resets all Animator parameters to defaults on re-activation.
     /// </summary>
     private void ShowPlayerBody()
     {
+        if (_playerArms != null)
+        {
+            _playerArms.SetActive(true);
+            _playerArms = null;
+            // Re-apply the held item's pickup animation after the Animator resets on re-enable,
+            // so the player visually holds the item correctly when the cutscene ends.
+            ReapplyHeldItemAnimatorState();
+        }
+
         if (_playerBody != null)
         {
             _playerBody.SetActive(true);
             _playerBody = null;
         }
+    }
 
-        if (_playerArms != null)
-        {
-            _playerArms.SetActive(true);
-            _playerArms = null;
-        }
+    // ─── Activity interrupt helpers ─────────────────────────────────────────
+
+    /// <summary>
+    /// If the player is currently mid-use on a held item (e.g. mopping), stops the use action
+    /// before entering dialogue mode so the activity animation and coroutine do not persist
+    /// through the cutscene.
+    /// </summary>
+    private static void ForceStopHeldObjectUse()
+    {
+        var player = PlayerInstance.Instance;
+        if (player == null) return;
+        player.GetComponent<PlayerPickupController>()?.ForceStopUse();
+    }
+
+    /// <summary>
+    /// Re-applies the currently held item's <see cref="PickableItemData.pickupAnimBool"/> to the
+    /// local animators after the arms GameObject is re-enabled. Unity resets all Animator parameters
+    /// to their default values when a GameObject is deactivated and reactivated, so without this
+    /// call the held-item animation (e.g. exam hold pose) is lost after every dialogue cutscene.
+    /// Uses <see cref="PlayerAnimationController.SetAnimBoolLocal"/> to avoid a redundant RPC —
+    /// the original RPC from <see cref="PickableObject.OnEquipped"/> already handled other clients.
+    /// </summary>
+    private static void ReapplyHeldItemAnimatorState()
+    {
+        var player = PlayerInstance.Instance;
+        if (player == null) return;
+        var pickup = player.GetComponent<PlayerPickupController>();
+        PickableItemData itemData = pickup?.HeldObject?.ItemData;
+        if (itemData == null || string.IsNullOrEmpty(itemData.pickupAnimBool)) return;
+        var pac = player.GetComponent<PlayerAnimationController>();
+        pac?.SetAnimBoolLocal(itemData.pickupAnimBool, true);
     }
 
     [ServerRpc(RequireOwnership = false)]

@@ -98,6 +98,11 @@ public class DumpsterInteractable : CollectableContainer
             _labelRoot.SetActive(false);
     }
 
+    // ── Capacity override ─────────────────────────────────────────────────────
+
+    /// <summary>Dumpsters have no fill limit — always accept more bags.</summary>
+    public override bool IsFull => false;
+
     // ── Interact ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -107,7 +112,7 @@ public class DumpsterInteractable : CollectableContainer
     public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
     {
         TrashBag bag = item as TrashBag;
-        if (IsFull || IsAwaitingPickup || bag == null) return;
+        if (bag == null) return;
 
         base.InteractWithItem(player, item);
         StartCoroutine(ThrowSequence(player, bag));
@@ -204,8 +209,8 @@ public class DumpsterInteractable : CollectableContainer
 
     // ── Interact text ─────────────────────────────────────────────────────────
 
-    protected override string GetDefaultInteractText() => $"Dumpster ({FillCount}/{Capacity})";
-    protected override string GetFullInteractText()    => "Call HQ for Pickup";
+    protected override string GetDefaultInteractText() => "Dumpster";
+    protected override string GetFullInteractText()    => "Dumpster";
 
     // ── World-space label ─────────────────────────────────────────────────────
 
@@ -213,21 +218,8 @@ public class DumpsterInteractable : CollectableContainer
     {
         if (_labelText == null) return;
 
-        if (IsAwaitingPickup)
-        {
-            _labelText.text  = "PICKUP REQUESTED";
-            _labelText.color = Color.yellow;
-        }
-        else if (IsFull)
-        {
-            _labelText.text  = "FULL";
-            _labelText.color = Color.red;
-        }
-        else
-        {
-            _labelText.text  = $"{FillCount}/{Capacity}";
-            _labelText.color = Color.white;
-        }
+        _labelText.text  = $"{FillCount}";
+        _labelText.color = Color.white;
     }
 
     // ── Audio ─────────────────────────────────────────────────────────────────

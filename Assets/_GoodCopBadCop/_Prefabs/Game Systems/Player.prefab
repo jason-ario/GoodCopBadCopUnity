@@ -90,8 +90,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0023922587, y: -0.99992615, z: -0.008029954, w: -0.008808639}
-  m_LocalPosition: {x: -1.9126318, y: 2.4766839, z: 7.978947}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.451, z: 0.106999755}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -129,9 +129,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.1
+  near clip plane: 0.12
   far clip plane: 5000
-  field of view: 60.000004
+  field of view: 65
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -10715,6 +10715,7 @@ GameObject:
   - component: {fileID: 103200548730608379}
   - component: {fileID: 2050668189222405873}
   - component: {fileID: 2194294831659451377}
+  - component: {fileID: 3688367130298847637}
   m_Layer: 14
   m_Name: Player
   m_TagString: Player
@@ -10793,7 +10794,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2146751676
+  GlobalObjectIdHash: 2119203540
   InScenePlacedSourceGlobalObjectIdHash: 2146751676
   DeferredDespawnTick: 0
   Ownership: 1
@@ -10837,6 +10838,8 @@ MonoBehaviour:
   maxCameraOffsetForLean: 0.3
   gravity: -20
   jumpForce: 7
+  jumpSound: {fileID: 0}
+  landSound: {fileID: 8300000, guid: 6b09870ea7284f7458f54e2873e673c6, type: 3}
   groundCheckDistance: 0.15
   groundMask:
     serializedVersion: 2
@@ -11116,7 +11119,6 @@ MonoBehaviour:
   frequencyGainNormal: 0.6
   amplitudeGainRumble: 1
   frequencyGainRumble: 2
-  _hitImpulseSource: {fileID: 0}
 --- !u!114 &389268076241102053
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11649,6 +11651,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GoodCopBadCop.VoiceChat.PlayerVoiceChatAdapter
   roomName: GoodCopBadCopProximity
   fallbackProximityRange: 10
+--- !u!114 &3688367130298847637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a86d14770b95a264ca3dbaf9efc4f20f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BallKicker
+  ShowTopMostFoldoutHeaderGroup: 1
+  kickForce: 6
+  upwardKickFactor: 0.25
+  kickCooldown: 0.25
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0

@@ -54,6 +54,20 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("The first campaign day on which this spawner becomes active.")]
     [SerializeField] private int firstActiveDay = 2;
 
+    [Tooltip("When enabled, this spawner will NOT start automatically on the night phase. " +
+             "Instead it only begins once a player enters its associated zone trigger " +
+             "(wired via a MutantSpawnerZoneTrigger component). " +
+             "Useful for location-specific spawners such as the power plant.")]
+    [SerializeField] private bool requiresZoneActivation = false;
+
+    [Tooltip("When enabled together with Requires Zone Activation, entering the zone fires a single burst " +
+             "instead of starting the continuous spawn loop. After the burst completes, the spawner enters " +
+             "a cooldown period before zone entry can trigger another burst.")]
+    [SerializeField] private bool burstOnlyMode = false;
+
+    [Tooltip("Seconds after a burst-only burst finishes before the zone trigger re-arms. Only used when Burst Only Mode is enabled.")]
+    [SerializeField] private float burstCooldownDuration = 180f;
+
     [Header("Day Scaling")]
     [Tooltip("When enabled, spawn parameters scale up with the current campaign day, starting sparse and growing toward the values above.")]
     [SerializeField] private bool scaledByDay = false;
@@ -83,6 +97,11 @@ public class MutantSpawner : NetworkBehaviour
 
     private readonly List<NetworkObject> _activeEnemies = new List<NetworkObject>();
     private bool _isRunning;
+    // Tracks whether the night phase is currently active (server-only).
+    private bool _isNightPhase;
+    // Burst-only mode cooldown state (server-only).
+    private bool _isOnBurstCooldown;
+    private Coroutine _burstCooldownCoroutine;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -103,8 +122,8 @@ public class MutantSpawner : NetworkBehaviour
 
         if (ShiftManager.Instance != null)
         {
-            ShiftManager.Instance.OnShiftStart      += OnShiftStarted;
-            ShiftManager.Instance.OnNightPhaseBegin += OnNightPhaseBegun;
+            ShiftManager.Instance.OnShiftStart += OnShiftStarted;
+            ShiftManager.Instance.OnShiftEnd   += OnNightPhaseBegun;
         }
         else
         {
@@ -118,11 +137,12 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
+        CancelBurstCooldown();
 
         if (ShiftManager.Instance != null)
         {
-            ShiftManager.Instance.OnShiftStart      -= OnShiftStarted;
-            ShiftManager.Instance.OnNightPhaseBegin -= OnNightPhaseBegun;
+            ShiftManager.Instance.OnShiftStart -= OnShiftStarted;
+            ShiftManager.Instance.OnShiftEnd   -= OnNightPhaseBegun;
         }
     }
 
@@ -142,6 +162,8 @@ public class MutantSpawner : NetworkBehaviour
     /// </summary>
     private void OnShiftStarted()
     {
+        _isNightPhase = false;
+        CancelBurstCooldown();
         if (_isRunning)
         {
             StopSpawning();
@@ -151,16 +173,23 @@ public class MutantSpawner : NetworkBehaviour
 
     /// <summary>
     /// Starts the spawner when the night phase begins, provided the current day meets
-    /// the <see cref="firstActiveDay"/> threshold.
+    /// the <see cref="firstActiveDay"/> threshold. Skipped when <see cref="requiresZoneActivation"/>
+    /// is enabled — the spawner will only start once a player enters the linked zone.
     /// </summary>
     private void OnNightPhaseBegun()
     {
+        _isNightPhase = true;
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
-        if (currentDay >= firstActiveDay)
+        if (currentDay < firstActiveDay) return;
+
+        if (requiresZoneActivation)
         {
-            BeginSpawning();
-            Debug.Log($"[MutantSpawner] Spawning started — night phase begun (Day {currentDay}).");
+            Debug.Log("[MutantSpawner] Night phase begun but zone activation required — waiting for player to enter zone.");
+            return;
         }
+
+        BeginSpawning();
+        Debug.Log($"[MutantSpawner] Spawning started — night phase begun (Day {currentDay}).");
     }
 
     private void BeginSpawning()
@@ -289,6 +318,102 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by <see cref="MutantSpawnerZoneTrigger"/> when a player first enters the
+    /// linked zone. If the spawner is in zone-activation mode, the night phase is active,
+    /// and the day threshold is met, spawning begins immediately.
+    /// When <see cref="burstOnlyMode"/> is also enabled, fires a single burst then enters
+    /// a <see cref="burstCooldownDuration"/> cooldown before the zone can trigger again.
+    /// SERVER ONLY — no-op on clients.
+    /// </summary>
+    public void ActivateFromZone()
+    {
+        if (!IsServer) return;
+
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        if (currentDay < firstActiveDay)
+        {
+            Debug.Log($"[MutantSpawner] Zone entered but day {currentDay} < firstActiveDay {firstActiveDay} — not starting.", this);
+            return;
+        }
+
+        // ── Burst-only mode ────────────────────────────────────────────────────
+        if (burstOnlyMode)
+        {
+            if (_isOnBurstCooldown)
+            {
+                Debug.Log("[MutantSpawner] Zone entered but burst cooldown active — skipping.", this);
+                return;
+            }
+
+            _burstCooldownCoroutine = StartCoroutine(BurstOnceAndCooldown());
+            Debug.Log("[MutantSpawner] Zone entered — burst-only mode, firing single burst.", this);
+            return;
+        }
+
+        // ── Continuous loop mode ───────────────────────────────────────────────
+        if (_isRunning) return;
+
+        if (!_isNightPhase)
+        {
+            Debug.Log("[MutantSpawner] Zone entered during day phase — spawner will start on next night phase.", this);
+            requiresZoneActivation = false;
+            return;
+        }
+
+        BeginSpawning();
+        Debug.Log("[MutantSpawner] Zone entered — spawning started.", this);
+    }
+
+    /// <summary>
+    /// Fires a single burst then waits <see cref="burstCooldownDuration"/> seconds before
+    /// re-arming the zone trigger. SERVER ONLY (started only from <see cref="ActivateFromZone"/>).
+    /// </summary>
+    private IEnumerator BurstOnceAndCooldown()
+    {
+        _isOnBurstCooldown = true;
+        _isRunning = true;
+        yield return StartCoroutine(SpawnBurst());
+        _isRunning = false;
+
+        Debug.Log($"[MutantSpawner] Burst complete — cooldown for {burstCooldownDuration}s.", this);
+        yield return new WaitForSeconds(burstCooldownDuration);
+
+        _isOnBurstCooldown = false;
+        _burstCooldownCoroutine = null;
+        Debug.Log("[MutantSpawner] Burst cooldown complete — zone re-armed.", this);
+    }
+
+    /// <summary>
+    /// Stops any in-progress burst cooldown and resets related state. SERVER ONLY.
+    /// </summary>
+    private void CancelBurstCooldown()
+    {
+        if (_burstCooldownCoroutine != null)
+        {
+            StopCoroutine(_burstCooldownCoroutine);
+            _burstCooldownCoroutine = null;
+        }
+        _isOnBurstCooldown = false;
+    }
+
+    /// <summary>
+    /// Called by <see cref="MutantSpawnerZoneTrigger"/> when all players have left the
+    /// linked zone (only when <see cref="MutantSpawnerZoneTrigger._deactivateWhenAllPlayersLeave"/>
+    /// is enabled). Stops the spawn loop; existing enemies remain active.
+    /// SERVER ONLY — no-op on clients.
+    /// </summary>
+    public void DeactivateFromZone()
+    {
+        if (!IsServer) return;
+        if (!_isRunning) return;
+
+        StopSpawning();
+        // Re-arm the zone gate so re-entry starts spawning again.
+        requiresZoneActivation = true;
+        Debug.Log("[MutantSpawner] All players left zone — spawning paused.", this);
+    }
 
     /// <summary>
     /// Manually triggers an immediate burst. SERVER ONLY.

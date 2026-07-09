@@ -93,7 +93,8 @@ namespace GoodCopBadCop.Effects
             if (settings == null || !settings.Enabled)
                 return;
 
-            cameraService.PlayLocalImpulse(settings.LocalImpulse);
+            cameraService.PlayLocalSway(settings.LocalSway);
+            cameraService.PlayLocalCameraKick(settings.LocalCameraKick);
         }
 
         private void PlayAudio(AudioEffectSettings settings, EffectContext context)

@@ -26,7 +26,18 @@ public class SuspectCharacter : Interactable
     public AudioSource audioSource;
     [SerializeField] private SpeakingInteraction speaking;
     [SerializeField] Texture2D idPhoto;
-    public Texture2D IDPhoto => idPhoto;
+
+    /// <summary>
+    /// At runtime, returns the replacement face photo when this suspect has been initialized
+    /// as a replacement. Falls back to the serialized idPhoto for all normal cases.
+    /// </summary>
+    public Texture2D IDPhoto => _isReplacement && suspectData != null && suspectData.replacementIDPhoto != null
+        ? suspectData.replacementIDPhoto
+        : idPhoto;
+
+    /// <summary>True when this character has been spawned as an uncanny replacement of a killed suspect.</summary>
+    public bool IsReplacement => _isReplacement;
+    private bool _isReplacement;
     [SerializeField] Collider interactionCollider;
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
@@ -473,6 +484,43 @@ public class SuspectCharacter : Interactable
         drunkBehaviour?.TryActivate();
     }
 
+    /// <summary>
+    /// Initializes this suspect as their uncanny replacement version.
+    /// The character spawns clean (no physical anomalies) but will serve replacement
+    /// dialogue, use the replacement ID photo, and present as subtly wrong.
+    /// Replicated to all clients via <see cref="SyncReplacementClientRpc"/>.
+    /// </summary>
+    public void InitializeAsReplacement()
+    {
+        _isReplacement = true;
+
+        anomalyController.InitializeClean();
+
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null)
+            suspectRecordViewer.SetRecord(record);
+        else
+            Debug.Log($"[SuspectCharacter] No record found for replacement '{suspectData.name}'.");
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        SyncAnomalySnapshot();
+        SyncReplacementClientRpc(true);
+
+        OnSuspectPresentingUncanny?.Invoke(this, 100);
+
+        Debug.Log($"[SuspectCharacter] '{suspectData.name}' initialized as replacement.");
+    }
+
+    [ClientRpc]
+    private void SyncReplacementClientRpc(bool isReplacement)
+    {
+        if (IsServer) return;
+        _isReplacement = isReplacement;
+    }
+
     private void SyncAnomalySnapshot()
     {
         if (anomalyController == null)
@@ -869,9 +917,9 @@ public class SuspectCharacter : Interactable
 
         int dayN0 = ShiftManager.Instance.CurrentDay;
 
-        // Uncanny override: fully-mutated suspects use uncanny entry dialogues when authored.
+        // Uncanny override: fully-mutated suspects AND replacements use uncanny entry dialogues when authored.
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (record != null && record.IsFullyMutated)
+        if (_isReplacement || (record != null && record.IsFullyMutated))
         {
             SuspectData.DialogueByVerdict uncannySet = suspectData.uncannyEntryDialogues;
             string[] uncannyLines = dayN0 < 11
@@ -934,9 +982,9 @@ public class SuspectCharacter : Interactable
                 answer = mismatch;
         }
 
-        // Uncanny override: fully-mutated suspects serve the uncanny answer when authored.
+        // Uncanny override: fully-mutated suspects AND replacements serve the uncanny answer when authored.
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (record != null && record.IsFullyMutated)
+        if (_isReplacement || (record != null && record.IsFullyMutated))
         {
             string uncannyAnswer;
             if (ShiftManager.Instance.IsEarlyDays)

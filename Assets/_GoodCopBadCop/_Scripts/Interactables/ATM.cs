@@ -8,7 +8,7 @@ using UnityEngine;
 /// NetworkObjects one after another at <see cref="_couponSpawnPoint"/>.
 /// Spawning is server-authoritative; the singleton is readable from all contexts.
 /// </summary>
-public class ATM : MonoBehaviour
+public class ATM : NetworkBehaviour
 {
     public static ATM Instance;
 
@@ -49,6 +49,9 @@ public class ATM : MonoBehaviour
     [Tooltip("MachineShake component that runs while the ATM is dispensing. Disable the component in the Inspector; it will be toggled on/off automatically.")]
     [SerializeField] private MachineShake _machineShake;
 
+    [Tooltip("Screen controller that flashes the payment amount on the ATM display.")]
+    [SerializeField] private ATMScreenController _screenController;
+
     [Header("Debug")]
     [Tooltip("Number of coupons to dispense when pressing M in a development build or the editor.")]
     [SerializeField] private int _debugDispenseAmount = 5;
@@ -62,6 +65,12 @@ public class ATM : MonoBehaviour
     private bool IsServer => NetworkManager.Singleton == null
         || !NetworkManager.Singleton.IsListening
         || NetworkManager.Singleton.IsServer;
+
+    /// <summary>
+    /// True when there is an active NetworkManager session that is listening.
+    /// </summary>
+    private bool IsNetworked => NetworkManager.Singleton != null
+        && NetworkManager.Singleton.IsListening;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -94,6 +103,12 @@ public class ATM : MonoBehaviour
         if (amount <= 0) return;
 
         PlayDispenseSound();
+
+        if (IsNetworked)
+            ShowPaymentClientRpc(amount);
+        else
+            _screenController?.ShowPayment(amount);
+
         StartCoroutine(SpawnCouponsRoutine(amount));
     }
 
@@ -181,5 +196,17 @@ public class ATM : MonoBehaviour
         Vector3 randomAxis = Random.onUnitSphere;
         float magnitude = Random.Range(_torqueMin, _torqueMax);
         rb.AddTorque(randomAxis * magnitude, ForceMode.Impulse);
+    }
+
+    // ── Network RPCs ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tells every client (including host) to show the payment amount on the ATM screen.
+    /// Called by the server after a coupon dispense begins.
+    /// </summary>
+    [ClientRpc]
+    private void ShowPaymentClientRpc(int amount)
+    {
+        _screenController?.ShowPayment(amount);
     }
 }

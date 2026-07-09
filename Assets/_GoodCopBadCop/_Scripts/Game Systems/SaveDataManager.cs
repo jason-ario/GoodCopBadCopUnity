@@ -201,10 +201,12 @@ public class SaveDataManager : MonoBehaviour
             SuspectRecord r = records[i];
             entries[i] = new SuspectSaveEntry
             {
-                SuspectName     = r.SuspectData != null ? r.SuspectData.name : string.Empty,
-                IsKilled        = r.isKilled,
+                SuspectName      = r.SuspectData != null ? r.SuspectData.name : string.Empty,
+                IsKilled         = r.isKilled,
+                KilledOnDay      = r.killedOnDay,
+                IsReplacement    = r.isReplacement,
                 QuarantinedOnDay = r.quarantinedOnDay,
-                InfectionScore  = r.infectionScore,
+                InfectionScore   = r.infectionScore,
             };
         }
 
@@ -416,6 +418,18 @@ public class SuspectSaveEntry
 
     /// <summary>True when this suspect was permanently eliminated and must never reappear.</summary>
     public bool IsKilled;
+
+    /// <summary>
+    /// Campaign day on which this suspect was killed (-1 = never killed).
+    /// Used to determine when the replacement version activates (killedOnDay + replacementWindowDays).
+    /// </summary>
+    public int KilledOnDay = -1;
+
+    /// <summary>
+    /// True when the replacement version of this killed suspect has been activated.
+    /// The replacement spawns as a doppelganger using the suspect's replacementConfig.
+    /// </summary>
+    public bool IsReplacement;
 
     /// <summary>
     /// Campaign day on which this suspect was most recently quarantined (-1 = never).

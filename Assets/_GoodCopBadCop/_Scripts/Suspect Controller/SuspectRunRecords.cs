@@ -8,6 +8,10 @@ public class SuspectRunRecords : MonoBehaviour
     public Vector2 startingInfectionScore = new Vector2(0, 10);
     public Vector2 inspectionScoreIncreasePerDay = new Vector2(5, 20);
 
+    [Header("Replacement System")]
+    [Tooltip("Number of days after a suspect is killed before their replacement version activates and re-enters the shift pool.")]
+    [Min(1)] public int replacementWindowDays = 7;
+
     public static SuspectRunRecords Instance;
 
     private void Start()
@@ -55,6 +59,8 @@ public class SuspectRunRecords : MonoBehaviour
             if (!lookup.TryGetValue(record.SuspectData.name, out SuspectSaveEntry entry)) continue;
 
             record.isKilled         = entry.IsKilled;
+            record.killedOnDay      = entry.KilledOnDay;
+            record.isReplacement    = entry.IsReplacement;
             record.quarantinedOnDay = entry.QuarantinedOnDay;
             record.infectionScore   = entry.InfectionScore;
             applied++;
@@ -91,14 +97,35 @@ public class SuspectRunRecords : MonoBehaviour
     /// Advances each living suspect's infection score by a per-character random amount.
     /// Quarantine-treated suspects have their score reset instead — unless they are fully mutated,
     /// in which case the quarantine has no effect.
+    /// Checks whether any killed suspect has waited long enough to have their replacement activate.
     /// Persists all changes to disk after advancing.
     /// Call this before DailySuspectManager populates the next shift.
     /// </summary>
     public void AdvanceDayInfection()
     {
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+
         foreach (SuspectRecord record in records)
         {
-            if (record.isKilled) continue;
+            // --- Replacement activation check ---
+            // A killed suspect with a valid replacementConfig re-enters the pool as an uncanny
+            // replacement after replacementWindowDays have elapsed since their death.
+            if (record.isKilled && !record.isReplacement)
+            {
+                if (currentDay >= 0 && record.killedOnDay >= 0
+                    && (currentDay - record.killedOnDay) >= replacementWindowDays
+                    && record.SuspectData != null && record.SuspectData.replacementIDPhoto != null)
+                {
+                    record.isReplacement = true;
+                    Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' replacement activated on day {currentDay} " +
+                              $"(killed on day {record.killedOnDay}, window {replacementWindowDays}d).");
+                }
+                // Killed suspects (not yet replaced) skip normal infection advancement.
+                continue;
+            }
+
+            // Replacement suspects also skip normal infection advancement (they're handled as doppelgangers).
+            if (record.isReplacement) continue;
 
             if (record.pendingVaccineReset)
             {

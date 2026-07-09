@@ -28,6 +28,7 @@ namespace GoodCopBadCop.Effects
         public float Opacity => opacity;
         public float Duration => duration;
         public AnimationCurve OpacityCurve => opacityCurve;
+
         public static FullscreenEffectSettings Disabled()
         {
             return new FullscreenEffectSettings
@@ -35,42 +36,26 @@ namespace GoodCopBadCop.Effects
                 enabled = false
             };
         }
-
     }
 
     [Serializable]
     public sealed class CameraEffectSettings
     {
         [SerializeField] private bool enabled = true;
-        [SerializeField] private CameraImpulseSettings localImpulse = CameraImpulseSettings.DefaultHit();
+        [SerializeField] private CameraSwaySettings localSway = CameraSwaySettings.Disabled();
+        [SerializeField] private CameraKickSettings localCameraKick = CameraKickSettings.Disabled();
 
         public bool Enabled => enabled;
-        public CameraImpulseSettings LocalImpulse => localImpulse;
+        public CameraSwaySettings LocalSway => localSway;
+        public CameraKickSettings LocalCameraKick => localCameraKick;
 
-        public static CameraEffectSettings LocalPlayerShake()
+        public static CameraEffectSettings LocalPlayerFeedback()
         {
             return new CameraEffectSettings
             {
                 enabled = true,
-                localImpulse = CameraImpulseSettings.DefaultHit()
-            };
-        }
-
-        public static CameraEffectSettings LocalPlayerShake(float force)
-        {
-            return new CameraEffectSettings
-            {
-                enabled = true,
-                localImpulse = CameraImpulseSettings.WithForce(force)
-            };
-        }
-
-        public static CameraEffectSettings LocalPlayerImpulse(CameraImpulseSettings impulse)
-        {
-            return new CameraEffectSettings
-            {
-                enabled = impulse != null && impulse.Enabled,
-                localImpulse = impulse ?? CameraImpulseSettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localCameraKick = CameraKickSettings.Disabled()
             };
         }
 
@@ -79,7 +64,8 @@ namespace GoodCopBadCop.Effects
             return new CameraEffectSettings
             {
                 enabled = false,
-                localImpulse = CameraImpulseSettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localCameraKick = CameraKickSettings.Disabled()
             };
         }
     }
@@ -109,7 +95,7 @@ namespace GoodCopBadCop.Effects
         [SerializeField] private string displayName;
         [SerializeField, Min(0f)] private float minInterval = 0.05f;
         [SerializeField] private FullscreenEffectSettings fullscreen = FullscreenEffectSettings.Disabled();
-        [SerializeField] private CameraEffectSettings camera = CameraEffectSettings.LocalPlayerShake();
+        [SerializeField] private CameraEffectSettings camera = CameraEffectSettings.LocalPlayerFeedback();
         [SerializeField] private AudioEffectSettings audio = new AudioEffectSettings();
 
         public string Key => key;
@@ -118,6 +104,5 @@ namespace GoodCopBadCop.Effects
         public FullscreenEffectSettings Fullscreen => fullscreen;
         public CameraEffectSettings Camera => camera;
         public AudioEffectSettings Audio => audio;
-
     }
 }

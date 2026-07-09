@@ -26,6 +26,14 @@ public class JunkItem : Interactable
     /// </summary>
     public static event Action OnAnyJunkItemCollected;
 
+    /// <summary>
+    /// Optional server-side callback fired when this specific item is collected.
+    /// When assigned, allows owning systems (e.g. CleanBoothMessTask) to track
+    /// their own spawned junk independently of the global static event.
+    /// Set this immediately after spawning on the server.
+    /// </summary>
+    [System.NonSerialized] public System.Action OnCollected;
+
     protected override void Awake()
     {
         base.Awake();
@@ -87,6 +95,7 @@ public class JunkItem : Interactable
         if (bag.IsFull) return;
 
         bag.AddJunk();
+        OnCollected?.Invoke();
         OnAnyJunkItemCollected?.Invoke();
         NetworkObject.Despawn(destroy: true);
     }

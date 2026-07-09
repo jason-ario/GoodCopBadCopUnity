@@ -23,6 +23,14 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public static event Action OnAnyMutantKilled;
 
+    /// <summary>
+    /// Fired on the server the first time any <see cref="MutantEnemy"/> instance acquires a
+    /// player target (i.e. transitions from idle/patrol to actively chasing).
+    /// <see cref="FollowTrailThreat"/> subscribes while the follow-trail task is active so that
+    /// encountering a pack mutant early skips straight to the kill-mutants task.
+    /// </summary>
+    public static event Action OnAnyMutantSpottedPlayer;
+
     // ── Configuration ─────────────────────────────────────────────────────────
 
     [SerializeField] private MutantEnemyData data;
@@ -201,6 +209,9 @@ public class MutantEnemy : NetworkBehaviour
 
             bool wasChasing = _currentTarget != null;
             _currentTarget = FindNearestLivingPlayer();
+
+            if (!wasChasing && _currentTarget != null)
+                OnAnyMutantSpottedPlayer?.Invoke();
 
             if (_currentTarget != null)
             {
@@ -550,6 +561,8 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Finds the nearest player that is alive (PlayerHealth not dead) within detection radius.
     /// Iterates all connected NetworkClients so it works in multiplayer.
+    /// Players who are inside a scripted dialogue cutscene are excluded — they cannot be
+    /// aggroed while the cutscene holds their controls.
     /// </summary>
     private Transform FindNearestLivingPlayer()
     {
@@ -563,6 +576,13 @@ public class MutantEnemy : NetworkBehaviour
 
             PlayerHealth health = client.PlayerObject.GetComponent<PlayerHealth>();
             if (health == null || health.IsDead)
+                continue;
+
+            // Do not target players who are locked inside a scripted dialogue cutscene.
+            // IsInCutscene is set by the owning client via DialogueChoiceSystem and replicated
+            // to the server through a NetworkVariable, so this check is server-authoritative.
+            PlayerInstance pi = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (pi != null && pi.IsInCutscene)
                 continue;
 
             float sqrDist = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
@@ -713,6 +733,13 @@ public class MutantEnemy : NetworkBehaviour
 
         PlayerHealth targetHealth = _currentTarget.GetComponent<PlayerHealth>();
         if (targetHealth == null || targetHealth.IsDead)
+            return;
+
+        // Do not attack a player who has entered a cutscene since the last ChaseLoop tick
+        // (guards the window between FindNearestLivingPlayer clearing the target and the
+        // next retarget interval, since _currentTarget can briefly outlive the exclusion).
+        PlayerInstance targetPlayer = _currentTarget.GetComponent<PlayerInstance>();
+        if (targetPlayer != null && targetPlayer.IsInCutscene)
             return;
 
         TriggerAttackAnimationClientRpc();

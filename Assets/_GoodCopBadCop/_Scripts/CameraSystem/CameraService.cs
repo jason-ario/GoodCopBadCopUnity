@@ -6,8 +6,8 @@ namespace GoodCopBadCop.CameraSystem
 {
     public interface ICameraService
     {
-        void ShakeLocalPlayer();
-        void PlayLocalImpulse(CameraImpulseSettings settings);
+        void PlayLocalSway(CameraSwaySettings settings);
+        void PlayLocalCameraKick(CameraKickSettings settings);
         void HideFromCapture(object source, global::SuspectCharacter suspect);
         void ShowInCapture(object source, global::SuspectCharacter suspect);
         bool IsVisibleInCapture(global::SuspectCharacter suspect);
@@ -24,12 +24,7 @@ namespace GoodCopBadCop.CameraSystem
             this.playerRuntimeModel = playerRuntimeModel;
         }
 
-        public void ShakeLocalPlayer()
-        {
-            PlayLocalImpulse(CameraImpulseSettings.DefaultHit());
-        }
-
-        public void PlayLocalImpulse(CameraImpulseSettings settings)
+        public void PlayLocalSway(CameraSwaySettings settings)
         {
             if (settings == null || !settings.Enabled)
                 return;
@@ -48,7 +43,29 @@ namespace GoodCopBadCop.CameraSystem
                 return;
             }
 
-            cameraController.PlayImpulse(settings);
+            cameraController.PlaySway(settings);
+        }
+
+        public void PlayLocalCameraKick(CameraKickSettings settings)
+        {
+            if (settings == null || !settings.Enabled)
+                return;
+
+            global::PlayerInstance player = FindLocalPlayer();
+            if (player == null)
+            {
+                Debug.LogWarning("[CameraService] Local player was not found.");
+                return;
+            }
+
+            global::PlayerCameraController cameraController = player.GetComponent<global::PlayerCameraController>();
+            if (cameraController == null)
+            {
+                Debug.LogWarning("[CameraService] Local player has no PlayerCameraController.");
+                return;
+            }
+
+            cameraController.PlayCameraKick(settings);
         }
 
         private global::PlayerInstance FindLocalPlayer()

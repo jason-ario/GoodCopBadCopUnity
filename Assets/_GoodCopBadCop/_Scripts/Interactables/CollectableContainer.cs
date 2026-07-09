@@ -44,7 +44,7 @@ public abstract class CollectableContainer : Interactable
     public int Capacity => _capacity;
 
     /// <summary>True when the container has reached capacity.</summary>
-    public bool IsFull => _fillCount.Value >= _capacity;
+    public virtual bool IsFull => _fillCount.Value >= _capacity;
 
     /// <summary>True after the player has called HQ and a collector is en route.</summary>
     public bool IsAwaitingPickup => _isAwaitingPickup.Value;

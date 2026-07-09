@@ -451,15 +451,16 @@ public class LobbyManager : MonoBehaviour
         else if (GameManager.Instance.HasGameStarted && !GameManager.Instance.HasIntroCutsceneStarted)
         {
             // Game started but intro cutscene not yet — treat this joiner as a lobby joiner so they get OnGameStart.
+            // Pass gameAlreadyStarted=true so StartCampaign() fires on the client (it missed StartGameClientRpc).
             Debug.Log($"[Host] Game started, intro cutscene not yet — spawning as lobby joiner for clientId={clientId}");
             GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
-            GameManager.Instance.InitializeLobbyJoinClient(clientId);
+            GameManager.Instance.InitializeLobbyJoinClient(clientId, gameAlreadyStarted: true);
         }
         else if (!GameManager.Instance.IsTransitioningToLobby)
         {
             Debug.Log($"[Host] Spawning lobby joiner for clientId={clientId}");
             GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
-            GameManager.Instance.InitializeLobbyJoinClient(clientId);
+            GameManager.Instance.InitializeLobbyJoinClient(clientId, gameAlreadyStarted: false);
         }
         else
         {

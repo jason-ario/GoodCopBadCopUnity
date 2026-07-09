@@ -14,6 +14,11 @@ public class ExamNotebook : PickableObject
     // Empty at design time — no page children live in the notebook prefab.
     private ExamPage[] pages = System.Array.Empty<ExamPage>();
 
+    // Guards against double-initialization when both a broadcast SetPageReferencesClientRpc
+    // (sent immediately after purchase/delivery) and a targeted one (sent in response to
+    // RequestPageReferencesServerRpc) arrive on the same client within the same session.
+    private bool _pagesInitialized;
+
     /// <summary>The registered page prefab asset for this notebook type. Must match the entry in the NetworkManager's Network Prefabs list.</summary>
     [SerializeField] private NetworkObject pagePrefab;
 
@@ -164,13 +169,58 @@ public class ExamNotebook : PickableObject
                 SetPageReferencesClientRpc(pageRefs);
             }
         }
-        else if (!IsServer && NetworkObject.IsSceneObject == true)
+        else if (!IsServer)
         {
-            // Non-host client: SetPageReferencesClientRpc was broadcast during the server's
+            // Non-host client: covers both scene objects and dynamically-spawned notebooks.
+            //
+            // Scene objects: SetPageReferencesClientRpc was broadcast during the server's
             // OnNetworkSpawn, which runs before clients finish connecting — so the RPC is
-            // never received. Request page references from the server now that this client
-            // is fully registered and listening.
+            // never received. Request page references from the server now.
+            //
+            // Dynamically-spawned notebooks (purchased / supply-box delivered): a broadcast
+            // SetPageReferencesClientRpc is sent by the caller of SpawnAndWirePages right
+            // after spawning. If a client joined before the notebook was spawned, that
+            // broadcast reaches them. If a client joins AFTER the notebook was already in
+            // the world, they missed the broadcast and must request references explicitly.
+            //
+            // In the early-join case the server will still have pages.Length == 0 when this
+            // ServerRpc arrives (purchase hasn't completed yet), so it returns early and the
+            // in-flight broadcast RPC handles initialization instead — no double-init.
             RequestPageReferencesServerRpc();
+        }
+
+        // Subscribe so every client re-activates pages and re-renders RTs when any player
+        // picks up this notebook (critical for notebooks delivered inside supply boxes whose
+        // pages were deactivated at delivery time and whose RTs were never rendered).
+        OnPickedUpNetworked += OnPickedUpAllClients;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        OnPickedUpNetworked -= OnPickedUpAllClients;
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via the <see cref="OnPickedUpNetworked"/> event (driven by the
+    /// server-authoritative _holdingClientId NetworkVariable) whenever any player picks up
+    /// this notebook. Re-activates pages and re-renders their RTs so every client that has
+    /// not yet seen a rendered snapshot (e.g. supply-box delivery path) gets correct visuals.
+    /// </summary>
+    private void OnPickedUpAllClients()
+    {
+        SetPagesActive(true);
+        SnapshotAllPages();
+    }
+
+    /// <summary>Triggers a fresh RT snapshot on every page that is still bound to this notebook.</summary>
+    private void SnapshotAllPages()
+    {
+        if (pages == null) return;
+        foreach (var page in pages)
+        {
+            if (page != null && !page.isRippedOut)
+                page.SnapshotChecklist();
         }
     }
 
@@ -270,6 +320,12 @@ public class ExamNotebook : PickableObject
 
     private IEnumerator ApplyPageReferences(NetworkObjectReference[] pageRefs)
     {
+        // Guard: if initialization already ran (e.g. broadcast RPC arrived before a targeted
+        // one sent in response to RequestPageReferencesServerRpc), skip the second call so
+        // OnValueChanged callbacks are not registered twice.
+        if (_pagesInitialized) yield break;
+        _pagesInitialized = true;
+
         // Wait until every referenced NetworkObject is registered locally before touching pages[].
         for (int i = 0; i < pageRefs.Length; i++)
         {
@@ -469,6 +525,9 @@ public class ExamNotebook : PickableObject
         base.OnPickedUp();
         // Always restore live pages when picked up out of a box or off the floor.
         SetPagesActive(true);
+        // Re-render RTs immediately on the picking-up client. Other clients are handled by
+        // OnPickedUpNetworked → OnPickedUpAllClients once the NetworkVariable propagates.
+        SnapshotAllPages();
         // Notify tutorial systems on all clients that a checklist has been acquired.
         AnyExamNotebookPickedUp = true;
         OnAnyExamNotebookPickedUp?.Invoke();

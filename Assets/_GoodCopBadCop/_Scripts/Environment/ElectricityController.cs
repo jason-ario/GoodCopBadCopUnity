@@ -14,7 +14,7 @@ public class ElectricityController : NetworkBehaviour
     [SerializeField] private bool enablePowerOutage = false;
 
     private NetworkVariable<bool> _isPowerOn = new NetworkVariable<bool>(
-        false,
+        true,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server
     );

@@ -56,6 +56,22 @@ public class BoothFlickeringLightsController : MonoBehaviour
 
     [SerializeField] private float flickerSoundVolume = 1f;
 
+    [Header("Ambient Flicker")]
+    [Tooltip("Minimum seconds between ambient flicker events (always active, unrelated to anomaly).")]
+    [SerializeField] private float minAmbientInterval = 15f;
+
+    [Tooltip("Maximum seconds between ambient flicker events.")]
+    [SerializeField] private float maxAmbientInterval = 45f;
+
+    [Tooltip("Intensity ratio the light dips to during an ambient flicker, relative to its normal intensity.")]
+    [SerializeField] [Range(0f, 1f)] private float ambientDipIntensityRatio = 0.15f;
+
+    [Tooltip("Minimum duration of the ambient dip in seconds.")]
+    [SerializeField] private float minAmbientDipDuration = 0.04f;
+
+    [Tooltip("Maximum duration of the ambient dip in seconds.")]
+    [SerializeField] private float maxAmbientDipDuration = 0.12f;
+
     [Header("Debug")]
     [Tooltip("Press this key in Play Mode to immediately trigger a single flicker burst.")]
     [SerializeField] private KeyCode testKey = KeyCode.F;
@@ -63,6 +79,19 @@ public class BoothFlickeringLightsController : MonoBehaviour
     private float[] _originalIntensities;
     private Coroutine _flickerLoopCoroutine;
     private Coroutine _testBurstCoroutine;
+    private Coroutine _ambientFlickerCoroutine;
+
+    private void Start()
+    {
+        CacheOriginalIntensities();
+        _ambientFlickerCoroutine = StartCoroutine(AmbientFlickerLoop());
+    }
+
+    private void OnDestroy()
+    {
+        if (_ambientFlickerCoroutine != null)
+            StopCoroutine(_ambientFlickerCoroutine);
+    }
 
     private void Update()
     {
@@ -115,6 +144,47 @@ public class BoothFlickeringLightsController : MonoBehaviour
 
         RestoreOriginalIntensities();
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Ambient Flicker
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs continuously throughout the scene, triggering an occasional, subtle
+    /// single-light dip to add atmospheric life. Suppressed while the anomaly
+    /// flicker loop is active to avoid visual interference.
+    /// </summary>
+    private IEnumerator AmbientFlickerLoop()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(Random.Range(minAmbientInterval, maxAmbientInterval));
+
+            // Defer to the anomaly if it is currently running.
+            if (_flickerLoopCoroutine != null) continue;
+
+            yield return StartCoroutine(AmbientFlickerDip());
+        }
+    }
+
+    /// <summary>
+    /// Briefly dips a single randomly chosen booth light to <see cref="ambientDipIntensityRatio"/>
+    /// of its normal intensity, then restores it.
+    /// </summary>
+    private IEnumerator AmbientFlickerDip()
+    {
+        if (boothLights == null || boothLights.Length == 0) yield break;
+
+        int index = Random.Range(0, boothLights.Length);
+        if (boothLights[index] == null) yield break;
+
+        float original = _originalIntensities[index];
+        boothLights[index].intensity = original * ambientDipIntensityRatio;
+        yield return new WaitForSeconds(Random.Range(minAmbientDipDuration, maxAmbientDipDuration));
+        boothLights[index].intensity = original;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
 
     private void CacheOriginalIntensities()
     {

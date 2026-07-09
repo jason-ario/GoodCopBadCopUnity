@@ -299,6 +299,17 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Immediately interrupts the current use action on the held object if it is actively being
+    /// used (e.g. mopping). Called by external systems such as <see cref="DialogueChoiceSystem"/>
+    /// to break the player out of an ongoing activity before locking controls for a cutscene.
+    /// </summary>
+    public void ForceStopUse()
+    {
+        if (_heldObject != null && _heldObject.IsBeingUsed)
+            StopUsingObject();
+    }
+
     void StopUsingObject()
     {
         if(_heldObject != null)

@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using TMPro;
+using GoodCopBadCop.SuspectBehaviorAnimation;
+using GoodCopBadCop.SuspectPaperwork;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -63,6 +64,7 @@ namespace GoodCopBadCop.Editor
         private const string PreviewRootPrefix = "[Anomaly Preview]";
         private const string PreviewDocumentPrefix = "[Anomaly Preview Document]";
         private const string PreviewDocumentRootName = "[Anomaly Preview Documents]";
+        private const string PreviewOnlyAnomalyRootName = "[Anomaly Preview Only Anomalies]";
         private const string SessionPreviewPrefabPathKey = "GoodCopBadCop.AnomalyPreview.PrefabPath";
         private const string SessionPendingPreviewKey = "GoodCopBadCop.AnomalyPreview.Pending";
         private static readonly string[] DocumentPrefabPaths =
@@ -71,10 +73,18 @@ namespace GoodCopBadCop.Editor
             "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Application Paper.prefab",
             "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Entry Permit.prefab"
         };
+        private static readonly Type[] PreviewOnlyDocumentAnomalyTypes =
+        {
+            typeof(global::FakeIdAnomaly),
+            typeof(global::ExpirationDateAnomaly),
+            typeof(global::MissingDocumentAnomaly)
+        };
 
         private GameObject targetRoot;
         private GameObject previewRoot;
         private GameObject previewDocumentRoot;
+        private readonly SuspectPaperworkModel paperworkModel = new();
+        private ISuspectPaperworkService paperworkService;
         private readonly List<Anomaly> anomalies = new();
         private readonly List<ActiveState> activeStates = new();
         private readonly List<RendererState> rendererStates = new();
@@ -86,10 +96,7 @@ namespace GoodCopBadCop.Editor
         private Vector2 windowScrollPosition;
         private Vector2 scrollPosition;
         private Animator previewAnimator;
-        private AnimationClip[] animationClips = Array.Empty<AnimationClip>();
-        private string[] animationClipLabels = Array.Empty<string>();
-        private int selectedAnimationClipIndex = -1;
-        private float animationSampleNormalized;
+        private SuspectBehaviorAnimationAdapter previewAnimationAdapter;
         private string status = "Select a suspect prefab or scene suspect.";
 
         static AnomalyPreviewWindow()
@@ -148,11 +155,14 @@ namespace GoodCopBadCop.Editor
             ClearPreviewInstance();
         }
 
+        private void OnInspectorUpdate()
+        {
+            if (targetRoot != null)
+                Repaint();
+        }
+
         private void OnGUI()
         {
-            DrawHeader();
-            EditorGUILayout.Space(8f);
-
             float anomalyPanelWidth = Mathf.Clamp(position.width * 0.45f, 360f, 520f);
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -167,15 +177,6 @@ namespace GoodCopBadCop.Editor
                 EditorGUILayout.Space(8f);
                 DrawAnomalyList(GUILayout.Width(anomalyPanelWidth), GUILayout.ExpandHeight(true));
             }
-        }
-
-        private void DrawHeader()
-        {
-            EditorGUILayout.LabelField("Anomaly Preview", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Runs anomaly previews in a small sandbox scene and Play Mode, without loading the tutorial or the main shift flow.",
-                MessageType.Info);
-            EditorGUILayout.HelpBox(status, MessageType.None);
         }
 
         private void DrawClearPreviewControls()
@@ -201,9 +202,6 @@ namespace GoodCopBadCop.Editor
             {
                 EditorGUILayout.LabelField("Source", EditorStyles.boldLabel);
                 DrawSuspectDataPicker();
-
-                EditorGUILayout.Space(6f);
-                EditorGUILayout.LabelField("Sandbox", SandboxScenePath, EditorStyles.wordWrappedMiniLabel);
             }
         }
 
@@ -217,9 +215,6 @@ namespace GoodCopBadCop.Editor
                 {
                     selectedSuspectIndex = EditorGUILayout.Popup(selectedSuspectIndex, suspectOptionLabels);
                 }
-
-                if (GUILayout.Button("Refresh", GUILayout.Width(72f)))
-                    RefreshSuspects();
             }
 
             SuspectOption selected = GetSelectedSuspectOption();
@@ -231,7 +226,6 @@ namespace GoodCopBadCop.Editor
                 using (new EditorGUI.DisabledScope(true))
                     EditorGUILayout.ObjectField("Prefab", selected.CharacterPrefab, typeof(global::SuspectCharacter), false);
 
-                EditorGUILayout.LabelField("Asset", selected.AssetPath, EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.LabelField("Anomalies on prefab", selected.AnomalyCount.ToString());
             }
             else if (suspectOptionLabels.Length == 0)
@@ -241,7 +235,7 @@ namespace GoodCopBadCop.Editor
 
             using (new EditorGUI.DisabledScope(!selected.CanSpawn))
             {
-                if (GUILayout.Button(EditorApplication.isPlaying ? "Respawn Selected Suspect" : "Start Selected Suspect Preview", GUILayout.Height(30f)))
+                if (GUILayout.Button("Spawn", GUILayout.Height(30f)))
                     SpawnSelectedSuspect();
             }
 
@@ -259,7 +253,7 @@ namespace GoodCopBadCop.Editor
 
                 if (targetRoot == null)
                 {
-                    EditorGUILayout.LabelField("Spawn a preview target to sample its animator clips.", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("Spawn a preview target to inspect its behavior animation state.", EditorStyles.wordWrappedMiniLabel);
                     return;
                 }
 
@@ -275,36 +269,21 @@ namespace GoodCopBadCop.Editor
                 {
                     EditorGUILayout.ObjectField("Animator", previewAnimator, typeof(Animator), true);
                     EditorGUILayout.ObjectField("Controller", previewAnimator.runtimeAnimatorController, typeof(RuntimeAnimatorController), false);
+                    EditorGUILayout.ObjectField("Adapter", previewAnimationAdapter, typeof(SuspectBehaviorAnimationAdapter), true);
+                    EditorGUILayout.ObjectField("Preset", previewAnimationAdapter != null ? previewAnimationAdapter.CurrentPreset : null, typeof(BehaviorAnimationPreset), false);
+                    EditorGUILayout.ObjectField("Current Clip", previewAnimationAdapter != null ? previewAnimationAdapter.CurrentClip : null, typeof(AnimationClip), false);
                 }
 
-                if (animationClips.Length == 0)
+                if (previewAnimationAdapter == null)
                 {
-                    EditorGUILayout.LabelField("Animator controller has no clips.", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("No behavior animation adapter found under current target.", EditorStyles.wordWrappedMiniLabel);
                     return;
                 }
 
-                selectedAnimationClipIndex = Mathf.Clamp(selectedAnimationClipIndex, 0, animationClips.Length - 1);
-                selectedAnimationClipIndex = EditorGUILayout.Popup("Clip", selectedAnimationClipIndex, animationClipLabels);
-
-                EditorGUI.BeginChangeCheck();
-                animationSampleNormalized = EditorGUILayout.Slider("Time", animationSampleNormalized, 0f, 1f);
-                if (EditorGUI.EndChangeCheck() && AnimationMode.InAnimationMode())
-                    SampleSelectedAnimationClip();
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button("Sample Clip", GUILayout.Height(24f)))
-                        SampleSelectedAnimationClip();
-
-                    if (GUILayout.Button("Rebind", GUILayout.Height(24f)))
-                        RebindPreviewAnimator();
-
-                    using (new EditorGUI.DisabledScope(!AnimationMode.InAnimationMode()))
-                    {
-                        if (GUILayout.Button("Stop", GUILayout.Height(24f)))
-                            StopAnimationPreview();
-                    }
-                }
+                string state = previewAnimationAdapter.CurrentClip != null
+                    ? "Playing"
+                    : previewAnimationAdapter.IsInPause ? "Pause" : "Idle";
+                EditorGUILayout.LabelField("State", state);
             }
         }
         private void DrawAnomalyList(params GUILayoutOption[] layoutOptions)
@@ -494,7 +473,6 @@ namespace GoodCopBadCop.Editor
                 SetHideFlagsRecursive(document, HideFlags.None);
 
                 previewDocuments.Add(document);
-                PopulatePreviewDocument(document, data);
             }
 
             ApplyPreviewDocumentState();
@@ -541,23 +519,22 @@ namespace GoodCopBadCop.Editor
                 return;
 
             global::SuspectData data = GetPreviewSuspectData();
-            bool missingDocumentActive = IsAnomalyTypeActive<MissingDocumentAnomaly>();
+            SuspectPaperworkState paperworkState = BuildPreviewPaperworkState(data);
 
             foreach (GameObject document in previewDocuments.ToArray())
             {
                 if (document == null)
                     continue;
 
-                PopulatePreviewDocument(document, data);
+                document.SetActive(paperworkState.DocumentsVisible);
+                if (!paperworkState.DocumentsVisible)
+                    continue;
 
-                if (document.name.Contains("Application Paper"))
-                    document.SetActive(!missingDocumentActive);
-                else
-                    document.SetActive(true);
+                PopulatePreviewDocument(document, data, paperworkState);
             }
         }
 
-        private void PopulatePreviewDocument(GameObject document, global::SuspectData data)
+        private void PopulatePreviewDocument(GameObject document, global::SuspectData data, SuspectPaperworkState paperworkState)
         {
             if (document == null || data == null)
                 return;
@@ -567,127 +544,30 @@ namespace GoodCopBadCop.Editor
                 if (component == null)
                     continue;
 
-                if (component is IDCard)
-                    ApplyIdCardPreview(component, data);
-                else if (component is ApplicationLetter)
-                    ApplyApplicationLetterPreview(component, data);
-                else if (component is EntryPermit)
-                    ApplyEntryPermitPreview(component, data);
+                if (component is IDCard idCard)
+                    idCard.ApplyPreviewState(paperworkState);
+                else if (component is ApplicationLetter applicationLetter)
+                    applicationLetter.ApplyPreviewState(paperworkState, data);
+                else if (component is EntryPermit entryPermit)
+                    entryPermit.ApplyPreviewState(paperworkState);
             }
         }
 
-        private void ApplyIdCardPreview(MonoBehaviour component, global::SuspectData data)
+        private SuspectPaperworkState BuildPreviewPaperworkState(global::SuspectData data)
         {
-            SetTextField(component, "nameText", GetDocumentName(data));
-            SetTextField(component, "birthDateText", GetDocumentBirthDate(data));
-            SetTextField(component, "expDateText", GetDocumentExpirationDate(data));
-            SetTextField(component, "idNoText", GetDocumentIdNumber(data));
-            SetTextField(component, "residentText", data.IsResident ? "* Resident of Saplavi *" : "Non-Resident");
-            SetObjectActiveField(component, "seal", data.IsResident);
-            SetRendererTextureField(component, "idPhoto", data.IDPhoto);
-        }
+            paperworkService ??= new SuspectPaperworkService(paperworkModel);
 
-        private void ApplyApplicationLetterPreview(MonoBehaviour component, global::SuspectData data)
-        {
-            string reason = GetDocumentEntryReason(data);
-            SetTextField(component, "nameText", GetDocumentName(data));
-            SetTextField(component, "birthDateText", GetDocumentBirthDate(data));
-            SetTextField(component, "sexText", GetDocumentSex(data));
-            SetTextField(component, "reasonForEntryText", reason);
-            SetTextField(component, "idNumberText", GetDocumentIdNumber(data));
+            IEnumerable<string> activeAnomalyTypeNames = anomalies
+                .Where(IsAnomalyActive)
+                .Select(anomaly => anomaly.GetType().Name);
 
-            SetTextFont(component, "nameText", data.handwritingFont);
-            SetTextFont(component, "birthDateText", data.handwritingFont);
-            SetTextFont(component, "sexText", data.handwritingFont);
-            SetTextFont(component, "reasonForEntryText", data.handwritingFont);
-        }
+            global::SuspectCharacter previewSuspect = GetPreviewSuspect();
+            Texture idPhoto = previewSuspect != null && previewSuspect.IDPhoto != null
+                ? previewSuspect.IDPhoto
+                : data != null ? data.IDPhoto : null;
 
-        private void ApplyEntryPermitPreview(MonoBehaviour component, global::SuspectData data)
-        {
-            SetTextField(component, "nameText", "<b>" + GetDocumentName(data) + "</b>");
-            SetTextField(component, "reasonText", "<b>" + GetDocumentEntryReason(data) + "</b>");
-            SetTextField(component, "expirationDateText", "<b>" + GetDocumentExpirationDate(data) + "</b>");
-            SetObjectActiveField(component, "seal", data.IsResident);
-        }
-
-        private string GetDocumentName(global::SuspectData data)
-        {
-            string name = $"{data.FirstName} {data.LastName}".Trim();
-            if (!IsAnomalyTypeActive<NameWrong>())
-                return name;
-
-            return string.IsNullOrWhiteSpace(name) ? "WRONG NAME" : name + "?";
-        }
-
-        private string GetDocumentBirthDate(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<BirthDateWrong>())
-                return data.DateOfBirth;
-
-            return string.IsNullOrWhiteSpace(data.DateOfBirth) ? "00/00/0000" : data.DateOfBirth + "?";
-        }
-
-        private string GetDocumentIdNumber(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<IDNumberWrong>() && !IsAnomalyTypeActive<FakeIdAnomaly>())
-                return data.IDNumber;
-
-            if (string.IsNullOrWhiteSpace(data.IDNumber))
-                return "0000000";
-
-            char[] chars = data.IDNumber.ToCharArray();
-            for (int i = chars.Length - 1; i >= 0; i--)
-            {
-                if (!char.IsDigit(chars[i]))
-                    continue;
-
-                chars[i] = chars[i] == '9' ? '0' : (char)(chars[i] + 1);
-                return new string(chars);
-            }
-
-            return data.IDNumber + "?";
-        }
-
-        private string GetDocumentSex(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<SexWrong>())
-                return data.Sex;
-
-            if (string.Equals(data.Sex, "Male", StringComparison.OrdinalIgnoreCase)) return "Female";
-            if (string.Equals(data.Sex, "Female", StringComparison.OrdinalIgnoreCase)) return "Male";
-            return string.IsNullOrWhiteSpace(data.Sex) ? "Unknown" : data.Sex + "?";
-        }
-
-        private string GetDocumentExpirationDate(global::SuspectData data)
-        {
-            if (!IsAnomalyTypeActive<ExpirationDateAnomaly>())
-                return data.EntryPermitExpiryDate;
-
-            return string.IsNullOrWhiteSpace(data.EntryPermitExpiryDate) ? "EXPIRED" : "EXPIRED " + data.EntryPermitExpiryDate;
-        }
-
-        private string GetDocumentEntryReason(global::SuspectData data)
-        {
-            global::SuspectData.EntryReasonSet reasonSet = IsAnomalyTypeActive<InvalidEntryReason>()
-                ? data.invalidEntryReasons
-                : data.entryReasons;
-
-            string reason = GetFirstAvailableReason(reasonSet.earlyDaysReasons)
-                ?? GetFirstAvailableReason(reasonSet.midDaysReasons)
-                ?? GetFirstAvailableReason(reasonSet.finalDaysReasons);
-
-            if (!string.IsNullOrWhiteSpace(reason))
-                return reason;
-
-            return IsAnomalyTypeActive<InvalidEntryReason>() ? "" : "Entry";
-        }
-
-        private static string GetFirstAvailableReason(string[] reasons)
-        {
-            if (reasons == null)
-                return null;
-
-            return reasons.FirstOrDefault(reason => !string.IsNullOrWhiteSpace(reason));
+            int currentDay = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 1;
+            return paperworkService.BuildForPreview(data, idPhoto, activeAnomalyTypeNames, currentDay, selectedSuspectIndex);
         }
 
         private global::SuspectData GetPreviewSuspectData()
@@ -752,54 +632,15 @@ namespace GoodCopBadCop.Editor
         private void RefreshAnimationPreviewIfNeeded()
         {
             Animator animator = targetRoot != null ? targetRoot.GetComponentInChildren<Animator>(true) : null;
-            RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : null;
-            AnimationClip[] nextClips = controller != null
-                ? controller.animationClips.Where(clip => clip != null).Distinct().OrderBy(clip => clip.name).ToArray()
-                : Array.Empty<AnimationClip>();
+            SuspectBehaviorAnimationAdapter adapter = targetRoot != null
+                ? targetRoot.GetComponentInChildren<SuspectBehaviorAnimationAdapter>(true)
+                : null;
 
-            if (animator == previewAnimator && SequenceEqual(animationClips, nextClips))
+            if (animator == previewAnimator && adapter == previewAnimationAdapter)
                 return;
 
             previewAnimator = animator;
-            animationClips = nextClips;
-            animationClipLabels = animationClips.Select(clip => clip.name).ToArray();
-            selectedAnimationClipIndex = animationClips.Length > 0 ? Mathf.Clamp(selectedAnimationClipIndex, 0, animationClips.Length - 1) : -1;
-            animationSampleNormalized = 0f;
-        }
-
-        private void SampleSelectedAnimationClip()
-        {
-            if (targetRoot == null || selectedAnimationClipIndex < 0 || selectedAnimationClipIndex >= animationClips.Length)
-                return;
-
-            AnimationClip clip = animationClips[selectedAnimationClipIndex];
-            float time = clip.length * animationSampleNormalized;
-
-            AnimationMode.StartAnimationMode();
-            AnimationMode.BeginSampling();
-            AnimationMode.SampleAnimationClip(targetRoot, clip, time);
-            AnimationMode.EndSampling();
-            SceneView.RepaintAll();
-            status = $"Sampled animation clip '{clip.name}' at {time:0.00}s.";
-        }
-
-        private void StopAnimationPreview()
-        {
-            if (AnimationMode.InAnimationMode())
-                AnimationMode.StopAnimationMode();
-
-            SceneView.RepaintAll();
-        }
-
-        private void RebindPreviewAnimator()
-        {
-            if (previewAnimator == null)
-                return;
-
-            previewAnimator.Rebind();
-            previewAnimator.Update(0f);
-            SceneView.RepaintAll();
-            status = $"Rebound animator on {previewAnimator.gameObject.name}.";
+            previewAnimationAdapter = adapter;
         }
 
         private bool IsAnomalyActive(Anomaly anomaly)
@@ -835,58 +676,6 @@ namespace GoodCopBadCop.Editor
             }
         }
 
-        private static bool SequenceEqual(AnimationClip[] left, AnimationClip[] right)
-        {
-            if (left == null || left.Length == 0)
-                return right == null || right.Length == 0;
-
-            if (right == null || left.Length != right.Length)
-                return false;
-
-            for (int i = 0; i < left.Length; i++)
-            {
-                if (left[i] != right[i])
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static void SetTextField(object target, string fieldName, string value)
-        {
-            TextMeshPro text = GetFieldValue<TextMeshPro>(target, fieldName);
-            if (text != null)
-                text.text = value;
-        }
-
-        private static void SetTextFont(object target, string fieldName, TMP_FontAsset font)
-        {
-            if (font == null)
-                return;
-
-            TextMeshPro text = GetFieldValue<TextMeshPro>(target, fieldName);
-            if (text != null)
-                text.font = font;
-        }
-
-        private static void SetObjectActiveField(object target, string fieldName, bool active)
-        {
-            GameObject gameObject = GetFieldValue<GameObject>(target, fieldName);
-            if (gameObject != null)
-                gameObject.SetActive(active);
-        }
-
-        private static void SetRendererTextureField(object target, string fieldName, Texture texture)
-        {
-            Renderer renderer = GetFieldValue<Renderer>(target, fieldName);
-            if (renderer == null || texture == null)
-                return;
-
-            MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetTexture("_MainTex", texture);
-            renderer.SetPropertyBlock(propertyBlock);
-        }
         private void StartPlaymodePreview(GameObject prefab)
         {
             if (prefab == null)
@@ -1185,12 +974,44 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
+            EnsurePreviewOnlyDocumentAnomalies();
+
             anomalies.AddRange(targetRoot.GetComponentsInChildren<Anomaly>(true)
                 .OrderBy(GetCategorySortOrder)
                 .ThenBy(anomaly => anomaly.GetType().Name));
 
             status = $"Found {anomalies.Count} anomaly component(s) under {targetRoot.name}.";
             Repaint();
+        }
+
+        private void EnsurePreviewOnlyDocumentAnomalies()
+        {
+            if (previewRoot == null || targetRoot == null)
+                return;
+
+            GameObject container = null;
+
+            foreach (Type anomalyType in PreviewOnlyDocumentAnomalyTypes)
+            {
+                if (targetRoot.GetComponentInChildren(anomalyType, true) != null)
+                    continue;
+
+                container ??= GetOrCreatePreviewOnlyAnomalyRoot();
+                Component anomaly = container.AddComponent(anomalyType);
+                anomaly.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+            }
+        }
+
+        private GameObject GetOrCreatePreviewOnlyAnomalyRoot()
+        {
+            Transform existing = targetRoot.transform.Find(PreviewOnlyAnomalyRootName);
+            if (existing != null)
+                return existing.gameObject;
+
+            GameObject container = new GameObject(PreviewOnlyAnomalyRootName);
+            container.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+            container.transform.SetParent(targetRoot.transform, false);
+            return container;
         }
 
 
@@ -1201,6 +1022,9 @@ namespace GoodCopBadCop.Editor
 
             if (resetFirst)
                 ResetTarget();
+
+            if (anomaly is AnimatedBehaviorAnomaly)
+                DeactivateOtherActiveAnimatedBehaviorAnomalies(anomaly);
 
             EnsureAnomalyInitialized(anomaly);
 
@@ -1220,6 +1044,22 @@ namespace GoodCopBadCop.Editor
             EditorUtility.SetDirty(anomaly);
             SceneView.RepaintAll();
             status = $"Activated {anomaly.GetType().Name}.";
+        }
+
+        private void DeactivateOtherActiveAnimatedBehaviorAnomalies(Anomaly selectedAnomaly)
+        {
+            foreach (Anomaly anomaly in anomalies.ToArray())
+            {
+                if (anomaly == null
+                    || ReferenceEquals(anomaly, selectedAnomaly)
+                    || !(anomaly is AnimatedBehaviorAnomaly)
+                    || !IsAnomalyActive(anomaly))
+                {
+                    continue;
+                }
+
+                DeactivateAnomaly(anomaly);
+            }
         }
 
         private void DeactivateAnomaly(Anomaly anomaly)
@@ -1280,7 +1120,6 @@ namespace GoodCopBadCop.Editor
 
         private void ClearPreviewInstance()
         {
-            StopAnimationPreview();
             ClearPreviewDocuments();
 
             DestroyPreviewObject(previewRoot);
@@ -1288,9 +1127,7 @@ namespace GoodCopBadCop.Editor
             previewRoot = null;
             targetRoot = null;
             previewAnimator = null;
-            animationClips = Array.Empty<AnimationClip>();
-            animationClipLabels = Array.Empty<string>();
-            selectedAnimationClipIndex = -1;
+            previewAnimationAdapter = null;
             anomalies.Clear();
             activeStates.Clear();
             rendererStates.Clear();

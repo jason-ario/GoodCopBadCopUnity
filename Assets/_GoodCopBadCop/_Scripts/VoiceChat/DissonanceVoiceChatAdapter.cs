@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Dissonance;
 using R3;
+using Unity.Netcode;
 using UnityEngine;
 using VContainer.Unity;
 
@@ -15,6 +16,7 @@ namespace GoodCopBadCop.VoiceChat
         private readonly HashSet<PlayerVoiceChatAdapter> playerAdapters = new();
         private DissonanceComms comms;
         private DisposableBag disposables;
+        private bool appliedLocalSpeaking;
 
         public DissonanceVoiceChatAdapter(
             IVoiceChatModel model,
@@ -29,8 +31,6 @@ namespace GoodCopBadCop.VoiceChat
         public void Initialize()
         {
             comms = commsRuntime.Comms;
-            comms.OnPlayerStartedSpeaking += OnPlayerStartedSpeaking;
-            comms.OnPlayerStoppedSpeaking += OnPlayerStoppedSpeaking;
 
             PlayerVoiceChatAdapter.Registered += OnPlayerAdapterRegistered;
             PlayerVoiceChatAdapter.Unregistered += OnPlayerAdapterUnregistered;
@@ -50,6 +50,15 @@ namespace GoodCopBadCop.VoiceChat
         {
             service.SetCommsAvailable(commsRuntime.Comms != null);
             service.SetNetworkReady(commsRuntime.Comms != null && commsRuntime.Comms.IsNetworkInitialized);
+
+            // TODO: If all players leave the lobby, the microphone indicator can remain visible;
+            // handle lobby/network disconnect events and force local speaking off.
+            bool localSpeaking = HasRemoteNetworkPeer() && HasActiveTransmission();
+            if (appliedLocalSpeaking != localSpeaking)
+            {
+                appliedLocalSpeaking = localSpeaking;
+                service.SetLocalSpeaking(localSpeaking);
+            }
         }
 
         public void Dispose()
@@ -57,12 +66,7 @@ namespace GoodCopBadCop.VoiceChat
             PlayerVoiceChatAdapter.Registered -= OnPlayerAdapterRegistered;
             PlayerVoiceChatAdapter.Unregistered -= OnPlayerAdapterUnregistered;
 
-            if (comms != null)
-            {
-                comms.OnPlayerStartedSpeaking -= OnPlayerStartedSpeaking;
-                comms.OnPlayerStoppedSpeaking -= OnPlayerStoppedSpeaking;
-            }
-
+            service.SetLocalSpeaking(false);
             disposables.Dispose();
             playerAdapters.Clear();
         }
@@ -101,11 +105,26 @@ namespace GoodCopBadCop.VoiceChat
             if (comms != null)
             {
                 bool enabled = model.IsEnabled.CurrentValue;
-                comms.IsMuted = !enabled || model.IsMuted.CurrentValue;
-                comms.IsDeafened = !enabled || model.IsDeafened.CurrentValue;
-                comms.MicrophoneName = string.IsNullOrWhiteSpace(model.MicrophoneName.CurrentValue)
+                bool targetMuted = !enabled || model.IsMuted.CurrentValue;
+                bool targetDeafened = !enabled || model.IsDeafened.CurrentValue;
+                string targetMicrophoneName = string.IsNullOrWhiteSpace(model.MicrophoneName.CurrentValue)
                     ? null
                     : model.MicrophoneName.CurrentValue;
+
+                if (comms.IsMuted != targetMuted)
+                {
+                    comms.IsMuted = targetMuted;
+                }
+
+                if (comms.IsDeafened != targetDeafened)
+                {
+                    comms.IsDeafened = targetDeafened;
+                }
+
+                if (comms.MicrophoneName != targetMicrophoneName)
+                {
+                    comms.MicrophoneName = targetMicrophoneName;
+                }
             }
 
             foreach (PlayerVoiceChatAdapter playerAdapter in playerAdapters)
@@ -123,20 +142,33 @@ namespace GoodCopBadCop.VoiceChat
                 model.ProximityRange.CurrentValue);
         }
 
-        private void OnPlayerStartedSpeaking(VoicePlayerState playerState)
+        private bool HasActiveTransmission()
         {
-            if (playerState != null && playerState.IsLocalPlayer)
+            foreach (PlayerVoiceChatAdapter playerAdapter in playerAdapters)
             {
-                service.SetLocalSpeaking(true);
+                if (playerAdapter != null && playerAdapter.IsTransmitting)
+                {
+                    return true;
+                }
             }
+
+            return false;
         }
 
-        private void OnPlayerStoppedSpeaking(VoicePlayerState playerState)
+        private static bool HasRemoteNetworkPeer()
         {
-            if (playerState != null && playerState.IsLocalPlayer)
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager == null || !networkManager.IsListening)
             {
-                service.SetLocalSpeaking(false);
+                return false;
             }
+
+            if (networkManager.IsHost || networkManager.IsServer)
+            {
+                return networkManager.ConnectedClientsIds.Count > 1;
+            }
+
+            return networkManager.IsClient && networkManager.IsConnectedClient;
         }
     }
 }
