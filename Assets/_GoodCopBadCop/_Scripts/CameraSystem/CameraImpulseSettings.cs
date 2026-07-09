@@ -19,6 +19,13 @@ namespace GoodCopBadCop.CameraSystem
         Rumble
     }
 
+    public enum ECameraSwayMotion
+    {
+        HeadSway,
+        CigaretteDrag,
+        HealRush
+    }
+
     [Serializable]
     public sealed class CameraImpulseSettings
     {
@@ -110,15 +117,19 @@ namespace GoodCopBadCop.CameraSystem
     public sealed class CameraSwaySettings
     {
         [SerializeField] private bool enabled;
+        [SerializeField] private ECameraSwayMotion motion = ECameraSwayMotion.HeadSway;
         [SerializeField, Min(0.01f)] private float duration = 0.8f;
         [SerializeField, Min(0.1f)] private float cycles = 1.5f;
         [SerializeField] private Vector3 eulerAmplitude = Vector3.zero;
+        [SerializeField] private float fieldOfViewOffset;
         [SerializeField] private AnimationCurve envelope = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.15f, 1f), new Keyframe(0.85f, 1f), new Keyframe(1f, 0f));
 
         public bool Enabled => enabled;
+        public ECameraSwayMotion Motion => motion;
         public float Duration => duration;
         public float Cycles => cycles;
         public Vector3 EulerAmplitude => eulerAmplitude;
+        public float FieldOfViewOffset => fieldOfViewOffset;
         public AnimationCurve Envelope => envelope;
 
         public static CameraSwaySettings Disabled()

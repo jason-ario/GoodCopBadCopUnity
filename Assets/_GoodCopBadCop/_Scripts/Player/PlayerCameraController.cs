@@ -1,4 +1,5 @@
 using GoodCopBadCop.CameraSystem;
+using DG.Tweening;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -16,29 +17,29 @@ public class PlayerCameraController : MonoBehaviour
     [Tooltip("Impulse source used when the player takes damage.")]
     [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
 
-    private CameraSwaySettings _activeSway;
-    private Vector3 _appliedSwayEuler;
-    private float _swayElapsed;
+    private CinemachineHeadSwayExtension _headSwayExtension;
+    private Sequence _swaySequence;
+    private Vector3 _appliedSwayOffsets;
+    private float _appliedFieldOfViewOffset;
 
     private void Awake()
     {
         EnsureHitImpulseSource();
     }
 
-    private void LateUpdate()
-    {
-        UpdateSway();
-    }
-
     private void OnDisable()
     {
-        ClearAppliedSway();
-        _activeSway = null;
+        StopSway();
     }
 
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>
     public void SetCameraActive(bool active)
     {
+        if (!active)
+        {
+            StopSway();
+        }
+
         if (camera != null)
             camera.gameObject.SetActive(active);
     }
@@ -97,53 +98,124 @@ public class PlayerCameraController : MonoBehaviour
 
     public void PlaySway(CameraSwaySettings settings)
     {
-        if (settings == null || !settings.Enabled || camera == null)
+        if (settings == null || !settings.Enabled || camera == null || !EnsureHeadSwayExtension(true))
             return;
 
-        ClearAppliedSway();
-        _activeSway = settings;
-        _swayElapsed = 0f;
+        StopSway();
+
+        _swaySequence = CreateSwaySequence(settings)
+            .OnComplete(ResetSwayOffsets)
+            .OnKill(() => _swaySequence = null);
     }
 
-    private void UpdateSway()
+    private void StopSway()
     {
-        if (_activeSway == null || camera == null)
-            return;
-
-        ClearAppliedSway();
-
-        float duration = Mathf.Max(0.01f, _activeSway.Duration);
-        _swayElapsed += Time.unscaledDeltaTime;
-        float normalizedTime = Mathf.Clamp01(_swayElapsed / duration);
-        float wave = Mathf.Sin(normalizedTime * _activeSway.Cycles * Mathf.PI * 2f);
-        float envelope = EvaluateSwayEnvelope(_activeSway, normalizedTime);
-
-        _appliedSwayEuler = _activeSway.EulerAmplitude * (wave * envelope);
-        camera.transform.localRotation *= Quaternion.Euler(_appliedSwayEuler);
-
-        if (_swayElapsed >= duration)
+        if (_swaySequence != null)
         {
-            ClearAppliedSway();
-            _activeSway = null;
+            _swaySequence.Kill(false);
+            _swaySequence = null;
+        }
+
+        ResetSwayOffsets();
+    }
+
+    private Sequence CreateSwaySequence(CameraSwaySettings settings)
+    {
+        float duration = Mathf.Max(0.01f, settings.Duration);
+        Vector3 amplitude = settings.EulerAmplitude;
+        float fieldOfViewOffset = settings.FieldOfViewOffset;
+
+        Sequence sequence = DOTween.Sequence()
+            .SetUpdate(true)
+            .SetTarget(this);
+
+        switch (settings.Motion)
+        {
+            case ECameraSwayMotion.CigaretteDrag:
+                return BuildCigaretteDragSequence(sequence, duration, amplitude);
+            case ECameraSwayMotion.HealRush:
+                return BuildHealRushSequence(sequence, duration, amplitude, fieldOfViewOffset);
+            default:
+                return BuildHeadSwaySequence(sequence, duration, amplitude);
         }
     }
 
-    private void ClearAppliedSway()
+    private Sequence BuildHeadSwaySequence(Sequence sequence, float duration, Vector3 amplitude)
     {
-        if (camera == null || _appliedSwayEuler == Vector3.zero)
-            return;
+        float leanInDuration = duration * 0.3f;
+        float swingDuration = duration * 0.4f;
+        float settleDuration = Mathf.Max(0.01f, duration - leanInDuration - swingDuration);
 
-        camera.transform.localRotation *= Quaternion.Inverse(Quaternion.Euler(_appliedSwayEuler));
-        _appliedSwayEuler = Vector3.zero;
+        return sequence
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, amplitude, leanInDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, -amplitude * 0.65f, swingDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, settleDuration)
+                .SetEase(Ease.OutSine));
     }
 
-    private static float EvaluateSwayEnvelope(CameraSwaySettings settings, float normalizedTime)
+    private Sequence BuildCigaretteDragSequence(Sequence sequence, float duration, Vector3 amplitude)
     {
-        AnimationCurve envelope = settings.Envelope;
-        if (envelope == null || envelope.length == 0)
-            return Mathf.Sin(normalizedTime * Mathf.PI);
+        float inhaleDuration = duration * 0.38f;
+        float liftDuration = duration * 0.24f;
+        float exhaleDuration = Mathf.Max(0.01f, duration - inhaleDuration - liftDuration);
+        Vector3 inhale = new Vector3(-Mathf.Abs(amplitude.x), amplitude.y * 0.35f, amplitude.z * 0.25f);
+        Vector3 lift = new Vector3(Mathf.Abs(amplitude.x) * 0.55f, -amplitude.y * 0.2f, -amplitude.z * 0.15f);
 
-        return Mathf.Clamp01(envelope.Evaluate(normalizedTime));
+        return sequence
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, inhale, inhaleDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, lift, liftDuration)
+                .SetEase(Ease.OutSine))
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, exhaleDuration)
+                .SetEase(Ease.InOutSine));
+    }
+
+    private Sequence BuildHealRushSequence(Sequence sequence, float duration, Vector3 amplitude, float fieldOfViewOffset)
+    {
+        float pushDuration = duration * 0.32f;
+        float holdDuration = duration * 0.08f;
+        float releaseDuration = duration * 0.24f;
+        float settleDuration = Mathf.Max(0.01f, duration - pushDuration - holdDuration - releaseDuration);
+        float resetStartTime = pushDuration + holdDuration;
+        Vector3 push = new Vector3(-Mathf.Abs(amplitude.x), amplitude.y, amplitude.z);
+        Vector3 release = new Vector3(Mathf.Abs(amplitude.x) * 0.18f, -amplitude.y * 0.18f, -amplitude.z * 0.15f);
+
+        return sequence
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, push, pushDuration)
+                .SetEase(Ease.InOutSine))
+            .Join(DOTween.To(() => _appliedFieldOfViewOffset, SetFieldOfViewOffset, fieldOfViewOffset, pushDuration)
+                .SetEase(Ease.InOutSine))
+            .AppendInterval(holdDuration)
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, release, releaseDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, settleDuration)
+                .SetEase(Ease.InOutSine))
+            .Insert(resetStartTime, DOTween.To(() => _appliedFieldOfViewOffset, SetFieldOfViewOffset, 0f, releaseDuration + settleDuration)
+                .SetEase(Ease.InOutSine));
+    }
+
+    private void SetSwayOffsets(Vector3 offsets)
+    {
+        _appliedSwayOffsets = offsets;
+
+        if (EnsureHeadSwayExtension(false))
+            _headSwayExtension.EulerOffset = offsets;
+    }
+
+    private void SetFieldOfViewOffset(float offset)
+    {
+        _appliedFieldOfViewOffset = offset;
+
+        if (EnsureHeadSwayExtension(false))
+            _headSwayExtension.FieldOfViewOffset = offset;
+    }
+
+    private void ResetSwayOffsets()
+    {
+        SetSwayOffsets(Vector3.zero);
+        SetFieldOfViewOffset(0f);
     }
 
     private static void ConfigureDefaultHitImpulseSource(CinemachineImpulseSource impulseSource)
@@ -215,5 +287,20 @@ public class PlayerCameraController : MonoBehaviour
         _hitImpulseSource = gameObject.AddComponent<CinemachineImpulseSource>();
         ConfigureDefaultHitImpulseSource(_hitImpulseSource);
         return _hitImpulseSource != null;
+    }
+
+    private bool EnsureHeadSwayExtension(bool createIfMissing)
+    {
+        if (_headSwayExtension != null)
+            return true;
+
+        if (camera == null)
+            return false;
+
+        _headSwayExtension = camera.GetComponent<CinemachineHeadSwayExtension>();
+        if (_headSwayExtension == null && createIfMissing)
+            _headSwayExtension = camera.gameObject.AddComponent<CinemachineHeadSwayExtension>();
+
+        return _headSwayExtension != null;
     }
 }
