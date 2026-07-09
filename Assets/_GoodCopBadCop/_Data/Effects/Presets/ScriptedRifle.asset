@@ -48,24 +48,11 @@ MonoBehaviour:
       m_RotationOrder: 4
   camera:
     enabled: 1
-    localImpulse:
-      enabled: 0
-      mode: 2
-      force: 0.42
-      velocity: {x: 0.05, y: -0.19, z: -0.06}
-      shape: 0
-      impulseDuration: 0.18
-      attackTime: 0.025
-      sustainTime: 0.035
-      decayTime: 0.28
-      scaleEnvelopeWithImpact: 0
-      amplitudeGain: 0.26
-      frequencyGain: 0.38
     localSway:
       enabled: 0
       duration: 0.8
       eulerAmplitude: {x: 0, y: 0, z: 0}
-    localDamage:
+    localCameraKick:
       enabled: 1
       duration: 0.2
       eulerKick: {x: -1.4, y: 0.8, z: -1.1}

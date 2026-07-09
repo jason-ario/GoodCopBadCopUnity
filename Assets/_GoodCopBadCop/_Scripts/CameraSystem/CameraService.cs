@@ -6,9 +6,8 @@ namespace GoodCopBadCop.CameraSystem
 {
     public interface ICameraService
     {
-        void PlayLocalImpulse(CameraImpulseSettings settings);
         void PlayLocalSway(CameraSwaySettings settings);
-        void PlayLocalDamageFeedback(CameraDamageFeedbackSettings settings);
+        void PlayLocalCameraKick(CameraKickSettings settings);
         void HideFromCapture(object source, global::SuspectCharacter suspect);
         void ShowInCapture(object source, global::SuspectCharacter suspect);
         bool IsVisibleInCapture(global::SuspectCharacter suspect);
@@ -23,28 +22,6 @@ namespace GoodCopBadCop.CameraSystem
         public CameraService(IPlayerRuntimeModel playerRuntimeModel)
         {
             this.playerRuntimeModel = playerRuntimeModel;
-        }
-
-        public void PlayLocalImpulse(CameraImpulseSettings settings)
-        {
-            if (settings == null || !settings.Enabled)
-                return;
-
-            global::PlayerInstance player = FindLocalPlayer();
-            if (player == null)
-            {
-                Debug.LogWarning("[CameraService] Local player was not found.");
-                return;
-            }
-
-            global::PlayerCameraController cameraController = player.GetComponent<global::PlayerCameraController>();
-            if (cameraController == null)
-            {
-                Debug.LogWarning("[CameraService] Local player has no PlayerCameraController.");
-                return;
-            }
-
-            cameraController.PlayImpulse(settings);
         }
 
         public void PlayLocalSway(CameraSwaySettings settings)
@@ -69,7 +46,7 @@ namespace GoodCopBadCop.CameraSystem
             cameraController.PlaySway(settings);
         }
 
-        public void PlayLocalDamageFeedback(CameraDamageFeedbackSettings settings)
+        public void PlayLocalCameraKick(CameraKickSettings settings)
         {
             if (settings == null || !settings.Enabled)
                 return;
@@ -88,7 +65,7 @@ namespace GoodCopBadCop.CameraSystem
                 return;
             }
 
-            cameraController.PlayDamageFeedback(settings);
+            cameraController.PlayCameraKick(settings);
         }
 
         private global::PlayerInstance FindLocalPlayer()
