@@ -213,6 +213,15 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
+    /// Resets the camera pitch and local rotation to a neutral forward-looking orientation.
+    /// Use this after teleporting the player so the camera doesn't retain a stale look angle.
+    /// </summary>
+    public void ResetCameraOrientation()
+    {
+        _playerMovementController?.ResetCameraRotation();
+    }
+
+    /// <summary>
     /// Kills the local player: disables movement and interaction, then activates the death camera.
     /// Ragdoll activation is handled automatically by <see cref="RagdollController"/> via OnDeath.
     /// </summary>

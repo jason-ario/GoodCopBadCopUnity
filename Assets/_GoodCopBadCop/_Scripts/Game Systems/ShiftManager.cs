@@ -693,7 +693,7 @@ public class ShiftManager : NetworkBehaviour
         if (PlayerInstance.Instance != null)
         {
             PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
-            PlayerInstance.Instance.SetIsOutside(false);
+            PlayerInstance.Instance.RequestSetIsOutside(false);
         }
     }
 
@@ -890,6 +890,11 @@ public class ShiftManager : NetworkBehaviour
         UIController.Instance.ClosePlayerUI();
         PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.SetCanMove(false);
+        // Freeze all camera look input for the duration of the cutscene.
+        // SetCanMove(false) only stops movement — Rotate() still runs unless CanControl
+        // is also disabled. Without this, Player 2 can look around freely during the
+        // cutscene, leaving the camera at a stale angle when the cutscene VCam releases.
+        PlayerInstance.Instance.CanControl = false;
         PlayerInstance.Instance.DisableReticle();
         StartCoroutine(PlayIntroCutscene());
     }
@@ -1142,7 +1147,10 @@ public class ShiftManager : NetworkBehaviour
         if (PlayerInstance.Instance != null)
         {
             PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
-            PlayerInstance.Instance.SetIsOutside(false);
+            PlayerInstance.Instance.RequestSetIsOutside(false);
+            // Reset the camera to a neutral forward orientation so the view doesn't snap
+            // to whatever angle the player was looking at before or during the cutscene.
+            PlayerInstance.Instance.ResetCameraOrientation();
         }
 
         yield return new WaitForSeconds(1f);

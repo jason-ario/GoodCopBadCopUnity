@@ -418,6 +418,25 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     }
 
     /// <summary>
+    /// Resets the camera pitch and local rotation to a neutral forward-looking orientation.
+    /// Call this after teleporting the player to a new spawn point so the camera doesn't
+    /// retain a stale look angle from a previous location (e.g. after the intro cutscene).
+    /// </summary>
+    public void ResetCameraRotation()
+    {
+        if (cameraTransform == null) return;
+
+        _cameraPitch = 0f;
+        _recoilRotation = Vector3.zero;
+        _smoothedMouseX = 0f;
+        _smoothedMouseY = 0f;
+        targetLookEuler = Vector3.zero;
+
+        cameraTransform.DOKill();
+        cameraTransform.localEulerAngles = Vector3.zero;
+    }
+
+    /// <summary>
     /// Locks player movement while still allowing camera look/rotation.
     /// </summary>
     public void SetMovementLocked(bool locked)

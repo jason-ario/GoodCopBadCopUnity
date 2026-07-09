@@ -545,6 +545,18 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static event Action<int> OnSuspectArrived;
 
+    /// <summary>
+    /// Fired on the server when a suspect is waiting at the booth but no player is inside.
+    /// Used by <see cref="TableBell"/> to begin periodic ringing.
+    /// </summary>
+    public static event Action OnSuspectWaitingAtBooth;
+
+    /// <summary>
+    /// Fired on the server when the booth becomes ready — a player has entered and the
+    /// suspect can begin their dialogue. Used by <see cref="TableBell"/> to stop ringing.
+    /// </summary>
+    public static event Action OnBoothBecameReady;
+
     private void ArrivedAtPosition()
     {
         if (suspectCharacter == null) return;
@@ -607,12 +619,18 @@ public class SuspectController : NetworkBehaviour
     /// <summary>
     /// Polls every half-second until at least one player is inside the booth
     /// and the shutter is open, then triggers the entry dialogue.
+    /// Fires <see cref="OnSuspectWaitingAtBooth"/> when no player is in the booth at the
+    /// start of the wait, and <see cref="OnBoothBecameReady"/> when the condition is met.
     /// </summary>
     private IEnumerator WaitForBoothReady()
     {
+        if (!IsAnyPlayerInsideBooth())
+            OnSuspectWaitingAtBooth?.Invoke();
+
         while (!IsAnyPlayerInsideBooth() || !IsShutterOpen())
             yield return new WaitForSeconds(0.5f);
 
+        OnBoothBecameReady?.Invoke();
         SayEntryDialogue();
     }
 
