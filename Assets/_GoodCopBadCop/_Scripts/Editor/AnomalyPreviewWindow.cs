@@ -857,6 +857,8 @@ namespace GoodCopBadCop.Editor
             if (camera == null)
                 camera = cameraObject.AddComponent<Camera>();
 
+            EnsureSandboxAudioListener(cameraObject);
+
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.18f, 0.2f, 0.22f);
             camera.fieldOfView = 21.2f;
@@ -1288,10 +1290,17 @@ namespace GoodCopBadCop.Editor
             if (camera == null)
                 return;
 
+            EnsureSandboxAudioListener(camera.gameObject);
             camera.fieldOfView = 21.2f;
             camera.transform.SetPositionAndRotation(
                 new Vector3(0.760934f, 1.620042f, -11.05713f),
                 Quaternion.Euler(0.679511f, 0f, 0f));
+        }
+
+        private static void EnsureSandboxAudioListener(GameObject cameraObject)
+        {
+            if (cameraObject != null && cameraObject.GetComponent<AudioListener>() == null)
+                cameraObject.AddComponent<AudioListener>();
         }
 
         private Bounds CalculatePreviewContentBounds(GameObject target)

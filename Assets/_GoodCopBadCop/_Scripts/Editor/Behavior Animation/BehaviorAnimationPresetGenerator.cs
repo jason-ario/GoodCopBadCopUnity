@@ -12,6 +12,9 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
     {
         private const string MixamoRawPath = "Assets/_GoodCopBadCop/_Animations/Anomalies/Behavior/Mixamo Raw";
         private const string PresetPath = "Assets/_GoodCopBadCop/_Animations/Anomalies/Behavior/Presets";
+        private const string BehaviorAudioPath = "Assets/_GoodCopBadCop/_Audio/Anomalies/Behavior";
+        private const string LaughingMaleAudioPath = BehaviorAudioPath + "/Laughing_Male_Mischievous.mp3";
+        private const string LaughingFemaleAudioPath = BehaviorAudioPath + "/Laughing_Female_Witch.mp3";
 
         [MenuItem("GoodCopBadCop/Anomalies/Generate Behavior Animation Presets")]
         public static void Generate()
@@ -19,6 +22,9 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             Directory.CreateDirectory(PresetPath);
 
             AssetDatabase.ImportAsset(MixamoRawPath, ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+            if (Directory.Exists(BehaviorAudioPath))
+                AssetDatabase.ImportAsset(BehaviorAudioPath, ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+
             SetClipLooping("Dizzy_Default Idle.fbx", true);
 
             CreatePreset(
@@ -64,6 +70,13 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 minPauseSeconds: 3f,
                 maxPauseSeconds: 7f,
                 "Laughing_Standing Laughing.fbx");
+            ConfigurePresetAudio(
+                "Laughing Behavior.asset",
+                LaughingMaleAudioPath,
+                LaughingFemaleAudioPath,
+                startDelaySeconds: 0.45f,
+                repeatDelaySeconds: 3f,
+                repeatCount: 1);
 
             CreatePreset(
                 "Violent Behavior.asset",
@@ -184,6 +197,35 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             serialized.FindProperty("maxPlaySeconds").floatValue = maxPlaySeconds;
             serialized.FindProperty("minPauseSeconds").floatValue = minPauseSeconds;
             serialized.FindProperty("maxPauseSeconds").floatValue = maxPauseSeconds;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(preset);
+        }
+
+        private static void ConfigurePresetAudio(
+            string assetName,
+            string maleAudioPath,
+            string femaleAudioPath,
+            float startDelaySeconds,
+            float repeatDelaySeconds,
+            int repeatCount)
+        {
+            string assetPath = $"{PresetPath}/{assetName}";
+            BehaviorAnimationPreset preset = AssetDatabase.LoadAssetAtPath<BehaviorAnimationPreset>(assetPath);
+            if (preset == null)
+            {
+                Debug.LogWarning($"[BehaviorAnimationPresetGenerator] Preset not found at {assetPath}.");
+                return;
+            }
+
+            SerializedObject serialized = new(preset);
+            serialized.FindProperty("maleAudioClip").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<AudioClip>(maleAudioPath);
+            serialized.FindProperty("femaleAudioClip").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<AudioClip>(femaleAudioPath);
+            serialized.FindProperty("audioVolume").floatValue = 1f;
+            serialized.FindProperty("audioStartDelaySeconds").floatValue = startDelaySeconds;
+            serialized.FindProperty("audioRepeatDelaySeconds").floatValue = repeatDelaySeconds;
+            serialized.FindProperty("audioRepeatCount").intValue = repeatCount;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(preset);
         }

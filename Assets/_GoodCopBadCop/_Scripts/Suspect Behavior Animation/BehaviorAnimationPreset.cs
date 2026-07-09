@@ -17,6 +17,12 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         [SerializeField] private float maxPlaySeconds;
         [SerializeField] private float minPauseSeconds = 2f;
         [SerializeField] private float maxPauseSeconds = 5f;
+        [SerializeField] private AudioClip maleAudioClip;
+        [SerializeField] private AudioClip femaleAudioClip;
+        [SerializeField] private float audioVolume = 1f;
+        [SerializeField] private float audioStartDelaySeconds;
+        [SerializeField] private float audioRepeatDelaySeconds;
+        [SerializeField] private int audioRepeatCount;
         [SerializeField] private int priority;
 
         public AnimationClip[] Clips => clips;
@@ -27,6 +33,10 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         public float BlendInSeconds => Mathf.Max(0f, blendInSeconds);
         public float BlendOutSeconds => Mathf.Max(0f, blendOutSeconds);
         public float MaxPlaySeconds => Mathf.Max(0f, maxPlaySeconds);
+        public float AudioVolume => Mathf.Clamp01(audioVolume);
+        public float AudioStartDelaySeconds => Mathf.Max(0f, audioStartDelaySeconds);
+        public float AudioRepeatDelaySeconds => Mathf.Max(0f, audioRepeatDelaySeconds);
+        public int AudioRepeatCount => Mathf.Max(0, audioRepeatCount);
         public int Priority => priority;
 
         public AnimationClip SelectClip(int sequenceSeed, int cycleIndex = 0, AnimationClip previousClip = null)
@@ -94,6 +104,16 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         {
             int seed = source != null ? StableHash($"{source.GetType().FullName}:{source.name}:pause") : 0;
             return SelectPauseSeconds(seed, cycleIndex);
+        }
+
+        public AudioClip SelectAudioClip(string sex)
+        {
+            bool isFemale = string.Equals(sex, "Female", System.StringComparison.OrdinalIgnoreCase);
+            AudioClip preferred = isFemale ? femaleAudioClip : maleAudioClip;
+            if (preferred != null)
+                return preferred;
+
+            return isFemale ? maleAudioClip : femaleAudioClip;
         }
 
         private static int NextRange(ref int state, int exclusiveMax)

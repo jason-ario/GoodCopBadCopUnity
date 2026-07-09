@@ -10,6 +10,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
     public sealed class SuspectBehaviorAnimationAdapter : MonoBehaviour
     {
         [SerializeField] private Animator animator;
+        [SerializeField] private AudioSource audioSource;
 
         private readonly Dictionary<object, ActivePreset> activePresets = new();
         private RuntimeAnimatorController originalController;
@@ -22,6 +23,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         private AnimationPlayableOutput output;
         private Coroutine playbackCoroutine;
         private Coroutine transitionCoroutine;
+        private Coroutine audioCoroutine;
         private object currentSource;
         private BehaviorAnimationPreset currentPreset;
         private AnimationClip currentClip;
@@ -36,6 +38,15 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             if (animator == null)
                 animator = GetComponentInChildren<Animator>(true);
 
+            if (audioSource == null)
+                audioSource = GetComponent<AudioSource>();
+
+            if (audioSource == null)
+                audioSource = gameObject.AddComponent<AudioSource>();
+
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f;
+
             if (animator != null)
                 originalController = animator.runtimeAnimatorController;
         }
@@ -45,6 +56,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             StopGraph();
             StopPlaybackCoroutine();
             StopTransitionCoroutine();
+            StopAudioCoroutine();
             activePresets.Clear();
             currentSource = null;
             currentPreset = null;
@@ -89,6 +101,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             isInPause = false;
             StopPlaybackCoroutine();
             StopTransitionCoroutine();
+            StopAudioCoroutine();
             StopGraph();
         }
 
@@ -102,6 +115,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
                 isInPause = false;
                 StopPlaybackCoroutine();
                 StopTransitionCoroutine();
+                StopAudioCoroutine();
                 StopGraph();
                 return;
             }
@@ -267,6 +281,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             output = AnimationPlayableOutput.Create(graph, "Behavior Animation", animator);
             output.SetSourcePlayable(mixerPlayable);
             graph.Play();
+            PlayPresetAudio(active.Preset);
         }
 
         private void CreateBaseOverrideGraph(ActivePreset baseActive, ActivePreset? overrideActive, float baseWeight, float overrideWeight)
@@ -313,6 +328,55 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             output = AnimationPlayableOutput.Create(graph, "Behavior Animation", animator);
             output.SetSourcePlayable(mixerPlayable);
             graph.Play();
+
+            if (overrideActive.HasValue)
+                PlayPresetAudio(overrideActive.Value.Preset);
+        }
+
+        private void PlayPresetAudio(BehaviorAnimationPreset preset)
+        {
+            StopAudioCoroutine();
+
+            if (audioSource == null || preset == null)
+                return;
+
+            AudioClip clip = preset.SelectAudioClip(GetSuspectSex());
+            if (clip == null)
+                return;
+
+            if (preset.AudioStartDelaySeconds <= 0f && preset.AudioRepeatCount == 0)
+            {
+                audioSource.PlayOneShot(clip, preset.AudioVolume);
+                return;
+            }
+
+            audioCoroutine = StartCoroutine(PlayPresetAudioSequence(preset, clip));
+        }
+
+        private IEnumerator PlayPresetAudioSequence(BehaviorAnimationPreset preset, AudioClip clip)
+        {
+            if (preset.AudioStartDelaySeconds > 0f)
+                yield return new WaitForSeconds(preset.AudioStartDelaySeconds);
+
+            audioSource.PlayOneShot(clip, preset.AudioVolume);
+
+            for (int i = 0; i < preset.AudioRepeatCount; i++)
+            {
+                if (preset.AudioRepeatDelaySeconds > 0f)
+                    yield return new WaitForSeconds(preset.AudioRepeatDelaySeconds);
+
+                audioSource.PlayOneShot(clip, preset.AudioVolume);
+            }
+
+            audioCoroutine = null;
+        }
+
+        private string GetSuspectSex()
+        {
+            SuspectCharacter suspectCharacter = GetComponentInParent<SuspectCharacter>();
+            return suspectCharacter != null && suspectCharacter.Data != null
+                ? suspectCharacter.Data.Sex
+                : string.Empty;
         }
 
         private IEnumerator FadeClipWeight(float from, float to, float duration)
@@ -425,6 +489,15 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
 
             StopCoroutine(transitionCoroutine);
             transitionCoroutine = null;
+        }
+
+        private void StopAudioCoroutine()
+        {
+            if (audioCoroutine == null)
+                return;
+
+            StopCoroutine(audioCoroutine);
+            audioCoroutine = null;
         }
 
         private int BuildSequenceSeed(object source, BehaviorAnimationPreset preset)
