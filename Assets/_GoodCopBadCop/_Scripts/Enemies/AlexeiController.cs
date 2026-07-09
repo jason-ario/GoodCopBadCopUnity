@@ -282,6 +282,14 @@ public class AlexeiController : NetworkBehaviour
         SFXController.Instance?.PlayAtPosition(_landingSound, position, _landingSoundVolume);
     }
 
+    private IEnumerator DelayedStartAlexeiMusic(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        MusicManager.Instance?.Play(_alexeiMusicClip);
+        if (IsSpawned)
+            StartAlexeiMusicClientRpc();
+    }
+
     [ClientRpc]
     private void StartAlexeiMusicClientRpc()
     {
@@ -436,14 +444,10 @@ public class AlexeiController : NetworkBehaviour
 
         netObj.Spawn(true);
 
-        // Start the encounter music on all clients as soon as Alexei is in the world.
+        // Start the encounter music on all clients after a short delay.
         // Play locally first (works offline / host), then broadcast to remote clients.
         if (_alexeiMusicClip != null)
-        {
-            MusicManager.Instance?.Play(_alexeiMusicClip);
-            if (IsSpawned)
-                StartAlexeiMusicClientRpc();
-        }
+            StartCoroutine(DelayedStartAlexeiMusic(1.5f));
 
         // Suspend AI immediately after spawn — ChaseLoop's first frame yield means this
         // call wins the race and prevents the mutant from targeting players during the entrance.

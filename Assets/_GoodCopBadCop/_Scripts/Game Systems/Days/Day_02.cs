@@ -218,6 +218,17 @@ public class Day_02 : DayBase
     private bool _outBackAnimalDialogueTriggered;
 
     // -------------------------------------------------------------------------
+    // Dead Animal — per-client activation
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Activates the dead animal prop locally on this client.
+    /// Called by <see cref="Day02NetworkSync.ActivateDeadAnimalClientRpc"/> on all clients,
+    /// so the prop is visible for both the host and client 2.
+    /// </summary>
+    public void ActivateDeadAnimalLocal() => _deadAnimalObject?.SetActive(true);
+
+    // -------------------------------------------------------------------------
     // DayBase Lifecycle
     // -------------------------------------------------------------------------
 
@@ -766,8 +777,13 @@ public class Day_02 : DayBase
             yield break;
         }
 
-        // Reveal the dead animal prop as soon as the out-back sequence begins.
-        _deadAnimalObject?.SetActive(true);
+        // Reveal the dead animal prop on ALL clients as soon as the out-back sequence begins.
+        // SetActive alone is server-local; Day02NetworkSync broadcasts a ClientRpc so client 2
+        // also sees the prop. ActivateDeadAnimalLocal() is the per-client activation handler.
+        if (Day02NetworkSync.Instance != null)
+            Day02NetworkSync.Instance.ActivateDeadAnimal();
+        else
+            ActivateDeadAnimalLocal(); // host-only fallback when NetworkSync isn't present
 
         // ── Phase 1: wait for player to approach Vlad outside ─────────────────
         yield return StartCoroutine(WaitForPlayerProximity(_spawnedVladOutBack.transform, _outBackProximityRadius));

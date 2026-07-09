@@ -145,6 +145,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // next node starts, preventing a fast-skipped trigger from replaying mid-sequence.
     private string _lastAnimTrigger = string.Empty;
 
+    // Tracks the most recently activated camera key on the server so late-joining clients
+    // can receive a camera catch-up RPC before LateJoinClientRpc fires.
+    private string _currentCameraKey = string.Empty;
+
     // NetworkObjectId of the current dialogue speaker — set on all clients by EnterScriptedModeClientRpc.
     // Used by SuspectController.ResolveCurrentDialogueSpeakerCam() to find the speaker's per-character cameras.
     // Reset to 0 when exiting scripted mode.
@@ -157,6 +161,41 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     public ulong CurrentSpeakerNetId => _clientSpeakerNetId;
 
     private void Awake() => Instance = this;
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Builds a <see cref="ClientRpcParams"/> that targets only the current
+    /// <see cref="_participants"/> set. Must only be called on the server.
+    /// </summary>
+    private ClientRpcParams BuildParticipantRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new System.Collections.Generic.List<ulong>(_participants)
+            }
+        };
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the player owned by <paramref name="clientId"/> is an
+    /// "inside" player — i.e. their <see cref="PlayerInstance.IsOutside"/> flag is false.
+    /// Inside players are always in the booth and should always participate in dialogue,
+    /// regardless of their exact distance from the speaker.
+    /// </summary>
+    private bool IsClientInsidePlayer(ulong clientId)
+    {
+        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+            return false;
+        if (client.PlayerObject == null)
+            return false;
+        var instance = client.PlayerObject.GetComponent<PlayerInstance>();
+        return instance != null && !instance.IsOutside;
+    }
 
     // -------------------------------------------------------------------------
     // Public API
@@ -196,7 +235,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     public void SwitchCamera(string key)
     {
         if (!IsServer) return;
-        SetActiveOverrideCamClientRpc(key ?? string.Empty);
+        _currentCameraKey = key ?? string.Empty;
+        SetActiveOverrideCamClientRpc(key ?? string.Empty, BuildParticipantRpcParams());
     }
 
     /// <summary>
@@ -208,6 +248,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     public void ExitScriptedMode()
     {
         if (!IsServer) return;
+        // Clear the server-side flag immediately so CheckProximityJoins stops running.
+        IsScriptedModeActive = false;
         _currentSpeakerTransform = null;
         _participants.Clear();
         ExitScriptedModeClientRpc();
@@ -310,19 +352,31 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         _lastAnimTrigger = string.Empty;
 
+        // Set the server-side flag immediately so CheckProximityJoins works even if the
+        // host client is not a participant (targeted RPCs won't reach a non-participant host).
+        IsScriptedModeActive = true;
+
         // Seed the participant set before broadcasting EnterScriptedMode so the advance
         // gate is correct from the very first line.
         _currentSpeakerTransform = speaker.transform;
-        SeedParticipants();
+        SeedParticipants(lockOutsidePlayers);
 
-        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers);
+        // Target EnterScriptedMode to participants only — far-away players should NOT be
+        // pulled into scripted mode until they walk within _joinRadius (LateJoinClientRpc).
+        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, BuildParticipantRpcParams());
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
         {
+            // Track the active camera key server-side so late-joining clients can receive
+            // a camera catch-up RPC before LateJoinClientRpc fires.
+            _currentCameraKey = node.cameraTrigger ?? string.Empty;
+
             // Camera cut and text effect are set before the line starts so they're
             // visible from the very first word of the subtitle.
-            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
+            // Target camera RPCs to participants — far-away players must not have their
+            // camera hijacked by a dialogue they are not yet part of.
+            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty, BuildParticipantRpcParams());
             SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
 
             // Reset the previous trigger and force idle before firing the next animation.
@@ -342,6 +396,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // or PlayMegaphoneDialogue (which exits mode when it completes).
         if (!deferExit)
         {
+            // Clear the server-side flag before the client RPC so CheckProximityJoins stops.
+            IsScriptedModeActive = false;
             _currentSpeakerTransform = null;
             _participants.Clear();
             ExitScriptedModeClientRpc(lockOutsidePlayers);
@@ -356,9 +412,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private IEnumerator SayAndWait(SuspectCharacter speaker, string text)
     {
         _awaitingScriptedInput = true;
-        SetAwaitingInputClientRpc(true);
+        // Target the "input open" signal only to participants — non-participants must not
+        // be able to send advance RPCs that interfere with the gate.
+        SetAwaitingInputClientRpc(true, BuildParticipantRpcParams());
         DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true);
         yield return StartCoroutine(WaitForScriptedAdvance());
+        // Broadcast the "input closed" signal so any late-joiner who had _clientIsWaitingForInput
+        // set (via LateJoinClientRpc) also has it cleared correctly.
         SetAwaitingInputClientRpc(false);
         _awaitingScriptedInput = false;
     }
@@ -402,7 +462,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         int required = Mathf.Max(1, _participants.Count);
 
-        if (_advanceSet.Count == 1 && _advanceTimerCoroutine == null)
+        // Only show the countdown timer when multiple participants need to advance.
+        // When required == 1 the gate opens immediately below — no timer needed.
+        if (_advanceSet.Count == 1 && _advanceTimerCoroutine == null && required > 1)
             _advanceTimerCoroutine = StartCoroutine(AdvanceTimeoutCoroutine());
 
         if (_advanceSet.Count >= required)
@@ -439,25 +501,41 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     /// <summary>
     /// Populates <see cref="_participants"/> at the start of a dialogue with all connected
-    /// clients whose player object is within <see cref="_joinRadius"/> of the speaker.
-    /// Falls back to including every connected client if no one is in range (e.g. dialogue
-    /// triggered before players have taken their positions).
+    /// clients who should participate in the advance and choice gates.
+    ///
+    /// Rules (applied in order):
+    /// <list type="bullet">
+    ///   <item>When <paramref name="lockOutsidePlayers"/> is <c>true</c>, every connected
+    ///         client is a participant — outside players are explicitly locked in.</item>
+    ///   <item>Inside players (<see cref="PlayerInstance.IsOutside"/> == false) are always
+    ///         included regardless of their distance from the speaker, because they are in
+    ///         the booth and will always enter dialogue mode.</item>
+    ///   <item>Outside players are included only if they are within
+    ///         <see cref="_joinRadius"/> of the speaker.</item>
+    ///   <item>Fallback: if no one qualifies, include all connected clients so the dialogue
+    ///         is never permanently unblockable (e.g. before players reach their positions).</item>
+    /// </list>
     /// Must be called on the server.
     /// </summary>
-    private void SeedParticipants()
+    private void SeedParticipants(bool lockOutsidePlayers = false)
     {
         _participants.Clear();
 
-        if (_currentSpeakerTransform == null)
+        // When all players are explicitly locked in, include everyone.
+        if (lockOutsidePlayers || _currentSpeakerTransform == null)
         {
             _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
+            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — all {_participants.Count} clients seeded (lockOutsidePlayers={lockOutsidePlayers}).");
             return;
         }
 
         Vector3 speakerPos = _currentSpeakerTransform.position;
         foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
         {
-            if (IsClientWithinJoinRadius(clientId, speakerPos))
+            // Inside players are always in the booth and will always enter dialogue mode —
+            // include them regardless of exact distance to avoid seeding race conditions
+            // where a player is slightly outside _joinRadius at the moment of seeding.
+            if (IsClientInsidePlayer(clientId) || IsClientWithinJoinRadius(clientId, speakerPos))
                 _participants.Add(clientId);
         }
 
@@ -470,9 +548,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     /// <summary>
     /// Checks every non-participant connected client against the join radius. Players who
-    /// have walked close enough are added to <see cref="_participants"/> and receive a
-    /// targeted <see cref="LateJoinClientRpc"/> to lock their controls and activate the
-    /// suspect camera. Called every frame on the server while a dialogue is active.
+    /// have walked close enough are added to <see cref="_participants"/> and receive:
+    /// <list type="number">
+    ///   <item>A targeted <see cref="SetActiveOverrideCamClientRpc"/> to catch up to the
+    ///         current camera state.</item>
+    ///   <item>A targeted <see cref="LateJoinClientRpc"/> to lock their controls, activate
+    ///         the suspect camera, and set their input-waiting state.</item>
+    /// </list>
+    /// Called every frame on the server while a dialogue is active.
     /// </summary>
     private void CheckProximityJoins()
     {
@@ -489,10 +572,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             Debug.Log($"[ScriptedDialogueRunner] Client {clientId} joined dialogue via proximity.");
 
             ulong speakerNetId = _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL;
-            LateJoinClientRpc(speakerNetId, new ClientRpcParams
+            var singleClientRpc = new ClientRpcParams
             {
                 Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            });
+            };
+
+            // Send the current camera state first so the late-joiner's view snaps to the
+            // correct camera before dialogue mode activates (avoids a one-frame camera pop).
+            SetActiveOverrideCamClientRpc(_currentCameraKey, singleClientRpc);
+
+            LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, singleClientRpc);
         }
     }
 
@@ -511,15 +600,26 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     /// <summary>
     /// Sent to a single client when they enter the join radius mid-dialogue.
-    /// Ensures <see cref="IsScriptedModeActive"/> is set and calls
-    /// <see cref="DialogueChoiceSystem.EnterScriptedDialogueMode"/> regardless of
-    /// <see cref="PlayerInstance.IsOutsideLocal"/> — the player is now physically close
-    /// enough to participate.
+    /// Ensures <see cref="IsScriptedModeActive"/> and <see cref="_clientIsWaitingForInput"/>
+    /// are set correctly and locks the player into the appropriate dialogue mode.
+    /// <para>
+    /// Mirrors <see cref="EnterScriptedModeClientRpc"/>: inside players receive
+    /// <see cref="DialogueChoiceSystem.EnterScriptedDialogueMode"/> (suspect cam + movement lock),
+    /// while outside players receive <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>
+    /// (movement lock only — no suspect cam). This prevents the booth-facing cam from being
+    /// permanently stuck on outside players when the exit path only restores inside players.
+    /// </para>
+    /// <para>
+    /// <paramref name="isWaitingForInput"/> mirrors the server's <c>_awaitingScriptedInput</c>
+    /// flag at the moment of the join, so the late-joiner can immediately advance the current
+    /// line if the gate is still open.
+    /// </para>
     /// </summary>
     [ClientRpc]
-    private void LateJoinClientRpc(ulong speakerNetId, ClientRpcParams rpcParams = default)
+    private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
+        _clientIsWaitingForInput = isWaitingForInput;
 
         if (PlayerInstance.Instance == null) return;
 
@@ -528,11 +628,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
             lookTarget = netObj.transform;
 
-        // EnterScriptedDialogueMode is idempotent (bails if already in mode), so it is safe
-        // to call even if the player was already locked in at dialogue start.
-        DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
+        // Mirror EnterScriptedModeClientRpc: outside players get movement-locked but must NOT
+        // receive the booth suspect-cam activation. Calling EnterScriptedDialogueMode for an
+        // outside player activates SuspectController.SetSuspectCamActive(true) and disables the
+        // interaction controller, leaving the cam and interaction lock permanently stuck because
+        // ExitScriptedModeClientRpc only calls ExitScriptedDialogueMode for inside players.
+        if (PlayerInstance.Instance.IsOutsideLocal)
+            DialogueChoiceSystem.Instance?.EnterScriptedDialogueModeOutside(lookTarget);
+        else
+            DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
 
-        Debug.Log($"[ScriptedDialogueRunner] LateJoinClientRpc — client {NetworkManager.Singleton.LocalClientId} entered dialogue mode via proximity.");
+        Debug.Log($"[ScriptedDialogueRunner] LateJoinClientRpc — client {NetworkManager.Singleton.LocalClientId} " +
+                  $"entered dialogue mode via proximity (outside={PlayerInstance.Instance.IsOutsideLocal}), " +
+                  $"isWaitingForInput={isWaitingForInput}.");
     }
 
     // -------------------------------------------------------------------------
@@ -613,7 +721,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _choicePlayerNames.Clear();
         _choiceResolved = false;
         _resolvedChoiceIndex = -1;
-        ShowChoicesClientRpc(node.choices[0].playerChoiceText, node.choices[1].playerChoiceText);
+        ShowChoicesClientRpc(node.choices[0].playerChoiceText, node.choices[1].playerChoiceText, BuildParticipantRpcParams());
 
         yield return new WaitUntil(() => _choiceResolved);
 
@@ -633,7 +741,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     [ClientRpc]
-    private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false)
+    private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
 
@@ -675,8 +783,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
         {
-            if (lockOutsidePlayers && PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
-                DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
+            // Always call ExitScriptedDialogueModeOutside for outside players — covers both the
+            // explicit lockOutsidePlayers path AND the late-join path where LateJoinClientRpc
+            // called EnterScriptedDialogueModeOutside without lockOutsidePlayers being set.
+            // ExitScriptedDialogueModeOutside is idempotent (bails if not in mode), so calling
+            // it when the player was never locked is a safe no-op.
+            if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+                DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
 
             _clientSpeakerNetId = 0;
             return;
@@ -709,12 +822,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Tells all clients whether the server is currently inside a SayAndWait gate.
-    /// Drives <see cref="_clientIsWaitingForInput"/> so non-host clients can process
+    /// Tells clients whether the server is currently inside a SayAndWait gate.
+    /// Drives <see cref="_clientIsWaitingForInput"/> so clients can process
     /// E-key and mouse-click input the same way the host does.
+    ///
+    /// Pass <see cref="BuildParticipantRpcParams"/> when setting to <c>true</c> to restrict
+    /// the signal to participants only. Setting to <c>false</c> is always broadcast so
+    /// any late-joiner who had the flag set also gets it cleared correctly.
     /// </summary>
     [ClientRpc]
-    private void SetAwaitingInputClientRpc(bool waiting)
+    private void SetAwaitingInputClientRpc(bool waiting, ClientRpcParams rpcParams = default)
     {
         _clientIsWaitingForInput = waiting;
     }
@@ -737,7 +854,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </para>
     /// </summary>
     [ClientRpc]
-    private void SetActiveOverrideCamClientRpc(string key)
+    private void SetActiveOverrideCamClientRpc(string key, ClientRpcParams rpcParams = default)
     {
         // Always deactivate the current override first.
         if (_activeOverrideCam != null)
@@ -880,7 +997,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     [ClientRpc]
-    private void ShowChoicesClientRpc(string choice0, string choice1)
+    private void ShowChoicesClientRpc(string choice0, string choice1, ClientRpcParams rpcParams = default)
     {
         _currentChoiceTexts = new[] { choice0, choice1 };
 

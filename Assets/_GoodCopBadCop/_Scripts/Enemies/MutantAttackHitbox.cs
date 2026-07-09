@@ -75,6 +75,13 @@ public class MutantAttackHitbox : MonoBehaviour
             if (playerHealth == null || playerHealth.IsDead)
                 continue;
 
+            // Do not damage players who entered a cutscene after the attack was committed
+            // (guards DelayedHitScan coroutines that were already in-flight when the player
+            // entered dialogue mode — the attack animation fires but the hit is suppressed).
+            PlayerInstance playerInstance = root.GetComponent<PlayerInstance>();
+            if (playerInstance != null && playerInstance.IsInCutscene)
+                continue;
+
             playerHealth.TakeDamage(damage, EffectKeys.MutantMeleeDamage);
             Debug.Log($"[MutantAttackHitbox] Hit player '{root.name}' via collider '{col.name}' for {damage} damage.", this);
 

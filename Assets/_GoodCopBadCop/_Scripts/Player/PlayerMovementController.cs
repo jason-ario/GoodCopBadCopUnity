@@ -57,6 +57,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     [Header("Jump Settings")]
     [SerializeField] private float jumpForce = 7f;
+    [SerializeField] private AudioClip jumpSound;
+    [SerializeField] private AudioClip landSound;
+
+    private bool _wasGrounded;
 
     [Header("Ground Check")]
     [Tooltip("Extra distance below the capsule base to scan for ground. Lower = stricter.")]
@@ -244,14 +248,23 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         inputDir = transform.TransformDirection(inputDir);
 
         // Apply gravity
-        if (CheckGrounded())
+        bool isGrounded = CheckGrounded();
+
+        if (isGrounded)
         {
+            // Landing: transitioned from airborne to grounded while falling
+            if (!_wasGrounded && _verticalVelocity < 0f)
+            {
+                SFXController.Instance.Play(landSound);
+            }
+
             _verticalVelocity = -2f; // Small constant to keep grounded
 
             if (Input.GetButtonDown("Jump") && !_isCrouching)
             {
                 _verticalVelocity = jumpForce;
                 _playerAnimationController.TriggerJumpAnim();
+                SFXController.Instance.Play(jumpSound);
             }
         }
         else
@@ -259,11 +272,13 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             _verticalVelocity += gravity * Time.deltaTime;
         }
 
+        _wasGrounded = isGrounded;
+
         // Keep IsGrounded false for the entire jump animation window so systems
         // that read this property (e.g. the animation controller) don't see a
         // grounded flicker the instant the player's feet leave the ground.
         bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
-        IsGrounded = CheckGrounded() && !jumpAnimActive;
+        IsGrounded = isGrounded && !jumpAnimActive;
 
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 
@@ -370,6 +385,18 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         CanControl = value;
         cameraTransform.DOKill();
         transform.DOKill();
+
+        if (!value)
+        {
+            // Clear the cached raw-input values so FootstepsAudio and the animation
+            // controller don't read stale non-zero movement while controls are suspended.
+            // CanMove is deliberately left unchanged — it's separate state that must
+            // survive the cutscene and be restored on exit.
+            MoveXRaw = 0f;
+            MoveZRaw = 0f;
+            IsRunning = false;
+            _sprintToggleActive = false;
+        }
     }
 
     public void SetCanMove(bool value)

@@ -42,6 +42,13 @@ public class PickableObject : Interactable
     public event Action OnPickedUpNetworked;
     protected bool isUsing;
 
+    /// <summary>
+    /// True while the local owner is actively using this item (e.g. holding LMB to mop).
+    /// Exposed so external systems (e.g. <see cref="DialogueChoiceSystem"/>) can check
+    /// whether use should be interrupted before locking player controls.
+    /// </summary>
+    public bool IsBeingUsed => isUsing;
+
     public bool CanPickUpManually { get; set; } = true;
 
     /// <summary>

@@ -357,7 +357,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Vector3 castOrigin = zone.GetRandomPosition() + Vector3.up * 5f;
 
-        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer))
+        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer, QueryTriggerInteraction.Ignore))
             return hit.point + Vector3.up * _spawnHeightOffset;
 
         return new Vector3(castOrigin.x, zone.transform.position.y + _spawnHeightOffset, castOrigin.z);

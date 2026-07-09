@@ -150,10 +150,8 @@ public class SuspectController : NetworkBehaviour
     [Header("Coupon Payouts")]
     [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
-    [Tooltip("Coupons earned per correctly identified category.")]
-    [SerializeField] int couponPerCorrectAnomaly = 5;
-    [Tooltip("Coupons deducted per active category the player failed to identify.")]
-    [SerializeField] int couponPenaltyPerMissedAnomaly = 2;
+    [Tooltip("Maximum bonus coupons awarded when 100% of anomaly categories are identified. Scales linearly with percent caught (0% = 0 bonus, 100% = full bonus).")]
+    [SerializeField] int couponMaxPercentBonus = 20;
     [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
     /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
@@ -1084,17 +1082,24 @@ public class SuspectController : NetworkBehaviour
     /// Calculates coupons from the category scoring fields, spawns them at the ATM,
     /// and broadcasts popup notifications to every connected client.
     /// Must only be called on the server after CalculateCategoryScores has run.
+    /// The percent-based reward scales linearly from 0 to couponMaxPercentBonus depending on
+    /// the fraction of active anomaly categories the player correctly identified.
     /// totalBonusAmount consolidates the perfect-identification bonus and the evidence bonus.
     /// </summary>
     private void PayOutResults()
     {
         if (!IsServer) return;
 
-        // Reward for each correctly identified category.
-        int categoryReward = _categoriesCorrect * couponPerCorrectAnomaly;
+        // Compute percent of active anomaly categories correctly identified (0.0 – 1.0).
+        // A clean suspect (no active categories) counts as 100% if no false positives were made.
+        float percentCaught = _totalActiveCategories > 0
+            ? (float)_categoriesCorrect / _totalActiveCategories
+            : (_categoriesFalsePositive == 0 ? 1f : 0f);
 
-        // Penalties for missed and falsely claimed categories.
-        int missedPenalty = _categoriesMissed * couponPenaltyPerMissedAnomaly;
+        // Reward scales linearly from 0 to couponMaxPercentBonus based on percent caught.
+        int percentReward = Mathf.RoundToInt(percentCaught * couponMaxPercentBonus);
+
+        // Penalty for falsely claimed categories (checking a box when there is no anomaly there).
         int falsePenalty = _categoriesFalsePositive * couponPenaltyPerFalsePositiveAnomaly;
 
         // Perfect bonus: every active category found and no false positives.
@@ -1120,7 +1125,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         int totalCoupons = Mathf.Max(0,
-            couponBaseReward + categoryReward - missedPenalty - falsePenalty + perfectBonusAmount + evidenceBonus);
+            couponBaseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
 
         if (ATM.Instance != null)
             ATM.Instance.SpawnCoupons(totalCoupons);
@@ -1129,13 +1134,13 @@ public class SuspectController : NetworkBehaviour
 
         Debug.Log(
             $"Payout — Correct categories: {_categoriesCorrect}/{_totalActiveCategories}, " +
-            $"Missed: {_categoriesMissed}, False positives: {_categoriesFalsePositive}, " +
-            $"Base: +{couponBaseReward}, Category reward: +{categoryReward}, " +
-            $"Missed penalty: -{missedPenalty}, False penalty: -{falsePenalty}, " +
-            $"Perfect bonus: +{perfectBonusAmount}, Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
+            $"Percent caught: {percentCaught:P0}, False positives: {_categoriesFalsePositive}, " +
+            $"Base: +{couponBaseReward}, Percent reward: +{percentReward}, " +
+            $"False penalty: -{falsePenalty}, Perfect bonus: +{perfectBonusAmount}, " +
+            $"Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
 
         ShowScoringResultsClientRpc(
-            categoryReward,
+            percentReward,
             _categoriesCorrect,
             _totalActiveCategories,
             perfectBonusAmount + evidenceBonus,

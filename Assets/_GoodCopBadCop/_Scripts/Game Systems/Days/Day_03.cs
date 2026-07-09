@@ -34,7 +34,7 @@ public class Day_03 : DayBase
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
+        TimecardMachine.OnClockOutServer -= OnClockOutServer;
         Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
     }
 
@@ -63,11 +63,12 @@ public class Day_03 : DayBase
 
     [Header("Day 3 — Power Outage Sequence")]
     [Tooltip("The ElectricityController that governs booth power. PowerOff() is called " +
-             "when the last suspect is processed.")]
+             "when the player punches the timecard machine.")]
     [SerializeField] private ElectricityController _electricityController;
 
-    [Tooltip("Seconds after the last suspect walks away before the lights cut out.")]
-    [SerializeField] private float _powerOutageDelay = 1.5f;
+    [Tooltip("Seconds after the timecard punch before the lights cut out. " +
+             "Keep at 0 for an immediate, causally-linked blackout.")]
+    [SerializeField] private float _powerOutageDelay = 0f;
 
     [Tooltip("Seconds after the power cuts before the phone starts ringing.")]
     [SerializeField] private float _phoneRingDelay = 3f;
@@ -104,7 +105,7 @@ public class Day_03 : DayBase
 
         // Only the server drives the power-outage trigger.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            ShiftManager.OnLastSuspectProcessed += OnLastSuspectProcessedServer;
+            TimecardMachine.OnClockOutServer += OnClockOutServer;
     }
 
     public override void DayDeactivated()
@@ -114,7 +115,7 @@ public class Day_03 : DayBase
         if (_boothDoor != null)
             _boothDoor.OnDoorOpened -= OnBoothDoorFirstOpened;
 
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
+        TimecardMachine.OnClockOutServer -= OnClockOutServer;
         Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
 
         StopAllCoroutines();
@@ -139,12 +140,13 @@ public class Day_03 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fired on the server by ShiftManager when the last suspect of the shift has been
-    /// processed. Starts the power-outage coroutine once per day.
+    /// Fired on the server by <see cref="TimecardMachine.OnClockOutServer"/> the instant
+    /// the player punches the timecard. Starts the power-outage sequence so the blackout
+    /// feels like a direct consequence of clocking out.
     /// </summary>
-    private void OnLastSuspectProcessedServer()
+    private void OnClockOutServer()
     {
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
+        TimecardMachine.OnClockOutServer -= OnClockOutServer;
         StartCoroutine(PowerOutageSequence());
     }
 
@@ -229,7 +231,7 @@ public class Day_03 : DayBase
 
     /// <summary>
     /// Forces the power outage sequence to start immediately, bypassing the
-    /// <see cref="ShiftManager.OnLastSuspectProcessed"/> gate. Server-only.
+    /// <see cref="TimecardMachine.OnClockOutServer"/> gate. Server-only.
     /// Called by <see cref="DebugConsole"/> to test the sequence without running
     /// through the full suspect lineup.
     /// </summary>
@@ -237,7 +239,7 @@ public class Day_03 : DayBase
     {
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
+        TimecardMachine.OnClockOutServer -= OnClockOutServer;
         StopAllCoroutines();
         StartCoroutine(PowerOutageSequence());
         Debug.Log("[Day_03] DebugTriggerPowerOutage: power outage sequence forced.");

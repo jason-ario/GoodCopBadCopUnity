@@ -28,6 +28,20 @@ public class PlayerInstance : NetworkBehaviour
     private bool _isOutsideLocal;
     public bool IsOutsideLocal => _isOutsideLocal;
 
+    /// <summary>
+    /// True while this player is locked inside a scripted dialogue cutscene.
+    /// Owner-write so the local client sets it; Everyone-read so the server can check it
+    /// inside <see cref="MutantEnemy"/> target selection and hit-scan guards.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isInCutscene = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner
+    );
+
+    /// <summary>True while this player is in a scripted dialogue cutscene.</summary>
+    public bool IsInCutscene => _isInCutscene.Value;
+
     public bool CanControl
     {
         get => _playerMovementController.CanControl;
@@ -91,6 +105,13 @@ public class PlayerInstance : NetworkBehaviour
             // (e.g. when this is a fresh spawn after the player was revived).
             SpectateManager.Instance?.StopSpectating();
             UIController.Instance?.HideDeathScreen();
+
+            // Revival via despawn+respawn creates a fresh NetworkObject and never fires
+            // PlayerHealth.OnRespawn, so Respawn() is never invoked. Re-enable the reticle
+            // and reset interaction state explicitly so the player can interact immediately.
+            // On a first-ever spawn these calls are harmless no-ops.
+            EnableReticle();
+            SetCanInteract(true);
         }
     }
 
@@ -134,6 +155,17 @@ public class PlayerInstance : NetworkBehaviour
         _isOutside.Value = value;
         _isOutsideLocal = value;
         playerLight.SetActive(value);
+    }
+
+    /// <summary>
+    /// Sets the cutscene state for this player's <see cref="_isInCutscene"/> NetworkVariable.
+    /// Must only be called on the owning client (i.e. from <see cref="DialogueChoiceSystem"/>
+    /// on <see cref="Instance"/>). The server reads this to prevent mutants from aggroing
+    /// or damaging players who are currently locked inside a scripted dialogue.
+    /// </summary>
+    public void SetIsInCutscene(bool value)
+    {
+        _isInCutscene.Value = value;
     }
 
     /// <summary>
@@ -336,7 +368,16 @@ public class PlayerInstance : NetworkBehaviour
 
     public void EnableReticle()
     {
-        _playerInteractionController.reticle.gameObject.SetActive(true);
+        // The reticle is a scene object, not a prefab child. On a fresh spawn after revival
+        // the controller's cached reference is null, and the reticle may still be inactive
+        // from the previous death, so FindFirstObjectByType won't find it unless we explicitly
+        // include inactive objects.
+        if (_playerInteractionController.reticle == null)
+            _playerInteractionController.reticle =
+                FindFirstObjectByType<ReticleController>(FindObjectsInactive.Include);
+
+        if (_playerInteractionController.reticle != null)
+            _playerInteractionController.reticle.gameObject.SetActive(true);
     }
 
     public Camera GetCamera()

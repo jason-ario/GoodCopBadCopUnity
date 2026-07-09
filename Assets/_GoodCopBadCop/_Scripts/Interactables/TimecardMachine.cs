@@ -1,5 +1,5 @@
+using System;
 using System.Collections;
-using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -10,6 +10,12 @@ using UnityEngine;
 /// </summary>
 public class TimecardMachine : Interactable
 {
+    /// <summary>
+    /// Fired on the server the moment a clock-out punch is accepted.
+    /// Subscribe to drive day-specific reactions (e.g. Day 3 power outage) that
+    /// should feel like a direct consequence of the player clocking out.
+    /// </summary>
+    public static event Action OnClockOutServer;
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
@@ -29,26 +35,6 @@ public class TimecardMachine : Interactable
     private static readonly int ReadyBool    = Animator.StringToHash("Ready");
 
     private bool _clockOutReady = false;
-    private HighlightEffect _highlight;
-
-    protected override void Awake()
-    {
-        base.Awake();
-        _highlight = GetComponent<HighlightEffect>();
-    }
-
-    public override void OnNetworkSpawn()
-    {
-        base.OnNetworkSpawn();
-        // Keep the highlight permanently on so the machine is always visible to the player.
-        if (_highlight != null) _highlight.highlighted = true;
-    }
-
-    /// <summary>The timecard machine highlight is always on — hover entry/exit does not toggle it.</summary>
-    public override void Highlight(bool highlight)
-    {
-        if (_highlight != null) _highlight.highlighted = true;
-    }
 
     public override void Interact(PlayerInteractionController player)
     {
@@ -73,6 +59,7 @@ public class TimecardMachine : Interactable
         if (!_clockOutReady) return;
 
         _clockOutReady = false;
+        OnClockOutServer?.Invoke();
         PunchCardClientRpc();
         StartCoroutine(EndShiftAfterDelay(_punchToReportDelay));
     }
@@ -117,6 +104,10 @@ public class TimecardMachine : Interactable
     {
         _clockOutReady = false;
         SetLightReady(false);
+
+        // Silence the fanfare immediately so the power-cut feels like a direct consequence.
+        if (_fanfareSource != null)
+            _fanfareSource.Stop();
 
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
