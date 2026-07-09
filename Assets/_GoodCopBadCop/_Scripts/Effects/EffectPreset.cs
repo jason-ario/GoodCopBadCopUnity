@@ -42,7 +42,7 @@ namespace GoodCopBadCop.Effects
     public sealed class CameraEffectSettings
     {
         [SerializeField] private bool enabled = true;
-        [SerializeField] private CameraImpulseSettings localImpulse = CameraImpulseSettings.DefaultHit();
+        [SerializeField] private CameraImpulseSettings localImpulse = CameraImpulseSettings.Disabled();
         [SerializeField] private CameraSwaySettings localSway = CameraSwaySettings.Disabled();
         [SerializeField] private CameraDamageFeedbackSettings localDamage = CameraDamageFeedbackSettings.Disabled();
 
@@ -51,18 +51,18 @@ namespace GoodCopBadCop.Effects
         public CameraSwaySettings LocalSway => localSway;
         public CameraDamageFeedbackSettings LocalDamage => localDamage;
 
-        public static CameraEffectSettings LocalPlayerShake()
+        public static CameraEffectSettings LocalPlayerFeedback()
         {
             return new CameraEffectSettings
             {
                 enabled = true,
-                localImpulse = CameraImpulseSettings.DefaultHit(),
+                localImpulse = CameraImpulseSettings.Disabled(),
                 localSway = CameraSwaySettings.Disabled(),
                 localDamage = CameraDamageFeedbackSettings.Disabled()
             };
         }
 
-        public static CameraEffectSettings LocalPlayerShake(float force)
+        public static CameraEffectSettings LocalPlayerImpulse(float force)
         {
             return new CameraEffectSettings
             {
@@ -121,7 +121,7 @@ namespace GoodCopBadCop.Effects
         [SerializeField] private string displayName;
         [SerializeField, Min(0f)] private float minInterval = 0.05f;
         [SerializeField] private FullscreenEffectSettings fullscreen = FullscreenEffectSettings.Disabled();
-        [SerializeField] private CameraEffectSettings camera = CameraEffectSettings.LocalPlayerShake();
+        [SerializeField] private CameraEffectSettings camera = CameraEffectSettings.LocalPlayerFeedback();
         [SerializeField] private AudioEffectSettings audio = new AudioEffectSettings();
 
         public string Key => key;

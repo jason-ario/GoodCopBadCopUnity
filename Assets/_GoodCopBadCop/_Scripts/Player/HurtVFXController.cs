@@ -19,7 +19,6 @@ public class HurtVFXController : NetworkBehaviour
 
     private PlayerHealth _playerHealth;
     private ScreenDamage _screenDamage;
-    private PlayerCameraController _cameraController;
     private float _previousHealth;
 
     public override void OnNetworkSpawn()
@@ -93,9 +92,7 @@ public class HurtVFXController : NetworkBehaviour
         {
             Debug.LogWarning("[HurtVFXController] Cannot preview screen damage: UIController.ScreenDamage is missing.", this);
         }
-
         PlayHurtAudio();
-        _cameraController?.TriggerHitImpulse();
 
         if (!string.IsNullOrEmpty(sourceLabel))
             Debug.Log($"[HurtVFXController] Previewed damage feedback: {sourceLabel} ({damageAmount}).", this);
@@ -116,9 +113,6 @@ public class HurtVFXController : NetworkBehaviour
     {
         if (_playerHealth == null)
             _playerHealth = GetComponent<PlayerHealth>();
-
-        if (_cameraController == null)
-            _cameraController = GetComponentInChildren<PlayerCameraController>();
 
         if (_screenDamage == null && UIController.Instance != null)
             _screenDamage = UIController.Instance.ScreenDamage;

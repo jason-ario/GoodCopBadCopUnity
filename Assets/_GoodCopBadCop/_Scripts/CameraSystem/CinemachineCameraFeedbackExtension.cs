@@ -4,8 +4,8 @@ using UnityEngine;
 namespace GoodCopBadCop.CameraSystem
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Good Cop Bad Cop/Camera/Cinemachine Head Sway Extension")]
-    public sealed class CinemachineHeadSwayExtension : CinemachineExtension
+    [AddComponentMenu("Good Cop Bad Cop/Camera/Cinemachine Camera Feedback Extension")]
+    public sealed class CinemachineCameraFeedbackExtension : CinemachineExtension
     {
         public Vector3 EulerOffset { get; set; }
         public float FieldOfViewOffset { get; set; }

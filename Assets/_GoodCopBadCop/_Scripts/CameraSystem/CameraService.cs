@@ -6,7 +6,6 @@ namespace GoodCopBadCop.CameraSystem
 {
     public interface ICameraService
     {
-        void ShakeLocalPlayer();
         void PlayLocalImpulse(CameraImpulseSettings settings);
         void PlayLocalSway(CameraSwaySettings settings);
         void PlayLocalDamageFeedback(CameraDamageFeedbackSettings settings);
@@ -24,11 +23,6 @@ namespace GoodCopBadCop.CameraSystem
         public CameraService(IPlayerRuntimeModel playerRuntimeModel)
         {
             this.playerRuntimeModel = playerRuntimeModel;
-        }
-
-        public void ShakeLocalPlayer()
-        {
-            PlayLocalImpulse(CameraImpulseSettings.DefaultHit());
         }
 
         public void PlayLocalImpulse(CameraImpulseSettings settings)
@@ -96,6 +90,7 @@ namespace GoodCopBadCop.CameraSystem
 
             cameraController.PlayDamageFeedback(settings);
         }
+
         private global::PlayerInstance FindLocalPlayer()
         {
             global::PlayerInstance player = playerRuntimeModel.LocalPlayer.CurrentValue;

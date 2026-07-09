@@ -2,6 +2,7 @@ using GoodCopBadCop.CameraSystem;
 using DG.Tweening;
 using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class PlayerCameraController : MonoBehaviour
 {
@@ -13,22 +14,17 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float amplitudeGainRumble;
     [SerializeField] private float frequencyGainRumble;
 
-    [Header("Hit Impulse")]
-    [Tooltip("Impulse source used when the player takes damage.")]
-    [SerializeField] private CinemachineImpulseSource _hitImpulseSource;
+    [Header("Camera Impulse")]
+    [Tooltip("Impulse source used by effect presets that still need Cinemachine impulse feedback.")]
+    [SerializeField, FormerlySerializedAs("_hitImpulseSource")] private CinemachineImpulseSource _impulseSource;
 
-    private CinemachineHeadSwayExtension _headSwayExtension;
+    private CinemachineCameraFeedbackExtension _cameraFeedbackExtension;
     private Sequence _swaySequence;
     private Sequence _damageSequence;
     private Vector3 _swayEulerOffset;
     private Vector3 _damageEulerOffset;
     private float _swayFieldOfViewOffset;
     private float _damageFieldOfViewOffset;
-
-    private void Awake()
-    {
-        EnsureHitImpulseSource();
-    }
 
     private void OnDisable()
     {
@@ -66,12 +62,6 @@ public class PlayerCameraController : MonoBehaviour
         cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainNormal;
     }
 
-    /// <summary>Fires a one-shot Cinemachine impulse to simulate a camera hit shake.</summary>
-    public void TriggerHitImpulse()
-    {
-        PlayImpulse(CameraImpulseSettings.DefaultHit());
-    }
-
     public void PlayImpulse(CameraImpulseSettings settings)
     {
         if (settings == null || !settings.Enabled)
@@ -79,31 +69,31 @@ public class PlayerCameraController : MonoBehaviour
             return;
         }
 
-        if (!EnsureHitImpulseSource())
+        if (!EnsureImpulseSource())
         {
-            Debug.LogWarning("[PlayerCameraController] Hit impulse source is not available.", this);
+            Debug.LogWarning("[PlayerCameraController] Camera impulse source is not available.", this);
             return;
         }
 
-        ApplyImpulseSettings(_hitImpulseSource, settings);
+        ApplyImpulseSettings(_impulseSource, settings);
 
         switch (settings.Mode)
         {
             case ECameraImpulseMode.Force:
-                _hitImpulseSource.GenerateImpulseWithForce(settings.Force);
+                _impulseSource.GenerateImpulseWithForce(settings.Force);
                 break;
             case ECameraImpulseMode.Velocity:
-                _hitImpulseSource.GenerateImpulseWithVelocity(settings.Velocity);
+                _impulseSource.GenerateImpulseWithVelocity(settings.Velocity);
                 break;
             default:
-                _hitImpulseSource.GenerateImpulse();
+                _impulseSource.GenerateImpulse();
                 break;
         }
     }
 
     public void PlaySway(CameraSwaySettings settings)
     {
-        if (settings == null || !settings.Enabled || camera == null || !EnsureHeadSwayExtension(true))
+        if (settings == null || !settings.Enabled || camera == null || !EnsureCameraFeedbackExtension(true))
             return;
 
         StopSway();
@@ -115,7 +105,7 @@ public class PlayerCameraController : MonoBehaviour
 
     public void PlayDamageFeedback(CameraDamageFeedbackSettings settings)
     {
-        if (settings == null || !settings.Enabled || camera == null || !EnsureHeadSwayExtension(true))
+        if (settings == null || !settings.Enabled || camera == null || !EnsureCameraFeedbackExtension(true))
             return;
 
         StopDamageFeedback();
@@ -287,20 +277,20 @@ public class PlayerCameraController : MonoBehaviour
 
     private void ApplyCameraFeedbackOffsets()
     {
-        if (!EnsureHeadSwayExtension(false))
+        if (!EnsureCameraFeedbackExtension(false))
             return;
 
-        _headSwayExtension.EulerOffset = _swayEulerOffset + _damageEulerOffset;
-        _headSwayExtension.FieldOfViewOffset = _swayFieldOfViewOffset + _damageFieldOfViewOffset;
+        _cameraFeedbackExtension.EulerOffset = _swayEulerOffset + _damageEulerOffset;
+        _cameraFeedbackExtension.FieldOfViewOffset = _swayFieldOfViewOffset + _damageFieldOfViewOffset;
     }
 
-    private static void ConfigureDefaultHitImpulseSource(CinemachineImpulseSource impulseSource)
+    private static void ConfigureDefaultImpulseSource(CinemachineImpulseSource impulseSource)
     {
         if (impulseSource == null)
             return;
 
         impulseSource.DefaultVelocity = Vector3.down;
-        impulseSource.ImpulseDefinition = CreateImpulseDefinition(CameraImpulseSettings.DefaultHit());
+        impulseSource.ImpulseDefinition = CreateImpulseDefinition(CameraImpulseSettings.DefaultImpulse());
     }
 
     private static void ApplyImpulseSettings(CinemachineImpulseSource impulseSource, CameraImpulseSettings settings)
@@ -351,32 +341,32 @@ public class PlayerCameraController : MonoBehaviour
         return definition;
     }
 
-    private bool EnsureHitImpulseSource()
+    private bool EnsureImpulseSource()
     {
-        if (_hitImpulseSource != null)
+        if (_impulseSource != null)
             return true;
 
-        _hitImpulseSource = GetComponent<CinemachineImpulseSource>();
-        if (_hitImpulseSource != null)
+        _impulseSource = GetComponent<CinemachineImpulseSource>();
+        if (_impulseSource != null)
             return true;
 
-        _hitImpulseSource = gameObject.AddComponent<CinemachineImpulseSource>();
-        ConfigureDefaultHitImpulseSource(_hitImpulseSource);
-        return _hitImpulseSource != null;
+        _impulseSource = gameObject.AddComponent<CinemachineImpulseSource>();
+        ConfigureDefaultImpulseSource(_impulseSource);
+        return _impulseSource != null;
     }
 
-    private bool EnsureHeadSwayExtension(bool createIfMissing)
+    private bool EnsureCameraFeedbackExtension(bool createIfMissing)
     {
-        if (_headSwayExtension != null)
+        if (_cameraFeedbackExtension != null)
             return true;
 
         if (camera == null)
             return false;
 
-        _headSwayExtension = camera.GetComponent<CinemachineHeadSwayExtension>();
-        if (_headSwayExtension == null && createIfMissing)
-            _headSwayExtension = camera.gameObject.AddComponent<CinemachineHeadSwayExtension>();
+        _cameraFeedbackExtension = camera.GetComponent<CinemachineCameraFeedbackExtension>();
+        if (_cameraFeedbackExtension == null && createIfMissing)
+            _cameraFeedbackExtension = camera.gameObject.AddComponent<CinemachineCameraFeedbackExtension>();
 
-        return _headSwayExtension != null;
+        return _cameraFeedbackExtension != null;
     }
 }
