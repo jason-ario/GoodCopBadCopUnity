@@ -1,4 +1,5 @@
-using Unity.Cinemachine;
+using System.Collections;
+using Unity.Netcode.Components;
 using UnityEngine;
 
 /// <summary>
@@ -6,36 +7,50 @@ using UnityEngine;
 /// browse and equip hats via <see cref="CosmeticsMenuUI"/>.
 ///
 /// On open:
-///   - Activates the face <see cref="CinemachineCamera"/> so Cinemachine blends to it.
-///   - Calls <see cref="PlayerAnimationController.EnterThirdPersonPreview"/> to restore the
-///     head bone scale and make the body arms mesh visible (mirrors the ragdoll death restore).
-///   - Hides the first-person arms at CinemachineCamera/Arms_Socket/Player_Arms.
+///   - Smoothly rotates the player's body to face the direction defined by
+///     <see cref="_playerFacingTarget"/> (auto-resolved from a child named
+///     "Player Facing Target" if not wired in the Inspector).
+///   - Calls <see cref="PlayerThirdPersonView.Enter"/> which activates the FaceCamera,
+///     restores the head bone scale, shows the body arms, hides FP arms, and disables the
+///     FP fill light.
 ///   - Disables player movement and the interaction reticle.
 ///   - Shows the Back UI button (Q to exit).
 ///
 /// On close:
-///   - Calls <see cref="PlayerAnimationController.ExitThirdPersonPreview"/> to revert visuals.
+///   - Calls <see cref="PlayerThirdPersonView.Exit"/> to revert all visuals.
 ///   - Re-enables everything in reverse order.
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 {
-    [Header("Face Camera")]
-    [Tooltip("CinemachineCamera that faces the player's character. Parented to the player prefab and inactive by default; set its priority higher than the FP camera.")]
-    [SerializeField] private CinemachineCamera _faceCamera;
+    [Header("Player Facing")]
+    [Tooltip("The player's Y rotation is smoothly rotated to match this transform's forward on open. " +
+             "Auto-resolved from a child named 'Player Facing Target' if left empty.")]
+    [SerializeField] private Transform _playerFacingTarget;
+
+    [Tooltip("Duration in seconds for the body rotation when opening the view.")]
+    [SerializeField] private float _rotationDuration = 0.3f;
 
     [Header("UI")]
     [Tooltip("The cosmetics selection panel to show while this view is open.")]
     [SerializeField] private CosmeticsMenuUI _menuUI;
 
+    [Header("Audio")]
+    [Tooltip("Sound played when the locker view opens.")]
+    [SerializeField] private AudioClip _openSFX;
+
     private PlayerInteractionController _interactingPlayer;
-    private PlayerAnimationController _playerAnimController;
-    private GameObject _firstPersonArms;
+    private PlayerThirdPersonView _thirdPersonView;
+    private Coroutine _rotationCoroutine;
 
     protected override void Awake()
     {
         base.Awake();
         interactText = "Cosmetics";
+
+        // Auto-resolve the facing target from a child of this locker.
+        if (_playerFacingTarget == null)
+            _playerFacingTarget = transform.Find("Player Facing Target");
     }
 
     // ─── IInteractable ───────────────────────────────────────────────────────
@@ -54,33 +69,36 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
     private void OpenView(PlayerInteractionController player)
     {
-        // Resolve the face camera from the spawned player if not set in the Inspector.
-        if (_faceCamera == null)
-            _faceCamera = player.transform.Find("FaceCamera")?.GetComponent<CinemachineCamera>();
-
         // Disable movement and the standard interaction/reticle system.
         player.playerMovementController.SetCanControl(false);
         player.SetSuspectCamMode(true);
 
+        // Smoothly rotate the player body to the facing target's Y angle.
+        // NetworkTransform is briefly disabled so it cannot overwrite the rotation
+        // each tick — the same pattern used by RagdollController.
+        if (_playerFacingTarget != null)
+        {
+            Vector3 forward = _playerFacingTarget.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude > 0.001f)
+            {
+                float targetY = Quaternion.LookRotation(forward.normalized).eulerAngles.y;
+                _rotationCoroutine = StartCoroutine(RotatePlayerY(player.transform, targetY, _rotationDuration));
+            }
+        }
+
         // Snap look angle to straight ahead so the face camera starts centred.
         player.playerMovementController.ResetCameraRotation();
 
-        // Restore head bone and body arms to a visible state BEFORE activating the
-        // face camera so the Cinemachine blend starts against the correct visuals.
-        _playerAnimController = player.GetComponent<PlayerAnimationController>();
-        _playerAnimController?.EnterThirdPersonPreview();
-
-        // Activate the face camera — Cinemachine blends automatically.
-        if (_faceCamera != null)
-            _faceCamera.gameObject.SetActive(true);
-
-        // Hide first-person arms to prevent them occluding the face view.
-        _firstPersonArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
-        if (_firstPersonArms != null)
-            _firstPersonArms.SetActive(false);
+        // Enter third-person view: head bone, body arms, FaceCamera, FP arms, FP light.
+        _thirdPersonView = player.GetComponent<PlayerThirdPersonView>();
+        _thirdPersonView?.Enter();
 
         UIController.Instance.ShowCursor();
         UIController.Instance.ShowBackButton(CloseView);
+
+        if (_openSFX != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(_openSFX, transform.position);
 
         // Open the cosmetics menu UI and bind the local player's hat controller.
         if (_menuUI != null)
@@ -92,23 +110,19 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
     private void CloseView()
     {
+        // Stop any in-progress rotation.
+        if (_rotationCoroutine != null)
+        {
+            StopCoroutine(_rotationCoroutine);
+            _rotationCoroutine = null;
+        }
+
         // Close the cosmetics menu UI first so it can clean up bindings.
         _menuUI?.Close();
 
-        // Deactivate face camera — Cinemachine blends back to the FP camera.
-        if (_faceCamera != null)
-            _faceCamera.gameObject.SetActive(false);
-
-        // Revert head bone and body arms to normal first-person state.
-        _playerAnimController?.ExitThirdPersonPreview();
-        _playerAnimController = null;
-
-        // Restore first-person arms.
-        if (_firstPersonArms != null)
-        {
-            _firstPersonArms.SetActive(true);
-            _firstPersonArms = null;
-        }
+        // Revert all third-person visuals: FaceCamera, head bone, body arms, FP arms, FP light.
+        _thirdPersonView?.Exit();
+        _thirdPersonView = null;
 
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
@@ -120,5 +134,39 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
             _interactingPlayer.playerMovementController.SetCanControl(true);
             _interactingPlayer = null;
         }
+    }
+
+    // ─── Rotation coroutine ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Smoothly rotates <paramref name="playerTransform"/> to <paramref name="targetY"/> degrees
+    /// on the Y axis over <paramref name="duration"/> seconds using SmoothStep easing.
+    /// Temporarily disables the <see cref="NetworkTransform"/> so it cannot overwrite the
+    /// rotation each network tick during the tween.
+    /// </summary>
+    private IEnumerator RotatePlayerY(Transform playerTransform, float targetY, float duration)
+    {
+        NetworkTransform networkTransform = playerTransform.GetComponent<NetworkTransform>();
+        if (networkTransform != null)
+            networkTransform.enabled = false;
+
+        float startY  = playerTransform.eulerAngles.y;
+        float delta   = Mathf.DeltaAngle(startY, targetY);  // shortest-path signed difference
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+            playerTransform.eulerAngles = new Vector3(0f, startY + delta * t, 0f);
+            yield return null;
+        }
+
+        playerTransform.eulerAngles = new Vector3(0f, targetY, 0f);
+
+        if (networkTransform != null)
+            networkTransform.enabled = true;
+
+        _rotationCoroutine = null;
     }
 }

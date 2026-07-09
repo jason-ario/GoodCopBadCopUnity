@@ -27,6 +27,10 @@ public class CosmeticsMenuUI : MonoBehaviour
     [Tooltip("Tint colour applied to all other (unselected) buttons.")]
     [SerializeField] private Color _deselectedColor = Color.white;
 
+    [Header("Audio")]
+    [Tooltip("Sound played when the player selects a hat button.")]
+    [SerializeField] private AudioClip _hatSwapSFX;
+
     // ─── Private state ────────────────────────────────────────────────────────
 
     private PlayerHatController _hatController;
@@ -118,6 +122,9 @@ public class CosmeticsMenuUI : MonoBehaviour
         int capturedIndex = hatIndex;
         btn.onClick.AddListener(() =>
         {
+            if (_hatSwapSFX != null && SFXController.Instance != null)
+                SFXController.Instance.Play(_hatSwapSFX);
+
             _hatController?.EquipHat(capturedIndex);
             // Optimistically refresh — RefreshSelection will also fire when the
             // NetworkVariable round-trip completes via OnHatChanged.

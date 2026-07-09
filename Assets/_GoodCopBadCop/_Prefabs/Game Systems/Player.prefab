@@ -10717,6 +10717,8 @@ GameObject:
   - component: {fileID: 2194294831659451377}
   - component: {fileID: 3688367130298847637}
   - component: {fileID: 4764846097613497096}
+  - component: {fileID: 4163953388148061898}
+  - component: {fileID: 3017125157704808302}
   m_Layer: 14
   m_Name: Player
   m_TagString: Player
@@ -11688,6 +11690,32 @@ MonoBehaviour:
   - {fileID: 8330552668416598224}
   hatData: []
   _defaultHatIndex: 0
+--- !u!114 &4163953388148061898
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d53010abcdc4d948a5f6156207367e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerThirdPersonView
+  ShowTopMostFoldoutHeaderGroup: 1
+  _faceCamera: {fileID: 5656829734660467599}
+--- !u!114 &3017125157704808302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 578938a570b1a2042b9f503db3f7ecd2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EmoteInputController
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0
@@ -11944,7 +11972,7 @@ Transform:
   m_GameObject: {fileID: 5170573693333215358}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -1, z: -0, w: -0.00000019371507}
-  m_LocalPosition: {x: 0.071, y: 2.533, z: 1.335}
+  m_LocalPosition: {x: 0.071, y: 2.429, z: 1.335}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

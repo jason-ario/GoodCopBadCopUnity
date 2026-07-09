@@ -43,9 +43,11 @@ public class PlayerAnimationController : NetworkBehaviour
 
     private float targetLayer1Weight = 0f;
     private float targetLayer2Weight = 0f;
+    private float targetLayer3Weight = 0f;
     private float targetLayer4Weight = 0f;
     private float currentLayer1Weight = 0f;
     private float currentLayer2Weight = 0f;
+    private float currentLayer3Weight = 0f;
     private float currentLayer4Weight = 0f;
 
     [Header("Body Arm Rigs")]
@@ -164,6 +166,9 @@ public class PlayerAnimationController : NetworkBehaviour
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
 
     private NetworkVariable<float> netLayer4Weight =
+        new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
+
+    private NetworkVariable<float> netLayer3Weight =
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
 
     /// <summary>
@@ -366,16 +371,6 @@ public class PlayerAnimationController : NetworkBehaviour
         }
 
         UpdateAnimations();
-        
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            ShrugEmote();
-        }
-        
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            WaveEmote();
-        }
 
         // Snapshot the IK-solved elbow world position before any lean modifies spine bones.
         // After ApplyLocalBodyLean shifts the shoulder forward, SolveTwoBoneIK re-aims the arm
@@ -400,29 +395,33 @@ public class PlayerAnimationController : NetworkBehaviour
         }
     }
 
-    void ShrugEmote()
+    /// <summary>
+    /// Zeroes all body arm animator layer weights (1, 2, 4) so the base locomotion layer
+    /// takes full control. Called at the start of an emote sequence.
+    /// Normal gameplay systems (item pickup, arm masks) restore the weights naturally
+    /// when the player next interacts with an object.
+    /// </summary>
+    public void ClearArmLayerWeights()
     {
-        StartCoroutine(ShrugEmoteCoroutine());
+        if (!IsOwner) return;
+        targetLayer1Weight = 0f;
+        targetLayer2Weight = 0f;
+        targetLayer4Weight = 0f;
     }
 
-    IEnumerator ShrugEmoteCoroutine()
+    /// <summary>
+    /// Sets the upper-body emote layer (layer 3) target weight. Owner only.
+    /// </summary>
+    public void SetLayer3Weight(float weight)
     {
-        SetAnimBool("Shrug", true);
-        yield return new WaitForSeconds(1);
-        SetAnimBool("Shrug", false);
-    }
-    
-    void WaveEmote()
-    {
-        StartCoroutine(WaveEmoteCoroutine());
+        if (!IsOwner) return;
+        targetLayer3Weight = weight;
     }
 
-    IEnumerator WaveEmoteCoroutine()
-    {
-        SetAnimBool("Waving", true);
-        yield return new WaitForSeconds(1);
-        SetAnimBool("Waving", false);
-    }
+    /// <summary>
+    /// Returns the current target weight for layer 3 (not the lerped value).
+    /// </summary>
+    public float GetLayer3TargetWeight() => targetLayer3Weight;
 
     /// <summary>
     /// Sets the Jump animator bool to true for <see cref="jumpAnimDuration"/> seconds, then resets it.
@@ -591,6 +590,8 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetLayerWeight(1, netLayer1Weight.Value);
             bodyAnimator.SetLayerWeight(2, netLayer2Weight.Value);
             armsAnimator.SetLayerWeight(2, netLayer2Weight.Value);
+            bodyAnimator.SetLayerWeight(3, netLayer3Weight.Value);
+            armsAnimator.SetLayerWeight(3, netLayer3Weight.Value);
             bodyAnimator.SetLayerWeight(4, netLayer4Weight.Value);
             armsAnimator.SetLayerWeight(4, netLayer4Weight.Value);
             return;
@@ -623,16 +624,20 @@ public class PlayerAnimationController : NetworkBehaviour
         // Smoothly lerp layer weights
         currentLayer1Weight = Mathf.Lerp(currentLayer1Weight, targetLayer1Weight, Time.deltaTime * animLerpSpeed);
         currentLayer2Weight = Mathf.Lerp(currentLayer2Weight, targetLayer2Weight, Time.deltaTime * animLerpSpeed);
+        currentLayer3Weight = Mathf.Lerp(currentLayer3Weight, targetLayer3Weight, Time.deltaTime * animLerpSpeed);
         currentLayer4Weight = Mathf.Lerp(currentLayer4Weight, targetLayer4Weight, Time.deltaTime * animLerpSpeed);
 
         netLayer1Weight.Value = currentLayer1Weight;
         netLayer2Weight.Value = currentLayer2Weight;
+        netLayer3Weight.Value = currentLayer3Weight;
         netLayer4Weight.Value = currentLayer4Weight;
 
         bodyAnimator.SetLayerWeight(1, currentLayer1Weight);
         armsAnimator.SetLayerWeight(1, currentLayer1Weight);
         bodyAnimator.SetLayerWeight(2, currentLayer2Weight);
         armsAnimator.SetLayerWeight(2, currentLayer2Weight);
+        bodyAnimator.SetLayerWeight(3, currentLayer3Weight);
+        armsAnimator.SetLayerWeight(3, currentLayer3Weight);
         bodyAnimator.SetLayerWeight(4, currentLayer4Weight);
         armsAnimator.SetLayerWeight(4, currentLayer4Weight);
     }
@@ -845,6 +850,14 @@ public class PlayerAnimationController : NetworkBehaviour
 
         if (armsOnBody != null && armsOnBody.TryGetComponent<SkinnedMeshRenderer>(out var smr))
             smr.shadowCastingMode = ShadowCastingMode.On;
+
+        // Snap body lean to zero so the spine/neck stand neutral in the face-camera view.
+        // _currentLeanFactor drives ApplyLocalBodyLean each LateUpdate; zeroing it immediately
+        // prevents the residual forward tilt from looking down before entering.
+        _targetLeanFactor = 0f;
+        _currentLeanFactor = 0f;
+        if (IsOwner)
+            netLeanFactor.Value = 0f;
     }
 
     /// <summary>

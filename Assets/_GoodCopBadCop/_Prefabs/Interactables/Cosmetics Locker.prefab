@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &8155752648449839123
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4148913158824047649}
+  m_Layer: 0
+  m_Name: Player Facing Target
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4148913158824047649
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8155752648449839123}
+  serializedVersion: 2
+  m_LocalRotation: {x: -7.1054265e-15, y: -0.99144495, z: -1.7763567e-14, w: 0.13052605}
+  m_LocalPosition: {x: -0, y: -0, z: 0.0036}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4678319882283890253}
+  m_LocalEulerAnglesHint: {x: 0, y: -165, z: 0}
 --- !u!1001 &5144802201693114790
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -82,7 +113,10 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 84e4999ec2ba20842aa64cb286a61023, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6ccc4cdc5eec04642b9ddd6a20986e50, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4148913158824047649}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 6ccc4cdc5eec04642b9ddd6a20986e50, type: 3}
       insertIndex: -1
@@ -97,6 +131,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1258137472543368387}
   m_SourcePrefab: {fileID: 100100000, guid: 6ccc4cdc5eec04642b9ddd6a20986e50, type: 3}
+--- !u!4 &4678319882283890253 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6ccc4cdc5eec04642b9ddd6a20986e50, type: 3}
+  m_PrefabInstance: {fileID: 5144802201693114790}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &5451444114197179639 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 6ccc4cdc5eec04642b9ddd6a20986e50, type: 3}
@@ -406,7 +445,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 1656019694
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -436,4 +475,6 @@ MonoBehaviour:
   interactText: 
   highlightNameFilter: 
   _faceCamera: {fileID: 0}
+  _playerFacingTarget: {fileID: 0}
   _menuUI: {fileID: 0}
+  _openSFX: {fileID: 8300000, guid: fd5b411e3debd7644a4e89a4c37c15e2, type: 3}

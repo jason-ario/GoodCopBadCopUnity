@@ -46,14 +46,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1595626917310361352}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 13
   m_Type: 2
   m_Color: {r: 1, g: 0.011764707, b: 0, a: 1}
   m_Intensity: 0.1
   m_Range: 3.4
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
@@ -98,7 +98,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShadowRadius: 0
+  m_ShapeRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -144,19 +144,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2d25995c984d4f869d603b12fb4e28e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::VolumetricLights.VolumetricLight
-  lightMode: 0
-  profileSync: 0
-  useCustomBounds: 0
-  bounds:
-    m_Center: {x: -2.8476655, y: 3.9201467, z: -15.362201}
-    m_Extent: {x: 3.3855035, y: 3.4, z: 3.3855035}
-  boundsInLocalSpace: 0
-  profile: {fileID: 11400000, guid: 7b44d0ac88ae97f44ba0da50dcfe75b8, type: 2}
-  customRange: 3.4
-  targetCamera: {fileID: 0}
-  useCustomSize: 0
-  areaWidth: 1
-  areaHeight: 1
   generatedRange: 3.4
   generatedTipRadius: -1
   generatedSpotAngle: -1
@@ -231,6 +218,7 @@ MonoBehaviour:
   shadowCullingMask:
     serializedVersion: 2
     m_Bits: 32765
+  shadowIncludeTransparent: 0
   shadowBakeInterval: 0
   shadowBakeIgnoreRotationChange: 0
   shadowNearDistance: 0.1
@@ -239,6 +227,19 @@ MonoBehaviour:
   shadowBakeMode: 0
   shadowOrientation: 0
   shadowDirection: {x: 0, y: -1, z: 0}
+  lightMode: 0
+  profileSync: 0
+  useCustomBounds: 0
+  bounds:
+    m_Center: {x: -2.8476655, y: 3.9201467, z: -15.362201}
+    m_Extent: {x: 3.3855035, y: 3.4, z: 3.3855035}
+  boundsInLocalSpace: 0
+  profile: {fileID: 11400000, guid: 7b44d0ac88ae97f44ba0da50dcfe75b8, type: 2}
+  customRange: 3.4
+  targetCamera: {fileID: 0}
+  useCustomSize: 0
+  areaWidth: 1
+  areaHeight: 1
 --- !u!33 &3021533172230741073
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -294,6 +295,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &6722481736773685802
 GameObject:
@@ -511,6 +513,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &9087207226723069915
 GameObject:
@@ -5282,7 +5285,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &4544574916830865360
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5328,6 +5331,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
   m_SortMode: 0
@@ -5359,7 +5363,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1001 &25841106473553734
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5456,13 +5459,13 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 8569452433223360100}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 8673459267933036802}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6551260003005174353}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8569452433223360100}
   m_SourcePrefab: {fileID: 100100000, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
 --- !u!4 &563362425123432621 stripped
 Transform:
@@ -5474,6 +5477,31 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
   m_PrefabInstance: {fileID: 25841106473553734}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8569452433223360100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 908222479975625239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 354783966
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &8673459267933036802
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5559,31 +5587,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
---- !u!114 &8569452433223360100
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 908222479975625239}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1317431226
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 0
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!23 &6890104498396250751 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -2322344684677018311, guid: cd0751d856afbd64b89385640eeadd49, type: 3}
