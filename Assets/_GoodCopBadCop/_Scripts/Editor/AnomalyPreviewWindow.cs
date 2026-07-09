@@ -159,9 +159,6 @@ namespace GoodCopBadCop.Editor
 
         private void OnGUI()
         {
-            DrawHeader();
-            EditorGUILayout.Space(8f);
-
             float anomalyPanelWidth = Mathf.Clamp(position.width * 0.45f, 360f, 520f);
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -176,15 +173,6 @@ namespace GoodCopBadCop.Editor
                 EditorGUILayout.Space(8f);
                 DrawAnomalyList(GUILayout.Width(anomalyPanelWidth), GUILayout.ExpandHeight(true));
             }
-        }
-
-        private void DrawHeader()
-        {
-            EditorGUILayout.LabelField("Anomaly Preview", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Runs anomaly previews in a small sandbox scene and Play Mode, without loading the tutorial or the main shift flow.",
-                MessageType.Info);
-            EditorGUILayout.HelpBox(status, MessageType.None);
         }
 
         private void DrawClearPreviewControls()
@@ -210,9 +198,6 @@ namespace GoodCopBadCop.Editor
             {
                 EditorGUILayout.LabelField("Source", EditorStyles.boldLabel);
                 DrawSuspectDataPicker();
-
-                EditorGUILayout.Space(6f);
-                EditorGUILayout.LabelField("Sandbox", SandboxScenePath, EditorStyles.wordWrappedMiniLabel);
             }
         }
 
@@ -226,9 +211,6 @@ namespace GoodCopBadCop.Editor
                 {
                     selectedSuspectIndex = EditorGUILayout.Popup(selectedSuspectIndex, suspectOptionLabels);
                 }
-
-                if (GUILayout.Button("Refresh", GUILayout.Width(72f)))
-                    RefreshSuspects();
             }
 
             SuspectOption selected = GetSelectedSuspectOption();
@@ -240,7 +222,6 @@ namespace GoodCopBadCop.Editor
                 using (new EditorGUI.DisabledScope(true))
                     EditorGUILayout.ObjectField("Prefab", selected.CharacterPrefab, typeof(global::SuspectCharacter), false);
 
-                EditorGUILayout.LabelField("Asset", selected.AssetPath, EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.LabelField("Anomalies on prefab", selected.AnomalyCount.ToString());
             }
             else if (suspectOptionLabels.Length == 0)
@@ -250,7 +231,7 @@ namespace GoodCopBadCop.Editor
 
             using (new EditorGUI.DisabledScope(!selected.CanSpawn))
             {
-                if (GUILayout.Button(EditorApplication.isPlaying ? "Respawn Selected Suspect" : "Start Selected Suspect Preview", GUILayout.Height(30f)))
+                if (GUILayout.Button("Spawn", GUILayout.Height(30f)))
                     SpawnSelectedSuspect();
             }
 
