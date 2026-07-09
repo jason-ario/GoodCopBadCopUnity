@@ -830,6 +830,41 @@ public class PlayerAnimationController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Enters a cosmetics preview mode on the local player.
+    /// Restores the head bone to full scale (it is zeroed in first-person) and switches the
+    /// body arms mesh to normal shadow casting so both are visible from an external camera.
+    /// Mirrors the visual restore done by <see cref="RagdollController"/> on death.
+    /// Only meaningful on the local player — no-op on remote proxies.
+    /// </summary>
+    public void EnterThirdPersonPreview()
+    {
+        if (!IsLocalPlayer) return;
+
+        if (_headBone != null)
+            _headBone.localScale = Vector3.one;
+
+        if (armsOnBody != null && armsOnBody.TryGetComponent<SkinnedMeshRenderer>(out var smr))
+            smr.shadowCastingMode = ShadowCastingMode.On;
+    }
+
+    /// <summary>
+    /// Exits cosmetics preview mode and restores normal first-person visual state.
+    /// Zeroes the head bone scale so it does not clip into the FP camera, and reverts
+    /// the body arms mesh to shadow-only rendering.
+    /// Only meaningful on the local player — no-op on remote proxies.
+    /// </summary>
+    public void ExitThirdPersonPreview()
+    {
+        if (!IsLocalPlayer) return;
+
+        if (_headBone != null)
+            _headBone.localScale = Vector3.zero;
+
+        if (armsOnBody != null && armsOnBody.TryGetComponent<SkinnedMeshRenderer>(out var smr))
+            smr.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+    }
+
+    /// <summary>
     /// Tells the animation controller whether the player is crouching. The controller then
     /// smoothly tilts the spine forward and counter-rotates the neck to keep the head readable,
     /// producing an upper-body lean without the awkward upward spine curve.
