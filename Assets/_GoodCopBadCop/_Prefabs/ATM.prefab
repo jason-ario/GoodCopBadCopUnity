@@ -355,6 +355,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2570473259526726281}
+  - component: {fileID: 5490392715582426707}
   - component: {fileID: 2966703791305121361}
   - component: {fileID: 3308727712874504906}
   m_Layer: 0
@@ -387,6 +388,31 @@ Transform:
   - {fileID: 8777964219618828714}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5490392715582426707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7100520795700253562}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 0
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &2966703791305121361
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -399,6 +425,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 36e8196b9402426409328a78cae56dd5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  ShowTopMostFoldoutHeaderGroup: 1
   _couponPickupPrefab: {fileID: 2155997411467273331, guid: c2ea5885bf3e2af4dbbb07d686c22c8b, type: 3}
   _couponSpawnPointA: {fileID: 8584779014696423263}
   _couponSpawnPointB: {fileID: 4287853468009818991}

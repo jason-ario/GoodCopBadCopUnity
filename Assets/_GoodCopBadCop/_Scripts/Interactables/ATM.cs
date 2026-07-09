@@ -8,7 +8,7 @@ using UnityEngine;
 /// NetworkObjects one after another at <see cref="_couponSpawnPoint"/>.
 /// Spawning is server-authoritative; the singleton is readable from all contexts.
 /// </summary>
-public class ATM : MonoBehaviour
+public class ATM : NetworkBehaviour
 {
     public static ATM Instance;
 
@@ -66,6 +66,12 @@ public class ATM : MonoBehaviour
         || !NetworkManager.Singleton.IsListening
         || NetworkManager.Singleton.IsServer;
 
+    /// <summary>
+    /// True when there is an active NetworkManager session that is listening.
+    /// </summary>
+    private bool IsNetworked => NetworkManager.Singleton != null
+        && NetworkManager.Singleton.IsListening;
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -97,7 +103,12 @@ public class ATM : MonoBehaviour
         if (amount <= 0) return;
 
         PlayDispenseSound();
-        _screenController?.ShowPayment(amount);
+
+        if (IsNetworked)
+            ShowPaymentClientRpc(amount);
+        else
+            _screenController?.ShowPayment(amount);
+
         StartCoroutine(SpawnCouponsRoutine(amount));
     }
 
@@ -185,5 +196,17 @@ public class ATM : MonoBehaviour
         Vector3 randomAxis = Random.onUnitSphere;
         float magnitude = Random.Range(_torqueMin, _torqueMax);
         rb.AddTorque(randomAxis * magnitude, ForceMode.Impulse);
+    }
+
+    // ── Network RPCs ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tells every client (including host) to show the payment amount on the ATM screen.
+    /// Called by the server after a coupon dispense begins.
+    /// </summary>
+    [ClientRpc]
+    private void ShowPaymentClientRpc(int amount)
+    {
+        _screenController?.ShowPayment(amount);
     }
 }
