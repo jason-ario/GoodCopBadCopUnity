@@ -49,7 +49,7 @@ MonoBehaviour:
   camera:
     enabled: 1
     localImpulse:
-      enabled: 1
+      enabled: 0
       mode: 2
       force: 0.72
       velocity: {x: 0, y: -0.34, z: 0.06}
@@ -108,6 +108,11 @@ MonoBehaviour:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
+    localDamage:
+      enabled: 1
+      duration: 0.32
+      eulerKick: {x: 1.8, y: 0, z: 0.4}
+      fieldOfViewKick: 0.9
   audio:
     enabled: 0
     clips: []

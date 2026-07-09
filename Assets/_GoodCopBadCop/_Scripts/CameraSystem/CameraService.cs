@@ -9,6 +9,7 @@ namespace GoodCopBadCop.CameraSystem
         void ShakeLocalPlayer();
         void PlayLocalImpulse(CameraImpulseSettings settings);
         void PlayLocalSway(CameraSwaySettings settings);
+        void PlayLocalDamageFeedback(CameraDamageFeedbackSettings settings);
         void HideFromCapture(object source, global::SuspectCharacter suspect);
         void ShowInCapture(object source, global::SuspectCharacter suspect);
         bool IsVisibleInCapture(global::SuspectCharacter suspect);
@@ -74,6 +75,27 @@ namespace GoodCopBadCop.CameraSystem
             cameraController.PlaySway(settings);
         }
 
+        public void PlayLocalDamageFeedback(CameraDamageFeedbackSettings settings)
+        {
+            if (settings == null || !settings.Enabled)
+                return;
+
+            global::PlayerInstance player = FindLocalPlayer();
+            if (player == null)
+            {
+                Debug.LogWarning("[CameraService] Local player was not found.");
+                return;
+            }
+
+            global::PlayerCameraController cameraController = player.GetComponent<global::PlayerCameraController>();
+            if (cameraController == null)
+            {
+                Debug.LogWarning("[CameraService] Local player has no PlayerCameraController.");
+                return;
+            }
+
+            cameraController.PlayDamageFeedback(settings);
+        }
         private global::PlayerInstance FindLocalPlayer()
         {
             global::PlayerInstance player = playerRuntimeModel.LocalPlayer.CurrentValue;

@@ -114,6 +114,27 @@ namespace GoodCopBadCop.CameraSystem
     }
 
     [Serializable]
+    public sealed class CameraDamageFeedbackSettings
+    {
+        [SerializeField] private bool enabled;
+        [SerializeField, Min(0.01f)] private float duration = 0.2f;
+        [SerializeField] private Vector3 eulerKick = Vector3.zero;
+        [SerializeField] private float fieldOfViewKick;
+
+        public bool Enabled => enabled;
+        public float Duration => duration;
+        public Vector3 EulerKick => eulerKick;
+        public float FieldOfViewKick => fieldOfViewKick;
+
+        public static CameraDamageFeedbackSettings Disabled()
+        {
+            return new CameraDamageFeedbackSettings
+            {
+                enabled = false
+            };
+        }
+    }
+    [Serializable]
     public sealed class CameraSwaySettings
     {
         [SerializeField] private bool enabled;

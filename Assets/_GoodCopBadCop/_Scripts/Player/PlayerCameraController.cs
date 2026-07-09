@@ -19,8 +19,11 @@ public class PlayerCameraController : MonoBehaviour
 
     private CinemachineHeadSwayExtension _headSwayExtension;
     private Sequence _swaySequence;
-    private Vector3 _appliedSwayOffsets;
-    private float _appliedFieldOfViewOffset;
+    private Sequence _damageSequence;
+    private Vector3 _swayEulerOffset;
+    private Vector3 _damageEulerOffset;
+    private float _swayFieldOfViewOffset;
+    private float _damageFieldOfViewOffset;
 
     private void Awake()
     {
@@ -30,6 +33,7 @@ public class PlayerCameraController : MonoBehaviour
     private void OnDisable()
     {
         StopSway();
+        StopDamageFeedback();
     }
 
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>
@@ -38,6 +42,7 @@ public class PlayerCameraController : MonoBehaviour
         if (!active)
         {
             StopSway();
+            StopDamageFeedback();
         }
 
         if (camera != null)
@@ -108,6 +113,18 @@ public class PlayerCameraController : MonoBehaviour
             .OnKill(() => _swaySequence = null);
     }
 
+    public void PlayDamageFeedback(CameraDamageFeedbackSettings settings)
+    {
+        if (settings == null || !settings.Enabled || camera == null || !EnsureHeadSwayExtension(true))
+            return;
+
+        StopDamageFeedback();
+
+        _damageSequence = CreateDamageFeedbackSequence(settings)
+            .OnComplete(ResetDamageFeedbackOffsets)
+            .OnKill(() => _damageSequence = null);
+    }
+
     private void StopSway()
     {
         if (_swaySequence != null)
@@ -117,6 +134,17 @@ public class PlayerCameraController : MonoBehaviour
         }
 
         ResetSwayOffsets();
+    }
+
+    private void StopDamageFeedback()
+    {
+        if (_damageSequence != null)
+        {
+            _damageSequence.Kill(false);
+            _damageSequence = null;
+        }
+
+        ResetDamageFeedbackOffsets();
     }
 
     private Sequence CreateSwaySequence(CameraSwaySettings settings)
@@ -140,6 +168,31 @@ public class PlayerCameraController : MonoBehaviour
         }
     }
 
+    private Sequence CreateDamageFeedbackSequence(CameraDamageFeedbackSettings settings)
+    {
+        float duration = Mathf.Max(0.01f, settings.Duration);
+        float impactDuration = duration * 0.22f;
+        float counterDuration = duration * 0.24f;
+        float settleDuration = Mathf.Max(0.01f, duration - impactDuration - counterDuration);
+        Vector3 kick = settings.EulerKick;
+        Vector3 counterKick = new Vector3(-kick.x * 0.18f, -kick.y * 0.2f, -kick.z * 0.24f);
+        float fieldOfViewKick = settings.FieldOfViewKick;
+
+        return DOTween.Sequence()
+            .SetUpdate(true)
+            .SetTarget(this)
+            .Append(DOTween.To(() => _damageEulerOffset, SetDamageEulerOffset, kick, impactDuration)
+                .SetEase(Ease.OutCubic))
+            .Join(DOTween.To(() => _damageFieldOfViewOffset, SetDamageFieldOfViewOffset, fieldOfViewKick, impactDuration)
+                .SetEase(Ease.OutCubic))
+            .Append(DOTween.To(() => _damageEulerOffset, SetDamageEulerOffset, counterKick, counterDuration)
+                .SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => _damageEulerOffset, SetDamageEulerOffset, Vector3.zero, settleDuration)
+                .SetEase(Ease.OutSine))
+            .Insert(impactDuration, DOTween.To(() => _damageFieldOfViewOffset, SetDamageFieldOfViewOffset, 0f, counterDuration + settleDuration)
+                .SetEase(Ease.OutSine));
+    }
+
     private Sequence BuildHeadSwaySequence(Sequence sequence, float duration, Vector3 amplitude)
     {
         float leanInDuration = duration * 0.3f;
@@ -147,11 +200,11 @@ public class PlayerCameraController : MonoBehaviour
         float settleDuration = Mathf.Max(0.01f, duration - leanInDuration - swingDuration);
 
         return sequence
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, amplitude, leanInDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, amplitude, leanInDuration)
                 .SetEase(Ease.InOutSine))
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, -amplitude * 0.65f, swingDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, -amplitude * 0.65f, swingDuration)
                 .SetEase(Ease.InOutSine))
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, settleDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, settleDuration)
                 .SetEase(Ease.OutSine));
     }
 
@@ -164,11 +217,11 @@ public class PlayerCameraController : MonoBehaviour
         Vector3 lift = new Vector3(Mathf.Abs(amplitude.x) * 0.55f, -amplitude.y * 0.2f, -amplitude.z * 0.15f);
 
         return sequence
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, inhale, inhaleDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, inhale, inhaleDuration)
                 .SetEase(Ease.InOutSine))
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, lift, liftDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, lift, liftDuration)
                 .SetEase(Ease.OutSine))
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, exhaleDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, exhaleDuration)
                 .SetEase(Ease.InOutSine));
     }
 
@@ -183,39 +236,62 @@ public class PlayerCameraController : MonoBehaviour
         Vector3 release = new Vector3(Mathf.Abs(amplitude.x) * 0.18f, -amplitude.y * 0.18f, -amplitude.z * 0.15f);
 
         return sequence
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, push, pushDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, push, pushDuration)
                 .SetEase(Ease.InOutSine))
-            .Join(DOTween.To(() => _appliedFieldOfViewOffset, SetFieldOfViewOffset, fieldOfViewOffset, pushDuration)
+            .Join(DOTween.To(() => _swayFieldOfViewOffset, SetSwayFieldOfViewOffset, fieldOfViewOffset, pushDuration)
                 .SetEase(Ease.InOutSine))
             .AppendInterval(holdDuration)
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, release, releaseDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, release, releaseDuration)
                 .SetEase(Ease.InOutSine))
-            .Append(DOTween.To(() => _appliedSwayOffsets, SetSwayOffsets, Vector3.zero, settleDuration)
+            .Append(DOTween.To(() => _swayEulerOffset, SetSwayEulerOffset, Vector3.zero, settleDuration)
                 .SetEase(Ease.InOutSine))
-            .Insert(resetStartTime, DOTween.To(() => _appliedFieldOfViewOffset, SetFieldOfViewOffset, 0f, releaseDuration + settleDuration)
+            .Insert(resetStartTime, DOTween.To(() => _swayFieldOfViewOffset, SetSwayFieldOfViewOffset, 0f, releaseDuration + settleDuration)
                 .SetEase(Ease.InOutSine));
     }
 
-    private void SetSwayOffsets(Vector3 offsets)
+    private void SetSwayEulerOffset(Vector3 offset)
     {
-        _appliedSwayOffsets = offsets;
-
-        if (EnsureHeadSwayExtension(false))
-            _headSwayExtension.EulerOffset = offsets;
+        _swayEulerOffset = offset;
+        ApplyCameraFeedbackOffsets();
     }
 
-    private void SetFieldOfViewOffset(float offset)
+    private void SetDamageEulerOffset(Vector3 offset)
     {
-        _appliedFieldOfViewOffset = offset;
+        _damageEulerOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
 
-        if (EnsureHeadSwayExtension(false))
-            _headSwayExtension.FieldOfViewOffset = offset;
+    private void SetSwayFieldOfViewOffset(float offset)
+    {
+        _swayFieldOfViewOffset = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void SetDamageFieldOfViewOffset(float offset)
+    {
+        _damageFieldOfViewOffset = offset;
+        ApplyCameraFeedbackOffsets();
     }
 
     private void ResetSwayOffsets()
     {
-        SetSwayOffsets(Vector3.zero);
-        SetFieldOfViewOffset(0f);
+        SetSwayEulerOffset(Vector3.zero);
+        SetSwayFieldOfViewOffset(0f);
+    }
+
+    private void ResetDamageFeedbackOffsets()
+    {
+        SetDamageEulerOffset(Vector3.zero);
+        SetDamageFieldOfViewOffset(0f);
+    }
+
+    private void ApplyCameraFeedbackOffsets()
+    {
+        if (!EnsureHeadSwayExtension(false))
+            return;
+
+        _headSwayExtension.EulerOffset = _swayEulerOffset + _damageEulerOffset;
+        _headSwayExtension.FieldOfViewOffset = _swayFieldOfViewOffset + _damageFieldOfViewOffset;
     }
 
     private static void ConfigureDefaultHitImpulseSource(CinemachineImpulseSource impulseSource)

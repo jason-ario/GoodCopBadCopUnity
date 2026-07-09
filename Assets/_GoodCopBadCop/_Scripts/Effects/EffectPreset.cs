@@ -44,10 +44,12 @@ namespace GoodCopBadCop.Effects
         [SerializeField] private bool enabled = true;
         [SerializeField] private CameraImpulseSettings localImpulse = CameraImpulseSettings.DefaultHit();
         [SerializeField] private CameraSwaySettings localSway = CameraSwaySettings.Disabled();
+        [SerializeField] private CameraDamageFeedbackSettings localDamage = CameraDamageFeedbackSettings.Disabled();
 
         public bool Enabled => enabled;
         public CameraImpulseSettings LocalImpulse => localImpulse;
         public CameraSwaySettings LocalSway => localSway;
+        public CameraDamageFeedbackSettings LocalDamage => localDamage;
 
         public static CameraEffectSettings LocalPlayerShake()
         {
@@ -55,7 +57,8 @@ namespace GoodCopBadCop.Effects
             {
                 enabled = true,
                 localImpulse = CameraImpulseSettings.DefaultHit(),
-                localSway = CameraSwaySettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localDamage = CameraDamageFeedbackSettings.Disabled()
             };
         }
 
@@ -65,7 +68,8 @@ namespace GoodCopBadCop.Effects
             {
                 enabled = true,
                 localImpulse = CameraImpulseSettings.WithForce(force),
-                localSway = CameraSwaySettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localDamage = CameraDamageFeedbackSettings.Disabled()
             };
         }
 
@@ -75,7 +79,8 @@ namespace GoodCopBadCop.Effects
             {
                 enabled = impulse != null && impulse.Enabled,
                 localImpulse = impulse ?? CameraImpulseSettings.Disabled(),
-                localSway = CameraSwaySettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localDamage = CameraDamageFeedbackSettings.Disabled()
             };
         }
 
@@ -85,7 +90,8 @@ namespace GoodCopBadCop.Effects
             {
                 enabled = false,
                 localImpulse = CameraImpulseSettings.Disabled(),
-                localSway = CameraSwaySettings.Disabled()
+                localSway = CameraSwaySettings.Disabled(),
+                localDamage = CameraDamageFeedbackSettings.Disabled()
             };
         }
     }
