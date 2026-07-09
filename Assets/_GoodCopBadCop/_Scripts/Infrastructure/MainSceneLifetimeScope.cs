@@ -53,8 +53,10 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<VoiceChatModel>(Lifetime.Scoped).AsSelf().As<IVoiceChatModel>();
             builder.RegisterEntryPoint<VoiceChatCommsRuntime>(Lifetime.Scoped);
             builder.Register<IVoiceChatService, VoiceChatService>(Lifetime.Scoped);
+            builder.RegisterComponentInHierarchy<VoiceSpeakingIndicatorView>();
             builder.RegisterEntryPoint<VoiceChatSettingsAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<DissonanceVoiceChatAdapter>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<VoiceSpeakingIndicatorPresenter>(Lifetime.Scoped);
 
             // Environment system registered before SettingsMenuPresenter so that
             // EnvironmentRenderAdapter and EnvironmentCampaignAdapter are earlier in

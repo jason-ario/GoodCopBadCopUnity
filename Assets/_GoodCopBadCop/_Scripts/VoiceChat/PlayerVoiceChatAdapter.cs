@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Dissonance;
 using Dissonance.Integrations.Unity_NFGO;
 using UnityEngine;
@@ -14,6 +14,7 @@ namespace GoodCopBadCop.VoiceChat
         [SerializeField] private string roomName = "GoodCopBadCopProximity";
         [SerializeField, Range(1, 100)] private int fallbackProximityRange = 10;
 
+        private NfgoPlayer nfgoPlayer;
         private VoiceProximityBroadcastTrigger broadcastTrigger;
         private VoiceProximityReceiptTrigger receiptTrigger;
         private bool hasAppliedSettings;
@@ -26,8 +27,11 @@ namespace GoodCopBadCop.VoiceChat
         public static event Action<PlayerVoiceChatAdapter> Registered;
         public static event Action<PlayerVoiceChatAdapter> Unregistered;
 
+        public bool IsTransmitting => IsLocalVoicePlayer() && broadcastTrigger != null && broadcastTrigger.IsTransmitting;
+
         private void Awake()
         {
+            nfgoPlayer = GetComponent<NfgoPlayer>();
             broadcastTrigger = GetComponent<VoiceProximityBroadcastTrigger>();
             receiptTrigger = GetComponent<VoiceProximityReceiptTrigger>();
             proximityRange = fallbackProximityRange;
@@ -44,19 +48,18 @@ namespace GoodCopBadCop.VoiceChat
             }
         }
 
+        private void Update()
+        {
+            if (hasAppliedSettings)
+            {
+                ApplyTriggerEnabledState();
+            }
+        }
+
         private void OnDisable()
         {
             UnregisterInstance();
-
-            if (broadcastTrigger != null)
-            {
-                broadcastTrigger.enabled = false;
-            }
-
-            if (receiptTrigger != null)
-            {
-                receiptTrigger.enabled = false;
-            }
+            SetTriggersEnabled(false);
         }
 
         private void OnDestroy()
@@ -119,20 +122,30 @@ namespace GoodCopBadCop.VoiceChat
             receiptTrigger.UseColliderTrigger = false;
             broadcastTrigger.Mode = ToDissonanceMode(inputMode);
             broadcastTrigger.IsMuted = !isEnabled || isMuted;
-            SetTriggersEnabled(isEnabled && isActiveAndEnabled);
+            ApplyTriggerEnabledState();
+        }
+
+        private void ApplyTriggerEnabledState()
+        {
+            SetTriggersEnabled(isEnabled && isActiveAndEnabled && IsLocalVoicePlayer());
         }
 
         private void SetTriggersEnabled(bool enabled)
         {
-            if (broadcastTrigger != null)
+            if (broadcastTrigger != null && broadcastTrigger.enabled != enabled)
             {
                 broadcastTrigger.enabled = enabled;
             }
 
-            if (receiptTrigger != null)
+            if (receiptTrigger != null && receiptTrigger.enabled != enabled)
             {
                 receiptTrigger.enabled = enabled;
             }
+        }
+
+        private bool IsLocalVoicePlayer()
+        {
+            return nfgoPlayer != null && nfgoPlayer.IsSpawned && nfgoPlayer.IsLocalPlayer;
         }
 
         private static CommActivationMode ToDissonanceMode(EVoiceChatInputMode mode)

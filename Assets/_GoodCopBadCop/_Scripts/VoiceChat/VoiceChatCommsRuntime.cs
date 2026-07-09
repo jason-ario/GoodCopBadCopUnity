@@ -42,9 +42,23 @@ namespace GoodCopBadCop.VoiceChat
                 return comms;
             }
 
+            DissonanceComms[] existingComms = UnityEngine.Object.FindObjectsByType<DissonanceComms>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+            if (existingComms.Length == 1)
+            {
+                comms = existingComms[0];
+                return comms;
+            }
+
+            if (existingComms.Length > 1)
+            {
+                throw new InvalidOperationException($"Expected a single {nameof(DissonanceComms)} instance, found {existingComms.Length}.");
+            }
+
             runtimeObject = new GameObject(RuntimeCommsObjectName);
-            runtimeObject.AddComponent<NfgoCommsNetwork>();
             comms = runtimeObject.AddComponent<DissonanceComms>();
+            runtimeObject.AddComponent<NfgoCommsNetwork>();
             return comms;
         }
     }
