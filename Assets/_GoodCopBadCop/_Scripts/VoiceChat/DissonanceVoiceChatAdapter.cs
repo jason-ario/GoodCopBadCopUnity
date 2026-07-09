@@ -51,6 +51,8 @@ namespace GoodCopBadCop.VoiceChat
             service.SetCommsAvailable(commsRuntime.Comms != null);
             service.SetNetworkReady(commsRuntime.Comms != null && commsRuntime.Comms.IsNetworkInitialized);
 
+            // TODO: If all players leave the lobby, the microphone indicator can remain visible;
+            // handle lobby/network disconnect events and force local speaking off.
             bool localSpeaking = HasRemoteNetworkPeer() && HasActiveTransmission();
             if (appliedLocalSpeaking != localSpeaking)
             {
