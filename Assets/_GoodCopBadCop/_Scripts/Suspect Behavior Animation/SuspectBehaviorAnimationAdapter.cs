@@ -17,6 +17,8 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         private AnimationMixerPlayable mixerPlayable;
         private AnimatorControllerPlayable controllerPlayable;
         private AnimationClipPlayable clipPlayable;
+        private AnimationClipPlayable baseClipPlayable;
+        private AnimationClipPlayable overrideClipPlayable;
         private AnimationPlayableOutput output;
         private Coroutine playbackCoroutine;
         private Coroutine transitionCoroutine;
@@ -134,6 +136,12 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
 
             if (active.Preset.PlayContinuously)
             {
+                if (active.Preset.UseFirstClipAsContinuousBase && active.Preset.Clips != null && active.Preset.Clips.Length > 1)
+                {
+                    playbackCoroutine = StartCoroutine(PlayBaseWithOverrides(active));
+                    return;
+                }
+
                 Play(active, 0f);
                 transitionCoroutine = StartCoroutine(FadeClipWeight(0f, 1f, active.Preset.BlendInSeconds));
                 return;
@@ -171,6 +179,52 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
                 currentClip = null;
                 StopGraph();
                 yield return new WaitForSeconds(active.Preset.SelectPauseSeconds(active.SequenceSeed, cycleIndex));
+                cycleIndex++;
+            }
+        }
+
+        private IEnumerator PlayBaseWithOverrides(ActivePreset active)
+        {
+            AnimationClip baseClip = active.Preset.SelectBaseClip();
+            if (baseClip == null)
+                yield break;
+
+            ActivePreset baseActive = new(active.Source, active.Preset, baseClip, active.SequenceSeed);
+            CreateBaseOverrideGraph(baseActive, null, 0f, 0f);
+            yield return FadeBaseOverrideWeights(0f, 1f, 0f, 0f, active.Preset.BlendInSeconds);
+
+            int cycleIndex = 0;
+            AnimationClip previousOverrideClip = null;
+
+            while (ReferenceEquals(currentSource, active.Source))
+            {
+                isInPause = false;
+                currentClip = baseClip;
+                yield return new WaitForSeconds(active.Preset.SelectPauseSeconds(active.SequenceSeed, cycleIndex));
+
+                AnimationClip overrideClip = active.Preset.SelectOverrideClip(active.SequenceSeed, cycleIndex, previousOverrideClip);
+                if (overrideClip == null)
+                {
+                    cycleIndex++;
+                    continue;
+                }
+
+                previousOverrideClip = overrideClip;
+                ActivePreset overrideActive = new(active.Source, active.Preset, overrideClip, active.SequenceSeed);
+                CreateBaseOverrideGraph(baseActive, overrideActive, 1f, 0f);
+                currentClip = overrideClip;
+                yield return FadeBaseOverrideWeights(1f, 0f, 0f, 1f, active.Preset.BlendInSeconds);
+
+                float clipSeconds = overrideClip.length / active.Preset.PlaybackSpeed;
+                if (active.Preset.MaxPlaySeconds > 0f)
+                    clipSeconds = Mathf.Min(clipSeconds, active.Preset.MaxPlaySeconds);
+
+                float playSeconds = Mathf.Max(0f, clipSeconds - active.Preset.BlendInSeconds);
+                if (playSeconds > 0f)
+                    yield return new WaitForSeconds(playSeconds);
+
+                yield return FadeBaseOverrideWeights(0f, 1f, 1f, 0f, active.Preset.BlendOutSeconds);
+                currentClip = baseClip;
                 cycleIndex++;
             }
         }
@@ -215,6 +269,52 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             graph.Play();
         }
 
+        private void CreateBaseOverrideGraph(ActivePreset baseActive, ActivePreset? overrideActive, float baseWeight, float overrideWeight)
+        {
+            if (animator == null || baseActive.Clip == null)
+                return;
+
+            StopTransitionCoroutine();
+            StopGraph();
+            currentPreset = baseActive.Preset;
+            currentClip = overrideActive.HasValue ? overrideActive.Value.Clip : baseActive.Clip;
+            isInPause = false;
+
+            graph = PlayableGraph.Create($"{nameof(SuspectBehaviorAnimationAdapter)}:{gameObject.name}:BaseOverride");
+            graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+
+            int inputCount = originalController != null ? 3 : 2;
+            mixerPlayable = AnimationMixerPlayable.Create(graph, inputCount);
+
+            int baseInputIndex = originalController != null ? 1 : 0;
+            int overrideInputIndex = originalController != null ? 2 : 1;
+
+            if (originalController != null)
+            {
+                controllerPlayable = AnimatorControllerPlayable.Create(graph, originalController);
+                graph.Connect(controllerPlayable, 0, mixerPlayable, 0);
+            }
+
+            baseClipPlayable = AnimationClipPlayable.Create(graph, baseActive.Clip);
+            baseClipPlayable.SetApplyFootIK(false);
+            baseClipPlayable.SetSpeed(baseActive.Preset.PlaybackSpeed);
+            graph.Connect(baseClipPlayable, 0, mixerPlayable, baseInputIndex);
+
+            if (overrideActive.HasValue && overrideActive.Value.Clip != null)
+            {
+                overrideClipPlayable = AnimationClipPlayable.Create(graph, overrideActive.Value.Clip);
+                overrideClipPlayable.SetApplyFootIK(false);
+                overrideClipPlayable.SetSpeed(overrideActive.Value.Preset.PlaybackSpeed);
+                graph.Connect(overrideClipPlayable, 0, mixerPlayable, overrideInputIndex);
+            }
+
+            SetBaseOverrideWeights(baseWeight, overrideWeight);
+
+            output = AnimationPlayableOutput.Create(graph, "Behavior Animation", animator);
+            output.SetSourcePlayable(mixerPlayable);
+            graph.Play();
+        }
+
         private IEnumerator FadeClipWeight(float from, float to, float duration)
         {
             if (!graph.IsValid() || !mixerPlayable.IsValid())
@@ -249,6 +349,58 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
                 mixerPlayable.SetInputWeight(0, 1f - clamped);
 
             mixerPlayable.SetInputWeight(clipInputIndex, clamped);
+        }
+
+        private IEnumerator FadeBaseOverrideWeights(
+            float fromBase,
+            float toBase,
+            float fromOverride,
+            float toOverride,
+            float duration)
+        {
+            if (!graph.IsValid() || !mixerPlayable.IsValid())
+                yield break;
+
+            if (duration <= 0f)
+            {
+                SetBaseOverrideWeights(toBase, toOverride);
+                yield break;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration && graph.IsValid() && mixerPlayable.IsValid())
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                SetBaseOverrideWeights(
+                    Mathf.Lerp(fromBase, toBase, t),
+                    Mathf.Lerp(fromOverride, toOverride, t));
+                yield return null;
+            }
+
+            SetBaseOverrideWeights(toBase, toOverride);
+        }
+
+        private void SetBaseOverrideWeights(float baseWeight, float overrideWeight)
+        {
+            if (!mixerPlayable.IsValid())
+                return;
+
+            float baseClamped = Mathf.Clamp01(baseWeight);
+            float overrideClamped = Mathf.Clamp01(overrideWeight);
+            float controllerWeight = Mathf.Clamp01(1f - Mathf.Max(baseClamped, overrideClamped));
+
+            if (originalController != null)
+            {
+                mixerPlayable.SetInputWeight(0, controllerWeight);
+                mixerPlayable.SetInputWeight(1, baseClamped);
+                mixerPlayable.SetInputWeight(2, overrideClamped);
+            }
+            else
+            {
+                mixerPlayable.SetInputWeight(0, baseClamped);
+                mixerPlayable.SetInputWeight(1, overrideClamped);
+            }
         }
 
         private void StopGraph()

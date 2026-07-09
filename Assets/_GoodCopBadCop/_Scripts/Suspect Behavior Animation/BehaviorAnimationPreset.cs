@@ -9,6 +9,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
     {
         [SerializeField] private AnimationClip[] clips;
         [SerializeField] private bool randomizeClip;
+        [SerializeField] private bool useFirstClipAsContinuousBase;
         [SerializeField] private float playbackSpeed = 1f;
         [SerializeField] private bool playContinuously = true;
         [SerializeField] private float blendInSeconds = 0.18f;
@@ -20,6 +21,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
 
         public AnimationClip[] Clips => clips;
         public bool RandomizeClip => randomizeClip;
+        public bool UseFirstClipAsContinuousBase => useFirstClipAsContinuousBase;
         public float PlaybackSpeed => Mathf.Max(0.01f, playbackSpeed);
         public bool PlayContinuously => playContinuously;
         public float BlendInSeconds => Mathf.Max(0f, blendInSeconds);
@@ -43,6 +45,29 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
 
             if (previousClip != null && clips[index] == previousClip)
                 index = (index + 1 + NextRange(ref state, clips.Length - 1)) % clips.Length;
+
+            return clips[index];
+        }
+
+        public AnimationClip SelectBaseClip()
+        {
+            return clips != null && clips.Length > 0 ? clips[0] : null;
+        }
+
+        public AnimationClip SelectOverrideClip(int sequenceSeed, int cycleIndex = 0, AnimationClip previousClip = null)
+        {
+            if (clips == null || clips.Length <= 1)
+                return null;
+
+            int overrideCount = clips.Length - 1;
+            if (overrideCount == 1)
+                return clips[1];
+
+            int state = Mix(sequenceSeed, cycleIndex);
+            int index = 1 + NextRange(ref state, overrideCount);
+
+            if (previousClip != null && clips[index] == previousClip)
+                index = 1 + PositiveModulo(index - 1 + 1 + NextRange(ref state, overrideCount - 1), overrideCount);
 
             return clips[index];
         }

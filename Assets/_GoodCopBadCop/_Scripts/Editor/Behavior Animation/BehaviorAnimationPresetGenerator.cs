@@ -19,13 +19,14 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             Directory.CreateDirectory(PresetPath);
 
             AssetDatabase.ImportAsset(MixamoRawPath, ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
-            SetClipLooping("Dizzy_Injured Stumble Idle.fbx", true);
+            SetClipLooping("Dizzy_Default Idle.fbx", true);
 
             CreatePreset(
                 "Paranoid Behavior.asset",
                 priority: 20,
                 playbackSpeed: 0.75f,
                 randomize: true,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: false,
                 blendInSeconds: 0.45f,
                 blendOutSeconds: 0.55f,
@@ -41,6 +42,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 priority: 20,
                 playbackSpeed: 1f,
                 randomize: false,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: false,
                 blendInSeconds: 0.45f,
                 blendOutSeconds: 0.55f,
@@ -54,6 +56,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 priority: 20,
                 playbackSpeed: 1f,
                 randomize: false,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: false,
                 blendInSeconds: 0.35f,
                 blendOutSeconds: 0.55f,
@@ -67,6 +70,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 priority: 20,
                 playbackSpeed: 1f,
                 randomize: true,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: false,
                 blendInSeconds: 0.3f,
                 blendOutSeconds: 0.45f,
@@ -78,27 +82,32 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 "Violent_Shake Fist.fbx",
                 "Violent_Angry Forward Gesture.fbx",
                 "Violent_Angry Forward Shoulders.fbx",
-                "Violent_Angry Point.fbx",
-                "Violent_Defeat.fbx");
+                "Violent_Angry Point.fbx");
 
             CreatePreset(
                 "Dizzy Behavior.asset",
                 priority: 20,
                 playbackSpeed: 0.37f,
-                randomize: false,
+                randomize: true,
+                useFirstClipAsContinuousBase: true,
                 playContinuously: true,
                 blendInSeconds: 0.55f,
                 blendOutSeconds: 0.55f,
                 maxPlaySeconds: 0f,
-                minPauseSeconds: 0f,
-                maxPauseSeconds: 0f,
-                "Dizzy_Injured Stumble Idle.fbx");
+                minPauseSeconds: 3.5f,
+                maxPauseSeconds: 7f,
+                "Dizzy_Default Idle.fbx",
+                "Dizzy_Drunk Idle.fbx",
+                "Dizzy_Drunk Idle Hiccup.fbx",
+                "Dizzy_Drunk Idle Stumble.fbx",
+                "Dizzy_Running Tired.fbx");
 
             CreatePreset(
                 "Distracted Behavior.asset",
                 priority: 20,
                 playbackSpeed: 0.45f,
                 randomize: true,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: true,
                 blendInSeconds: 0.55f,
                 blendOutSeconds: 0.55f,
@@ -114,6 +123,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
                 priority: 20,
                 playbackSpeed: 2f,
                 randomize: true,
+                useFirstClipAsContinuousBase: false,
                 playContinuously: false,
                 blendInSeconds: 0.35f,
                 blendOutSeconds: 0.45f,
@@ -134,6 +144,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             int priority,
             float playbackSpeed,
             bool randomize,
+            bool useFirstClipAsContinuousBase,
             bool playContinuously,
             float blendInSeconds,
             float blendOutSeconds,
@@ -166,6 +177,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             serialized.FindProperty("priority").intValue = priority;
             serialized.FindProperty("playbackSpeed").floatValue = playbackSpeed;
             serialized.FindProperty("randomizeClip").boolValue = randomize;
+            serialized.FindProperty("useFirstClipAsContinuousBase").boolValue = useFirstClipAsContinuousBase;
             serialized.FindProperty("playContinuously").boolValue = playContinuously;
             serialized.FindProperty("blendInSeconds").floatValue = blendInSeconds;
             serialized.FindProperty("blendOutSeconds").floatValue = blendOutSeconds;
