@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using UnityEngine;
 
@@ -82,6 +83,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             string applicationSex = sex;
             string applicationIdNumber = idNumber;
             string expirationDate = data.EntryPermitExpiryDate;
+            string applicationExpirationDate = expirationDate;
             string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: Has(active, nameof(InvalidEntryReason)));
             bool applicationVisible = !Has(active, nameof(MissingDocumentAnomaly));
 
@@ -89,7 +91,7 @@ namespace GoodCopBadCop.SuspectPaperwork
                 applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrong), applicationFullName));
 
             if (Has(active, nameof(BirthDateWrong)))
-                applicationBirthDate = MutateDigits(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrong), applicationBirthDate), preserve: '/');
+                applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrong), applicationBirthDate));
 
             if (Has(active, nameof(IDNumberWrong)) || Has(active, nameof(FakeIdAnomaly)))
                 applicationIdNumber = MutateDigits(applicationIdNumber, BuildSeed(data, currentDay, suspectIndex, nameof(IDNumberWrong), applicationIdNumber), preserve: '\0');
@@ -98,7 +100,7 @@ namespace GoodCopBadCop.SuspectPaperwork
                 applicationSex = MutateSex(applicationSex);
 
             if (Has(active, nameof(ExpirationDateAnomaly)))
-                expirationDate = string.IsNullOrWhiteSpace(expirationDate) ? "EXPIRED" : "EXPIRED " + expirationDate;
+                applicationExpirationDate = MutateDocumentDate(applicationExpirationDate, BuildSeed(data, currentDay, suspectIndex, nameof(ExpirationDateAnomaly), applicationExpirationDate));
 
             return new SuspectPaperworkState(
                 fullName,
@@ -109,6 +111,7 @@ namespace GoodCopBadCop.SuspectPaperwork
                 applicationBirthDate,
                 applicationSex,
                 applicationIdNumber,
+                applicationExpirationDate,
                 entryReason,
                 expirationDate,
                 data.IsResident,
@@ -204,6 +207,31 @@ namespace GoodCopBadCop.SuspectPaperwork
             new[] { '0', '8' }
         };
 
+        private enum DatePart
+        {
+            Day,
+            Month,
+            Year
+        }
+
+        private readonly struct ParsedDocumentDate
+        {
+            public readonly DateTime Date;
+            public readonly bool HasYear;
+            public readonly bool UsesMonthName;
+            public readonly bool UsesFullMonthName;
+            public readonly bool MonthIsUppercase;
+
+            public ParsedDocumentDate(DateTime date, bool hasYear, bool usesMonthName, bool usesFullMonthName, bool monthIsUppercase)
+            {
+                Date = date;
+                HasYear = hasYear;
+                UsesMonthName = usesMonthName;
+                UsesFullMonthName = usesFullMonthName;
+                MonthIsUppercase = monthIsUppercase;
+            }
+        }
+
         private static string MutateDigits(string value, int seed, char preserve)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -233,6 +261,139 @@ namespace GoodCopBadCop.SuspectPaperwork
             }
 
             return new string(chars);
+        }
+
+        private static string MutateDocumentDate(string value, int seed)
+        {
+            if (!TryParseDocumentDate(value, out ParsedDocumentDate parsed))
+                return value;
+
+            List<DatePart> parts = new() { DatePart.Day, DatePart.Month };
+            if (parsed.HasYear)
+                parts.Add(DatePart.Year);
+
+            DateTime mutated = parsed.Date;
+            for (int attempt = 0; attempt < parts.Count; attempt++)
+            {
+                DatePart part = parts[PositiveModulo(Mix(seed, attempt), parts.Count)];
+                mutated = MutateDatePart(parsed.Date, part, Mix(seed, attempt + 41));
+                if (mutated != parsed.Date)
+                    break;
+            }
+
+            return FormatDocumentDate(mutated, parsed);
+        }
+
+        private static bool TryParseDocumentDate(string value, out ParsedDocumentDate parsed)
+        {
+            parsed = default;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string trimmed = value.Trim();
+            string[] numericFormats = { "dd/MM/yyyy", "d/M/yyyy" };
+            if (DateTime.TryParseExact(trimmed, numericFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime numericDate))
+            {
+                parsed = new ParsedDocumentDate(numericDate, hasYear: true, usesMonthName: false, usesFullMonthName: false, monthIsUppercase: false);
+                return true;
+            }
+
+            string[] monthNameFormats = { "dd MMM yyyy", "d MMM yyyy", "dd MMMM yyyy", "d MMMM yyyy" };
+            if (DateTime.TryParseExact(trimmed, monthNameFormats, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out DateTime namedDateWithYear))
+            {
+                parsed = new ParsedDocumentDate(
+                    namedDateWithYear,
+                    hasYear: true,
+                    usesMonthName: true,
+                    usesFullMonthName: HasFullMonthName(trimmed),
+                    monthIsUppercase: HasUppercaseMonthName(trimmed));
+                return true;
+            }
+
+            string[] monthNameFormatsWithoutYear = { "dd MMM", "d MMM", "dd MMMM", "d MMMM" };
+            if (DateTime.TryParseExact(trimmed, monthNameFormatsWithoutYear, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out DateTime namedDate))
+            {
+                parsed = new ParsedDocumentDate(
+                    namedDate,
+                    hasYear: false,
+                    usesMonthName: true,
+                    usesFullMonthName: HasFullMonthName(trimmed),
+                    monthIsUppercase: HasUppercaseMonthName(trimmed));
+                return true;
+            }
+
+            return false;
+        }
+
+        private static DateTime MutateDatePart(DateTime date, DatePart part, int seed)
+        {
+            switch (part)
+            {
+                case DatePart.Day:
+                    return new DateTime(date.Year, date.Month, MutateDay(date.Day, date.Year, date.Month, seed));
+                case DatePart.Month:
+                    int month = MutateMonth(date.Month, seed);
+                    int day = Mathf.Min(date.Day, DateTime.DaysInMonth(date.Year, month));
+                    return new DateTime(date.Year, month, day);
+                case DatePart.Year:
+                    int year = MutateYear(date.Year, seed);
+                    int clampedDay = Mathf.Min(date.Day, DateTime.DaysInMonth(year, date.Month));
+                    return new DateTime(year, date.Month, clampedDay);
+                default:
+                    return date;
+            }
+        }
+
+        private static int MutateDay(int day, int year, int month, int seed)
+        {
+            int daysInMonth = DateTime.DaysInMonth(year, month);
+            if (daysInMonth <= 1)
+                return day;
+
+            return 1 + PositiveModulo(day - 1 + 1 + PositiveModulo(seed, daysInMonth - 1), daysInMonth);
+        }
+
+        private static int MutateMonth(int month, int seed)
+            => 1 + PositiveModulo(month - 1 + 1 + PositiveModulo(seed, 11), 12);
+
+        private static int MutateYear(int year, int seed)
+        {
+            int offset = 1 + PositiveModulo(seed, 8);
+            if (PositiveModulo(seed, 2) == 0)
+                offset = -offset;
+
+            return Mathf.Clamp(year + offset, 1, 9999);
+        }
+
+        private static string FormatDocumentDate(DateTime date, ParsedDocumentDate parsed)
+        {
+            if (!parsed.UsesMonthName)
+                return date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+            string monthFormat = parsed.UsesFullMonthName ? "MMMM" : "MMM";
+            string month = date.ToString(monthFormat, CultureInfo.InvariantCulture);
+            if (parsed.MonthIsUppercase)
+                month = month.ToUpperInvariant();
+
+            if (parsed.HasYear)
+                return $"{date.ToString("dd", CultureInfo.InvariantCulture)} {month} {date.ToString("yyyy", CultureInfo.InvariantCulture)}";
+
+            return $"{date.ToString("dd", CultureInfo.InvariantCulture)} {month}";
+        }
+
+        private static bool HasFullMonthName(string value)
+            => GetMonthToken(value).Length > 3;
+
+        private static bool HasUppercaseMonthName(string value)
+        {
+            string token = GetMonthToken(value);
+            return token.Length > 0 && token.All(character => !char.IsLetter(character) || char.IsUpper(character));
+        }
+
+        private static string GetMonthToken(string value)
+        {
+            string[] tokens = value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return tokens.Length >= 2 ? tokens[1] : string.Empty;
         }
 
         private static char MutateDigitToSimilar(char digit, int seed)

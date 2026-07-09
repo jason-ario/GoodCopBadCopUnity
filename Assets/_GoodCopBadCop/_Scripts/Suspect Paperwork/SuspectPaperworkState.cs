@@ -12,6 +12,7 @@ namespace GoodCopBadCop.SuspectPaperwork
         public readonly string ApplicationBirthDate;
         public readonly string ApplicationSex;
         public readonly string ApplicationIdNumber;
+        public readonly string ApplicationExpirationDate;
         public readonly string EntryReason;
         public readonly string ExpirationDate;
         public readonly bool IsResident;
@@ -27,6 +28,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             string applicationBirthDate,
             string applicationSex,
             string applicationIdNumber,
+            string applicationExpirationDate,
             string entryReason,
             string expirationDate,
             bool isResident,
@@ -41,6 +43,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             ApplicationBirthDate = applicationBirthDate ?? string.Empty;
             ApplicationSex = applicationSex ?? string.Empty;
             ApplicationIdNumber = applicationIdNumber ?? string.Empty;
+            ApplicationExpirationDate = applicationExpirationDate ?? string.Empty;
             EntryReason = entryReason ?? string.Empty;
             ExpirationDate = expirationDate ?? string.Empty;
             IsResident = isResident;
@@ -49,6 +52,7 @@ namespace GoodCopBadCop.SuspectPaperwork
         }
 
         public static SuspectPaperworkState Empty { get; } = new(
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty,

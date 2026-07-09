@@ -65,6 +65,7 @@ public class IDCard : FolderItem
             suspectCharacter.Data.DateOfBirth,
             suspectCharacter.Data.Sex,
             suspectCharacter.Data.IDNumber,
+            suspectCharacter.Data.EntryPermitExpiryDate,
             string.Empty,
             suspectCharacter.Data.EntryPermitExpiryDate,
             suspectCharacter.Data.IsResident,

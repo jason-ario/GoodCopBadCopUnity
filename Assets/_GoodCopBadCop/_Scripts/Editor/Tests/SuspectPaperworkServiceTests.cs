@@ -1,5 +1,7 @@
 using GoodCopBadCop.SuspectPaperwork;
 using NUnit.Framework;
+using System;
+using System.Globalization;
 using UnityEngine;
 
 namespace GoodCopBadCop.Editor.Tests
@@ -59,6 +61,7 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual("Male", state.ApplicationSex);
             Assert.AreEqual("1234567", state.IdNumber);
             Assert.AreEqual("1234567", state.ApplicationIdNumber);
+            Assert.AreEqual("31/12/2030", state.ApplicationExpirationDate);
             Assert.AreEqual("Work", state.EntryReason);
             Assert.AreEqual("31/12/2030", state.ExpirationDate);
             Assert.IsTrue(state.ApplicationVisible);
@@ -75,6 +78,8 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual(first.ApplicationBirthDate, second.ApplicationBirthDate);
             Assert.AreEqual(data.DateOfBirth, first.BirthDate);
             Assert.AreNotEqual(data.DateOfBirth, first.ApplicationBirthDate);
+            AssertDocumentDate(data.DateOfBirth, "dd/MM/yyyy");
+            AssertDocumentDate(first.ApplicationBirthDate, "dd/MM/yyyy");
         }
 
         [Test]
@@ -125,6 +130,44 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
+        public void BuildForPreview_ExpirationDateAnomaly_ChangesOnlyApplicationExpirationDate()
+        {
+            string[] anomalies = { nameof(ExpirationDateAnomaly) };
+            data.EntryPermitExpiryDate = "27 OCT";
+
+            SuspectPaperworkState first = service.BuildForPreview(data, null, anomalies, 2, 3);
+            SuspectPaperworkState second = service.BuildForPreview(data, null, anomalies, 2, 3);
+
+            Assert.AreEqual(first.ApplicationExpirationDate, second.ApplicationExpirationDate);
+            Assert.AreEqual(data.EntryPermitExpiryDate, first.ExpirationDate);
+            Assert.AreNotEqual(data.EntryPermitExpiryDate, first.ApplicationExpirationDate);
+            AssertDocumentDate(data.EntryPermitExpiryDate, "dd MMM");
+            AssertDocumentDate(first.ApplicationExpirationDate, "dd MMM");
+        }
+
+        [Test]
+        public void BuildForPreview_ExpirationDateAnomaly_CanChangeTextMonth()
+        {
+            string[] anomalies = { nameof(ExpirationDateAnomaly) };
+            data.EntryPermitExpiryDate = "27 OCT";
+
+            bool changedMonth = false;
+            for (int currentDay = 1; currentDay <= 31; currentDay++)
+            {
+                SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, currentDay, 0);
+                AssertDocumentDate(state.ApplicationExpirationDate, "dd MMM");
+
+                if (!string.Equals(GetMonthToken(data.EntryPermitExpiryDate), GetMonthToken(state.ApplicationExpirationDate), StringComparison.Ordinal))
+                {
+                    changedMonth = true;
+                    break;
+                }
+            }
+
+            Assert.IsTrue(changedMonth);
+        }
+
+        [Test]
         public void BuildForPreview_MissingDocument_HidesApplication()
         {
             SuspectPaperworkState state = service.BuildForPreview(
@@ -137,12 +180,18 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.IsFalse(state.ApplicationVisible);
         }
 
-        private static void AssertSimilarDigitChanges(string original, string mutated)
+        private static void AssertSimilarDigitChanges(string original, string mutated, char preserve = '\0')
         {
             Assert.AreEqual(original.Length, mutated.Length);
             int changedDigits = 0;
             for (int i = 0; i < original.Length; i++)
             {
+                if (original[i] == preserve)
+                {
+                    Assert.AreEqual(original[i], mutated[i]);
+                    continue;
+                }
+
                 if (original[i] == mutated[i])
                     continue;
 
@@ -169,6 +218,19 @@ namespace GoodCopBadCop.Editor.Tests
                 case '9': return new[] { '0', '8' };
                 default: return System.Array.Empty<char>();
             }
+        }
+
+        private static void AssertDocumentDate(string value, string format)
+        {
+            Assert.IsTrue(
+                DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
+                $"Expected '{value}' to parse as '{format}'.");
+        }
+
+        private static string GetMonthToken(string value)
+        {
+            string[] tokens = value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return tokens.Length >= 2 ? tokens[1] : string.Empty;
         }
     }
 }

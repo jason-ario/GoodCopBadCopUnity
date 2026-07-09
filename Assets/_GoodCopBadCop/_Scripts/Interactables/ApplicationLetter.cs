@@ -11,11 +11,13 @@ public class ApplicationLetter : FolderItem
     [SerializeField] private TextMeshPro sexText;
     [SerializeField] private TextMeshPro reasonForEntryText;
     [SerializeField] private TextMeshPro idNumberText;
+    [SerializeField] private TextMeshPro expirationDateText;
 
     private readonly NetworkVariable<FixedString512Bytes> syncedFullName = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedSex = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedIdNumber = new(new FixedString512Bytes(string.Empty));
+    private readonly NetworkVariable<FixedString512Bytes> syncedExpirationDate = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedEntryReason = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<bool> syncedVisible = new(true);
 
@@ -27,6 +29,7 @@ public class ApplicationLetter : FolderItem
         syncedBirthDate.OnValueChanged += OnBirthDateChanged;
         syncedSex.OnValueChanged += OnSexChanged;
         syncedIdNumber.OnValueChanged += OnIdNumberChanged;
+        syncedExpirationDate.OnValueChanged += OnExpirationDateChanged;
         syncedEntryReason.OnValueChanged += OnEntryReasonChanged;
         syncedVisible.OnValueChanged += OnVisibleChanged;
 
@@ -39,6 +42,7 @@ public class ApplicationLetter : FolderItem
         syncedBirthDate.OnValueChanged -= OnBirthDateChanged;
         syncedSex.OnValueChanged -= OnSexChanged;
         syncedIdNumber.OnValueChanged -= OnIdNumberChanged;
+        syncedExpirationDate.OnValueChanged -= OnExpirationDateChanged;
         syncedEntryReason.OnValueChanged -= OnEntryReasonChanged;
         syncedVisible.OnValueChanged -= OnVisibleChanged;
 
@@ -58,6 +62,7 @@ public class ApplicationLetter : FolderItem
                 suspectData.DateOfBirth,
                 suspectData.Sex,
                 suspectData.IDNumber,
+                suspectData.EntryPermitExpiryDate,
                 string.Empty,
                 suspectData.EntryPermitExpiryDate,
                 suspectData.IsResident,
@@ -75,6 +80,7 @@ public class ApplicationLetter : FolderItem
         syncedBirthDate.Value = ToFixedString(state.ApplicationBirthDate);
         syncedSex.Value = ToFixedString(state.ApplicationSex);
         syncedIdNumber.Value = ToFixedString(state.ApplicationIdNumber);
+        syncedExpirationDate.Value = ToFixedString(state.ApplicationExpirationDate);
         syncedEntryReason.Value = ToFixedString(state.EntryReason);
         syncedVisible.Value = state.ApplicationVisible;
 
@@ -99,6 +105,7 @@ public class ApplicationLetter : FolderItem
             syncedBirthDate.Value.ToString(),
             syncedSex.Value.ToString(),
             syncedIdNumber.Value.ToString(),
+            syncedExpirationDate.Value.ToString(),
             syncedEntryReason.Value.ToString(),
             string.Empty,
             false,
@@ -112,6 +119,7 @@ public class ApplicationLetter : FolderItem
         birthDateText.text = state.ApplicationBirthDate;
         sexText.text = state.ApplicationSex;
         idNumberText.text = state.ApplicationIdNumber;
+        SetText(expirationDateText, state.ApplicationExpirationDate);
         reasonForEntryText.text = state.EntryReason;
         SetDocumentVisible(state.ApplicationVisible);
     }
@@ -125,12 +133,15 @@ public class ApplicationLetter : FolderItem
         reasonForEntryText.font = suspectData.handwritingFont;
         birthDateText.font = suspectData.handwritingFont;
         sexText.font = suspectData.handwritingFont;
+        if (expirationDateText != null)
+            expirationDateText.font = suspectData.handwritingFont;
     }
 
     private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
     private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
     private void OnSexChanged(FixedString512Bytes previous, FixedString512Bytes current) => sexText.text = current.ToString();
     private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNumberText.text = current.ToString();
+    private void OnExpirationDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => SetText(expirationDateText, current.ToString());
     private void OnEntryReasonChanged(FixedString512Bytes previous, FixedString512Bytes current) => reasonForEntryText.text = current.ToString();
     private void OnVisibleChanged(bool previous, bool current)
     {
@@ -155,6 +166,12 @@ public class ApplicationLetter : FolderItem
             safeValue = safeValue.Substring(0, maxCharacters);
 
         return new FixedString512Bytes(safeValue);
+    }
+
+    private static void SetText(TextMeshPro target, string value)
+    {
+        if (target != null)
+            target.text = value;
     }
     
     public void SetInsideFolder(FolderController folder)
