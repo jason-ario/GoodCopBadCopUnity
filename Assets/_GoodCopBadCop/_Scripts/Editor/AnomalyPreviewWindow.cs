@@ -74,6 +74,7 @@ namespace GoodCopBadCop.Editor
         };
         private static readonly Type[] PreviewOnlyDocumentAnomalyTypes =
         {
+            typeof(global::FakeIdAnomaly),
             typeof(global::ExpirationDateAnomaly)
         };
 

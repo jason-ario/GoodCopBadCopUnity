@@ -67,6 +67,7 @@ public class ApplicationLetter : FolderItem
                 suspectData.EntryPermitExpiryDate,
                 suspectData.IsResident,
                 true,
+                false,
                 suspectData.IDPhoto),
             suspectData);
     }
@@ -110,6 +111,7 @@ public class ApplicationLetter : FolderItem
             string.Empty,
             false,
             syncedVisible.Value,
+            false,
             null));
     }
 

@@ -65,6 +65,7 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual("Work", state.EntryReason);
             Assert.AreEqual("31/12/2030", state.ExpirationDate);
             Assert.IsTrue(state.ApplicationVisible);
+            Assert.IsFalse(state.IsFakeId);
         }
 
         [Test]
@@ -103,6 +104,18 @@ namespace GoodCopBadCop.Editor.Tests
             SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
 
             AssertSimilarDigitChanges(data.IDNumber, state.ApplicationIdNumber);
+        }
+
+        [Test]
+        public void BuildForPreview_FakeId_SetsFakeIdFlagWithoutMutatingApplicationId()
+        {
+            string[] anomalies = { nameof(FakeIdAnomaly) };
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
+
+            Assert.IsTrue(state.IsFakeId);
+            Assert.AreEqual(data.IDNumber, state.IdNumber);
+            Assert.AreEqual(data.IDNumber, state.ApplicationIdNumber);
         }
 
         [Test]

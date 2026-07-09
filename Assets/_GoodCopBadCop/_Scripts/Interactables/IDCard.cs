@@ -13,27 +13,40 @@ public class IDCard : FolderItem
    [SerializeField] TextMeshPro idNoText;
    [SerializeField] private TextMeshPro residentText;
    [SerializeField] private GameObject seal;
+   [SerializeField] private SpriteRenderer sealRenderer;
    [SerializeField] private MeshRenderer idPhoto;
+   [SerializeField] private MeshRenderer cardSurfaceRenderer;
+   [SerializeField] private Texture defaultCardTexture;
+   [SerializeField] private Texture fakeCardTexture;
+   [SerializeField] private Sprite defaultSealSprite;
+   [SerializeField] private Sprite fakeSealSprite;
 
    private readonly NetworkVariable<FixedString512Bytes> syncedFullName = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedExpiry = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedIdNumber = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<bool> syncedIsResident = new(false);
+   private readonly NetworkVariable<bool> syncedIsFakeId = new(false);
    private readonly NetworkVariable<NetworkObjectReference> syncedSuspectRef = new();
+
+   private const string BaseMapProperty = "_BaseMap";
+   private const string MainTexProperty = "_MainTex";
 
    public override void OnNetworkSpawn()
    {
       base.OnNetworkSpawn();
+      CacheDefaultVisuals();
 
       syncedFullName.OnValueChanged += OnFullNameChanged;
       syncedBirthDate.OnValueChanged += OnBirthDateChanged;
       syncedExpiry.OnValueChanged += OnExpiryChanged;
       syncedIdNumber.OnValueChanged += OnIdNumberChanged;
       syncedIsResident.OnValueChanged += OnResidentChanged;
+      syncedIsFakeId.OnValueChanged += OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged += OnSuspectRefChanged;
 
       ApplySyncedTextState();
+      ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
       ApplyPhotoFromSuspectRef(syncedSuspectRef.Value);
    }
 
@@ -44,6 +57,7 @@ public class IDCard : FolderItem
       syncedExpiry.OnValueChanged -= OnExpiryChanged;
       syncedIdNumber.OnValueChanged -= OnIdNumberChanged;
       syncedIsResident.OnValueChanged -= OnResidentChanged;
+      syncedIsFakeId.OnValueChanged -= OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged -= OnSuspectRefChanged;
 
       base.OnNetworkDespawn();
@@ -70,6 +84,7 @@ public class IDCard : FolderItem
             suspectCharacter.Data.EntryPermitExpiryDate,
             suspectCharacter.Data.IsResident,
             true,
+            false,
             suspectCharacter.IDPhoto),
          suspectCharacter);
    }
@@ -84,11 +99,13 @@ public class IDCard : FolderItem
       syncedExpiry.Value = ToFixedString(state.ExpirationDate);
       syncedIdNumber.Value = ToFixedString(state.IdNumber);
       syncedIsResident.Value = state.IsResident;
+      syncedIsFakeId.Value = state.IsFakeId;
 
       if (suspectCharacter != null && suspectCharacter.TryGetComponent(out NetworkObject suspectNetworkObject))
          syncedSuspectRef.Value = new NetworkObjectReference(suspectNetworkObject);
 
       ApplySyncedTextState();
+      ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
          idPhoto.material.mainTexture = state.IdPhoto;
    }
@@ -101,8 +118,7 @@ public class IDCard : FolderItem
       expDateText.text = state.ExpirationDate;
       idNoText.text = state.IdNumber;
       residentText.text = state.IsResident ? "* Resident of Saplavi *" : "Non-Resident";
-      if (seal != null)
-         seal.SetActive(state.IsResident);
+      ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
          idPhoto.material.mainTexture = state.IdPhoto;
    }
@@ -115,8 +131,7 @@ public class IDCard : FolderItem
       expDateText.text = syncedExpiry.Value.ToString();
       idNoText.text = syncedIdNumber.Value.ToString();
       residentText.text = syncedIsResident.Value ? "* Resident of Saplavi *" : "Non-Resident";
-      if (seal != null)
-         seal.SetActive(syncedIsResident.Value);
+      ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
    }
 
    private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
@@ -126,9 +141,9 @@ public class IDCard : FolderItem
    private void OnResidentChanged(bool previous, bool current)
    {
       residentText.text = current ? "* Resident of Saplavi *" : "Non-Resident";
-      if (seal != null)
-         seal.SetActive(current);
+      ApplyIdVisualState(syncedIsFakeId.Value, current);
    }
+   private void OnFakeIdChanged(bool previous, bool current) => ApplyIdVisualState(current, syncedIsResident.Value);
 
    private void OnSuspectRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
    {
@@ -155,6 +170,97 @@ public class IDCard : FolderItem
 
          yield return null;
       }
+   }
+
+   private void CacheDefaultVisuals()
+   {
+      MeshRenderer surfaceRenderer = GetCardSurfaceRenderer();
+      if (surfaceRenderer != null && defaultCardTexture == null)
+         defaultCardTexture = GetMaterialTexture(surfaceRenderer.material);
+
+      SpriteRenderer renderer = GetSealRenderer();
+      if (renderer != null && defaultSealSprite == null)
+         defaultSealSprite = renderer.sprite;
+   }
+
+   private void ApplyIdVisualState(bool isFakeId, bool isResident)
+   {
+      CacheDefaultVisuals();
+
+      MeshRenderer surfaceRenderer = GetCardSurfaceRenderer();
+      if (surfaceRenderer != null)
+         SetMaterialTexture(surfaceRenderer.material, isFakeId && fakeCardTexture != null ? fakeCardTexture : defaultCardTexture);
+
+      SpriteRenderer renderer = GetSealRenderer();
+      if (renderer != null)
+         renderer.sprite = isFakeId && fakeSealSprite != null ? fakeSealSprite : defaultSealSprite;
+
+      if (seal != null)
+         seal.SetActive(isResident || isFakeId);
+   }
+
+   private MeshRenderer GetCardSurfaceRenderer()
+   {
+      if (cardSurfaceRenderer != null)
+         return cardSurfaceRenderer;
+
+      foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>(true))
+      {
+         if (renderer == idPhoto || renderer.GetComponent<TextMeshPro>() != null)
+            continue;
+
+         cardSurfaceRenderer = renderer;
+         return cardSurfaceRenderer;
+      }
+
+      return null;
+   }
+
+   private SpriteRenderer GetSealRenderer()
+   {
+      if (sealRenderer != null)
+         return sealRenderer;
+
+      if (seal != null)
+         sealRenderer = seal.GetComponent<SpriteRenderer>();
+
+      return sealRenderer;
+   }
+
+   private static Texture GetMaterialTexture(Material material)
+   {
+      if (material == null)
+         return null;
+
+      if (material.HasProperty(BaseMapProperty))
+         return material.GetTexture(BaseMapProperty);
+
+      if (material.HasProperty(MainTexProperty))
+         return material.GetTexture(MainTexProperty);
+
+      return material.mainTexture;
+   }
+
+   private static void SetMaterialTexture(Material material, Texture texture)
+   {
+      if (material == null || texture == null)
+         return;
+
+      bool assigned = false;
+      if (material.HasProperty(BaseMapProperty))
+      {
+         material.SetTexture(BaseMapProperty, texture);
+         assigned = true;
+      }
+
+      if (material.HasProperty(MainTexProperty))
+      {
+         material.SetTexture(MainTexProperty, texture);
+         assigned = true;
+      }
+
+      if (!assigned)
+         material.mainTexture = texture;
    }
 
    private static FixedString512Bytes ToFixedString(string value)

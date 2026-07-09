@@ -86,6 +86,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             string applicationExpirationDate = expirationDate;
             string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: Has(active, nameof(InvalidEntryReason)));
             bool applicationVisible = !Has(active, nameof(MissingDocumentAnomaly));
+            bool isFakeId = Has(active, nameof(FakeIdAnomaly));
 
             if (Has(active, nameof(NameWrong)))
                 applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrong), applicationFullName));
@@ -93,7 +94,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             if (Has(active, nameof(BirthDateWrong)))
                 applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrong), applicationBirthDate));
 
-            if (Has(active, nameof(IDNumberWrong)) || Has(active, nameof(FakeIdAnomaly)))
+            if (Has(active, nameof(IDNumberWrong)))
                 applicationIdNumber = MutateDigits(applicationIdNumber, BuildSeed(data, currentDay, suspectIndex, nameof(IDNumberWrong), applicationIdNumber), preserve: '\0');
 
             if (Has(active, nameof(SexWrong)))
@@ -116,6 +117,7 @@ namespace GoodCopBadCop.SuspectPaperwork
                 expirationDate,
                 data.IsResident,
                 applicationVisible,
+                isFakeId,
                 idPhoto);
         }
 
