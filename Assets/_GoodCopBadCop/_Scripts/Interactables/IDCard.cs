@@ -84,6 +84,7 @@ public class IDCard : FolderItem
             suspectCharacter.Data.EntryPermitExpiryDate,
             suspectCharacter.Data.IsResident,
             true,
+            true,
             false,
             suspectCharacter.IDPhoto),
          suspectCharacter);

@@ -16,6 +16,7 @@ namespace GoodCopBadCop.SuspectPaperwork
         public readonly string EntryReason;
         public readonly string ExpirationDate;
         public readonly bool IsResident;
+        public readonly bool DocumentsVisible;
         public readonly bool ApplicationVisible;
         public readonly bool IsFakeId;
         public readonly Texture IdPhoto;
@@ -33,6 +34,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             string entryReason,
             string expirationDate,
             bool isResident,
+            bool documentsVisible,
             bool applicationVisible,
             bool isFakeId,
             Texture idPhoto)
@@ -49,6 +51,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             EntryReason = entryReason ?? string.Empty;
             ExpirationDate = expirationDate ?? string.Empty;
             IsResident = isResident;
+            DocumentsVisible = documentsVisible;
             ApplicationVisible = applicationVisible;
             IsFakeId = isFakeId;
             IdPhoto = idPhoto;
@@ -67,6 +70,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             string.Empty,
             string.Empty,
             false,
+            true,
             true,
             false,
             null);

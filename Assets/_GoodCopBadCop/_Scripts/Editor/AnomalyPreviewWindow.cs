@@ -75,7 +75,8 @@ namespace GoodCopBadCop.Editor
         private static readonly Type[] PreviewOnlyDocumentAnomalyTypes =
         {
             typeof(global::FakeIdAnomaly),
-            typeof(global::ExpirationDateAnomaly)
+            typeof(global::ExpirationDateAnomaly),
+            typeof(global::MissingDocumentAnomaly)
         };
 
         private GameObject targetRoot;
@@ -555,7 +556,10 @@ namespace GoodCopBadCop.Editor
                 if (document == null)
                     continue;
 
-                document.SetActive(true);
+                document.SetActive(paperworkState.DocumentsVisible);
+                if (!paperworkState.DocumentsVisible)
+                    continue;
+
                 PopulatePreviewDocument(document, data, paperworkState);
             }
         }

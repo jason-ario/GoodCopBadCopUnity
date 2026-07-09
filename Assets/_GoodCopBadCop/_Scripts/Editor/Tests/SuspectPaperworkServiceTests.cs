@@ -64,6 +64,7 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual("31/12/2030", state.ApplicationExpirationDate);
             Assert.AreEqual("Work", state.EntryReason);
             Assert.AreEqual("31/12/2030", state.ExpirationDate);
+            Assert.IsTrue(state.DocumentsVisible);
             Assert.IsTrue(state.ApplicationVisible);
             Assert.IsFalse(state.IsFakeId);
         }
@@ -181,7 +182,7 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
-        public void BuildForPreview_MissingDocument_HidesApplication()
+        public void BuildForPreview_MissingDocument_HidesAllDocuments()
         {
             SuspectPaperworkState state = service.BuildForPreview(
                 data,
@@ -190,7 +191,37 @@ namespace GoodCopBadCop.Editor.Tests
                 1,
                 0);
 
+            Assert.IsFalse(state.DocumentsVisible);
             Assert.IsFalse(state.ApplicationVisible);
+        }
+
+        [Test]
+        public void BuildForPreview_MissingDocument_SuppressesOtherDocumentAnomalies()
+        {
+            SuspectPaperworkState state = service.BuildForPreview(
+                data,
+                null,
+                new[]
+                {
+                    nameof(MissingDocumentAnomaly),
+                    nameof(FakeIdAnomaly),
+                    nameof(NameWrong),
+                    nameof(BirthDateWrong),
+                    nameof(IDNumberWrong),
+                    nameof(ExpirationDateAnomaly),
+                    nameof(InvalidEntryReason)
+                },
+                1,
+                0);
+
+            Assert.IsFalse(state.DocumentsVisible);
+            Assert.IsFalse(state.ApplicationVisible);
+            Assert.IsFalse(state.IsFakeId);
+            Assert.AreEqual("Alexei Sokolov", state.ApplicationFullName);
+            Assert.AreEqual(data.DateOfBirth, state.ApplicationBirthDate);
+            Assert.AreEqual(data.IDNumber, state.ApplicationIdNumber);
+            Assert.AreEqual(data.EntryPermitExpiryDate, state.ApplicationExpirationDate);
+            Assert.AreEqual("Work", state.EntryReason);
         }
 
         private static void AssertSimilarDigitChanges(string original, string mutated, char preserve = '\0')

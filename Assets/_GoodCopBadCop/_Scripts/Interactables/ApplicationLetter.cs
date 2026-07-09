@@ -67,6 +67,7 @@ public class ApplicationLetter : FolderItem
                 suspectData.EntryPermitExpiryDate,
                 suspectData.IsResident,
                 true,
+                true,
                 false,
                 suspectData.IDPhoto),
             suspectData);
@@ -110,6 +111,7 @@ public class ApplicationLetter : FolderItem
             syncedEntryReason.Value.ToString(),
             string.Empty,
             false,
+            syncedVisible.Value,
             syncedVisible.Value,
             false,
             null));

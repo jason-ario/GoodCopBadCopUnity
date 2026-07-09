@@ -84,23 +84,24 @@ namespace GoodCopBadCop.SuspectPaperwork
             string applicationIdNumber = idNumber;
             string expirationDate = data.EntryPermitExpiryDate;
             string applicationExpirationDate = expirationDate;
-            string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: Has(active, nameof(InvalidEntryReason)));
-            bool applicationVisible = !Has(active, nameof(MissingDocumentAnomaly));
-            bool isFakeId = Has(active, nameof(FakeIdAnomaly));
+            bool documentsVisible = !Has(active, nameof(MissingDocumentAnomaly));
+            bool applicationVisible = documentsVisible;
+            bool isFakeId = documentsVisible && Has(active, nameof(FakeIdAnomaly));
+            string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReason)));
 
-            if (Has(active, nameof(NameWrong)))
+            if (documentsVisible && Has(active, nameof(NameWrong)))
                 applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrong), applicationFullName));
 
-            if (Has(active, nameof(BirthDateWrong)))
+            if (documentsVisible && Has(active, nameof(BirthDateWrong)))
                 applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrong), applicationBirthDate));
 
-            if (Has(active, nameof(IDNumberWrong)))
+            if (documentsVisible && Has(active, nameof(IDNumberWrong)))
                 applicationIdNumber = MutateDigits(applicationIdNumber, BuildSeed(data, currentDay, suspectIndex, nameof(IDNumberWrong), applicationIdNumber), preserve: '\0');
 
-            if (Has(active, nameof(SexWrong)))
+            if (documentsVisible && Has(active, nameof(SexWrong)))
                 applicationSex = MutateSex(applicationSex);
 
-            if (Has(active, nameof(ExpirationDateAnomaly)))
+            if (documentsVisible && Has(active, nameof(ExpirationDateAnomaly)))
                 applicationExpirationDate = MutateDocumentDate(applicationExpirationDate, BuildSeed(data, currentDay, suspectIndex, nameof(ExpirationDateAnomaly), applicationExpirationDate));
 
             return new SuspectPaperworkState(
@@ -116,6 +117,7 @@ namespace GoodCopBadCop.SuspectPaperwork
                 entryReason,
                 expirationDate,
                 data.IsResident,
+                documentsVisible,
                 applicationVisible,
                 isFakeId,
                 idPhoto);

@@ -793,6 +793,8 @@ public class SuspectController : NetworkBehaviour
         if (!suspectCharacter.Data.GivesPaperwork) return;
 
         SuspectPaperworkState paperworkState = BuildPaperworkState();
+        if (!paperworkState.DocumentsVisible)
+            return;
         
         Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
         randomPos.y = documentSpawnEndPos.position.y;
