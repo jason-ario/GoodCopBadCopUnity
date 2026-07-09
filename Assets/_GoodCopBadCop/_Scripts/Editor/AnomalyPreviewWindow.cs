@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using GoodCopBadCop.SuspectBehaviorAnimation;
 using GoodCopBadCop.SuspectPaperwork;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -95,10 +96,7 @@ namespace GoodCopBadCop.Editor
         private Vector2 windowScrollPosition;
         private Vector2 scrollPosition;
         private Animator previewAnimator;
-        private AnimationClip[] animationClips = Array.Empty<AnimationClip>();
-        private string[] animationClipLabels = Array.Empty<string>();
-        private int selectedAnimationClipIndex = -1;
-        private float animationSampleNormalized;
+        private SuspectBehaviorAnimationAdapter previewAnimationAdapter;
         private string status = "Select a suspect prefab or scene suspect.";
 
         static AnomalyPreviewWindow()
@@ -155,6 +153,12 @@ namespace GoodCopBadCop.Editor
         {
             Selection.selectionChanged -= Repaint;
             ClearPreviewInstance();
+        }
+
+        private void OnInspectorUpdate()
+        {
+            if (targetRoot != null)
+                Repaint();
         }
 
         private void OnGUI()
@@ -249,7 +253,7 @@ namespace GoodCopBadCop.Editor
 
                 if (targetRoot == null)
                 {
-                    EditorGUILayout.LabelField("Spawn a preview target to sample its animator clips.", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("Spawn a preview target to inspect its behavior animation state.", EditorStyles.wordWrappedMiniLabel);
                     return;
                 }
 
@@ -265,36 +269,21 @@ namespace GoodCopBadCop.Editor
                 {
                     EditorGUILayout.ObjectField("Animator", previewAnimator, typeof(Animator), true);
                     EditorGUILayout.ObjectField("Controller", previewAnimator.runtimeAnimatorController, typeof(RuntimeAnimatorController), false);
+                    EditorGUILayout.ObjectField("Adapter", previewAnimationAdapter, typeof(SuspectBehaviorAnimationAdapter), true);
+                    EditorGUILayout.ObjectField("Preset", previewAnimationAdapter != null ? previewAnimationAdapter.CurrentPreset : null, typeof(BehaviorAnimationPreset), false);
+                    EditorGUILayout.ObjectField("Current Clip", previewAnimationAdapter != null ? previewAnimationAdapter.CurrentClip : null, typeof(AnimationClip), false);
                 }
 
-                if (animationClips.Length == 0)
+                if (previewAnimationAdapter == null)
                 {
-                    EditorGUILayout.LabelField("Animator controller has no clips.", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("No behavior animation adapter found under current target.", EditorStyles.wordWrappedMiniLabel);
                     return;
                 }
 
-                selectedAnimationClipIndex = Mathf.Clamp(selectedAnimationClipIndex, 0, animationClips.Length - 1);
-                selectedAnimationClipIndex = EditorGUILayout.Popup("Clip", selectedAnimationClipIndex, animationClipLabels);
-
-                EditorGUI.BeginChangeCheck();
-                animationSampleNormalized = EditorGUILayout.Slider("Time", animationSampleNormalized, 0f, 1f);
-                if (EditorGUI.EndChangeCheck() && AnimationMode.InAnimationMode())
-                    SampleSelectedAnimationClip();
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button("Sample Clip", GUILayout.Height(24f)))
-                        SampleSelectedAnimationClip();
-
-                    if (GUILayout.Button("Rebind", GUILayout.Height(24f)))
-                        RebindPreviewAnimator();
-
-                    using (new EditorGUI.DisabledScope(!AnimationMode.InAnimationMode()))
-                    {
-                        if (GUILayout.Button("Stop", GUILayout.Height(24f)))
-                            StopAnimationPreview();
-                    }
-                }
+                string state = previewAnimationAdapter.CurrentClip != null
+                    ? "Playing"
+                    : previewAnimationAdapter.IsInPause ? "Pause" : "Idle";
+                EditorGUILayout.LabelField("State", state);
             }
         }
         private void DrawAnomalyList(params GUILayoutOption[] layoutOptions)
@@ -643,54 +632,15 @@ namespace GoodCopBadCop.Editor
         private void RefreshAnimationPreviewIfNeeded()
         {
             Animator animator = targetRoot != null ? targetRoot.GetComponentInChildren<Animator>(true) : null;
-            RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : null;
-            AnimationClip[] nextClips = controller != null
-                ? controller.animationClips.Where(clip => clip != null).Distinct().OrderBy(clip => clip.name).ToArray()
-                : Array.Empty<AnimationClip>();
+            SuspectBehaviorAnimationAdapter adapter = targetRoot != null
+                ? targetRoot.GetComponentInChildren<SuspectBehaviorAnimationAdapter>(true)
+                : null;
 
-            if (animator == previewAnimator && SequenceEqual(animationClips, nextClips))
+            if (animator == previewAnimator && adapter == previewAnimationAdapter)
                 return;
 
             previewAnimator = animator;
-            animationClips = nextClips;
-            animationClipLabels = animationClips.Select(clip => clip.name).ToArray();
-            selectedAnimationClipIndex = animationClips.Length > 0 ? Mathf.Clamp(selectedAnimationClipIndex, 0, animationClips.Length - 1) : -1;
-            animationSampleNormalized = 0f;
-        }
-
-        private void SampleSelectedAnimationClip()
-        {
-            if (targetRoot == null || selectedAnimationClipIndex < 0 || selectedAnimationClipIndex >= animationClips.Length)
-                return;
-
-            AnimationClip clip = animationClips[selectedAnimationClipIndex];
-            float time = clip.length * animationSampleNormalized;
-
-            AnimationMode.StartAnimationMode();
-            AnimationMode.BeginSampling();
-            AnimationMode.SampleAnimationClip(targetRoot, clip, time);
-            AnimationMode.EndSampling();
-            SceneView.RepaintAll();
-            status = $"Sampled animation clip '{clip.name}' at {time:0.00}s.";
-        }
-
-        private void StopAnimationPreview()
-        {
-            if (AnimationMode.InAnimationMode())
-                AnimationMode.StopAnimationMode();
-
-            SceneView.RepaintAll();
-        }
-
-        private void RebindPreviewAnimator()
-        {
-            if (previewAnimator == null)
-                return;
-
-            previewAnimator.Rebind();
-            previewAnimator.Update(0f);
-            SceneView.RepaintAll();
-            status = $"Rebound animator on {previewAnimator.gameObject.name}.";
+            previewAnimationAdapter = adapter;
         }
 
         private bool IsAnomalyActive(Anomaly anomaly)
@@ -724,23 +674,6 @@ namespace GoodCopBadCop.Editor
             {
                 controller.activeAnomalies.Remove(anomaly);
             }
-        }
-
-        private static bool SequenceEqual(AnimationClip[] left, AnimationClip[] right)
-        {
-            if (left == null || left.Length == 0)
-                return right == null || right.Length == 0;
-
-            if (right == null || left.Length != right.Length)
-                return false;
-
-            for (int i = 0; i < left.Length; i++)
-            {
-                if (left[i] != right[i])
-                    return false;
-            }
-
-            return true;
         }
 
         private void StartPlaymodePreview(GameObject prefab)
@@ -1090,6 +1023,9 @@ namespace GoodCopBadCop.Editor
             if (resetFirst)
                 ResetTarget();
 
+            if (anomaly is AnimatedBehaviorAnomaly)
+                DeactivateOtherActiveAnimatedBehaviorAnomalies(anomaly);
+
             EnsureAnomalyInitialized(anomaly);
 
             try
@@ -1108,6 +1044,22 @@ namespace GoodCopBadCop.Editor
             EditorUtility.SetDirty(anomaly);
             SceneView.RepaintAll();
             status = $"Activated {anomaly.GetType().Name}.";
+        }
+
+        private void DeactivateOtherActiveAnimatedBehaviorAnomalies(Anomaly selectedAnomaly)
+        {
+            foreach (Anomaly anomaly in anomalies.ToArray())
+            {
+                if (anomaly == null
+                    || ReferenceEquals(anomaly, selectedAnomaly)
+                    || !(anomaly is AnimatedBehaviorAnomaly)
+                    || !IsAnomalyActive(anomaly))
+                {
+                    continue;
+                }
+
+                DeactivateAnomaly(anomaly);
+            }
         }
 
         private void DeactivateAnomaly(Anomaly anomaly)
@@ -1168,7 +1120,6 @@ namespace GoodCopBadCop.Editor
 
         private void ClearPreviewInstance()
         {
-            StopAnimationPreview();
             ClearPreviewDocuments();
 
             DestroyPreviewObject(previewRoot);
@@ -1176,9 +1127,7 @@ namespace GoodCopBadCop.Editor
             previewRoot = null;
             targetRoot = null;
             previewAnimator = null;
-            animationClips = Array.Empty<AnimationClip>();
-            animationClipLabels = Array.Empty<string>();
-            selectedAnimationClipIndex = -1;
+            previewAnimationAdapter = null;
             anomalies.Clear();
             activeStates.Clear();
             rendererStates.Clear();
