@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
@@ -57,11 +58,12 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             if (source == null || preset == null)
                 return;
 
-            AnimationClip clip = preset.SelectClip(source as Object);
+            int sequenceSeed = BuildSequenceSeed(source, preset);
+            AnimationClip clip = preset.SelectClip(sequenceSeed);
             if (clip == null)
                 return;
 
-            activePresets[source] = new ActivePreset(source, preset, clip);
+            activePresets[source] = new ActivePreset(source, preset, clip, sequenceSeed);
             ApplyHighestPriorityPreset();
         }
 
@@ -143,14 +145,16 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         private IEnumerator PlayWithPauses(ActivePreset active)
         {
             int cycleIndex = 0;
+            AnimationClip previousClip = null;
 
             while (ReferenceEquals(currentSource, active.Source))
             {
-                AnimationClip clip = active.Preset.SelectClip(active.Source as Object, cycleIndex);
+                AnimationClip clip = active.Preset.SelectClip(active.SequenceSeed, cycleIndex, previousClip);
                 if (clip == null)
                     yield break;
 
-                ActivePreset cycle = new(active.Source, active.Preset, clip);
+                previousClip = clip;
+                ActivePreset cycle = new(active.Source, active.Preset, clip, active.SequenceSeed);
                 Play(cycle, 0f);
                 yield return FadeClipWeight(0f, 1f, active.Preset.BlendInSeconds);
 
@@ -166,7 +170,7 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
                 isInPause = true;
                 currentClip = null;
                 StopGraph();
-                yield return new WaitForSeconds(active.Preset.SelectPauseSeconds(active.Source as Object, cycleIndex));
+                yield return new WaitForSeconds(active.Preset.SelectPauseSeconds(active.SequenceSeed, cycleIndex));
                 cycleIndex++;
             }
         }
@@ -271,17 +275,83 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
             transitionCoroutine = null;
         }
 
+        private int BuildSequenceSeed(object source, BehaviorAnimationPreset preset)
+        {
+            string sourceType = source != null ? source.GetType().FullName : "null";
+            string presetName = preset != null ? preset.name : "null";
+
+            if (TryGetNetworkObjectId(source, out ulong networkObjectId))
+                return StableHash($"net:{networkObjectId}:{sourceType}:{presetName}");
+
+            return StableHash($"local:{sourceType}:{GetHierarchyPath(source)}:{presetName}");
+        }
+
+        private bool TryGetNetworkObjectId(object source, out ulong networkObjectId)
+        {
+            NetworkObject networkObject = null;
+            if (source is Component component)
+                networkObject = component.GetComponentInParent<NetworkObject>();
+
+            if (networkObject == null)
+                networkObject = GetComponentInParent<NetworkObject>();
+
+            if (networkObject != null && networkObject.IsSpawned)
+            {
+                networkObjectId = networkObject.NetworkObjectId;
+                return true;
+            }
+
+            networkObjectId = 0;
+            return false;
+        }
+
+        private static string GetHierarchyPath(object source)
+        {
+            Transform transform = source switch
+            {
+                Component component => component.transform,
+                GameObject gameObject => gameObject.transform,
+                _ => null
+            };
+
+            if (transform == null)
+                return source is Object unityObject ? unityObject.name : "null";
+
+            string path = transform.name;
+            while (transform.parent != null)
+            {
+                transform = transform.parent;
+                path = $"{transform.name}/{path}";
+            }
+
+            return path;
+        }
+
+        private static int StableHash(string value)
+        {
+            unchecked
+            {
+                int hash = 17;
+                for (int i = 0; i < value.Length; i++)
+                    hash = hash * 31 + value[i];
+
+                return hash;
+            }
+        }
+
         private readonly struct ActivePreset
         {
             public readonly object Source;
             public readonly BehaviorAnimationPreset Preset;
             public readonly AnimationClip Clip;
+            public readonly int SequenceSeed;
 
-            public ActivePreset(object source, BehaviorAnimationPreset preset, AnimationClip clip)
+            public ActivePreset(object source, BehaviorAnimationPreset preset, AnimationClip clip, int sequenceSeed)
             {
                 Source = source;
                 Preset = preset;
                 Clip = clip;
+                SequenceSeed = sequenceSeed;
             }
         }
     }

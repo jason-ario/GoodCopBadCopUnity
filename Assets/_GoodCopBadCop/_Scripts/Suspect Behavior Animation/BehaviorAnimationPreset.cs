@@ -27,29 +27,77 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
         public float MaxPlaySeconds => Mathf.Max(0f, maxPlaySeconds);
         public int Priority => priority;
 
-        public AnimationClip SelectClip(Object source, int cycleIndex = 0)
+        public AnimationClip SelectClip(int sequenceSeed, int cycleIndex = 0, AnimationClip previousClip = null)
         {
             if (clips == null || clips.Length == 0)
                 return null;
 
-            if (!randomizeClip || clips.Length == 1)
+            if (clips.Length == 1)
                 return clips[0];
 
-            int seed = source != null ? StableHash($"{source.GetType().FullName}:{source.name}:{cycleIndex}") : cycleIndex;
-            int index = (int)((uint)seed % (uint)clips.Length);
+            if (!randomizeClip)
+                return clips[PositiveModulo(cycleIndex, clips.Length)];
+
+            int state = Mix(sequenceSeed, cycleIndex);
+            int index = NextRange(ref state, clips.Length);
+
+            if (previousClip != null && clips[index] == previousClip)
+                index = (index + 1 + NextRange(ref state, clips.Length - 1)) % clips.Length;
+
             return clips[index];
         }
 
-        public float SelectPauseSeconds(Object source, int cycleIndex)
+        public AnimationClip SelectClip(Object source, int cycleIndex = 0, AnimationClip previousClip = null)
+        {
+            int seed = source != null ? StableHash($"{source.GetType().FullName}:{source.name}") : 0;
+            return SelectClip(seed, cycleIndex, previousClip);
+        }
+
+        public float SelectPauseSeconds(int sequenceSeed, int cycleIndex)
         {
             float min = Mathf.Max(0f, minPauseSeconds);
             float max = Mathf.Max(min, maxPauseSeconds);
             if (Mathf.Approximately(min, max))
                 return min;
 
-            int seed = source != null ? StableHash($"{source.GetType().FullName}:{source.name}:pause:{cycleIndex}") : cycleIndex;
+            int seed = Mix(sequenceSeed, cycleIndex);
             float t = ((uint)seed % 1000u) / 999f;
             return Mathf.Lerp(min, max, t);
+        }
+
+        public float SelectPauseSeconds(Object source, int cycleIndex)
+        {
+            int seed = source != null ? StableHash($"{source.GetType().FullName}:{source.name}:pause") : 0;
+            return SelectPauseSeconds(seed, cycleIndex);
+        }
+
+        private static int NextRange(ref int state, int exclusiveMax)
+        {
+            if (exclusiveMax <= 1)
+                return 0;
+
+            state = Mix(state, unchecked((int)0x9E3779B9));
+            return (int)((uint)state % (uint)exclusiveMax);
+        }
+
+        private static int PositiveModulo(int value, int modulo)
+        {
+            int result = value % modulo;
+            return result < 0 ? result + modulo : result;
+        }
+
+        private static int Mix(int seed, int salt)
+        {
+            unchecked
+            {
+                int value = seed + salt * 0x6D2B79F5;
+                value ^= value >> 15;
+                value *= unchecked((int)0x85EBCA6B);
+                value ^= value >> 13;
+                value *= unchecked((int)0xC2B2AE35);
+                value ^= value >> 16;
+                return value;
+            }
         }
 
         private static int StableHash(string value)
