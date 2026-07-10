@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
@@ -373,7 +374,7 @@ public class DebugConsole : MonoBehaviour
         }
 
         const float DebugHitDamage = 10f;
-        PlayerInstance.Instance.PlayerHealth.TakeDamage(DebugHitDamage);
+        PlayerInstance.Instance.PlayerHealth.TakeDamage(DebugHitDamage, EffectKeys.DefaultPlayerDamage);
         Debug.Log($"[DebugConsole] Local player hit for {DebugHitDamage} damage (H).");
     }
 
@@ -392,7 +393,7 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        PlayerInstance.Instance.PlayerHealth.TakeDamage(999f);
+        PlayerInstance.Instance.PlayerHealth.TakeDamage(999f, EffectKeys.PlayerDeath);
         Debug.Log("[DebugConsole] Local player killed (K).");
     }
 

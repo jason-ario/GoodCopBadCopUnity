@@ -328,7 +328,7 @@ public class PlayerInstance : NetworkBehaviour
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (IsLocalPlayer && Input.GetKeyDown(KeyCode.K))
-            PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth);
+            PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth, EffectKeys.PlayerDeath);
 #endif
     }
 

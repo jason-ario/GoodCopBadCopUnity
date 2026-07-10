@@ -92,11 +92,6 @@ public class PlayerHealth : NetworkBehaviour
     /// Reduces health by the given amount.
     /// Can be called from any client - routes through a ServerRpc when not on the server.
     /// </summary>
-    public void TakeDamage(float damage)
-    {
-        TakeDamage(damage, EffectKeys.DefaultPlayerDamage);
-    }
-
     public void TakeDamage(float damage, string effectKey)
     {
         if (IsServer)
