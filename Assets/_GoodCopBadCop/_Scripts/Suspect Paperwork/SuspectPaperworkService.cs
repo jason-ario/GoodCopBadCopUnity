@@ -8,8 +8,8 @@ namespace GoodCopBadCop.SuspectPaperwork
 {
     public interface ISuspectPaperworkService
     {
-        SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex);
-        SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex);
+        SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null);
+        SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null);
     }
 
     public sealed class SuspectPaperworkService : ISuspectPaperworkService
@@ -21,7 +21,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             this.model = model;
         }
 
-        public SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex)
+        public SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null)
         {
             if (suspect == null || suspect.Data == null)
             {
@@ -41,13 +41,14 @@ namespace GoodCopBadCop.SuspectPaperwork
                 activeAnomalyTypeNames,
                 currentDay,
                 suspectIndex,
-                suspect.ChosenEntryReasonIndex);
+                suspect.ChosenEntryReasonIndex,
+                idPhotoPool);
 
             model.SetCurrent(state);
             return state;
         }
 
-        public SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex)
+        public SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null)
         {
             SuspectPaperworkState state = BuildState(
                 data,
@@ -55,7 +56,8 @@ namespace GoodCopBadCop.SuspectPaperwork
                 activeAnomalyTypeNames,
                 currentDay,
                 suspectIndex,
-                chosenEntryReasonIndex: 0);
+                chosenEntryReasonIndex: 0,
+                idPhotoPool);
 
             model.SetCurrent(state);
             return state;
@@ -67,7 +69,8 @@ namespace GoodCopBadCop.SuspectPaperwork
             IEnumerable<string> activeAnomalyTypeNames,
             int currentDay,
             int suspectIndex,
-            int chosenEntryReasonIndex)
+            int chosenEntryReasonIndex,
+            IEnumerable<Texture> idPhotoPool)
         {
             if (data == null)
                 return SuspectPaperworkState.Empty;
@@ -87,6 +90,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             bool documentsVisible = !Has(active, nameof(MissingDocumentAnomaly));
             bool applicationVisible = documentsVisible;
             bool isFakeId = documentsVisible && Has(active, nameof(FakeIdAnomaly));
+            Texture resolvedIdPhoto = ResolveIdPhoto(data, idPhoto, idPhotoPool, active, documentsVisible, currentDay, suspectIndex);
             string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReason)));
 
             if (documentsVisible && Has(active, nameof(NameWrong)))
@@ -120,7 +124,33 @@ namespace GoodCopBadCop.SuspectPaperwork
                 documentsVisible,
                 applicationVisible,
                 isFakeId,
-                idPhoto);
+                resolvedIdPhoto);
+        }
+
+        private static Texture ResolveIdPhoto(
+            global::SuspectData data,
+            Texture idPhoto,
+            IEnumerable<Texture> idPhotoPool,
+            HashSet<string> active,
+            bool documentsVisible,
+            int currentDay,
+            int suspectIndex)
+        {
+            if (!documentsVisible || !Has(active, nameof(PhotoIDMismatch)))
+                return idPhoto;
+
+            List<Texture> candidates = (idPhotoPool ?? Enumerable.Empty<Texture>())
+                .Where(photo => photo != null && !ReferenceEquals(photo, idPhoto))
+                .GroupBy(photo => photo.name, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(photo => photo.name, StringComparer.Ordinal)
+                .ToList();
+
+            if (candidates.Count == 0)
+                return idPhoto;
+
+            int seed = BuildSeed(data, currentDay, suspectIndex, nameof(PhotoIDMismatch), idPhoto != null ? idPhoto.name : string.Empty);
+            return candidates[PositiveModulo(seed, candidates.Count)];
         }
 
         private static bool Has(HashSet<string> activeAnomalyTypeNames, string typeName)

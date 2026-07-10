@@ -64,7 +64,6 @@ namespace GoodCopBadCop.Editor
         private const string PreviewRootPrefix = "[Anomaly Preview]";
         private const string PreviewDocumentPrefix = "[Anomaly Preview Document]";
         private const string PreviewDocumentRootName = "[Anomaly Preview Documents]";
-        private const string PreviewOnlyAnomalyRootName = "[Anomaly Preview Only Anomalies]";
         private const string SessionPreviewPrefabPathKey = "GoodCopBadCop.AnomalyPreview.PrefabPath";
         private const string SessionPendingPreviewKey = "GoodCopBadCop.AnomalyPreview.Pending";
         private static readonly string[] DocumentPrefabPaths =
@@ -72,12 +71,6 @@ namespace GoodCopBadCop.Editor
             "Assets/_GoodCopBadCop/_Prefabs/Equipment/Pickups/ID card.prefab",
             "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Application Paper.prefab",
             "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Entry Permit.prefab"
-        };
-        private static readonly Type[] PreviewOnlyDocumentAnomalyTypes =
-        {
-            typeof(global::FakeIdAnomaly),
-            typeof(global::ExpirationDateAnomaly),
-            typeof(global::MissingDocumentAnomaly)
         };
 
         private GameObject targetRoot;
@@ -567,7 +560,11 @@ namespace GoodCopBadCop.Editor
                 : data != null ? data.IDPhoto : null;
 
             int currentDay = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 1;
-            return paperworkService.BuildForPreview(data, idPhoto, activeAnomalyTypeNames, currentDay, selectedSuspectIndex);
+            IEnumerable<Texture> idPhotoPool = suspectOptions
+                .Select(option => option.Data != null ? option.Data.IDPhoto : null)
+                .Where(photo => photo != null);
+
+            return paperworkService.BuildForPreview(data, idPhoto, activeAnomalyTypeNames, currentDay, selectedSuspectIndex, idPhotoPool);
         }
 
         private global::SuspectData GetPreviewSuspectData()
@@ -976,44 +973,12 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
-            EnsurePreviewOnlyDocumentAnomalies();
-
             anomalies.AddRange(targetRoot.GetComponentsInChildren<Anomaly>(true)
                 .OrderBy(GetCategorySortOrder)
                 .ThenBy(anomaly => anomaly.GetType().Name));
 
             status = $"Found {anomalies.Count} anomaly component(s) under {targetRoot.name}.";
             Repaint();
-        }
-
-        private void EnsurePreviewOnlyDocumentAnomalies()
-        {
-            if (previewRoot == null || targetRoot == null)
-                return;
-
-            GameObject container = null;
-
-            foreach (Type anomalyType in PreviewOnlyDocumentAnomalyTypes)
-            {
-                if (targetRoot.GetComponentInChildren(anomalyType, true) != null)
-                    continue;
-
-                container ??= GetOrCreatePreviewOnlyAnomalyRoot();
-                Component anomaly = container.AddComponent(anomalyType);
-                anomaly.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
-            }
-        }
-
-        private GameObject GetOrCreatePreviewOnlyAnomalyRoot()
-        {
-            Transform existing = targetRoot.transform.Find(PreviewOnlyAnomalyRootName);
-            if (existing != null)
-                return existing.gameObject;
-
-            GameObject container = new GameObject(PreviewOnlyAnomalyRootName);
-            container.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
-            container.transform.SetParent(targetRoot.transform, false);
-            return container;
         }
 
 

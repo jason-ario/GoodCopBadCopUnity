@@ -25,6 +25,7 @@ public class IDCard : FolderItem
    private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedExpiry = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedIdNumber = new(new FixedString512Bytes(string.Empty));
+   private readonly NetworkVariable<FixedString512Bytes> syncedIdPhotoName = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<bool> syncedIsResident = new(false);
    private readonly NetworkVariable<bool> syncedIsFakeId = new(false);
    private readonly NetworkVariable<NetworkObjectReference> syncedSuspectRef = new();
@@ -41,13 +42,14 @@ public class IDCard : FolderItem
       syncedBirthDate.OnValueChanged += OnBirthDateChanged;
       syncedExpiry.OnValueChanged += OnExpiryChanged;
       syncedIdNumber.OnValueChanged += OnIdNumberChanged;
+      syncedIdPhotoName.OnValueChanged += OnIdPhotoNameChanged;
       syncedIsResident.OnValueChanged += OnResidentChanged;
       syncedIsFakeId.OnValueChanged += OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged += OnSuspectRefChanged;
 
       ApplySyncedTextState();
       ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
-      ApplyPhotoFromSuspectRef(syncedSuspectRef.Value);
+      ApplyIdPhotoByNameOrFallback(syncedIdPhotoName.Value.ToString(), syncedSuspectRef.Value);
    }
 
    public override void OnNetworkDespawn()
@@ -56,6 +58,7 @@ public class IDCard : FolderItem
       syncedBirthDate.OnValueChanged -= OnBirthDateChanged;
       syncedExpiry.OnValueChanged -= OnExpiryChanged;
       syncedIdNumber.OnValueChanged -= OnIdNumberChanged;
+      syncedIdPhotoName.OnValueChanged -= OnIdPhotoNameChanged;
       syncedIsResident.OnValueChanged -= OnResidentChanged;
       syncedIsFakeId.OnValueChanged -= OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged -= OnSuspectRefChanged;
@@ -99,6 +102,7 @@ public class IDCard : FolderItem
       syncedBirthDate.Value = ToFixedString(state.BirthDate);
       syncedExpiry.Value = ToFixedString(state.ExpirationDate);
       syncedIdNumber.Value = ToFixedString(state.IdNumber);
+      syncedIdPhotoName.Value = ToFixedString(state.IdPhoto != null ? state.IdPhoto.name : string.Empty);
       syncedIsResident.Value = state.IsResident;
       syncedIsFakeId.Value = state.IsFakeId;
 
@@ -108,7 +112,7 @@ public class IDCard : FolderItem
       ApplySyncedTextState();
       ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
-         idPhoto.material.mainTexture = state.IdPhoto;
+         SetIdPhotoTexture(state.IdPhoto);
    }
 
    /// <summary>Editor preview path: applies state without touching NGO state.</summary>
@@ -121,7 +125,7 @@ public class IDCard : FolderItem
       residentText.text = state.IsResident ? "* Resident of Saplavi *" : "Non-Resident";
       ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
-         idPhoto.material.mainTexture = state.IdPhoto;
+         SetIdPhotoTexture(state.IdPhoto);
    }
 
    /// <summary>Applies all display values locally, resolving the ID photo from the suspect NetworkObject.</summary>
@@ -139,6 +143,11 @@ public class IDCard : FolderItem
    private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
    private void OnExpiryChanged(FixedString512Bytes previous, FixedString512Bytes current) => expDateText.text = current.ToString();
    private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNoText.text = current.ToString();
+   private void OnIdPhotoNameChanged(FixedString512Bytes previous, FixedString512Bytes current)
+   {
+      ApplyIdPhotoByNameOrFallback(current.ToString(), syncedSuspectRef.Value);
+   }
+
    private void OnResidentChanged(bool previous, bool current)
    {
       residentText.text = current ? "* Resident of Saplavi *" : "Non-Resident";
@@ -148,7 +157,49 @@ public class IDCard : FolderItem
 
    private void OnSuspectRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
    {
-      ApplyPhotoFromSuspectRef(current);
+      ApplyIdPhotoByNameOrFallback(syncedIdPhotoName.Value.ToString(), current);
+   }
+
+   private void ApplyIdPhotoByNameOrFallback(string photoName, NetworkObjectReference suspectRef)
+   {
+      if (!string.IsNullOrWhiteSpace(photoName))
+      {
+         StartCoroutine(ApplyNamedPhotoWhenReady(photoName, suspectRef));
+         return;
+      }
+
+      ApplyPhotoFromSuspectRef(suspectRef);
+   }
+
+   private IEnumerator ApplyNamedPhotoWhenReady(string photoName, NetworkObjectReference fallbackSuspectRef)
+   {
+      const int maxFramesToWait = 60;
+      for (int i = 0; i < maxFramesToWait; i++)
+      {
+         if (TryApplyIdPhotoFromPool(photoName))
+            yield break;
+
+         yield return null;
+      }
+
+      ApplyPhotoFromSuspectRef(fallbackSuspectRef);
+   }
+
+   private bool TryApplyIdPhotoFromPool(string photoName)
+   {
+      if (DailySuspectManager.Instance == null)
+         return false;
+
+      foreach (Texture photo in DailySuspectManager.Instance.GetIdPhotoPool())
+      {
+         if (photo != null && string.Equals(photo.name, photoName, System.StringComparison.Ordinal))
+         {
+            SetIdPhotoTexture(photo);
+            return true;
+         }
+      }
+
+      return false;
    }
 
    private void ApplyPhotoFromSuspectRef(NetworkObjectReference suspectRef)
@@ -165,7 +216,7 @@ public class IDCard : FolderItem
          {
             SuspectCharacter suspect = suspectNetObj.GetComponent<SuspectCharacter>();
             if (suspect != null && suspect.IDPhoto != null)
-               idPhoto.material.mainTexture = suspect.IDPhoto;
+               SetIdPhotoTexture(suspect.IDPhoto);
             yield break;
          }
 
@@ -215,6 +266,12 @@ public class IDCard : FolderItem
       }
 
       return null;
+   }
+
+   private void SetIdPhotoTexture(Texture texture)
+   {
+      if (idPhoto != null && texture != null)
+         idPhoto.material.mainTexture = texture;
    }
 
    private SpriteRenderer GetSealRenderer()

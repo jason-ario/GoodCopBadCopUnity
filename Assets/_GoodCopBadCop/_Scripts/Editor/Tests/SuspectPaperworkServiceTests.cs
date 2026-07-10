@@ -11,6 +11,9 @@ namespace GoodCopBadCop.Editor.Tests
         private SuspectData data;
         private SuspectPaperworkModel model;
         private SuspectPaperworkService service;
+        private Texture2D currentPhoto;
+        private Texture2D otherPhoto;
+        private Texture2D secondOtherPhoto;
 
         [SetUp]
         public void SetUp()
@@ -24,6 +27,10 @@ namespace GoodCopBadCop.Editor.Tests
             data.IDNumber = "1234567";
             data.EntryPermitExpiryDate = "31/12/2030";
             data.IsResident = true;
+            currentPhoto = new Texture2D(1, 1) { name = "Current Photo" };
+            otherPhoto = new Texture2D(1, 1) { name = "Other Photo" };
+            secondOtherPhoto = new Texture2D(1, 1) { name = "Second Other Photo" };
+            data.IDPhoto = currentPhoto;
             data.entryReasons = new SuspectData.EntryReasonSet
             {
                 earlyDaysReasons = new[] { "Work" },
@@ -45,6 +52,9 @@ namespace GoodCopBadCop.Editor.Tests
         public void TearDown()
         {
             model.Dispose();
+            UnityEngine.Object.DestroyImmediate(currentPhoto);
+            UnityEngine.Object.DestroyImmediate(otherPhoto);
+            UnityEngine.Object.DestroyImmediate(secondOtherPhoto);
             UnityEngine.Object.DestroyImmediate(data);
         }
 
@@ -120,6 +130,33 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
+        public void BuildForPreview_PhotoIdMismatch_UsesDeterministicDifferentPhoto()
+        {
+            string[] anomalies = { nameof(PhotoIDMismatch) };
+            Texture[] photoPool = { currentPhoto, otherPhoto, secondOtherPhoto };
+
+            SuspectPaperworkState first = service.BuildForPreview(data, currentPhoto, anomalies, 3, 4, photoPool);
+            SuspectPaperworkState second = service.BuildForPreview(data, currentPhoto, anomalies, 3, 4, photoPool);
+
+            Assert.AreSame(first.IdPhoto, second.IdPhoto);
+            Assert.AreNotSame(currentPhoto, first.IdPhoto);
+            CollectionAssert.Contains(new[] { otherPhoto, secondOtherPhoto }, first.IdPhoto);
+            Assert.AreEqual(data.IDNumber, first.IdNumber);
+            Assert.AreEqual(data.IDNumber, first.ApplicationIdNumber);
+        }
+
+        [Test]
+        public void BuildForPreview_PhotoIdMismatch_KeepsSourcePhotoWhenNoAlternativeExists()
+        {
+            string[] anomalies = { nameof(PhotoIDMismatch) };
+            Texture[] photoPool = { currentPhoto, null, currentPhoto };
+
+            SuspectPaperworkState state = service.BuildForPreview(data, currentPhoto, anomalies, 3, 4, photoPool);
+
+            Assert.AreSame(currentPhoto, state.IdPhoto);
+        }
+
+        [Test]
         public void BuildForPreview_NameWrong_ChangesOnlyApplicationName()
         {
             string[] anomalies = { nameof(NameWrong) };
@@ -182,6 +219,17 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
+        public void BuildForPreview_SexWrong_ChangesOnlyApplicationSex()
+        {
+            string[] anomalies = { nameof(SexWrong) };
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
+
+            Assert.AreEqual("Male", state.Sex);
+            Assert.AreEqual("Female", state.ApplicationSex);
+        }
+
+        [Test]
         public void BuildForPreview_MissingDocument_HidesAllDocuments()
         {
             SuspectPaperworkState state = service.BuildForPreview(
@@ -208,11 +256,14 @@ namespace GoodCopBadCop.Editor.Tests
                     nameof(NameWrong),
                     nameof(BirthDateWrong),
                     nameof(IDNumberWrong),
+                    nameof(SexWrong),
                     nameof(ExpirationDateAnomaly),
-                    nameof(InvalidEntryReason)
+                    nameof(InvalidEntryReason),
+                    nameof(PhotoIDMismatch)
                 },
                 1,
-                0);
+                0,
+                new Texture[] { currentPhoto, otherPhoto });
 
             Assert.IsFalse(state.DocumentsVisible);
             Assert.IsFalse(state.ApplicationVisible);
@@ -220,8 +271,10 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual("Alexei Sokolov", state.ApplicationFullName);
             Assert.AreEqual(data.DateOfBirth, state.ApplicationBirthDate);
             Assert.AreEqual(data.IDNumber, state.ApplicationIdNumber);
+            Assert.AreEqual(data.Sex, state.ApplicationSex);
             Assert.AreEqual(data.EntryPermitExpiryDate, state.ApplicationExpirationDate);
             Assert.AreEqual("Work", state.EntryReason);
+            Assert.AreSame(currentPhoto, state.IdPhoto);
         }
 
         private static void AssertSimilarDigitChanges(string original, string mutated, char preserve = '\0')

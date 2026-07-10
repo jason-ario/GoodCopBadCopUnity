@@ -833,12 +833,16 @@ public class SuspectController : NetworkBehaviour
 
     private SuspectPaperworkState BuildPaperworkState()
     {
+        IEnumerable<Texture> idPhotoPool = dailySuspectManager != null
+            ? dailySuspectManager.GetIdPhotoPool()
+            : DailySuspectManager.Instance != null ? DailySuspectManager.Instance.GetIdPhotoPool() : null;
+
         if (suspectPaperworkService != null)
-            return suspectPaperworkService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+            return suspectPaperworkService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value, idPhotoPool);
 
         SuspectPaperworkModel fallbackModel = new SuspectPaperworkModel();
         SuspectPaperworkService fallbackService = new SuspectPaperworkService(fallbackModel);
-        SuspectPaperworkState state = fallbackService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
+        SuspectPaperworkState state = fallbackService.BuildForSuspect(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value, idPhotoPool);
         fallbackModel.Dispose();
         return state;
     }

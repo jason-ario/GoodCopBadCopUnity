@@ -371,6 +371,22 @@ public class DailySuspectManager : MonoBehaviour
         return _replacementSlotIndices.Contains(lineupIndex);
     }
 
+    public IEnumerable<Texture> GetIdPhotoPool()
+    {
+        IEnumerable<SuspectData> source = allSuspects != null && allSuspects.suspects != null
+            ? allSuspects.suspects
+            : shiftSuspects;
+
+        if (source == null)
+            yield break;
+
+        foreach (SuspectData suspect in source)
+        {
+            if (suspect != null && suspect.IDPhoto != null)
+                yield return suspect.IDPhoto;
+        }
+    }
+
     private List<SuspectData> GetRandomSuspects(int amount)
     {
         List<SuspectData> randomSuspects = new List<SuspectData>();
