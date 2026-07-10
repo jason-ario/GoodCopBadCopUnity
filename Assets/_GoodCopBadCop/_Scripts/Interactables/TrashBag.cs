@@ -33,6 +33,10 @@ public class TrashBag : PickableObject, IAmmoProvider
     [Tooltip("Duration in seconds for the blend shape to smoothly transition to the new fill level.")]
     [SerializeField] private float _blendShapeTweenDuration = 0.4f;
 
+    [Header("Audio")]
+    [Tooltip("Sound played on all clients each time a junk item is collected into this bag.")]
+    [SerializeField] private AudioClip _useSound;
+
     // ── Networked state ───────────────────────────────────────────────────────
 
     private readonly NetworkVariable<int> _junkCount = new(
@@ -124,6 +128,9 @@ public class TrashBag : PickableObject, IAmmoProvider
     {
         OnAmmoChanged?.Invoke();
         UpdateBlendShapeSmooth(current);
+
+        if (_useSound != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(_useSound, transform.position);
     }
 
     /// <summary>

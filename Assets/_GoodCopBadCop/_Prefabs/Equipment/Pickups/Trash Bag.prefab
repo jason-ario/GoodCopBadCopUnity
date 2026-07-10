@@ -60,6 +60,34 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_DirtyAABB
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Center.x
+      value: -0.0050553754
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Center.y
+      value: -0.005762942
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Center.z
+      value: -0.0069765374
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Extent.x
+      value: 0.15331662
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Extent.y
+      value: 0.14957196
+      objectReference: {fileID: 0}
+    - target: {fileID: -3887185075125053422, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
+      propertyPath: m_AABB.m_Extent.z
+      value: 0.176326
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: e7d20a6add5e25442b251609b4c173ce, type: 3}
       propertyPath: m_Name
       value: Trash Bag
@@ -398,7 +426,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2998920629
+  GlobalObjectIdHash: 1595241044
   InScenePlacedSourceGlobalObjectIdHash: 2998920629
   DeferredDespawnTick: 0
   Ownership: 1
@@ -430,6 +458,7 @@ MonoBehaviour:
   itemData: {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   _maxJunkCapacity: 5
   _blendShapeTweenDuration: 0.4
+  _useSound: {fileID: 8300000, guid: 1a2a47fa19978cb419c7866adef5a912, type: 3}
 --- !u!135 &6413690275662010405
 SphereCollider:
   m_ObjectHideFlags: 0
