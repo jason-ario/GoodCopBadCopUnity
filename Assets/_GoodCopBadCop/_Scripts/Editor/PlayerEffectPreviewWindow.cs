@@ -11,9 +11,11 @@ namespace GoodCopBadCop.Editor
     public sealed class PlayerEffectPreviewWindow : EditorWindow
     {
         private const string EffectCatalogAssetPath = "Assets/_GoodCopBadCop/_Data/Effects/EffectCatalog.asset";
+        private const float PreviewDamageAmount = 1f;
+        private const float PreviewHealAmount = 1f;
+        private const float PreviewLethalDamageAmount = 999f;
 
         private readonly List<EffectPreset> previewPresets = new List<EffectPreset>();
-        private readonly FullscreenEffectService fallbackFullscreenEffectService = new FullscreenEffectService();
         private PlayerInstance player;
         private PlayerHealth playerHealth;
         private IEffectService effectService;
@@ -115,18 +117,26 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
-            EffectContext context = player != null
-                ? new EffectContext(player.gameObject, player.transform.position)
-                : EffectContext.Default;
-
-            if (effectService != null)
+            if (IsDamageEffect(preset.Key))
             {
-                effectService.Play(preset, context);
+                playerHealth.TakeDamage(PreviewDamageAmount, preset.Key);
+            }
+            else if (IsHealEffect(preset.Key))
+            {
+                if (playerHealth.Health >= playerHealth.MaxHealth)
+                {
+                    Debug.LogWarning($"[PlayerEffectPreviewWindow] Cannot preview '{preset.DisplayName}': player health is already full.");
+                    return;
+                }
+
+                playerHealth.Heal(PreviewHealAmount, preset.Key);
             }
             else
             {
-                fallbackFullscreenEffectService.Play(preset.Fullscreen, context);
+                effectService.PlayByKey(preset.Key, new EffectContext(player.gameObject, player.transform.position));
             }
+
+            Debug.Log($"[PlayerEffectPreviewWindow] Previewed '{preset.DisplayName}' through the runtime gameplay path.");
 
             Repaint();
         }
@@ -141,17 +151,7 @@ namespace GoodCopBadCop.Editor
                 return;
             }
 
-            EffectContext context = new EffectContext(player.gameObject, player.transform.position);
-            if (effectService != null)
-            {
-                effectService.PlayByKey(EffectKeys.PlayerDeath, context);
-            }
-            else if (effectCatalog != null && effectCatalog.TryGet(EffectKeys.PlayerDeath, out EffectPreset deathPreset))
-            {
-                fallbackFullscreenEffectService.Play(deathPreset.Fullscreen, context);
-            }
-
-            playerHealth.TakeDamage(999f, EffectKeys.PlayerDeath);
+            playerHealth.TakeDamage(PreviewLethalDamageAmount, EffectKeys.PlayerDeath);
             Debug.Log("[PlayerEffectPreviewWindow] Applied lethal damage to the local player.");
             Repaint();
         }
@@ -263,15 +263,13 @@ namespace GoodCopBadCop.Editor
 
             if (effectService == null)
             {
-                status = playerHealth == null
-                    ? "Effects service and local player were not found. Preview uses fullscreen fallback only; Dead is disabled."
-                    : "Effects service was not found. Preview uses fullscreen fallback only.";
+                status = "Effects service was not found. Runtime preview is disabled.";
                 return;
             }
 
             if (playerHealth == null)
             {
-                status = "Local player was not found. Preview works; Dead is disabled.";
+                status = "Local player was not found. Runtime preview is disabled.";
                 return;
             }
 
@@ -283,7 +281,10 @@ namespace GoodCopBadCop.Editor
             return EditorApplication.isPlaying
                    && effectCatalog != null
                    && preset != null
-                   && (effectService != null || (preset.Fullscreen != null && preset.Fullscreen.Enabled));
+                   && effectService != null
+                   && player != null
+                   && playerHealth != null
+                   && !playerHealth.IsDead;
         }
 
         private bool CanKillPlayer()
@@ -291,7 +292,20 @@ namespace GoodCopBadCop.Editor
             return EditorApplication.isPlaying
                    && player != null
                    && playerHealth != null
+                   && effectService != null
                    && !playerHealth.IsDead;
+        }
+
+        private static bool IsDamageEffect(string effectKey)
+        {
+            return !string.IsNullOrWhiteSpace(effectKey)
+                   && effectKey.StartsWith("player.damage.", StringComparison.Ordinal);
+        }
+
+        private static bool IsHealEffect(string effectKey)
+        {
+            return !string.IsNullOrWhiteSpace(effectKey)
+                   && effectKey.StartsWith("player.heal.", StringComparison.Ordinal);
         }
     }
 }

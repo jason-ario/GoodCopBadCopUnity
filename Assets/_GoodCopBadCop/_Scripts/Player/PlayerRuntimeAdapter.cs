@@ -4,10 +4,11 @@ using VContainer.Unity;
 
 namespace GoodCopBadCop.Player
 {
-    public sealed class PlayerRuntimeAdapter : IInitializable, IDisposable
+    public sealed class PlayerRuntimeAdapter : IInitializable, ITickable, IDisposable
     {
         private readonly IPlayerRuntimeService playerRuntimeService;
         private NetworkManager networkManager;
+        private bool isSubscribed;
 
         public PlayerRuntimeAdapter(IPlayerRuntimeService playerRuntimeService)
         {
@@ -16,32 +17,19 @@ namespace GoodCopBadCop.Player
 
         public void Initialize()
         {
-            networkManager = NetworkManager.Singleton;
-            if (networkManager == null)
-            {
-                playerRuntimeService.SetLocalPlayer(null);
-                return;
-            }
+            RefreshNetworkManager();
+            RefreshLocalPlayer();
+        }
 
-            networkManager.OnClientStarted += RefreshLocalPlayer;
-            networkManager.OnClientStopped += OnClientStopped;
-            networkManager.OnClientConnectedCallback += OnClientStateChanged;
-            networkManager.OnClientDisconnectCallback += OnClientStateChanged;
-
+        public void Tick()
+        {
+            RefreshNetworkManager();
             RefreshLocalPlayer();
         }
 
         public void Dispose()
         {
-            if (networkManager == null)
-            {
-                return;
-            }
-
-            networkManager.OnClientStarted -= RefreshLocalPlayer;
-            networkManager.OnClientStopped -= OnClientStopped;
-            networkManager.OnClientConnectedCallback -= OnClientStateChanged;
-            networkManager.OnClientDisconnectCallback -= OnClientStateChanged;
+            UnsubscribeNetworkManager();
         }
 
         private void OnClientStateChanged(ulong _)
@@ -63,6 +51,48 @@ namespace GoodCopBadCop.Player
             playerRuntimeService.SetLocalPlayer(playerObject != null
                 ? playerObject.GetComponent<global::PlayerInstance>()
                 : null);
+        }
+
+        private void RefreshNetworkManager()
+        {
+            NetworkManager currentNetworkManager = NetworkManager.Singleton;
+            if (networkManager == currentNetworkManager)
+            {
+                SubscribeNetworkManager();
+                return;
+            }
+
+            UnsubscribeNetworkManager();
+            networkManager = currentNetworkManager;
+            SubscribeNetworkManager();
+        }
+
+        private void SubscribeNetworkManager()
+        {
+            if (networkManager == null || isSubscribed)
+            {
+                return;
+            }
+
+            networkManager.OnClientStarted += RefreshLocalPlayer;
+            networkManager.OnClientStopped += OnClientStopped;
+            networkManager.OnClientConnectedCallback += OnClientStateChanged;
+            networkManager.OnClientDisconnectCallback += OnClientStateChanged;
+            isSubscribed = true;
+        }
+
+        private void UnsubscribeNetworkManager()
+        {
+            if (networkManager == null || !isSubscribed)
+            {
+                return;
+            }
+
+            networkManager.OnClientStarted -= RefreshLocalPlayer;
+            networkManager.OnClientStopped -= OnClientStopped;
+            networkManager.OnClientConnectedCallback -= OnClientStateChanged;
+            networkManager.OnClientDisconnectCallback -= OnClientStateChanged;
+            isSubscribed = false;
         }
     }
 }

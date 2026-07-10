@@ -446,6 +446,7 @@ Debug editor tools:
 - Use `EditorConstants.RootMenuPath` for project tools, currently `Tools/GoodCopBadCop/`.
 - Use `EditorConstants.RootMenuPriority` for project menu items so the project tool group stays near the top of Unity's `Tools` menu.
 - Runtime debug windows may resolve services from the active `MainSceneLifetimeScope.Container` in Play Mode.
+- Keep runtime debug tools as close to real gameplay behavior as possible. Trigger the same commands, services, networked state changes, and adapters that gameplay uses instead of directly poking final views, VFX, overlays, or renderers.
 - Do not apply gameplay/rendering changes directly from the editor window; call the feature service.
 - Do not run scene searches or DI resolves from Odin-drawn properties, `EnableIf`, or other draw-path methods.
 - Cache resolved services/models and subscribe to model events when the window needs live state.
