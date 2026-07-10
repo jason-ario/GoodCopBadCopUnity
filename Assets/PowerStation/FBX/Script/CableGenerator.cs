@@ -68,7 +68,12 @@ public class CableGenerator : MonoBehaviour
             isHanging, hasCap
         );
 
-        CleanupGeneratedMesh();
+        // Clean up memory in edit mode
+        if (_mf.sharedMesh != null && !UnityEditor.AssetDatabase.Contains(_mf.sharedMesh))
+        {
+            if (Application.isPlaying) Destroy(_mf.sharedMesh);
+            else DestroyImmediate(_mf.sharedMesh);
+        }
 
         _mf.sharedMesh = meshData.ToMesh();
 
@@ -81,18 +86,6 @@ public class CableGenerator : MonoBehaviour
         {
             _mr.sharedMaterial = material;
         }
-    }
-
-    private void CleanupGeneratedMesh()
-    {
-        if (_mf.sharedMesh == null) return;
-
-#if UNITY_EDITOR
-        if (UnityEditor.AssetDatabase.Contains(_mf.sharedMesh)) return;
-#endif
-
-        if (Application.isPlaying) Destroy(_mf.sharedMesh);
-        else DestroyImmediate(_mf.sharedMesh);
     }
 
     public float SpanLength()
