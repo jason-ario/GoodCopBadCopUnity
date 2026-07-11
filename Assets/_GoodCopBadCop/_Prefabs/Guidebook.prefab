@@ -223,6 +223,7 @@ GameObject:
   - component: {fileID: 4856052693451353306}
   - component: {fileID: 5947448801528774778}
   - component: {fileID: 355981113983481066}
+  - component: {fileID: 7456547851269711157}
   m_Layer: 0
   m_Name: Guidebook
   m_TagString: Untagged
@@ -364,7 +365,8 @@ MonoBehaviour:
   _leftOrigin: {x: -0.1, y: 0, z: 0}
   _pageThickness: 0.002
   _pageDepth: 0.001
-  _turnDuration: 0.35
+  _turnDuration: 0.5
+  _snapFlipDuration: 0.2
   _arcHeight: 0.02
   _turnCurve:
     serializedVersion: 2
@@ -387,6 +389,105 @@ MonoBehaviour:
       weightedMode: 0
       inWeight: 0
       outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  _audioSource: {fileID: 7456547851269711157}
+  _pageFlipClip: {fileID: 8300000, guid: 061f222fa28cc65408ecf4ce08528f0f, type: 3}
+--- !u!82 &7456547851269711157
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5201651653850134112}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 0.367
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 5
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
@@ -657,7 +758,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 23.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -715,6 +816,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Page - Radiation
       objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.049
@@ -765,7 +870,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.9
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -778,7 +883,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 24.45
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -925,6 +1030,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Page - Missing Documents
       objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.049
@@ -975,7 +1084,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -988,7 +1097,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 22
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1115,9 +1224,33 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 4856052693451353306}
     m_Modifications:
+    - target: {fileID: 32943849410153654, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 216.573
+      objectReference: {fileID: 0}
+    - target: {fileID: 32943849410153654, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -19.114
+      objectReference: {fileID: 0}
+    - target: {fileID: 1029622632185082533, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 414.615
+      objectReference: {fileID: 0}
+    - target: {fileID: 1029622632185082533, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1029622632185082533, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1029622632185082533, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -3.56
+      objectReference: {fileID: 0}
     - target: {fileID: 1516226388546953923, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
-      value: HOW TO PLAY
+      value: DO YOUR DUTY
       objectReference: {fileID: 0}
     - target: {fileID: 4457911259374895931, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1139,6 +1272,10 @@ PrefabInstance:
       propertyPath: 'm_fontSharedMaterials.Array.data[0]'
       value: 
       objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 5070921936764687297, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_text
+      value: GUIDEBOOK
+      objectReference: {fileID: 0}
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - How To Play
@@ -1209,7 +1346,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 18
+      value: 17.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_fontSizeMin
+      value: 16.1
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1222,7 +1363,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.65
+      value: 23.45
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1240,6 +1381,10 @@ PrefabInstance:
       propertyPath: 'm_fontSharedMaterials.Array.data[0]'
       value: 
       objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -1372,6 +1517,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Page - Distracted
       objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.049
@@ -1423,7 +1572,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 27.45
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1436,7 +1585,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 26.6
+      value: 24.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1483,6 +1632,10 @@ PrefabInstance:
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Wrong Name
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1534,7 +1687,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 27.75
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1547,7 +1700,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1556,6 +1709,10 @@ PrefabInstance:
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1656,7 +1813,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 24.8
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1666,7 +1823,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.75
+      value: 24.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1722,6 +1879,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Page - Entry Reason
       objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.049
@@ -1773,7 +1934,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.65
+      value: 22.5
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1786,7 +1947,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.8
+      value: 22.65
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1830,9 +1991,17 @@ PrefabInstance:
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
+    - target: {fileID: 5070921936764687297, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_text
+      value: SUPERNATURAL ANOMALIES
+      objectReference: {fileID: 0}
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Flickering Lights
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1884,7 +2053,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -1897,7 +2066,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -1906,6 +2075,10 @@ PrefabInstance:
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1944,9 +2117,17 @@ PrefabInstance:
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
+    - target: {fileID: 5070921936764687297, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_text
+      value: VITALS ANOMALIES
+      objectReference: {fileID: 0}
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Lesions
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2004,7 +2185,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 24.25
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2013,6 +2194,10 @@ PrefabInstance:
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2051,6 +2236,10 @@ PrefabInstance:
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Violent
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2103,7 +2292,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2116,7 +2305,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.35
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2160,9 +2349,17 @@ PrefabInstance:
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
+    - target: {fileID: 5070921936764687297, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_text
+      value: BEHAVIOR ANOMALIES
+      objectReference: {fileID: 0}
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Laughing
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2214,7 +2411,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 28.8
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2227,7 +2424,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 22.85
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2236,6 +2433,10 @@ PrefabInstance:
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2277,6 +2478,10 @@ PrefabInstance:
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
       value: Page - Heart Rate
+      objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2329,7 +2534,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 28.5
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2484,6 +2689,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Page - Vomiting
       objectReference: {fileID: 0}
+    - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5918102911147241945, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.049
@@ -2534,7 +2743,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 27.85
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2544,7 +2753,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2726,7 +2935,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2736,7 +2945,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 24.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2745,6 +2954,10 @@ PrefabInstance:
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2779,6 +2992,10 @@ PrefabInstance:
     - target: {fileID: 4457911259374895931, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 5070921936764687297, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_text
+      value: PHYSICAL ANOMALIES
       objectReference: {fileID: 0}
     - target: {fileID: 5563734077315402762, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_Name
@@ -2842,7 +3059,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 29.25
+      value: 26.95
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2851,7 +3068,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 27.35
+      value: 25.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -2864,6 +3081,10 @@ PrefabInstance:
     - target: {fileID: 8427266257741030000, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_BlockingMask.m_Bits
       value: 262143
+      objectReference: {fileID: 0}
+    - target: {fileID: 8805586350392450202, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9136816778516421403, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_PresetInfoIsWorld
@@ -2961,7 +3182,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7385412647217292329, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.6
+      value: 24.05
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_text
@@ -2971,7 +3192,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontSize
-      value: 25.05
+      value: 21.9
       objectReference: {fileID: 0}
     - target: {fileID: 8236481025658057187, guid: 3c65c5fcec52d6b4e8e210b612078d30, type: 3}
       propertyPath: m_fontColor32.rgba

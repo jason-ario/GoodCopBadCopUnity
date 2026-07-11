@@ -27,8 +27,8 @@ public struct GuidebookPageEntry
 /// <summary>
 /// Physical page-stack mechanic for the Guidebook.
 ///
-/// Pages begin on the right (unread) stack. Pressing E flips the top right page
-/// 180° on the Z axis onto the left (read) stack. Q flips the top left page back.
+/// Pages begin on the right (unread) stack. Moving the horizontal axis right flips the
+/// top right page 180° on the Z axis onto the left (read) stack; left flips it back.
 ///
 /// Each page is double-sided: a "Canvas" child shows the front face and a
 /// "Canvas Back" child (rotated 180° Z) shows the back face. The active face
@@ -42,10 +42,7 @@ public struct GuidebookPageEntry
 /// </summary>
 public class GuidebookPageController : MonoBehaviour
 {
-    private static readonly KeyCode NextKey = KeyCode.E;
-    private static readonly KeyCode PrevKey = KeyCode.Q;
-    private static readonly KeyCode NextPad = KeyCode.JoystickButton5; // RB
-    private static readonly KeyCode PrevPad = KeyCode.JoystickButton4; // LB
+    private const float HorizontalThreshold = 0.5f;
 
     private const string FrontCanvasName = "Contents/Canvas";
     private const string BackCanvasName  = "Contents/Canvas Back";
@@ -66,9 +63,15 @@ public class GuidebookPageController : MonoBehaviour
     [SerializeField] private float _pageDepth = 0.001f;
 
     [Header("Animation")]
-    [SerializeField] private float          _turnDuration = 0.35f;
-    [SerializeField] private float          _arcHeight    = 0.02f;
-    [SerializeField] private AnimationCurve _turnCurve    = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [SerializeField] private float          _turnDuration     = 0.35f;
+    [Tooltip("Per-page flip duration used when animating a tab jump across multiple pages.")]
+    [SerializeField] private float          _snapFlipDuration = 0.08f;
+    [SerializeField] private float          _arcHeight        = 0.02f;
+    [SerializeField] private AnimationCurve _turnCurve        = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Header("Audio")]
+    [SerializeField] private AudioSource _audioSource;
+    [SerializeField] private AudioClip   _pageFlipClip;
 
     /// <summary>
     /// Fired when a flip animation completes.
@@ -88,6 +91,8 @@ public class GuidebookPageController : MonoBehaviour
     private int     _leftCount;
     private bool    _isTurning;
     private float[] _pageZRotations;
+    private float   _prevHorizontal;
+    private Coroutine _snapSequence;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -105,18 +110,23 @@ public class GuidebookPageController : MonoBehaviour
 
     private void Update()
     {
-        if (_isTurning) return;
+        float h = Input.GetAxisRaw("Horizontal");
 
-        if (Input.GetKeyDown(NextKey) || Input.GetKeyDown(NextPad))
-            TurnNext();
-        else if (Input.GetKeyDown(PrevKey) || Input.GetKeyDown(PrevPad))
-            TurnPrevious();
+        if (!_isTurning)
+        {
+            if (h > HorizontalThreshold && _prevHorizontal <= HorizontalThreshold)
+                TurnNext(_turnDuration);
+            else if (h < -HorizontalThreshold && _prevHorizontal >= -HorizontalThreshold)
+                TurnPrevious(_turnDuration);
+        }
+
+        _prevHorizontal = h;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /// <summary>Flips the top right-stack page onto the left stack (E / forward).</summary>
-    public void TurnNext()
+    /// <summary>Flips the top right-stack page onto the left stack (axis right / forward).</summary>
+    public void TurnNext(float duration)
     {
         if (_isTurning || !HasNextPage) return;
 
@@ -124,6 +134,7 @@ public class GuidebookPageController : MonoBehaviour
         Transform page       = _activePages[_leftCount];
         int       idx        = _leftCount;
 
+        PlayFlipSound();
         StartCoroutine(AnimateTurn(
             page,
             RightPos(rightCount - 1),
@@ -131,13 +142,14 @@ public class GuidebookPageController : MonoBehaviour
             _pageZRotations[idx],
             _pageZRotations[idx] - 180f,
             idx,
+            duration,
             showBackAtMidpoint: true,
             () => { _leftCount++; OnPageChanged?.Invoke(_leftCount); }
         ));
     }
 
-    /// <summary>Flips the top left-stack page back onto the right stack (Q / back).</summary>
-    public void TurnPrevious()
+    /// <summary>Flips the top left-stack page back onto the right stack (axis left / back).</summary>
+    public void TurnPrevious(float duration)
     {
         if (_isTurning || !HasPreviousPage) return;
 
@@ -145,6 +157,7 @@ public class GuidebookPageController : MonoBehaviour
         Transform page       = _activePages[_leftCount - 1];
         int       idx        = _leftCount - 1;
 
+        PlayFlipSound();
         StartCoroutine(AnimateTurn(
             page,
             LeftPos(_leftCount - 1),
@@ -152,6 +165,7 @@ public class GuidebookPageController : MonoBehaviour
             _pageZRotations[idx],
             _pageZRotations[idx] + 180f,
             idx,
+            duration,
             showBackAtMidpoint: false,
             () => { _leftCount--; OnPageChanged?.Invoke(_leftCount); }
         ));
@@ -197,15 +211,38 @@ public class GuidebookPageController : MonoBehaviour
     public void ResetPages() => SnapTo(0);
 
     /// <summary>
-    /// Snaps to the position that shows <paramref name="page"/> at the top of the right stack.
-    /// Does nothing if the page is not currently active (locked or missing).
+    /// Animates page flips in sequence until <paramref name="page"/> is at the top of the
+    /// right stack. Each flip uses <see cref="_snapFlipDuration"/> so the sequence is fast
+    /// but still visually readable. Cancels any in-progress sequence before starting.
     /// Called by <see cref="GuidebookSectionTab"/> when the player clicks a section tab.
     /// </summary>
     public void SnapToPage(Transform page)
     {
         if (_activePages == null || page == null) return;
         int idx = Array.IndexOf(_activePages, page);
-        if (idx >= 0) SnapTo(idx);
+        if (idx < 0 || idx == _leftCount) return;
+
+        if (_snapSequence != null) StopCoroutine(_snapSequence);
+        _snapSequence = StartCoroutine(AnimatedSnapTo(idx));
+    }
+
+    private IEnumerator AnimatedSnapTo(int targetLeftCount)
+    {
+        while (_leftCount != targetLeftCount)
+        {
+            // Wait for any in-progress flip to finish before queuing the next one.
+            while (_isTurning) yield return null;
+
+            if (_leftCount < targetLeftCount)
+                TurnNext(_snapFlipDuration);
+            else
+                TurnPrevious(_snapFlipDuration);
+
+            // Give AnimateTurn one frame to set _isTurning before we re-check it.
+            yield return null;
+        }
+
+        _snapSequence = null;
     }
 
     // ── Face visibility ───────────────────────────────────────────────────────
@@ -317,6 +354,12 @@ public class GuidebookPageController : MonoBehaviour
 
     // ── Animation ─────────────────────────────────────────────────────────────
 
+    private void PlayFlipSound()
+    {
+        if (_audioSource != null && _pageFlipClip != null)
+            _audioSource.PlayOneShot(_pageFlipClip);
+    }
+
     private IEnumerator AnimateTurn(
         Transform page,
         Vector3   fromPos,
@@ -324,6 +367,7 @@ public class GuidebookPageController : MonoBehaviour
         float     fromZ,
         float     toZ,
         int       pageIndex,
+        float     duration,
         bool      showBackAtMidpoint,
         Action    onComplete)
     {
@@ -331,10 +375,10 @@ public class GuidebookPageController : MonoBehaviour
         bool faceSwitched = false;
 
         float elapsed = 0f;
-        while (elapsed < _turnDuration)
+        while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = _turnCurve.Evaluate(Mathf.Clamp01(elapsed / _turnDuration));
+            float t = _turnCurve.Evaluate(Mathf.Clamp01(elapsed / duration));
 
             // Switch face at the midpoint — the page is most edge-on at t≈0.5,
             // hiding the content swap from the viewer.
