@@ -23,9 +23,15 @@ public class GeigerCounterUI : MonoBehaviour
     [SerializeField] private float needleSmoothSpeed = 6f;
 
     [Header("Jitter – Geiger Counter Feel")]
-    [Tooltip("Maximum random jitter in degrees, scales with current radiation level.")]
-    [SerializeField] private float jitterAmplitude = 5f;
-    [SerializeField] private float jitterFrequency = 14f;
+    [Tooltip("Maximum jitter in degrees at full exposure rate.")]
+    [SerializeField] private float jitterAmplitude = 8f;
+    [Tooltip("Base frequency of the needle oscillation.")]
+    [SerializeField] private float jitterFrequency = 10f;
+    [Tooltip("Radiation units/sec considered 'maximum' exposure for jitter scaling. " +
+             "Passive rate is ~0.15 u/s; hotspots are typically 1-3 u/s.")]
+    [SerializeField] private float maxExposureRate = 2f;
+    [Tooltip("How quickly the jitter scale smooths toward the measured exposure rate.")]
+    [SerializeField] private float jitterSmoothing = 4f;
 
     [Header("Arc Fill")]
     [Tooltip("The Image whose fill represents the current radiation level.")]
@@ -44,6 +50,13 @@ public class GeigerCounterUI : MonoBehaviour
     private PlayerRadiation _playerRadiation;
     private float _targetAngle;
     private float _currentAngle;
+
+    // ── Exposure-rate tracking (drives jitter) ─────────────────────────────────
+
+    /// <summary>Smoothed 0-1 value representing how fast radiation is currently rising.</summary>
+    private float _jitterScale;
+    private float _previousRadiation;
+    private float _lastRadiationTime = float.NegativeInfinity;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -125,6 +138,23 @@ public class GeigerCounterUI : MonoBehaviour
         float normalized = max > 0f ? current / max : 0f;
         _targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, normalized);
 
+        // ── Measure exposure rate ──────────────────────────────────────────────
+        float now     = Time.time;
+        float elapsed = now - _lastRadiationTime;
+
+        if (elapsed > 0f && elapsed < 2f)   // ignore stale gaps (scene load, pause, etc.)
+        {
+            float instantRate      = Mathf.Max(0f, current - _previousRadiation) / elapsed;
+            float normalizedRate   = Mathf.Clamp01(instantRate / Mathf.Max(0.001f, maxExposureRate));
+            // Square-root curve so even slow passive exposure produces visible jitter.
+            float targetJitter     = Mathf.Sqrt(normalizedRate);
+            _jitterScale = Mathf.Lerp(_jitterScale, targetJitter, elapsed * jitterSmoothing);
+        }
+
+        _previousRadiation = current;
+        _lastRadiationTime = now;
+
+        // ── Arc and text ───────────────────────────────────────────────────────
         if (arcFillImage != null)
         {
             arcFillImage.fillAmount = normalized;
@@ -145,10 +175,13 @@ public class GeigerCounterUI : MonoBehaviour
             _currentAngle, _targetAngle,
             Time.deltaTime * needleSmoothSpeed);
 
-        // Jitter scales with current radiation to simulate geiger counter activity.
-        float normalized = _playerRadiation != null ? _playerRadiation.Normalized : 0f;
-        float jitter     = Mathf.Sin(Time.time * jitterFrequency) * jitterAmplitude * normalized;
+        // Multi-frequency noise gives an organic, irregular geiger-counter feel
+        // rather than a simple repeating sine wave.
+        float t = Time.time * jitterFrequency;
+        float noise = Mathf.Sin(t)               * 0.50f
+                    + Mathf.Sin(t * 2.71f + 1f)  * 0.30f
+                    + Mathf.Sin(t * 6.83f + 4f)  * 0.20f;
 
-        needle.localRotation = Quaternion.Euler(0f, 0f, _currentAngle + jitter);
+        needle.localRotation = Quaternion.Euler(0f, 0f, _currentAngle + noise * jitterAmplitude * _jitterScale);
     }
 }

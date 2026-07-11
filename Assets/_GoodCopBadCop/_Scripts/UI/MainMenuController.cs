@@ -32,6 +32,7 @@ public class MainMenuController : MonoBehaviour
     [Header("Button Group")]
     [SerializeField] private Animator buttonGroupAnimator;
     [SerializeField] private RuntimeAnimatorController buttonGroupFastController;
+    [SerializeField] private GameObject continueButton;
 
     [Header("Scene Setup")]
     [SerializeField] private Animator rollingShutter;
@@ -104,6 +105,7 @@ public class MainMenuController : MonoBehaviour
 
         SwitchToScreen(homeScreen);
         playableDirector.gameObject.SetActive(true);
+        RefreshContinueButton();
     }
 
     // ---------------------------------------------------------------------------
@@ -167,8 +169,11 @@ public class MainMenuController : MonoBehaviour
     }
 
     /// <summary>Returns to the home screen from any screen.</summary>
-    public void BackToHomeScreen() =>
+    public void BackToHomeScreen()
+    {
         SwitchToScreen(homeScreen);
+        RefreshContinueButton();
+    }
 
     private void CloseSettingsScreen()
     {
@@ -197,8 +202,11 @@ public class MainMenuController : MonoBehaviour
     }
 
     /// <summary>Backward-compatible alias kept for existing UnityEvent bindings.</summary>
-    public void BackToStartShiftScreen() =>
+    public void BackToStartShiftScreen()
+    {
         SwitchToScreen(homeScreen);
+        RefreshContinueButton();
+    }
 
     // ---------------------------------------------------------------------------
     // Multiplayer Hub Actions
@@ -271,20 +279,43 @@ public class MainMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Resumes a previous solo session without the full transition sequence.
-    /// Expects the active slot to already be set via <see cref="SaveDataManager.SelectSlot"/>.
+    /// Resumes the player's most recently saved slot without requiring manual slot selection.
+    /// Mirrors the DebugSkipToGame flow: selects the best slot, creates a lobby, transitions,
+    /// initialises the slot, and starts the game — bypassing the pre-game lobby screen.
     /// </summary>
     public async void ContinueGame()
     {
-        if (SaveDataManager.Instance.ActiveSlot == null)
+        int slotIndex = SaveDataManager.Instance.GetMostRecentOccupiedSlotIndex();
+        if (slotIndex < 0)
         {
-            Debug.LogWarning("[ContinueGame] No active slot selected.");
+            Debug.LogWarning("[ContinueGame] No occupied save slot found.");
             return;
         }
 
-        bool success = await LobbyManager.Instance.CreateLobby();
-        if (success)
-            GameManager.Instance.TryStartGame(skipTransition: true);
+        try
+        {
+            SaveDataManager.Instance.SelectSlot(slotIndex);
+            GameManager.Instance.BeginLobbyTransition();
+            bool success = await LobbyManager.Instance.CreateLobby();
+
+            if (success)
+            {
+                await WaitUntilHostReady();
+                SaveDataManager.Instance.InitialiseActiveSlot();
+                GameManager.Instance.TransitionToLobby();
+                GameManager.Instance.TryStartGame();
+            }
+            else
+            {
+                Debug.LogError("[ContinueGame] CreateLobby failed — cancelling transition.");
+                GameManager.Instance.CancelLobbyTransition();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[ContinueGame] Unhandled exception: {e}");
+            GameManager.Instance.CancelLobbyTransition();
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -328,6 +359,16 @@ public class MainMenuController : MonoBehaviour
     /// <summary>Returns true when any slot has meaningful progress.</summary>
     public bool HasSaveFile =>
         SaveDataManager.Instance != null && SaveDataManager.Instance.HasSaveFile;
+
+    /// <summary>
+    /// Shows or hides the Continue button based on whether any occupied save slot exists.
+    /// Called on Start and whenever we return to the home screen.
+    /// </summary>
+    private void RefreshContinueButton()
+    {
+        if (continueButton != null)
+            continueButton.SetActive(HasSaveFile);
+    }
 
     // ---------------------------------------------------------------------------
     // Helpers

@@ -42,6 +42,7 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<IFullscreenEffectService, FullscreenEffectService>(Lifetime.Scoped);
             builder.Register<IEffectService, EffectService>(Lifetime.Scoped);
             builder.RegisterEntryPoint<PlayerHealthEffectsAdapter>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<PlayerDrunkEffectsAdapter>(Lifetime.Scoped);
             builder.RegisterComponentInHierarchy<global::SuspectController>();
             builder.RegisterComponentInHierarchy<global::Thermometer>();
 

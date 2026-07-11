@@ -247,6 +247,27 @@ public class SaveDataManager : MonoBehaviour
     // Slot Access
     // ---------------------------------------------------------------------------
 
+    /// <summary>
+    /// Returns the index (0-based) of the most recently saved occupied slot,
+    /// or -1 when no occupied slots exist. Used by the Continue button to resume
+    /// the player's last session without requiring manual slot selection.
+    /// </summary>
+    public int GetMostRecentOccupiedSlotIndex()
+    {
+        int bestIndex = -1;
+        DateTime bestTime = DateTime.MinValue;
+        for (int i = 0; i < _saveData.Slots.Length; i++)
+        {
+            SaveSlot slot = _saveData.Slots[i];
+            if (slot.IsOccupied && slot.LastSaved > bestTime)
+            {
+                bestTime = slot.LastSaved;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
     /// <summary>Returns the save slot at the given index (0-based).</summary>
     public SaveSlot GetSlot(int index)
     {
@@ -357,8 +378,26 @@ public class SaveDataManager : MonoBehaviour
     // IO
     // ---------------------------------------------------------------------------
 
+    /// <summary>
+    /// Returns true when this peer is allowed to write save data to disk.
+    /// In a networked session only the host persists save state; clients skip all disk writes.
+    /// Outside of an active session (solo / pre-game) saving is always permitted.
+    /// </summary>
+    private bool CanSave()
+    {
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening) return true;
+        return nm.IsHost || nm.IsServer;
+    }
+
     private void Save()
     {
+        if (!CanSave())
+        {
+            Debug.Log("[SaveDataManager] Save skipped — client peer does not write to disk.");
+            return;
+        }
+
         string json = JsonUtility.ToJson(_saveData, prettyPrint: true);
         File.WriteAllText(_savePath, json);
         Debug.Log($"[SaveDataManager] Saved to: {_savePath}");
