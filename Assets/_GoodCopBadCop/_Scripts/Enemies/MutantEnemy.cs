@@ -78,6 +78,19 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Sound played on all clients when this enemy dies.")]
     [SerializeField] private AudioClip deathSound;
 
+    [Header("Flee Behaviour")]
+    [Tooltip("When enabled, reaching zero health triggers a rapid flee-and-despawn instead of a normal death. " +
+             "Intended for fully-mutated civilian variants that cannot be permanently killed in the world.")]
+    [SerializeField] private bool fleeInsteadOfDie = false;
+
+    [Tooltip("NavMesh movement speed during the flee phase. Should be noticeably faster than normal move speed.")]
+    [Min(1f)]
+    [SerializeField] private float fleeSpeed = 12f;
+
+    [Tooltip("Seconds after beginning the flee before the mutant force-despawns regardless of distance.")]
+    [Min(1f)]
+    [SerializeField] private float fleeDespawnTimeout = 8f;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private NavMeshAgent _agent;
@@ -849,6 +862,15 @@ public class MutantEnemy : NetworkBehaviour
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
 
+        if (fleeInsteadOfDie)
+        {
+            // Restore health so IsDead stays true (flee path) but the unit remains functional
+            // long enough to run the flee coroutine. _isDead prevents re-entry from TakeDamage.
+            _agent.enabled = true;
+            StartCoroutine(FleeAndDespawn());
+            return;
+        }
+
         // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
         OnAnyMutantKilled?.Invoke();
 
@@ -867,6 +889,63 @@ public class MutantEnemy : NetworkBehaviour
             if (IsSpawned)
                 NetworkObject.Despawn();
         }
+    }
+
+    /// <summary>
+    /// Flee-and-despawn sequence for fully-mutated civilian mutants that cannot be permanently
+    /// killed. The mutant breaks off from its current target, sprints away from the nearest
+    /// player at <see cref="fleeSpeed"/>, and despawns after <see cref="fleeDespawnTimeout"/>
+    /// seconds regardless of distance. No kill event is fired and no MutantBit is dropped.
+    /// </summary>
+    private IEnumerator FleeAndDespawn()
+    {
+        if (!IsServer) yield break;
+
+        // Boost speed and stop any current attack animation.
+        _agent.speed = fleeSpeed;
+        SetAttackAnimClientRpc(false);
+        SetFleeingClientRpc(true);
+
+        float elapsed = 0f;
+
+        while (elapsed < fleeDespawnTimeout)
+        {
+            // Continuously update destination away from the nearest player.
+            Transform player = FindNearestLivingPlayer();
+            if (player != null)
+            {
+                Vector3 awayDir = (transform.position - player.position).normalized;
+                Vector3 fleeTarget = transform.position + awayDir * 20f;
+
+                // Clamp to NavMesh surface.
+                if (UnityEngine.AI.NavMesh.SamplePosition(fleeTarget, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
+                    _agent.SetDestination(hit.position);
+            }
+
+            elapsed += 0.5f;
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        SetFleeingClientRpc(false);
+
+        if (IsSpawned)
+            NetworkObject.Despawn();
+    }
+
+    [ClientRpc]
+    private void SetAttackAnimClientRpc(bool attacking)
+    {
+        if (animator != null && !string.IsNullOrEmpty(attackBoolName))
+            animator.SetBool(attackBoolName, attacking);
+    }
+
+    [ClientRpc]
+    private void SetFleeingClientRpc(bool fleeing)
+    {
+        // Reuse the Speed parameter — the animator reads it for locomotion blend.
+        // Optionally, set a dedicated "Fleeing" bool if the animator has one.
+        if (animator != null)
+            animator.SetBool("Fleeing", fleeing);
     }
 
     [ClientRpc]

@@ -130,6 +130,15 @@ public class SuspectController : NetworkBehaviour
 
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
+
+    /// <summary>
+    /// True when the current suspect slot was flagged as fully mutated by
+    /// <see cref="DailySuspectManager.IsFullMutantSlot"/>. Read by <see cref="SayEntryDialogue"/>
+    /// to replace the normal entry bark with the scripted full-mutant cutscene.
+    /// Server-side only — set in <see cref="SpawnSuspectServer"/> and consumed in
+    /// <see cref="SayEntryDialogue"/>.
+    /// </summary>
+    private bool _currentSuspectIsFullMutant = false;
     FolderController spawnedFolder;
 
     public UnityAction OnTakeFolder;
@@ -273,6 +282,12 @@ public class SuspectController : NetworkBehaviour
         {
             suspectCharacter.InitializeByInfectionStage();
         }
+
+        // If this slot is fully mutated, swap to the mutant mesh on all clients.
+        bool isFullMutant = dailySuspectManager.IsFullMutantSlot(lineupIndex, out _);
+        _currentSuspectIsFullMutant = isFullMutant;
+        if (isFullMutant)
+            suspectCharacter.ActivateFullMutantForm();
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;
@@ -640,6 +655,20 @@ public class SuspectController : NetworkBehaviour
 
         bool forceSkipEntry = ForceNextSuspectSkipEntryDialogue;
         ForceNextSuspectSkipEntryDialogue = false;
+
+        // Full mutant path: skip normal entry bark, bark schedule, and paperwork.
+        // Play the scripted booth cutscene instead, then leave the suspect at the window
+        // for the player to process via the normal verdict buttons.
+        if (!forceSkipEntry && _currentSuspectIsFullMutant)
+        {
+            _currentSuspectIsFullMutant = false;
+            ScriptedDialogue cutscene = suspectCharacter.Data?.fullMutant?.boothCutscene;
+            if (cutscene != null && ScriptedDialogueRunner.Instance != null)
+                ScriptedDialogueRunner.Instance.PlayDialogue(suspectCharacter, cutscene, null);
+            else
+                Debug.LogWarning($"[SuspectController] Full mutant '{suspectCharacter.name}' has no boothCutscene assigned — no entry dialogue will play.", this);
+            return;
+        }
 
         // If this is the player's first encounter with this suspect and they have an intro
         // dialogue, hand control to SuspectEncounterManager. It will suppress the generic

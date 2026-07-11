@@ -34,6 +34,12 @@ public class SuspectData : ScriptableObject
     [Tooltip("Authored note on expected behavior, shown on the terminal.")]
     public string normalBehaviorNotes;
 
+    [Header("Full Mutant State")]
+    [Tooltip("Configuration for this suspect's full-mutant booth encounter and world form. " +
+             "When boothPrefab is assigned and the infection score reaches the fully-mutated threshold, " +
+             "the next appearance spawns the mutant form instead of the civilian.")]
+    public FullMutantConfig fullMutant;
+
     [Header("Replacement System")]
     [Tooltip("Face photo used when this suspect returns as an uncanny replacement after being killed. " +
              "Leave null to disable replacement for this character.")]
@@ -148,5 +154,31 @@ public class SuspectData : ScriptableObject
     {
         IDNumber = Random.Range(1000000, 9999999).ToString();
     }
-    
+
+    /// <summary>
+    /// Inline configuration for a suspect's fully-mutated appearance.
+    /// When <see cref="boothCutscene"/> is assigned and the suspect's
+    /// <see cref="SuspectRecord.infectionScore"/> is at or above
+    /// <see cref="AnomalyController.FULLY_MUTATED_THRESHOLD"/>, the suspect's normal
+    /// prefab is used but the full-mutant mesh child is toggled on and this dialogue plays
+    /// in place of the normal entry bark.
+    /// </summary>
+    [System.Serializable]
+    public class FullMutantConfig
+    {
+        [Header("Booth Encounter")]
+        [Tooltip("Scripted dialogue played when this suspect arrives at the booth window in their fully-mutated form. " +
+                 "Uses the suspect's existing SuspectCharacter prefab — assign a fullMutantMesh child on the prefab " +
+                 "and wire it via SuspectCharacter._fullMutantMesh. Leave null to disable the full-mutant path.")]
+        public ScriptedDialogue boothCutscene;
+
+        [Header("World Encounter")]
+        [Tooltip("Networked prefab (MutantEnemy with fleeInsteadOfDie enabled) added to world " +
+                 "MutantSpawner pools so the player can encounter this mutant form while exploring. " +
+                 "Leave null to prevent world spawning for this suspect.")]
+        public GameObject worldMutantPrefab;
+
+        /// <summary>True when a booth cutscene is assigned — minimum requirement to enable the full-mutant path.</summary>
+        public bool IsConfigured => boothCutscene != null;
+    }
 }

@@ -69,6 +69,38 @@ public class SuspectCharacter : Interactable
 
     #endregion
 
+    [Header("Full Mutant Form")]
+    [Tooltip("The character's normal civilian body mesh root. Disabled when the full mutant form activates. " +
+             "Assign the top-level mesh child (e.g. 'leonbase').")]
+    [SerializeField] private GameObject _civilianMesh;
+
+    [Tooltip("The character's fully-mutated mesh root. Keep disabled in the prefab; " +
+             "SuspectController activates it automatically when the suspect is fully mutated.")]
+    [SerializeField] private GameObject _fullMutantMesh;
+
+    /// <summary>True when a full mutant mesh is configured on this prefab.</summary>
+    public bool HasFullMutantForm => _fullMutantMesh != null;
+
+    /// <summary>
+    /// Toggles this suspect into their full-mutant visual form on the server and replicates
+    /// the change to all clients. Enables the mutant mesh child and hides the civilian mesh.
+    /// Must be called on the server.
+    /// </summary>
+    public void ActivateFullMutantForm()
+    {
+        if (_civilianMesh != null) _civilianMesh.SetActive(false);
+        if (_fullMutantMesh != null) _fullMutantMesh.SetActive(true);
+        ActivateFullMutantFormClientRpc();
+    }
+
+    [ClientRpc]
+    private void ActivateFullMutantFormClientRpc()
+    {
+        if (IsServer) return;
+        if (_civilianMesh != null) _civilianMesh.SetActive(false);
+        if (_fullMutantMesh != null) _fullMutantMesh.SetActive(true);
+    }
+
     [Header("Cameras")]
     [Tooltip("Per-character wide-shot camera used during dialogue. When assigned, this overrides the shared " +
              "scene-level 'At Booth Cam' for this specific character. Assign a child CinemachineCamera GameObject.")]

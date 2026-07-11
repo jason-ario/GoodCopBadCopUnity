@@ -22,6 +22,14 @@ public class DailySuspectManager : MonoBehaviour
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
 
     /// <summary>
+    /// Tracks which lineup slot indices belong to fully-mutated civilians.
+    /// Populated by <see cref="InjectFullMutantSlots"/> after all other slot injections.
+    /// The corresponding <see cref="SuspectData"/> for each index always has a configured
+    /// <see cref="SuspectData.FullMutantConfig"/> and a <see cref="SuspectRecord.IsFullyMutated"/> record.
+    /// </summary>
+    private readonly HashSet<int> _fullMutantSlotIndices = new HashSet<int>();
+
+    /// <summary>
     /// Tracks which lineup slot indices are replacement suspects (killed civilians that have
     /// re-activated after their replacement window elapsed). These suspects spawn normally
     /// but are initialized via InitializeAsReplacement on SuspectCharacter.
@@ -106,6 +114,7 @@ public class DailySuspectManager : MonoBehaviour
             Debug.Log($"[DailySuspectManager] Shift populated via override — {shiftSuspects.Count} suspect(s).");
             InjectMutantSlots();
             InjectDoppelgangerSlots();
+            InjectFullMutantSlots();
             return;
         }
 
@@ -129,6 +138,7 @@ public class DailySuspectManager : MonoBehaviour
 
         InjectMutantSlots();
         InjectDoppelgangerSlots();
+        InjectFullMutantSlots();
     }
 
     /// <summary>
@@ -294,6 +304,7 @@ public class DailySuspectManager : MonoBehaviour
     {
         _mutantSlotIndices.Clear();
         _doppelgangerSlots.Clear();
+        _fullMutantSlotIndices.Clear();
         _replacementSlotIndices.Clear();
     }
 
@@ -369,6 +380,45 @@ public class DailySuspectManager : MonoBehaviour
     public bool IsReplacementSlot(int lineupIndex)
     {
         return _replacementSlotIndices.Contains(lineupIndex);
+    }
+
+    /// <summary>
+    /// Scans the final populated lineup and registers any slot whose suspect has crossed the
+    /// fully-mutated threshold AND has a configured <see cref="SuspectData.FullMutantConfig"/>.
+    /// Must run after all other injections so indices are stable.
+    /// Doppelganger, mutant-intruder, and replacement slots are never double-flagged.
+    /// </summary>
+    private void InjectFullMutantSlots()
+    {
+        for (int i = 0; i < shiftSuspects.Count; i++)
+        {
+            SuspectData suspect = shiftSuspects[i];
+            if (suspect == null) continue;
+            if (_mutantSlotIndices.Contains(i)) continue;
+            if (_doppelgangerSlots.ContainsKey(i)) continue;
+            if (_replacementSlotIndices.Contains(i)) continue;
+
+            if (suspect.fullMutant == null || !suspect.fullMutant.IsConfigured) continue;
+
+            SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
+            if (record == null || !record.IsFullyMutated) continue;
+
+            _fullMutantSlotIndices.Add(i);
+            Debug.Log($"[DailySuspectManager] '{suspect.name}' is fully mutated — slot {i} flagged as full mutant.");
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the given lineup index is a fully-mutated civilian slot.
+    /// Outputs the suspect's <see cref="SuspectData"/> so the caller can read
+    /// <see cref="SuspectData.FullMutantConfig"/> directly.
+    /// </summary>
+    public bool IsFullMutantSlot(int lineupIndex, out SuspectData suspectData)
+    {
+        suspectData = null;
+        if (!_fullMutantSlotIndices.Contains(lineupIndex)) return false;
+        suspectData = lineupIndex < shiftSuspects.Count ? shiftSuspects[lineupIndex] : null;
+        return suspectData != null;
     }
 
     public IEnumerable<Texture> GetIdPhotoPool()
