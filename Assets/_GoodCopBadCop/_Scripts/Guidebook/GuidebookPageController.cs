@@ -90,6 +90,7 @@ public class GuidebookPageController : MonoBehaviour
 
     private int     _leftCount;
     private bool    _isTurning;
+    private bool    _isSnapping;
     private float[] _pageZRotations;
     private float   _prevHorizontal;
     private Coroutine _snapSequence;
@@ -110,15 +111,14 @@ public class GuidebookPageController : MonoBehaviour
 
     private void Update()
     {
+        if (_isTurning || _isSnapping) return;
+
         float h = Input.GetAxisRaw("Horizontal");
 
-        if (!_isTurning)
-        {
-            if (h > HorizontalThreshold && _prevHorizontal <= HorizontalThreshold)
-                TurnNext(_turnDuration);
-            else if (h < -HorizontalThreshold && _prevHorizontal >= -HorizontalThreshold)
-                TurnPrevious(_turnDuration);
-        }
+        if (h > HorizontalThreshold && _prevHorizontal <= HorizontalThreshold)
+            TurnNext(_turnDuration);
+        else if (h < -HorizontalThreshold && _prevHorizontal >= -HorizontalThreshold)
+            TurnPrevious(_turnDuration);
 
         _prevHorizontal = h;
     }
@@ -228,9 +228,11 @@ public class GuidebookPageController : MonoBehaviour
 
     private IEnumerator AnimatedSnapTo(int targetLeftCount)
     {
+        _isSnapping = true;
+
         while (_leftCount != targetLeftCount)
         {
-            // Wait for any in-progress flip to finish before queuing the next one.
+            // If already turning (e.g. from a physical input just before click), wait for it.
             while (_isTurning) yield return null;
 
             if (_leftCount < targetLeftCount)
@@ -238,25 +240,51 @@ public class GuidebookPageController : MonoBehaviour
             else
                 TurnPrevious(_snapFlipDuration);
 
-            // Give AnimateTurn one frame to set _isTurning before we re-check it.
-            yield return null;
+            // Wait for the flip we just triggered to start and finish.
+            yield return null; 
+            while (_isTurning) yield return null;
         }
 
+        _isSnapping = false;
         _snapSequence = null;
     }
 
     // ── Face visibility ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Sets the active face on a single page.
-    /// Finds "Canvas" (front) and "Canvas Back" (back) children by name and toggles them.
+    /// Shows the correct canvas for the current stack side while also hiding any canvas
+    /// whose anomaly is still locked. Front and back are gated independently so a page
+    /// with only one unlocked side still shows that side correctly.
     /// </summary>
     private void SetPageFace(Transform page, bool showBack)
     {
+        bool frontUnlocked = true;
+        bool backUnlocked  = true;
+
+        if (_pageEntries != null)
+        {
+            foreach (GuidebookPageEntry entry in _pageEntries)
+            {
+                if (entry.page != page) continue;
+                frontUnlocked = IsEntryUnlocked(entry.anomalyTypeName);
+                backUnlocked  = IsEntryUnlocked(entry.backAnomalyTypeName);
+                break;
+            }
+        }
+
         Transform front = page.Find(FrontCanvasName);
         Transform back  = page.Find(BackCanvasName);
-        if (front != null) front.gameObject.SetActive(!showBack);
-        if (back  != null) back.gameObject.SetActive(showBack);
+
+        if (showBack)
+        {
+            if (front != null) front.gameObject.SetActive(false);
+            if (back  != null) back.gameObject.SetActive(backUnlocked);
+        }
+        else
+        {
+            if (front != null) front.gameObject.SetActive(frontUnlocked);
+            if (back  != null) back.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -290,6 +318,13 @@ public class GuidebookPageController : MonoBehaviour
 
     // ── Unlock handling ───────────────────────────────────────────────────────
 
+    private bool IsEntryUnlocked(string typeName)
+    {
+        return string.IsNullOrEmpty(typeName)
+            || AnomalyUnlockManager.Instance == null
+            || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(typeName);
+    }
+
     private void RebuildActivePages()
     {
         var active = new List<Transform>();
@@ -304,16 +339,16 @@ public class GuidebookPageController : MonoBehaviour
         {
             if (entry.page == null) continue;
 
-            bool unlocked = string.IsNullOrEmpty(entry.anomalyTypeName)
-                || AnomalyUnlockManager.Instance == null
-                || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(entry.anomalyTypeName);
+            bool frontUnlocked = IsEntryUnlocked(entry.anomalyTypeName);
+            bool backUnlocked  = IsEntryUnlocked(entry.backAnomalyTypeName);
+            bool pageActive    = frontUnlocked || backUnlocked;
 
-            entry.page.gameObject.SetActive(unlocked);
+            entry.page.gameObject.SetActive(pageActive);
 
-            if (unlocked)
+            if (pageActive)
             {
-                // Ensure both canvas faces are active; UpdateFaceVisibility will
-                // set the correct front/back state for each page's stack position.
+                // Pre-enable both canvases; UpdateFaceVisibility will immediately
+                // hide whichever face is locked and set the correct stack-side face.
                 SetPageContentsActive(entry.page, true);
                 active.Add(entry.page);
             }
@@ -329,7 +364,8 @@ public class GuidebookPageController : MonoBehaviour
         bool relevant = false;
         foreach (GuidebookPageEntry entry in _pageEntries)
         {
-            if (string.Equals(entry.anomalyTypeName, typeName, StringComparison.Ordinal))
+            if (string.Equals(entry.anomalyTypeName,     typeName, StringComparison.Ordinal)
+             || string.Equals(entry.backAnomalyTypeName, typeName, StringComparison.Ordinal))
             {
                 relevant = true;
                 break;
@@ -406,8 +442,8 @@ public class GuidebookPageController : MonoBehaviour
         if (!faceSwitched)
             SetPageFace(page, showBackAtMidpoint);
 
-        onComplete?.Invoke();
         _isTurning = false;
+        onComplete?.Invoke();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
