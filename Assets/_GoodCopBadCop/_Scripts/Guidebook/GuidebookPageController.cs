@@ -36,9 +36,9 @@ public struct GuidebookPageEntry
 /// hidden at the moment the page is most edge-on to the viewer.
 ///
 /// Pages can be locked behind an anomaly unlock via <see cref="GuidebookPageEntry.anomalyTypeName"/>.
-/// Locked pages remain visible in the right stack as blank paper (Canvas children deactivated)
-/// but cannot be flipped until their anomaly is unlocked.
-/// When a new anomaly unlocks, the page list is rebuilt and repositioned automatically.
+/// Locked pages are fully deactivated and contribute no thickness to the stack.
+/// When a new anomaly unlocks, the page is reactivated, the list is rebuilt, and all
+/// positions are recalculated automatically.
 /// </summary>
 public class GuidebookPageController : MonoBehaviour
 {
@@ -47,8 +47,8 @@ public class GuidebookPageController : MonoBehaviour
     private static readonly KeyCode NextPad = KeyCode.JoystickButton5; // RB
     private static readonly KeyCode PrevPad = KeyCode.JoystickButton4; // LB
 
-    private const string FrontCanvasName = "Canvas";
-    private const string BackCanvasName  = "Canvas Back";
+    private const string FrontCanvasName = "Contents/Canvas";
+    private const string BackCanvasName  = "Contents/Canvas Back";
 
     [Header("Pages")]
     [Tooltip("All guidebook pages in reading order. Pages with an anomalyTypeName are hidden " +
@@ -80,13 +80,6 @@ public class GuidebookPageController : MonoBehaviour
 
     /// <summary>Unlocked pages that can be flipped through.</summary>
     private Transform[] _activePages;
-
-    /// <summary>
-    /// Locked pages whose anomaly has not yet been unlocked.
-    /// Kept active in the hierarchy but with Canvas children deactivated so they
-    /// appear as blank paper at the back of the right stack.
-    /// </summary>
-    private Transform[] _lockedPageViews;
 
     public int  LeftCount       => _leftCount;
     public bool HasNextPage     => _activePages != null && _leftCount < _activePages.Length;
@@ -197,23 +190,23 @@ public class GuidebookPageController : MonoBehaviour
             }
         }
 
-        // Locked pages sit at the back of the right stack as blank paper.
-        int activeRightCount = n - _leftCount;
-        if (_lockedPageViews != null)
-        {
-            for (int i = 0; i < _lockedPageViews.Length; i++)
-            {
-                if (_lockedPageViews[i] == null) continue;
-                _lockedPageViews[i].localPosition = RightPos(activeRightCount + i);
-                _lockedPageViews[i].localRotation = Quaternion.identity;
-            }
-        }
-
         UpdateFaceVisibility();
     }
 
     /// <summary>Returns every active page to the right stack with zero rotation.</summary>
     public void ResetPages() => SnapTo(0);
+
+    /// <summary>
+    /// Snaps to the position that shows <paramref name="page"/> at the top of the right stack.
+    /// Does nothing if the page is not currently active (locked or missing).
+    /// Called by <see cref="GuidebookSectionTab"/> when the player clicks a section tab.
+    /// </summary>
+    public void SnapToPage(Transform page)
+    {
+        if (_activePages == null || page == null) return;
+        int idx = Array.IndexOf(_activePages, page);
+        if (idx >= 0) SnapTo(idx);
+    }
 
     // ── Face visibility ───────────────────────────────────────────────────────
 
@@ -263,12 +256,10 @@ public class GuidebookPageController : MonoBehaviour
     private void RebuildActivePages()
     {
         var active = new List<Transform>();
-        var locked = new List<Transform>();
 
         if (_pageEntries == null)
         {
-            _activePages     = Array.Empty<Transform>();
-            _lockedPageViews = Array.Empty<Transform>();
+            _activePages = Array.Empty<Transform>();
             return;
         }
 
@@ -280,20 +271,18 @@ public class GuidebookPageController : MonoBehaviour
                 || AnomalyUnlockManager.Instance == null
                 || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(entry.anomalyTypeName);
 
-            // Always keep the physical page GameObject active so it appears in the stack.
-            entry.page.gameObject.SetActive(true);
-
-            // Show canvas content only for unlocked pages; locked pages show as blank paper.
-            SetPageContentsActive(entry.page, unlocked);
+            entry.page.gameObject.SetActive(unlocked);
 
             if (unlocked)
+            {
+                // Ensure both canvas faces are active; UpdateFaceVisibility will
+                // set the correct front/back state for each page's stack position.
+                SetPageContentsActive(entry.page, true);
                 active.Add(entry.page);
-            else
-                locked.Add(entry.page);
+            }
         }
 
-        _activePages     = active.ToArray();
-        _lockedPageViews = locked.ToArray();
+        _activePages = active.ToArray();
     }
 
     private void HandleAnomalyUnlocked(string typeName)
