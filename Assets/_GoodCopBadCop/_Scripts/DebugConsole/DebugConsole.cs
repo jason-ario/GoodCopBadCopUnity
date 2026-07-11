@@ -633,6 +633,25 @@ public class DebugConsole : MonoBehaviour
 
         _debugMutantSpawner.ForceSpawnAggroed();
         Debug.Log("[DebugConsole] Aggroed mutant spawn triggered (O).");
-}
-
     }
+
+    /// <summary>
+    /// Immediately shows the Thanks For Playing screen as if Day 7 just ended.
+    /// Marks the campaign as complete so the shift sequence cannot resume afterward.
+    /// </summary>
+    public void SkipToEndOfDemo()
+    {
+        if (UIController.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDemo: UIController not available — start the game first.");
+            return;
+        }
+
+        if (CampaignManager.Instance != null)
+            CampaignManager.Instance.DebugForceCampaignComplete();
+
+        UIController.Instance.ShowThanksForPlayingScreen();
+        Debug.Log("[DebugConsole] Skipped to end of demo — Thanks For Playing screen shown.");
+    }
+
+}

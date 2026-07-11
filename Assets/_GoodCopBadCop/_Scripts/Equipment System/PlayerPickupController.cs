@@ -1018,6 +1018,66 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Silently stows the currently held item to <paramref name="stowPoint"/> without
+    /// broadcasting a world drop. The GameObject is deactivated while stashed.
+    /// Call <see cref="UnstowItemToHand"/> to retrieve it.
+    /// Returns the stowed <see cref="PickableObject"/>, or <c>null</c> if nothing was held.
+    /// </summary>
+    public PickableObject StowCurrentItemToPoint(Transform stowPoint)
+    {
+        if (_heldObject == null) return null;
+
+        PickableObject stowed = _heldObject;
+        pickUpCooldownComplete = false;
+        DisableArmIKs();
+
+        // Re-seat at stow point so it re-activates at the right position.
+        stowed.RemoveParent();
+        stowed.transform.position = stowPoint.position;
+        stowed.transform.rotation = stowPoint.rotation;
+
+        // Give the item a chance to clean up its active state (e.g. turn off the flashlight).
+        stowed.OnStowed();
+
+        // Deactivate so nothing on the item runs while stashed.
+        stowed.gameObject.SetActive(false);
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        foreach (var container in objectContainers)
+            container.UnequipItem(this);
+
+        _camEquippedItem             = null;
+        _bodyCurrentlyEquippedItem   = null;
+        _heldObject                  = null;
+        _heldObjectRef.Value         = default;
+        itemEquippedIndex.Value      = -1;
+        _playerAnimationController.DisableRightArmMask();
+
+        ObjectPlacer.Instance.DeactivatePlacer();
+
+        // Deliberately NOT firing OnHeldObjectChanged — PlayerInventory manages stow state directly.
+        return stowed;
+    }
+
+    /// <summary>
+    /// Retrieves a previously stowed item and brings it to hand via the normal
+    /// <see cref="PickUpObject"/> flow. The hand must be empty before calling this.
+    /// </summary>
+    public void UnstowItemToHand(PickableObject item)
+    {
+        if (item == null || _heldObject != null) return;
+
+        // Re-activate and place at hand before the normal pickup flow runs.
+        item.gameObject.SetActive(true);
+        item.RemoveParent();
+        item.transform.position = holdPoint.position;
+        item.transform.rotation = holdPoint.rotation;
+
+        PickUpObject(item);
+    }
+
     [ServerRpc]
     private void RequestDropServerRpc(int itemIndex, Vector3 position, Quaternion rotation)
     {

@@ -47,6 +47,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private DeathScreenUI deathScreenUI;
     [SerializeField] private GameObject _endDayPopup;
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
+    [SerializeField] private GameObject _thanksForPlayingPanel;
+    [SerializeField] private ThanksForPlayingUI _thanksForPlayingUI;
 
     /// <summary>The <see cref="ScreenDamage"/> component driving the screen hurt overlay.</summary>
     public ScreenDamage ScreenDamage => _screenDamage;
@@ -485,5 +487,35 @@ public class UIController : MonoBehaviour
     {
         if (_endDayPopup != null)
             _endDayPopup.SetActive(false);
+    }
+
+    // ─── Thanks For Playing ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows the "Thanks for Playing the Demo" end screen.
+    /// Locks player movement, interaction, and look, and shows the cursor.
+    /// Called by <see cref="ShiftManager"/> after the final day's shift sequence completes.
+    /// </summary>
+    public void ShowThanksForPlayingScreen()
+    {
+        if (PlayerInstance.Instance != null)
+        {
+            PlayerInstance.Instance.CanControl = false;
+            PlayerInstance.Instance.PlayerInteractionController?.SetCanInteract(false, string.Empty);
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>()?.SetCanLook(false);
+        }
+
+        ShowCursor();
+        playerUI.SetActive(false);
+
+        if (_thanksForPlayingPanel != null)
+            _thanksForPlayingPanel.SetActive(true);
+    }
+
+    /// <summary>Hides the thanks-for-playing screen.</summary>
+    public void HideThanksForPlayingScreen()
+    {
+        if (_thanksForPlayingPanel != null)
+            _thanksForPlayingPanel.SetActive(false);
     }
 }

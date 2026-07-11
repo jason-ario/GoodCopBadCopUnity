@@ -178,19 +178,25 @@ Shader "GoodCopBadCop/RippedPoster"
                 // Sample texture
                 half4 texColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv) * _Color;
 
-                // Diffuse lighting – simple NdotL + ambient lift
+                // Lighting: main directional + URP ambient/SH (same as URP Lit shader)
                 float3 normalWS  = normalize(IN.normalWS);
                 Light  mainLight = GetMainLight();
                 half   NdotL     = saturate(dot(normalWS, mainLight.direction));
-                half3  diffuse   = mainLight.color * (NdotL * 0.7 + 0.3);
+
+                // SampleSH gives correct ambient from the scene's environment/skybox/probes
+                half3  ambient   = SampleSH(normalWS);
+                half3  diffuse   = mainLight.color * NdotL + ambient;
 
                 half3 litColor = texColor.rgb * diffuse;
 
                 // Inner shadow just past the white paper edge
                 litColor *= lerp(1.0 - _ShadowStrength, 1.0, shadowMask);
 
-                // Blend paper-edge color → lit poster color
-                half3 finalRGB = lerp(_EdgeColor.rgb, litColor, edgeMask);
+                // Apply same lighting to the paper edge so it reacts to scene light
+                half3 litEdge = _EdgeColor.rgb * diffuse;
+
+                // Blend lit paper-edge color → lit poster color
+                half3 finalRGB = lerp(litEdge, litColor, edgeMask);
 
                 // Fog
                 finalRGB = MixFog(finalRGB, IN.fogFactor);

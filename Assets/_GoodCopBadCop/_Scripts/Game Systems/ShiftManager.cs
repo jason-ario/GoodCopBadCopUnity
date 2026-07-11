@@ -633,6 +633,14 @@ public class ShiftManager : NetworkBehaviour
         UIController.Instance.FadeOut();
         yield return new WaitForSeconds(1f);
 
+        // When the final demo day ends, hand off to the thanks-for-playing screen
+        // instead of starting the next shift.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsCampaignComplete)
+        {
+            UIController.Instance.ShowThanksForPlayingScreen();
+            yield break;
+        }
+
         EnablePlayerControl();
         OnDoorUnlock?.Invoke();
         OnShiftReady?.Invoke();

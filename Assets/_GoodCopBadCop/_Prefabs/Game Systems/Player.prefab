@@ -10719,6 +10719,7 @@ GameObject:
   - component: {fileID: 4764846097613497096}
   - component: {fileID: 4163953388148061898}
   - component: {fileID: 3017125157704808302}
+  - component: {fileID: 3300788087747057016}
   m_Layer: 14
   m_Name: Player
   m_TagString: Player
@@ -10760,6 +10761,7 @@ Transform:
   - {fileID: 4628353955597244318}
   - {fileID: 6654549000153014940}
   - {fileID: 394960201828361671}
+  - {fileID: 956981113952334744}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -180, z: 0}
 --- !u!143 &5788063810737065446
@@ -11491,6 +11493,18 @@ MonoBehaviour:
       NameHash: -1511146327
       Synchronize: 1
       ParameterType: 4
+    - name: Point
+      NameHash: 1986321440
+      Synchronize: 1
+      ParameterType: 4
+    - name: Puke
+      NameHash: 60972478
+      Synchronize: 1
+      ParameterType: 4
+    - name: Dance
+      NameHash: -645213589
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!114 &5788097999620647467
 MonoBehaviour:
@@ -11716,6 +11730,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 578938a570b1a2042b9f503db3f7ecd2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EmoteInputController
+--- !u!114 &3300788087747057016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b52d7436b783144183a4c109eb92587, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  ShowTopMostFoldoutHeaderGroup: 1
+  stowPoint: {fileID: 956981113952334744}
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0
@@ -11914,6 +11942,37 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7342743542733398178}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4194450941912979967
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 956981113952334744}
+  m_Layer: 0
+  m_Name: Stow Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &956981113952334744
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4194450941912979967}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.25, y: 0.85, z: 0.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8000816560836992802}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4961214662234779086
 GameObject:

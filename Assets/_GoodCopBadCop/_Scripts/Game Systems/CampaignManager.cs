@@ -51,6 +51,14 @@ public class CampaignManager : NetworkBehaviour
     /// <summary>Fired when the final day has been completed.</summary>
     public static event Action OnCampaignComplete;
 
+    /// <summary>
+    /// True once the campaign has been completed (no further days remain).
+    /// Set on all clients via <see cref="NotifyCampaignCompleteClientRpc"/>.
+    /// ShiftManager reads this in <c>InBetweenShiftSequence</c> to decide whether to
+    /// restore player control or hand off to the thanks-for-playing screen.
+    /// </summary>
+    public bool IsCampaignComplete { get; private set; }
+
     private readonly Dictionary<int, DayBase> _days = new Dictionary<int, DayBase>();
 
     /// <summary>
@@ -202,7 +210,9 @@ public class CampaignManager : NetworkBehaviour
         {
             Debug.Log("[CampaignManager] Campaign complete — no further days configured.");
             ActiveDay?.DayCompleted();
+            IsCampaignComplete = true;
             OnCampaignComplete?.Invoke();
+            NotifyCampaignCompleteClientRpc();
             return;
         }
 
@@ -215,6 +225,36 @@ public class CampaignManager : NetworkBehaviour
 
         // Server applies immediately; clients apply via OnNetworkDayChanged.
         ApplyDay(nextDay);
+    }
+
+    // -------------------------------------------------------------------------
+    // Campaign Complete
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Broadcasts campaign completion to all clients. Sets <see cref="IsCampaignComplete"/>
+    /// true on each client so that <c>ShiftManager.InBetweenShiftSequence</c> can skip
+    /// the normal shift-start path and instead show the thanks-for-playing screen.
+    /// </summary>
+    [ClientRpc]
+    private void NotifyCampaignCompleteClientRpc()
+    {
+        IsCampaignComplete = true;
+        Debug.Log("[CampaignManager] Campaign complete notification received on client.");
+    }
+
+    /// <summary>
+    /// Debug only — immediately marks the campaign as complete on this client and
+    /// broadcasts the flag to all clients via <see cref="NotifyCampaignCompleteClientRpc"/>.
+    /// Use this from <see cref="DebugConsole"/> to show the thanks-for-playing screen
+    /// without running through the full shift-end sequence.
+    /// </summary>
+    public void DebugForceCampaignComplete()
+    {
+        IsCampaignComplete = true;
+        if (IsServer)
+            NotifyCampaignCompleteClientRpc();
+        Debug.Log("[CampaignManager] DEBUG — campaign forcibly marked complete.");
     }
 
     // -------------------------------------------------------------------------
