@@ -430,6 +430,10 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Scripted suspects use the normal SuspectCharacter flow. If the prefab also carries
+        // dormant mutant components, they must not auto-initialize during NetworkObject.Spawn().
+        spawnedSuspect.GetComponent<MutantEnemy>()?.DisableAutoInit();
+
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
