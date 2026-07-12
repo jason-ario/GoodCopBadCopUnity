@@ -385,28 +385,33 @@ public class SuspectCharacter : Interactable
     // Navigation
 
     [Header("Navigation")]
-    [Tooltip("Movement speed passed to the NavMeshAgent. Match to the walk animation speed.")]
+    [Tooltip("Walk speed in units per second. Used to calculate DOTween movement duration " +
+             "and also applied to the NavMeshAgent when InitNavigation() is called explicitly " +
+             "for special cases (e.g. MutantSuspectBehaviour retreat pathfinding).")]
     [SerializeField] private float _walkSpeed = 1.5f;
 
-    [Tooltip("Rotation speed (degrees/second) while the NavMeshAgent is moving.")]
+    [Tooltip("Rotation speed (degrees/second) used when the NavMeshAgent is active for special cases.")]
     [SerializeField] private float _angularSpeed = 240f;
 
-    [Tooltip("Distance from the destination at which the agent is considered to have arrived.")]
+    [Tooltip("Stopping distance applied to the NavMeshAgent when it is explicitly enabled for special cases.")]
     [SerializeField] private float _stoppingDistance = 0.1f;
 
-    [Tooltip("Agent speed threshold at or above which the 'Running' animator bool is set instead of 'Walking'. " +
-             "Set the agent speed above this value (e.g. via NavigateTo after a speed change) to trigger the run animation.")]
+    [Tooltip("Speed threshold at or above which the 'Running' animator bool is set instead of 'Walking'.")]
     [SerializeField] private float _runThreshold = 2.5f;
 
     private NavMeshAgent _navAgent;
     private Coroutine _navMoveCoroutine;
+    private Tween _activeTween;
 
     /// <summary>The cached NavMeshAgent, or null if no agent is attached.</summary>
     public NavMeshAgent NavAgent => _navAgent;
 
     /// <summary>
-    /// Enables and configures the NavMeshAgent. Must be called server-side after the character
-    /// spawns or is placed in the scene. No-op when no NavMeshAgent component is present.
+    /// Configures the NavMeshAgent properties (speed, angular speed, stopping distance) without
+    /// enabling it. The agent stays disabled during normal DOTween-based movement and is only
+    /// enabled explicitly by systems that require pathfinding (e.g. MutantSuspectBehaviour for
+    /// retreat/climb-through sequences).
+    /// No-op when no NavMeshAgent component is present.
     /// </summary>
     public void InitNavigation()
     {
@@ -416,31 +421,26 @@ public class SuspectCharacter : Interactable
         _navAgent.speed = _walkSpeed;
         _navAgent.angularSpeed = _angularSpeed;
         _navAgent.stoppingDistance = _stoppingDistance;
-        _navAgent.updateRotation = false; // Manual rotation when stationary; enabled during NavigateTo.
-        _navAgent.enabled = true;
+        _navAgent.updateRotation = false;
+        // Agent stays disabled — MutantSuspectBehaviour enables it directly when pathfinding is needed.
     }
 
     /// <summary>
-    /// Sets the NavMeshAgent destination and invokes <paramref name="onArrived"/> once the agent
-    /// stops within <see cref="_stoppingDistance"/> of the target. Server-side only.
-    /// Cancels any in-progress navigation before starting the new path.
+    /// Moves the character to <paramref name="destination"/> using a DOTween position tween,
+    /// then invokes <paramref name="onArrived"/>. Duration is derived from distance and
+    /// <see cref="_walkSpeed"/>. Cancels any in-progress movement before starting.
+    /// The NavMeshAgent is not used and remains disabled.
     /// </summary>
     /// <param name="destination">World-space destination.</param>
     /// <param name="onArrived">Optional callback invoked on arrival.</param>
     public void NavigateTo(Vector3 destination, Action onArrived = null)
     {
-        if (_navAgent == null || !_navAgent.enabled)
-        {
-            Debug.LogWarning($"[SuspectCharacter] NavigateTo called on '{name}' but NavMeshAgent is not available.");
-            onArrived?.Invoke();
-            return;
-        }
-
         if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
-        _navMoveCoroutine = StartCoroutine(NavMoveCoroutine(destination, onArrived));
+        _activeTween?.Kill();
+        _navMoveCoroutine = StartCoroutine(WalkToCoroutine(destination, onArrived));
     }
 
-    /// <summary>Stops the current navigation immediately.</summary>
+    /// <summary>Stops the current DOTween movement immediately.</summary>
     public void StopNavigation()
     {
         if (_navMoveCoroutine != null)
@@ -449,65 +449,33 @@ public class SuspectCharacter : Interactable
             _navMoveCoroutine = null;
         }
 
-        if (_navAgent != null && _navAgent.enabled && _navAgent.isOnNavMesh)
-        {
-            _navAgent.isStopped = true;
-            _navAgent.updateRotation = false;
-        }
+        _activeTween?.Kill();
+        _activeTween = null;
     }
 
-    private IEnumerator NavMoveCoroutine(Vector3 destination, Action onArrived)
+    private IEnumerator WalkToCoroutine(Vector3 destination, Action onArrived)
     {
-        const float retryDelay = 0.25f;
-        const int maxRetries = 10;
-        int retries = 0;
+        // Snap to face the destination direction before moving.
+        Vector3 dir = destination - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude > 0.001f)
+            transform.rotation = Quaternion.LookRotation(dir.normalized);
 
-        _navAgent.updateRotation = true;
-        _navAgent.isStopped = false;
+        // Calculate flat-plane distance so vertical offsets don't inflate the duration.
+        Vector3 flatStart = new Vector3(transform.position.x, 0f, transform.position.z);
+        Vector3 flatEnd   = new Vector3(destination.x,        0f, destination.z);
+        float distance    = Vector3.Distance(flatStart, flatEnd);
+        float duration    = distance / Mathf.Max(0.01f, _walkSpeed);
 
-        while (_navAgent.enabled)
-        {
-            _navAgent.SetDestination(destination);
-            yield return null; // One frame for path calculation to begin.
-            while (_navAgent.pathPending) yield return null;
+        bool done = false;
+        _activeTween = transform
+            .DOMove(destination, duration)
+            .SetEase(Ease.Linear)
+            .OnComplete(() => done = true);
 
-            if (_navAgent.pathStatus == NavMeshPathStatus.PathComplete)
-            {
-                // Full path - wait until the agent actually arrives.
-                while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
-                    yield return null;
-                break;
-            }
+        yield return new WaitUntil(() => done);
 
-            // Partial or invalid path - a closed gate or door is likely blocking.
-            // Let the agent walk as far as it can so the obstacle's proximity auto-open fires,
-            // then wait for the NavMesh to update and retry.
-            if (retries >= maxRetries)
-            {
-                Debug.LogWarning($"[SuspectCharacter] NavigateTo '{name}': could not reach destination after {maxRetries} retries - proceeding anyway.");
-                break;
-            }
-
-            while (_navAgent.enabled && !_navAgent.pathPending
-                   && _navAgent.remainingDistance > _navAgent.stoppingDistance
-                   && !float.IsInfinity(_navAgent.remainingDistance))
-                yield return null;
-
-            // Already close enough - treat as arrived.
-            if (Vector3.Distance(transform.position, destination) <= _navAgent.stoppingDistance + 0.05f)
-                break;
-
-            // Brief wait for the obstacle to clear and NavMesh to re-bake.
-            yield return new WaitForSeconds(retryDelay);
-            retries++;
-        }
-
-        if (_navAgent.enabled && _navAgent.isOnNavMesh)
-        {
-            _navAgent.isStopped = true;
-            _navAgent.updateRotation = false;
-        }
-
+        _activeTween = null;
         _navMoveCoroutine = null;
         onArrived?.Invoke();
     }
@@ -523,27 +491,27 @@ public class SuspectCharacter : Interactable
 
     /// <summary>
     /// Sets the locomotion animation state and replicates to all clients.
-    /// Compares the NavMeshAgent's current speed against <see cref="_runThreshold"/>:
-    /// if moving and speed >= threshold the 'Running' bool is set; otherwise 'Walking' is set.
+    /// Compares <see cref="_walkSpeed"/> against <see cref="_runThreshold"/>:
+    /// if moving and speed is at or above the threshold the 'Running' bool is set; otherwise 'Walking'.
     /// Both bools are cleared when <paramref name="moving"/> is false.
-    /// Use this instead of setting 'Walking' directly so the run state is always evaluated correctly.
     /// </summary>
     public void SetLocomotionState(bool moving)
     {
-        bool shouldRun = moving && _navAgent != null && _navAgent.speed >= _runThreshold;
+        bool shouldRun = moving && _walkSpeed >= _runThreshold;
         SetAnimatorBool("Walking", moving && !shouldRun);
         SetAnimatorBool("Running", shouldRun);
     }
 
     /// <summary>
-    /// Sets the NavMeshAgent speed and immediately re-evaluates the locomotion animation state.
-    /// Use when you want to switch between walk and run speeds while the suspect is already navigating.
+    /// Sets the movement speed and immediately re-evaluates the locomotion animation state.
+    /// Also updates the NavMeshAgent speed if the agent is present, for special-case pathfinding.
     /// </summary>
     public void SetMovementSpeed(float speed)
     {
+        _walkSpeed = speed;
         if (_navAgent != null) _navAgent.speed = speed;
-        // Re-evaluate animation state only if the agent is currently moving.
-        bool isMoving = _navAgent != null && _navAgent.hasPath && !_navAgent.isStopped;
+        // Re-evaluate animation state only if a movement is currently in progress.
+        bool isMoving = _activeTween != null && _activeTween.IsActive() && _activeTween.IsPlaying();
         if (isMoving) SetLocomotionState(true);
     }
 

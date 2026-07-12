@@ -109,6 +109,17 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         dialogueChoiceContainer.SetActive(false);
         backButton.SetActive(false);
+
+        // If scripted dialogue is still active (e.g. old-style dialogue closed while a scripted
+        // sequence was running), do not restore normal gameplay state — the scripted mode exit
+        // path will do that when the sequence finishes. Keep the cursor visible so the player
+        // can still advance lines and make choices.
+        if (ScriptedDialogueRunner.IsScriptedModeActive)
+        {
+            UIController.Instance.ShowCursor();
+            return;
+        }
+
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
 
@@ -140,7 +151,17 @@ public class DialogueChoiceSystem : NetworkBehaviour
                   $"PlayerInstance={PlayerInstance.Instance != null}, " +
                   $"SuspectController={SuspectController.Instance != null}");
 
-        if (IsInDialogueMode) return;
+        if (IsInDialogueMode)
+        {
+            // Scripted mode is taking over while old-style dialogue mode was already active
+            // (e.g. player clicked a suspect just before the scripted sequence fired).
+            // Force-show the cursor and tear down the lingering choice UI so it cannot
+            // later call ExitDialogueMode and hide the cursor mid-sequence.
+            UIController.Instance.ShowCursor();
+            if (_reshowCoroutine != null) { StopCoroutine(_reshowCoroutine); _reshowCoroutine = null; }
+            dialogueChoiceContainer.SetActive(false);
+            return;
+        }
 
         IsInDialogueMode = true;
         PlayerInstance.Instance?.SetIsInCutscene(true);
@@ -185,7 +206,15 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// </summary>
     public void EnterScriptedDialogueModeOutside(Transform lookTarget = null)
     {
-        if (IsInDialogueMode) return;
+        if (IsInDialogueMode)
+        {
+            // Same guard as EnterScriptedDialogueMode: scripted mode takes over, show cursor
+            // and clear old choice UI so it cannot hide the cursor via ExitDialogueMode later.
+            UIController.Instance.ShowCursor();
+            if (_reshowCoroutine != null) { StopCoroutine(_reshowCoroutine); _reshowCoroutine = null; }
+            dialogueChoiceContainer.SetActive(false);
+            return;
+        }
 
         IsInDialogueMode = true;
         PlayerInstance.Instance?.SetIsInCutscene(true);

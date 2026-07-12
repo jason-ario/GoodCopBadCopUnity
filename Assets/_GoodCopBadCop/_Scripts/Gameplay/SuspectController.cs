@@ -546,9 +546,6 @@ public class SuspectController : NetworkBehaviour
         _activeStandPos = NextSuspectStandPosOverride != null ? NextSuspectStandPosOverride : standPos;
         NextSuspectStandPosOverride = null;
 
-        // Enable NavMeshAgent for this suspect now that we are server-side and about to move.
-        suspectCharacter.InitNavigation();
-
         suspectCharacter.SetLocomotionState(true);
         suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 

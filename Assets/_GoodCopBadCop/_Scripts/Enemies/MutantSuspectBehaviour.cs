@@ -28,6 +28,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [Tooltip("Short stinger played on all clients the moment the mutant finishes climbing through and lands inside.")]
     [SerializeField] private AudioClip _climbLandSound;
 
+    [Tooltip("If true, the chase music clip will play when this mutant breaks through the window. " +
+             "Enable only on suspect characters that transform into a mutant mid-shift.")]
+    [SerializeField] private bool _playChaseMusic = false;
+
     [Header("Chase Music")]
     [Tooltip("Looping music that plays on all clients once the mutant has landed inside and starts chasing. " +
              "Faded out automatically when the mutant flees or dies.")]
@@ -188,7 +192,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         // Wait for the actual movement tween to finish.
         yield return new WaitUntil(() => moveDone);
         PlayClimbLandSoundClientRpc();
-        StartChaseMusicClientRpc();
+        if (_playChaseMusic)
+            StartChaseMusicClientRpc();
 
         if (_isDone) yield break;
 
