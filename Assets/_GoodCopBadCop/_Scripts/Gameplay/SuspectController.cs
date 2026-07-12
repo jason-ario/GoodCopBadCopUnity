@@ -1277,6 +1277,14 @@ public class SuspectController : NetworkBehaviour
     public void Quarantine()
     {
         if (!IsServer) return;
+
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+        if (SuspectRunRecords.Instance != null && !SuspectRunRecords.Instance.HasQuarantineSlot(currentDay))
+        {
+            Debug.LogWarning("[SuspectController] Quarantine blocked: quarantine slots are full.");
+            return;
+        }
+
         StartCoroutine(QuarantineSequence());
     }
 

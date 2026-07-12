@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
+using GoodCopBadCop.SuspectPaperwork;
 using UnityEngine;
 
 public class PC : Interactable
@@ -38,6 +39,7 @@ public class PC : Interactable
     // List management
     private List<SuspectData> _currentBaseList;
     private List<SuspectData> _currentVisibleList;
+    private bool _showQuarantineDays;
 
     private void Start()
     {
@@ -136,18 +138,11 @@ public class PC : Interactable
         CloseAllScreens();
         profilePage.gameObject.SetActive(true);
 
-        // Resolve the status stamp shown on the profile from the runtime suspect record.
-        string status = string.Empty;
-        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (record != null)
-        {
-            if (record.isReplacement)
-                status = "REPLACED";
-            else if (record.isKilled)
-                status = "DECEASED";
-        }
-
-        profilePage.SetProfileData(suspectData, status: status);
+        profilePage.SetProfileData(
+            suspectData,
+            GetProfileEntryReason(suspectData),
+            GetProfileLastExitDate(),
+            GetProfileStatus(suspectData));
 
         UpdateProfileNavigationUI();
 
@@ -276,10 +271,9 @@ public class PC : Interactable
 
     public void OpenResidents()
     {
-        _currentBaseList = _suspectSet.suspects
-            .OrderBy(s => s.LastName)
-            .ThenBy(s => s.FirstName)
-            .ToList();
+        _showQuarantineDays = false;
+        _currentBaseList = SortSuspects(_suspectSet.suspects
+            .Where(s => s != null && s.IsResident));
 
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
@@ -292,54 +286,181 @@ public class PC : Interactable
 
     public void OpenVisitors()
     {
-        _currentBaseList = _suspectSet.suspects
-            .OrderBy(s => s.LastName)
-            .ThenBy(s => s.FirstName)
-            .ToList();
+        _showQuarantineDays = false;
+        _currentBaseList = SortSuspects(_suspectSet.suspects
+            .Where(s => s != null && !s.IsResident));
 
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
-        RenderCurrentList();
         OpenScreen(suspectListScreen);
+        FilterAF();
+        RenderCurrentList();
         SelectFolderTab(0);
     }
 
     public void OpenDeceased()
     {
-        // Filter to suspects that have been killed this run.
-        _currentBaseList = _suspectSet.suspects
+        _showQuarantineDays = false;
+        _currentBaseList = SortSuspects(_suspectSet.suspects
             .Where(s =>
             {
                 if (s == null) return false;
                 SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(s);
                 return record != null && record.isKilled;
-            })
-            .OrderBy(s => s.LastName)
-            .ThenBy(s => s.FirstName)
-            .ToList();
+            }));
 
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
-        RenderCurrentList();
         OpenScreen(suspectListScreen);
+        FilterAF();
+        RenderCurrentList();
+        SelectFolderTab(0);
+    }
+
+    public void OpenQuarantine()
+    {
+        _showQuarantineDays = true;
+        int currentDay = GetCurrentDay();
+
+        IEnumerable<SuspectData> quarantinedSuspects = SuspectRunRecords.Instance != null
+            ? SuspectRunRecords.Instance.GetActiveQuarantineRecords(currentDay)
+                .Where(record => record?.SuspectData != null)
+                .Select(record => record.SuspectData)
+            : Enumerable.Empty<SuspectData>();
+
+        _currentBaseList = SortSuspects(quarantinedSuspects);
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
+        OpenScreen(suspectListScreen);
+        FilterAF();
+        RenderCurrentList();
         SelectFolderTab(0);
     }
 
     public void OpenAll()
     {
-        _currentBaseList = _suspectSet.suspects
-            .OrderBy(s => s.LastName)
-            .ThenBy(s => s.FirstName)
-            .ToList();
+        _showQuarantineDays = false;
+        _currentBaseList = SortSuspects(_suspectSet.suspects
+            .Where(s => s != null));
 
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
 
-        RenderCurrentList();
         OpenScreen(suspectListScreen);
+        FilterAF();
+        RenderCurrentList();
         SelectFolderTab(0);
+    }
+
+    public string GetTerminalStatus(SuspectData suspectData)
+    {
+        string status = GetBaseStatus(suspectData);
+        if (status != "QUARANTINED" || !_showQuarantineDays)
+            return status;
+
+        int daysLeft = SuspectRunRecords.Instance != null
+            ? SuspectRunRecords.Instance.GetRemainingQuarantineDays(suspectData, GetCurrentDay())
+            : 0;
+
+        string dayLabel = daysLeft == 1 ? "DAY" : "DAYS";
+        return $"QUARANTINED - {daysLeft} {dayLabel} LEFT";
+    }
+
+    private string GetProfileEntryReason(SuspectData suspectData)
+    {
+        if (suspectData == null)
+            return "unknown";
+
+        SuspectPaperworkModel paperworkModel = new SuspectPaperworkModel();
+        SuspectPaperworkService paperworkService = new SuspectPaperworkService(paperworkModel);
+        SuspectPaperworkState state = paperworkService.BuildForPreview(
+            suspectData,
+            suspectData.IDPhoto,
+            Array.Empty<string>(),
+            GetPaperworkDay(),
+            GetSuspectSetIndex(suspectData));
+
+        paperworkModel.Dispose();
+
+        return string.IsNullOrWhiteSpace(state.EntryReason) ? "unknown" : state.EntryReason;
+    }
+
+    private string GetProfileLastExitDate()
+    {
+        if (ShiftManager.Instance == null)
+            return "unknown";
+
+        return ShiftManager.Instance.CurrentGameDate.ToString("MM/dd/yy");
+    }
+
+    private int GetPaperworkDay()
+    {
+        if (ShiftManager.Instance != null)
+            return ShiftManager.Instance.CurrentDay;
+
+        if (CampaignManager.Instance != null)
+            return CampaignManager.Instance.CurrentDay;
+
+        return 1;
+    }
+
+    private int GetSuspectSetIndex(SuspectData suspectData)
+    {
+        if (suspectData == null || _suspectSet == null || _suspectSet.suspects == null)
+            return 0;
+
+        int index = _suspectSet.suspects.IndexOf(suspectData);
+        return index >= 0 ? index : 0;
+    }
+
+    private string GetProfileStatus(SuspectData suspectData)
+    {
+        string status = GetBaseStatus(suspectData);
+        return status == "CLEAR" ? string.Empty : status;
+    }
+
+    private string GetBaseStatus(SuspectData suspectData)
+    {
+        if (suspectData == null)
+            return "CLEAR";
+
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record == null)
+            return "CLEAR";
+
+        if (record.isReplacement)
+            return "REPLACED";
+
+        if (record.isKilled)
+            return "DECEASED";
+
+        if (SuspectRunRecords.Instance != null
+            && SuspectRunRecords.Instance.IsInActiveQuarantine(suspectData, GetCurrentDay()))
+            return "QUARANTINED";
+
+        return "CLEAR";
+    }
+
+    private int GetCurrentDay()
+        => CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+
+    private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
+    {
+        return suspects
+            .Where(HasTerminalName)
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToList();
+    }
+
+    private static bool HasTerminalName(SuspectData suspect)
+    {
+        return suspect != null
+               && !string.IsNullOrWhiteSpace(suspect.LastName)
+               && !string.IsNullOrWhiteSpace(suspect.FirstName);
     }
 
     // --------------------------------------------------
