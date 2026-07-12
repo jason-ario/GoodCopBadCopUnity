@@ -14,6 +14,13 @@ public enum DeathBehaviour { Destroy, PlayAnimation }
 [RequireComponent(typeof(NavMeshAgent))]
 public class MutantEnemy : NetworkBehaviour
 {
+    /// <summary>
+    /// Fired on the server just before this mutant is removed from play — either by fleeing
+    /// and despawning, or by dying. Subscribe to this to defer any post-breakthrough logic
+    /// (e.g. queuing the next suspect) until the mutant is truly out of the scene.
+    /// </summary>
+    public event Action OnRemovedFromPlay;
+
     // ── Static events ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -953,6 +960,7 @@ public class MutantEnemy : NetworkBehaviour
 
         // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
         OnAnyMutantKilled?.Invoke();
+        OnRemovedFromPlay?.Invoke();
 
         // Attempt to drop a MutantBit if the night phase is active.
         MutantThreat.Instance?.TryDropBitAt(transform.position);
@@ -1008,6 +1016,7 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         SetFleeingClientRpc(false);
+        OnRemovedFromPlay?.Invoke();
 
         if (IsSpawned)
             NetworkObject.Despawn();

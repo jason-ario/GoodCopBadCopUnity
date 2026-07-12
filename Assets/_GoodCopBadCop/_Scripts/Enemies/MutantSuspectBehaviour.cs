@@ -218,11 +218,24 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _mutantEnemy.SetForceAggro(true);
             _mutantEnemy.enabled = true;
             _mutantEnemy.InitialiseServer();
+
+            // Defer the lineup slot release until the mutant is removed from play (fled or died),
+            // so the next suspect only queues once this one is truly out of the scene.
+            _mutantEnemy.OnRemovedFromPlay += () =>
+            {
+                _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+                OnSequenceComplete?.Invoke(true);
+            };
         }
 
         _isDone = true;
-        _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
-        OnSequenceComplete?.Invoke(true);
+
+        // Fallback: if there is no MutantEnemy to listen to, notify immediately.
+        if (_mutantEnemy == null)
+        {
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+            OnSequenceComplete?.Invoke(true);
+        }
     }
 
     /// <summary>
