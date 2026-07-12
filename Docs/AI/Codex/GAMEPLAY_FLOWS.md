@@ -5,7 +5,7 @@ Scope: static source inspection; validate in Unity before relying on exact scene
 
 ## When To Read
 
-Read this when behavior depends on runtime ordering: menu to lobby, campaign start, day activation, shift flow, suspect spawn/verdict, day advance, or late join. For ownership and source-file map only, use `SYSTEMS.md`.
+Read this when behavior depends on runtime ordering: menu to lobby, campaign start, day activation, shift flow, suspect spawn/verdict, day advance, or late join.
 
 ## 1. Menu to Gameplay
 

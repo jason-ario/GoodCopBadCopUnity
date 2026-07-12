@@ -10,7 +10,9 @@
 
 For AI-assisted project coding tasks:
 
-- Read `Docs/AI/README.md` and follow its routing.
+- Read `Docs/AI/SESSION_START.md` for compact shared project context.
+- For architecture-sensitive work, read `Docs/AI/ARCHITECTURE.md`.
+- For process, tests, or verification, read `Docs/AI/WORKFLOW.md`.
 - For any Git-related work, read `Docs/AI/GIT.md` before running commands that modify repository state.
 - Do not read every file in `Docs/AI` by default.
 - Inspect actual source files before making code changes.
