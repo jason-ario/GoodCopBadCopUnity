@@ -24,6 +24,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<ESettingsMenuTab> TabSelected { get; }
         Observable<Unit> BackRequested { get; }
         Observable<Unit> Closed { get; }
+        void Initialize();
         void SetVisible(bool isVisible);
         void ShowTab(ESettingsMenuTab tab);
         void SetDisplayModeValue(int value);
@@ -286,6 +287,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<Unit> backRequested = new();
         private readonly Subject<Unit> closed = new();
         private DisposableBag tabDisposables;
+        private bool isInitialized;
 
         public Observable<int> DisplayModeChanged => displayModeChanged;
         public Observable<int> ScreenResolutionChanged => screenResolutionChanged;
@@ -305,6 +307,17 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private void Awake()
         {
+            Initialize();
+        }
+
+        public void Initialize()
+        {
+            if (isInitialized)
+            {
+                return;
+            }
+
+            isInitialized = true;
             DisableDecorativeRaycastTargets();
             BuildSettingsContent();
             BindTabs();

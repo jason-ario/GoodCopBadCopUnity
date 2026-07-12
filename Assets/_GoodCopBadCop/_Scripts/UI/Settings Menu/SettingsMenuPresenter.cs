@@ -31,6 +31,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         public void Initialize()
         {
+            view.Initialize();
+
             view.TabSelected.Subscribe(OnTabSelected).AddTo(ref disposables);
             view.DisplayModeChanged.Subscribe(OnDisplayModeChanged).AddTo(ref disposables);
             view.ScreenResolutionChanged.Subscribe(OnScreenResolutionChanged).AddTo(ref disposables);
