@@ -755,6 +755,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 				// Injection Point: 'Outline Pass/Tags'
 			}
 			Cull Front
+			ColorMask RGB
 			// Injection Point: 'Outline Pass/Shader States'
 
 			HLSLPROGRAM

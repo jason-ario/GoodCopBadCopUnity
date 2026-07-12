@@ -13,6 +13,7 @@ public class PlayerInstance : NetworkBehaviour
     [SerializeField] private Unity.Cinemachine.CinemachineCamera deathCamera;
     [SerializeField] private Unity.Cinemachine.CinemachineCamera spectateCamera;
     [SerializeField] private float deathUIDelay = 2f;
+    [SerializeField] private AudioClip _deathStinger;
 
     private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
         false,
@@ -229,6 +230,9 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     public void Die()
     {
+        if (_deathStinger != null)
+            SFXController.Instance?.Play(_deathStinger);
+
         CanControl = false;
         SetCanInteract(false);
         SetCanMove(false);

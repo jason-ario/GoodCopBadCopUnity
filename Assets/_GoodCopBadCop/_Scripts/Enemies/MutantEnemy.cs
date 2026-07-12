@@ -41,6 +41,8 @@ public class MutantEnemy : NetworkBehaviour
     [SerializeField] private string groundedParameterName = "Grounded";
     [SerializeField] private string attackBoolName = "Attack";
     [SerializeField] private string deathBoolName = "Death";
+    [Tooltip("Bool parameter set to true whenever the agent is moving. Derived from the synced Speed value — no extra NetworkVariable required.")]
+    [SerializeField] private string runningBoolName = "Running";
 
     [Header("Attack Hitbox")]
     [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
@@ -90,6 +92,12 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Seconds after beginning the flee before the mutant force-despawns regardless of distance.")]
     [Min(1f)]
     [SerializeField] private float fleeDespawnTimeout = 8f;
+
+    [Header("Deferred Initialisation")]
+    [Tooltip("When false, InitialiseServer() is NOT called automatically on OnNetworkSpawn. " +
+             "Use this when the enemy lives on a SuspectCharacter prefab and should only activate " +
+             "after its booth cutscene completes. Call InitialiseServer() manually via SuspectCharacter.BeginMutantBehavior().")]
+    [SerializeField] private bool _autoInitialiseOnSpawn = true;
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -145,7 +153,7 @@ public class MutantEnemy : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (IsServer)
+        if (IsServer && _autoInitialiseOnSpawn)
         {
             InitialiseServer();
         }
@@ -189,12 +197,30 @@ public class MutantEnemy : NetworkBehaviour
         _agent.angularSpeed = data.angularSpeed;
         _agent.acceleration = data.acceleration;
         _agent.stoppingDistance = data.stoppingDistance;
+        _agent.updateRotation = true;
+        _agent.isStopped = false;
 
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
         StartCoroutine(ChaseLoop());
     }
+
+    /// <summary>
+    /// Assigns the Animator reference used for speed and grounded blending.
+    /// Call this before <see cref="InitialiseServer"/> when the enemy's Animator lives on a
+    /// child that is only activated at runtime (e.g. the Mutated Version mesh on a SuspectCharacter prefab).
+    /// </summary>
+    public void SetAnimator(Animator a) => animator = a;
+
+    /// <summary>
+    /// Prevents <see cref="InitialiseServer"/> from firing automatically during
+    /// <see cref="OnNetworkSpawn"/>. Must be called before <see cref="NetworkObject.Spawn"/>
+    /// on the server when this enemy lives on a <see cref="SuspectCharacter"/> prefab and must
+    /// stay dormant until the booth cutscene ends and
+    /// <see cref="SuspectCharacter.BeginMutantBehavior"/> fires.
+    /// </summary>
+    public void DisableAutoInit() => _autoInitialiseOnSpawn = false;
 
     // ── Server Loops ───────────────────────────────────────────────────────────
 
@@ -477,7 +503,13 @@ public class MutantEnemy : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServer || _isDead || !_agent.isActiveAndEnabled) return;
+        if (!IsServer || !_agent.isActiveAndEnabled) return;
+
+        // Always sync locomotion state so clients see movement during flee even though _isDead is true.
+        _networkSpeed.Value = _agent.velocity.magnitude;
+        _networkGrounded.Value = _agent.isOnNavMesh;
+
+        if (_isDead) return;
 
         // ── Rotation Tracking ──────────────────────────────────────────────────
         // If we are in range to attack something, ensure we rotate to face it 
@@ -533,9 +565,6 @@ public class MutantEnemy : NetworkBehaviour
                 TryAttackFence();
             }
         }
-
-        _networkSpeed.Value = _agent.velocity.magnitude;
-        _networkGrounded.Value = _agent.isOnNavMesh;
     }
 
     // ── Targeting ──────────────────────────────────────────────────────────────
@@ -982,8 +1011,13 @@ public class MutantEnemy : NetworkBehaviour
 
     private void ApplyAnimatorSpeed(float speed)
     {
-        if (animator != null && !string.IsNullOrEmpty(speedParameterName))
+        if (animator == null) return;
+
+        if (!string.IsNullOrEmpty(speedParameterName))
             animator.SetFloat(speedParameterName, speed);
+
+        if (!string.IsNullOrEmpty(runningBoolName))
+            animator.SetBool(runningBoolName, speed > 0.1f);
     }
 
     private void OnNetworkGroundedChanged(bool oldValue, bool newValue)

@@ -90,8 +90,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 58595389007674765}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.451, z: 0.106999755}
+  m_LocalRotation: {x: 0.0023922587, y: -0.99992615, z: -0.008029954, w: -0.008808639}
+  m_LocalPosition: {x: -1.9126318, y: 2.4766839, z: 7.978947}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -128,9 +128,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.12
+  near clip plane: 0.1
   far clip plane: 5000
-  field of view: 65
+  field of view: 60.000004
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -10801,7 +10801,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2146751676
+  GlobalObjectIdHash: 2119203540
   InScenePlacedSourceGlobalObjectIdHash: 2146751676
   DeferredDespawnTick: 0
   Ownership: 1
@@ -10929,12 +10929,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
-    are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:Spine1'\n\tTransform
-    'mixamorig:Spine2'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform 'mixamorig:Head'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
-    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:RightShoulder'\n\tand more ..."
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -11030,6 +11025,7 @@ MonoBehaviour:
   deathCamera: {fileID: 6875769014329330890}
   spectateCamera: {fileID: 7191204140556434343}
   deathUIDelay: 2
+  _deathStinger: {fileID: 8300000, guid: b3db94b317dd0154e85fa0ccac97658c, type: 3}
 --- !u!114 &7541639783584628704
 MonoBehaviour:
   m_ObjectHideFlags: 0

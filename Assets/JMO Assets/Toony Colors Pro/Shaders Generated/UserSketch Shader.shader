@@ -745,6 +745,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			}
 			Cull Front
 			Blend [_SrcBlend] [_DstBlend]
+			ColorMask RGB
 			ZWrite On
 			// Injection Point: 'Outline Pass/Shader States'
 

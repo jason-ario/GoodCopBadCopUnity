@@ -52,7 +52,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
-    private const float GiveUpPauseDuration = 1f;
+    private const float GiveUpPauseDuration = 0.1f;
     private const string ClimbingAnimBool = "climbing";
     private const string BangOnShuttersAnimBool = "BangOnShutters";
 
@@ -278,24 +278,31 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     }
 
     /// <summary>
-    /// Rotates to face the despawn point, walks back to it, then either calls
+    /// Snaps to face the despawn point, sprints back to it, then either calls
     /// <see cref="SuspectController.OnMutantIntruderComplete"/> (climbing mutants that gave up)
     /// or despawns directly (non-climbing mutants whose lineup slot was already released).
+    /// A hard <see cref="MutantIntruderData.retreatDespawnTimeout"/> deadline ensures the
+    /// mutant is force-despawned within that window even if it never reaches the despawn point.
     /// </summary>
     private IEnumerator RetreatingSequence(bool notifyController)
     {
         if (_isDone) yield break;
 
-        // Rotate to face the despawn direction before walking.
+        float retreatDeadline = Time.time + _data.retreatDespawnTimeout;
+
+        // Quick snap-turn toward the despawn direction.
         Vector3 toSpawn = _despawnPos.position - transform.position;
         toSpawn.y = 0f;
         if (toSpawn.sqrMagnitude > 0.001f)
         {
             bool rotDone = false;
             _activeTween = transform
-                .DORotateQuaternion(Quaternion.LookRotation(toSpawn.normalized), 0.5f)
+                .DORotateQuaternion(Quaternion.LookRotation(toSpawn.normalized), 0.2f)
                 .OnComplete(() => rotDone = true);
-            yield return new WaitUntil(() => rotDone);
+
+            // Honour the hard deadline even during the turn.
+            while (!rotDone && Time.time < retreatDeadline)
+                yield return null;
         }
 
         if (_isDone) yield break;
@@ -308,10 +315,16 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_agent.isOnNavMesh)
         {
+            _agent.speed = _data.retreatSpeed;
             _agent.SetDestination(_despawnPos.position);
 
-            while (_agent.pathPending || _agent.remainingDistance > _agent.stoppingDistance + ArrivalTolerance)
+            // Sprint until arrival OR the hard deadline fires — whichever comes first.
+            while (!_isDone && Time.time < retreatDeadline)
+            {
+                if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + ArrivalTolerance)
+                    break;
                 yield return new WaitForSeconds(ArrivalPollInterval);
+            }
 
             _agent.ResetPath();
         }
@@ -386,6 +399,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         else
             yield return StartCoroutine(ShutterBangSequence());
     }
+
+    /// <summary>
+    /// Assigns the Animator reference used for all animation RPCs.
+    /// Call this after swapping the mesh on a full-mutant SuspectCharacter prefab so that
+    /// walking, climbing, and attack bools are driven on the correct skeleton.
+    /// </summary>
+    public void SetAnimator(Animator a) => _animator = a;
 
     /// <summary>Server-side: sets an Animator bool on all clients.</summary>
     public void SetAnimBool(string paramName, bool value) => SetAnimBoolClientRpc(paramName, value);

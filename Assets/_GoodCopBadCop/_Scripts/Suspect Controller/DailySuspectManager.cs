@@ -24,8 +24,8 @@ public class DailySuspectManager : MonoBehaviour
     /// <summary>
     /// Tracks which lineup slot indices belong to fully-mutated civilians.
     /// Populated by <see cref="InjectFullMutantSlots"/> after all other slot injections.
-    /// The corresponding <see cref="SuspectData"/> for each index always has a configured
-    /// <see cref="SuspectData.FullMutantConfig"/> and a <see cref="SuspectRecord.IsFullyMutated"/> record.
+    /// The corresponding <see cref="SuspectData"/> for each index always has
+    /// <see cref="SuspectData.fullMutantDialogue"/> assigned and a <see cref="SuspectRecord.IsFullyMutated"/> record.
     /// </summary>
     private readonly HashSet<int> _fullMutantSlotIndices = new HashSet<int>();
 
@@ -384,7 +384,7 @@ public class DailySuspectManager : MonoBehaviour
 
     /// <summary>
     /// Scans the final populated lineup and registers any slot whose suspect has crossed the
-    /// fully-mutated threshold AND has a configured <see cref="SuspectData.FullMutantConfig"/>.
+    /// fully-mutated threshold AND has a <see cref="SuspectData.fullMutantDialogue"/> assigned.
     /// Must run after all other injections so indices are stable.
     /// Doppelganger, mutant-intruder, and replacement slots are never double-flagged.
     /// </summary>
@@ -398,7 +398,7 @@ public class DailySuspectManager : MonoBehaviour
             if (_doppelgangerSlots.ContainsKey(i)) continue;
             if (_replacementSlotIndices.Contains(i)) continue;
 
-            if (suspect.fullMutant == null || !suspect.fullMutant.IsConfigured) continue;
+            if (suspect.fullMutantDialogue == null) continue;
 
             SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
             if (record == null || !record.IsFullyMutated) continue;
@@ -410,8 +410,7 @@ public class DailySuspectManager : MonoBehaviour
 
     /// <summary>
     /// Returns true if the given lineup index is a fully-mutated civilian slot.
-    /// Outputs the suspect's <see cref="SuspectData"/> so the caller can read
-    /// <see cref="SuspectData.FullMutantConfig"/> directly.
+    /// Outputs the suspect's <see cref="SuspectData"/> so the caller can read it directly.
     /// </summary>
     public bool IsFullMutantSlot(int lineupIndex, out SuspectData suspectData)
     {

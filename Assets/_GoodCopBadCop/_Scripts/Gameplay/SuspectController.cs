@@ -44,6 +44,15 @@ public class SuspectController : NetworkBehaviour
     public static bool ForceNextSuspectMutant = false;
 
     /// <summary>
+    /// When true, the next suspect to spawn is treated as fully mutated regardless of whether
+    /// their <see cref="SuspectData.FullMutantConfig.IsConfigured"/> returns true.
+    /// Bypasses the <c>boothCutscene</c> null-check so the mesh toggle and
+    /// <see cref="SuspectCharacter.BeginMutantBehavior"/> fire even without a wired cutscene.
+    /// Consumed and reset to false after one use. Set by DebugConsole (B).
+    /// </summary>
+    public static bool ForceNextSuspectAsFullMutant = false;
+
+    /// <summary>
     /// Optional server-side intercept for the next suspect spawn. When set, this is invoked
     /// instead of spawning a normal or mutant suspect for that slot. Consumed and reset to null
     /// after one use. Set by day-specific controllers (e.g. Day_01 for the Alexei scripted event).
@@ -259,6 +268,17 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Pre-check full-mutant state BEFORE Spawn() so MutantEnemy.OnNetworkSpawn never
+        // auto-calls InitialiseServer(). ForceNextSuspectAsFullMutant is intentionally only
+        // peeked here — the existing block below is responsible for consuming it.
+        bool preCheckFullMutant = dailySuspectManager.IsFullMutantSlot(lineupIndex, out _)
+                                  || ForceNextSuspectAsFullMutant;
+        if (preCheckFullMutant)
+        {
+            var preEnemy = spawnedSuspect.GetComponent<MutantEnemy>();
+            preEnemy?.DisableAutoInit();
+        }
+
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
@@ -285,9 +305,23 @@ public class SuspectController : NetworkBehaviour
 
         // If this slot is fully mutated, swap to the mutant mesh on all clients.
         bool isFullMutant = dailySuspectManager.IsFullMutantSlot(lineupIndex, out _);
+
+        // Debug override — bypasses the IsConfigured (boothCutscene != null) check.
+        if (!isFullMutant && ForceNextSuspectAsFullMutant)
+        {
+            ForceNextSuspectAsFullMutant = false;
+            isFullMutant = true;
+        }
+
         _currentSuspectIsFullMutant = isFullMutant;
         if (isFullMutant)
+        {
             suspectCharacter.ActivateFullMutantForm();
+            // Inject booth references so BeginMutantBehavior can hand off to
+            // MutantSuspectBehaviour.BeginAtStandPos after the cutscene ends.
+            suspectCharacter.SetupFullMutantWindowBreach(
+                standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+        }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;
@@ -515,7 +549,7 @@ public class SuspectController : NetworkBehaviour
         // Enable NavMeshAgent for this suspect now that we are server-side and about to move.
         suspectCharacter.InitNavigation();
 
-        suspectCharacter.animator.SetBool("Walking", true);
+        suspectCharacter.SetLocomotionState(true);
         suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 
         // Notify all clients so they can show the booth-waiting notification if needed.
@@ -587,7 +621,7 @@ public class SuspectController : NetworkBehaviour
             .DORotateQuaternion(_activeStandPos.rotation, 0.5f)
             .OnComplete(OnRotationComplete);
 
-        suspectCharacter.animator.SetBool("Walking", false);
+        suspectCharacter.SetLocomotionState(false);
         EnableLook();
     }
 
@@ -656,17 +690,13 @@ public class SuspectController : NetworkBehaviour
         bool forceSkipEntry = ForceNextSuspectSkipEntryDialogue;
         ForceNextSuspectSkipEntryDialogue = false;
 
-        // Full mutant path: skip normal entry bark, bark schedule, and paperwork.
-        // Play the scripted booth cutscene instead, then leave the suspect at the window
-        // for the player to process via the normal verdict buttons.
+        // Full mutant path: SuspectCharacter owns the cutscene reference and the
+        // BeginMutantBehavior callback — delegate entirely so no SuspectData is
+        // reached from here.
         if (!forceSkipEntry && _currentSuspectIsFullMutant)
         {
             _currentSuspectIsFullMutant = false;
-            ScriptedDialogue cutscene = suspectCharacter.Data?.fullMutant?.boothCutscene;
-            if (cutscene != null && ScriptedDialogueRunner.Instance != null)
-                ScriptedDialogueRunner.Instance.PlayDialogue(suspectCharacter, cutscene, null);
-            else
-                Debug.LogWarning($"[SuspectController] Full mutant '{suspectCharacter.name}' has no boothCutscene assigned — no entry dialogue will play.", this);
+            suspectCharacter.StartFullMutantCutscene();
             return;
         }
 
@@ -1044,18 +1074,18 @@ public class SuspectController : NetworkBehaviour
         yield return null;
         yield return null;
 
-        thisCharacter.animator.SetBool("Walking", true);
+        thisCharacter.SetLocomotionState(true);
         bool gateArrived = false;
         thisCharacter.NavigateTo(gatePos.position, () => gateArrived = true);
         yield return new WaitUntil(() => gateArrived);
-        thisCharacter.animator.SetBool("Walking", false);
+        thisCharacter.SetLocomotionState(false);
 
         if (IsServer)
             ShiftManager.Instance.SetNextSuspectReady();
 
         yield return new WaitForSeconds(2f);
 
-        thisCharacter.animator.SetBool("Walking", true);
+        thisCharacter.SetLocomotionState(true);
         thisCharacter.NavigateTo(despawnPos.position, () =>
         {
             if (IsServer) DespawnSuspect(thisCharacter);

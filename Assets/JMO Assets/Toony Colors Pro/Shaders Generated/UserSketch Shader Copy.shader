@@ -627,6 +627,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Copy"
 			{
 			}
 			Cull Front
+			ColorMask RGB
 
 			HLSLPROGRAM
 
