@@ -1068,7 +1068,7 @@ public class MutantEnemy : NetworkBehaviour
     [ClientRpc]
     private void StopChaseMusicClientRpc()
     {
-        SFXController.Instance?.StopMusic(_chaseMusicFadeOutSeconds);
+        MusicManager.Instance?.FadeOut(_chaseMusicFadeOutSeconds);
     }
 
     private IEnumerator DespawnAfterDelay(float delay)
