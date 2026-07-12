@@ -19,8 +19,10 @@ public class AnomalyController : MonoBehaviour
     // ── Thresholds ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Infection score at or above which a suspect is considered too far gone:
-    /// all anomalies activate and quarantine has no effect.
+    /// Infection score at or above which a suspect is considered fully mutated.
+    /// At this threshold anomalies are suppressed entirely — the character's visual
+    /// transformation is the only observable signal. Below the threshold up to
+    /// <see cref="CATEGORY_CAP_BELOW_THRESHOLD"/> anomaly categories activate.
     /// </summary>
     public const int FULLY_MUTATED_THRESHOLD = 80;
 
@@ -54,8 +56,9 @@ public class AnomalyController : MonoBehaviour
     ///
     ///   Dimension 1 — which categories are active. Below <see cref="FULLY_MUTATED_THRESHOLD"/>
     ///   exactly <see cref="CATEGORY_CAP_BELOW_THRESHOLD"/> (4) populated categories are chosen
-    ///   at random, leaving one dark. At or above the threshold every populated category
-    ///   activates, which is the observable "too far gone" signal.
+    ///   at random, leaving one dark. At or above the threshold the suspect is considered fully
+    ///   mutated and <see cref="InitializeClean"/> is called — no anomalies activate because the
+    ///   character's visual transformation is the only signal needed.
     ///
     ///   Dimension 2 — how many anomalies within each active category. Anomalies are shuffled
     ///   randomly within their pool and the count scales proportionally with the score, with
@@ -71,6 +74,15 @@ public class AnomalyController : MonoBehaviour
         if (infectionScore <= 0)
         {
             InitializeClean();
+            return;
+        }
+
+        bool fullyMutated = infectionScore >= FULLY_MUTATED_THRESHOLD;
+
+        if (fullyMutated)
+        {
+            InitializeClean();
+            Debug.Log($"[AnomalyController] Score {infectionScore} → fully mutated — anomalies suppressed.");
             return;
         }
 
@@ -95,13 +107,9 @@ public class AnomalyController : MonoBehaviour
             return;
         }
 
-        bool fullyMutated = infectionScore >= FULLY_MUTATED_THRESHOLD;
-
         // ── Dimension 1: randomly choose which categories are active ──────────
         ShuffleList(categoryPools);
-        int activeCategoryCount = fullyMutated
-            ? categoryPools.Count
-            : Mathf.Min(CATEGORY_CAP_BELOW_THRESHOLD, categoryPools.Count);
+        int activeCategoryCount = Mathf.Min(CATEGORY_CAP_BELOW_THRESHOLD, categoryPools.Count);
 
         // ── Dimension 2: randomly pick and activate anomalies within each category ──
         int totalActivated = 0;
@@ -119,9 +127,7 @@ public class AnomalyController : MonoBehaviour
 
             ShuffleList(pool);
 
-            int countInCategory = fullyMutated
-                ? pool.Count
-                : Mathf.Max(1, Mathf.FloorToInt((float)infectionScore / FULLY_MUTATED_THRESHOLD * pool.Count));
+            int countInCategory = Mathf.Max(1, Mathf.FloorToInt((float)infectionScore / FULLY_MUTATED_THRESHOLD * pool.Count));
 
             for (int i = 0; i < pool.Count; i++)
             {
@@ -139,8 +145,7 @@ public class AnomalyController : MonoBehaviour
 
         Debug.Log($"[AnomalyController] Score {infectionScore} → " +
                   $"{activeCategoryCount}/{categoryPools.Count} categories, " +
-                  $"{totalActivated} anomaly/ies active." +
-                  (fullyMutated ? " (FULLY MUTATED)" : string.Empty));
+                  $"{totalActivated} anomaly/ies active.");
     }
 
     /// <summary>
@@ -152,8 +157,9 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// True when every populated anomaly category has at least one active anomaly.
-    /// This is the observable in-game signal that the suspect is past the point of no return —
-    /// all five checklist categories will show a positive result simultaneously.
+    /// Score-based initialization never reaches this state for fully-mutated suspects
+    /// (their anomalies are suppressed). This property is only true after a forced
+    /// full-activation via <see cref="Initialize"/> (doppelgangers, debug tools).
     /// </summary>
     public bool IsFullyMutated
     {
@@ -172,12 +178,35 @@ public class AnomalyController : MonoBehaviour
     // ── Tutorial / Forced-State API ───────────────────────────────────────────
 
     /// <summary>
-    /// Forces every anomaly on this suspect to activate regardless of infection score.
-    /// Used for doppelgangers and any scenario requiring a full-anomaly loadout.
+    /// Forces every unlocked anomaly on this suspect to activate regardless of infection score.
+    /// Bypasses the fully-mutated suppression guard in <see cref="InitializeByInfectionScore"/>.
+    /// Legacy entry point — prefer <see cref="InitializeByInfectionScore"/> for all new call sites.
     /// </summary>
     public void Initialize()
     {
-        InitializeByInfectionScore(100);
+        ClearInitializationState(deactivateActive: true);
+
+        var categoryPools = new List<List<Anomaly>>
+        {
+            FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_vitalsAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_behaviorAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_mutationAnomalies.Cast<Anomaly>().ToList()),
+            FilterToUnlocked(_supernaturalAnomalies.Cast<Anomaly>().ToList()),
+        };
+        categoryPools.RemoveAll(p => p.Count == 0);
+
+        int totalActivated = 0;
+        foreach (List<Anomaly> pool in categoryPools)
+        {
+            foreach (Anomaly a in pool)
+            {
+                ActivateAnomaly(a);
+                totalActivated++;
+            }
+        }
+
+        Debug.Log($"[AnomalyController] Initialize() → {totalActivated} unlocked anomaly/ies active (all categories forced).");
     }
 
     /// <summary>

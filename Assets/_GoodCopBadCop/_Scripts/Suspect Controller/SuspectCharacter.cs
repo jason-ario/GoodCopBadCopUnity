@@ -751,17 +751,17 @@ public class SuspectCharacter : Interactable
 
     /// <summary>
     /// Initializes this suspect as a doppelganger using the provided configuration.
-    /// Applies overlapping anomalies and all uncanny anomalies, then replicates
-    /// visual modifiers (skin desaturation, idle suppression) to clients.
+    /// Anomaly activation follows the same score-based rules as a normal suspect —
+    /// the doppelganger's accrued infection score drives which anomalies are shown.
+    /// Replicates visual modifiers (skin desaturation, idle suppression) to clients.
     /// </summary>
-    /// <param name="data">The DoppelgangerData driving anomaly count and visual overrides.</param>
+    /// <param name="data">The DoppelgangerData driving visual overrides.</param>
     public void InitializeAsDoppelganger(DoppelgangerData data)
     {
-        // Anomaly initialization - full doppelganger loadout will be wired here
-        // once AnomalyController.InitializeAsDoppelganger is implemented.
-        anomalyController.Initialize();
-
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+
+        int score = record?.infectionScore ?? 0;
+        anomalyController.InitializeByInfectionScore(score);
         if (record != null)
             suspectRecordViewer.SetRecord(record);
         else
