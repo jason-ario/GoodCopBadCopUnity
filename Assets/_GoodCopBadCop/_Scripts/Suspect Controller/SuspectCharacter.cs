@@ -297,9 +297,11 @@ public class SuspectCharacter : Interactable
     {
         if (!IsServer) return;
 
+        _isMutant = true;
         StopNavigation();
         enabled = false;
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
+        SetMutantVoiceClientRpc();
 
         // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
         // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
@@ -346,6 +348,23 @@ public class SuspectCharacter : Interactable
         if (enableMutantEnemy && _mutantEnemy != null) _mutantEnemy.enabled = true;
         enabled = false;
     }
+
+    [ClientRpc]
+    private void SetMutantVoiceClientRpc()
+    {
+        speaking?.SetMutantVoice(true);
+    }
+
+    [ClientRpc]
+    private void PlayUncannyArriveSoundClientRpc()
+    {
+        if (_uncannyArrivesSound != null)
+            SFXController.Instance?.Play(_uncannyArrivesSound);
+    }
+
+    [Header("Sounds")]
+    [Tooltip("Played on all clients when a fully-mutated suspect presents at the booth (uncanny arrival sting).")]
+    [SerializeField] private AudioClip _uncannyArrivesSound;
 
     [Header("Cameras")]
     [Tooltip("Per-character wide-shot camera used during dialogue. When assigned, this overrides the shared " +
@@ -578,6 +597,7 @@ public class SuspectCharacter : Interactable
 
     private float _health;
     private bool _isDead;
+    private bool _isMutant;
 
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
@@ -683,7 +703,11 @@ public class SuspectCharacter : Interactable
         drunkBehaviour?.TryActivate();
 
         if (record.IsFullyMutated)
+        {
             OnSuspectPresentingUncanny?.Invoke(this, record.infectionScore);
+            SetMutantVoiceClientRpc();
+            PlayUncannyArriveSoundClientRpc();
+        }
     }
 
     /// <summary>
@@ -827,6 +851,7 @@ public class SuspectCharacter : Interactable
         SyncReplacementClientRpc(true);
 
         OnSuspectPresentingUncanny?.Invoke(this, 100);
+        PlayUncannyArriveSoundClientRpc();
 
         Debug.Log($"[SuspectCharacter] '{suspectData.name}' initialized as replacement.");
     }
@@ -1084,9 +1109,13 @@ public class SuspectCharacter : Interactable
         if (!IsServer || _isDead)
             return;
 
-        _health -= amount;
         SpawnHitParticleClientRpc(hitPoint);
         OnHit?.Invoke();
+
+        if (!_isMutant)
+            return;
+
+        _health -= amount;
 
         if (_health <= 0f)
             KillSuspect();

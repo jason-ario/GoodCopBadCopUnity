@@ -1,5 +1,38 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &634647001712147690
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4765131295092465403}
+  m_Layer: 11
+  m_Name: Supernatural Anomalies
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4765131295092465403
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 634647001712147690}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6196107899827949964}
+  - {fileID: 8169526522299367735}
+  m_Father: {fileID: 2926345404913525736}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1417358131249511475
 GameObject:
   m_ObjectHideFlags: 0
@@ -773,6 +806,7 @@ Transform:
   - {fileID: 218149521530335478}
   - {fileID: 5861432877967466489}
   - {fileID: 1783500189774605639}
+  - {fileID: 4765131295092465403}
   - {fileID: 5786031879214078177}
   m_Father: {fileID: 9165884929875893673}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1065,7 +1099,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 3615840691
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1124,6 +1158,7 @@ MonoBehaviour:
   _mutantEnemy: {fileID: 4425771342621210441}
   _mutantSuspectBehaviour: {fileID: 8154835080764322672}
   _fullMutantIntruderData: {fileID: 11400000, guid: c4c02e4ee1dcc594888335cc8c4b68c5, type: 2}
+  _uncannyArrivesSound: {fileID: 8300000, guid: 10ff9e0a540b91a45aa40cfb33de721a, type: 3}
   _suspectCam: {fileID: 7165712762372772399}
   _suspectFaceCam: {fileID: 5417930054641599086}
   _walkSpeed: 1.5
@@ -1789,7 +1824,9 @@ MonoBehaviour:
   - {fileID: 4374993038035683967}
   - {fileID: 9059146522512625062}
   - {fileID: 6657026380098968827}
-  _supernaturalAnomalies: []
+  _supernaturalAnomalies:
+  - {fileID: 3463909296000034263}
+  - {fileID: 7440286823154738676}
   activeAnomalies: []
 --- !u!114 &820681201371413921
 MonoBehaviour:
@@ -1829,6 +1866,7 @@ MonoBehaviour:
   speakerName: Suspect
   voiceAudioClips: []
   audioSource: {fileID: 1751970679333441786}
+  _mutantDistortionLevel: 0.35
   dialogueChoices: []
   suspectData: {fileID: 0}
   lookTarget: {fileID: 5330771091470271895}
@@ -2010,6 +2048,10 @@ MonoBehaviour:
   deathBehaviour: 0
   deathAnimationDuration: 2
   deathSound: {fileID: 0}
+  _hurtSounds: []
+  _chaseSounds: []
+  _chaseScreamIntervalMin: 5
+  _chaseScreamIntervalMax: 15
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
@@ -2028,6 +2070,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MutantSuspectBehaviour
   ShowTopMostFoldoutHeaderGroup: 1
   canClimb: 1
+  _climbAnimHoldSeconds: 0.3
+  _climbThroughSound: {fileID: 8300000, guid: 02debca420f4411418c2c2f6db82eb5f, type: 3}
 --- !u!1 &4528955243091184220
 GameObject:
   m_ObjectHideFlags: 0
@@ -2109,6 +2153,51 @@ MonoBehaviour:
   twitchDuration: 1
   minInterval: 1
   maxInterval: 7
+--- !u!1 &4680913876816411453
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8169526522299367735}
+  - component: {fileID: 7440286823154738676}
+  m_Layer: 11
+  m_Name: Light Flickering Anomaly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8169526522299367735
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4680913876816411453}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4765131295092465403}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7440286823154738676
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4680913876816411453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2baaf31117900f4fb31aab22c60d4d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FlickeringLightsAnomaly
+  lightsController: {fileID: 0}
 --- !u!1 &5231750380208789831
 GameObject:
   m_ObjectHideFlags: 0
@@ -2661,6 +2750,50 @@ Transform:
   - {fileID: 7036954384269948024}
   m_Father: {fileID: 2926345404913525736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8495567890370233670
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6196107899827949964}
+  - component: {fileID: 3463909296000034263}
+  m_Layer: 11
+  m_Name: Glitching Anomaly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6196107899827949964
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8495567890370233670}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4765131295092465403}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3463909296000034263
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8495567890370233670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ff3f4244c3b20a4fa6dfd6dd433bca1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlitchingAnomaly
 --- !u!1 &8845115931742292278
 GameObject:
   m_ObjectHideFlags: 0

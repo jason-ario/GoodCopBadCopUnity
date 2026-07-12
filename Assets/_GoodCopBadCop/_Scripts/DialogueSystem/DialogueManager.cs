@@ -23,6 +23,19 @@ public class DialogueManager : NetworkBehaviour
 
     [SerializeField] private float minDelayBetweenClips = 0.03f;
     [SerializeField] private float maxDelayBetweenClips = 0.1f;
+
+    [Header("Pitch Variation")]
+    [Tooltip("Probability (0–1) that any given voice clip gets a random pitch shift applied.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _pitchShiftChance = 0.25f;
+
+    [Tooltip("Minimum pitch multiplier relative to the AudioSource's current pitch.")]
+    [Range(0.5f, 1f)]
+    [SerializeField] private float _pitchShiftMin = 0.93f;
+
+    [Tooltip("Maximum pitch multiplier relative to the AudioSource's current pitch.")]
+    [Range(1f, 2f)]
+    [SerializeField] private float _pitchShiftMax = 1.2f;
     [SerializeField] DialogueChoiceSystem dialogueChoiceSystem;
     [SerializeField] private Subtitles NPCSubtitlesPrefab;
     [SerializeField] private Subtitles playerSubtitlesPrefab;
@@ -159,9 +172,17 @@ public class DialogueManager : NetworkBehaviour
 
             lastClipIndex = randomIndex;
             AudioClip clip = audioClips[randomIndex];
+
+            float basePitch = audioSource.pitch;
+            if (UnityEngine.Random.value < _pitchShiftChance)
+                audioSource.pitch = basePitch * UnityEngine.Random.Range(_pitchShiftMin, _pitchShiftMax);
+
             audioSource.PlayOneShot(clip);
 
             float clipDuration = clip.length;
+            yield return new WaitForSeconds(clipDuration);
+
+            audioSource.pitch = basePitch;
             yield return new WaitForSeconds(clipDuration);
 
             float extraDelay = UnityEngine.Random.Range(minDelayBetweenClips, maxDelayBetweenClips);

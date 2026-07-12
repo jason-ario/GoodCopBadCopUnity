@@ -80,6 +80,21 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Sound played on all clients when this enemy dies.")]
     [SerializeField] private AudioClip deathSound;
 
+    [Header("Sounds")]
+    [Tooltip("Clips played spatially at random when this mutant takes a hit and survives.")]
+    [SerializeField] private AudioClip[] _hurtSounds;
+
+    [Tooltip("Clips played spatially at random while this mutant is actively chasing a player.")]
+    [SerializeField] private AudioClip[] _chaseSounds;
+
+    [Tooltip("Minimum seconds between random chase screams.")]
+    [Min(0.5f)]
+    [SerializeField] private float _chaseScreamIntervalMin = 5f;
+
+    [Tooltip("Maximum seconds between random chase screams.")]
+    [Min(0.5f)]
+    [SerializeField] private float _chaseScreamIntervalMax = 15f;
+
     [Header("Flee Behaviour")]
     [Tooltip("When enabled, reaching zero health triggers a rapid flee-and-despawn instead of a normal death. " +
              "Intended for fully-mutated civilian variants that cannot be permanently killed in the world.")]
@@ -106,6 +121,7 @@ public class MutantEnemy : NetworkBehaviour
     private float _health;
     private float _attackCooldownTimer;
     private float _doorOpenCooldownTimer;
+    private float _chaseScreamTimer;
     private bool _isDead;
 
     // Patrol & aggro state (server only)
@@ -202,6 +218,8 @@ public class MutantEnemy : NetworkBehaviour
 
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
+
+        _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
 
         StartCoroutine(ChaseLoop());
     }
@@ -510,6 +528,23 @@ public class MutantEnemy : NetworkBehaviour
         _networkGrounded.Value = _agent.isOnNavMesh;
 
         if (_isDead) return;
+
+        // ── Chase Scream ───────────────────────────────────────────────────────
+        if (_currentTarget != null)
+        {
+            _chaseScreamTimer -= Time.deltaTime;
+            if (_chaseScreamTimer <= 0f && _chaseSounds != null && _chaseSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _chaseSounds.Length);
+                PlayChaseSoundClientRpc(idx);
+                _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+            }
+        }
+        else
+        {
+            // Reset to a fresh interval so the first scream fires naturally after acquiring a target.
+            _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+        }
 
         // ── Rotation Tracking ──────────────────────────────────────────────────
         // If we are in range to attack something, ensure we rotate to face it 
@@ -869,7 +904,16 @@ public class MutantEnemy : NetworkBehaviour
         SpawnHitParticleClientRpc(hitPoint);
 
         if (_health <= 0f)
+        {
             Die();
+            return;
+        }
+
+        if (_hurtSounds != null && _hurtSounds.Length > 0)
+        {
+            int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
+            PlayHurtSoundClientRpc(idx);
+        }
     }
 
     [ClientRpc]
@@ -992,6 +1036,24 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (deathSound != null)
             SFXController.Instance.Play(deathSound);
+    }
+
+    [ClientRpc]
+    private void PlayHurtSoundClientRpc(int index)
+    {
+        if (_hurtSounds == null || index < 0 || index >= _hurtSounds.Length) return;
+        AudioClip clip = _hurtSounds[index];
+        if (clip != null)
+            SFXController.Instance?.PlayAtPosition(clip, transform.position);
+    }
+
+    [ClientRpc]
+    private void PlayChaseSoundClientRpc(int index)
+    {
+        if (_chaseSounds == null || index < 0 || index >= _chaseSounds.Length) return;
+        AudioClip clip = _chaseSounds[index];
+        if (clip != null)
+            SFXController.Instance?.PlayAtPosition(clip, transform.position);
     }
 
     private IEnumerator DespawnAfterDelay(float delay)

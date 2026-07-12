@@ -18,6 +18,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [Tooltip("If false, this mutant will never climb through the booth window even when the shutter is open. It will bang on the window frame and retreat instead.")]
     [SerializeField] private bool canClimb = true;
 
+    [Tooltip("How long the climbing animation bool stays true after the climb begins. Set to 0 to turn it off exactly when the movement tween finishes.")]
+    [SerializeField] private float _climbAnimHoldSeconds = 0.3f;
+
+    [Header("Sounds")]
+    [Tooltip("Played on all clients at the moment the mutant begins climbing through the booth window.")]
+    [SerializeField] private AudioClip _climbThroughSound;
+
     private MutantIntruderData _data;
     private Transform _standPos;
     private Transform _despawnPos;
@@ -151,6 +158,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (!IsServer || _isDone) yield break;
 
         SetClimbingClientRpc(true);
+        PlayClimbThroughSoundClientRpc();
 
         // Disable agent so DOTween can move freely across the counter (off-mesh).
         _agent.enabled = false;
@@ -468,5 +476,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private void HitShutterClientRpc()
     {
         ShutterController.Instance?.OnHitByMutant();
+    }
+
+    /// <summary>Plays the climb-through sound at full volume on all clients.</summary>
+    [ClientRpc]
+    private void PlayClimbThroughSoundClientRpc()
+    {
+        if (_climbThroughSound != null)
+            SFXController.Instance?.Play(_climbThroughSound);
     }
 }

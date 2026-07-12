@@ -606,6 +606,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static event Action OnBoothBecameReady;
 
+    /// <summary>
+    /// Fired on the server when the current tracked suspect is despawned.
+    /// Use this to clean up any effects that were started in response to
+    /// <see cref="SuspectCharacter.OnSuspectPresentingUncanny"/>.
+    /// </summary>
+    public static event Action OnCurrentSuspectDespawned;
+
     private void ArrivedAtPosition()
     {
         if (suspectCharacter == null) return;
@@ -1486,6 +1493,7 @@ public class SuspectController : NetworkBehaviour
         if (suspectCharacter == suspectToDespawn)
         {
             suspectCharacter = null;
+            OnCurrentSuspectDespawned?.Invoke();
         }
     }
 

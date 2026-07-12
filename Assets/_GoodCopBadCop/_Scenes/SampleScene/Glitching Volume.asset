@@ -1,33 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-8982763933432261747
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 899c54efeace73346a0a16faa3afe726, type: 3}
-  m_Name: Vignette
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.Vignette
-  active: 1
-  color:
-    m_OverrideState: 1
-    m_Value: {r: 0, g: 0, b: 0, a: 1}
-  center:
-    m_OverrideState: 0
-    m_Value: {x: 0.5, y: 0.5}
-  intensity:
-    m_OverrideState: 1
-    m_Value: 0.553
-  smoothness:
-    m_OverrideState: 1
-    m_Value: 0.169
-  rounded:
-    m_OverrideState: 0
-    m_Value: 0
 --- !u!114 &-7802953741649933955
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -138,7 +110,7 @@ MonoBehaviour:
   m_OffsetY:
     m_OverrideState: 0
     m_Value: 0
---- !u!114 &-6307138085519639187
+--- !u!114 &-6450684141306384843
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -147,44 +119,94 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 29fa0085f50d5e54f8144f766051a691, type: 3}
-  m_Name: FilmGrain
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FilmGrain
-  active: 1
-  type:
-    m_OverrideState: 1
-    m_Value: 0
+  m_Script: {fileID: 11500000, guid: 6856d47d797869a429baa6830acad632, type: 3}
+  m_Name: InterferencesVolume
+  m_EditorClassIdentifier: FronkonGames.Glitches.Interferences::FronkonGames.Glitches.Interferences.InterferencesVolume
+  active: 0
   intensity:
     m_OverrideState: 1
-    m_Value: 0.759
-  response:
+    m_Value: 0.087
+    min: 0
+    max: 1
+  blend:
     m_OverrideState: 1
-    m_Value: 0.8
-  texture:
+    m_Value: 0
+  offset:
     m_OverrideState: 0
-    m_Value: {fileID: 0}
---- !u!114 &-6183130183920739414
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5485954d14dfb9a4c8ead8edb0ded5b1, type: 3}
-  m_Name: LiftGammaGain
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.LiftGammaGain
-  active: 1
-  lift:
+    m_Value: 1
+    min: 0
+    max: 10
+  distortion:
+    m_OverrideState: 1
+    m_Value: 0.079
+    min: 0
+    max: 2
+  distortionSpeed:
+    m_OverrideState: 1
+    m_Value: 10
+    min: 0
+    max: 100
+  distortionDensity:
+    m_OverrideState: 1
+    m_Value: 2
+    min: 0
+    max: 10
+  distortionAmplitude:
+    m_OverrideState: 1
+    m_Value: 0.04
+    min: 0
+    max: 5
+  distortionFrequency:
     m_OverrideState: 0
-    m_Value: {x: 1, y: 1, z: 1, w: 0}
+    m_Value: 0.3
+    min: 0
+    max: 10
+  scanlines:
+    m_OverrideState: 0
+    m_Value: 0.75
+    min: 0
+    max: 1
+  scanlinesDensity:
+    m_OverrideState: 0
+    m_Value: 0.25
+    min: 0
+    max: 1
+  scanlinesOpacity:
+    m_OverrideState: 0
+    m_Value: 0.5
+    min: 0
+    max: 1
+  brightness:
+    m_OverrideState: 0
+    m_Value: 0
+    min: -1
+    max: 1
+  contrast:
+    m_OverrideState: 0
+    m_Value: 1
+    min: 0
+    max: 10
   gamma:
     m_OverrideState: 0
-    m_Value: {x: 1, y: 1, z: 1, w: 0.025236692}
-  gain:
-    m_OverrideState: 1
-    m_Value: {x: 1, y: 0.50557125, z: 0.71324056, w: 1}
+    m_Value: 1
+    min: 0.1
+    max: 10
+  hue:
+    m_OverrideState: 0
+    m_Value: 0
+    min: 0
+    max: 1
+  saturation:
+    m_OverrideState: 0
+    m_Value: 1
+    min: 0
+    max: 2
+  affectSceneView:
+    m_OverrideState: 0
+    m_Value: 0
+  useScaledTime:
+    m_OverrideState: 0
+    m_Value: 1
 --- !u!114 &-5269701036951381725
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -201,34 +223,6 @@ MonoBehaviour:
   intensity:
     m_OverrideState: 1
     m_Value: 1
---- !u!114 &-1849037693974293413
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66f335fb1ffd8684294ad653bf1c7564, type: 3}
-  m_Name: ColorAdjustments
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ColorAdjustments
-  active: 1
-  postExposure:
-    m_OverrideState: 1
-    m_Value: 1.5
-  contrast:
-    m_OverrideState: 1
-    m_Value: 30.1
-  colorFilter:
-    m_OverrideState: 1
-    m_Value: {r: 1, g: 1, b: 1, a: 1}
-  hueShift:
-    m_OverrideState: 1
-    m_Value: -1
-  saturation:
-    m_OverrideState: 1
-    m_Value: 0
 --- !u!114 &-675193509401890554
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -344,16 +338,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
-  m_Name: Intro Post Processing
+  m_Name: Glitching Volume
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
-  - {fileID: -1849037693974293413}
-  - {fileID: 8454363667032986970}
-  - {fileID: -8982763933432261747}
-  - {fileID: 6164926614321786720}
-  - {fileID: -6183130183920739414}
-  - {fileID: -6307138085519639187}
-  - {fileID: 8241730684587351040}
+  - {fileID: -6450684141306384843}
   - {fileID: -5269701036951381725}
 --- !u!114 &3175878613428323006
 MonoBehaviour:
@@ -528,40 +516,6 @@ MonoBehaviour:
   m_Count:
     m_OverrideState: 1
     m_Value: 64
---- !u!114 &6164926614321786720
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 558a8e2b6826cf840aae193990ba9f2e, type: 3}
-  m_Name: ShadowsMidtonesHighlights
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights
-  active: 1
-  shadows:
-    m_OverrideState: 1
-    m_Value: {x: 1, y: 0.933677, z: 0.84550005, w: -0.030250989}
-  midtones:
-    m_OverrideState: 1
-    m_Value: {x: 1, y: 0.8516519, z: 0.8793983, w: 0.20373031}
-  highlights:
-    m_OverrideState: 0
-    m_Value: {x: 0.32405308, y: 1, z: 0.29898995, w: 0.23051968}
-  shadowsStart:
-    m_OverrideState: 0
-    m_Value: 0
-  shadowsEnd:
-    m_OverrideState: 0
-    m_Value: 0.91
-  highlightsStart:
-    m_OverrideState: 0
-    m_Value: 0.55
-  highlightsEnd:
-    m_OverrideState: 0
-    m_Value: 1
 --- !u!114 &7786033654532375619
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -597,69 +551,3 @@ MonoBehaviour:
   m_Crisp:
     m_OverrideState: 1
     m_Value: 1
---- !u!114 &8241730684587351040
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b8939db46657c514099467c505522a4b, type: 3}
-  m_Name: LowResolutionVolume
-  m_EditorClassIdentifier: Assembly-CSharp::LowResolutionVolume
-  active: 1
-  pixelSize:
-    m_OverrideState: 1
-    m_Value: 2
---- !u!114 &8454363667032986970
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0b2db86121404754db890f4c8dfe81b2, type: 3}
-  m_Name: Bloom
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.Bloom
-  active: 1
-  skipIterations:
-    m_OverrideState: 0
-    m_Value: 1
-  threshold:
-    m_OverrideState: 1
-    m_Value: 0.9
-  intensity:
-    m_OverrideState: 1
-    m_Value: 0.5
-  scatter:
-    m_OverrideState: 1
-    m_Value: 0.66
-  clamp:
-    m_OverrideState: 0
-    m_Value: 65472
-  tint:
-    m_OverrideState: 0
-    m_Value: {r: 1, g: 1, b: 1, a: 1}
-  highQualityFiltering:
-    m_OverrideState: 0
-    m_Value: 1
-  filter:
-    m_OverrideState: 0
-    m_Value: 0
-  downscale:
-    m_OverrideState: 0
-    m_Value: 0
-  maxIterations:
-    m_OverrideState: 0
-    m_Value: 6
-  dirtTexture:
-    m_OverrideState: 0
-    m_Value: {fileID: 0}
-    dimension: 1
-  dirtIntensity:
-    m_OverrideState: 0
-    m_Value: 0
