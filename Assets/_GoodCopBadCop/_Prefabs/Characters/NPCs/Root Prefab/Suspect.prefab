@@ -2052,6 +2052,7 @@ MonoBehaviour:
   _chaseSounds: []
   _chaseScreamIntervalMin: 5
   _chaseScreamIntervalMax: 15
+  _chaseMusicFadeOutSeconds: 2
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
@@ -2070,8 +2071,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MutantSuspectBehaviour
   ShowTopMostFoldoutHeaderGroup: 1
   canClimb: 1
-  _climbAnimHoldSeconds: 0.3
+  _climbAnimHoldSeconds: 0
   _climbThroughSound: {fileID: 8300000, guid: 02debca420f4411418c2c2f6db82eb5f, type: 3}
+  _climbLandSound: {fileID: 8300000, guid: 62d3d2553c2e5ff40b674e56a5868b77, type: 3}
+  _chaseMusic: {fileID: 8300000, guid: 665eee567a1cdc64d9471073e04b98c0, type: 3}
+  _chaseMusicFadeInSeconds: 1.5
 --- !u!1 &4528955243091184220
 GameObject:
   m_ObjectHideFlags: 0

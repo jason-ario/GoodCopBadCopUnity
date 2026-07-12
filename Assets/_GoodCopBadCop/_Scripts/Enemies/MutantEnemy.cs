@@ -95,6 +95,10 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0.5f)]
     [SerializeField] private float _chaseScreamIntervalMax = 15f;
 
+    [Tooltip("Seconds to fade out chase music when this mutant dies or flees.")]
+    [Min(0f)]
+    [SerializeField] private float _chaseMusicFadeOutSeconds = 2f;
+
     [Header("Flee Behaviour")]
     [Tooltip("When enabled, reaching zero health triggers a rapid flee-and-despawn instead of a normal death. " +
              "Intended for fully-mutated civilian variants that cannot be permanently killed in the world.")]
@@ -944,6 +948,9 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
+        // Stop chase music on all clients before the death sequence plays.
+        StopChaseMusicClientRpc();
+
         // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
         OnAnyMutantKilled?.Invoke();
 
@@ -974,10 +981,11 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (!IsServer) yield break;
 
-        // Boost speed and stop any current attack animation.
+        // Boost speed, stop any attack animation, and stop chase music on all clients.
         _agent.speed = fleeSpeed;
         SetAttackAnimClientRpc(false);
         SetFleeingClientRpc(true);
+        StopChaseMusicClientRpc();
 
         float elapsed = 0f;
 
@@ -1054,6 +1062,13 @@ public class MutantEnemy : NetworkBehaviour
         AudioClip clip = _chaseSounds[index];
         if (clip != null)
             SFXController.Instance?.PlayAtPosition(clip, transform.position);
+    }
+
+    /// <summary>Fades out and stops the looping chase music on all clients.</summary>
+    [ClientRpc]
+    private void StopChaseMusicClientRpc()
+    {
+        SFXController.Instance?.StopMusic(_chaseMusicFadeOutSeconds);
     }
 
     private IEnumerator DespawnAfterDelay(float delay)

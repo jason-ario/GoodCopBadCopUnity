@@ -14,6 +14,13 @@ public class SFXController : MonoBehaviour
     [Header("Spatial Emitter")]
     [SerializeField] private GameObject spatialAudioEmitterPrefab;
 
+    [Header("Music")]
+    [Tooltip("Dedicated AudioSource used for looping music tracks (e.g. chase music). " +
+             "Should be a separate AudioSource with loop enabled and spatial blend = 0 (2D).")]
+    [SerializeField] private AudioSource _musicSource;
+
+    private Coroutine _musicFadeCoroutine;
+
     void Awake()
     {
         Instance = this;
@@ -29,6 +36,61 @@ public class SFXController : MonoBehaviour
 
         sfxSource.pitch = pitch;
         sfxSource.PlayOneShot(clip, volume);
+    }
+
+    /// <summary>
+    /// Starts playing <paramref name="clip"/> as a looping 2D music track, fading in over
+    /// <paramref name="fadeDuration"/> seconds. Any previously playing music is interrupted immediately.
+    /// </summary>
+    public void PlayMusicLooping(AudioClip clip, float fadeDuration = 1f)
+    {
+        if (!clip || _musicSource == null) return;
+
+        if (_musicFadeCoroutine != null)
+            StopCoroutine(_musicFadeCoroutine);
+
+        _musicSource.clip = clip;
+        _musicSource.loop = true;
+        _musicSource.volume = 0f;
+        _musicSource.Play();
+        _musicFadeCoroutine = StartCoroutine(FadeMusic(1f, fadeDuration, stopOnComplete: false));
+    }
+
+    /// <summary>
+    /// Fades out and stops the currently looping music over <paramref name="fadeDuration"/> seconds.
+    /// Safe to call when nothing is playing.
+    /// </summary>
+    public void StopMusic(float fadeDuration = 1f)
+    {
+        if (_musicSource == null || !_musicSource.isPlaying) return;
+
+        if (_musicFadeCoroutine != null)
+            StopCoroutine(_musicFadeCoroutine);
+
+        _musicFadeCoroutine = StartCoroutine(FadeMusic(0f, fadeDuration, stopOnComplete: true));
+    }
+
+    private IEnumerator FadeMusic(float targetVolume, float duration, bool stopOnComplete)
+    {
+        float startVolume = _musicSource.volume;
+        float elapsed = 0f;
+
+        if (duration > 0f)
+        {
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                _musicSource.volume = Mathf.Lerp(startVolume, targetVolume, elapsed / duration);
+                yield return null;
+            }
+        }
+
+        _musicSource.volume = targetVolume;
+
+        if (stopOnComplete)
+            _musicSource.Stop();
+
+        _musicFadeCoroutine = null;
     }
 
     /// <summary>

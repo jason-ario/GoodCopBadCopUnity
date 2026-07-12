@@ -19,11 +19,23 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [SerializeField] private bool canClimb = true;
 
     [Tooltip("How long the climbing animation bool stays true after the climb begins. Set to 0 to turn it off exactly when the movement tween finishes.")]
-    [SerializeField] private float _climbAnimHoldSeconds = 0.3f;
+    [SerializeField] private float _climbAnimHoldSeconds = 0.1f;
 
     [Header("Sounds")]
     [Tooltip("Played on all clients at the moment the mutant begins climbing through the booth window.")]
     [SerializeField] private AudioClip _climbThroughSound;
+
+    [Tooltip("Short stinger played on all clients the moment the mutant finishes climbing through and lands inside.")]
+    [SerializeField] private AudioClip _climbLandSound;
+
+    [Header("Chase Music")]
+    [Tooltip("Looping music that plays on all clients once the mutant has landed inside and starts chasing. " +
+             "Faded out automatically when the mutant flees or dies.")]
+    [SerializeField] private AudioClip _chaseMusic;
+
+    [Tooltip("Seconds to fade the chase music in after the mutant lands.")]
+    [Min(0f)]
+    [SerializeField] private float _chaseMusicFadeInSeconds = 1.5f;
 
     private MutantIntruderData _data;
     private Transform _standPos;
@@ -168,11 +180,15 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             .DOMove(_climbThroughTargetPos.position, _data.climbDurationSeconds)
             .OnComplete(() => moveDone = true);
 
-        // Keep the climbing bool true for exactly one second as requested.
-        yield return new WaitForSeconds(1f);
+        // Fire the climbing bool like a trigger — hold briefly then clear so the
+        // animation plays exactly once without looping for the full climb duration.
+        yield return new WaitForSeconds(_climbAnimHoldSeconds);
         SetClimbingClientRpc(false);
 
+        // Wait for the actual movement tween to finish.
         yield return new WaitUntil(() => moveDone);
+        PlayClimbLandSoundClientRpc();
+        StartChaseMusicClientRpc();
 
         if (_isDone) yield break;
 
@@ -484,5 +500,21 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_climbThroughSound != null)
             SFXController.Instance?.Play(_climbThroughSound);
+    }
+
+    /// <summary>Plays the climb-land stinger on all clients the moment the mutant finishes climbing through.</summary>
+    [ClientRpc]
+    private void PlayClimbLandSoundClientRpc()
+    {
+        if (_climbLandSound != null)
+            SFXController.Instance?.Play(_climbLandSound);
+    }
+
+    /// <summary>Starts the looping chase music on all clients with a fade-in.</summary>
+    [ClientRpc]
+    private void StartChaseMusicClientRpc()
+    {
+        if (_chaseMusic != null)
+            MusicManager.Instance?.Play(_chaseMusic, loop: true, fadeInDuration: _chaseMusicFadeInSeconds);
     }
 }
