@@ -24,6 +24,12 @@ public class LobbyManager : MonoBehaviour
     // Replace with your actual Steam App ID. 480 is Valve's test app (Spacewar).
     private const uint SteamAppId = 3262820;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticState()
+    {
+        Instance = null;
+    }
+
     private void Awake()
     {
         if (Instance != null)
@@ -102,6 +108,14 @@ public class LobbyManager : MonoBehaviour
             SteamClient.Shutdown();
 
         Instance = null;
+    }
+
+    private void OnDisable()
+    {
+        if (!Application.isPlaying || Instance != this)
+            return;
+
+        ShutdownNetworkSessionImmediate();
     }
 
     private void OnOverlayToggled(bool isActive)
@@ -509,6 +523,7 @@ public class LobbyManager : MonoBehaviour
         {
             networkManager.Shutdown();
             await WaitForNetworkShutdownAsync(networkManager);
+            networkManager.NetworkConfig?.NetworkTransport?.Shutdown();
         }
 
         OnLobbyUpdated?.Invoke();
@@ -554,7 +569,9 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null &&
             (NetworkManager.Singleton.IsListening || NetworkManager.Singleton.IsHost || NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))
         {
-            NetworkManager.Singleton.Shutdown();
+            NetworkManager.Singleton.Shutdown(discardMessageQueue: true);
         }
+
+        NetworkManager.Singleton?.NetworkConfig?.NetworkTransport?.Shutdown();
     }
 }
