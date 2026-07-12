@@ -14,6 +14,13 @@ public enum DeathBehaviour { Destroy, PlayAnimation }
 [RequireComponent(typeof(NavMeshAgent))]
 public class MutantEnemy : NetworkBehaviour
 {
+    /// <summary>
+    /// Fired on the server just before this mutant is removed from play — either by fleeing
+    /// and despawning, or by dying. Subscribe to this to defer any post-breakthrough logic
+    /// (e.g. queuing the next suspect) until the mutant is truly out of the scene.
+    /// </summary>
+    public event Action OnRemovedFromPlay;
+
     // ── Static events ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -41,6 +48,8 @@ public class MutantEnemy : NetworkBehaviour
     [SerializeField] private string groundedParameterName = "Grounded";
     [SerializeField] private string attackBoolName = "Attack";
     [SerializeField] private string deathBoolName = "Death";
+    [Tooltip("Bool parameter set to true whenever the agent is moving. Derived from the synced Speed value — no extra NetworkVariable required.")]
+    [SerializeField] private string runningBoolName = "Running";
 
     [Header("Attack Hitbox")]
     [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
@@ -78,6 +87,44 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Sound played on all clients when this enemy dies.")]
     [SerializeField] private AudioClip deathSound;
 
+    [Header("Sounds")]
+    [Tooltip("Clips played spatially at random when this mutant takes a hit and survives.")]
+    [SerializeField] private AudioClip[] _hurtSounds;
+
+    [Tooltip("Clips played spatially at random while this mutant is actively chasing a player.")]
+    [SerializeField] private AudioClip[] _chaseSounds;
+
+    [Tooltip("Minimum seconds between random chase screams.")]
+    [Min(0.5f)]
+    [SerializeField] private float _chaseScreamIntervalMin = 5f;
+
+    [Tooltip("Maximum seconds between random chase screams.")]
+    [Min(0.5f)]
+    [SerializeField] private float _chaseScreamIntervalMax = 15f;
+
+    [Tooltip("Seconds to fade out chase music when this mutant dies or flees.")]
+    [Min(0f)]
+    [SerializeField] private float _chaseMusicFadeOutSeconds = 2f;
+
+    [Header("Flee Behaviour")]
+    [Tooltip("When enabled, reaching zero health triggers a rapid flee-and-despawn instead of a normal death. " +
+             "Intended for fully-mutated civilian variants that cannot be permanently killed in the world.")]
+    [SerializeField] private bool fleeInsteadOfDie = false;
+
+    [Tooltip("NavMesh movement speed during the flee phase. Should be noticeably faster than normal move speed.")]
+    [Min(1f)]
+    [SerializeField] private float fleeSpeed = 12f;
+
+    [Tooltip("Seconds after beginning the flee before the mutant force-despawns regardless of distance.")]
+    [Min(1f)]
+    [SerializeField] private float fleeDespawnTimeout = 8f;
+
+    [Header("Deferred Initialisation")]
+    [Tooltip("When false, InitialiseServer() is NOT called automatically on OnNetworkSpawn. " +
+             "Use this when the enemy lives on a SuspectCharacter prefab and should only activate " +
+             "after its booth cutscene completes. Call InitialiseServer() manually via SuspectCharacter.BeginMutantBehavior().")]
+    [SerializeField] private bool _autoInitialiseOnSpawn = true;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private NavMeshAgent _agent;
@@ -85,6 +132,7 @@ public class MutantEnemy : NetworkBehaviour
     private float _health;
     private float _attackCooldownTimer;
     private float _doorOpenCooldownTimer;
+    private float _chaseScreamTimer;
     private bool _isDead;
 
     // Patrol & aggro state (server only)
@@ -132,7 +180,7 @@ public class MutantEnemy : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (IsServer)
+        if (IsServer && _autoInitialiseOnSpawn)
         {
             InitialiseServer();
         }
@@ -176,12 +224,32 @@ public class MutantEnemy : NetworkBehaviour
         _agent.angularSpeed = data.angularSpeed;
         _agent.acceleration = data.acceleration;
         _agent.stoppingDistance = data.stoppingDistance;
+        _agent.updateRotation = true;
+        _agent.isStopped = false;
 
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
+        _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+
         StartCoroutine(ChaseLoop());
     }
+
+    /// <summary>
+    /// Assigns the Animator reference used for speed and grounded blending.
+    /// Call this before <see cref="InitialiseServer"/> when the enemy's Animator lives on a
+    /// child that is only activated at runtime (e.g. the Mutated Version mesh on a SuspectCharacter prefab).
+    /// </summary>
+    public void SetAnimator(Animator a) => animator = a;
+
+    /// <summary>
+    /// Prevents <see cref="InitialiseServer"/> from firing automatically during
+    /// <see cref="OnNetworkSpawn"/>. Must be called before <see cref="NetworkObject.Spawn"/>
+    /// on the server when this enemy lives on a <see cref="SuspectCharacter"/> prefab and must
+    /// stay dormant until the booth cutscene ends and
+    /// <see cref="SuspectCharacter.BeginMutantBehavior"/> fires.
+    /// </summary>
+    public void DisableAutoInit() => _autoInitialiseOnSpawn = false;
 
     // ── Server Loops ───────────────────────────────────────────────────────────
 
@@ -464,7 +532,30 @@ public class MutantEnemy : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServer || _isDead || !_agent.isActiveAndEnabled) return;
+        if (!IsServer || !_agent.isActiveAndEnabled) return;
+
+        // Always sync locomotion state so clients see movement during flee even though _isDead is true.
+        _networkSpeed.Value = _agent.velocity.magnitude;
+        _networkGrounded.Value = _agent.isOnNavMesh;
+
+        if (_isDead) return;
+
+        // ── Chase Scream ───────────────────────────────────────────────────────
+        if (_currentTarget != null)
+        {
+            _chaseScreamTimer -= Time.deltaTime;
+            if (_chaseScreamTimer <= 0f && _chaseSounds != null && _chaseSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _chaseSounds.Length);
+                PlayChaseSoundClientRpc(idx);
+                _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+            }
+        }
+        else
+        {
+            // Reset to a fresh interval so the first scream fires naturally after acquiring a target.
+            _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+        }
 
         // ── Rotation Tracking ──────────────────────────────────────────────────
         // If we are in range to attack something, ensure we rotate to face it 
@@ -520,9 +611,6 @@ public class MutantEnemy : NetworkBehaviour
                 TryAttackFence();
             }
         }
-
-        _networkSpeed.Value = _agent.velocity.magnitude;
-        _networkGrounded.Value = _agent.isOnNavMesh;
     }
 
     // ── Targeting ──────────────────────────────────────────────────────────────
@@ -827,7 +915,16 @@ public class MutantEnemy : NetworkBehaviour
         SpawnHitParticleClientRpc(hitPoint);
 
         if (_health <= 0f)
+        {
             Die();
+            return;
+        }
+
+        if (_hurtSounds != null && _hurtSounds.Length > 0)
+        {
+            int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
+            PlayHurtSoundClientRpc(idx);
+        }
     }
 
     [ClientRpc]
@@ -849,8 +946,21 @@ public class MutantEnemy : NetworkBehaviour
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
 
+        if (fleeInsteadOfDie)
+        {
+            // Restore health so IsDead stays true (flee path) but the unit remains functional
+            // long enough to run the flee coroutine. _isDead prevents re-entry from TakeDamage.
+            _agent.enabled = true;
+            StartCoroutine(FleeAndDespawn());
+            return;
+        }
+
+        // Stop chase music on all clients before the death sequence plays.
+        StopChaseMusicClientRpc();
+
         // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
         OnAnyMutantKilled?.Invoke();
+        OnRemovedFromPlay?.Invoke();
 
         // Attempt to drop a MutantBit if the night phase is active.
         MutantThreat.Instance?.TryDropBitAt(transform.position);
@@ -867,6 +977,65 @@ public class MutantEnemy : NetworkBehaviour
             if (IsSpawned)
                 NetworkObject.Despawn();
         }
+    }
+
+    /// <summary>
+    /// Flee-and-despawn sequence for fully-mutated civilian mutants that cannot be permanently
+    /// killed. The mutant breaks off from its current target, sprints away from the nearest
+    /// player at <see cref="fleeSpeed"/>, and despawns after <see cref="fleeDespawnTimeout"/>
+    /// seconds regardless of distance. No kill event is fired and no MutantBit is dropped.
+    /// </summary>
+    private IEnumerator FleeAndDespawn()
+    {
+        if (!IsServer) yield break;
+
+        // Boost speed, stop any attack animation, and stop chase music on all clients.
+        _agent.speed = fleeSpeed;
+        SetAttackAnimClientRpc(false);
+        SetFleeingClientRpc(true);
+        StopChaseMusicClientRpc();
+
+        float elapsed = 0f;
+
+        while (elapsed < fleeDespawnTimeout)
+        {
+            // Continuously update destination away from the nearest player.
+            Transform player = FindNearestLivingPlayer();
+            if (player != null)
+            {
+                Vector3 awayDir = (transform.position - player.position).normalized;
+                Vector3 fleeTarget = transform.position + awayDir * 20f;
+
+                // Clamp to NavMesh surface.
+                if (UnityEngine.AI.NavMesh.SamplePosition(fleeTarget, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
+                    _agent.SetDestination(hit.position);
+            }
+
+            elapsed += 0.5f;
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        SetFleeingClientRpc(false);
+        OnRemovedFromPlay?.Invoke();
+
+        if (IsSpawned)
+            NetworkObject.Despawn();
+    }
+
+    [ClientRpc]
+    private void SetAttackAnimClientRpc(bool attacking)
+    {
+        if (animator != null && !string.IsNullOrEmpty(attackBoolName))
+            animator.SetBool(attackBoolName, attacking);
+    }
+
+    [ClientRpc]
+    private void SetFleeingClientRpc(bool fleeing)
+    {
+        // Reuse the Speed parameter — the animator reads it for locomotion blend.
+        // Optionally, set a dedicated "Fleeing" bool if the animator has one.
+        if (animator != null)
+            animator.SetBool("Fleeing", fleeing);
     }
 
     [ClientRpc]
@@ -886,6 +1055,31 @@ public class MutantEnemy : NetworkBehaviour
             SFXController.Instance.Play(deathSound);
     }
 
+    [ClientRpc]
+    private void PlayHurtSoundClientRpc(int index)
+    {
+        if (_hurtSounds == null || index < 0 || index >= _hurtSounds.Length) return;
+        AudioClip clip = _hurtSounds[index];
+        if (clip != null)
+            SFXController.Instance?.PlayAtPosition(clip, transform.position);
+    }
+
+    [ClientRpc]
+    private void PlayChaseSoundClientRpc(int index)
+    {
+        if (_chaseSounds == null || index < 0 || index >= _chaseSounds.Length) return;
+        AudioClip clip = _chaseSounds[index];
+        if (clip != null)
+            SFXController.Instance?.PlayAtPosition(clip, transform.position);
+    }
+
+    /// <summary>Fades out and stops the looping chase music on all clients.</summary>
+    [ClientRpc]
+    private void StopChaseMusicClientRpc()
+    {
+        MusicManager.Instance?.FadeOut(_chaseMusicFadeOutSeconds);
+    }
+
     private IEnumerator DespawnAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -903,8 +1097,13 @@ public class MutantEnemy : NetworkBehaviour
 
     private void ApplyAnimatorSpeed(float speed)
     {
-        if (animator != null && !string.IsNullOrEmpty(speedParameterName))
+        if (animator == null) return;
+
+        if (!string.IsNullOrEmpty(speedParameterName))
             animator.SetFloat(speedParameterName, speed);
+
+        if (!string.IsNullOrEmpty(runningBoolName))
+            animator.SetBool(runningBoolName, speed > 0.1f);
     }
 
     private void OnNetworkGroundedChanged(bool oldValue, bool newValue)

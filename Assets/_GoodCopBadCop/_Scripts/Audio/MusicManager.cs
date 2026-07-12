@@ -26,6 +26,8 @@ public class MusicManager : MonoBehaviour
     [Tooltip("Seconds over which a new Play() call cross-fades out the currently playing track.")]
     [SerializeField] private float _crossFadeDuration = 1.5f;
 
+    [SerializeField] private float defaultVolume = .5f;
+
     private AudioSource _source;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -121,7 +123,7 @@ public class MusicManager : MonoBehaviour
     {
         _source.clip   = clip;
         _source.loop   = loop;
-        _source.volume = fadeIn > 0f ? 0f : 1f;
+        _source.volume = fadeIn > 0f ? 0f : defaultVolume;
         _source.Play();
 
         if (fadeIn > 0f)

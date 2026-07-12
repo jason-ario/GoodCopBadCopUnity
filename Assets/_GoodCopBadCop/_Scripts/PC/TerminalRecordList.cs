@@ -17,7 +17,7 @@ public class TerminalRecordListUI : MonoBehaviour
         for (int i = 0; i < suspectDatas.Count; i++)
         {
             TerminalListItem item = Instantiate(listItemPrefab, listContainer);
-            item.Setup(suspectDatas[i], pc);
+            item.Setup(suspectDatas[i], pc, pc.GetTerminalStatus(suspectDatas[i]));
             _spawnedItems.Add(item);
         }
     }

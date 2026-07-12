@@ -4,7 +4,6 @@ Compact context packet for new AI/MCP sessions. Keep it short and open deeper do
 
 ## Read Strategy
 
-- Start from `AGENTS.md`, `Docs/AI/README.md`, then this file.
 - Run `git status --short` before edits.
 - Do not read all AI docs by default.
 - Prefer direct source inspection over stale memory when behavior matters.

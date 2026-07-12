@@ -26,4 +26,9 @@ public class PickableItemData : ScriptableObject
     public bool useLeftIK;
     public bool useRightIK;
     public bool useAimIK;
+
+    [Header("UI")]
+    [Tooltip("Icon displayed in the inventory HUD slot when this item is carried.")]
+    [SerializeField] private Sprite icon;
+    public Sprite Icon => icon;
 }

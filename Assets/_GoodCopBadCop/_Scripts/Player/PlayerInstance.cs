@@ -13,6 +13,7 @@ public class PlayerInstance : NetworkBehaviour
     [SerializeField] private Unity.Cinemachine.CinemachineCamera deathCamera;
     [SerializeField] private Unity.Cinemachine.CinemachineCamera spectateCamera;
     [SerializeField] private float deathUIDelay = 2f;
+    [SerializeField] private AudioClip _deathStinger;
 
     private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
         false,
@@ -56,6 +57,7 @@ public class PlayerInstance : NetworkBehaviour
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     public PlayerRadiation PlayerRadiation { get; set; }
     public PlayerHealth PlayerHealth { get; set; }
+    public PlayerDrunkState PlayerDrunkState { get; set; }
     public PlayerAnimationController PlayerAnimationController { get; private set; }
     public PlayerPickupController PlayerPickupController { get; private set; }
 
@@ -76,6 +78,7 @@ public class PlayerInstance : NetworkBehaviour
         _playerCameraController = GetComponent<PlayerCameraController>();
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
+        PlayerDrunkState = GetComponent<PlayerDrunkState>();
         PlayerAnimationController = GetComponent<PlayerAnimationController>();
         PlayerPickupController = GetComponent<PlayerPickupController>();
     }
@@ -227,6 +230,9 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     public void Die()
     {
+        if (_deathStinger != null)
+            SFXController.Instance?.Play(_deathStinger);
+
         CanControl = false;
         SetCanInteract(false);
         SetCanMove(false);
@@ -346,6 +352,7 @@ public class PlayerInstance : NetworkBehaviour
         if (_playerCameraController != null) _playerCameraController.enabled = false;
         if (PlayerHealth != null) PlayerHealth.enabled = false;
         if (PlayerRadiation != null) PlayerRadiation.enabled = false;
+        if (PlayerDrunkState != null) PlayerDrunkState.enabled = false;
 
         // 2. Disable Networking
         var nt = GetComponent<Unity.Netcode.Components.NetworkTransform>();

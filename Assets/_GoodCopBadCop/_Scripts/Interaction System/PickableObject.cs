@@ -621,6 +621,12 @@ public class PickableObject : Interactable
         interactableColliders = colliders;
     }
 
+    /// <summary>
+    /// Called on the owner client just before this object is stowed to a player's hip anchor.
+    /// Override to perform cleanup (e.g. turn off a flashlight) before the GameObject deactivates.
+    /// </summary>
+    public virtual void OnStowed() { }
+
     public virtual void OnStartUse()
     {
         isUsing = true;

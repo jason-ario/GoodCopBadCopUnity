@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: PavleFullMutantDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: Permit. Right. Force of habit.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 0
+    npcLine: The gauze finally came off last week. The skin had grown around the edges.
+      I didn't have much say in the matter.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 0
+    npcLine: The grinding you've been hearing. I used to say it was from the shop.
+      It was never from the shop.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 0
+    npcLine: My brother stopped asking questions about a week ago. I think he could
+      tell I didn't have good answers anymore.
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 1
+    npcLine: The hunger got very specific. Like I told you it would. I just didn't
+      know yet what it was hungry for.
+    animationTrigger: TalkCocky
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices:
+    - playerChoiceText: Pavle, step back from the window.
+      npcResponse: In a moment. I've been looking forward to this for a while.
+      animationTrigger: TalkSmile
+    - playerChoiceText: What do you want?
+      npcResponse: What I've always wanted. Something fresh. I've been very patient.
+      animationTrigger: TalkCocky
+  - type: 0
+    npcLine: I've been coming to this window for a long time. You were always very
+      good to me. I want you to know that.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 0
+    npcLine: You'd make a very clean cut. I always mean that as a compliment.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []

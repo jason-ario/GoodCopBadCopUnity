@@ -434,6 +434,16 @@ public class FolderController : PickableObject
         if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
         if (isOpen.Value) { Debug.LogWarning("[FolderController] Stamp blocked: folder is open."); return; }
 
+        if (stampType == StampContainer.StampType.Quarantine && IsQuarantineFull())
+        {
+            Debug.LogWarning("[FolderController] Quarantine stamp blocked: quarantine slots are full.");
+            QuarantineFullClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
         // Consume one ink use for limited stamp types; block and notify the requesting client if none remain.
         if (StampInkManager.Instance != null && !StampInkManager.Instance.ConsumeInk(stampType))
         {
@@ -450,6 +460,19 @@ public class FolderController : PickableObject
         Debug.Log($"[FolderController] isStamped set to true on server. NetworkObjectId={NetworkObjectId}");
 
         StartUseStampClientRpc(interactingPlayerId, stampType);
+    }
+
+    private bool IsQuarantineFull()
+    {
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+        return SuspectRunRecords.Instance != null
+               && !SuspectRunRecords.Instance.HasQuarantineSlot(currentDay);
+    }
+
+    [ClientRpc]
+    private void QuarantineFullClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.ShowShopNotification("<color=red>5/5 quarantine slots full!</color>");
     }
 
     [ClientRpc]

@@ -70,7 +70,8 @@ namespace GoodCopBadCop.Editor
         {
             "Assets/_GoodCopBadCop/_Prefabs/Equipment/Pickups/ID card.prefab",
             "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Application Paper.prefab",
-            "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Entry Permit.prefab"
+            "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Entry Permit.prefab",
+            "Assets/_GoodCopBadCop/_Prefabs/Interactables/Documents/Exam Pages/Documentation Exam page.prefab"
         };
 
         private GameObject targetRoot;
@@ -519,8 +520,9 @@ namespace GoodCopBadCop.Editor
                 if (document == null)
                     continue;
 
-                document.SetActive(paperworkState.DocumentsVisible);
-                if (!paperworkState.DocumentsVisible)
+                bool isExamPage = IsExamPageDocument(document);
+                document.SetActive(isExamPage || paperworkState.DocumentsVisible);
+                if (!document.activeSelf)
                     continue;
 
                 PopulatePreviewDocument(document, data, paperworkState);
@@ -543,8 +545,51 @@ namespace GoodCopBadCop.Editor
                     applicationLetter.ApplyPreviewState(paperworkState, data);
                 else if (component is EntryPermit entryPermit)
                     entryPermit.ApplyPreviewState(paperworkState);
+                else if (component is ExamPage examPage)
+                    ApplyPreviewExamPageState(examPage);
             }
         }
+
+        private void ApplyPreviewExamPageState(ExamPage examPage)
+        {
+            if (examPage == null || examPage.ChecklistItems == null)
+                return;
+
+            HashSet<string> activeAnomalyTypeNames = anomalies
+                .Where(IsAnomalyActive)
+                .Select(anomaly => anomaly.GetType().Name)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (ChecklistItem item in examPage.ChecklistItems)
+            {
+                if (item == null)
+                    continue;
+
+                item.ApplyLockState(locked: false);
+                item.SetInteractable(false);
+                SetPreviewChecklistItemChecked(item, activeAnomalyTypeNames.Contains(item.AnomalyTypeName));
+            }
+        }
+
+        private static void SetPreviewChecklistItemChecked(ChecklistItem item, bool isChecked)
+        {
+            ChecklistVisual visual = item.GetComponent<ChecklistVisual>();
+            if (visual != null)
+            {
+                visual.SetVisible(true);
+                visual.SetChecked(isChecked);
+            }
+
+            foreach (Checkbox checkbox in item.GetComponentsInChildren<Checkbox>(true))
+            {
+                FieldInfo checkmarkField = FindField(typeof(Checkbox), "checkmark");
+                if (checkmarkField?.GetValue(checkbox) is GameObject checkmark)
+                    checkmark.SetActive(isChecked);
+            }
+        }
+
+        private static bool IsExamPageDocument(GameObject document)
+            => document != null && document.GetComponentInChildren<ExamPage>(true) != null;
 
         private SuspectPaperworkState BuildPreviewPaperworkState(global::SuspectData data)
         {
@@ -588,7 +633,7 @@ namespace GoodCopBadCop.Editor
             if (maxSize <= 0.001f)
                 return;
 
-            float targetSize = prefabPath.Contains("Application Paper") ? 1.35f : 1.08f;
+            float targetSize = prefabPath.Contains("Application Paper") || prefabPath.Contains("Exam page") ? 1.35f : 1.08f;
             float scaleMultiplier = targetSize / maxSize;
             document.transform.localScale *= scaleMultiplier;
         }
@@ -612,7 +657,9 @@ namespace GoodCopBadCop.Editor
                 case 1:
                     return new Vector3(2.066f, 1.894f, -5.597f);
                 case 2:
-                    return new Vector3(0.860608f, 1.588348f, -9.497043f);
+                    return new Vector3(1.172f, 1.405f, -9.492f);
+                case 3:
+                    return new Vector3(0.975f, 1.952f, -5.551678f);
                 default:
                     return new Vector3(1.05f, 2.34f - index * 0.6f, -0.52f);
             }
@@ -620,6 +667,9 @@ namespace GoodCopBadCop.Editor
 
         private static Quaternion GetDocumentPreviewRotation(string prefabPath)
         {
+            if (prefabPath.Contains("Documentation Exam page"))
+                return Quaternion.Euler(0f, 180f, 90f);
+
             if (prefabPath.Contains("Entry Permit"))
                 return Quaternion.Euler(272.5217f, 270.7207f, 268.3602f);
 

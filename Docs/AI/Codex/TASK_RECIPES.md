@@ -1,6 +1,6 @@
 # Task Recipes
 
-These are quick-start recipes for future Codex sessions. Use them after reading `AGENTS.md` and `Docs/AI/Codex/README.md`.
+Quick-start recipes for future Codex sessions.
 
 ## Standard Broad Task
 

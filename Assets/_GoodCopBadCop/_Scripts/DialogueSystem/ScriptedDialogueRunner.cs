@@ -621,6 +621,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
 
+        UIController.Instance?.ClosePlayerUI();
+
         if (PlayerInstance.Instance == null) return;
 
         Transform lookTarget = null;
@@ -745,6 +747,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         IsScriptedModeActive = true;
 
+        UIController.Instance?.ClosePlayerUI();
+
         // Cache the speaker ID on all clients so SuspectController can resolve per-character cameras
         // via CurrentSpeakerNetId — must be stored before any early return below.
         _clientSpeakerNetId = speakerNetId;
@@ -780,6 +784,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Deactivate any override camera before restoring the default cam state.
         DeactivateOverrideCam();
+
+        UIController.Instance?.ShowPlayerUI();
 
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
         {

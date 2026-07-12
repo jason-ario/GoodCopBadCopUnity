@@ -94,6 +94,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay3PowerOutage());
             SetVisible(false);
         }));
+
+        _cheats.Add(("Skip to End of Demo (Thanks For Playing)", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDemo());
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

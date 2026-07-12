@@ -34,6 +34,12 @@ public class SuspectData : ScriptableObject
     [Tooltip("Authored note on expected behavior, shown on the terminal.")]
     public string normalBehaviorNotes;
 
+    [Header("Full Mutant State")]
+    [Tooltip("Scripted dialogue played when this suspect arrives at the booth window in their fully-mutated form. " +
+             "Must be assigned for the full-mutant path to activate — mirrors introDialogue in structure and usage. " +
+             "Leave null to disable the full-mutant booth encounter for this suspect.")]
+    public ScriptedDialogue fullMutantDialogue;
+
     [Header("Replacement System")]
     [Tooltip("Face photo used when this suspect returns as an uncanny replacement after being killed. " +
              "Leave null to disable replacement for this character.")]
@@ -148,5 +154,5 @@ public class SuspectData : ScriptableObject
     {
         IDNumber = Random.Range(1000000, 9999999).ToString();
     }
-    
+
 }

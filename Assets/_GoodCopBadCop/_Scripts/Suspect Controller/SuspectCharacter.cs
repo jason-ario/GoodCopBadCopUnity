@@ -69,6 +69,303 @@ public class SuspectCharacter : Interactable
 
     #endregion
 
+    [Header("Full Mutant Form")]
+    [Tooltip("The 'Base Version' container GameObject — the entire civilian mesh and its child hierarchy. " +
+             "Assign the direct child named 'Base Version'. Disabled when the fully-mutated form activates.")]
+    [SerializeField] private GameObject _baseVersion;
+
+    [Tooltip("The 'Mutated Version' container GameObject — the mutated mesh and its child hierarchy. " +
+             "Assign the direct child named 'Mutated Version'. Enabled when the fully-mutated form activates. " +
+             "Keep this GameObject disabled in the prefab.")]
+    [SerializeField] private GameObject _mutatedVersion;
+
+    [Tooltip("The MutantEnemy component on this prefab. Assign in the Inspector; falls back to " +
+             "GetComponent at runtime. Kept disabled until BeginMutantBehavior() fires after the booth cutscene.")]
+    [SerializeField] private MutantEnemy _mutantEnemy;
+
+    [Tooltip("The MutantSuspectBehaviour component on this prefab. When assigned, BeginMutantBehavior() " +
+             "hands off to this component for the window-breach sequence (climb-through or shutter bang) " +
+             "instead of enabling MutantEnemy directly. Assign in the Inspector; falls back to GetComponent.")]
+    [SerializeField] private MutantSuspectBehaviour _mutantSuspectBehaviour;
+
+    [Tooltip("MutantIntruderData config used for the booth window-breach phase after the full-mutant " +
+             "cutscene. Controls walk, climb, and shutter-bang timings. Assign a MutantIntruderData asset.")]
+    [SerializeField] private MutantIntruderData _fullMutantIntruderData;
+
+    // Booth references injected by SuspectController at spawn time for the window-breach phase.
+    private Transform _fullMutantStandPos;
+    private Transform _fullMutantDespawnPos;
+    private Transform _fullMutantClimbTargetPos;
+    private ShutterController _fullMutantShutterController;
+    private SuspectController _fullMutantController;
+
+    /// <summary>True when a mutated version container is configured on this prefab.</summary>
+    public bool HasFullMutantForm => _mutatedVersion != null;
+
+    /// <summary>
+    /// Switches this suspect to their full-mutant visual form on the server and replicates to all clients.
+    /// Disables the Base Version container, enables the Mutated Version container, dynamically
+    /// re-assigns the <see cref="animator"/> field (and related components) to the mutated mesh's Animator,
+    /// and ensures <see cref="MutantEnemy"/> is disabled so <see cref="SuspectCharacter"/> stays in control
+    /// until the booth cutscene completes.
+    /// Must be called on the server.
+    /// </summary>
+    public void ActivateFullMutantForm()
+    {
+        if (_baseVersion != null) _baseVersion.SetActive(false);
+        if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
+
+        // Disable MutantEnemy before AssignMutatedAnimator so any exception inside
+        // AssignMutatedAnimator cannot leave it in an active state.
+        if (_mutantEnemy != null) _mutantEnemy.enabled = false;
+
+        AssignMutatedAnimator();
+        ActivateFullMutantFormClientRpc();
+    }
+
+    /// <summary>
+    /// Finds the Animator inside the active mutated version and assigns it to all animator-consuming
+    /// components on this GameObject. Also remaps the <see cref="FLookAnimator"/> bone chain to the
+    /// mutant skeleton and re-initializes it so look-at tracking follows the mutant head.
+    /// Called locally on both server and clients.
+    /// </summary>
+    private void AssignMutatedAnimator()
+    {
+        if (_mutatedVersion == null) return;
+
+        Animator mutantAnim = _mutatedVersion.GetComponentInChildren<Animator>(true);
+        if (mutantAnim == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}' Mutated Version has no Animator in its hierarchy — cannot reassign.", this);
+            return;
+        }
+
+        animator = mutantAnim;
+
+        var adapter = GetComponent<GoodCopBadCop.SuspectBehaviorAnimation.SuspectBehaviorAnimationAdapter>();
+        adapter?.UpdateAnimatorReference(mutantAnim);
+
+        _mutantEnemy?.SetAnimator(mutantAnim);
+        _mutantSuspectBehaviour?.SetAnimator(mutantAnim);
+
+        // Remap the FLookAnimator bone chain to the mutant skeleton so look-at tracking
+        // follows the mutant head instead of the now-disabled civilian bones.
+        RemapLookAnimatorToMutantSkeleton();
+    }
+
+    /// <summary>
+    /// Builds a name-keyed lookup of every Transform inside <see cref="_mutatedVersion"/>,
+    /// then replaces each <see cref="FLookAnimator.LookBones"/> Transform reference and
+    /// <see cref="FLookAnimator.LeadBone"/> with the matching mutant bone.
+    /// Finally calls <see cref="FLookAnimator.InitializeBaseVariables"/> so all internal
+    /// rotation correction data is recalculated for the new skeleton.
+    /// </summary>
+    private void RemapLookAnimatorToMutantSkeleton()
+    {
+        if (lookAnimator == null || _mutatedVersion == null) return;
+
+        // Index every bone in the mutant hierarchy by name for O(1) matching.
+        var mutantBones = new Dictionary<string, Transform>();
+        foreach (Transform t in _mutatedVersion.GetComponentsInChildren<Transform>(true))
+        {
+            if (!mutantBones.ContainsKey(t.name))
+                mutantBones[t.name] = t;
+        }
+
+        // Swap each LookBone Transform to its mutant counterpart (same Mixamo bone name).
+        foreach (FLookAnimator.LookBone lookBone in lookAnimator.LookBones)
+        {
+            if (lookBone.Transform != null && mutantBones.TryGetValue(lookBone.Transform.name, out Transform mutantBone))
+                lookBone.Transform = mutantBone;
+        }
+
+        // Reassign LeadBone (the primary head bone driven by look rotation).
+        if (lookAnimator.LeadBone != null && mutantBones.TryGetValue(lookAnimator.LeadBone.name, out Transform mutantLeadBone))
+        {
+            lookAnimator.LeadBone = mutantLeadBone;
+        }
+        else
+        {
+            // LeadBone was null or its name wasn't found — fall back to Humanoid head bone.
+            Transform fallback = animator.GetBoneTransform(HumanBodyBones.Head);
+            if (fallback != null)
+                lookAnimator.LeadBone = fallback;
+            else
+                Debug.LogWarning($"[SuspectCharacter] '{name}' could not find a mutant LeadBone by name or HumanBodyBones.Head — FLookAnimator LeadBone not updated.", this);
+        }
+
+        // Recalculate internal bone-direction correction data for the new skeleton.
+        if (lookAnimator.LeadBone != null)
+        {
+            try
+            {
+                lookAnimator.InitializeBaseVariables();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[SuspectCharacter] '{name}' FLookAnimator.InitializeBaseVariables threw after mutant bone remap — look-at may be miscalibrated but spawn will continue. ({e.GetType().Name}: {e.Message})", this);
+            }
+        }
+    }
+
+    [ClientRpc]
+    private void ActivateFullMutantFormClientRpc()
+    {
+        if (IsServer) return;
+        if (_baseVersion != null) _baseVersion.SetActive(false);
+        if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
+        AssignMutatedAnimator();
+
+        if (_mutantEnemy != null) _mutantEnemy.enabled = false;
+    }
+
+    /// <summary>
+    /// Plays the fully-mutated booth cutscene for this suspect via <see cref="ScriptedDialogueRunner"/>.
+    /// Mirrors the intro-dialogue pattern from <see cref="SuspectEncounterManager"/>: starts a
+    /// coroutine on this component, waits one second for the character to settle at the window,
+    /// then calls <see cref="ScriptedDialogueRunner.PlayDialogue"/> with
+    /// <see cref="SuspectData.FullMutantConfig.boothCutscene"/> from this character's own data.
+    /// <see cref="BeginMutantBehavior"/> fires automatically as the <c>onComplete</c> callback.
+    /// Must be called on the server from <see cref="SuspectController"/> when the suspect arrives
+    /// at the booth window.
+    /// </summary>
+    public void StartFullMutantCutscene()
+    {
+        if (!IsServer) return;
+        StartCoroutine(PlayFullMutantCutsceneRoutine());
+    }
+
+    private IEnumerator PlayFullMutantCutsceneRoutine()
+    {
+        ScriptedDialogue cutscene = suspectData?.fullMutantDialogue;
+
+        if (cutscene == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}': fullMutantDialogue is not assigned on '{suspectData?.name}' — skipping cutscene and going straight to mutant behaviour.", this);
+            BeginMutantBehavior();
+            yield break;
+        }
+
+        if (ScriptedDialogueRunner.Instance == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}': ScriptedDialogueRunner.Instance is null — cannot play full-mutant cutscene.", this);
+            BeginMutantBehavior();
+            yield break;
+        }
+
+        // Settle beat — character finishes facing the player before the first line plays.
+        // Matches the 1-second wait used by SuspectEncounterManager.PlayIntroDialogue.
+        yield return new WaitForSeconds(1f);
+
+        Debug.Log($"[SuspectCharacter] '{name}': starting full-mutant cutscene '{cutscene.name}'.");
+        ScriptedDialogueRunner.Instance.PlayDialogue(this, cutscene, onComplete: BeginMutantBehavior);
+    }
+
+    /// <summary>
+    /// Stores the booth references needed by <see cref="MutantSuspectBehaviour.BeginAtStandPos"/>
+    /// so <see cref="BeginMutantBehavior"/> can start the window-breach sequence without
+    /// reaching back into <see cref="SuspectController"/>.
+    /// Must be called on the server from <see cref="SuspectController"/> immediately after
+    /// <see cref="ActivateFullMutantForm"/> when spawning a full-mutant slot.
+    /// </summary>
+    public void SetupFullMutantWindowBreach(
+        Transform standPos,
+        Transform despawnPos,
+        Transform climbTargetPos,
+        ShutterController shutterController,
+        SuspectController controller)
+    {
+        _fullMutantStandPos         = standPos;
+        _fullMutantDespawnPos       = despawnPos;
+        _fullMutantClimbTargetPos   = climbTargetPos;
+        _fullMutantShutterController = shutterController;
+        _fullMutantController       = controller;
+    }
+
+    /// <summary>
+    /// Hands control from <see cref="SuspectCharacter"/> to the window-breach phase after the
+    /// booth cutscene completes.
+    /// When <see cref="_mutantSuspectBehaviour"/> and <see cref="_fullMutantIntruderData"/> are
+    /// both configured, delegates to <see cref="MutantSuspectBehaviour.BeginAtStandPos"/> which
+    /// drives the rotate-to-window → climb-through-or-bang sequence and enables
+    /// <see cref="MutantEnemy"/> itself after a successful breakthrough.
+    /// Falls back to enabling <see cref="MutantEnemy"/> directly when no
+    /// <see cref="MutantSuspectBehaviour"/> is present.
+    /// Called automatically as the <c>onComplete</c> of <see cref="StartFullMutantCutscene"/>.
+    /// </summary>
+    public void BeginMutantBehavior()
+    {
+        if (!IsServer) return;
+
+        _isMutant = true;
+        StopNavigation();
+        enabled = false;
+        TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
+        SetMutantVoiceClientRpc();
+
+        // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
+        // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
+        if (_mutantSuspectBehaviour != null && _fullMutantIntruderData != null
+            && _fullMutantStandPos != null)
+        {
+            _mutantSuspectBehaviour.BeginAtStandPos(
+                _fullMutantIntruderData,
+                _fullMutantStandPos,
+                _fullMutantDespawnPos,
+                _fullMutantClimbTargetPos,
+                _fullMutantShutterController,
+                _fullMutantController);
+            return;
+        }
+
+        // Fallback — no MutantSuspectBehaviour or intruder data: enable MutantEnemy directly.
+        if (_mutantEnemy == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}' has no MutantEnemy — cannot begin mutant behaviour.", this);
+            return;
+        }
+
+        _mutantEnemy.enabled = true;
+        _mutantEnemy.InitialiseServer();
+        EnableMutantEnemyClientRpc();
+    }
+
+    [ClientRpc]
+    private void EnableMutantEnemyClientRpc()
+    {
+        if (_mutantEnemy != null) _mutantEnemy.enabled = true;
+    }
+
+    /// <summary>
+    /// Disables <see cref="SuspectCharacter"/> on all non-server clients.
+    /// When <paramref name="enableMutantEnemy"/> is true also enables <see cref="MutantEnemy"/>
+    /// directly (fallback path). The preferred path lets <see cref="MutantSuspectBehaviour"/>
+    /// enable <see cref="MutantEnemy"/> via its own ClientRpc after breakthrough.
+    /// </summary>
+    [ClientRpc]
+    private void TransitionToMutantBehaviorClientRpc(bool enableMutantEnemy)
+    {
+        if (enableMutantEnemy && _mutantEnemy != null) _mutantEnemy.enabled = true;
+        enabled = false;
+    }
+
+    [ClientRpc]
+    private void SetMutantVoiceClientRpc()
+    {
+        speaking?.SetMutantVoice(true);
+    }
+
+    [ClientRpc]
+    private void PlayUncannyArriveSoundClientRpc()
+    {
+        if (_uncannyArrivesSound != null)
+            SFXController.Instance?.Play(_uncannyArrivesSound);
+    }
+
+    [Header("Sounds")]
+    [Tooltip("Played on all clients when a fully-mutated suspect presents at the booth (uncanny arrival sting).")]
+    [SerializeField] private AudioClip _uncannyArrivesSound;
+
     [Header("Cameras")]
     [Tooltip("Per-character wide-shot camera used during dialogue. When assigned, this overrides the shared " +
              "scene-level 'At Booth Cam' for this specific character. Assign a child CinemachineCamera GameObject.")]
@@ -88,24 +385,33 @@ public class SuspectCharacter : Interactable
     // Navigation
 
     [Header("Navigation")]
-    [Tooltip("Movement speed passed to the NavMeshAgent. Match to the walk animation speed.")]
+    [Tooltip("Walk speed in units per second. Used to calculate DOTween movement duration " +
+             "and also applied to the NavMeshAgent when InitNavigation() is called explicitly " +
+             "for special cases (e.g. MutantSuspectBehaviour retreat pathfinding).")]
     [SerializeField] private float _walkSpeed = 1.5f;
 
-    [Tooltip("Rotation speed (degrees/second) while the NavMeshAgent is moving.")]
+    [Tooltip("Rotation speed (degrees/second) used when the NavMeshAgent is active for special cases.")]
     [SerializeField] private float _angularSpeed = 240f;
 
-    [Tooltip("Distance from the destination at which the agent is considered to have arrived.")]
+    [Tooltip("Stopping distance applied to the NavMeshAgent when it is explicitly enabled for special cases.")]
     [SerializeField] private float _stoppingDistance = 0.1f;
+
+    [Tooltip("Speed threshold at or above which the 'Running' animator bool is set instead of 'Walking'.")]
+    [SerializeField] private float _runThreshold = 2.5f;
 
     private NavMeshAgent _navAgent;
     private Coroutine _navMoveCoroutine;
+    private Tween _activeTween;
 
     /// <summary>The cached NavMeshAgent, or null if no agent is attached.</summary>
     public NavMeshAgent NavAgent => _navAgent;
 
     /// <summary>
-    /// Enables and configures the NavMeshAgent. Must be called server-side after the character
-    /// spawns or is placed in the scene. No-op when no NavMeshAgent component is present.
+    /// Configures the NavMeshAgent properties (speed, angular speed, stopping distance) without
+    /// enabling it. The agent stays disabled during normal DOTween-based movement and is only
+    /// enabled explicitly by systems that require pathfinding (e.g. MutantSuspectBehaviour for
+    /// retreat/climb-through sequences).
+    /// No-op when no NavMeshAgent component is present.
     /// </summary>
     public void InitNavigation()
     {
@@ -115,31 +421,26 @@ public class SuspectCharacter : Interactable
         _navAgent.speed = _walkSpeed;
         _navAgent.angularSpeed = _angularSpeed;
         _navAgent.stoppingDistance = _stoppingDistance;
-        _navAgent.updateRotation = false; // Manual rotation when stationary; enabled during NavigateTo.
-        _navAgent.enabled = true;
+        _navAgent.updateRotation = false;
+        // Agent stays disabled — MutantSuspectBehaviour enables it directly when pathfinding is needed.
     }
 
     /// <summary>
-    /// Sets the NavMeshAgent destination and invokes <paramref name="onArrived"/> once the agent
-    /// stops within <see cref="_stoppingDistance"/> of the target. Server-side only.
-    /// Cancels any in-progress navigation before starting the new path.
+    /// Moves the character to <paramref name="destination"/> using a DOTween position tween,
+    /// then invokes <paramref name="onArrived"/>. Duration is derived from distance and
+    /// <see cref="_walkSpeed"/>. Cancels any in-progress movement before starting.
+    /// The NavMeshAgent is not used and remains disabled.
     /// </summary>
     /// <param name="destination">World-space destination.</param>
     /// <param name="onArrived">Optional callback invoked on arrival.</param>
     public void NavigateTo(Vector3 destination, Action onArrived = null)
     {
-        if (_navAgent == null || !_navAgent.enabled)
-        {
-            Debug.LogWarning($"[SuspectCharacter] NavigateTo called on '{name}' but NavMeshAgent is not available.");
-            onArrived?.Invoke();
-            return;
-        }
-
         if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
-        _navMoveCoroutine = StartCoroutine(NavMoveCoroutine(destination, onArrived));
+        _activeTween?.Kill();
+        _navMoveCoroutine = StartCoroutine(WalkToCoroutine(destination, onArrived));
     }
 
-    /// <summary>Stops the current navigation immediately.</summary>
+    /// <summary>Stops the current DOTween movement immediately.</summary>
     public void StopNavigation()
     {
         if (_navMoveCoroutine != null)
@@ -148,65 +449,33 @@ public class SuspectCharacter : Interactable
             _navMoveCoroutine = null;
         }
 
-        if (_navAgent != null && _navAgent.enabled && _navAgent.isOnNavMesh)
-        {
-            _navAgent.isStopped = true;
-            _navAgent.updateRotation = false;
-        }
+        _activeTween?.Kill();
+        _activeTween = null;
     }
 
-    private IEnumerator NavMoveCoroutine(Vector3 destination, Action onArrived)
+    private IEnumerator WalkToCoroutine(Vector3 destination, Action onArrived)
     {
-        const float retryDelay = 0.25f;
-        const int maxRetries = 10;
-        int retries = 0;
+        // Snap to face the destination direction before moving.
+        Vector3 dir = destination - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude > 0.001f)
+            transform.rotation = Quaternion.LookRotation(dir.normalized);
 
-        _navAgent.updateRotation = true;
-        _navAgent.isStopped = false;
+        // Calculate flat-plane distance so vertical offsets don't inflate the duration.
+        Vector3 flatStart = new Vector3(transform.position.x, 0f, transform.position.z);
+        Vector3 flatEnd   = new Vector3(destination.x,        0f, destination.z);
+        float distance    = Vector3.Distance(flatStart, flatEnd);
+        float duration    = distance / Mathf.Max(0.01f, _walkSpeed);
 
-        while (_navAgent.enabled)
-        {
-            _navAgent.SetDestination(destination);
-            yield return null; // One frame for path calculation to begin.
-            while (_navAgent.pathPending) yield return null;
+        bool done = false;
+        _activeTween = transform
+            .DOMove(destination, duration)
+            .SetEase(Ease.Linear)
+            .OnComplete(() => done = true);
 
-            if (_navAgent.pathStatus == NavMeshPathStatus.PathComplete)
-            {
-                // Full path - wait until the agent actually arrives.
-                while (_navAgent.enabled && (_navAgent.pathPending || _navAgent.remainingDistance > _navAgent.stoppingDistance))
-                    yield return null;
-                break;
-            }
+        yield return new WaitUntil(() => done);
 
-            // Partial or invalid path - a closed gate or door is likely blocking.
-            // Let the agent walk as far as it can so the obstacle's proximity auto-open fires,
-            // then wait for the NavMesh to update and retry.
-            if (retries >= maxRetries)
-            {
-                Debug.LogWarning($"[SuspectCharacter] NavigateTo '{name}': could not reach destination after {maxRetries} retries - proceeding anyway.");
-                break;
-            }
-
-            while (_navAgent.enabled && !_navAgent.pathPending
-                   && _navAgent.remainingDistance > _navAgent.stoppingDistance
-                   && !float.IsInfinity(_navAgent.remainingDistance))
-                yield return null;
-
-            // Already close enough - treat as arrived.
-            if (Vector3.Distance(transform.position, destination) <= _navAgent.stoppingDistance + 0.05f)
-                break;
-
-            // Brief wait for the obstacle to clear and NavMesh to re-bake.
-            yield return new WaitForSeconds(retryDelay);
-            retries++;
-        }
-
-        if (_navAgent.enabled && _navAgent.isOnNavMesh)
-        {
-            _navAgent.isStopped = true;
-            _navAgent.updateRotation = false;
-        }
-
+        _activeTween = null;
         _navMoveCoroutine = null;
         onArrived?.Invoke();
     }
@@ -219,6 +488,32 @@ public class SuspectCharacter : Interactable
 
 
     // Networked Animation Helpers
+
+    /// <summary>
+    /// Sets the locomotion animation state and replicates to all clients.
+    /// Compares <see cref="_walkSpeed"/> against <see cref="_runThreshold"/>:
+    /// if moving and speed is at or above the threshold the 'Running' bool is set; otherwise 'Walking'.
+    /// Both bools are cleared when <paramref name="moving"/> is false.
+    /// </summary>
+    public void SetLocomotionState(bool moving)
+    {
+        bool shouldRun = moving && _walkSpeed >= _runThreshold;
+        SetAnimatorBool("Walking", moving && !shouldRun);
+        SetAnimatorBool("Running", shouldRun);
+    }
+
+    /// <summary>
+    /// Sets the movement speed and immediately re-evaluates the locomotion animation state.
+    /// Also updates the NavMeshAgent speed if the agent is present, for special-case pathfinding.
+    /// </summary>
+    public void SetMovementSpeed(float speed)
+    {
+        _walkSpeed = speed;
+        if (_navAgent != null) _navAgent.speed = speed;
+        // Re-evaluate animation state only if a movement is currently in progress.
+        bool isMoving = _activeTween != null && _activeTween.IsActive() && _activeTween.IsPlaying();
+        if (isMoving) SetLocomotionState(true);
+    }
 
     /// <summary>
     /// Sets an animator bool parameter on the server and replicates it to all clients.
@@ -270,6 +565,7 @@ public class SuspectCharacter : Interactable
 
     private float _health;
     private bool _isDead;
+    private bool _isMutant;
 
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
@@ -330,6 +626,15 @@ public class SuspectCharacter : Interactable
 
         _junkItem = GetComponent<JunkItem>();
 
+        // Cache MutantEnemy — it lives on the same GameObject (same prefab root).
+        // The Inspector field is preferred; fall back to GetComponent so the prefab
+        // works even if it was not wired up manually.
+        if (_mutantEnemy == null)
+            _mutantEnemy = GetComponent<MutantEnemy>();
+
+        if (_mutantSuspectBehaviour == null)
+            _mutantSuspectBehaviour = GetComponent<MutantSuspectBehaviour>();
+
         // Cache and disable NavMeshAgent by default; server enables it via InitNavigation().
         _navAgent = GetComponent<NavMeshAgent>();
         if (_navAgent != null)
@@ -366,7 +671,11 @@ public class SuspectCharacter : Interactable
         drunkBehaviour?.TryActivate();
 
         if (record.IsFullyMutated)
+        {
             OnSuspectPresentingUncanny?.Invoke(this, record.infectionScore);
+            SetMutantVoiceClientRpc();
+            PlayUncannyArriveSoundClientRpc();
+        }
     }
 
     /// <summary>
@@ -434,17 +743,17 @@ public class SuspectCharacter : Interactable
 
     /// <summary>
     /// Initializes this suspect as a doppelganger using the provided configuration.
-    /// Applies overlapping anomalies and all uncanny anomalies, then replicates
-    /// visual modifiers (skin desaturation, idle suppression) to clients.
+    /// Anomaly activation follows the same score-based rules as a normal suspect —
+    /// the doppelganger's accrued infection score drives which anomalies are shown.
+    /// Replicates visual modifiers (skin desaturation, idle suppression) to clients.
     /// </summary>
-    /// <param name="data">The DoppelgangerData driving anomaly count and visual overrides.</param>
+    /// <param name="data">The DoppelgangerData driving visual overrides.</param>
     public void InitializeAsDoppelganger(DoppelgangerData data)
     {
-        // Anomaly initialization - full doppelganger loadout will be wired here
-        // once AnomalyController.InitializeAsDoppelganger is implemented.
-        anomalyController.Initialize();
-
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
+
+        int score = record?.infectionScore ?? 0;
+        anomalyController.InitializeByInfectionScore(score);
         if (record != null)
             suspectRecordViewer.SetRecord(record);
         else
@@ -510,6 +819,7 @@ public class SuspectCharacter : Interactable
         SyncReplacementClientRpc(true);
 
         OnSuspectPresentingUncanny?.Invoke(this, 100);
+        PlayUncannyArriveSoundClientRpc();
 
         Debug.Log($"[SuspectCharacter] '{suspectData.name}' initialized as replacement.");
     }
@@ -767,9 +1077,13 @@ public class SuspectCharacter : Interactable
         if (!IsServer || _isDead)
             return;
 
-        _health -= amount;
         SpawnHitParticleClientRpc(hitPoint);
         OnHit?.Invoke();
+
+        if (!_isMutant)
+            return;
+
+        _health -= amount;
 
         if (_health <= 0f)
             KillSuspect();

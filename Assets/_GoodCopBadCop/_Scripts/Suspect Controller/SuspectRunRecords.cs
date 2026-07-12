@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class SuspectRunRecords : MonoBehaviour
 {
+    public const int QuarantineSlotLimit = 5;
+    public const int QuarantineDurationDays = 2;
+
     private List<SuspectRecord> records = new List<SuspectRecord>();
     public SuspectSet allSuspects;
     public Vector2 startingInfectionScore = new Vector2(0, 10);
@@ -75,6 +78,62 @@ public class SuspectRunRecords : MonoBehaviour
     public SuspectRecord GetRecord(SuspectData suspectData)
     {
         return records.Find(record => record.SuspectData == suspectData);
+    }
+
+    public int GetActiveQuarantineCount(int currentDay)
+    {
+        int count = 0;
+
+        foreach (SuspectRecord record in records)
+        {
+            if (record == null || record.isKilled)
+                continue;
+
+            if (GetRemainingQuarantineDays(record, currentDay) > 0)
+                count++;
+        }
+
+        return count;
+    }
+
+    public bool HasQuarantineSlot(int currentDay)
+        => GetActiveQuarantineCount(currentDay) < QuarantineSlotLimit;
+
+    public List<SuspectRecord> GetActiveQuarantineRecords(int currentDay)
+    {
+        List<SuspectRecord> activeRecords = new List<SuspectRecord>();
+
+        foreach (SuspectRecord record in records)
+        {
+            if (record == null || record.isKilled)
+                continue;
+
+            if (GetRemainingQuarantineDays(record, currentDay) > 0)
+                activeRecords.Add(record);
+        }
+
+        return activeRecords;
+    }
+
+    public bool IsInActiveQuarantine(SuspectData suspectData, int currentDay)
+    {
+        SuspectRecord record = GetRecord(suspectData);
+        return GetRemainingQuarantineDays(record, currentDay) > 0;
+    }
+
+    public int GetRemainingQuarantineDays(SuspectData suspectData, int currentDay)
+    {
+        SuspectRecord record = GetRecord(suspectData);
+        return GetRemainingQuarantineDays(record, currentDay);
+    }
+
+    public int GetRemainingQuarantineDays(SuspectRecord record, int currentDay)
+    {
+        if (record == null || currentDay < 0 || record.quarantinedOnDay < 0)
+            return 0;
+
+        int elapsedDays = currentDay - record.quarantinedOnDay;
+        return Mathf.Clamp(QuarantineDurationDays - elapsedDays, 0, QuarantineDurationDays);
     }
 
     /// <summary>

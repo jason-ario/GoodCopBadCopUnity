@@ -40,6 +40,13 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Spawner used by O to force-spawn a guaranteed aggroed mutant.")]
     [SerializeField] private MutantSpawner _debugMutantSpawner;
 
+    [Header("Full Mutant Debug")]
+    [Tooltip("SuspectData for the Butcher. Assign in Inspector. Used by the B hack.")]
+    [SerializeField] private SuspectData _butcherSuspectData;
+
+    [Tooltip("ElectricityController scene object. Assign in Inspector. The B hack calls PowerOn() to guarantee lights are on at Day 4.")]
+    [SerializeField] private ElectricityController _electricityController;
+
     [Header("Gate Debug")]
     [Tooltip("Start Shift Gate — forced into post-intro state by the F12 skip so interactions toggle it instead of opening the start-shift screen.")]
     [SerializeField] private GateStartShiftController _startShiftGate;
@@ -190,6 +197,12 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F11))
         {
             ForceAlexeiSequenceOnNextSuspect();
+        }
+
+        // B — skip to Day 4 booth-ready and force the Butcher to arrive as fully mutated.
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            ForceFullMutantButcher();
         }
 
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
@@ -633,6 +646,108 @@ public class DebugConsole : MonoBehaviour
 
         _debugMutantSpawner.ForceSpawnAggroed();
         Debug.Log("[DebugConsole] Aggroed mutant spawn triggered (O).");
-}
-
     }
+
+    /// <summary>
+    /// Immediately shows the Thanks For Playing screen as if Day 7 just ended.
+    /// Marks the campaign as complete so the shift sequence cannot resume afterward.
+    /// </summary>
+    public void SkipToEndOfDemo()
+    {
+        if (UIController.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDemo: UIController not available — start the game first.");
+            return;
+        }
+
+        if (CampaignManager.Instance != null)
+            CampaignManager.Instance.DebugForceCampaignComplete();
+
+        UIController.Instance.ShowThanksForPlayingScreen();
+        Debug.Log("[DebugConsole] Skipped to end of demo — Thanks For Playing screen shown.");
+    }
+
+    /// <summary>
+    /// B — skips to Day 4 booth-ready, forces the Butcher's infection score to the fully-mutated
+    /// threshold, locks the lineup to the Butcher only, and starts the shift with a short
+    /// first-arrival window so he appears at the booth window in ~2 seconds.
+    ///
+    /// <see cref="SuspectController.ForceNextSuspectAsFullMutant"/> is set so the full-mutant
+    /// mesh swap and <see cref="SuspectCharacter.BeginMutantBehavior"/> fire even if
+    /// <see cref="SuspectData.fullMutantDialogue"/> is not yet wired up.
+    /// </summary>
+    private void ForceFullMutantButcher()
+    {
+        if (_butcherSuspectData == null)
+        {
+            Debug.LogWarning("[DebugConsole] ForceFullMutantButcher: _butcherSuspectData not assigned in Inspector (B).");
+            return;
+        }
+
+        if (!GameManager.Instance.HasGameStarted)
+        {
+            EnsureGameStartedThen(ForceFullMutantButcher);
+            return;
+        }
+
+        StartCoroutine(ForceFullMutantButcherRoutine());
+    }
+
+    private IEnumerator ForceFullMutantButcherRoutine()
+    {
+        // 1. Spike the Butcher's infection score to the fully-mutated threshold.
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(_butcherSuspectData);
+        if (record != null)
+        {
+            record.infectionScore = AnomalyController.FULLY_MUTATED_THRESHOLD;
+            Debug.Log($"[DebugConsole] Butcher infection score set to {AnomalyController.FULLY_MUTATED_THRESHOLD}.");
+        }
+        else
+        {
+            Debug.LogWarning("[DebugConsole] ForceFullMutantButcher: could not find SuspectRecord for the Butcher.");
+        }
+
+        // 2. Override the shift lineup to contain only the Butcher — self-clears after population.
+        var manager = DailySuspectManager.Instance;
+        if (manager != null)
+        {
+            manager.PopulateSuspectOverride = () =>
+            {
+                manager.PopulateSuspectOverride = null;
+                manager.shiftSuspects.Add(_butcherSuspectData);
+            };
+        }
+
+        // 3. Bypass the fullMutantDialogue null-check so the full-mutant path fires
+        //    even if the dialogue hasn't been wired up on the SuspectData asset yet.
+        SuspectController.ForceNextSuspectAsFullMutant = true;
+
+        // 4. Skip to Day 4 with the player placed in the booth.
+        SkipToDay(4);
+
+        // 5. Wait one frame for Day 4 to activate.
+        yield return null;
+
+        // 6. Start the shift — Butcher arrives at the window in ~2 s.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(2f, 2f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // 7. Wait an extra frame for TryStartShift RPCs to propagate before turning power on.
+        yield return null;
+
+        // 8. Ensure power is on — _isPowerOn is a NetworkVariable that persists across day
+        //    skips, so any prior power outage (e.g. Day 3) would leave it false.
+        //    Fall back to FindAnyObjectByType if the Inspector field was not assigned.
+        ElectricityController ec = _electricityController != null
+            ? _electricityController
+            : FindAnyObjectByType<ElectricityController>();
+
+        if (ec != null)
+            ec.PowerOn();
+        else
+            Debug.LogWarning("[DebugConsole] ForceFullMutantButcher: ElectricityController not found — power state unchanged. Assign _electricityController in the Inspector.");
+
+        Debug.Log("[DebugConsole] Full Mutant Butcher hack active — he arrives in ~2 s (B).");
+    }
+
+}

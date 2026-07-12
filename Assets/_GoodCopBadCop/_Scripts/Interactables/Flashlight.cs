@@ -203,6 +203,8 @@ public class Flashlight : PickableObject
         TurnOffServerRpc();
     }
 
+    public override void OnStowed() => TurnOff();
+
     /// <summary>
     /// Disables lights directly on the local ghost clone so the placement preview
     /// never shows the flashlight as active, regardless of the real item's state.

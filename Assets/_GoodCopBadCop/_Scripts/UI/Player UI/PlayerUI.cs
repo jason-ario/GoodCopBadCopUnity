@@ -10,6 +10,12 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private HealthBar _healthBar;
     public HealthBar HealthBar => _healthBar;
 
+    [SerializeField] private GeigerCounterUI _geigerCounterUI;
+    public GeigerCounterUI GeigerCounterUI => _geigerCounterUI;
+
+    [SerializeField] private InventoryHUDController _inventoryHUD;
+    public InventoryHUDController InventoryHUD => _inventoryHUD;
+
     private void Awake()
     {
         Instance = this;

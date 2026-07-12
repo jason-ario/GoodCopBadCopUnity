@@ -3,17 +3,20 @@ using UnityEngine;
 
 /// <summary>
 /// Wraps GuidebookPageController with named tab navigation.
-/// Q / LB = previous tab.  E / RB = next tab.
+/// Q / LB = previous page.  E / RB = next page.
+///
+/// Input and physical page animation are owned by GuidebookPageController.
+/// This controller subscribes to <see cref="GuidebookPageController.OnPageChanged"/>
+/// and refreshes the visible content for whichever tab is now active.
+///
+/// <see cref="ShowTab"/> can be called externally to jump to a specific tab
+/// instantly (uses SnapTo — no animation).
+///
 /// Resets to tab 0 (How to Play) each time the guidebook opens (OnEnable).
 /// </summary>
 [RequireComponent(typeof(GuidebookPageController))]
 public class GuidebookTabController : MonoBehaviour
 {
-    private static readonly KeyCode NextKey = KeyCode.E;
-    private static readonly KeyCode PrevKey = KeyCode.Q;
-    private static readonly KeyCode NextPad = KeyCode.JoystickButton5; // RB
-    private static readonly KeyCode PrevPad = KeyCode.JoystickButton4; // LB
-
     private const int TasksTabIndex = 1;
 
     [Tooltip("In-scene content objects, one per tab in tab order. "
@@ -31,6 +34,8 @@ public class GuidebookTabController : MonoBehaviour
     /// </summary>
     public static event Action OnTasksTabViewed;
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     private void Awake()
     {
         _pageController = GetComponent<GuidebookPageController>();
@@ -38,33 +43,50 @@ public class GuidebookTabController : MonoBehaviour
 
     private void OnEnable()
     {
-        ShowTab(0);
+        _pageController.OnPageChanged += HandlePageChanged;
+        // Snap pages to tab 0 and refresh content without animation on open.
+        ActiveTabIndex = -1;
+        _pageController.SnapTo(0);
+        RefreshTabContent(0);
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        if (Input.GetKeyDown(NextKey) || Input.GetKeyDown(NextPad))
-            ShowTab(ActiveTabIndex + 1);
-        else if (Input.GetKeyDown(PrevKey) || Input.GetKeyDown(PrevPad))
-            ShowTab(ActiveTabIndex - 1);
+        _pageController.OnPageChanged -= HandlePageChanged;
     }
+
+    // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Navigates to the tab at tabIndex, clamped to the valid range.
-    /// Drives the page-flip animator and calls Refresh on the new page's content object.
-    /// Fires OnTasksTabViewed when the Tasks tab becomes active.
+    /// Jumps to <paramref name="tabIndex"/> instantly (no flip animation).
+    /// Clamps to the valid range. Safe to call from any system.
     /// </summary>
     public void ShowTab(int tabIndex)
     {
         if (_pageContents == null || _pageContents.Length == 0) return;
 
         tabIndex = Mathf.Clamp(tabIndex, 0, _pageContents.Length - 1);
-        if (tabIndex == ActiveTabIndex) return;
+        _pageController.SnapTo(tabIndex);
+        RefreshTabContent(tabIndex);
+    }
 
-        // Drive the physical page-flip animator to the correct spread.
-        _pageController.ResetPages();
-        for (int i = 0; i < tabIndex; i++)
-            _pageController.TurnNext();
+    // ── Internal ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by GuidebookPageController after each animated flip completes.
+    /// Pages are already in position — only refresh the visible tab content.
+    /// </summary>
+    private void HandlePageChanged(int leftCount)
+    {
+        int tabIndex = Mathf.Clamp(leftCount, 0, _pageContents != null ? _pageContents.Length - 1 : 0);
+        RefreshTabContent(tabIndex);
+    }
+
+    /// <summary>Updates ActiveTabIndex and calls Refresh on the newly visible content object.</summary>
+    private void RefreshTabContent(int tabIndex)
+    {
+        if (_pageContents == null || _pageContents.Length == 0) return;
+        if (tabIndex == ActiveTabIndex) return;
 
         ActiveTabIndex = tabIndex;
 

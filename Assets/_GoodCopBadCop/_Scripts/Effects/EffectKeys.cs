@@ -12,5 +12,6 @@ namespace GoodCopBadCop.Effects
         public const string CigaretteHeal = "player.heal.cigarette";
         public const string FoodHeal = "player.heal.food";
         public const string PlayerDeath = "player.death";
+        public const string PlayerDrunk = "player.drunk";
     }
 }

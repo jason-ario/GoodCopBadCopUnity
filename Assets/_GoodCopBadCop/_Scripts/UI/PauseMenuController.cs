@@ -1,21 +1,26 @@
 using GoodCopBadCop.UI.SettingsMenu;
-using JetBrains.Annotations;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using R3;
 using VContainer;
 
 public class PauseMenuController : MonoBehaviour
 {
     [SerializeField] private GameObject mainMenu;
-    [SerializeField] private GameObject areYouSureQuitMenu;
-    [SerializeField] private GameObject areYouSureMainMenu;
+    [SerializeField] private ConfirmationDialogController confirmationDialog;
     [SerializeField] private TextButton[] _textButtons;
     [SerializeField] private RectTransform rootRectTransform;
     [SerializeField] private TextMeshProUGUI lobbyCodeText;
 
     private const string LobbyCodePrefix = "LOBBY CODE: ";
+    private const string ReturnToMainMenuTitle = "Return to main menu?";
+    private const string ReturnToMainMenuBody = "Current shift progress may be lost.";
+    private const string QuitGameTitle = "Quit game?";
+    private const string QuitGameBody = "Any unsaved progress will be lost.";
+    private const string ConfirmText = "Yes";
+    private const string CancelText = "No";
 
     private ISettingsMenuView settingsMenuView;
     private DisposableBag settingsDisposables;
@@ -47,7 +52,7 @@ public class PauseMenuController : MonoBehaviour
 
     private void OnDisable()
     {
-        BackToMainMenu();
+        HideTransientPanels();
     }
 
     /// <summary>Updates the lobby code label. Shows the encoded code when in an active lobby, hides it otherwise.</summary>
@@ -67,33 +72,52 @@ public class PauseMenuController : MonoBehaviour
 
     public void ShowAreYouSureMainMenu()
     {
-        mainMenu.SetActive(true);
-        areYouSureQuitMenu.SetActive(false);
-        areYouSureMainMenu.SetActive(false);
+        ShowMainMenu();
     }
-    
+
+    /// <summary>Backward-compatible UnityEvent target for the pause menu Main Menu button.</summary>
+    public void ShowMainMenu()
+    {
+        mainMenu.SetActive(false);
+        settingsMenuView.SetVisible(false);
+        isSettingsOpen = false;
+
+        confirmationDialog.Show(
+            ReturnToMainMenuTitle,
+            ReturnToMainMenuBody,
+            ConfirmText,
+            CancelText,
+            ReturnToMainMenu,
+            BackToMainMenu);
+    }
+
     public void ShowSettingsMenu()
     {
         mainMenu.SetActive(false);
-        areYouSureQuitMenu.SetActive(false);
-        areYouSureMainMenu.SetActive(false);
+        confirmationDialog.Hide();
         isSettingsOpen = true;
         settingsMenuView.SetVisible(true);
     }
-    
+
     public void ShowAreYouSureQuitMenu()
     {
         mainMenu.SetActive(false);
-        areYouSureQuitMenu.SetActive(true);
+        settingsMenuView.SetVisible(false);
+        isSettingsOpen = false;
+
+        confirmationDialog.Show(
+            QuitGameTitle,
+            QuitGameBody,
+            ConfirmText,
+            CancelText,
+            QuitGame,
+            BackToMainMenu);
     }
-    
+
     public void BackToMainMenu()
     {
-        isSettingsOpen = false;
-        settingsMenuView.SetVisible(false);
+        HideTransientPanels();
         mainMenu.SetActive(true);
-        areYouSureQuitMenu.SetActive(false);
-        areYouSureMainMenu.SetActive(false);
     }
 
     private void CloseSettingsMenu()
@@ -104,5 +128,32 @@ public class PauseMenuController : MonoBehaviour
         }
 
         BackToMainMenu();
+    }
+
+    private void HideTransientPanels()
+    {
+        isSettingsOpen = false;
+        settingsMenuView?.SetVisible(false);
+        confirmationDialog?.Hide();
+    }
+
+    private async void ReturnToMainMenu()
+    {
+        if (LobbyManager.Instance != null)
+            await LobbyManager.Instance.ExitLobbyAsync();
+
+        SceneManager.LoadScene(SceneManager.GetActiveScene().path);
+    }
+
+    private async void QuitGame()
+    {
+        if (LobbyManager.Instance != null)
+            await LobbyManager.Instance.ExitLobbyAsync();
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 }

@@ -44,6 +44,15 @@ public class SuspectController : NetworkBehaviour
     public static bool ForceNextSuspectMutant = false;
 
     /// <summary>
+    /// When true, the next suspect to spawn is treated as fully mutated regardless of whether
+    /// their <see cref="SuspectData.FullMutantConfig.IsConfigured"/> returns true.
+    /// Bypasses the <c>boothCutscene</c> null-check so the mesh toggle and
+    /// <see cref="SuspectCharacter.BeginMutantBehavior"/> fire even without a wired cutscene.
+    /// Consumed and reset to false after one use. Set by DebugConsole (B).
+    /// </summary>
+    public static bool ForceNextSuspectAsFullMutant = false;
+
+    /// <summary>
     /// Optional server-side intercept for the next suspect spawn. When set, this is invoked
     /// instead of spawning a normal or mutant suspect for that slot. Consumed and reset to null
     /// after one use. Set by day-specific controllers (e.g. Day_01 for the Alexei scripted event).
@@ -130,6 +139,15 @@ public class SuspectController : NetworkBehaviour
 
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
+
+    /// <summary>
+    /// True when the current suspect slot was flagged as fully mutated by
+    /// <see cref="DailySuspectManager.IsFullMutantSlot"/>. Read by <see cref="SayEntryDialogue"/>
+    /// to replace the normal entry bark with the scripted full-mutant cutscene.
+    /// Server-side only — set in <see cref="SpawnSuspectServer"/> and consumed in
+    /// <see cref="SayEntryDialogue"/>.
+    /// </summary>
+    private bool _currentSuspectIsFullMutant = false;
     FolderController spawnedFolder;
 
     public UnityAction OnTakeFolder;
@@ -250,6 +268,17 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Pre-check full-mutant state BEFORE Spawn() so MutantEnemy.OnNetworkSpawn never
+        // auto-calls InitialiseServer(). ForceNextSuspectAsFullMutant is intentionally only
+        // peeked here — the existing block below is responsible for consuming it.
+        bool preCheckFullMutant = dailySuspectManager.IsFullMutantSlot(lineupIndex, out _)
+                                  || ForceNextSuspectAsFullMutant;
+        if (preCheckFullMutant)
+        {
+            var preEnemy = spawnedSuspect.GetComponent<MutantEnemy>();
+            preEnemy?.DisableAutoInit();
+        }
+
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
@@ -272,6 +301,26 @@ public class SuspectController : NetworkBehaviour
         else
         {
             suspectCharacter.InitializeByInfectionStage();
+        }
+
+        // If this slot is fully mutated, swap to the mutant mesh on all clients.
+        bool isFullMutant = dailySuspectManager.IsFullMutantSlot(lineupIndex, out _);
+
+        // Debug override — bypasses the IsConfigured (boothCutscene != null) check.
+        if (!isFullMutant && ForceNextSuspectAsFullMutant)
+        {
+            ForceNextSuspectAsFullMutant = false;
+            isFullMutant = true;
+        }
+
+        _currentSuspectIsFullMutant = isFullMutant;
+        if (isFullMutant)
+        {
+            suspectCharacter.ActivateFullMutantForm();
+            // Inject booth references so BeginMutantBehavior can hand off to
+            // MutantSuspectBehaviour.BeginAtStandPos after the cutscene ends.
+            suspectCharacter.SetupFullMutantWindowBreach(
+                standPos, despawnPos, climbThroughTargetPos, shutterController, this);
         }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
@@ -380,6 +429,10 @@ public class SuspectController : NetworkBehaviour
             Destroy(spawnedSuspect);
             return;
         }
+
+        // Scripted suspects use the normal SuspectCharacter flow. If the prefab also carries
+        // dormant mutant components, they must not auto-initialize during NetworkObject.Spawn().
+        spawnedSuspect.GetComponent<MutantEnemy>()?.DisableAutoInit();
 
         netObj.Spawn();
 
@@ -497,10 +550,7 @@ public class SuspectController : NetworkBehaviour
         _activeStandPos = NextSuspectStandPosOverride != null ? NextSuspectStandPosOverride : standPos;
         NextSuspectStandPosOverride = null;
 
-        // Enable NavMeshAgent for this suspect now that we are server-side and about to move.
-        suspectCharacter.InitNavigation();
-
-        suspectCharacter.animator.SetBool("Walking", true);
+        suspectCharacter.SetLocomotionState(true);
         suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 
         // Notify all clients so they can show the booth-waiting notification if needed.
@@ -557,6 +607,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static event Action OnBoothBecameReady;
 
+    /// <summary>
+    /// Fired on the server when the current tracked suspect is despawned.
+    /// Use this to clean up any effects that were started in response to
+    /// <see cref="SuspectCharacter.OnSuspectPresentingUncanny"/>.
+    /// </summary>
+    public static event Action OnCurrentSuspectDespawned;
+
     private void ArrivedAtPosition()
     {
         if (suspectCharacter == null) return;
@@ -572,7 +629,7 @@ public class SuspectController : NetworkBehaviour
             .DORotateQuaternion(_activeStandPos.rotation, 0.5f)
             .OnComplete(OnRotationComplete);
 
-        suspectCharacter.animator.SetBool("Walking", false);
+        suspectCharacter.SetLocomotionState(false);
         EnableLook();
     }
 
@@ -640,6 +697,16 @@ public class SuspectController : NetworkBehaviour
 
         bool forceSkipEntry = ForceNextSuspectSkipEntryDialogue;
         ForceNextSuspectSkipEntryDialogue = false;
+
+        // Full mutant path: SuspectCharacter owns the cutscene reference and the
+        // BeginMutantBehavior callback — delegate entirely so no SuspectData is
+        // reached from here.
+        if (!forceSkipEntry && _currentSuspectIsFullMutant)
+        {
+            _currentSuspectIsFullMutant = false;
+            suspectCharacter.StartFullMutantCutscene();
+            return;
+        }
 
         // If this is the player's first encounter with this suspect and they have an intro
         // dialogue, hand control to SuspectEncounterManager. It will suppress the generic
@@ -1015,18 +1082,18 @@ public class SuspectController : NetworkBehaviour
         yield return null;
         yield return null;
 
-        thisCharacter.animator.SetBool("Walking", true);
+        thisCharacter.SetLocomotionState(true);
         bool gateArrived = false;
         thisCharacter.NavigateTo(gatePos.position, () => gateArrived = true);
         yield return new WaitUntil(() => gateArrived);
-        thisCharacter.animator.SetBool("Walking", false);
+        thisCharacter.SetLocomotionState(false);
 
         if (IsServer)
             ShiftManager.Instance.SetNextSuspectReady();
 
         yield return new WaitForSeconds(2f);
 
-        thisCharacter.animator.SetBool("Walking", true);
+        thisCharacter.SetLocomotionState(true);
         thisCharacter.NavigateTo(despawnPos.position, () =>
         {
             if (IsServer) DespawnSuspect(thisCharacter);
@@ -1211,6 +1278,14 @@ public class SuspectController : NetworkBehaviour
     public void Quarantine()
     {
         if (!IsServer) return;
+
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+        if (SuspectRunRecords.Instance != null && !SuspectRunRecords.Instance.HasQuarantineSlot(currentDay))
+        {
+            Debug.LogWarning("[SuspectController] Quarantine blocked: quarantine slots are full.");
+            return;
+        }
+
         StartCoroutine(QuarantineSequence());
     }
 
@@ -1427,6 +1502,7 @@ public class SuspectController : NetworkBehaviour
         if (suspectCharacter == suspectToDespawn)
         {
             suspectCharacter = null;
+            OnCurrentSuspectDespawned?.Invoke();
         }
     }
 

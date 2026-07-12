@@ -31,7 +31,7 @@ public class ProfilePage : MonoBehaviour
         dateOfBirthText.text =  "DoB: " + suspectData.DateOfBirth;
         genderText.text = "Sex: " + suspectData.Sex;
         lastExitText.text = "Last Exit: " + lastExitDate;
-        reasonText.text = lastExitReason;
+        reasonText.text = "Reason: " + lastExitReason;
         idNumberText.text = "ID:" + suspectData.IDNumber;
         
         Sprite sprite = Sprite.Create(suspectData.IDPhoto,

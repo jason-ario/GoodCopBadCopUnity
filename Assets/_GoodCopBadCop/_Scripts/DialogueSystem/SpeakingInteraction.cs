@@ -16,6 +16,11 @@ public class SpeakingInteraction : NetworkBehaviour
     [SerializeField] private AudioClip[] voiceAudioClips;
     [SerializeField] private AudioSource audioSource;
 
+    [Header("Mutant Voice")]
+    [Tooltip("Distortion level applied when mutant voice is active (0 = none, 1 = maximum).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _mutantDistortionLevel = 0.35f;
+
     /// <summary>
     /// Returns the voice clips for this speaker. When a <see cref="SuspectData"/> asset is
     /// assigned and it contains clips, those take priority over the local serialized array —
@@ -103,5 +108,30 @@ public class SpeakingInteraction : NetworkBehaviour
         }
 
         return dialogueChoices;
+    }
+
+    /// <summary>
+    /// Applies or removes the mutant voice effect on the AudioSource.
+    /// When enabled, lowers pitch and adds an AudioDistortionFilter for a distorted, deeper tone.
+    /// Safe to call on any client.
+    /// </summary>
+    public void SetMutantVoice(bool isMutant)
+    {
+        if (audioSource == null) return;
+
+        AudioDistortionFilter distortion = audioSource.gameObject.GetComponent<AudioDistortionFilter>();
+
+        if (isMutant)
+        {
+            if (distortion == null)
+                distortion = audioSource.gameObject.AddComponent<AudioDistortionFilter>();
+
+            distortion.distortionLevel = _mutantDistortionLevel;
+            distortion.enabled = true;
+        }
+        else if (distortion != null)
+        {
+            distortion.enabled = false;
+        }
     }
 }

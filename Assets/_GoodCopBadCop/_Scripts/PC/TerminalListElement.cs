@@ -7,9 +7,13 @@ public class TerminalListItem : MonoBehaviour
     private PC _pc;
     private SuspectData _suspectData;
     
-    public void Setup(SuspectData suspectData, PC pc)
+    public void Setup(SuspectData suspectData, PC pc, string status = "")
     {
-        nameText.text = suspectData.LastName + ", " + suspectData.FirstName;
+        string displayName = suspectData.LastName + ", " + suspectData.FirstName;
+        nameText.text = string.IsNullOrWhiteSpace(status)
+            ? displayName
+            : displayName + " - " + status;
+
         _suspectData = suspectData;
         _pc = pc;
     }

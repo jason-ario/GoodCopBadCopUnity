@@ -18,6 +18,29 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [Tooltip("If false, this mutant will never climb through the booth window even when the shutter is open. It will bang on the window frame and retreat instead.")]
     [SerializeField] private bool canClimb = true;
 
+    [Tooltip("How long the climbing animation bool stays true after the climb begins. Set to 0 to turn it off exactly when the movement tween finishes.")]
+    [SerializeField] private float _climbAnimHoldSeconds = 0.1f;
+
+    [Header("Sounds")]
+    [Tooltip("Played on all clients at the moment the mutant begins climbing through the booth window.")]
+    [SerializeField] private AudioClip _climbThroughSound;
+
+    [Tooltip("Short stinger played on all clients the moment the mutant finishes climbing through and lands inside.")]
+    [SerializeField] private AudioClip _climbLandSound;
+
+    [Tooltip("If true, the chase music clip will play when this mutant breaks through the window. " +
+             "Enable only on suspect characters that transform into a mutant mid-shift.")]
+    [SerializeField] private bool _playChaseMusic = false;
+
+    [Header("Chase Music")]
+    [Tooltip("Looping music that plays on all clients once the mutant has landed inside and starts chasing. " +
+             "Faded out automatically when the mutant flees or dies.")]
+    [SerializeField] private AudioClip _chaseMusic;
+
+    [Tooltip("Seconds to fade the chase music in after the mutant lands.")]
+    [Min(0f)]
+    [SerializeField] private float _chaseMusicFadeInSeconds = 1.5f;
+
     private MutantIntruderData _data;
     private Transform _standPos;
     private Transform _despawnPos;
@@ -52,7 +75,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     private const float ArrivalPollInterval = 0.1f;
     private const float ArrivalTolerance = 0.25f;
-    private const float GiveUpPauseDuration = 1f;
+    private const float GiveUpPauseDuration = 0.1f;
     private const string ClimbingAnimBool = "climbing";
     private const string BangOnShuttersAnimBool = "BangOnShutters";
 
@@ -151,6 +174,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (!IsServer || _isDone) yield break;
 
         SetClimbingClientRpc(true);
+        PlayClimbThroughSoundClientRpc();
 
         // Disable agent so DOTween can move freely across the counter (off-mesh).
         _agent.enabled = false;
@@ -160,11 +184,16 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             .DOMove(_climbThroughTargetPos.position, _data.climbDurationSeconds)
             .OnComplete(() => moveDone = true);
 
-        // Keep the climbing bool true for exactly one second as requested.
-        yield return new WaitForSeconds(1f);
+        // Fire the climbing bool like a trigger — hold briefly then clear so the
+        // animation plays exactly once without looping for the full climb duration.
+        yield return new WaitForSeconds(_climbAnimHoldSeconds);
         SetClimbingClientRpc(false);
 
+        // Wait for the actual movement tween to finish.
         yield return new WaitUntil(() => moveDone);
+        PlayClimbLandSoundClientRpc();
+        if (_playChaseMusic)
+            StartChaseMusicClientRpc();
 
         if (_isDone) yield break;
 
@@ -189,11 +218,24 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _mutantEnemy.SetForceAggro(true);
             _mutantEnemy.enabled = true;
             _mutantEnemy.InitialiseServer();
+
+            // Defer the lineup slot release until the mutant is removed from play (fled or died),
+            // so the next suspect only queues once this one is truly out of the scene.
+            _mutantEnemy.OnRemovedFromPlay += () =>
+            {
+                _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+                OnSequenceComplete?.Invoke(true);
+            };
         }
 
         _isDone = true;
-        _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
-        OnSequenceComplete?.Invoke(true);
+
+        // Fallback: if there is no MutantEnemy to listen to, notify immediately.
+        if (_mutantEnemy == null)
+        {
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+            OnSequenceComplete?.Invoke(true);
+        }
     }
 
     /// <summary>
@@ -278,24 +320,31 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     }
 
     /// <summary>
-    /// Rotates to face the despawn point, walks back to it, then either calls
+    /// Snaps to face the despawn point, sprints back to it, then either calls
     /// <see cref="SuspectController.OnMutantIntruderComplete"/> (climbing mutants that gave up)
     /// or despawns directly (non-climbing mutants whose lineup slot was already released).
+    /// A hard <see cref="MutantIntruderData.retreatDespawnTimeout"/> deadline ensures the
+    /// mutant is force-despawned within that window even if it never reaches the despawn point.
     /// </summary>
     private IEnumerator RetreatingSequence(bool notifyController)
     {
         if (_isDone) yield break;
 
-        // Rotate to face the despawn direction before walking.
+        float retreatDeadline = Time.time + _data.retreatDespawnTimeout;
+
+        // Quick snap-turn toward the despawn direction.
         Vector3 toSpawn = _despawnPos.position - transform.position;
         toSpawn.y = 0f;
         if (toSpawn.sqrMagnitude > 0.001f)
         {
             bool rotDone = false;
             _activeTween = transform
-                .DORotateQuaternion(Quaternion.LookRotation(toSpawn.normalized), 0.5f)
+                .DORotateQuaternion(Quaternion.LookRotation(toSpawn.normalized), 0.2f)
                 .OnComplete(() => rotDone = true);
-            yield return new WaitUntil(() => rotDone);
+
+            // Honour the hard deadline even during the turn.
+            while (!rotDone && Time.time < retreatDeadline)
+                yield return null;
         }
 
         if (_isDone) yield break;
@@ -308,10 +357,16 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_agent.isOnNavMesh)
         {
+            _agent.speed = _data.retreatSpeed;
             _agent.SetDestination(_despawnPos.position);
 
-            while (_agent.pathPending || _agent.remainingDistance > _agent.stoppingDistance + ArrivalTolerance)
+            // Sprint until arrival OR the hard deadline fires — whichever comes first.
+            while (!_isDone && Time.time < retreatDeadline)
+            {
+                if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance + ArrivalTolerance)
+                    break;
                 yield return new WaitForSeconds(ArrivalPollInterval);
+            }
 
             _agent.ResetPath();
         }
@@ -387,6 +442,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             yield return StartCoroutine(ShutterBangSequence());
     }
 
+    /// <summary>
+    /// Assigns the Animator reference used for all animation RPCs.
+    /// Call this after swapping the mesh on a full-mutant SuspectCharacter prefab so that
+    /// walking, climbing, and attack bools are driven on the correct skeleton.
+    /// </summary>
+    public void SetAnimator(Animator a) => _animator = a;
+
     /// <summary>Server-side: sets an Animator bool on all clients.</summary>
     public void SetAnimBool(string paramName, bool value) => SetAnimBoolClientRpc(paramName, value);
 
@@ -448,5 +510,29 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private void HitShutterClientRpc()
     {
         ShutterController.Instance?.OnHitByMutant();
+    }
+
+    /// <summary>Plays the climb-through sound at full volume on all clients.</summary>
+    [ClientRpc]
+    private void PlayClimbThroughSoundClientRpc()
+    {
+        if (_climbThroughSound != null)
+            SFXController.Instance?.Play(_climbThroughSound);
+    }
+
+    /// <summary>Plays the climb-land stinger on all clients the moment the mutant finishes climbing through.</summary>
+    [ClientRpc]
+    private void PlayClimbLandSoundClientRpc()
+    {
+        if (_climbLandSound != null)
+            SFXController.Instance?.Play(_climbLandSound);
+    }
+
+    /// <summary>Starts the looping chase music on all clients with a fade-in.</summary>
+    [ClientRpc]
+    private void StartChaseMusicClientRpc()
+    {
+        if (_chaseMusic != null)
+            MusicManager.Instance?.Play(_chaseMusic, loop: true, fadeInDuration: _chaseMusicFadeInSeconds);
     }
 }

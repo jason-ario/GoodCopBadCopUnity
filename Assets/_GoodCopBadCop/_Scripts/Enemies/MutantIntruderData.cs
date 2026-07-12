@@ -39,6 +39,15 @@ public class MutantIntruderData : ScriptableObject
     [Min(0.1f)]
     public float bangIntervalSeconds = 1.5f;
 
+    [Header("Retreat")]
+    [Tooltip("NavMeshAgent speed when sprinting away after losing interest. Should be noticeably faster than walk-in speed.")]
+    [Min(1f)]
+    public float retreatSpeed = 12f;
+
+    [Tooltip("Hard deadline in seconds from the start of the retreat before the mutant is force-despawned, regardless of distance to the despawn point.")]
+    [Min(0.5f)]
+    public float retreatDespawnTimeout = 2f;
+
     [Header("Animation Triggers")]
     [Tooltip("Animator trigger name played when climbing through the booth window.")]
     public string climbAnimationTrigger = "Climb";

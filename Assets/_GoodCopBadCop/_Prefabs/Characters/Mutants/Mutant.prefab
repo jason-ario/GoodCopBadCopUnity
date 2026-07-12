@@ -237,6 +237,7 @@ MonoBehaviour:
   groundedParameterName: Grounded
   attackBoolName: Attack
   deathBoolName: Death
+  runningBoolName: Running
   attackHitbox: {fileID: 291297765939751491}
   attackHitDelay: 0.4
   doorDetectionRadius: 3
@@ -247,6 +248,10 @@ MonoBehaviour:
   deathBehaviour: 0
   deathAnimationDuration: 2
   deathSound: {fileID: 0}
+  fleeInsteadOfDie: 0
+  fleeSpeed: 12
+  fleeDespawnTimeout: 8
+  _autoInitialiseOnSpawn: 1
 --- !u!114 &7127085182576174026
 MonoBehaviour:
   m_ObjectHideFlags: 0

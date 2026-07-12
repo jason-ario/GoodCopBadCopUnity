@@ -1,95 +1,101 @@
-using System.Collections.Generic;
+using System.Collections;
 using FronkonGames.Glitches.Interferences;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
-/// Drives the FronkonGames <see cref="InterferencesVolume"/> based on the player's
-/// proximity to the nearest anomalous suspect and that suspect's infection score.
+/// Drives a post-processing glitch volume (Interferences + Film Grain) whose effect
+/// scales smoothly with proximity to the nearest fully-mutated suspect.
 ///
-/// Attach to any persistent scene GameObject. Assign <see cref="_postProcessingVolume"/>
-/// in the Inspector (the global Post Processing volume). Player origin is resolved
-/// automatically from Camera.main, or you can pin a specific transform.
+/// The values authored on the volume profile are treated as maximums: at full proximity
+/// the profile values apply in full; further away they scale down to zero. Film grain
+/// type reverts to the profile default below a configurable proximity threshold.
+///
+/// A booth-arrival event provides reliable full-intensity activation when the suspect
+/// is sitting at the desk. Occasional distortion bursts fire in sync with a glitch
+/// AudioSource, scaled by the current intensity.
 /// </summary>
 public class GlitchController : MonoBehaviour
 {
     // ── References ────────────────────────────────────────────────────────────
 
     [Header("References")]
-    [Tooltip("The global Post Processing Volume that holds (or will receive) the InterferencesVolume override.")]
+    [Tooltip("The glitch Post Processing Volume. Intensity is driven at runtime — set parameters on the profile as maximums.")]
     [SerializeField] private Volume _postProcessingVolume;
 
     // ── Detection ─────────────────────────────────────────────────────────────
 
     [Header("Detection")]
-    [Tooltip("Suspects inside this radius can trigger the effect.")]
-    [SerializeField] private float _detectionRadius = 6f;
+    [Tooltip("Within this radius the effect is always at full intensity.")]
+    [SerializeField] private float _innerRadius = 5f;
 
-    [Tooltip("Seconds between suspect scan passes. Scanning every frame is unnecessary.")]
-    [SerializeField] private float _scanInterval = 0.2f;
+    [Tooltip("Beyond this radius the effect is fully off. Effect fades linearly between inner and outer.")]
+    [SerializeField] private float _outerRadius = 18f;
 
-    // ── Smoothing ─────────────────────────────────────────────────────────────
+    [Tooltip("Seconds between proximity scan passes.")]
+    [SerializeField] private float _scanInterval = 0.3f;
 
-    [Header("Smoothing")]
+    // ── Fade ──────────────────────────────────────────────────────────────────
+
+    [Header("Fade")]
     [Tooltip("How quickly the effect fades IN when a signal is detected.")]
-    [SerializeField] private float _fadeInSpeed = 5f;
+    [SerializeField] private float _fadeInSpeed = 2f;
 
     [Tooltip("How quickly the effect fades OUT when the signal drops.")]
-    [SerializeField] private float _fadeOutSpeed = 2f;
+    [SerializeField] private float _fadeOutSpeed = 1.5f;
 
-    [Tooltip("Maps the raw 0-1 signal (score × proximity) to the final effect intensity.")]
-    [SerializeField] private AnimationCurve _intensityCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    // ── Film Grain ────────────────────────────────────────────────────────────
 
-    // ── Effect Parameters at Full Intensity ───────────────────────────────────
+    [Header("Film Grain")]
+    [Tooltip("Proximity signal below this threshold reverts film grain type to the profile default.")]
+    [SerializeField, Range(0f, 1f)] private float _filmGrainTypeThreshold = 0.3f;
 
-    [Header("Effect at Full Intensity")]
-    [SerializeField, Range(0f, 10f)]  private float _maxOffset             = 2.5f;
-    [SerializeField, Range(0f, 2f)]   private float _maxDistortion         = 1.0f;
-    [SerializeField, Range(0f, 100f)] private float _maxDistortionSpeed    = 25f;
-    [SerializeField, Range(0f, 10f)]  private float _maxDistortionDensity  = 5f;
-    [SerializeField, Range(0f, 5f)]   private float _maxDistortionAmplitude = 0.4f;
-    [SerializeField, Range(0f, 1f)]   private float _maxScanlines          = 0.9f;
-    [SerializeField, Range(0f, 1f)]   private float _maxScanlinesOpacity   = 0.7f;
+    // ── Glitch Bursts ─────────────────────────────────────────────────────────
+
+    [Header("Glitch Bursts")]
+    [Tooltip("AudioSource whose clip is seeked to a random position each burst. Loop on, Play On Awake off.")]
+    [SerializeField] private AudioSource _glitchAudioSource;
+
+    [Tooltip("Seconds of silence between glitch bursts.")]
+    [SerializeField] private float _glitchIntervalMin = 3f;
+    [SerializeField] private float _glitchIntervalMax = 8f;
+
+    [Tooltip("Duration of each individual glitch burst.")]
+    [SerializeField] private float _glitchDurationMin = 0.15f;
+    [SerializeField] private float _glitchDurationMax = 1.5f;
+
+    [Tooltip("Peak distortion amplitude injected during a burst (scaled further by current intensity).")]
+    [SerializeField, Range(0f, 1f)] private float _glitchBurstIntensity = 0.5f;
 
     // ── Debug ─────────────────────────────────────────────────────────────────
 
     [Header("Debug")]
-    [Tooltip("Force the effect on without requiring a nearby anomalous suspect.")]
+    [Tooltip("Force the glitch volume to full intensity without a nearby fully-mutated suspect.")]
     [SerializeField] private bool _debugForceGlitch;
-
-    [SerializeField, Range(0f, 1f)]
-    private float _debugIntensity = 0.5f;
-
-    [Tooltip("Press this key to infect the nearest suspect with _debugInfectionScore at runtime.")]
-    [SerializeField] private KeyCode _debugInfectKey = KeyCode.F7;
-
-    [Tooltip("Press this key to clear any debug infection applied to a suspect.")]
-    [SerializeField] private KeyCode _debugClearKey = KeyCode.F8;
-
-    [Tooltip("InfectionScore applied to the nearest suspect when the infect hotkey is pressed.")]
-    [SerializeField, Range(0, 100)] private int _debugInfectionScore = 80;
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
     private InterferencesVolume _interferences;
-    private float _targetIntensity;
-    private float _smoothedIntensity;
+    private FilmGrain _filmGrain;
+
+    // Max values read from the profile at startup — treated as the authored ceiling.
+    private float _maxInterferencesIntensity;
+    private float _maxFilmGrainIntensity;
+    private FilmGrainLookup _defaultFilmGrainType;
+
+    // Smoothed proximity signal [0, 1].
+    private float _currentWeight;
+    private float _targetWeight;
+
+    // Additive distortion spike from the burst coroutine.
+    private float _burstAmplitude;
+
     private float _scanTimer;
 
-    // Cached results from the last scan to avoid garbage from OverlapSphere each frame.
-    private readonly List<SuspectCharacter> _candidateSuspects = new();
-
-    // Suspect that was infected via the debug hotkey, held so we can clean them up.
-    private SuspectCharacter _debugInfectedSuspect;
-
-    // Baseline values to lerp FROM at t = 0.
-    private const float BASE_OFFSET              = 0f;
-    private const float BASE_DISTORTION          = 0f;
-    private const float BASE_DISTORTION_SPEED    = 10f;
-    private const float BASE_DISTORTION_DENSITY  = 2f;
-    private const float BASE_DISTORTION_AMPLITUDE = 0f;
-    private const float BASE_SCANLINES           = 0f;
-    private const float BASE_SCANLINES_OPACITY   = 0f;
+    // True while a fully-mutated suspect is presenting at the booth (event-driven, reliable on all clients).
+    private bool _boothMutantActive;
+    private SuspectCharacter _boothMutant;
 
     // ── Unity Lifecycle ───────────────────────────────────────────────────────
 
@@ -102,199 +108,213 @@ public class GlitchController : MonoBehaviour
             return;
         }
 
-        // volume.profile creates a runtime instance (cloned from sharedProfile) on first access,
-        // so we never write back to the asset on disk.
+        // volume.profile gives a runtime clone — changes never write back to the asset on disk.
         VolumeProfile profile = _postProcessingVolume.profile;
 
+        // ── Interferences ──────────────────────────────────────────────────
         if (!profile.TryGet(out _interferences))
         {
-            // Add the component at runtime if the profile didn't include one.
             _interferences = profile.Add<InterferencesVolume>(true);
             Debug.Log("[GlitchController] InterferencesVolume was absent from the profile — created at runtime.");
         }
-
-        // Mark all parameters we drive as overrides so the blending system picks them up.
-        _interferences.intensity.overrideState           = true;
-        _interferences.offset.overrideState              = true;
-        _interferences.distortion.overrideState          = true;
-        _interferences.distortionSpeed.overrideState     = true;
-        _interferences.distortionDensity.overrideState   = true;
+        _interferences.active = true;
+        _interferences.intensity.overrideState          = true;
         _interferences.distortionAmplitude.overrideState = true;
-        _interferences.scanlines.overrideState           = true;
-        _interferences.scanlinesOpacity.overrideState    = true;
 
-        ApplyParameters(0f);
+        // Read the profile's authored intensity as the URP blend ceiling — set once, never changed again.
+        _maxInterferencesIntensity = _interferences.intensity.value;
+        _interferences.intensity.value = _maxInterferencesIntensity;
+
+        // ── Film Grain ─────────────────────────────────────────────────────
+        if (!profile.TryGet(out _filmGrain))
+            _filmGrain = profile.Add<FilmGrain>(true);
+        _filmGrain.active = true;
+        _filmGrain.type.overrideState      = true;
+        _filmGrain.intensity.overrideState = true;
+
+        // Store the profile defaults before we touch them at runtime.
+        _defaultFilmGrainType  = _filmGrain.type.value;
+        _maxFilmGrainIntensity = _filmGrain.intensity.value;
+        _filmGrain.intensity.value = _maxFilmGrainIntensity;
+
+        // Start fully off — weight = 0 means URP blends all overrides to zero.
+        _postProcessingVolume.weight  = 0f;
+        _postProcessingVolume.enabled = false;
+    }
+
+    private void OnEnable()
+    {
+        SuspectCharacter.OnSuspectPresentingUncanny += OnBoothMutantArrived;
+        SuspectController.OnCurrentSuspectDespawned  += OnBoothMutantDespawned;
+        StartCoroutine(GlitchBurstLoop());
+    }
+
+    private void OnDisable()
+    {
+        SuspectCharacter.OnSuspectPresentingUncanny -= OnBoothMutantArrived;
+        SuspectController.OnCurrentSuspectDespawned  -= OnBoothMutantDespawned;
+
+        _boothMutantActive = false;
+        _boothMutant       = null;
+        _currentWeight     = 0f;
+        _targetWeight      = 0f;
+        _burstAmplitude    = 0f;
+
+        SetGlitchAudio(false);
+
+        _postProcessingVolume.weight  = 0f;
+        _postProcessingVolume.enabled = false;
     }
 
     private void Update()
     {
-#if UNITY_EDITOR
-        if (Input.GetKeyDown(_debugInfectKey)) DebugInfectNearestSuspect();
-        if (Input.GetKeyDown(_debugClearKey))  DebugClearInfection();
-#endif
-
-        if (_debugForceGlitch)
+        // ── Recompute target on scan interval ──────────────────────────────
+        _scanTimer -= Time.deltaTime;
+        if (_scanTimer <= 0f)
         {
-            _targetIntensity = _debugIntensity;
-        }
-        else
-        {
-            _scanTimer -= Time.deltaTime;
-            if (_scanTimer <= 0f)
-            {
-                _scanTimer = _scanInterval;
-                _targetIntensity = SampleNearbyAnomalies();
-            }
+            _scanTimer    = _scanInterval;
+            _targetWeight = ComputeTargetWeight();
         }
 
-        // Asymmetric smoothing: fast attack, slow release.
-        float speed = (_smoothedIntensity < _targetIntensity) ? _fadeInSpeed : _fadeOutSpeed;
-        _smoothedIntensity = Mathf.Lerp(_smoothedIntensity, _targetIntensity, Time.deltaTime * speed);
+        // ── Smooth lerp (asymmetric attack / release) ──────────────────────
+        float speed = (_currentWeight < _targetWeight) ? _fadeInSpeed : _fadeOutSpeed;
+        _currentWeight = Mathf.Lerp(_currentWeight, _targetWeight, Time.deltaTime * speed);
 
-        ApplyParameters(_smoothedIntensity);
+        if (_currentWeight < 0.001f)
+            _currentWeight = 0f;
+
+        // ── Apply ──────────────────────────────────────────────────────────
+        bool active = _currentWeight > 0f;
+        _postProcessingVolume.enabled = active;
+
+        if (active)
+        {
+            // weight drives URP blending — all overridden parameters scale proportionally
+            // from zero up to the values authored on the profile.
+            _postProcessingVolume.weight = _currentWeight;
+
+            // Burst amplitude is written directly; weight already scales it down with distance.
+            _interferences.distortionAmplitude.value = _burstAmplitude;
+
+            // Film grain type switches at the proximity threshold — can't be lerped by weight.
+            _filmGrain.type.value = _currentWeight >= _filmGrainTypeThreshold
+                ? FilmGrainLookup.Large01
+                : _defaultFilmGrainType;
+        }
     }
 
-    // ── Scanning ──────────────────────────────────────────────────────────────
+    // ── Weight Computation ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Iterates all active SuspectCharacters, keeps those inside the detection radius
-    /// that have at least one active anomaly, and returns the strongest combined signal.
-    /// Signal = (infectionScore / FULLY_MUTATED_THRESHOLD) × (1 - normalisedDistance).
-    /// </summary>
-    private float SampleNearbyAnomalies()
+    private float ComputeTargetWeight()
     {
-        Transform origin = ResolvePlayerTransform();
+        if (_debugForceGlitch) return 1f;
+
+        Transform origin = PlayerInstance.Instance != null ? PlayerInstance.Instance.transform : null;
         if (origin == null) return 0f;
 
-        _candidateSuspects.Clear();
-
-        // FindObjectsByType is called every _scanInterval seconds (default 0.2 s),
-        // not every frame, so the cost is acceptable for a small suspect count.
-        var allSuspects = FindObjectsByType<SuspectCharacter>(FindObjectsSortMode.None);
-        foreach (var suspect in allSuspects)
-        {
-            float dist = Vector3.Distance(origin.position, suspect.transform.position);
-            if (dist > _detectionRadius) continue;
-
-            var anomalies = suspect.AnomalyController;
-            if (anomalies == null || anomalies.activeAnomalies.Count == 0) continue;
-
-            _candidateSuspects.Add(suspect);
-        }
-
-        if (_candidateSuspects.Count == 0) return 0f;
-
         float maxSignal = 0f;
-        foreach (var suspect in _candidateSuspects)
+
+        // Booth suspect — tracked by reference so distance scaling works even when
+        // InfectionScore is not synced to non-host clients.
+        if (_boothMutantActive && _boothMutant != null)
         {
-            float scoreNorm = Mathf.Clamp01(
-                (float)suspect.InfectionScore / AnomalyController.FULLY_MUTATED_THRESHOLD);
-
-            float dist      = Vector3.Distance(origin.position, suspect.transform.position);
-            float proximity = 1f - Mathf.Clamp01(dist / _detectionRadius);
-
-            float signal = scoreNorm * proximity;
+            float signal = SignalForDistance(Vector3.Distance(origin.position, _boothMutant.transform.position));
             if (signal > maxSignal) maxSignal = signal;
         }
 
-        return _intensityCurve.Evaluate(maxSignal);
-    }
-
-    // ── Parameter Application ─────────────────────────────────────────────────
-
-    /// <summary>
-    /// Writes all Interferences parameters based on a normalised intensity [0, 1].
-    /// </summary>
-    private void ApplyParameters(float t)
-    {
-        _interferences.intensity.value           = t;
-        _interferences.offset.value              = Mathf.Lerp(BASE_OFFSET,               _maxOffset,              t);
-        _interferences.distortion.value          = Mathf.Lerp(BASE_DISTORTION,           _maxDistortion,          t);
-        _interferences.distortionSpeed.value     = Mathf.Lerp(BASE_DISTORTION_SPEED,     _maxDistortionSpeed,     t);
-        _interferences.distortionDensity.value   = Mathf.Lerp(BASE_DISTORTION_DENSITY,   _maxDistortionDensity,   t);
-        _interferences.distortionAmplitude.value = Mathf.Lerp(BASE_DISTORTION_AMPLITUDE, _maxDistortionAmplitude, t);
-        _interferences.scanlines.value           = Mathf.Lerp(BASE_SCANLINES,            _maxScanlines,           t);
-        _interferences.scanlinesOpacity.value    = Mathf.Lerp(BASE_SCANLINES_OPACITY,    _maxScanlinesOpacity,    t);
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private Transform ResolvePlayerTransform()
-    {
-        return PlayerInstance.Instance != null ? PlayerInstance.Instance.transform : null;
-    }
-
-    // ── Debug Hotkeys (Editor only) ───────────────────────────────────────────
-
-#if UNITY_EDITOR
-    /// <summary>
-    /// Finds the nearest SuspectCharacter, stamps <see cref="_debugInfectionScore"/> on it,
-    /// and calls <see cref="AnomalyController.InitializeByInfectionScore"/> so the normal
-    /// scanning path picks up the signal without any override shortcuts.
-    /// </summary>
-    private void DebugInfectNearestSuspect()
-    {
-        Transform origin = ResolvePlayerTransform();
-        if (origin == null)
-        {
-            Debug.LogWarning("[GlitchController] Cannot infect suspect — player not found.");
-            return;
-        }
-
-        SuspectCharacter nearest = null;
-        float nearestDist = float.MaxValue;
-
+        // World proximity — catches roaming mutants and supplements the booth check.
         foreach (var suspect in FindObjectsByType<SuspectCharacter>(FindObjectsSortMode.None))
         {
-            float d = Vector3.Distance(origin.position, suspect.transform.position);
-            if (d < nearestDist)
-            {
-                nearestDist = d;
-                nearest = suspect;
-            }
+            if (suspect.InfectionScore < AnomalyController.FULLY_MUTATED_THRESHOLD) continue;
+
+            float signal = SignalForDistance(Vector3.Distance(origin.position, suspect.transform.position));
+            if (signal > maxSignal) maxSignal = signal;
         }
 
-        if (nearest == null)
-        {
-            Debug.LogWarning("[GlitchController] No SuspectCharacter found in the scene.");
-            return;
-        }
-
-        // Clear any previous debug infection first.
-        DebugClearInfection();
-
-        _debugInfectedSuspect          = nearest;
-        nearest.InfectionScore         = _debugInfectionScore;
-        nearest.AnomalyController?.InitializeByInfectionScore(_debugInfectionScore);
-
-        Debug.Log($"[GlitchController] DEBUG — infected '{nearest.name}' " +
-                  $"with score {_debugInfectionScore} ({nearestDist:F1} m away).");
+        return maxSignal;
     }
 
     /// <summary>
-    /// Clears the infection applied by <see cref="DebugInfectNearestSuspect"/>,
-    /// resetting the suspect to a clean state.
+    /// Returns a 0–1 signal for a given distance.
+    /// Full intensity within <see cref="_innerRadius"/>, fades to zero at <see cref="_outerRadius"/>.
     /// </summary>
-    private void DebugClearInfection()
+    private float SignalForDistance(float dist)
     {
-        if (_debugInfectedSuspect == null) return;
-
-        _debugInfectedSuspect.InfectionScore = 0;
-        _debugInfectedSuspect.AnomalyController?.InitializeClean();
-
-        Debug.Log($"[GlitchController] DEBUG — cleared infection on '{_debugInfectedSuspect.name}'.");
-        _debugInfectedSuspect = null;
+        if (dist <= _innerRadius) return 1f;
+        return 1f - Mathf.Clamp01((dist - _innerRadius) / Mathf.Max(_outerRadius - _innerRadius, 0.001f));
     }
-#endif
+
+    // ── Booth Events ──────────────────────────────────────────────────────────
+
+    private void OnBoothMutantArrived(SuspectCharacter suspect, int infectionScore)
+    {
+        _boothMutantActive = true;
+        _boothMutant       = suspect;
+    }
+
+    private void OnBoothMutantDespawned()
+    {
+        _boothMutantActive = false;
+        _boothMutant       = null;
+    }
+
+    // ── Burst Loop ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Randomly fires distortion bursts while the effect has any intensity,
+    /// mirroring the pattern used in <see cref="LogoMaterialController"/>.
+    /// </summary>
+    private IEnumerator GlitchBurstLoop()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(Random.Range(_glitchIntervalMin, _glitchIntervalMax));
+
+            if (_currentWeight < 0.01f) continue;
+
+            float duration = Random.Range(_glitchDurationMin, _glitchDurationMax);
+            float rampTime = Mathf.Max(duration * 0.15f, 0.001f);
+
+            SetGlitchAudio(true);
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float inRamp  = Mathf.Clamp01(elapsed / rampTime);
+                float outRamp = Mathf.Clamp01((duration - elapsed) / rampTime);
+                _burstAmplitude = Mathf.Min(inRamp, outRamp) * _glitchBurstIntensity;
+                yield return null;
+            }
+
+            _burstAmplitude = 0f;
+            SetGlitchAudio(false);
+        }
+    }
+
+    /// <summary>
+    /// Enables or disables the glitch AudioSource and seeks to a random position in the clip
+    /// so every burst starts from an unpredictable point in the sound.
+    /// </summary>
+    private void SetGlitchAudio(bool active)
+    {
+        if (_glitchAudioSource == null || _glitchAudioSource.enabled == active) return;
+
+        _glitchAudioSource.enabled = active;
+
+        if (active && _glitchAudioSource.clip != null)
+            _glitchAudioSource.time = Random.Range(0f, _glitchAudioSource.clip.length);
+    }
 
     // ── Gizmos ───────────────────────────────────────────────────────────────
 
     private void OnDrawGizmosSelected()
     {
-        Transform origin = ResolvePlayerTransform();
-        if (origin == null) return;
-
-        Gizmos.color = new Color(0f, 0.9f, 1f, 0.25f);
-        Gizmos.DrawWireSphere(origin.position, _detectionRadius);
+        if (PlayerInstance.Instance == null) return;
+        Vector3 pos = PlayerInstance.Instance.transform.position;
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.5f);
+        Gizmos.DrawWireSphere(pos, _innerRadius);
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.2f);
+        Gizmos.DrawWireSphere(pos, _outerRadius);
     }
 }

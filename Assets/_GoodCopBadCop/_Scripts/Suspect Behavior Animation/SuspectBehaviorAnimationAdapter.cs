@@ -67,6 +67,30 @@ namespace GoodCopBadCop.SuspectBehaviorAnimation
                 animator.runtimeAnimatorController = originalController;
         }
 
+        /// <summary>
+        /// Replaces the Animator reference at runtime — used when the active mesh switches
+        /// (e.g. civilian → mutated form on a SuspectCharacter prefab).
+        /// Stops any active playable graph first so the old animator is cleanly released,
+        /// then caches the new animator's original controller for the next restore.
+        /// </summary>
+        public void UpdateAnimatorReference(Animator newAnimator)
+        {
+            if (newAnimator == null) return;
+
+            // Release the old graph before swapping so the previous animator isn't left in a broken state.
+            StopGraph();
+            StopPlaybackCoroutine();
+            StopTransitionCoroutine();
+            activePresets.Clear();
+            currentSource = null;
+            currentPreset = null;
+            currentClip = null;
+            isInPause = false;
+
+            animator = newAnimator;
+            originalController = newAnimator.runtimeAnimatorController;
+        }
+
         public void Apply(object source, BehaviorAnimationPreset preset)
         {
             if (source == null || preset == null)
