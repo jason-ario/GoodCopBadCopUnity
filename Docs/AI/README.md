@@ -10,14 +10,15 @@ After reaching this file from `AGENTS.md`:
 
 1. Read `SESSION_START.md` for compact shared project context.
 2. For architecture-sensitive work, read `ARCHITECTURE.md`.
-3. For process, tests, verification, or commit naming, read `WORKFLOW.md`.
+3. For process, tests, or verification, read `WORKFLOW.md`.
 4. Inspect actual source files before making claims or edits.
 
 ## Shared File Index
 
 - `SESSION_START.md` - compact shared context packet for new AI sessions.
 - `ARCHITECTURE.md` - shared architecture direction for new significant features.
-- `WORKFLOW.md` - shared work cycle, testing rules, verification, and commit naming.
+- `WORKFLOW.md` - shared work cycle, testing rules, and verification.
+- `GIT.md` - git workflow, staging rules, and commit naming.
 
 ## Tool-Specific Context
 
