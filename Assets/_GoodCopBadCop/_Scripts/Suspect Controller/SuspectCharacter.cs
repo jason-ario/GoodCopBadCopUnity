@@ -600,6 +600,7 @@ public class SuspectCharacter : Interactable
     public int ChosenWhoDoYouLiveWithIndex = -1;
 
     public int radiationAmount = 10;
+    public int heartRateBpm = 72;
     private Vector2 radiationNormal = new Vector2(0, 30);
     private Vector2 radiationSuspicious = new Vector2(31, 70);
     private Vector2 radiationInfected = new Vector2(71, 100);

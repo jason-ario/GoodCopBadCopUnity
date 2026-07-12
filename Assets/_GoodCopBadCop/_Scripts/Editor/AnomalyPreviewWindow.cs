@@ -66,6 +66,9 @@ namespace GoodCopBadCop.Editor
         private const string PreviewDocumentRootName = "[Anomaly Preview Documents]";
         private const string SessionPreviewPrefabPathKey = "GoodCopBadCop.AnomalyPreview.PrefabPath";
         private const string SessionPendingPreviewKey = "GoodCopBadCop.AnomalyPreview.Pending";
+        private const float NormalBodyTemperature = 36.5f;
+        private const float NormalBodyTemperatureJitter = 0.3f;
+        private const float BaseRoomTemperature = 22f;
         private static readonly string[] DocumentPrefabPaths =
         {
             "Assets/_GoodCopBadCop/_Prefabs/Equipment/Pickups/ID card.prefab",
@@ -164,6 +167,8 @@ namespace GoodCopBadCop.Editor
                 DrawSourceControls();
                 EditorGUILayout.Space(8f);
                 DrawAnimationPreviewControls();
+                EditorGUILayout.Space(8f);
+                DrawVitalsReadouts();
                 EditorGUILayout.Space(8f);
                 DrawClearPreviewControls();
                 EditorGUILayout.EndScrollView();
@@ -280,6 +285,124 @@ namespace GoodCopBadCop.Editor
                 EditorGUILayout.LabelField("State", state);
             }
         }
+
+        private void DrawVitalsReadouts()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("Numeric Readouts", EditorStyles.boldLabel);
+
+                if (targetRoot == null)
+                {
+                    EditorGUILayout.LabelField("Spawn a preview target to inspect scanner values.", EditorStyles.wordWrappedMiniLabel);
+                    return;
+                }
+
+                global::SuspectCharacter suspect = GetPreviewSuspect();
+                if (suspect == null)
+                {
+                    EditorGUILayout.LabelField("No SuspectCharacter found under current target.", EditorStyles.wordWrappedMiniLabel);
+                    return;
+                }
+
+                float roomOffset = GetActiveRoomTemperatureOffset();
+                float roomTemperature = BaseRoomTemperature + roomOffset;
+                global::HighTemperatureAnomaly temperatureAnomaly = GetFirstAnomaly<global::HighTemperatureAnomaly>();
+                bool hasActiveTemperatureAnomaly = temperatureAnomaly != null && temperatureAnomaly.IsActive;
+                float bodyBaseTemperature = hasActiveTemperatureAnomaly
+                    ? temperatureAnomaly.ElevatedTemperature
+                    : NormalBodyTemperature;
+                float bodyJitter = hasActiveTemperatureAnomaly
+                    ? temperatureAnomaly.JitterRange
+                    : NormalBodyTemperatureJitter;
+                float bodyTemperature = bodyBaseTemperature + roomOffset;
+
+                DrawReadoutRow("Room Temp", FormatTemperature(roomTemperature), FormatOffsetNote(roomOffset));
+                DrawReadoutRow("Body Temp", FormatTemperature(bodyTemperature), FormatJitterNote(bodyJitter, hasActiveTemperatureAnomaly));
+                DrawReadoutRow("Heart Rate", $"{suspect.heartRateBpm} bpm", FormatHeartRateNote());
+                DrawReadoutRow("Radiation", suspect.radiationAmount.ToString(), FormatRadiationNote());
+            }
+        }
+
+        private void DrawReadoutRow(string label, string value, string note)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(label, GUILayout.Width(96f));
+                EditorGUILayout.LabelField(value, EditorStyles.boldLabel, GUILayout.Width(72f));
+                EditorGUILayout.LabelField(note, EditorStyles.miniLabel);
+            }
+        }
+
+        private float GetActiveRoomTemperatureOffset()
+        {
+            float offset = 0f;
+            foreach (global::RoomTemperatureDropAnomaly anomaly in anomalies.OfType<global::RoomTemperatureDropAnomaly>())
+            {
+                if (!IsAnomalyActive(anomaly))
+                    continue;
+
+                if (TryReadSerializedFloat(anomaly, "temperatureOffset", out float temperatureOffset))
+                    offset += temperatureOffset;
+            }
+
+            return offset;
+        }
+
+        private T GetFirstAnomaly<T>() where T : Anomaly
+        {
+            return anomalies.OfType<T>().FirstOrDefault();
+        }
+
+        private string FormatRadiationNote()
+        {
+            return IsAnomalyTypeActive<global::HighRadiationAnomaly>()
+                ? "current SuspectCharacter radiationAmount"
+                : "current baseline radiationAmount";
+        }
+
+        private string FormatHeartRateNote()
+        {
+            return IsAnomalyTypeActive<global::HeartRateAnomaly>()
+                ? "current SuspectCharacter heartRateBpm"
+                : "current baseline heartRateBpm";
+        }
+
+        private static string FormatJitterNote(float jitter, bool isAnomalyTemperature)
+        {
+            string source = isAnomalyTemperature ? "anomaly target" : "normal target";
+            return $"{source}, jitter +/-{jitter:0.#}C";
+        }
+
+        private static string FormatOffsetNote(float offset)
+        {
+            if (Mathf.Approximately(offset, 0f))
+                return $"base {BaseRoomTemperature:0.#}C";
+
+            return $"base {BaseRoomTemperature:0.#}C, active offset {FormatSignedTemperature(offset)}";
+        }
+
+        private static string FormatTemperature(float value)
+        {
+            return $"{value:0.#}C";
+        }
+
+        private static string FormatSignedTemperature(float value)
+        {
+            return $"{value:+0.#;-0.#;0}C";
+        }
+
+        private static bool TryReadSerializedFloat(UnityEngine.Object target, string propertyName, out float value)
+        {
+            value = 0f;
+            SerializedProperty property = new SerializedObject(target).FindProperty(propertyName);
+            if (property == null || property.propertyType != SerializedPropertyType.Float)
+                return false;
+
+            value = property.floatValue;
+            return true;
+        }
+
         private void DrawAnomalyList(params GUILayoutOption[] layoutOptions)
         {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, layoutOptions))

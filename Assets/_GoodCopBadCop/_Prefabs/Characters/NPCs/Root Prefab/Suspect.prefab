@@ -840,6 +840,7 @@ GameObject:
   - component: {fileID: 1549626828937643178}
   - component: {fileID: 4425771342621210441}
   - component: {fileID: 8154835080764322672}
+  - component: {fileID: 4018783668865833290}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -1174,6 +1175,7 @@ MonoBehaviour:
   ChosenSymptomResponseIndex: -1
   ChosenWhoDoYouLiveWithIndex: -1
   radiationAmount: 10
+  heartRateBpm: 72
 --- !u!114 &5784780132604979857
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2077,6 +2079,19 @@ MonoBehaviour:
   _playChaseMusic: 1
   _chaseMusic: {fileID: 8300000, guid: 665eee567a1cdc64d9471073e04b98c0, type: 3}
   _chaseMusicFadeInSeconds: 1.5
+--- !u!114 &4018783668865833290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb205490f4df42643a3c9aec675c8df8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeartRateAnomaly
+  elevatedHeartRateBpm: 140
 --- !u!1 &4528955243091184220
 GameObject:
   m_ObjectHideFlags: 0
