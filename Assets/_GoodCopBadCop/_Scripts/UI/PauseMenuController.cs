@@ -137,15 +137,18 @@ public class PauseMenuController : MonoBehaviour
         confirmationDialog?.Hide();
     }
 
-    private void ReturnToMainMenu()
+    private async void ReturnToMainMenu()
     {
-        LobbyManager.Instance?.ExitLobby();
+        if (LobbyManager.Instance != null)
+            await LobbyManager.Instance.ExitLobbyAsync();
+
         SceneManager.LoadScene(SceneManager.GetActiveScene().path);
     }
 
-    private void QuitGame()
+    private async void QuitGame()
     {
-        LobbyManager.Instance?.ExitLobby();
+        if (LobbyManager.Instance != null)
+            await LobbyManager.Instance.ExitLobbyAsync();
 
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;

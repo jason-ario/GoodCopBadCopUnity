@@ -22,9 +22,11 @@ public class ThanksForPlayingUI : MonoBehaviour
     /// Called by the Return to Main Menu button's OnClick event.
     /// Shuts down the network session and returns the player to the home screen.
     /// </summary>
-    public void OnReturnToMainMenuClicked()
+    public async void OnReturnToMainMenuClicked()
     {
-        LobbyManager.Instance.ExitLobby();
+        if (LobbyManager.Instance != null)
+            await LobbyManager.Instance.ExitLobbyAsync();
+
         MainMenuController.Instance.BackToHomeScreen();
     }
 }

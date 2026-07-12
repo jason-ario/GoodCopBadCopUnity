@@ -82,6 +82,11 @@ public class LobbyManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance != this)
+            return;
+
+        ShutdownNetworkSessionImmediate();
+
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
@@ -95,6 +100,8 @@ public class LobbyManager : MonoBehaviour
 
         if (SteamClient.IsValid)
             SteamClient.Shutdown();
+
+        Instance = null;
     }
 
     private void OnOverlayToggled(bool isActive)
@@ -142,12 +149,7 @@ public class LobbyManager : MonoBehaviour
             return false;
         }
 
-        // Clean up any previous lobby before creating a new one.
-        if (CurrentLobby.Id != 0)
-        {
-            CurrentLobby.Leave();
-            CurrentLobby = default;
-        }
+        await ExitLobbyAsync();
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
         Debug.Log($"[CreateLobby] Transport type: {(transport != null ? transport.GetType().Name : "null")}");
@@ -222,7 +224,11 @@ public class LobbyManager : MonoBehaviour
 
             if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
             {
-                NetworkManager.Singleton.StartHost();
+                if (!NetworkManager.Singleton.StartHost())
+                {
+                    Debug.LogError("[CreateLobby] Failed to start LAN host.");
+                    return false;
+                }
             }
 
             return true;
@@ -481,16 +487,15 @@ public class LobbyManager : MonoBehaviour
 
     public bool IsHost => NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
 
-    public void ExitLobby()
+    public async void ExitLobby()
+    {
+        await ExitLobbyAsync();
+    }
+
+    public async Task ExitLobbyAsync()
     {
         inviteOverlayWasOpenedByUs = false;
         CurrentJoinCode = null;
-
-        if (NetworkManager.Singleton != null &&
-            (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))
-        {
-            NetworkManager.Singleton.Shutdown();
-        }
 
         if (CurrentLobby.Id != 0)
         {
@@ -498,6 +503,58 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby = default;
         }
 
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null &&
+            (networkManager.IsListening || networkManager.IsHost || networkManager.IsServer || networkManager.IsClient || networkManager.ShutdownInProgress))
+        {
+            networkManager.Shutdown();
+            await WaitForNetworkShutdownAsync(networkManager);
+        }
+
         OnLobbyUpdated?.Invoke();
+    }
+
+    private static async Task WaitForNetworkShutdownAsync(NetworkManager networkManager)
+    {
+        const int TimeoutMs = 3000;
+        const int PollDelayMs = 50;
+        int elapsedMs = 0;
+
+        while (networkManager != null &&
+               (networkManager.IsListening || networkManager.IsHost || networkManager.IsServer || networkManager.IsClient || networkManager.ShutdownInProgress) &&
+               elapsedMs < TimeoutMs)
+        {
+            await Task.Delay(PollDelayMs);
+            elapsedMs += PollDelayMs;
+        }
+
+        if (networkManager != null &&
+            (networkManager.IsListening || networkManager.IsHost || networkManager.IsServer || networkManager.IsClient || networkManager.ShutdownInProgress))
+        {
+            Debug.LogWarning($"[LobbyManager] Timed out waiting for NetworkManager shutdown. IsListening={networkManager.IsListening}, IsHost={networkManager.IsHost}, IsServer={networkManager.IsServer}, IsClient={networkManager.IsClient}, ShutdownInProgress={networkManager.ShutdownInProgress}");
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        ShutdownNetworkSessionImmediate();
+    }
+
+    private void ShutdownNetworkSessionImmediate()
+    {
+        inviteOverlayWasOpenedByUs = false;
+        CurrentJoinCode = null;
+
+        if (CurrentLobby.Id != 0)
+        {
+            CurrentLobby.Leave();
+            CurrentLobby = default;
+        }
+
+        if (NetworkManager.Singleton != null &&
+            (NetworkManager.Singleton.IsListening || NetworkManager.Singleton.IsHost || NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
     }
 }
