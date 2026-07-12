@@ -13,91 +13,234 @@ MonoBehaviour:
   m_Name: Chichiko
   m_EditorClassIdentifier: Assembly-CSharp::SuspectData
   FirstName: Chichiko
-  LastName: 
+  LastName: Beridze
   Nickname: 
-  Occupation: 
-  CharacterDescription: 
-  CharacterArc: 
-  DateOfBirth: 
-  Sex: 
-  EntryPermitExpiryDate: 
+  Occupation: Hair Salon Owner
+  CharacterDescription: 'Vain, compulsive, and oddly endearing. Chichiko runs the
+    neighbourhood hair salon and considers himself the foremost authority on aesthetic
+    self-improvement in the district. He performs his own botox, mixes his own serums,
+    and treats every border crossing as a fresh opportunity to dispense unsolicited
+    grooming advice. His enthusiasm is completely genuine, his results are questionable,
+    and his face is a permanent work-in-progress he never stops revising.'
+  CharacterArc: "As the infection spreads, Chichiko\u2019s harmless vanity curdles
+    into something frightening. He begins mutilating himself to chase increasingly
+    impossible beauty standards, convinced the contamination is eroding his looks.
+    His friendly tips flip into aggressive judgment; his need to be seen as beautiful
+    becomes a compulsion to tear down anyone he perceives as watching him. A dark
+    lookmaxxer parody that ends in self-destruction."
+  DateOfBirth: 14/03/1979
+  Sex: Male
+  EntryPermitExpiryDate: 15 NOV
   IsResident: 1
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: The Mutated Looksmaxer
+  basePersonalityDescriptors:
+  - Compliments your bone structure before handing over his documents.
+  - Runs the only salon still open in the district; clients show up more out of
+    habit than hope.
+  - Offers unsolicited grooming tips with absolute sincerity.
+  - Treats his own face as a permanent renovation project with no completion date.
+  - Genuinely believes aesthetic optimisation is the highest calling available to
+    a person.
+  normalBehaviorNotes: 'Friendly, chatty, and laser-focused on appearances. In his
+    base state Chichiko reads as harmless vanity with a service-industry smile. He
+    will compliment you, push beauty tips whether you want them or not, and talk
+    at length about his latest self-administered procedure. Watch for rapid mood
+    swings when his own appearance is questioned or when he suspects he is being
+    evaluated.'
+  fullMutantDialogue: {fileID: 11400000, guid: e4dfd878f4ba72e4db8e1020ec867cbf, type: 2}
+  replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 0}
   CharacterPrefab: {fileID: 0}
   entryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Returning to open the salon for morning appointments.
+    - Picking up a shipment of imported hair product from the depot.
+    - Visiting a client in the residential block for a home styling session.
+    midDaysReasons:
+    - Bartering salon services for food and medicine at the market.
+    - Searching the district for any remaining beauty supply stock.
+    - Returning from a supply run — the city has no conditioner left anywhere.
+    finalDaysReasons:
+    - Keeping the salon open for whoever still comes. Someone always does.
+    - Hoarding the last of the medical-grade filler before the border closes permanently.
+    - Returning home to finish a procedure he started this morning.
   invalidEntryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Going to the dentist to get my cheekbones sharpened.
+    - Picking up a replacement nose I ordered from the pharmacy.
+    - I have a consultation with a surgeon who works out of the river.
+    midDaysReasons:
+    - The government said I could exchange my jaw at the processing centre.
+    - My skin needs recalibrating. The technician lives in the restricted zone.
+    - Applying for a permit to have a second face installed on the back of my head.
+    finalDaysReasons:
+    - I am going to find whoever invented these beauty standards and thank them personally.
+    - The checkpoint mirror told me I needed a touch-up. I am going to fix it.
+    - I have an appointment with myself. I cannot be late.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - "Officer! Your eyebrows are doing something very interesting today. In a good
+      way \u2014 mostly. Have you considered threading?"
+    - Ah, back again! I have been testing a new under-eye technique. Tell me honestly
+      — can you see the bruising?
+    - 'Here are my papers. While I have you: do you moisturise? This air is absolutely
+      destroying everyone''s pores.'
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - I did a new procedure last night. Do not be alarmed by the swelling. It is
+      part of the process.
+    - 'You look tired, officer. I have something for that. Here — take a card. First
+      session is free.'
+    - The salon is still open. We are the last beauty service running in this district.
+      That means something.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - Do not stare. I know it looks dramatic. Beauty requires sacrifice, and I am
+      very committed.
+    - 'I have been refining my jaw all week. The symmetry is almost perfect. Almost.'
+    - Something is wrong with the mirrors in this city. They have all started lying.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - You are STARING at me. Do not. Stare. At. Me.
+    - I can see exactly what you think of my face right now. It is written all over
+      yours. You are wrong.
+    - I look incredible. Say it. I need you to say it before I let you stamp anything.
+    dialoguesMidDays:
+    - 'This? This is an improvement. Each one is an improvement. Stop making that
+      face at me.'
+    - I have been optimising. Non-stop. You could never understand what it takes.
+    - 'You do not get to judge me. Nobody gets to judge me anymore. Stamp it and
+      look away.'
+    dialoguesFinalDays:
+    - 'I am the most beautiful thing left in this city. Everything else has rotted.
+      I am still here. I am STILL PERFECT.'
+    - My face is not finished. None of this is finished. Stop looking at it like
+      it is finished.
+    - 'I know what I look like. I KNOW. And it is FINE. Everything is fine. Stamp
+      it.'
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - "Wonderful! Come by the salon sometime. You have good raw material \u2014 I
+      could do a lot with it."
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - Smart choice, officer. Judgement is a two-way street. Remember that.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - You passed me through. Good. You have good instincts. Or good taste, at least.
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Excuse me?! Do you have any idea who does the hair for half this district?!
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - 'This is because of how I LOOK, isn''t it. Admit it. ADMIT IT.'
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - I am not going in there. My face is not done yet. I absolutely refuse.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - 'But... I still had... so much left... to fix...'
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - My face... no... it was almost... symmetrical...
     dialoguesFinalDays:
-    - 
-    - 
-    - 
-  quarantineExitLines: []
-  killExitLines: []
+    - 'I was... so close... to perfect...'
+  quarantineExitLines:
+  - This is aesthetic discrimination and I will be filing a formal complaint.
+  - "Fine. FINE. But when I come out I will look INCREDIBLE, and you will feel terrible\
+    \ about this."
+  - I have tweezers in my pocket. You cannot stop the process.
+  killExitLines:
+  - "I was\u2026 so close\u2026 to the jawline I wanted\u2026"
+  - "Nobody\u2026 ever appreciated\u2026 how much work went into this\u2026"
+  - "It just needed\u2026 one more\u2026 adjustment\u2026"
   voiceAudioClips: []
-  questionResponses: []
+  introDialogue: {fileID: 0}
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The salon. Full book today — cuts, colour, two botox sessions.
+      My hands are exhausted but the results speak for themselves.
+    midDaysAnswer: The black market near the river. Someone had imported hyaluronic
+      filler. I bought everything they had.
+    finalDaysAnswer: I have been walking since the early hours. I could not sleep.
+      I was working on something. I lost track of time.
+    mismatchEarlyDaysAnswer: Home. I stayed home all day. The salon was closed. I
+      did not see anyone or do anything to my face.
+    mismatchMidDaysAnswer: The pharmacy. I bought standard aspirin. Nothing else.
+      Completely standard purchase, nothing out of the ordinary.
+    mismatchFinalDaysAnswer: I was at the salon. Normal day. Normal clients. Everything
+      is completely normal about my face right now.
+    uncannyEarlyDaysAnswer: The supply depot. They still have things I need. Do not
+      ask what. You would not understand the list.
+    uncannyMidDaysAnswer: I have been working. Non-stop. On myself. It is a full-time
+      commitment and I do not expect you to understand that.
+    uncannyFinalDaysAnswer: I do not remember. I was in the mirror for a long time.
+      Time moves differently when you are focused.
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: "Some bruising around the jaw \u2014 self-administered, nothing
+      to worry about. The swelling goes down. It always does."
+    midDaysAnswer: My pain threshold has gone up significantly. I consider that a
+      sign I am adapting well.
+    finalDaysAnswer: I cannot feel my cheekbones anymore. That is fine. They look
+      correct. That is what matters.
+    mismatchEarlyDaysAnswer: No bruising anywhere. My skin is completely normal.
+      I have not done a single procedure this week. I have been resting.
+    mismatchMidDaysAnswer: Perfect health. I feel nothing at all. No pain anywhere.
+      I have not touched my face in days.
+    mismatchFinalDaysAnswer: I feel wonderful. Everything is fine. My face is exactly
+      how it was. No modifications. No changes at all.
+    uncannyEarlyDaysAnswer: I told you. No symptoms. These are improvements. There
+      is a significant difference.
+    uncannyMidDaysAnswer: Everyone keeps calling them symptoms. They are not symptoms.
+      They are upgrades.
+    uncannyFinalDaysAnswer: My body is cooperating fully with the vision. That is
+      all you need to know.
+  - question: Who do you live with?
+    earlyDaysAnswer: 'Alone, but clients are in and out all day. The salon is directly
+      below my flat. It never really closes.'
+    midDaysAnswer: One of my regulars has been sleeping on the treatment chair. I
+      do not mind. It keeps the place from feeling empty.
+    finalDaysAnswer: Just me now. The regular left. Said something about my face
+      that I choose not to repeat.
+    mismatchEarlyDaysAnswer: I share the flat with two other people. The salon is
+      just a workplace. I go home at the end of every shift like a normal person.
+    mismatchMidDaysAnswer: My flatmate is still there. Everything at home is unchanged.
+      The salon closes at normal hours. Everything is completely normal.
+    mismatchFinalDaysAnswer: I live with several people. We have dinner together
+      every evening. The salon has a lock and I use it. Everything is fine and regular.
+    uncannyEarlyDaysAnswer: No one you need to worry about.
+    uncannyMidDaysAnswer: Alone. Better that way. Other people always have opinions
+      about the face.
+    uncannyFinalDaysAnswer: Just the mirrors. We understand each other now.
   idleBarks:
-    earlyDays: []
-    midDays: []
-    finalDays: []
-  IDNumber: 
+    earlyDays:
+    - 'Your skin is dehydrated, officer. Drink water. Use SPF. I am genuinely begging
+      you.'
+    - I opened the salon at six this morning. I will close it when the city does.
+    - A man came in yesterday asking for the post-apocalyptic look. I gave him a
+      trim and sent him home.
+    midDays:
+    - The good products are all gone from the shelves. I have been improvising. The
+      results are mostly fine.
+    - People keep telling me I look different. I look optimised. There is a difference.
+    - "Certain fillers can still be sourced from the medical quarter if you know
+      the right people. I know the right people."
+    finalDays:
+    - The mirror in my salon cracked this morning. I took it as a challenge.
+    - Everyone in this city has stopped caring about how they look. It is deeply
+      upsetting to witness.
+    - I am not finished. I want to be clear about that. What you are seeing is a
+      work in progress.
+    uncannyEarlyDays:
+    - Stop looking at my face. I can see you looking.
+    - I know what I look like. I am the only one who gets to decide what that means.
+    uncannyMidDays:
+    - You have an opinion about my face. I can tell. Keep it to yourself.
+    - I rate everyone I meet on sight. You are not performing as well as you think
+      you are.
+    uncannyFinalDays:
+    - Perfect. Almost perfect. Getting closer every single day.
+    - I am the last beautiful thing left in this district. Someone has to be.
+  IDNumber: 4819263

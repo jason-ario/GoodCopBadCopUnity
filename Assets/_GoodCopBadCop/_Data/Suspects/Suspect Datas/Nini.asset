@@ -30,9 +30,24 @@ MonoBehaviour:
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
   dailyInfectionProgression: {x: 3, y: 8}
-  alterEgoName: 
-  basePersonalityDescriptors: []
-  normalBehaviorNotes: 
+  alterEgoName: The Masked Lady
+  basePersonalityDescriptors:
+  - Occupation is unclear — she says accountant, or possibly mortician, depending
+    on when you ask. She is never direct about it.
+  - Never removes the mask. Claims it is because of the scars. That is what she says.
+  - Seductive and flirtatious in a way that feels deliberate — charm as a calculated
+    tool, not a natural habit.
+  - Will attempt to bribe you if the questioning gets too specific. The offer is always
+    surprisingly reasonable.
+  - No recorded family. No next of kin, no mentions, no trace. She arrived in this
+    district fully formed.
+  normalBehaviorNotes: 'In her base state Nini presents with controlled, deliberate
+    charm. She is unhurried and seductive in a way that suggests she is used to getting
+    what she wants through social leverage rather than direct pressure. The mask is
+    always present; she addresses it before you can. Watch for the moment the charm
+    tips into something cooler — particularly around questions about occupation, identity,
+    or the scars. The bribe reflex is the clearest tell: when it surfaces, she has
+    hit something she cannot talk around.'
   IDPhoto: {fileID: 2800000, guid: 0a1d83fdb3fe4574990eee09aeaac946, type: 3}
   CharacterPrefab: {fileID: 793074409391834654, guid: afd46dd979f4ef9429d317cb91da466c, type: 3}
   entryReasons:
@@ -82,17 +97,17 @@ MonoBehaviour:
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Here. She places the documents down without looking at you.
+    - You want something. I can tell. Everyone does.
+    - My papers. She says nothing else. No expression. No follow-up.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - She does not speak immediately. She just watches you.
+    - Here. Nothing else.
+    - I know the process. The documents are already down before you have asked.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - She stands very still. Too still.
+    - Take them. She has not blinked in some time.
+    - She is just there. Waiting. Like she has been waiting for a long time.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -139,10 +154,9 @@ MonoBehaviour:
       Easy. Everything's fine there. No issue at all.
     mismatchFinalDaysAnswer: My studio. I haven't left in a week. The canvas is almost
       done. I need to finish it before the colours stop.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
-  - question: Have you been experiencing any strange symptoms lately?
+    uncannyEarlyDaysAnswer: Somewhere. It is not relevant.
+    uncannyMidDaysAnswer: I do not remember exactly. The walk was long.
+    uncannyFinalDaysAnswer: She considers the question for too long. I do not know.
     earlyDaysAnswer: I have a condition. It's managed. I don't want to talk about
       it.
     midDaysAnswer: My medication isn't working as well as it did. The dosage may
@@ -155,9 +169,10 @@ MonoBehaviour:
       feel very clear right now. Very clear.
     mismatchFinalDaysAnswer: Everything I feel is real. Vivid and sharp and completely
       real. I have never been more certain of that.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    uncannyEarlyDaysAnswer: No.
+    uncannyMidDaysAnswer: A long pause. No.
+    uncannyFinalDaysAnswer: I do not feel things the way I used to. That is not a
+      complaint.
   - question: Who do you live with?
     earlyDaysAnswer: My caretaker, Tamar. She comes every morning.
     midDaysAnswer: Just me now. Tamar stopped coming. I manage on my own.
@@ -168,9 +183,10 @@ MonoBehaviour:
       the moment actually. Very lively.
     mismatchFinalDaysAnswer: Tamar. She came again this morning. Like always. Everything
       is exactly the same as it was.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    uncannyEarlyDaysAnswer: No one.
+    uncannyMidDaysAnswer: No one. There is no one.
+    uncannyFinalDaysAnswer: She tilts her head slightly. I do not think that question
+      applies anymore.
   idleBarks:
     earlyDays:
     - The shadow your booth makes at this hour is really quite striking. I keep meaning
@@ -189,7 +205,16 @@ MonoBehaviour:
     - You are the most interesting face I have had to draw in a while, officer. I
       hope you know that.
     - The world is finally becoming the abstract piece I always dreamed of.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+    uncannyEarlyDays:
+    - She stands very still and says nothing for a long time.
+    - The face behind the mask is less interesting than people think.
+    - Did you say something just now?
+    uncannyMidDays:
+    - She watches you from the corner of her eye. Not hostile. Just watching.
+    - You are very loud. Your breathing.
+    - I used to feel cold. I do not anymore.
+    uncannyFinalDays:
+    - Something about her stillness is wrong. It has no weight to it.
+    - There is nothing behind the mask. Just like you suspected.
+    - I am still here. I am not sure why.
   IDNumber: 9722713
