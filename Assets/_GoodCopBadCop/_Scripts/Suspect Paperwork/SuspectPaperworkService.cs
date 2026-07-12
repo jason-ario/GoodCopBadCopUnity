@@ -91,18 +91,18 @@ namespace GoodCopBadCop.SuspectPaperwork
             bool applicationVisible = documentsVisible;
             bool isFakeId = documentsVisible && Has(active, nameof(FakeIdAnomaly));
             Texture resolvedIdPhoto = ResolveIdPhoto(data, idPhoto, idPhotoPool, active, documentsVisible, currentDay, suspectIndex);
-            string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReason)));
+            string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReasonAnomaly)));
 
-            if (documentsVisible && Has(active, nameof(NameWrong)))
-                applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrong), applicationFullName));
+            if (documentsVisible && Has(active, nameof(NameWrongAnomaly)))
+                applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrongAnomaly), applicationFullName));
 
-            if (documentsVisible && Has(active, nameof(BirthDateWrong)))
-                applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrong), applicationBirthDate));
+            if (documentsVisible && Has(active, nameof(BirthDateWrongAnomaly)))
+                applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrongAnomaly), applicationBirthDate));
 
-            if (documentsVisible && Has(active, nameof(IDNumberWrong)))
-                applicationIdNumber = MutateDigits(applicationIdNumber, BuildSeed(data, currentDay, suspectIndex, nameof(IDNumberWrong), applicationIdNumber), preserve: '\0');
+            if (documentsVisible && Has(active, nameof(IDNumberWrongAnomaly)))
+                applicationIdNumber = MutateDigits(applicationIdNumber, BuildSeed(data, currentDay, suspectIndex, nameof(IDNumberWrongAnomaly), applicationIdNumber), preserve: '\0');
 
-            if (documentsVisible && Has(active, nameof(SexWrong)))
+            if (documentsVisible && Has(active, nameof(SexWrongAnomaly)))
                 applicationSex = MutateSex(applicationSex);
 
             if (documentsVisible && Has(active, nameof(ExpirationDateAnomaly)))
@@ -136,7 +136,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             int currentDay,
             int suspectIndex)
         {
-            if (!documentsVisible || !Has(active, nameof(PhotoIDMismatch)))
+            if (!documentsVisible || !Has(active, nameof(PhotoIDMismatchAnomaly)))
                 return idPhoto;
 
             List<Texture> candidates = (idPhotoPool ?? Enumerable.Empty<Texture>())
@@ -149,7 +149,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             if (candidates.Count == 0)
                 return idPhoto;
 
-            int seed = BuildSeed(data, currentDay, suspectIndex, nameof(PhotoIDMismatch), idPhoto != null ? idPhoto.name : string.Empty);
+            int seed = BuildSeed(data, currentDay, suspectIndex, nameof(PhotoIDMismatchAnomaly), idPhoto != null ? idPhoto.name : string.Empty);
             return candidates[PositiveModulo(seed, candidates.Count)];
         }
 

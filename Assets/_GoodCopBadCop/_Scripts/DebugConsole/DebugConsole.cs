@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using GoodCopBadCop.Effects;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -68,12 +67,13 @@ public class DebugConsole : MonoBehaviour
         }
     }
     
-    private void Start()
+    private async void Start()
     {
         if (skipToBoothReady || skipToAfterShift || autoStart || skipToDay1Booth)
         {
-            NetworkManager.Singleton.StartHost();
-            LobbyManager.Instance.CreateLobby();
+            if (!await LobbyManager.Instance.CreateLobby())
+                return;
+
             GameManager.Instance.TryStartGame(true);
 
             if (autoStart)
@@ -90,8 +90,9 @@ public class DebugConsole : MonoBehaviour
                 UIController.Instance.ClosePlayerUI();
                 return;
             }
-            NetworkManager.Singleton.StartHost();
-            LobbyManager.Instance.CreateLobby();
+            if (!await LobbyManager.Instance.CreateLobby())
+                return;
+
             GameManager.Instance.TryStartGame(true);
         }
         
@@ -242,7 +243,7 @@ public class DebugConsole : MonoBehaviour
     /// otherwise bootstraps a host session and defers the callback until
     /// <see cref="GameManager.OnGameStart"/> fires and the player is fully spawned.
     /// </summary>
-    public void EnsureGameStartedThen(Action onReady)
+    public async void EnsureGameStartedThen(Action onReady)
     {
         if (GameManager.Instance.HasGameStarted)
         {
@@ -250,8 +251,9 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        NetworkManager.Singleton.StartHost();
-        LobbyManager.Instance.CreateLobby();
+        if (!await LobbyManager.Instance.CreateLobby())
+            return;
+
         GameManager.Instance.TryStartGame(true);
 
         UnityAction handler = null;
