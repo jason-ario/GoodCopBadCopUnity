@@ -15,13 +15,14 @@ MonoBehaviour:
   _scriptedDayUnlocks:
   - Day: 1
     UnlockTypeNames:
-    - NameWrong
-    - BirthDateWrong
+    - NameWrongAnomaly
+    - BirthDateWrongAnomaly
     - MissingDocumentAnomaly
   - Day: 2
     UnlockTypeNames:
     - RandomTumorAnomaly
     - RandomTentacleAnomaly
+    - LesionAnomaly
     - BlackEyesAnomaly
     - ExpirationDateAnomaly
   - Day: 3
@@ -53,12 +54,12 @@ MonoBehaviour:
   - CategoryName: Documentation
     AnomalyTypeNames:
     - ExpirationDateAnomaly
-    - InvalidEntryReason
-    - BirthDateWrong
-    - NameWrong
-    - IDNumberWrong
-    - SexWrong
-    - PhotoIDMismatch
+    - InvalidEntryReasonAnomaly
+    - BirthDateWrongAnomaly
+    - NameWrongAnomaly
+    - IDNumberWrongAnomaly
+    - SexWrongAnomaly
+    - PhotoIDMismatchAnomaly
     - MissingDocumentAnomaly
     - StoryMismatchAnomaly
     - FakeIdAnomaly
@@ -67,6 +68,7 @@ MonoBehaviour:
     - RandomTumorAnomaly
     - RandomTentacleAnomaly
     - BlackEyesAnomaly
+    - LesionAnomaly
     - BlueVeinsAnomaly
     - TwitchingAnomaly
     - SupernaturalAnomaly

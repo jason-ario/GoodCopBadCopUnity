@@ -82,7 +82,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_BirthDateWrong_IsDeterministicAndDifferent()
         {
-            string[] anomalies = { nameof(BirthDateWrong) };
+            string[] anomalies = { nameof(BirthDateWrongAnomaly) };
 
             SuspectPaperworkState first = service.BuildForPreview(data, null, anomalies, 1, 0);
             SuspectPaperworkState second = service.BuildForPreview(data, null, anomalies, 1, 0);
@@ -97,7 +97,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_IdNumberWrong_ChangesOnlyApplicationId()
         {
-            string[] anomalies = { nameof(IDNumberWrong) };
+            string[] anomalies = { nameof(IDNumberWrongAnomaly) };
 
             SuspectPaperworkState first = service.BuildForPreview(data, null, anomalies, 2, 3);
             SuspectPaperworkState second = service.BuildForPreview(data, null, anomalies, 2, 3);
@@ -110,7 +110,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_IdNumberWrong_UsesSimilarDigitReplacements()
         {
-            string[] anomalies = { nameof(IDNumberWrong) };
+            string[] anomalies = { nameof(IDNumberWrongAnomaly) };
 
             SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
 
@@ -132,7 +132,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_PhotoIdMismatch_UsesDeterministicDifferentPhoto()
         {
-            string[] anomalies = { nameof(PhotoIDMismatch) };
+            string[] anomalies = { nameof(PhotoIDMismatchAnomaly) };
             Texture[] photoPool = { currentPhoto, otherPhoto, secondOtherPhoto };
 
             SuspectPaperworkState first = service.BuildForPreview(data, currentPhoto, anomalies, 3, 4, photoPool);
@@ -148,7 +148,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_PhotoIdMismatch_KeepsSourcePhotoWhenNoAlternativeExists()
         {
-            string[] anomalies = { nameof(PhotoIDMismatch) };
+            string[] anomalies = { nameof(PhotoIDMismatchAnomaly) };
             Texture[] photoPool = { currentPhoto, null, currentPhoto };
 
             SuspectPaperworkState state = service.BuildForPreview(data, currentPhoto, anomalies, 3, 4, photoPool);
@@ -159,7 +159,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_NameWrong_ChangesOnlyApplicationName()
         {
-            string[] anomalies = { nameof(NameWrong) };
+            string[] anomalies = { nameof(NameWrongAnomaly) };
 
             SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
 
@@ -170,7 +170,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_NameWrong_PreservesOriginalLetterCase()
         {
-            string[] anomalies = { nameof(NameWrong) };
+            string[] anomalies = { nameof(NameWrongAnomaly) };
             data.FirstName = "A";
             data.LastName = string.Empty;
 
@@ -221,7 +221,7 @@ namespace GoodCopBadCop.Editor.Tests
         [Test]
         public void BuildForPreview_SexWrong_ChangesOnlyApplicationSex()
         {
-            string[] anomalies = { nameof(SexWrong) };
+            string[] anomalies = { nameof(SexWrongAnomaly) };
 
             SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 2, 3);
 
@@ -253,13 +253,13 @@ namespace GoodCopBadCop.Editor.Tests
                 {
                     nameof(MissingDocumentAnomaly),
                     nameof(FakeIdAnomaly),
-                    nameof(NameWrong),
-                    nameof(BirthDateWrong),
-                    nameof(IDNumberWrong),
-                    nameof(SexWrong),
+                    nameof(NameWrongAnomaly),
+                    nameof(BirthDateWrongAnomaly),
+                    nameof(IDNumberWrongAnomaly),
+                    nameof(SexWrongAnomaly),
                     nameof(ExpirationDateAnomaly),
-                    nameof(InvalidEntryReason),
-                    nameof(PhotoIDMismatch)
+                    nameof(InvalidEntryReasonAnomaly),
+                    nameof(PhotoIDMismatchAnomaly)
                 },
                 1,
                 0,
