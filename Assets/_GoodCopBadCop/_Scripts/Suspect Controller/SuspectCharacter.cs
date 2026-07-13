@@ -375,11 +375,37 @@ public class SuspectCharacter : Interactable
              "ScriptedDialogueRunner. Assign a child CinemachineCamera GameObject.")]
     [SerializeField] private GameObject _suspectFaceCam;
 
-    /// <summary>Per-character wide-shot camera, or null to fall back to the shared scene-level suspect cam.</summary>
-    public GameObject SuspectCam => _suspectCam;
+    [Tooltip("Optional wide-shot camera used when the mutated form is active. " +
+             "When assigned and the Mutated Version mesh is visible, this replaces _suspectCam. " +
+             "Leave empty to keep using _suspectCam for both forms. " +
+             "Assign a child CinemachineCamera inside the 'Mutated Version' container.")]
+    [SerializeField] private GameObject _mutantSuspectCam;
 
-    /// <summary>Per-character close face camera. Use camera trigger key 'SuspectFaceCam' in ScriptedDialogueNode.</summary>
-    public GameObject SuspectFaceCam => _suspectFaceCam;
+    [Tooltip("Optional close face camera used when the mutated form is active. " +
+             "When assigned and the Mutated Version mesh is visible, this replaces _suspectFaceCam " +
+             "for the 'SuspectFaceCam' trigger key. Leave empty to fall back to _suspectFaceCam. " +
+             "Assign a child CinemachineCamera inside the 'Mutated Version' container.")]
+    [SerializeField] private GameObject _mutantFaceCam;
+
+    /// <summary>
+    /// Per-character wide-shot camera. Returns the mutant version when the mutated form is active
+    /// and <see cref="_mutantSuspectCam"/> is assigned; otherwise falls back to <see cref="_suspectCam"/>.
+    /// Returns null when neither cam is assigned (SuspectController uses the shared scene-level cam as fallback).
+    /// </summary>
+    public GameObject SuspectCam =>
+        (_mutatedVersion != null && _mutatedVersion.activeSelf && _mutantSuspectCam != null)
+            ? _mutantSuspectCam
+            : _suspectCam;
+
+    /// <summary>
+    /// Per-character close face camera. Returns the mutant version when the mutated form is active
+    /// and <see cref="_mutantFaceCam"/> is assigned; otherwise falls back to <see cref="_suspectFaceCam"/>.
+    /// Use camera trigger key 'SuspectFaceCam' in a ScriptedDialogueNode to cut to this camera.
+    /// </summary>
+    public GameObject SuspectFaceCam =>
+        (_mutatedVersion != null && _mutatedVersion.activeSelf && _mutantFaceCam != null)
+            ? _mutantFaceCam
+            : _suspectFaceCam;
 
 
     // Navigation
