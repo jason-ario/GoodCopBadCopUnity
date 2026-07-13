@@ -661,6 +661,7 @@ public class SuspectCharacter : Interactable
         }
 
         anomalyController.InitializeByInfectionScore(record.infectionScore);
+        MarkSuspectShown(record);
         suspectRecordViewer.SetRecord(record);
 
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
@@ -688,6 +689,7 @@ public class SuspectCharacter : Interactable
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
         if (record != null)
         {
+            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
         }
         else
@@ -713,6 +715,13 @@ public class SuspectCharacter : Interactable
     {
         anomalyController.InitializeWithDocumentationAnomalies(count);
 
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null)
+        {
+            MarkSuspectShown(record);
+            suspectRecordViewer.SetRecord(record);
+        }
+
         SyncAnomalySnapshot();
 
     }
@@ -729,7 +738,10 @@ public class SuspectCharacter : Interactable
 
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
         if (record != null)
+        {
+            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
+        }
         else
             Debug.Log("No record found for " + suspectData.name);
 
@@ -756,7 +768,10 @@ public class SuspectCharacter : Interactable
         int score = record?.infectionScore ?? 0;
         anomalyController.InitializeByInfectionScore(score);
         if (record != null)
+        {
+            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
+        }
         else
             Debug.Log($"[SuspectCharacter] No record found for doppelganger target '{suspectData.name}'.");
 
@@ -782,7 +797,10 @@ public class SuspectCharacter : Interactable
         anomalyController.InitializeClean();
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
         if (record != null)
+        {
+            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
+        }
         else
             Debug.Log("No record found for " + suspectData.name);
 
@@ -808,7 +826,10 @@ public class SuspectCharacter : Interactable
 
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
         if (record != null)
+        {
+            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
+        }
         else
             Debug.Log($"[SuspectCharacter] No record found for replacement '{suspectData.name}'.");
 
@@ -830,6 +851,26 @@ public class SuspectCharacter : Interactable
     {
         if (IsServer) return;
         _isReplacement = isReplacement;
+    }
+
+    private void MarkSuspectShown(SuspectRecord record)
+    {
+        if (record == null)
+            return;
+
+        int currentDay = ShiftManager.Instance != null
+            ? ShiftManager.Instance.CurrentDay
+            : CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+
+        if (currentDay > 0 && record.lastDayShown == currentDay)
+            return;
+
+        record.daysShown++;
+        if (currentDay > 0)
+            record.lastDayShown = currentDay;
+
+        if (SuspectRunRecords.Instance != null && SaveDataManager.Instance != null)
+            SuspectRunRecords.Instance.SaveRecords();
     }
 
     private void SyncAnomalySnapshot()

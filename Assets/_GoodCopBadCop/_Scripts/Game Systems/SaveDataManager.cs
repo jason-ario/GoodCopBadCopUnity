@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using GoodCopBadCop.Population;
 using UnityEngine;
 
 public class SaveDataManager : MonoBehaviour
@@ -203,6 +204,9 @@ public class SaveDataManager : MonoBehaviour
             {
                 SuspectName      = r.SuspectData != null ? r.SuspectData.name : string.Empty,
                 IsKilled         = r.isKilled,
+                HasEnteredCity   = r.hasEnteredCity,
+                PopulationKillPending = r.populationKillPending,
+                PopulationDeathRecorded = r.populationDeathRecorded,
                 KilledOnDay      = r.killedOnDay,
                 IsReplacement    = r.isReplacement,
                 QuarantinedOnDay = r.quarantinedOnDay,
@@ -222,6 +226,24 @@ public class SaveDataManager : MonoBehaviour
     public SuspectSaveEntry[] GetSavedSuspectRecords()
     {
         return ActiveSlot?.SuspectRecords ?? new SuspectSaveEntry[0];
+    }
+
+    // -------------------------------------------------------------------------
+    // Population
+    // -------------------------------------------------------------------------
+
+    public void SavePopulation(PopulationSaveData population)
+    {
+        if (ActiveSlot == null) return;
+
+        ActiveSlot.Population = population ?? new PopulationSaveData();
+        Save();
+        Debug.Log("[SaveDataManager] Population saved.");
+    }
+
+    public PopulationSaveData GetSavedPopulation()
+    {
+        return ActiveSlot?.Population ?? new PopulationSaveData();
     }
 
     // ---------------------------------------------------------------------------
@@ -458,6 +480,15 @@ public class SuspectSaveEntry
     /// <summary>True when this suspect was permanently eliminated and must never reappear.</summary>
     public bool IsKilled;
 
+    /// <summary>True once this suspect was passed through the gate into the city.</summary>
+    public bool HasEnteredCity;
+
+    /// <summary>True when this suspect gets one pending night of background kills.</summary>
+    public bool PopulationKillPending;
+
+    /// <summary>True once this suspect has already reduced contactable population alive count.</summary>
+    public bool PopulationDeathRecorded;
+
     /// <summary>
     /// Campaign day on which this suspect was killed (-1 = never killed).
     /// Used to determine when the replacement version activates (killedOnDay + replacementWindowDays).
@@ -526,6 +557,9 @@ public class SaveSlot
     /// Populated and consumed by <see cref="SuspectRunRecords"/>.
     /// </summary>
     public SuspectSaveEntry[] SuspectRecords = new SuspectSaveEntry[0];
+
+    /// <summary>Aggregate town population state for the active campaign run.</summary>
+    public PopulationSaveData Population = new PopulationSaveData();
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

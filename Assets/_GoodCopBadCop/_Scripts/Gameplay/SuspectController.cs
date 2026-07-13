@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using GoodCopBadCop.Infrastructure;
+using GoodCopBadCop.Population;
 using GoodCopBadCop.SuspectPaperwork;
 using DG.Tweening;
 using Unity.Netcode;
@@ -16,6 +17,7 @@ public class SuspectController : NetworkBehaviour
     public static SuspectController Instance;
 
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
+    [VContainer.Inject] private IPopulationService populationService;
     [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
 
     /// <summary>
@@ -1046,6 +1048,15 @@ public class SuspectController : NetworkBehaviour
             yield break;
 
         ShiftManager.Instance.PassedSuspect(suspectCharacter);
+        SuspectRecord passRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
+        if (passRecord != null)
+        {
+            int activeAnomalyCount = suspectCharacter.AnomalyController != null
+                ? suspectCharacter.AnomalyController.activeAnomalies.Count
+                : 0;
+            populationService?.RecordContactableResidentPassed(passRecord, activeAnomalyCount);
+            SuspectRunRecords.Instance.SaveRecords();
+        }
 
         SuspectCharacter thisCharacter = suspectCharacter;
 
@@ -1314,6 +1325,8 @@ public class SuspectController : NetworkBehaviour
             if (quarantineRecord != null)
             {
                 quarantineRecord.pendingVaccineReset = true;
+                quarantineRecord.hasEnteredCity = false;
+                quarantineRecord.populationKillPending = false;
                 quarantineRecord.quarantinedOnDay = CampaignManager.Instance?.CurrentDay ?? -1;
                 SuspectRunRecords.Instance.SaveRecords();
             }
@@ -1413,9 +1426,14 @@ public class SuspectController : NetworkBehaviour
         SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (killRecord != null)
         {
+            populationService?.RecordContactableResidentKilled(killRecord);
             killRecord.isKilled    = true;
+            killRecord.hasEnteredCity = false;
+            killRecord.populationKillPending = false;
             killRecord.killedOnDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
             SuspectRunRecords.Instance.SaveRecords();
+            if (populationService != null)
+                SaveDataManager.Instance?.SavePopulation(populationService.ToSaveData());
         }
 
         yield return new WaitForSeconds(1f);

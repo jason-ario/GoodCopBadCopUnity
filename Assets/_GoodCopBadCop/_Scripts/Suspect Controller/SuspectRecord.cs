@@ -18,6 +18,14 @@ public class SuspectRecord
     public bool IsFullyMutated => infectionScore >= AnomalyController.FULLY_MUTATED_THRESHOLD;
 
     /// <summary>
+    /// Population deaths use the design-facing mutant threshold, not the full
+    /// transformation threshold. A suspect becomes eligible if they are passed
+    /// while their persisted mutation score is above 80 or they visibly present
+    /// more than 10 active anomalies.
+    /// </summary>
+    public bool IsPopulationMutantByScore => infectionScore > 80;
+
+    /// <summary>
     /// When true, the next AdvanceDayInfection resets infectionScore to the suspect's base level
     /// (applied after a Quarantine verdict). Has no effect if IsFullyMutated is true.
     /// </summary>
@@ -25,6 +33,27 @@ public class SuspectRecord
 
     /// <summary>When true the suspect was killed and will no longer appear in future shifts.</summary>
     public bool isKilled;
+
+    /// <summary>
+    /// True once this suspect has been passed through the gate into the city.
+    /// This is persisted as historical state; population deaths are driven by
+    /// <see cref="populationKillPending"/> so a passed mutant only gets one night.
+    /// </summary>
+    public bool hasEnteredCity;
+
+    /// <summary>
+    /// True when this suspect was passed into the city while qualifying as a
+    /// population-killing mutant. The population simulation consumes this once
+    /// on the next night and then clears it.
+    /// </summary>
+    public bool populationKillPending;
+
+    /// <summary>
+    /// True once this suspect's death has already been counted by the population system.
+    /// Prevents repeated contactable-population death counts if save/load or duplicate
+    /// verdict paths touch the same record again.
+    /// </summary>
+    public bool populationDeathRecorded;
 
     /// <summary>
     /// The 1-based campaign day on which this suspect was killed. -1 means never killed.
@@ -60,8 +89,15 @@ public class SuspectRecord
     public SuspectRecord(SuspectData suspectData)
     {
         SuspectData = suspectData;
-        infectionScore = (int)UnityEngine.Random.Range(
-            SuspectRunRecords.Instance.startingInfectionScore.x,
-            SuspectRunRecords.Instance.startingInfectionScore.y);
+        if (SuspectRunRecords.Instance != null)
+        {
+            infectionScore = (int)UnityEngine.Random.Range(
+                SuspectRunRecords.Instance.startingInfectionScore.x,
+                SuspectRunRecords.Instance.startingInfectionScore.y);
+        }
+        else
+        {
+            infectionScore = suspectData != null ? suspectData.startingInfectionScore : 0;
+        }
     }
 }

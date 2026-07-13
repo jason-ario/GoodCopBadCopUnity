@@ -7,6 +7,7 @@ public class SuspectRunRecords : MonoBehaviour
     public const int QuarantineDurationDays = 2;
 
     private List<SuspectRecord> records = new List<SuspectRecord>();
+    public IReadOnlyList<SuspectRecord> Records => records;
     public SuspectSet allSuspects;
     public Vector2 startingInfectionScore = new Vector2(0, 10);
     public Vector2 inspectionScoreIncreasePerDay = new Vector2(5, 20);
@@ -61,11 +62,14 @@ public class SuspectRunRecords : MonoBehaviour
             if (record.SuspectData == null) continue;
             if (!lookup.TryGetValue(record.SuspectData.name, out SuspectSaveEntry entry)) continue;
 
-            record.isKilled         = entry.IsKilled;
-            record.killedOnDay      = entry.KilledOnDay;
-            record.isReplacement    = entry.IsReplacement;
-            record.quarantinedOnDay = entry.QuarantinedOnDay;
-            record.infectionScore   = entry.InfectionScore;
+            record.isKilled                = entry.IsKilled;
+            record.hasEnteredCity          = entry.HasEnteredCity;
+            record.populationKillPending   = entry.PopulationKillPending;
+            record.populationDeathRecorded = entry.PopulationDeathRecorded;
+            record.killedOnDay             = entry.KilledOnDay;
+            record.isReplacement           = entry.IsReplacement;
+            record.quarantinedOnDay        = entry.QuarantinedOnDay;
+            record.infectionScore          = entry.InfectionScore;
             applied++;
         }
 

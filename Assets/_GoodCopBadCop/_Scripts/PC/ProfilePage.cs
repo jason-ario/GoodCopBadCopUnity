@@ -8,13 +8,13 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] TextMeshProUGUI dateOfBirthText;
     [SerializeField] TextMeshProUGUI genderText;
     [SerializeField] TextMeshProUGUI lastExitText;
-    [SerializeField] TextMeshProUGUI reasonText; 
-    [SerializeField] TextMeshProUGUI idNumberText; 
+    [SerializeField] TextMeshProUGUI reasonText;
+    [SerializeField] TextMeshProUGUI idNumberText;
     [SerializeField] Image profileImage;
 
     [Tooltip("Optional stamp-style text shown over the profile when a suspect is DECEASED or REPLACED.")]
     [SerializeField] TextMeshProUGUI statusStampText;
-    
+
     [SerializeField] private ClickablePCElement nextButton;
     [SerializeField] private ClickablePCElement prevButton;
 
@@ -31,14 +31,21 @@ public class ProfilePage : MonoBehaviour
         dateOfBirthText.text =  "DoB: " + suspectData.DateOfBirth;
         genderText.text = "Sex: " + suspectData.Sex;
         lastExitText.text = "Last Exit: " + lastExitDate;
-        reasonText.text = "Reason: " + lastExitReason;
+        if (reasonText != null)
+        {
+            bool hasReason = !string.IsNullOrWhiteSpace(lastExitReason);
+            reasonText.gameObject.SetActive(hasReason);
+            if (hasReason)
+                reasonText.text = "Reason: " + lastExitReason;
+        }
         idNumberText.text = "ID:" + suspectData.IDNumber;
-        
+
         Sprite sprite = Sprite.Create(suspectData.IDPhoto,
             new Rect(0, 0, suspectData.IDPhoto.width, suspectData.IDPhoto.height),
             new Vector2(0.5f, 0.5f));
-        
+
         profileImage.sprite = sprite;
+        profileImage.enabled = true;
 
         // Status stamp (DECEASED / REPLACED)
         if (statusStampText != null)
@@ -47,7 +54,37 @@ public class ProfilePage : MonoBehaviour
             statusStampText.gameObject.SetActive(!string.IsNullOrEmpty(status));
         }
     }
-    
+
+    public void SetNewsData(TerminalNewsEntry newsEntry)
+    {
+        NewspaperContentScriptable content = newsEntry?.Content;
+
+        nameText.text = content != null ? content.headerText : "NEWS ENTRY UNAVAILABLE";
+        dateOfBirthText.text = newsEntry != null ? "Date: " + newsEntry.Date : "Date: unknown";
+        genderText.text = content != null ? content.subheaderText : string.Empty;
+        lastExitText.text = string.Empty;
+        if (reasonText != null)
+        {
+            reasonText.gameObject.SetActive(true);
+            reasonText.text = content != null ? content.descriptionText : string.Empty;
+        }
+        idNumberText.text = content != null ? content.footerText : string.Empty;
+
+        if (profileImage != null)
+        {
+            profileImage.sprite = null;
+            profileImage.enabled = false;
+        }
+
+        if (statusStampText != null)
+        {
+            statusStampText.text = string.Empty;
+            statusStampText.gameObject.SetActive(false);
+        }
+
+        SetNavigationState(false, false);
+    }
+
     public void SetNavigationState(bool canGoPrev, bool canGoNext)
     {
         SetButtonState(prevButton, canGoPrev);

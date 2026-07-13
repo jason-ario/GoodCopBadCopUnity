@@ -199,6 +199,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4680321856157407927}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7314068954240135171}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5649306799028136248}
   m_SourcePrefab: {fileID: 100100000, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
 --- !u!1 &5819269505631014830 stripped
 GameObject:
@@ -245,8 +251,59 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   meshRenderers: []
   itemData: {fileID: 11400000, guid: 5fe8564a7140fb34eb4f9164b78b0c42, type: 2}
+  readingText: {fileID: 0}
+  maxDistance: 3
+  idleHeartRateBpm: 0
+  rampSpeed: 180
+  falloffSpeed: 240
+  rereadInterval: 0.08
+  readingJitter: 2
+  screenRenderer: {fileID: 728046709383064979}
+  highColor: {r: 1, g: 0, b: 0, a: 1}
+  normalColor: {r: 0, g: 1, b: 0, a: 1}
+  idleColor: {r: 0, g: 0, b: 0, a: 1}
+  screenAnimationSpeed: 0.35
+  highHeartRateThreshold: 110
+  validHeartRateThreshold: 30
   pickupSound: {fileID: 0}
   putDownSound: {fileID: 0}
+--- !u!114 &7314068954240135171
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5819269505631014830}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ede24a4b8327d194488cb283b5c2579a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
+  ShowTopMostFoldoutHeaderGroup: 1
+  maxBatteryCapacity: 1
+  batteryDrainRate: 0.01
+--- !u!1773428102 &5649306799028136248
+ParentConstraint:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5819269505631014830}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Weight: 1
+  m_TranslationAtRest: {x: 0, y: 0, z: 0}
+  m_RotationAtRest: {x: 0, y: 0, z: 0}
+  m_TranslationOffsets: []
+  m_RotationOffsets: []
+  m_AffectTranslationX: 1
+  m_AffectTranslationY: 1
+  m_AffectTranslationZ: 1
+  m_AffectRotationX: 1
+  m_AffectRotationY: 1
+  m_AffectRotationZ: 1
+  m_Active: 0
+  m_IsLocked: 0
 --- !u!65 &6988650317516088836
 BoxCollider:
   m_ObjectHideFlags: 0

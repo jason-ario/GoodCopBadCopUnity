@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class Scanner : PickableObject
+[RequireComponent(typeof(InternalBattery))]
+public class Scanner : HeartRateScanner
 {
-    
 }

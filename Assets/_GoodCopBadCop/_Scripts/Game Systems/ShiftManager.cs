@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
+using GoodCopBadCop.Population;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -12,6 +13,8 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>Fired on the server whenever a suspect is killed.</summary>
     public static event System.Action OnSuspectKilled;
+
+    [VContainer.Inject] private IPopulationService populationService;
 
     [Header("Network Variables")]
     public NetworkVariable<bool> shiftStarted = new NetworkVariable<bool>(false);
@@ -60,6 +63,7 @@ public class ShiftManager : NetworkBehaviour
     [SerializeField] private int penaltyPerWrongKill = 20;
 
     private int _taskCompletedCount = 0;
+    private bool _campaignAdvancedForCurrentReport;
 
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
@@ -441,7 +445,7 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public List<EndOfShiftReportUI.ReportRowData> BuildEndOfShiftReport()
     {
-        return new List<EndOfShiftReportUI.ReportRowData>
+        var reportData = new List<EndOfShiftReportUI.ReportRowData>
         {
             new EndOfShiftReportUI.ReportRowData(
                 $"Citizens Processed: {suspectsProcessed}", 0, false, isHeader: true),
@@ -465,6 +469,12 @@ public class ShiftManager : NetworkBehaviour
                 $"Wrongly Eliminated: {suspectsKilledWrong}",
                 suspectsKilledWrong * penaltyPerWrongKill, isPenalty: true),
         };
+
+        AppendPopulationRows(reportData,
+            populationService != null ? populationService.Model.PopulationAlive.CurrentValue : -1,
+            populationService != null ? populationService.Model.DeadOvernight.CurrentValue : -1);
+
+        return reportData;
     }
 
     /// <summary>
@@ -539,19 +549,27 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>
     /// Called by any client when a player confirms going to bed.
     /// Broadcasts the end-of-shift report to all clients so both players see it simultaneously.
-    /// The six tracked counters are passed as ints (NGO-serializable); each client rebuilds
-    /// the report rows using its own reward config, which is identical on all clients.
+    /// The tracked counters are passed as ints (NGO-serializable); each client rebuilds
+    /// the report rows using its own reward config and server-authored population values.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void TriggerEndOfShiftReportServerRpc()
     {
+        if (!_campaignAdvancedForCurrentReport && CampaignManager.Instance != null)
+        {
+            CampaignManager.Instance.AdvanceDay();
+            _campaignAdvancedForCurrentReport = true;
+        }
+
         ShowEndOfShiftReportClientRpc(
             suspectsProcessed,
             suspectsPassedCorrect,
             suspectsPassedWrong,
             suspectsQuarantined,
             suspectsKilledCorrect,
-            suspectsKilledWrong);
+            suspectsKilledWrong,
+            populationService != null ? populationService.Model.PopulationAlive.CurrentValue : -1,
+            populationService != null ? populationService.Model.DeadOvernight.CurrentValue : -1);
     }
 
     /// <summary>
@@ -560,7 +578,8 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void ShowEndOfShiftReportClientRpc(
         int processed, int passedCorrect, int passedWrong,
-        int quarantined, int killedCorrect, int killedWrong)
+        int quarantined, int killedCorrect, int killedWrong,
+        int populationAlive, int deadOvernight)
     {
         var reportData = new List<EndOfShiftReportUI.ReportRowData>
         {
@@ -587,7 +606,24 @@ public class ShiftManager : NetworkBehaviour
                 killedWrong * penaltyPerWrongKill, isPenalty: true),
         };
 
+        AppendPopulationRows(reportData, populationAlive, deadOvernight);
+
         UIController.Instance.ShowEndShiftReport(reportData);
+    }
+
+    private static void AppendPopulationRows(
+        List<EndOfShiftReportUI.ReportRowData> reportData,
+        int populationAlive,
+        int deadOvernight)
+    {
+        if (reportData == null || populationAlive < 0)
+            return;
+
+        reportData.Add(new EndOfShiftReportUI.ReportRowData(
+            $"Population Alive: {populationAlive}", 0, false, isHeader: true));
+
+        reportData.Add(new EndOfShiftReportUI.ReportRowData(
+            $"Dead Overnight: {Mathf.Max(0, deadOvernight)}", 0));
     }
 
     private IEnumerator InBetweenShiftSequence()
@@ -615,11 +651,16 @@ public class ShiftManager : NetworkBehaviour
         SuspectController.Instance.ResetSuspects();
 
         // Advance the campaign day — server-only; propagates to all clients via NetworkVariable.
-        // CampaignManager.AdvanceDay() calls ApplyDay() → SetCurrentDay() which is the single
-        // authoritative path for updating ShiftManager._currentDay. CompletedShift() is not
-        // called here to avoid double-incrementing when state is already at the correct day.
+        // Usually this already happened before the report was shown so "Dead Overnight" can
+        // include the just-simulated population losses. Keep the fallback for older/debug paths
+        // that enter this transition without first broadcasting the report.
         if (IsServer)
-            CampaignManager.Instance.AdvanceDay();
+        {
+            if (_campaignAdvancedForCurrentReport)
+                _campaignAdvancedForCurrentReport = false;
+            else
+                CampaignManager.Instance.AdvanceDay();
+        }
 
         // Teleport the local player to their outside-bunker spawn while the screen is dark.
         if (PlayerInstance.Instance != null)

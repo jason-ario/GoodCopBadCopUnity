@@ -5,6 +5,7 @@ using GoodCopBadCop.EnvironmentSystem;
 using GoodCopBadCop.Effects;
 using GoodCopBadCop.Audio;
 using GoodCopBadCop.Player;
+using GoodCopBadCop.Population;
 using GoodCopBadCop.RoomSystem;
 using GoodCopBadCop.Settings;
 using GoodCopBadCop.SuspectPaperwork;
@@ -20,12 +21,18 @@ namespace GoodCopBadCop.Infrastructure
     {
         [SerializeField] private EnvironmentSchedule environmentSchedule;
         [SerializeField] private EffectCatalog effectCatalog;
+        [SerializeField] private PopulationConfig populationConfig;
 
         protected override void Configure(IContainerBuilder builder)
         {
             if (effectCatalog == null)
             {
                 throw new InvalidOperationException("Effect catalog is not assigned in MainSceneLifetimeScope.");
+            }
+
+            if (populationConfig == null)
+            {
+                throw new InvalidOperationException("Population config is not assigned in MainSceneLifetimeScope.");
             }
 
             builder.Register<SettingsModel>(Lifetime.Scoped).AsSelf().As<ISettingsModel>();
@@ -38,6 +45,9 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<IRoomService, RoomService>(Lifetime.Scoped);
             builder.Register<SuspectPaperworkModel>(Lifetime.Scoped).AsSelf().As<ISuspectPaperworkModel>();
             builder.Register<ISuspectPaperworkService, SuspectPaperworkService>(Lifetime.Scoped);
+            builder.RegisterInstance(populationConfig);
+            builder.Register<PopulationModel>(Lifetime.Scoped).AsSelf().As<IPopulationModel>();
+            builder.Register<IPopulationService, PopulationService>(Lifetime.Scoped);
             builder.RegisterInstance(effectCatalog).As<IEffectCatalog>();
             builder.Register<IFullscreenEffectService, FullscreenEffectService>(Lifetime.Scoped);
             builder.Register<IEffectService, EffectService>(Lifetime.Scoped);
@@ -50,6 +60,8 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<IPlayerRuntimeService, PlayerRuntimeService>(Lifetime.Scoped);
             builder.RegisterEntryPoint<PlayerRuntimeAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<PlayerControlsSettingsAdapter>(Lifetime.Scoped);
+            builder.RegisterComponentInHierarchy<global::CampaignManager>();
+            builder.RegisterComponentInHierarchy<global::ShiftManager>();
 
             builder.Register<VoiceChatModel>(Lifetime.Scoped).AsSelf().As<IVoiceChatModel>();
             builder.RegisterEntryPoint<VoiceChatCommsRuntime>(Lifetime.Scoped);
