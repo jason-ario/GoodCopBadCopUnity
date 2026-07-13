@@ -9,10 +9,19 @@ public class TerminalRecordListUI : MonoBehaviour
 
     private readonly List<TerminalListItem> _spawnedItems = new();
 
-    public void ShowRecords(List<SuspectData> suspectDatas)
+    public void ShowRecords(List<SuspectData> suspectDatas, string summary = "")
     {
-        Clear(); 
-        Debug.Log("Showing records");
+        Clear();
+
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            TerminalListItem summaryItem = Instantiate(listItemPrefab, listContainer);
+            summaryItem.SetupSummary(summary);
+            _spawnedItems.Add(summaryItem);
+        }
+
+        if (suspectDatas == null)
+            return;
 
         for (int i = 0; i < suspectDatas.Count; i++)
         {

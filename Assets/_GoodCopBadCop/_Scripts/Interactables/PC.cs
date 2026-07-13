@@ -4,10 +4,33 @@ using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
 using GoodCopBadCop.SuspectPaperwork;
+using TMPro;
 using UnityEngine;
 
 public class PC : Interactable
 {
+    private enum TerminalSection
+    {
+        All,
+        Residents,
+        Visitors,
+        Deceased,
+        Quarantine,
+        News
+    }
+
+    private enum MainMenuMode
+    {
+        Root,
+        Registry
+    }
+
+    private const int MainMenuPopulation = 300;
+    private const string MainMenuVillageName = "Saplavi";
+    private const string MainMenuPopulationObjectName = "Main Menu Population";
+    private static readonly Vector2 MainMenuTitlePosition = new Vector2(-0.056f, 1.168f);
+    private static readonly Vector2 MainMenuPopulationPosition = new Vector2(0f, -0.85f);
+
     [Header("Data")]
     [SerializeField] private SuspectSet _suspectSet;
 
@@ -40,6 +63,10 @@ public class PC : Interactable
     private List<SuspectData> _currentBaseList;
     private List<SuspectData> _currentVisibleList;
     private bool _showQuarantineDays;
+    private TerminalSection _currentSection = TerminalSection.All;
+    private int _debugCurrentDayOverride = -1;
+    private TextMeshProUGUI _mainMenuPopulationLabel;
+    private MainMenuMode _mainMenuMode = MainMenuMode.Root;
 
     private void Start()
     {
@@ -90,15 +117,20 @@ public class PC : Interactable
     private void ExitPC()
     {
         pcActive = false;
-        UIController.Instance.HideBackButton();
-        
-        _player.SetCanInteract(true, "");
+
+        if (UIController.Instance != null)
+            UIController.Instance.HideBackButton();
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
 
-        _virtualCanvasCursor.enabled = false;
-        
+        if (_virtualCanvasCursor != null)
+            _virtualCanvasCursor.enabled = false;
+
+        if (_player == null)
+            return;
+
+        _player.SetCanInteract(true, "");
         _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
     }
 
@@ -109,15 +141,46 @@ public class PC : Interactable
         suspectListScreen.SetActive(screen == suspectListScreen);
         mainScreen.SetActive(screen == mainScreen);
 
-        mouseCursor.SetScreenContent();
+        if (screen == mainScreen)
+            RefreshMainMenu();
+
+        RefreshMouseNow();
         StartCoroutine(WaitAndRefreshMouse());
+    }
+
+    public void DebugSetCurrentDay(int currentDay)
+    {
+        _debugCurrentDayOverride = currentDay;
+    }
+
+    public void DebugOpenTerminal()
+    {
+        _mainMenuMode = MainMenuMode.Root;
+        pcActive = true;
+        isOn = true;
+
+        if (_virtualCanvasCursor != null)
+            _virtualCanvasCursor.enabled = true;
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Confined;
+
+        OpenScreen(mainScreen);
+        RefreshMouseNow();
+        ClearCurrentProfileSelection();
     }
 
     private IEnumerator WaitAndRefreshMouse()
     {
         yield return new WaitForEndOfFrame();
         yield return new WaitForEndOfFrame();
-        mouseCursor.SetScreenContent();
+        RefreshMouseNow();
+    }
+
+    private void RefreshMouseNow()
+    {
+        if (mouseCursor != null)
+            mouseCursor.SetScreenContent();
     }
 
     public void CloseAllScreens()
@@ -269,8 +332,15 @@ public class PC : Interactable
     // CATEGORY / FOLDER BUTTONS
     // --------------------------------------------------
 
+    public void OpenRegistry()
+    {
+        _mainMenuMode = MainMenuMode.Registry;
+        OpenScreen(mainScreen);
+    }
+
     public void OpenResidents()
     {
+        _currentSection = TerminalSection.Residents;
         _showQuarantineDays = false;
         _currentBaseList = SortSuspects(_suspectSet.suspects
             .Where(s => s != null && s.IsResident));
@@ -286,6 +356,7 @@ public class PC : Interactable
 
     public void OpenVisitors()
     {
+        _currentSection = TerminalSection.Visitors;
         _showQuarantineDays = false;
         _currentBaseList = SortSuspects(_suspectSet.suspects
             .Where(s => s != null && !s.IsResident));
@@ -299,8 +370,22 @@ public class PC : Interactable
         SelectFolderTab(0);
     }
 
+    public void OpenNews()
+    {
+        _currentSection = TerminalSection.News;
+        _showQuarantineDays = false;
+        _currentBaseList = new List<SuspectData>();
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
+        ClearCurrentProfileSelection();
+
+        OpenScreen(suspectListScreen);
+        RenderCurrentList();
+        SelectFolderTab(0);
+    }
+
     public void OpenDeceased()
     {
+        _currentSection = TerminalSection.Deceased;
         _showQuarantineDays = false;
         _currentBaseList = SortSuspects(_suspectSet.suspects
             .Where(s =>
@@ -321,6 +406,7 @@ public class PC : Interactable
 
     public void OpenQuarantine()
     {
+        _currentSection = TerminalSection.Quarantine;
         _showQuarantineDays = true;
         int currentDay = GetCurrentDay();
 
@@ -342,6 +428,7 @@ public class PC : Interactable
 
     public void OpenAll()
     {
+        _currentSection = TerminalSection.All;
         _showQuarantineDays = false;
         _currentBaseList = SortSuspects(_suspectSet.suspects
             .Where(s => s != null));
@@ -445,7 +532,9 @@ public class PC : Interactable
     }
 
     private int GetCurrentDay()
-        => CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+        => _debugCurrentDayOverride >= 0
+            ? _debugCurrentDayOverride
+            : CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
 
     private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
     {
@@ -542,7 +631,216 @@ public class PC : Interactable
 
     private void RenderCurrentList()
     {
-        terminalRecordListUI.ShowRecords(_currentVisibleList);
+        terminalRecordListUI.ShowRecords(_currentVisibleList, GetSectionSummary());
+        RefreshMouseNow();
         StartCoroutine(WaitAndRefreshMouse());
+    }
+
+    private string GetSectionSummary()
+    {
+        switch (_currentSection)
+        {
+            case TerminalSection.Quarantine:
+                int currentDay = GetCurrentDay();
+                int activeQuarantine = SuspectRunRecords.Instance != null
+                    ? SuspectRunRecords.Instance.GetActiveQuarantineCount(currentDay)
+                    : 0;
+                int remainingSlots = Mathf.Max(0, SuspectRunRecords.QuarantineSlotLimit - activeQuarantine);
+                return $"QUARANTINE: {activeQuarantine}/{SuspectRunRecords.QuarantineSlotLimit} USED, {remainingSlots} OPEN";
+
+            case TerminalSection.Deceased:
+                return $"DECEASED: {GetDeceasedCount()}";
+
+            case TerminalSection.Residents:
+                return $"RESIDENTS: {_currentBaseList?.Count ?? 0}";
+
+            case TerminalSection.Visitors:
+                return $"VISITORS: {_currentBaseList?.Count ?? 0}";
+
+            case TerminalSection.News:
+                return "NEWS";
+
+            default:
+                return $"RECORDS: {_currentBaseList?.Count ?? 0}";
+        }
+    }
+
+    private int GetDeceasedCount()
+    {
+        if (_suspectSet == null || _suspectSet.suspects == null)
+            return 0;
+
+        return _suspectSet.suspects.Count(suspect =>
+            HasTerminalName(suspect)
+            && SuspectRunRecords.Instance?.GetRecord(suspect)?.isKilled == true);
+    }
+
+    private void RefreshMainMenu()
+    {
+        if (mainScreen == null)
+            return;
+
+        TextMeshProUGUI[] labels = mainScreen.GetComponentsInChildren<TextMeshProUGUI>(true);
+        foreach (TextMeshProUGUI label in labels)
+        {
+            if (label == null)
+                continue;
+
+            string labelText = label.text?.Trim();
+            if (string.IsNullOrEmpty(labelText))
+                continue;
+
+            if (IsMainMenuTitle(label, labelText))
+            {
+                label.text = _mainMenuMode == MainMenuMode.Registry ? "Registry" : MainMenuVillageName;
+                label.rectTransform.anchoredPosition = MainMenuTitlePosition;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = Mathf.Min(label.fontSizeMin, 14f);
+                label.fontSizeMax = Mathf.Max(label.fontSizeMax, label.fontSize);
+                EnsureMainMenuPopulationLabel(label);
+                continue;
+            }
+
+            RefreshMainMenuItem(label, labelText);
+        }
+
+        if (_mainMenuPopulationLabel != null)
+            _mainMenuPopulationLabel.gameObject.SetActive(_mainMenuMode == MainMenuMode.Root);
+    }
+
+    private bool IsMainMenuTitle(TextMeshProUGUI label, string labelText)
+    {
+        if (label.transform.parent != mainScreen.transform)
+            return false;
+
+        return labelText == "Archive Index"
+               || labelText == "Saplavi"
+               || labelText == "Registry"
+               || labelText.StartsWith(MainMenuVillageName, StringComparison.Ordinal);
+    }
+
+    private void RefreshMainMenuItem(TextMeshProUGUI label, string labelText)
+    {
+        if (_mainMenuMode == MainMenuMode.Registry)
+        {
+            RefreshRegistryMenuItem(label, labelText);
+            return;
+        }
+
+        RefreshRootMenuItem(label, labelText);
+    }
+
+    private void RefreshRootMenuItem(TextMeshProUGUI label, string labelText)
+    {
+        if (labelText == "Residents" || labelText == "Registry")
+        {
+            ConfigureMainMenuButton(label, "Registry", true, OpenRegistry);
+            return;
+        }
+
+        if (labelText == "Visitors" || labelText == "News")
+        {
+            ConfigureMainMenuButton(label, "News", true, OpenNews);
+            return;
+        }
+
+        if (labelText == "Show All" || labelText == "All" || labelText == "Deceased" || labelText == "Quarantine")
+            ConfigureMainMenuButton(label, labelText, false, null);
+    }
+
+    private void RefreshRegistryMenuItem(TextMeshProUGUI label, string labelText)
+    {
+        if (labelText == "Show All" || labelText == "All")
+        {
+            ConfigureMainMenuButton(label, "All", true, OpenAll);
+            return;
+        }
+
+        if (labelText == "Residents" || labelText == "Registry")
+        {
+            ConfigureMainMenuButton(label, "Residents", true, OpenResidents);
+            return;
+        }
+
+        if (labelText == "Visitors" || labelText == "News")
+        {
+            ConfigureMainMenuButton(label, "Visitors", true, OpenVisitors);
+            return;
+        }
+
+        if (labelText == "Quarantine")
+        {
+            ConfigureMainMenuButton(label, "Quarantine", true, OpenQuarantine);
+            return;
+        }
+
+        if (labelText == "Deceased")
+            ConfigureMainMenuButton(label, "Deceased", true, OpenDeceased);
+    }
+
+    private static void ConfigureMainMenuButton(TextMeshProUGUI label, string text, bool active, UnityEngine.Events.UnityAction onClick)
+    {
+        label.text = text;
+
+        ClickablePCElement button = label.GetComponentInParent<ClickablePCElement>(true);
+        if (button == null)
+            return;
+
+        button.gameObject.SetActive(active);
+        button.onClickEvent = new UnityEngine.Events.UnityEvent();
+
+        if (onClick != null)
+            button.onClickEvent.AddListener(onClick);
+    }
+    private void EnsureMainMenuPopulationLabel(TextMeshProUGUI titleLabel)
+    {
+        if (titleLabel == null)
+            return;
+
+        if (_mainMenuPopulationLabel == null)
+        {
+            Transform existing = titleLabel.transform.parent != null
+                ? titleLabel.transform.parent.Find(MainMenuPopulationObjectName)
+                : null;
+
+            if (existing != null)
+            {
+                _mainMenuPopulationLabel = existing.GetComponent<TextMeshProUGUI>();
+            }
+            else
+            {
+                GameObject labelObject = new GameObject(MainMenuPopulationObjectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                labelObject.transform.SetParent(titleLabel.transform.parent, false);
+                _mainMenuPopulationLabel = labelObject.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        RectTransform titleRect = titleLabel.rectTransform;
+        RectTransform populationRect = _mainMenuPopulationLabel.rectTransform;
+        populationRect.anchorMin = new Vector2(0.5f, 0.5f);
+        populationRect.anchorMax = new Vector2(0.5f, 0.5f);
+        populationRect.pivot = new Vector2(0.5f, 0.5f);
+        populationRect.localRotation = titleRect.localRotation;
+        populationRect.localScale = titleRect.localScale;
+        populationRect.anchoredPosition = MainMenuPopulationPosition;
+        populationRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, titleRect.sizeDelta.y);
+
+        _mainMenuPopulationLabel.text = $"Population: {MainMenuPopulation}";
+        _mainMenuPopulationLabel.font = titleLabel.font;
+        _mainMenuPopulationLabel.fontSharedMaterial = titleLabel.fontSharedMaterial;
+        _mainMenuPopulationLabel.color = titleLabel.color;
+        _mainMenuPopulationLabel.alignment = TextAlignmentOptions.Center;
+        _mainMenuPopulationLabel.enableAutoSizing = true;
+        _mainMenuPopulationLabel.fontSizeMin = Mathf.Min(titleLabel.fontSizeMin, 12f);
+        _mainMenuPopulationLabel.fontSizeMax = Mathf.Max(titleLabel.fontSize, 22f);
+        _mainMenuPopulationLabel.raycastTarget = false;
+        _mainMenuPopulationLabel.gameObject.SetActive(true);
+    }
+
+    private static void SetMainMenuItemActive(TextMeshProUGUI label, bool active)
+    {
+        ClickablePCElement button = label.GetComponentInParent<ClickablePCElement>(true);
+        if (button != null)
+            button.gameObject.SetActive(active);
     }
 }
