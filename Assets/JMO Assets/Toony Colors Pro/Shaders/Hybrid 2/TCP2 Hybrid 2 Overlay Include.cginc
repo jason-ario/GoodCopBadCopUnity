@@ -437,7 +437,11 @@ half CalculateSpecular(half3 lightDir, half3 viewDir, float3 normal, half specul
 		spec *= surfaceReduction;
 	#endif
 
-	return max(0, spec);
+	// Clamp to [0,1]: the GGX NDF is not bounded and can return values >> 1 at low
+	// roughness (e.g. roughness=0.1, NdotH=1 → spec≈5). That pushes emission far above
+	// the bloom threshold and causes very bright flickering bloom as the highlight moves.
+	// Absolute brightness is controlled by the HDR-capable _SpecularColor property.
+	return saturate(spec);
 }
 
 #if defined(_DBUFFER)

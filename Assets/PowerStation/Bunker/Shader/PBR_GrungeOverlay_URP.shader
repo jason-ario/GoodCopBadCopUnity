@@ -46,6 +46,9 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
 
+            ZWrite On
+            ZTest LEqual
+
             HLSLPROGRAM
             #pragma vertex LitPassVertex
             #pragma fragment LitPassFragment
@@ -57,11 +60,15 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile _ _SCREEN_SPACE_OCCLUSION
             
             // Baked GI Pragmas
             #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile _ DYNAMICLIGHTMAP_ON
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+
+            // Fog
+            #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -86,7 +93,8 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
                 float2 uv0          : TEXCOORD4;
                 float2 uv2          : TEXCOORD5;
                 float2 lightmapUV   : TEXCOORD6; 
-                half3 vertexSH      : TEXCOORD7; 
+                half3 vertexSH      : TEXCOORD7;
+                half  fogFactor     : TEXCOORD8;
             };
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
@@ -134,6 +142,8 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
                     output.vertexSH = SampleSHVertex(normalInput.normalWS);
                 #endif
 
+                output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+
                 return output;
             }
 
@@ -170,6 +180,7 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
                 inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                inputData.fogCoord = input.fogFactor;
                 
                 #if defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_SURFACE_TYPE_TRANSPARENT)
                     inputData.shadowCoord = ComputeScreenPos(input.positionCS);
@@ -243,6 +254,76 @@ Shader "Custom/URP/PBR_GrungeOverlay_GI_Fixed"
             half4 DepthOnlyFragment(Varyings input) : SV_Target { return 0; }
             ENDHLSL
         }
+        Pass
+        {
+            Name "DepthNormals"
+            Tags { "LightMode" = "DepthNormals" }
+            ZWrite On
+            ZTest LEqual
+
+            HLSLPROGRAM
+            #pragma vertex DepthNormalsVertex
+            #pragma fragment DepthNormalsFragment
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+                float4 tangentOS  : TANGENT;
+                float2 uv0        : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS  : SV_POSITION;
+                float3 normalWS    : TEXCOORD0;
+                float3 tangentWS   : TEXCOORD1;
+                float3 bitangentWS : TEXCOORD2;
+                float2 uv0         : TEXCOORD3;
+            };
+
+            TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4 _BaseColor;
+                half _NormalScale;
+                half _Roughness;
+                half _Metallic;
+                float4 _GrungeTiling;
+                float4 _GrungeOffset;
+                half _GrungeOpacity;
+                half _GrungeContrastLow;
+                half _GrungeContrastHigh;
+                half _GrungeRoughnessMod;
+            CBUFFER_END
+
+            Varyings DepthNormalsVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+                output.positionCS  = vertexInput.positionCS;
+                output.normalWS    = normalInput.normalWS;
+                output.tangentWS   = normalInput.tangentWS;
+                output.bitangentWS = normalInput.bitangentWS;
+                output.uv0 = TRANSFORM_TEX(input.uv0, _BaseMap);
+                return output;
+            }
+
+            float4 DepthNormalsFragment(Varyings input) : SV_Target
+            {
+                half4 normalSample = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, input.uv0);
+                half3 normalTS = UnpackNormalScale(normalSample, _NormalScale);
+                half3 normalWS = TransformTangentToWorld(normalTS, half3x3(input.tangentWS, input.bitangentWS, input.normalWS));
+                normalWS = NormalizeNormalPerPixel(normalWS);
+                return float4(normalWS * 0.5 + 0.5, 0.0);
+            }
+            ENDHLSL
+        }
+
     }
     FallBack "Universal Render Pipeline/Lit"
 }

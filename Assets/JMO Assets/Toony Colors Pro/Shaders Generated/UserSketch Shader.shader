@@ -442,7 +442,9 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// PS1-style vertex snapping
 				clipPos.xy = floor(clipPos.xy / clipPos.w * _SnapResolution + 0.5) / _SnapResolution * clipPos.w;
 
-				float4 screenPos = ComputeScreenPos(clipPos);
+				// Use pre-snap clip position for screen UV so the sketch texture
+				// doesn't jitter in sync with the vertex snap, which causes bloom flicker.
+				float4 screenPos = ComputeScreenPos(vertexInput.positionCS);
 				output.screenPosition.xyzw = screenPos;
 
 				VertexNormalInputs vertexNormalInput = GetVertexNormalInputs(input.normal, input.tangent);
@@ -501,7 +503,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				float __rampThreshold = ( _RampThreshold );
 				float __rampSmoothing = ( _RampSmoothing );
 				float3 __sketchColor = ( float3(0,0,0) );
-				float3 __sketchTexture = ( TCP2_TEX2D_SAMPLE(_SketchTexture, _SketchTexture, screenUV * _ScreenParams.zw * _SketchTexture_ST.xy + _SketchTexture_ST.zw + hash22(floor(_Time.xx * _SketchTexture_OffsetSpeed.xx) / _SketchTexture_OffsetSpeed.xx)).aaa );
+				// Guard against _SketchTexture_OffsetSpeed == 0: dividing by zero produces NaN which
+				// propagates through hash22 into the UV and corrupts color.rgb, causing bloom whiteout.
+				float _SketchOffsetSpeedSafe = max(_SketchTexture_OffsetSpeed, 0.001);
+				float3 __sketchTexture = ( TCP2_TEX2D_SAMPLE(_SketchTexture, _SketchTexture, screenUV * _ScreenParams.zw * _SketchTexture_ST.xy + _SketchTexture_ST.zw + hash22(floor(_Time.xx * _SketchOffsetSpeedSafe) / _SketchOffsetSpeedSafe)).aaa );
 				float __sketchThresholdScale = ( 1.0 );
 				float3 __shadowColor = ( _SColor.rgb );
 				float3 __highlightColor = ( _HColor.rgb );
@@ -596,7 +601,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 				half3 color = half3(0,0,0);
 				half3 accumulatedRamp = ramp * max(lightColor.r, max(lightColor.g, lightColor.b));
-				half3 accumulatedColors = ramp * lightColor.rgb;
+				// float3 instead of half3: multiple bright point lights can push the accumulated
+				// sum past the half-precision limit (~65504) producing +Inf, which turns into
+				// extreme bloom whiteout via  albedo * accumulatedColors * highlightColor.
+				float3 accumulatedColors = ramp * lightColor.rgb;
 
 				// Additional lights loop
 			#ifdef _ADDITIONAL_LIGHTS
@@ -728,6 +736,10 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				color = MixFog(color, fogFactor);
 
 				// Injection Point: 'Main Pass/Fragment Shader/End'
+
+				// Clamp out any NaN or +Inf that could have entered through the lighting
+				// or sketch calculations before it reaches the bloom pass.
+				color = clamp(color, half3(0, 0, 0), half3(65000, 65000, 65000));
 
 				return half4(color, alpha);
 			}
