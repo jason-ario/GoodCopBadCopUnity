@@ -59,6 +59,18 @@ public class ClickablePCScrollbar : ClickablePCElement
         scrollbar.value = Mathf.Clamp01(scrollbar.value + normalizedDelta);
     }
 
+    public void ScrollFromWheel(float wheelDelta)
+    {
+        if (scrollbar == null || Mathf.Approximately(wheelDelta, 0f))
+            return;
+
+        float normalizedDelta = wheelDelta * 0.08f;
+        if (invert)
+            normalizedDelta = -normalizedDelta;
+
+        scrollbar.value = Mathf.Clamp01(scrollbar.value + normalizedDelta);
+    }
+
     public void ResetToTop()
     {
         if (scrollbar == null)

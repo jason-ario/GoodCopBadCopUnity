@@ -8,6 +8,8 @@ public class TerminalListItem : MonoBehaviour
     private static readonly Vector2 ProfileImageSize = new Vector2(0.24f, 0.24f);
     private static readonly Vector2 RecordTextPosition = new Vector2(0.42f, 0f);
     private const float RecordTextWidth = 250f;
+    private static readonly Vector2 NewsTextPosition = new Vector2(0.42f, 0f);
+    private const float NewsTextWidth = 320f;
 
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private Image profileImage;
@@ -178,8 +180,8 @@ public class TerminalListItem : MonoBehaviour
         textRect.anchorMin = new Vector2(0f, 0.5f);
         textRect.anchorMax = new Vector2(0f, 0.5f);
         textRect.pivot = new Vector2(0f, 0.5f);
-        textRect.anchoredPosition = new Vector2(0.12f, 0f);
-        textRect.sizeDelta = new Vector2(360f, textRect.sizeDelta.y);
+        textRect.anchoredPosition = NewsTextPosition;
+        textRect.sizeDelta = new Vector2(NewsTextWidth, textRect.sizeDelta.y);
     }
 
     private void ClearProfileImage()

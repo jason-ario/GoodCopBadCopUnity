@@ -27,7 +27,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
     private ClickablePCElement[] clickableElements = Array.Empty<ClickablePCElement>();
     private readonly Vector3[] cornersBuffer = new Vector3[4];
-    
+
     public Vector2 LastMouseDelta => lastMouseDelta;
 
     private void Awake()
@@ -47,6 +47,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
     {
         MoveCursor();
         UpdateHoveredElement();
+        HandleScrollWheel();
         HandleClickDown();
         HandleDragging();
         HandleClickUp();
@@ -68,8 +69,8 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         cursorRect.anchoredPosition = pos;
     }
-    
-    
+
+
 
     private void UpdateHoveredElement()
     {
@@ -112,7 +113,7 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         SetHoveredElement(bestElement);
     }
-    
+
     private bool IsElementVisibleAtPoint(RectTransform elementRect, Vector2 canvasPoint)
     {
         Transform current = elementRect;
@@ -158,6 +159,32 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
         if (currentHoveredElement != null)
             currentHoveredElement.OnHoverEnter();
+    }
+
+    private void HandleScrollWheel()
+    {
+        float wheelDelta = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(wheelDelta, 0f))
+            return;
+
+        ClickablePCScrollbar scrollbar = FindActiveScrollbar();
+        if (scrollbar != null)
+            scrollbar.ScrollFromWheel(wheelDelta);
+    }
+
+    private ClickablePCScrollbar FindActiveScrollbar()
+    {
+        for (int i = 0; i < clickableElements.Length; i++)
+        {
+            if (clickableElements[i] is ClickablePCScrollbar scrollbar
+                && scrollbar.enabled
+                && scrollbar.gameObject.activeInHierarchy)
+            {
+                return scrollbar;
+            }
+        }
+
+        return null;
     }
 
     private void HandleClickDown()
