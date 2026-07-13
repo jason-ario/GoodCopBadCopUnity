@@ -7,12 +7,11 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: body
-  m_Shader: {fileID: 4800000, guid: e249050cfbc5dcb48bec67c10f23582e, type: 3}
+  m_Name: mutated hair
+  m_Shader: {fileID: 4800000, guid: cee48b891b6c5034291f6435e1bd81f1, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - TCP2_BLUE_VEINS
   - TCP2_UV_NORMALS_FULL
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -27,7 +26,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: f006d2c0711020b40a95f1a886dcf261, type: 3}
+        m_Texture: {fileID: 2800000, guid: ad095dde7ef0b7b4493fce01cc087a5f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -50,16 +49,8 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _EyeMaskMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _LesionMaskMap:
-        m_Texture: {fileID: 2800000, guid: ae3f190fa8354844294f0cbb7a3e51f2, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: f006d2c0711020b40a95f1a886dcf261, type: 3}
+        m_Texture: {fileID: 2800000, guid: ad095dde7ef0b7b4493fce01cc087a5f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -83,14 +74,6 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _StylizedThreshold:
-        m_Texture: {fileID: 2800000, guid: 608c8f119ceafdc439c32f936e29b63c, type: 3}
-        m_Scale: {x: 5, y: 5}
-        m_Offset: {x: 0, y: 0}
-    - _VeinMap:
-        m_Texture: {fileID: 2800000, guid: 6c64f3c0498609441b5733091a1e4983, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: -8.68}
-    - _WorldDisplacementTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -111,7 +94,6 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _BlackEyesStrength: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -121,47 +103,35 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DisplacementStrength: 0.01
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
-    - _LesionStrength: 0
     - _Metallic: 0
     - _Mode: 0
     - _NormalsSource: 0
     - _NormalsUVType: 0
     - _OcclusionStrength: 1
-    - _OutlineWidth: 0.3
+    - _OutlineWidth: 1
     - _Parallax: 0.02
     - _QueueOffset: 0
-    - _RampSmoothing: 0.562
-    - _RampThreshold: 0.508
+    - _RampSmoothing: 0.678
+    - _RampThreshold: 0.468
     - _ReceiveShadows: 1
     - _ReceiveShadowsOff: 1
     - _RenderingMode: 0
     - _SketchTexture_OffsetSpeed: 120
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
-    - _SnapResolution: 1024
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _UVLightFalloff: 1
-    - _UVLightRadius: 1
     - _UVSec: 0
-    - _UseBlackEyes: 0
-    - _UseBlueVeins: 0
-    - _UseLesion: 0
+    - _UseNormalMap: 0
     - _UseSketch: 0
-    - _VeinEdgeSoftness: 0.5
-    - _VeinFalloff: 1
-    - _WobbleAmplitude: 0.001
-    - _WobbleFrequency: 15
-    - _WobbleSpeed: 15
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
@@ -173,12 +143,11 @@ Material:
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
     - _HColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
     - _OutlineColorVertex: {r: 0, g: 0, b: 0, a: 1}
-    - _SColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _SColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _UVLightPosition: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &3090229173351453097
+--- !u!114 &4137403665449080808
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
