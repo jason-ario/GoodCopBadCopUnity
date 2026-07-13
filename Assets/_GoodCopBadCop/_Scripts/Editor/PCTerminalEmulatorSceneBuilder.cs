@@ -40,7 +40,7 @@ public static class PCTerminalEmulatorSceneBuilder
         serializedBootstrapper.FindProperty("pc").objectReferenceValue = pcObject.GetComponent<PC>();
         serializedBootstrapper.FindProperty("runRecords").objectReferenceValue = records;
         serializedBootstrapper.FindProperty("allSuspects").objectReferenceValue = allSuspects;
-        serializedBootstrapper.FindProperty("currentDay").intValue = 3;
+        serializedBootstrapper.FindProperty("currentDay").intValue = 6;
         serializedBootstrapper.FindProperty("killedCount").intValue = 2;
         serializedBootstrapper.FindProperty("quarantinedCount").intValue = 2;
         serializedBootstrapper.ApplyModifiedPropertiesWithoutUndo();
@@ -53,7 +53,7 @@ public static class PCTerminalEmulatorSceneBuilder
 
         scene.name = "PC Terminal Emulator";
         Selection.activeGameObject = pcObject;
-        Debug.Log("[PCTerminalEmulatorSceneBuilder] Created unsaved PC Terminal Emulator scene. Entering Play Mode. Hotkeys: 1 Residents, 2 All, 3 Deceased, 4 Quarantine, 5 News.");
+        Debug.Log("[PCTerminalEmulatorSceneBuilder] Created unsaved PC Terminal Emulator scene for Day 6. Entering Play Mode. Hotkeys: 1 Residents, 2 All, 3 Deceased, 4 Quarantine, 5 News.");
 
         if (!EditorApplication.isPlayingOrWillChangePlaymode)
             EditorApplication.isPlaying = true;

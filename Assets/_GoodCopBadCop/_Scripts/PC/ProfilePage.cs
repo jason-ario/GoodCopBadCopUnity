@@ -39,6 +39,7 @@ public class ProfilePage : MonoBehaviour
             new Vector2(0.5f, 0.5f));
         
         profileImage.sprite = sprite;
+        profileImage.enabled = true;
 
         // Status stamp (DECEASED / REPLACED)
         if (statusStampText != null)
@@ -46,6 +47,32 @@ public class ProfilePage : MonoBehaviour
             statusStampText.text = status;
             statusStampText.gameObject.SetActive(!string.IsNullOrEmpty(status));
         }
+    }
+
+    public void SetNewsData(TerminalNewsEntry newsEntry)
+    {
+        NewspaperContentScriptable content = newsEntry?.Content;
+
+        nameText.text = content != null ? content.headerText : "NEWS ENTRY UNAVAILABLE";
+        dateOfBirthText.text = newsEntry != null ? "Date: " + newsEntry.Date : "Date: unknown";
+        genderText.text = content != null ? content.subheaderText : string.Empty;
+        lastExitText.text = string.Empty;
+        reasonText.text = content != null ? content.descriptionText : string.Empty;
+        idNumberText.text = content != null ? content.footerText : string.Empty;
+
+        if (profileImage != null)
+        {
+            profileImage.sprite = null;
+            profileImage.enabled = false;
+        }
+
+        if (statusStampText != null)
+        {
+            statusStampText.text = string.Empty;
+            statusStampText.gameObject.SetActive(false);
+        }
+
+        SetNavigationState(false, false);
     }
     
     public void SetNavigationState(bool canGoPrev, bool canGoNext)

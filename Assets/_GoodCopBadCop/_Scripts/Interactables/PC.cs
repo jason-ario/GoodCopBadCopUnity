@@ -33,6 +33,7 @@ public class PC : Interactable
 
     [Header("Data")]
     [SerializeField] private SuspectSet _suspectSet;
+    [SerializeField] private NewspaperContentScriptable[] _newspaperContentScriptables;
 
     [Header("Set Up")]
     [SerializeField] private GameObject computerCamera;
@@ -62,11 +63,13 @@ public class PC : Interactable
     // List management
     private List<SuspectData> _currentBaseList;
     private List<SuspectData> _currentVisibleList;
+    private List<TerminalNewsEntry> _currentNewsEntries = new();
     private bool _showQuarantineDays;
     private TerminalSection _currentSection = TerminalSection.All;
     private int _debugCurrentDayOverride = -1;
     private TextMeshProUGUI _mainMenuPopulationLabel;
     private MainMenuMode _mainMenuMode = MainMenuMode.Root;
+    private static readonly DateTime NewspaperStartDate = new DateTime(1989, 10, 20);
 
     private void Start()
     {
@@ -376,11 +379,25 @@ public class PC : Interactable
         _showQuarantineDays = false;
         _currentBaseList = new List<SuspectData>();
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
+        _currentNewsEntries = BuildNewsEntries();
         ClearCurrentProfileSelection();
 
         OpenScreen(suspectListScreen);
         RenderCurrentList();
         SelectFolderTab(0);
+    }
+
+    public void OpenNewsEntryPage(TerminalNewsEntry newsEntry)
+    {
+        if (newsEntry == null)
+            return;
+
+        ClearCurrentProfileSelection();
+        CloseAllScreens();
+        profilePage.gameObject.SetActive(true);
+        profilePage.SetNewsData(newsEntry);
+
+        StartCoroutine(WaitAndRefreshMouse());
     }
 
     public void OpenDeceased()
@@ -536,6 +553,29 @@ public class PC : Interactable
             ? _debugCurrentDayOverride
             : CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
 
+    private List<TerminalNewsEntry> BuildNewsEntries()
+    {
+        var entries = new List<TerminalNewsEntry>();
+
+        if (_newspaperContentScriptables == null || _newspaperContentScriptables.Length == 0)
+            return entries;
+
+        int currentDay = Mathf.Max(1, GetCurrentDay());
+        int lastReadableDay = Mathf.Min(currentDay, _newspaperContentScriptables.Length);
+
+        for (int day = lastReadableDay; day >= 1; day--)
+        {
+            NewspaperContentScriptable content = _newspaperContentScriptables[day - 1];
+            if (content == null)
+                continue;
+
+            string date = NewspaperStartDate.AddDays(day - 1).ToString("dd MMM yyyy").ToUpperInvariant();
+            entries.Add(new TerminalNewsEntry(day, date, content));
+        }
+
+        return entries;
+    }
+
     private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
     {
         return suspects
@@ -594,12 +634,24 @@ public class PC : Interactable
 
     public void ClearLetterFilter()
     {
+        if (_currentSection == TerminalSection.News)
+        {
+            RenderCurrentList();
+            return;
+        }
+
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         RenderCurrentList();
     }
 
     private void FilterByLastNameRange(char start, char end)
     {
+        if (_currentSection == TerminalSection.News)
+        {
+            RenderCurrentList();
+            return;
+        }
+
         if (_currentBaseList == null || _currentBaseList.Count == 0)
         {
             _currentVisibleList = new List<SuspectData>();
@@ -631,6 +683,14 @@ public class PC : Interactable
 
     private void RenderCurrentList()
     {
+        if (_currentSection == TerminalSection.News)
+        {
+            terminalRecordListUI.ShowNews(_currentNewsEntries, GetSectionSummary());
+            RefreshMouseNow();
+            StartCoroutine(WaitAndRefreshMouse());
+            return;
+        }
+
         terminalRecordListUI.ShowRecords(_currentVisibleList, GetSectionSummary());
         RefreshMouseNow();
         StartCoroutine(WaitAndRefreshMouse());
@@ -658,7 +718,10 @@ public class PC : Interactable
                 return $"VISITORS: {_currentBaseList?.Count ?? 0}";
 
             case TerminalSection.News:
-                return "NEWS";
+                int newsCount = _currentNewsEntries?.Count ?? 0;
+                return newsCount > 0
+                    ? $"NEWS ARCHIVE: {newsCount} ISSUES"
+                    : "NEWS ARCHIVE: NO ISSUES";
 
             default:
                 return $"RECORDS: {_currentBaseList?.Count ?? 0}";

@@ -1,6 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public sealed class TerminalNewsEntry
+{
+    public TerminalNewsEntry(int day, string date, NewspaperContentScriptable content)
+    {
+        Day = day;
+        Date = date;
+        Content = content;
+    }
+
+    public int Day { get; }
+    public string Date { get; }
+    public NewspaperContentScriptable Content { get; }
+}
+
 public class TerminalRecordListUI : MonoBehaviour
 {
     [SerializeField] private Transform listContainer;
@@ -27,6 +41,28 @@ public class TerminalRecordListUI : MonoBehaviour
         {
             TerminalListItem item = Instantiate(listItemPrefab, listContainer);
             item.Setup(suspectDatas[i], pc, pc.GetTerminalStatus(suspectDatas[i]));
+            _spawnedItems.Add(item);
+        }
+    }
+
+    public void ShowNews(List<TerminalNewsEntry> newsEntries, string summary = "")
+    {
+        Clear();
+
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            TerminalListItem summaryItem = Instantiate(listItemPrefab, listContainer);
+            summaryItem.SetupSummary(summary);
+            _spawnedItems.Add(summaryItem);
+        }
+
+        if (newsEntries == null)
+            return;
+
+        for (int i = 0; i < newsEntries.Count; i++)
+        {
+            TerminalListItem item = Instantiate(listItemPrefab, listContainer);
+            item.SetupNews(newsEntries[i], pc);
             _spawnedItems.Add(item);
         }
     }

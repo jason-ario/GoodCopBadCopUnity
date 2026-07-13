@@ -14,11 +14,13 @@ public class TerminalListItem : MonoBehaviour
 
     private PC _pc;
     private SuspectData _suspectData;
+    private TerminalNewsEntry _newsEntry;
     private Sprite _generatedProfileSprite;
 
     public void Setup(SuspectData suspectData, PC pc, string status = "")
     {
         _suspectData = suspectData;
+        _newsEntry = null;
         _pc = pc;
 
         ConfigureTextSizing();
@@ -33,9 +35,27 @@ public class TerminalListItem : MonoBehaviour
         SetProfileImage(suspectData);
     }
 
+    public void SetupNews(TerminalNewsEntry newsEntry, PC pc)
+    {
+        _suspectData = null;
+        _newsEntry = newsEntry;
+        _pc = pc;
+
+        ConfigureTextSizing();
+        ApplyNewsLayout();
+
+        string header = newsEntry?.Content != null ? newsEntry.Content.headerText : "MISSING NEWS ENTRY";
+        string date = newsEntry != null ? newsEntry.Date : "UNKNOWN DATE";
+        nameText.text = $"{date} - {header}";
+
+        SetClickable(newsEntry?.Content != null);
+        ClearProfileImage();
+    }
+
     public void SetupSummary(string text)
     {
         _suspectData = null;
+        _newsEntry = null;
         _pc = null;
         ConfigureTextSizing();
         ApplySummaryLayout();
@@ -47,10 +67,17 @@ public class TerminalListItem : MonoBehaviour
 
     public void Select()
     {
-        if (_pc == null || _suspectData == null)
+        if (_pc == null)
             return;
 
-        _pc.OpenProfilePage(_suspectData);
+        if (_newsEntry != null)
+        {
+            _pc.OpenNewsEntryPage(_newsEntry);
+            return;
+        }
+
+        if (_suspectData != null)
+            _pc.OpenProfilePage(_suspectData);
     }
 
     private void ConfigureTextSizing()
@@ -140,6 +167,19 @@ public class TerminalListItem : MonoBehaviour
         textRect.pivot = new Vector2(0.5f, 0.5f);
         textRect.anchoredPosition = new Vector2(0.9767f, 0f);
         textRect.sizeDelta = new Vector2(329.491f, textRect.sizeDelta.y);
+    }
+
+    private void ApplyNewsLayout()
+    {
+        if (nameText == null)
+            return;
+
+        RectTransform textRect = nameText.rectTransform;
+        textRect.anchorMin = new Vector2(0f, 0.5f);
+        textRect.anchorMax = new Vector2(0f, 0.5f);
+        textRect.pivot = new Vector2(0f, 0.5f);
+        textRect.anchoredPosition = new Vector2(0.12f, 0f);
+        textRect.sizeDelta = new Vector2(360f, textRect.sizeDelta.y);
     }
 
     private void ClearProfileImage()

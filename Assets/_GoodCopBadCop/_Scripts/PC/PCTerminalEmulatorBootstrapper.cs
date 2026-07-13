@@ -11,7 +11,7 @@ public class PCTerminalEmulatorBootstrapper : MonoBehaviour
     [SerializeField] private SuspectSet allSuspects;
 
     [Header("Seed Data")]
-    [SerializeField] private int currentDay = 3;
+    [SerializeField] private int currentDay = 6;
     [SerializeField] private int killedCount = 2;
     [SerializeField] private int quarantinedCount = 2;
 
