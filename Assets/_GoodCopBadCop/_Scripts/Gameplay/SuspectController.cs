@@ -1051,7 +1051,10 @@ public class SuspectController : NetworkBehaviour
         SuspectRecord passRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (passRecord != null)
         {
-            populationService?.RecordContactableResidentPassed(passRecord);
+            int activeAnomalyCount = suspectCharacter.AnomalyController != null
+                ? suspectCharacter.AnomalyController.activeAnomalies.Count
+                : 0;
+            populationService?.RecordContactableResidentPassed(passRecord, activeAnomalyCount);
             SuspectRunRecords.Instance.SaveRecords();
         }
 
@@ -1323,6 +1326,7 @@ public class SuspectController : NetworkBehaviour
             {
                 quarantineRecord.pendingVaccineReset = true;
                 quarantineRecord.hasEnteredCity = false;
+                quarantineRecord.populationKillPending = false;
                 quarantineRecord.quarantinedOnDay = CampaignManager.Instance?.CurrentDay ?? -1;
                 SuspectRunRecords.Instance.SaveRecords();
             }
@@ -1425,6 +1429,7 @@ public class SuspectController : NetworkBehaviour
             populationService?.RecordContactableResidentKilled(killRecord);
             killRecord.isKilled    = true;
             killRecord.hasEnteredCity = false;
+            killRecord.populationKillPending = false;
             killRecord.killedOnDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
             SuspectRunRecords.Instance.SaveRecords();
             if (populationService != null)

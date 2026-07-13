@@ -7,7 +7,7 @@ namespace GoodCopBadCop.Population
     {
         IPopulationModel Model { get; }
         void Initialize(PopulationSaveData savedData, int contactableResidentCount);
-        void RecordContactableResidentPassed(SuspectRecord record);
+        void RecordContactableResidentPassed(SuspectRecord record, int activeAnomalyCount);
         void RecordContactableResidentKilled(SuspectRecord record);
         void SimulateDay(int day, IReadOnlyList<SuspectRecord> suspectRecords);
         PopulationSaveData ToSaveData();
@@ -60,12 +60,14 @@ namespace GoodCopBadCop.Population
             initialized = true;
         }
 
-        public void RecordContactableResidentPassed(SuspectRecord record)
+        public void RecordContactableResidentPassed(SuspectRecord record, int activeAnomalyCount)
         {
             if (record == null || record.isKilled)
                 return;
 
             record.hasEnteredCity = true;
+            if (record.IsPopulationMutantByScore || activeAnomalyCount > 10)
+                record.populationKillPending = true;
         }
 
         public void RecordContactableResidentKilled(SuspectRecord record)
@@ -78,6 +80,7 @@ namespace GoodCopBadCop.Population
 
             record.populationDeathRecorded = true;
             record.hasEnteredCity = false;
+            record.populationKillPending = false;
             model.ContactableDeadMutable.Value = Mathf.Min(
                 model.ContactableDeadMutable.Value + 1,
                 model.ContactableAliveMutable.Value + model.ContactableDeadMutable.Value);
@@ -94,16 +97,17 @@ namespace GoodCopBadCop.Population
                 return;
 
             int deaths = 0;
-            if (suspectRecords != null && model.BackgroundAliveMutable.Value > 0)
+            if (suspectRecords != null)
             {
                 Vector2Int deathRange = NormalizeDeathRange(config.backgroundDeathsPerMutantPerDay);
                 for (int i = 0; i < suspectRecords.Count; i++)
                 {
                     SuspectRecord record = suspectRecords[i];
-                    if (record == null || record.isKilled || !record.hasEnteredCity || !record.IsFullyMutated)
+                    if (record == null || record.isKilled || !record.populationKillPending)
                         continue;
 
                     deaths += Random.Range(deathRange.x, deathRange.y + 1);
+                    record.populationKillPending = false;
                 }
             }
 

@@ -205,6 +205,7 @@ public class SaveDataManager : MonoBehaviour
                 SuspectName      = r.SuspectData != null ? r.SuspectData.name : string.Empty,
                 IsKilled         = r.isKilled,
                 HasEnteredCity   = r.hasEnteredCity,
+                PopulationKillPending = r.populationKillPending,
                 PopulationDeathRecorded = r.populationDeathRecorded,
                 KilledOnDay      = r.killedOnDay,
                 IsReplacement    = r.isReplacement,
@@ -481,6 +482,9 @@ public class SuspectSaveEntry
 
     /// <summary>True once this suspect was passed through the gate into the city.</summary>
     public bool HasEnteredCity;
+
+    /// <summary>True when this suspect gets one pending night of background kills.</summary>
+    public bool PopulationKillPending;
 
     /// <summary>True once this suspect has already reduced contactable population alive count.</summary>
     public bool PopulationDeathRecorded;

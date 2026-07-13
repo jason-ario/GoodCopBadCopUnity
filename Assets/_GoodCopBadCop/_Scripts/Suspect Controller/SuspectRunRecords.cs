@@ -64,6 +64,7 @@ public class SuspectRunRecords : MonoBehaviour
 
             record.isKilled                = entry.IsKilled;
             record.hasEnteredCity          = entry.HasEnteredCity;
+            record.populationKillPending   = entry.PopulationKillPending;
             record.populationDeathRecorded = entry.PopulationDeathRecorded;
             record.killedOnDay             = entry.KilledOnDay;
             record.isReplacement           = entry.IsReplacement;

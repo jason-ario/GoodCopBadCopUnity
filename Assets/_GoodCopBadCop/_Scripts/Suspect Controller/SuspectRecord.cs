@@ -18,6 +18,14 @@ public class SuspectRecord
     public bool IsFullyMutated => infectionScore >= AnomalyController.FULLY_MUTATED_THRESHOLD;
 
     /// <summary>
+    /// Population deaths use the design-facing mutant threshold, not the full
+    /// transformation threshold. A suspect becomes eligible if they are passed
+    /// while their persisted mutation score is above 80 or they visibly present
+    /// more than 10 active anomalies.
+    /// </summary>
+    public bool IsPopulationMutantByScore => infectionScore > 80;
+
+    /// <summary>
     /// When true, the next AdvanceDayInfection resets infectionScore to the suspect's base level
     /// (applied after a Quarantine verdict). Has no effect if IsFullyMutated is true.
     /// </summary>
@@ -28,10 +36,17 @@ public class SuspectRecord
 
     /// <summary>
     /// True once this suspect has been passed through the gate into the city.
-    /// Population simulation uses this persisted flag to decide whether a fully-mutated
-    /// suspect can kill background civilians between shifts.
+    /// This is persisted as historical state; population deaths are driven by
+    /// <see cref="populationKillPending"/> so a passed mutant only gets one night.
     /// </summary>
     public bool hasEnteredCity;
+
+    /// <summary>
+    /// True when this suspect was passed into the city while qualifying as a
+    /// population-killing mutant. The population simulation consumes this once
+    /// on the next night and then clears it.
+    /// </summary>
+    public bool populationKillPending;
 
     /// <summary>
     /// True once this suspect's death has already been counted by the population system.

@@ -39,41 +39,60 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
-        public void SimulateDay_PassedFullyMutatedLivingSuspect_KillsBackgroundResident()
+        public void RecordPassed_ScoreAboveEighty_KillsBackgroundResidentOnce()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: false);
+            SuspectRecord record = CreateRecord(infectionScore: 81);
 
+            service.RecordContactableResidentPassed(record, activeAnomalyCount: 0);
             service.SimulateDay(2, new[] { record });
+            service.SimulateDay(3, new[] { record });
 
             Assert.AreEqual(69, model.BackgroundAlive.CurrentValue);
             Assert.AreEqual(1, model.BackgroundDead.CurrentValue);
-            Assert.AreEqual(1, model.DeadOvernight.CurrentValue);
+            Assert.AreEqual(0, model.DeadOvernight.CurrentValue);
             Assert.AreEqual(99, model.PopulationAlive.CurrentValue);
+            Assert.IsFalse(record.populationKillPending);
         }
 
         [Test]
-        public void SimulateDay_FullyMutatedSuspectThatNeverEnteredCity_DoesNotKill()
+        public void RecordPassed_ScoreAtEighty_DoesNotKill()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: false, fullyMutated: true, killed: false);
+            SuspectRecord record = CreateRecord(infectionScore: 80);
 
+            service.RecordContactableResidentPassed(record, activeAnomalyCount: 0);
             service.SimulateDay(2, new[] { record });
 
             Assert.AreEqual(70, model.BackgroundAlive.CurrentValue);
             Assert.AreEqual(0, model.DeadOvernight.CurrentValue);
+            Assert.IsFalse(record.populationKillPending);
         }
 
         [Test]
-        public void SimulateDay_KilledFullyMutatedSuspect_DoesNotKill()
+        public void RecordPassed_MoreThanTenAnomalies_KillsBackgroundResident()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: true);
+            SuspectRecord record = CreateRecord(infectionScore: 0);
 
+            service.RecordContactableResidentPassed(record, activeAnomalyCount: 11);
+            service.SimulateDay(2, new[] { record });
+
+            Assert.AreEqual(69, model.BackgroundAlive.CurrentValue);
+            Assert.AreEqual(1, model.DeadOvernight.CurrentValue);
+        }
+
+        [Test]
+        public void RecordPassed_TenAnomalies_DoesNotKill()
+        {
+            service.Initialize(null, 30);
+            SuspectRecord record = CreateRecord(infectionScore: 0);
+
+            service.RecordContactableResidentPassed(record, activeAnomalyCount: 10);
             service.SimulateDay(2, new[] { record });
 
             Assert.AreEqual(70, model.BackgroundAlive.CurrentValue);
-            Assert.AreEqual(0, model.DeadOvernight.CurrentValue);
+            Assert.IsFalse(record.populationKillPending);
         }
 
         [Test]
@@ -82,8 +101,8 @@ namespace GoodCopBadCop.Editor.Tests
             config.totalPopulation = 2;
             config.backgroundDeathsPerMutantPerDay = new Vector2Int(4, 4);
             service.Initialize(null, 1);
-            SuspectRecord first = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: false);
-            SuspectRecord second = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: false);
+            SuspectRecord first = CreateRecord(infectionScore: 81, populationKillPending: true);
+            SuspectRecord second = CreateRecord(infectionScore: 81, populationKillPending: true);
 
             service.SimulateDay(2, new[] { first, second });
 
@@ -94,10 +113,24 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
+        public void SimulateDay_NoBackgroundResidentsStillConsumesPendingKill()
+        {
+            config.totalPopulation = 1;
+            service.Initialize(null, 1);
+            SuspectRecord record = CreateRecord(infectionScore: 81, populationKillPending: true);
+
+            service.SimulateDay(2, new[] { record });
+
+            Assert.AreEqual(0, model.BackgroundAlive.CurrentValue);
+            Assert.AreEqual(0, model.DeadOvernight.CurrentValue);
+            Assert.IsFalse(record.populationKillPending);
+        }
+
+        [Test]
         public void SimulateDay_SameDayTwice_DoesNotDoubleCount()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: false);
+            SuspectRecord record = CreateRecord(infectionScore: 81, populationKillPending: true);
 
             service.SimulateDay(2, new[] { record });
             service.SimulateDay(2, new[] { record });
@@ -133,23 +166,23 @@ namespace GoodCopBadCop.Editor.Tests
         public void RecordContactableResidentKilled_CountsOnlyOnce()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: true, fullyMutated: false, killed: false);
+            SuspectRecord record = CreateRecord(infectionScore: 0, populationKillPending: true);
 
             service.RecordContactableResidentKilled(record);
             service.RecordContactableResidentKilled(record);
 
             Assert.IsTrue(record.populationDeathRecorded);
             Assert.IsFalse(record.hasEnteredCity);
+            Assert.IsFalse(record.populationKillPending);
             Assert.AreEqual(29, model.ContactableAlive.CurrentValue);
             Assert.AreEqual(1, model.ContactableDead.CurrentValue);
         }
 
         [Test]
-        public void SimulateDay_PreviouslyPassedThenRemovedFromCity_DoesNotKill()
+        public void SimulateDay_KilledPendingMutant_DoesNotKill()
         {
             service.Initialize(null, 30);
-            SuspectRecord record = CreateRecord(hasEnteredCity: true, fullyMutated: true, killed: false);
-            record.hasEnteredCity = false;
+            SuspectRecord record = CreateRecord(infectionScore: 81, killed: true, populationKillPending: true);
 
             service.SimulateDay(2, new[] { record });
 
@@ -157,14 +190,18 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreEqual(0, model.DeadOvernight.CurrentValue);
         }
 
-        private static SuspectRecord CreateRecord(bool hasEnteredCity, bool fullyMutated, bool killed)
+        private static SuspectRecord CreateRecord(
+            int infectionScore,
+            bool killed = false,
+            bool populationKillPending = false)
         {
             SuspectData data = ScriptableObject.CreateInstance<SuspectData>();
             SuspectRecord record = new SuspectRecord(data)
             {
-                hasEnteredCity = hasEnteredCity,
+                hasEnteredCity = populationKillPending,
                 isKilled = killed,
-                infectionScore = fullyMutated ? AnomalyController.FULLY_MUTATED_THRESHOLD : 0,
+                infectionScore = infectionScore,
+                populationKillPending = populationKillPending,
             };
             UnityEngine.Object.DestroyImmediate(data);
             return record;

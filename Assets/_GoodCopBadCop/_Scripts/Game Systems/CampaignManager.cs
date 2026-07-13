@@ -231,6 +231,7 @@ public class CampaignManager : NetworkBehaviour
             TryEnsurePopulationInitialized();
             SuspectRunRecords.Instance.AdvanceDayInfection();
             populationService?.SimulateDay(nextDay, SuspectRunRecords.Instance.Records);
+            SuspectRunRecords.Instance.SaveRecords();
             if (populationService != null)
                 SaveDataManager.Instance.SavePopulation(populationService.ToSaveData());
         }
