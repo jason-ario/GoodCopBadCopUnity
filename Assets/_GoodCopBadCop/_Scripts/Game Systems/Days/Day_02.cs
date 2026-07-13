@@ -120,6 +120,11 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
 
     [Header("Day 2 — Post-Shift Vlad (Out Back)")]
+    [Tooltip("Master toggle. Uncheck to cut the entire end-of-day Vlad / dead animal sequence. " +
+             "When disabled the shift ends immediately and the night phase unlocks without spawning " +
+             "Vlad, the dead animal, or the trail event.")]
+    [SerializeField] private bool _enablePostShiftVladSequence = true;
+
     [Tooltip("Vlad's SuspectCharacter prefab for the out-back sequence. Instantiated when the shift ends and destroyed after the sequence.")]
     [SerializeField] private SuspectCharacter _vladOutBackCharacter;
 
@@ -339,6 +344,14 @@ public class Day_02 : DayBase
     {
         base.ShiftEnded();
         if (!NetworkManager.Singleton.IsServer) return;
+
+        if (!_enablePostShiftVladSequence)
+        {
+            Debug.Log("[Day_02] Post-shift Vlad sequence is disabled — advancing night phase directly.");
+            BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+            return;
+        }
+
         StartCoroutine(PostShiftSetupSequence());
     }
 
