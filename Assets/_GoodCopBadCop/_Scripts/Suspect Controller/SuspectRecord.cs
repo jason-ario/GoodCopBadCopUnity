@@ -27,6 +27,20 @@ public class SuspectRecord
     public bool isKilled;
 
     /// <summary>
+    /// True once this suspect has been passed through the gate into the city.
+    /// Population simulation uses this persisted flag to decide whether a fully-mutated
+    /// suspect can kill background civilians between shifts.
+    /// </summary>
+    public bool hasEnteredCity;
+
+    /// <summary>
+    /// True once this suspect's death has already been counted by the population system.
+    /// Prevents repeated contactable-population death counts if save/load or duplicate
+    /// verdict paths touch the same record again.
+    /// </summary>
+    public bool populationDeathRecorded;
+
+    /// <summary>
     /// The 1-based campaign day on which this suspect was killed. -1 means never killed.
     /// Used to calculate when the replacement version of this suspect should activate.
     /// </summary>
@@ -60,8 +74,15 @@ public class SuspectRecord
     public SuspectRecord(SuspectData suspectData)
     {
         SuspectData = suspectData;
-        infectionScore = (int)UnityEngine.Random.Range(
-            SuspectRunRecords.Instance.startingInfectionScore.x,
-            SuspectRunRecords.Instance.startingInfectionScore.y);
+        if (SuspectRunRecords.Instance != null)
+        {
+            infectionScore = (int)UnityEngine.Random.Range(
+                SuspectRunRecords.Instance.startingInfectionScore.x,
+                SuspectRunRecords.Instance.startingInfectionScore.y);
+        }
+        else
+        {
+            infectionScore = suspectData != null ? suspectData.startingInfectionScore : 0;
+        }
     }
 }

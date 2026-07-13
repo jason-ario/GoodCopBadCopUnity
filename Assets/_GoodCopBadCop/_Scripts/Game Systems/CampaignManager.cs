@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GoodCopBadCop.Population;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -60,6 +61,8 @@ public class CampaignManager : NetworkBehaviour
     public bool IsCampaignComplete { get; private set; }
 
     private readonly Dictionary<int, DayBase> _days = new Dictionary<int, DayBase>();
+
+    [VContainer.Inject] private IPopulationService populationService;
 
     /// <summary>
     /// When >= 0, overrides the destination day number in the next <see cref="AdvanceDay"/> call.
@@ -152,6 +155,9 @@ public class CampaignManager : NetworkBehaviour
             _currentDay = Mathf.Max(1, _networkCurrentDay.Value);
         }
 
+        if (IsServer)
+            TryEnsurePopulationInitialized();
+
         ApplyDay(_currentDay);
 
         Debug.Log($"[CampaignManager] Campaign started on Day {_currentDay}.");
@@ -221,7 +227,13 @@ public class CampaignManager : NetworkBehaviour
 
         // Advance every suspect's infection score before the new shift is populated.
         if (SuspectRunRecords.Instance != null)
+        {
+            TryEnsurePopulationInitialized();
             SuspectRunRecords.Instance.AdvanceDayInfection();
+            populationService?.SimulateDay(nextDay, SuspectRunRecords.Instance.Records);
+            if (populationService != null)
+                SaveDataManager.Instance.SavePopulation(populationService.ToSaveData());
+        }
 
         // Server applies immediately; clients apply via OnNetworkDayChanged.
         ApplyDay(nextDay);
@@ -323,6 +335,52 @@ public class CampaignManager : NetworkBehaviour
             ResetAllPlayersHealth();
 
         Debug.Log($"[CampaignManager] Day {day} applied.");
+    }
+
+    private bool TryEnsurePopulationInitialized()
+    {
+        if (populationService == null || SaveDataManager.Instance == null || SuspectRunRecords.Instance == null)
+            return false;
+
+        int contactableCount = 0;
+        SuspectSet suspectSet = SuspectRunRecords.Instance.allSuspects;
+
+        if (suspectSet != null && suspectSet.suspects != null)
+        {
+            for (int i = 0; i < suspectSet.suspects.Count; i++)
+            {
+                if (suspectSet.suspects[i] != null)
+                    contactableCount++;
+            }
+        }
+
+        populationService.Initialize(SaveDataManager.Instance.GetSavedPopulation(), contactableCount);
+        ReconcilePopulationWithKilledSuspects();
+        return true;
+    }
+
+    private void ReconcilePopulationWithKilledSuspects()
+    {
+        if (populationService == null || SuspectRunRecords.Instance == null)
+            return;
+
+        bool changed = false;
+        IReadOnlyList<SuspectRecord> records = SuspectRunRecords.Instance.Records;
+        for (int i = 0; i < records.Count; i++)
+        {
+            SuspectRecord record = records[i];
+            if (record == null || !record.isKilled || record.populationDeathRecorded)
+                continue;
+
+            populationService.RecordContactableResidentKilled(record);
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
+        SuspectRunRecords.Instance.SaveRecords();
+        SaveDataManager.Instance.SavePopulation(populationService.ToSaveData());
     }
 
     private void FireTutorialSteps(List<TutorialStep> steps)
