@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using DG.Tweening;
+using GoodCopBadCop.Population;
 using GoodCopBadCop.SuspectPaperwork;
 using TMPro;
 using UnityEngine;
@@ -55,7 +56,6 @@ public class PC : Interactable
         }
     }
 
-    private const int MainMenuPopulation = 300;
     private const string MainMenuVillageName = "Saplavi";
     private const string MainMenuPopulationObjectName = "Main Menu Population";
     private const string UpDirectoryButtonName = "Up Directory (1)";
@@ -85,6 +85,8 @@ public class PC : Interactable
 
     [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
     [SerializeField] private ClickablePCScrollbar PCScrollbar;
+
+    [VContainer.Inject] private IPopulationModel _populationModel;
 
     // Profile navigation state
     private SuspectData _currentProfileSuspect;
@@ -1271,7 +1273,7 @@ public class PC : Interactable
         populationRect.anchoredPosition = MainMenuPopulationPosition;
         populationRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, titleRect.sizeDelta.y);
 
-        _mainMenuPopulationLabel.text = $"Population: {MainMenuPopulation}";
+        _mainMenuPopulationLabel.text = $"Population: {_populationModel.PopulationAlive.CurrentValue}";
         _mainMenuPopulationLabel.font = titleLabel.font;
         _mainMenuPopulationLabel.fontSharedMaterial = titleLabel.fontSharedMaterial;
         _mainMenuPopulationLabel.color = titleLabel.color;

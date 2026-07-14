@@ -5,7 +5,6 @@ namespace GoodCopBadCop.Population
 {
     public interface IPopulationService
     {
-        IPopulationModel Model { get; }
         void Initialize(PopulationSaveData savedData, int contactableResidentCount);
         void RecordContactableResidentPassed(SuspectRecord record, int activeAnomalyCount);
         void RecordContactableResidentKilled(SuspectRecord record);
@@ -24,8 +23,6 @@ namespace GoodCopBadCop.Population
             this.model = model;
             this.config = config;
         }
-
-        public IPopulationModel Model => model;
 
         public void Initialize(PopulationSaveData savedData, int contactableResidentCount)
         {

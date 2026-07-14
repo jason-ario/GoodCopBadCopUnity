@@ -61,6 +61,7 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<PlayerRuntimeAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<PlayerControlsSettingsAdapter>(Lifetime.Scoped);
             builder.RegisterComponentInHierarchy<global::CampaignManager>();
+            builder.RegisterComponentInHierarchy<global::PC>();
             builder.RegisterComponentInHierarchy<global::ShiftManager>();
 
             builder.Register<VoiceChatModel>(Lifetime.Scoped).AsSelf().As<IVoiceChatModel>();

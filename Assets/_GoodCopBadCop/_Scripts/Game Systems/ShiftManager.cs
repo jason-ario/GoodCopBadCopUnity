@@ -14,7 +14,7 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>Fired on the server whenever a suspect is killed.</summary>
     public static event System.Action OnSuspectKilled;
 
-    [VContainer.Inject] private IPopulationService populationService;
+    [VContainer.Inject] private IPopulationModel populationModel;
 
     [Header("Network Variables")]
     public NetworkVariable<bool> shiftStarted = new NetworkVariable<bool>(false);
@@ -471,8 +471,8 @@ public class ShiftManager : NetworkBehaviour
         };
 
         AppendPopulationRows(reportData,
-            populationService != null ? populationService.Model.PopulationAlive.CurrentValue : -1,
-            populationService != null ? populationService.Model.DeadOvernight.CurrentValue : -1);
+            populationModel.PopulationAlive.CurrentValue,
+            populationModel.DeadOvernight.CurrentValue);
 
         return reportData;
     }
@@ -568,8 +568,8 @@ public class ShiftManager : NetworkBehaviour
             suspectsQuarantined,
             suspectsKilledCorrect,
             suspectsKilledWrong,
-            populationService != null ? populationService.Model.PopulationAlive.CurrentValue : -1,
-            populationService != null ? populationService.Model.DeadOvernight.CurrentValue : -1);
+            populationModel.PopulationAlive.CurrentValue,
+            populationModel.DeadOvernight.CurrentValue);
     }
 
     /// <summary>
