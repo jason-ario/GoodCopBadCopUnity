@@ -387,16 +387,28 @@ public class UIController : MonoBehaviour
     
     public void ClosePauseMenu()
     {
-        // Restore CanLook first so the CanControl setter can properly re-enable the reticle.
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
-        
-        if (showedCursorBeforePaused == false)
+        bool dialogueModeActive = DialogueChoiceSystem.IsInDialogueMode;
+
+        if (dialogueModeActive)
         {
-            HideCursor();
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+            ShowCursor();
+            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(false);
         }
-        
-        PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+        else
+        {
+            // Restore CanLook first so the CanControl setter can properly re-enable the reticle.
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
+
+            if (showedCursorBeforePaused == false)
+            {
+                HideCursor();
+            }
+
+            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+        }
 
         playerUI.SetActive(playerUIWasActiveBeforePaused);
 
