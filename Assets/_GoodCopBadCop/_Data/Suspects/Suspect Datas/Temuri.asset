@@ -30,7 +30,12 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
+  fullMutantDialogue: {fileID: 11400000, guid: e6781bf6291ce6d4a986690c6f487609, type: 2}
+  replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 2800000, guid: d03a80ab24358784b9cf7b9eed8c485e, type: 3}
   CharacterPrefab: {fileID: 1896175955159167368, guid: 80fd0ca23a5eedc4585657454979dbec, type: 3}
   entryReasons:
@@ -73,6 +78,20 @@ MonoBehaviour:
     - The forest is gone. It didn't die; it just... left.
     - I don't need a name anymore. The wind doesn't use them.
     - I am going to find a cave. The sky is looking for us.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - 
+    - 
+    - 
+    dialoguesMidDays:
+    - 
+    - 
+    - 
+    dialoguesFinalDays:
+    - 
+    - 
+    - 
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -99,35 +118,51 @@ MonoBehaviour:
     - The hunt... is... over.
   quarantineExitLines:
   - A den. I have slept in worse.
-  - "The scent in here is wrong. But I have endured worse smells."
+  - The scent in here is wrong. But I have endured worse smells.
   - Watch the door. Things follow you more than you think they do.
   killExitLines:
   - "Back to the roots\u2026 back to the dark soil\u2026 This is\u2026 correct."
   - "The predator\u2026 always finds you\u2026 in the end\u2026"
   - "Tell the forest\u2026 nothing has been wasted\u2026 I will feed it\u2026"
-  voiceAudioClips: []
+  voiceAudioClips:
+  - {fileID: 8300000, guid: 8b5083ebc4b2e314e87a3f2b5e1f8eba, type: 3}
+  - {fileID: 8300000, guid: ece3f167a7de2124fa497b899efcaf98, type: 3}
+  - {fileID: 8300000, guid: e3cdb9eab2d950648b76cb554789640f, type: 3}
+  - {fileID: 8300000, guid: 3be2feb69f6ea1c438afb62151579274, type: 3}
+  - {fileID: 8300000, guid: 8f5d1bd97f1284043a91970f2cf26d6b, type: 3}
+  - {fileID: 8300000, guid: c26498727e0554c47a41491739c77de3, type: 3}
+  - {fileID: 8300000, guid: c1e2376eac2fa6c4b96aa3bf55a3fc5b, type: 3}
+  - {fileID: 8300000, guid: 89cc41c3e406ce14894eb63b02a64e8e, type: 3}
+  - {fileID: 8300000, guid: 5f82d09201db1724588cef0db663f244, type: 3}
+  - {fileID: 8300000, guid: c49b46b384434cf4f838433b07de65ec, type: 3}
   introDialogue: {fileID: 11400000, guid: 544d33efb8c0ec647a20787bd40441a9, type: 2}
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The church. Evening service.
     midDaysAnswer: Visiting the sick in the parish. There are more each week.
     finalDaysAnswer: I've been walking the district. Checking on people.
-    mismatchEarlyDaysAnswer: The forest. My usual timber route. I don't come into the
-      city except to sell. Nothing unusual.
+    mismatchEarlyDaysAnswer: The forest. My usual timber route. I don't come into
+      the city except to sell. Nothing unusual.
     mismatchMidDaysAnswer: The church. Full day. Morning service, evening service,
       and confessions in between. God's work does not pause.
     mismatchFinalDaysAnswer: The forest. Same as always. I don't know anything about
       the sick in the parish. I've been away.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Have you been experiencing any strange symptoms lately?
     earlyDaysAnswer: I am well, by the grace of God.
     midDaysAnswer: I have been tired. But the work is heavy.
     finalDaysAnswer: My sight is a little dim in the mornings. It clears by noon.
-    mismatchEarlyDaysAnswer: My sight has been dim for weeks. Both eyes. It does not
-      clear no matter the hour.
-    mismatchMidDaysAnswer: Not tired at all. Strong, well-rested. The forest air keeps
-      you sharp. God provides.
+    mismatchEarlyDaysAnswer: My sight has been dim for weeks. Both eyes. It does
+      not clear no matter the hour.
+    mismatchMidDaysAnswer: Not tired at all. Strong, well-rested. The forest air
+      keeps you sharp. God provides.
     mismatchFinalDaysAnswer: My sight is perfect. Sharp as it has ever been. No dimness.
       I see everything clearly.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   - question: Who do you live with?
     earlyDaysAnswer: The other priests at the rectory. Four of us.
     midDaysAnswer: Two of us now. Father Nikoloz passed last week.
@@ -136,8 +171,11 @@ MonoBehaviour:
       share it with anyone.
     mismatchMidDaysAnswer: My hunting partner, Davit. We share the cabin. He is well.
       I saw him this morning.
-    mismatchFinalDaysAnswer: The other priests. Still four of us. Father Nikoloz is
-      in good health. I saw him at morning prayer.
+    mismatchFinalDaysAnswer: The other priests. Still four of us. Father Nikoloz
+      is in good health. I saw him at morning prayer.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - The birds left the valley this morning. They know before we do.
@@ -151,4 +189,7 @@ MonoBehaviour:
     - The forest did not die. It left. You do not understand what that means yet.
     - The sky is looking for us. Stay under something solid.
     - Everything that was green is gone. That is all I will say.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
   IDNumber: 1849021

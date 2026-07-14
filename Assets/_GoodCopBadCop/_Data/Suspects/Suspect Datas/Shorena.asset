@@ -13,91 +13,192 @@ MonoBehaviour:
   m_Name: Shorena
   m_EditorClassIdentifier: Assembly-CSharp::SuspectData
   FirstName: Shorena
-  LastName: 
+  LastName: Maisuradze
   Nickname: 
-  Occupation: 
-  CharacterDescription: 
-  CharacterArc: 
-  DateOfBirth: 
-  Sex: 
-  EntryPermitExpiryDate: 
+  Occupation: Teacher
+  CharacterDescription: A mother, teacher, and authority figure among her peers.
+    Demanding but polite, yet critical of everything. Loves her daughters deeply
+    but is very strict and demanding with them.
+  CharacterArc: "When mutated, becomes self-critical and talks badly about herself.
+    Grows demotivated and gives up easily. Lazy \u2014 unwilling to do work or even
+    give full sentence answers."
+  DateOfBirth: 12/04/1976
+  Sex: Female
+  EntryPermitExpiryDate: 30 APR
   IsResident: 1
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
-  dailyInfectionProgression: 5
-  IDPhoto: {fileID: 0}
-  CharacterPrefab: {fileID: 0}
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: 
+  basePersonalityDescriptors: []
+  normalBehaviorNotes: 
+  fullMutantDialogue: {fileID: 11400000, guid: 3ba7e947134d03441bf762eb45290a22, type: 2}
+  replacementIDPhoto: {fileID: 0}
+  IDPhoto: {fileID: 2800000, guid: 1080ecc81c72f2443861003ba48ffc1b, type: 3}
+  CharacterPrefab: {fileID: 727857191599976996, guid: 2a89d31018f2a8e4386129855e3565e4, type: 3}
   entryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Returning home after afternoon classes.
+    - Resident returning from a parent meeting at the school.
+    - Picking up textbooks from the district supply depot.
+    midDaysReasons:
+    - Returning from school. Administration wants daily sign-ins now.
+    - Coming back from a department meeting. It ran long, as they always do.
+    - Collecting curriculum materials from the regional office.
+    finalDaysReasons:
+    - Returning to residence. The school has suspended operations.
+    - Mandatory resident check-in. I know the procedure.
+    - Coming home to my daughters. They are waiting for me.
   invalidEntryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Taking my students to the restricted zone for a field observation.
+    - Meeting with a parent outside the northern perimeter.
+    - Going to the administration block past the evacuation boundary.
+    midDaysReasons:
+    - Collecting assignments from students in the quarantine ward.
+    - Holding a parent-teacher conference near the contaminated district.
+    - Taking curriculum materials to a school that has been closed.
+    finalDaysReasons:
+    - Going to check on a colleague who did not report to work.
+    - I need to reach the other side to find my eldest daughter.
+    - The school is closed but someone has to be there.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Here are my papers. I always keep them in order. Unlike some of my students.
+    - Good afternoon. I trust you have a checklist. This goes faster when there is
+      a checklist.
+    - My documents. I prepared them this morning. Everything is current.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - You are slower than the officer yesterday. It is fine. Everyone has a pace.
+    - The procedure has changed again. I noticed. You should announce these things.
+    - The light in here is very poor. I am not complaining. I am noting it.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - My daughters are waiting for me on the fourth floor. I would like to be efficient.
+    - Every day the line is longer and the staff is smaller. Someone should address
+      that.
+    - I have been through this checkpoint many times. The form is always the same.
+      I never make mistakes on the form.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - My papers. They are... I checked them. I think I checked them.
+    - I am probably not the person you should be worried about. I know that much.
+    - I went over the form twice. There might be something wrong with it. I don't
+      know.
+    dialoguesMidDays:
+    - Everything is probably fine. With the forms. Everything is probably fine.
+    - I marked the date. I think I marked the date. I should have been more careful.
+    - Sorry. I know you are busy. Take as long as you need. I don't mind waiting.
+    dialoguesFinalDays:
+    - It doesn't matter how long it takes. Whatever you decide.
+    - I probably filled something wrong. I usually catch things like that. I didn't
+      check as carefully today.
+    - My daughters can wait. It's fine. I'm not important right now.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Good. Everything should run this smoothly.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - I will tell the others in my block. They worry unnecessarily.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - My daughters are waiting. Thank you for being thorough.
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - My daughters need to know. Please tell them I will be delayed. They will worry.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - I understand the protocol. I also understand it could be faster.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - My daughters. Someone tell them I will not be home tonight. Please.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - "My daughters\u2026 tell them\u2026 I want them to understand\u2026"
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - I had things to finish. I was not done.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
-  quarantineExitLines: []
-  killExitLines: []
+    - "Tell them\u2026 I was coming home\u2026"
+  quarantineExitLines:
+  - My daughters are in apartment fourteen on the fourth floor. Someone please inform
+    them.
+  - I have papers to grade in my bag. I would like to keep them with me.
+  - I understand. But the procedure here is not well designed. Someone should improve
+    it.
+  killExitLines:
+  - I never missed a day of school in thirty years. This is embarrassing.
+  - My daughters are on their own now. They know what to do. I made sure of that.
+  - I had more to say to them. I always meant to say more.
   voiceAudioClips: []
-  questionResponses: []
+  introDialogue: {fileID: 11400000, guid: 73a7d02ab0b687141ace821fbe204419, type: 2}
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: School. Afternoon classes. I also covered a colleague's section
+      today.
+    midDaysAnswer: The school building. It is technically closed but someone has to
+      manage the materials.
+    finalDaysAnswer: I walked the longer route. The shorter one has broken glass.
+      I noted it. No one is fixing it.
+    mismatchEarlyDaysAnswer: Home. I have been home all day. I needed a rest day.
+      I don't take them often but today I took one.
+    mismatchMidDaysAnswer: The market. Very ordinary. I bought bread. Everything
+      was normal. I didn't see anyone I knew.
+    mismatchFinalDaysAnswer: I went for a walk. No particular route. I just walk
+      sometimes. It clears my head.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: Nothing unusual. I have been tired. But I am always tired. It
+      means I am working.
+    midDaysAnswer: A headache for several days. I assume it is the air quality. I
+      am managing it.
+    finalDaysAnswer: I do not sleep as much as I used to. I have things to think
+      about. That is normal.
+    mismatchEarlyDaysAnswer: Nothing at all. I feel excellent. Better than usual.
+      Very clear-headed.
+    mismatchMidDaysAnswer: No headache. I feel fine. I have been sleeping very well.
+      No problems at all.
+    mismatchFinalDaysAnswer: I sleep perfectly. I have no complaints. Everything
+      is quite good, actually.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Who do you live with?
+    earlyDaysAnswer: My two daughters. Tamara is twelve. Nana is nine. They are upstairs
+      right now.
+    midDaysAnswer: My daughters. They are staying close. I did not want them in the
+      evacuation shelter. I keep them with me.
+    finalDaysAnswer: My daughters. They are all I have left here. I need to get home
+      to them.
+    mismatchEarlyDaysAnswer: Alone. I have lived alone for six years. My daughters
+      are with their father. It is an arrangement.
+    mismatchMidDaysAnswer: No one. My daughters are with relatives in the north.
+      They were moved early. Better that way.
+    mismatchFinalDaysAnswer: No one. I am alone here. My daughters left at the beginning.
+      I have not heard from them.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
-    earlyDays: []
-    midDays: []
-    finalDays: []
-  IDNumber: 
+    earlyDays:
+    - Your filing system at this checkpoint is inconsistent. I can see it from here.
+    - The officer before you was faster. Not a criticism. Just an observation.
+    - I give my students this same look when they forget their documents. You are
+      doing very well by comparison.
+    midDays:
+    - Do you have children? You should consider it. It changes how you prioritize.
+    - Every day this procedure gets slower. I keep hoping someone is taking notes.
+    - I have been a teacher for twenty-two years. Waiting in lines does not bother
+      me. Children bother me.
+    finalDays:
+    - My daughters ask me if I am afraid. I tell them I am managing it. That is my
+      job.
+    - I have informed my daughters what to do if I do not come home. They know. They
+      did not like knowing. But they know.
+    - This checkpoint will be unnecessary in a few weeks. One way or another.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
+  IDNumber: 4823610

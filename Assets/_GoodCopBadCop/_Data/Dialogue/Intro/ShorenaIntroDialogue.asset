@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: ShorenaIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: You have a new form. The spacing on this column is different from last
+      week. Did someone approve that?
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 0
+    npcLine: Shorena Maisuradze. Secondary school teacher. Language and literature.
+      Twenty-two years.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: My daughters are on the fourth floor waiting for me. I told them I would
+      be back before dark. I do not make promises I cannot keep.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: How old are your daughters?
+      npcResponse: "Tamara is twelve. Nana is nine. They are very different. Tamara
+        argues about everything. Nana accepts too much. I am working on both of those
+        things."
+      animationTrigger: TalkIdle
+    - playerChoiceText: Are they doing alright?
+      npcResponse: "They are afraid. They are trying not to show me. I pretend not
+        to notice so they can keep trying. It is an arrangement we have."
+      animationTrigger: TalkLookDown
+  - type: 0
+    npcLine: The school is closed now. Technically. I still go in to manage the materials.
+      Someone has to.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
+  - type: 1
+    npcLine: My students are scattered across four different shelters. I sent work
+      to three of them last week. Only one submitted it.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleText: 0
+    choices:
+    - playerChoiceText: That was kind of you.
+      npcResponse: It was not kindness. It was structure. Children fall apart without
+        structure. Adults do too, but they are less honest about it.
+      animationTrigger: TalkIdle
+    - playerChoiceText: Is that really a priority right now?
+      npcResponse: "Everything I have said for twenty-two years becomes meaningless
+        if I stop the moment things get difficult. So yes. It is a priority."
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: My documents. Everything is in order. I double-checked on the way here
+      because I knew there would be a line.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleText: 0
+    choices: []
