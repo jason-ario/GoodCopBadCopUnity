@@ -25,15 +25,14 @@ public class SuspectCharacter : Interactable
     public Animator animator;
     public AudioSource audioSource;
     [SerializeField] private SpeakingInteraction speaking;
-    [SerializeField] Texture2D idPhoto;
 
     /// <summary>
     /// At runtime, returns the replacement face photo when this suspect has been initialized
-    /// as a replacement. Falls back to the serialized idPhoto for all normal cases.
+    /// as a replacement. For normal suspects, SuspectData is the source of truth.
     /// </summary>
     public Texture2D IDPhoto => _isReplacement && suspectData != null && suspectData.replacementIDPhoto != null
         ? suspectData.replacementIDPhoto
-        : idPhoto;
+        : suspectData != null ? suspectData.IDPhoto : null;
 
     /// <summary>True when this character has been spawned as an uncanny replacement of a killed suspect.</summary>
     public bool IsReplacement => _isReplacement;
