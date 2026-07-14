@@ -16,7 +16,6 @@ public class PC : Interactable
     {
         All,
         Residents,
-        Visitors,
         Deceased,
         Quarantine,
         News
@@ -60,6 +59,7 @@ public class PC : Interactable
     private const string MainMenuPopulationObjectName = "Main Menu Population";
     private const string UpDirectoryButtonName = "Up Directory (1)";
     private const string ProfileUpDirectoryButtonName = "Up Directory";
+    private const int DefaultTerminalPopulation = 300;
     private static readonly Vector2 MainMenuTitlePosition = new Vector2(-0.056f, 1.168f);
     private static readonly Vector2 MainMenuPopulationPosition = new Vector2(0f, -0.85f);
 
@@ -312,9 +312,6 @@ public class PC : Interactable
             case TerminalSection.Residents:
                 OpenResidents();
                 break;
-            case TerminalSection.Visitors:
-                OpenVisitors();
-                break;
             case TerminalSection.Deceased:
                 OpenDeceased();
                 break;
@@ -470,7 +467,7 @@ public class PC : Interactable
         profilePage.SetProfileData(
             suspectData,
             GetProfileEntryReason(suspectData),
-            GetProfileLastExitDate(),
+            GetProfileLastEntryDate(suspectData),
             GetProfileStatus(suspectData));
 
         UpdateProfileNavigationUI();
@@ -641,26 +638,7 @@ public class PC : Interactable
         _currentSection = TerminalSection.Residents;
         _showQuarantineDays = false;
         _currentBaseList = SortSuspects(_suspectSet.suspects
-            .Where(s => s != null && s.IsResident));
-
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(true);
-        FilterAF();
-        RenderCurrentList();
-        SelectFolderTab(0);
-    }
-
-    public void OpenVisitors()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.Visitors;
-        _showQuarantineDays = false;
-        _currentBaseList = SortSuspects(_suspectSet.suspects
-            .Where(s => s != null && !s.IsResident));
+            .Where(s => s != null));
 
         _currentVisibleList = new List<SuspectData>(_currentBaseList);
         ClearCurrentProfileSelection();
@@ -807,7 +785,7 @@ public class PC : Interactable
             return string.Empty;
 
         if (!HasMetSuspect(suspectData))
-            return string.Empty;
+            return "unknown";
 
         SuspectPaperworkModel paperworkModel = new SuspectPaperworkModel();
         SuspectPaperworkService paperworkService = new SuspectPaperworkService(paperworkModel);
@@ -833,12 +811,13 @@ public class PC : Interactable
                    || record.isKilled
                    || record.quarantinedOnDay >= 0);
     }
-    private string GetProfileLastExitDate()
+    private string GetProfileLastEntryDate(SuspectData suspectData)
     {
-        if (ShiftManager.Instance == null)
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record == null || record.lastDayShown <= 0)
             return "unknown";
 
-        return ShiftManager.Instance.CurrentGameDate.ToString("MM/dd/yy");
+        return NewspaperStartDate.AddDays(record.lastDayShown - 1).ToString("MM/dd/yy");
     }
 
     private int GetPaperworkDay()
@@ -863,8 +842,18 @@ public class PC : Interactable
 
     private string GetProfileStatus(SuspectData suspectData)
     {
-        string status = GetBaseStatus(suspectData);
-        return status == "CLEAR" ? string.Empty : status;
+        return ToProfileDisplayStatus(GetBaseStatus(suspectData));
+    }
+
+    private static string ToProfileDisplayStatus(string status)
+    {
+        return status switch
+        {
+            "DECEASED" => "Deceased",
+            "QUARANTINED" => "Quarantined",
+            "REPLACED" => "Replaced",
+            _ => "Alive"
+        };
     }
 
     private string GetBaseStatus(SuspectData suspectData)
@@ -1100,9 +1089,6 @@ public class PC : Interactable
             case TerminalSection.Residents:
                 return $"RESIDENTS: {_currentBaseList?.Count ?? 0}";
 
-            case TerminalSection.Visitors:
-                return $"VISITORS: {_currentBaseList?.Count ?? 0}";
-
             case TerminalSection.News:
                 int newsCount = _currentNewsEntries?.Count ?? 0;
                 return newsCount > 0
@@ -1212,7 +1198,7 @@ public class PC : Interactable
 
         if (labelText == "Visitors" || labelText == "News")
         {
-            ConfigureMainMenuButton(label, "Visitors", true, OpenVisitors);
+            ConfigureMainMenuButton(label, labelText, false, null);
             return;
         }
 
@@ -1240,6 +1226,14 @@ public class PC : Interactable
         if (onClick != null)
             button.onClickEvent.AddListener(onClick);
     }
+
+    private int GetPopulationAliveForTerminal()
+    {
+        return _populationModel != null
+            ? _populationModel.PopulationAlive.CurrentValue
+            : DefaultTerminalPopulation;
+    }
+
     private void EnsureMainMenuPopulationLabel(TextMeshProUGUI titleLabel)
     {
         if (titleLabel == null)
@@ -1273,7 +1267,7 @@ public class PC : Interactable
         populationRect.anchoredPosition = MainMenuPopulationPosition;
         populationRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, titleRect.sizeDelta.y);
 
-        _mainMenuPopulationLabel.text = $"Population: {_populationModel.PopulationAlive.CurrentValue}";
+        _mainMenuPopulationLabel.text = $"Population: {GetPopulationAliveForTerminal()}";
         _mainMenuPopulationLabel.font = titleLabel.font;
         _mainMenuPopulationLabel.fontSharedMaterial = titleLabel.fontSharedMaterial;
         _mainMenuPopulationLabel.color = titleLabel.color;

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 public class ProfilePage : MonoBehaviour
 {
+    private const string StatusObjectName = "Status";
     [SerializeField] TextMeshProUGUI nameText;
     [SerializeField] TextMeshProUGUI dateOfBirthText;
     [SerializeField] TextMeshProUGUI genderText;
@@ -12,31 +13,34 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] TextMeshProUGUI idNumberText;
     [SerializeField] Image profileImage;
 
-    [Tooltip("Optional stamp-style text shown over the profile when a suspect is DECEASED or REPLACED.")]
+    [Tooltip("Optional text shown in the profile status field.")]
     [SerializeField] TextMeshProUGUI statusStampText;
 
     [SerializeField] private ClickablePCElement nextButton;
     [SerializeField] private ClickablePCElement prevButton;
 
+    private void Awake()
+    {
+        CacheStatusText();
+    }
+
     /// <summary>
     /// Populates the profile page for the given suspect.
     /// </summary>
     /// <param name="suspectData">Suspect whose data is displayed.</param>
-    /// <param name="lastExitReason">Last recorded exit reason shown on the terminal.</param>
-    /// <param name="lastExitDate">Last recorded exit date shown on the terminal.</param>
-    /// <param name="status">Optional status stamp text (e.g. "DECEASED", "REPLACED"). Pass empty to hide.</param>
-    public void SetProfileData(SuspectData suspectData, string lastExitReason = "unknown", string lastExitDate = "unknown", string status = "")
+    /// <param name="entryReason">Last known entry reason shown on the terminal.</param>
+    /// <param name="lastEntryDate">Last known entry date shown on the terminal.</param>
+    /// <param name="displayStatus">Status text ready for display.</param>
+    public void SetProfileData(SuspectData suspectData, string entryReason = "unknown", string lastEntryDate = "unknown", string displayStatus = "Alive")
     {
         nameText.text = "Name: " + suspectData.FirstName + " " + suspectData.LastName;
         dateOfBirthText.text =  "DoB: " + suspectData.DateOfBirth;
         genderText.text = "Sex: " + suspectData.Sex;
-        lastExitText.text = "Last Exit: " + lastExitDate;
+        lastExitText.text = "Last Entry: " + NormalizeUnknown(lastEntryDate);
         if (reasonText != null)
         {
-            bool hasReason = !string.IsNullOrWhiteSpace(lastExitReason);
-            reasonText.gameObject.SetActive(hasReason);
-            if (hasReason)
-                reasonText.text = "Reason: " + lastExitReason;
+            reasonText.gameObject.SetActive(true);
+            reasonText.text = "Reason: " + NormalizeUnknown(entryReason);
         }
         idNumberText.text = "ID:" + suspectData.IDNumber;
 
@@ -47,12 +51,7 @@ public class ProfilePage : MonoBehaviour
         profileImage.sprite = sprite;
         profileImage.enabled = true;
 
-        // Status stamp (DECEASED / REPLACED)
-        if (statusStampText != null)
-        {
-            statusStampText.text = status;
-            statusStampText.gameObject.SetActive(!string.IsNullOrEmpty(status));
-        }
+        SetStatus(displayStatus);
     }
 
     public void SetNewsData(TerminalNewsEntry newsEntry)
@@ -89,6 +88,50 @@ public class ProfilePage : MonoBehaviour
     {
         SetButtonState(prevButton, canGoPrev);
         SetButtonState(nextButton, canGoNext);
+    }
+
+    private void SetStatus(string status)
+    {
+        CacheStatusText();
+        if (statusStampText == null)
+            return;
+
+        statusStampText.gameObject.SetActive(true);
+        statusStampText.text = "Status: " + NormalizeUnknown(status);
+    }
+
+    private void CacheStatusText()
+    {
+        if (statusStampText != null)
+            return;
+
+        Transform statusTransform = FindDescendantByName(transform, StatusObjectName);
+        if (statusTransform != null)
+            statusStampText = statusTransform.GetComponent<TextMeshProUGUI>();
+    }
+
+    private static Transform FindDescendantByName(Transform root, string targetName)
+    {
+        if (root == null)
+            return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child.name == targetName)
+                return child;
+
+            Transform result = FindDescendantByName(child, targetName);
+            if (result != null)
+                return result;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeUnknown(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
     }
 
     private void SetButtonState(ClickablePCElement button, bool enabled)
