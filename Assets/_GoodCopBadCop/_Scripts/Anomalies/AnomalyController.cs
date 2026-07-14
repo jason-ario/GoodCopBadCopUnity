@@ -236,21 +236,13 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// Activates exactly <paramref name="count"/> anomalies from the documentation pool only.
-    /// All other categories are fully disabled. Used for tutorial suspects (e.g. Ivan on Day 1)
-    /// that must exhibit documentation discrepancies and nothing else.
+    /// Used for tutorial suspects (e.g. Ivan on Day 1) that must exhibit paperwork
+    /// discrepancies. Other categories stay unavailable through the normal unlock rules.
     /// Only unlocked documentation anomalies are eligible for selection.
     /// </summary>
     public void InitializeWithDocumentationAnomalies(int count)
     {
         ClearInitializationState(deactivateActive: true);
-
-        // Disable every non-documentation anomaly first.
-        var others = new List<Anomaly>();
-        others.AddRange(_vitalsAnomalies.Cast<Anomaly>());
-        others.AddRange(_behaviorAnomalies.Cast<Anomaly>());
-        others.AddRange(_mutationAnomalies.Cast<Anomaly>());
-        others.AddRange(_supernaturalAnomalies.Cast<Anomaly>());
-        foreach (Anomaly a in others) InitializeDisabled(a);
 
         // Filter to unlocked documentation anomalies, then shuffle and activate.
         var docPool = FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList());
