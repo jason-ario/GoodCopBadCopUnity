@@ -2,6 +2,7 @@ using GoodCopBadCop.SuspectPaperwork;
 using NUnit.Framework;
 using System;
 using System.Globalization;
+using System.Linq;
 using UnityEngine;
 
 namespace GoodCopBadCop.Editor.Tests
@@ -92,6 +93,43 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.AreNotEqual(data.DateOfBirth, first.ApplicationBirthDate);
             AssertDocumentDate(data.DateOfBirth, "dd/MM/yyyy");
             AssertDocumentDate(first.ApplicationBirthDate, "dd/MM/yyyy");
+        }
+
+        [Test]
+        public void BuildForPreview_BirthDateWrong_PrefersSimilarDigitReplacement()
+        {
+            string[] anomalies = { nameof(BirthDateWrongAnomaly) };
+            data.DateOfBirth = "12/03/1984";
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 1, 0);
+
+            Assert.AreNotEqual(data.DateOfBirth, state.ApplicationBirthDate);
+            AssertDocumentDate(state.ApplicationBirthDate, "dd/MM/yyyy");
+            AssertSimilarDigitChanges(data.DateOfBirth, state.ApplicationBirthDate, preserve: '/');
+        }
+
+        [Test]
+        public void BuildForPreview_BirthDateWrong_HandlesLeapDay()
+        {
+            string[] anomalies = { nameof(BirthDateWrongAnomaly) };
+            data.DateOfBirth = "29/02/2024";
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 5, 2);
+
+            Assert.AreNotEqual(data.DateOfBirth, state.ApplicationBirthDate);
+            AssertDocumentDate(state.ApplicationBirthDate, "dd/MM/yyyy");
+        }
+
+        [Test]
+        public void BuildForPreview_BirthDateWrong_HandlesMonthEnd()
+        {
+            string[] anomalies = { nameof(BirthDateWrongAnomaly) };
+            data.DateOfBirth = "31/01/2030";
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 7, 4);
+
+            Assert.AreNotEqual(data.DateOfBirth, state.ApplicationBirthDate);
+            AssertDocumentDate(state.ApplicationBirthDate, "dd/MM/yyyy");
         }
 
         [Test]
@@ -197,25 +235,28 @@ namespace GoodCopBadCop.Editor.Tests
         }
 
         [Test]
-        public void BuildForPreview_ExpirationDateAnomaly_CanChangeTextMonth()
+        public void BuildForPreview_ExpirationDateAnomaly_WithTextMonth_ChangesToValidDate()
         {
             string[] anomalies = { nameof(ExpirationDateAnomaly) };
             data.EntryPermitExpiryDate = "27 OCT";
 
-            bool changedMonth = false;
-            for (int currentDay = 1; currentDay <= 31; currentDay++)
-            {
-                SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, currentDay, 0);
-                AssertDocumentDate(state.ApplicationExpirationDate, "dd MMM");
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 3, 1);
 
-                if (!string.Equals(GetMonthToken(data.EntryPermitExpiryDate), GetMonthToken(state.ApplicationExpirationDate), StringComparison.Ordinal))
-                {
-                    changedMonth = true;
-                    break;
-                }
-            }
+            Assert.AreNotEqual(data.EntryPermitExpiryDate, state.ApplicationExpirationDate);
+            AssertDocumentDate(state.ApplicationExpirationDate, "dd MMM");
+        }
 
-            Assert.IsTrue(changedMonth);
+        [Test]
+        public void BuildForPreview_ExpirationDateAnomaly_FallsBackToNonSimilarDigitWhenSimilarDigitsCannotMakeValidDate()
+        {
+            string[] anomalies = { nameof(ExpirationDateAnomaly) };
+            data.EntryPermitExpiryDate = "31 MAY";
+
+            SuspectPaperworkState state = service.BuildForPreview(data, null, anomalies, 1, 0);
+
+            Assert.AreNotEqual(data.EntryPermitExpiryDate, state.ApplicationExpirationDate);
+            AssertDocumentDate(state.ApplicationExpirationDate, "dd MMM");
+            AssertHasNonSimilarDigitChange(data.EntryPermitExpiryDate, state.ApplicationExpirationDate, preserve: ' ');
         }
 
         [Test]
@@ -299,6 +340,28 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.Greater(changedDigits, 0);
         }
 
+        private static void AssertHasNonSimilarDigitChange(string original, string mutated, char preserve = '\0')
+        {
+            Assert.AreEqual(original.Length, mutated.Length);
+            bool hasNonSimilarDigitChange = false;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (original[i] == preserve || original[i] == mutated[i])
+                    continue;
+
+                if (!char.IsDigit(original[i]))
+                    continue;
+
+                if (!SimilarDigitReplacements(original[i]).Contains(mutated[i]))
+                {
+                    hasNonSimilarDigitChange = true;
+                    break;
+                }
+            }
+
+            Assert.IsTrue(hasNonSimilarDigitChange, $"Expected '{mutated}' to include at least one non-similar digit change from '{original}'.");
+        }
+
         private static char[] SimilarDigitReplacements(char digit)
         {
             switch (digit)
@@ -324,10 +387,5 @@ namespace GoodCopBadCop.Editor.Tests
                 $"Expected '{value}' to parse as '{format}'.");
         }
 
-        private static string GetMonthToken(string value)
-        {
-            string[] tokens = value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            return tokens.Length >= 2 ? tokens[1] : string.Empty;
-        }
     }
 }

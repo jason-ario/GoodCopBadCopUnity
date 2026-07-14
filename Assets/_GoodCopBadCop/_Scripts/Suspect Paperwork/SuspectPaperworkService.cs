@@ -241,13 +241,6 @@ namespace GoodCopBadCop.SuspectPaperwork
             new[] { '0', '8' }
         };
 
-        private enum DatePart
-        {
-            Day,
-            Month,
-            Year
-        }
-
         private readonly struct ParsedDocumentDate
         {
             public readonly DateTime Date;
@@ -302,20 +295,13 @@ namespace GoodCopBadCop.SuspectPaperwork
             if (!TryParseDocumentDate(value, out ParsedDocumentDate parsed))
                 return value;
 
-            List<DatePart> parts = new() { DatePart.Day, DatePart.Month };
-            if (parsed.HasYear)
-                parts.Add(DatePart.Year);
+            string formatted = FormatDocumentDate(parsed.Date, parsed);
+            if (TryMutateDateWithDigitReplacements(formatted, parsed, seed, similarOnly: true, out string mutated))
+                return mutated;
 
-            DateTime mutated = parsed.Date;
-            for (int attempt = 0; attempt < parts.Count; attempt++)
-            {
-                DatePart part = parts[PositiveModulo(Mix(seed, attempt), parts.Count)];
-                mutated = MutateDatePart(parsed.Date, part, Mix(seed, attempt + 41));
-                if (mutated != parsed.Date)
-                    break;
-            }
-
-            return FormatDocumentDate(mutated, parsed);
+            return TryMutateDateWithDigitReplacements(formatted, parsed, seed, similarOnly: false, out mutated)
+                ? mutated
+                : value;
         }
 
         private static bool TryParseDocumentDate(string value, out ParsedDocumentDate parsed)
@@ -359,44 +345,88 @@ namespace GoodCopBadCop.SuspectPaperwork
             return false;
         }
 
-        private static DateTime MutateDatePart(DateTime date, DatePart part, int seed)
+        private static bool TryMutateDateWithDigitReplacements(string formatted, ParsedDocumentDate original, int seed, bool similarOnly, out string mutated)
         {
-            switch (part)
+            mutated = null;
+
+            char[] chars = formatted.ToCharArray();
+            var digitIndices = new List<int>();
+            for (int i = 0; i < chars.Length; i++)
             {
-                case DatePart.Day:
-                    return new DateTime(date.Year, date.Month, MutateDay(date.Day, date.Year, date.Month, seed));
-                case DatePart.Month:
-                    int month = MutateMonth(date.Month, seed);
-                    int day = Mathf.Min(date.Day, DateTime.DaysInMonth(date.Year, month));
-                    return new DateTime(date.Year, month, day);
-                case DatePart.Year:
-                    int year = MutateYear(date.Year, seed);
-                    int clampedDay = Mathf.Min(date.Day, DateTime.DaysInMonth(year, date.Month));
-                    return new DateTime(year, date.Month, clampedDay);
-                default:
-                    return date;
+                if (char.IsDigit(chars[i]))
+                    digitIndices.Add(i);
+            }
+
+            if (digitIndices.Count == 0)
+                return false;
+
+            var candidates = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            AddDateCandidates(chars, digitIndices, original, candidates, seen, similarOnly, firstIndex: -1, firstReplacement: '\0');
+
+            for (int i = 0; i < digitIndices.Count; i++)
+            {
+                int firstIndex = digitIndices[i];
+                foreach (char firstReplacement in GetDateDigitReplacements(chars[firstIndex], similarOnly))
+                    AddDateCandidates(chars, digitIndices, original, candidates, seen, similarOnly, firstIndex, firstReplacement);
+            }
+
+            if (candidates.Count == 0)
+                return false;
+
+            mutated = candidates[PositiveModulo(seed, candidates.Count)];
+            return true;
+        }
+
+        private static void AddDateCandidates(
+            char[] source,
+            List<int> digitIndices,
+            ParsedDocumentDate original,
+            List<string> candidates,
+            HashSet<string> seen,
+            bool similarOnly,
+            int firstIndex,
+            char firstReplacement)
+        {
+            foreach (int secondIndex in digitIndices)
+            {
+                if (secondIndex == firstIndex)
+                    continue;
+
+                foreach (char secondReplacement in GetDateDigitReplacements(source[secondIndex], similarOnly))
+                {
+                    char[] chars = (char[])source.Clone();
+                    if (firstIndex >= 0)
+                        chars[firstIndex] = firstReplacement;
+                    chars[secondIndex] = secondReplacement;
+
+                    string candidate = new string(chars);
+                    if (!seen.Add(candidate))
+                        continue;
+
+                    if (!TryParseDocumentDate(candidate, out ParsedDocumentDate parsed) || parsed.Date == original.Date)
+                        continue;
+
+                    candidates.Add(FormatDocumentDate(parsed.Date, original));
+                }
             }
         }
 
-        private static int MutateDay(int day, int year, int month, int seed)
+        private static IEnumerable<char> GetDateDigitReplacements(char digit, bool similarOnly)
         {
-            int daysInMonth = DateTime.DaysInMonth(year, month);
-            if (daysInMonth <= 1)
-                return day;
+            char[] similar = SimilarDigitReplacements[digit - '0'];
+            if (similarOnly)
+                return similar;
 
-            return 1 + PositiveModulo(day - 1 + 1 + PositiveModulo(seed, daysInMonth - 1), daysInMonth);
-        }
+            var replacements = new List<char>(9);
+            for (char candidate = '0'; candidate <= '9'; candidate++)
+            {
+                if (candidate != digit && !similar.Contains(candidate))
+                    replacements.Add(candidate);
+            }
 
-        private static int MutateMonth(int month, int seed)
-            => 1 + PositiveModulo(month - 1 + 1 + PositiveModulo(seed, 11), 12);
-
-        private static int MutateYear(int year, int seed)
-        {
-            int offset = 1 + PositiveModulo(seed, 8);
-            if (PositiveModulo(seed, 2) == 0)
-                offset = -offset;
-
-            return Mathf.Clamp(year + offset, 1, 9999);
+            return replacements;
         }
 
         private static string FormatDocumentDate(DateTime date, ParsedDocumentDate parsed)
