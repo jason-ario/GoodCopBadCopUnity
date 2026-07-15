@@ -12,7 +12,7 @@ using UnityEngine;
 
 public class PC : Interactable
 {
-    private enum TerminalSection { All, Residents, Deceased, Quarantine, News }
+    private enum TerminalSection { All, Active, Deceased, Quarantine, News }
     private enum TerminalScreen { RootMenu, RegistryMenu, List, Profile, NewsEntry }
 
     private struct NavState
@@ -148,13 +148,14 @@ public class PC : Interactable
         ShowFileList("Registry", "Folders", new List<PCListItemModel>
         {
             new PCListItemModel("All", PCListItemIcon.Folder, OpenAll),
-            new PCListItemModel("Residents", PCListItemIcon.Folder, OpenResidents),
+            new PCListItemModel("Active", PCListItemIcon.Folder, OpenActive),
             new PCListItemModel("Quarantine", PCListItemIcon.Folder, OpenQuarantine),
             new PCListItemModel("Deceased", PCListItemIcon.Folder, OpenDeceased)
         });
     }
 
-    public void OpenResidents() => OpenSuspectList(TerminalSection.Residents, $"RESIDENTS: {GetAllNamedSuspects().Count}", GetAllNamedSuspects(), false);
+    public void OpenResidents() => OpenActive();
+    public void OpenActive() => OpenSuspectList(TerminalSection.Active, $"ACTIVE: {GetActiveSuspects().Count}", GetActiveSuspects(), false);
     public void OpenAll() => OpenSuspectList(TerminalSection.All, $"RECORDS: {GetAllNamedSuspects().Count}", GetAllNamedSuspects(), false);
     public void OpenDeceased() => OpenSuspectList(TerminalSection.Deceased, $"DECEASED: {GetDeceasedCount()}", GetAllNamedSuspects().Where(IsDeceased), false);
 
@@ -333,11 +334,36 @@ public class PC : Interactable
             SuspectData suspect = suspects[i];
             if (suspect == null) continue;
             string displayName = suspect.LastName + ", " + suspect.FirstName;
-            string status = GetTerminalStatus(suspect);
+            string status = GetListStatus(suspect);
             string text = string.IsNullOrWhiteSpace(status) ? displayName : displayName + " - " + status;
             items.Add(new PCListItemModel(text, PCListItemIcon.Profile, () => OpenProfilePage(suspect), suspect.IDPhoto));
         }
         return items;
+    }
+
+    private string GetListStatus(SuspectData suspect)
+    {
+        if (_currentSection == TerminalSection.Deceased)
+            return GetDeathDate(suspect);
+
+        if (_currentSection == TerminalSection.Quarantine)
+        {
+            int daysLeft = SuspectRunRecords.Instance != null
+                ? SuspectRunRecords.Instance.GetRemainingQuarantineDays(suspect, GetCurrentDay())
+                : 0;
+            return $"{daysLeft} {(daysLeft == 1 ? "DAY" : "DAYS")} LEFT";
+        }
+
+        string status = GetTerminalStatus(suspect);
+        return status == "CLEAR" ? string.Empty : status;
+    }
+
+    private string GetDeathDate(SuspectData suspect)
+    {
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
+        return record != null && record.killedOnDay > 0
+            ? NewspaperStartDate.AddDays(record.killedOnDay - 1).ToString("MM/dd/yy")
+            : "unknown";
     }
 
     private List<PCListItemModel> BuildNewsItems()
@@ -403,7 +429,7 @@ public class PC : Interactable
     {
         switch (section)
         {
-            case TerminalSection.Residents: OpenResidents(); break;
+            case TerminalSection.Active: OpenActive(); break;
             case TerminalSection.Deceased: OpenDeceased(); break;
             case TerminalSection.Quarantine: OpenQuarantine(); break;
             case TerminalSection.News: OpenNews(); break;
@@ -535,6 +561,21 @@ public class PC : Interactable
         return SortSuspects(_suspectSet.suspects.Where(s => s != null));
     }
 
+    private List<SuspectData> GetActiveSuspects()
+    {
+        return SortSuspects(GetAllNamedSuspects().Where(IsActiveSuspect));
+    }
+
+    private bool IsActiveSuspect(SuspectData suspect)
+    {
+        return !IsDeceased(suspect) && !IsInQuarantine(suspect);
+    }
+
+    private bool IsInQuarantine(SuspectData suspect)
+    {
+        return SuspectRunRecords.Instance != null && SuspectRunRecords.Instance.IsInActiveQuarantine(suspect, GetCurrentDay());
+    }
+
     private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
     {
         return suspects.Where(HasTerminalName).OrderBy(s => NormalizeForAlphabet(s.LastName)).ThenBy(s => s.FirstName).ToList();
@@ -592,8 +633,8 @@ public class PC : Interactable
                 return $"QUARANTINE: {active}/{SuspectRunRecords.QuarantineSlotLimit} USED, {open} OPEN";
             case TerminalSection.Deceased:
                 return $"DECEASED: {GetDeceasedCount()}";
-            case TerminalSection.Residents:
-                return $"RESIDENTS: {_currentBaseList?.Count ?? 0}";
+            case TerminalSection.Active:
+                return $"ACTIVE: {_currentBaseList?.Count ?? 0}";
             case TerminalSection.News:
                 int count = _currentNewsEntries?.Count ?? 0;
                 return count > 0 ? $"NEWS ARCHIVE: {count} ISSUES" : "NEWS ARCHIVE: NO ISSUES";
