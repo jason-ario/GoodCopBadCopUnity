@@ -16,6 +16,12 @@ public class ClickablePCScrollbar : ClickablePCElement
     private bool isDragging;
     private Vector2 lastCursorLocalPos;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        SetFeedbackAnimationEnabled(false);
+    }
+
     public override void OnClick()
     {
         // Handle click itself does nothing special.

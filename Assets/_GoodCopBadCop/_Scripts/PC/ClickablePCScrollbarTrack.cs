@@ -4,6 +4,12 @@ public class ClickablePCScrollbarTrack : ClickablePCElement
 {
     [SerializeField] private ClickablePCScrollbar targetScrollbar;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        SetFeedbackAnimationEnabled(false);
+    }
+
     public override void OnClick()
     {
         if (targetScrollbar == null)

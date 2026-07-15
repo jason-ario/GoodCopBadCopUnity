@@ -12,56 +12,21 @@ using UnityEngine;
 
 public class PC : Interactable
 {
-    private enum TerminalSection
-    {
-        All,
-        Residents,
-        Deceased,
-        Quarantine,
-        News
-    }
+    private enum TerminalSection { All, Residents, Deceased, Quarantine, News }
+    private enum TerminalScreen { RootMenu, RegistryMenu, List, Profile, NewsEntry }
 
-    private enum MainMenuMode
-    {
-        Root,
-        Registry
-    }
-
-    private enum TerminalScreen
-    {
-        RootMenu,
-        RegistryMenu,
-        List,
-        Profile,
-        NewsEntry
-    }
-
-    private struct TerminalNavigationState
+    private struct NavState
     {
         public TerminalScreen Screen;
-        public MainMenuMode MenuMode;
         public TerminalSection Section;
-        public SuspectData ProfileSuspect;
-        public TerminalNewsEntry NewsEntry;
-
-        public static TerminalNavigationState Root()
-        {
-            return new TerminalNavigationState
-            {
-                Screen = TerminalScreen.RootMenu,
-                MenuMode = MainMenuMode.Root,
-                Section = TerminalSection.All
-            };
-        }
+        public SuspectData Suspect;
+        public TerminalNewsEntry News;
+        public static NavState Root() => new NavState { Screen = TerminalScreen.RootMenu, Section = TerminalSection.All };
     }
 
-    private const string MainMenuVillageName = "Saplavi";
-    private const string MainMenuPopulationObjectName = "Main Menu Population";
-    private const string UpDirectoryButtonName = "Up Directory (1)";
-    private const string ProfileUpDirectoryButtonName = "Up Directory";
+    private const string VillageName = "Saplavi";
     private const int DefaultTerminalPopulation = 300;
-    private static readonly Vector2 MainMenuTitlePosition = new Vector2(-0.056f, 1.168f);
-    private static readonly Vector2 MainMenuPopulationPosition = new Vector2(0f, -0.85f);
+    private static readonly DateTime NewspaperStartDate = new DateTime(1989, 10, 20);
 
     [Header("Data")]
     [SerializeField] private SuspectSet _suspectSet;
@@ -71,82 +36,83 @@ public class PC : Interactable
     [SerializeField] private GameObject computerCamera;
     [SerializeField] private Transform lookAtTarget;
     [SerializeField] private Transform standPos;
-    private bool pcActive = false;
-    private PlayerInteractionController _player;
     [SerializeField] private SimpleCanvasCursorFromMouseDelta _virtualCanvasCursor;
 
-    [Header("Screens")]
+    [Header("Terminal")]
+    [SerializeField] private TextMeshProUGUI header;
+    [SerializeField] private FileListView fileListView;
+    [SerializeField] private ProfileView profileView;
+    [SerializeField] private NewsView newsView;
+    [SerializeField] private ClickablePCElement backButton;
+    [SerializeField] private ClickablePCElement previousButton;
+    [SerializeField] private ClickablePCElement nextButton;
+    [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
+
+    [Header("Legacy References")]
     [SerializeField] private GameObject mainScreen;
     [SerializeField] private GameObject suspectListScreen;
     [SerializeField] private ProfilePage profilePage;
-
-    [Header("Optional UI Renderer")]
     [SerializeField] private TerminalRecordListUI terminalRecordListUI;
-
-    [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
     [SerializeField] private ClickablePCScrollbar PCScrollbar;
+    [SerializeField] private PCFolderTab[] _folderTabs;
 
     [VContainer.Inject] private IPopulationModel _populationModel;
 
-    // Profile navigation state
+    private bool pcActive;
+    private bool isOn;
+    private PlayerInteractionController _player;
     private SuspectData _currentProfileSuspect;
     private int _currentProfileIndex = -1;
-    [SerializeField] private PCFolderTab[] _folderTabs;
-    private bool isOn;
-
-    // List management
-    private List<SuspectData> _currentBaseList;
-    private List<SuspectData> _currentVisibleList;
+    private int _currentNewsIndex = -1;
+    private List<SuspectData> _currentBaseList = new();
+    private List<SuspectData> _currentVisibleList = new();
     private List<TerminalNewsEntry> _currentNewsEntries = new();
     private bool _showQuarantineDays;
     private TerminalSection _currentSection = TerminalSection.All;
     private int _debugCurrentDayOverride = -1;
-    private TextMeshProUGUI _mainMenuPopulationLabel;
-    private ClickablePCElement _upDirectoryButton;
-    private ClickablePCElement _profileUpDirectoryButton;
-    private Transform _upDirectoryOriginalParent;
-    private UnityEngine.Events.UnityAction _upDirectoryBackAction;
-    private MainMenuMode _mainMenuMode = MainMenuMode.Root;
-    private readonly Stack<TerminalNavigationState> _terminalBackStack = new();
-    private TerminalNavigationState _currentNavigationState = TerminalNavigationState.Root();
-    private bool _restoringTerminalNavigation;
-    private TerminalNewsEntry _currentNewsEntry;
-    private static readonly DateTime NewspaperStartDate = new DateTime(1989, 10, 20);
+    private readonly Stack<NavState> _backStack = new();
+    private NavState _currentState = NavState.Root();
+    private bool _restoring;
+
+    private void Awake() => ResolveReferences();
 
     private void Start()
     {
-        CacheUpDirectoryButton();
-        CacheProfileDirectoryButton();
+        ResolveReferences();
         CloseAllScreens();
+        RefreshNavigationButtons();
     }
 
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-
+        ResolveReferences();
         player.playerMovementController.SetCanControl(false);
         player.SetCanInteract(false, "");
-
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Confined;
         ShowPCBackButton();
 
-        player.playerMovementController.LookAtTarget(lookAtTarget.transform);
-        player.transform.DOMove(standPos.position, 0.5f);
-        player.transform.DORotate(standPos.rotation.eulerAngles, 0.5f);
-
-        //Move camera
-        player.playerMovementController.MoveCameraTo(computerCamera.transform);
+        if (lookAtTarget != null)
+            player.playerMovementController.LookAtTarget(lookAtTarget.transform);
+        if (standPos != null)
+        {
+            player.transform.DOMove(standPos.position, 0.5f);
+            player.transform.DORotate(standPos.rotation.eulerAngles, 0.5f);
+        }
+        if (computerCamera != null)
+            player.playerMovementController.MoveCameraTo(computerCamera.transform);
 
         pcActive = true;
         _player = player;
-        _virtualCanvasCursor.enabled = true;
+        if (_virtualCanvasCursor != null)
+            _virtualCanvasCursor.enabled = true;
 
         if (!isOn)
         {
             isOn = true;
-            ResetTerminalNavigation();
-            OpenScreen(mainScreen);
+            ResetNavigation();
+            OpenRootMenu();
         }
 
         ClearCurrentProfileSelection();
@@ -154,154 +120,296 @@ public class PC : Interactable
 
     private void Update()
     {
-        if (!pcActive) return;
-
-        if (Input.GetButtonDown("Back"))
-        {
+        if (pcActive && Input.GetButtonDown("Back"))
             HandleBackButton();
-        }
     }
 
-    private void ShowPCBackButton()
+    public void DebugSetCurrentDay(int currentDay) => _debugCurrentDayOverride = currentDay;
+
+    public void DebugOpenTerminal()
     {
-        if (UIController.Instance == null)
-            return;
-
-        UIController.Instance.HideBackButton();
-        UIController.Instance.ShowBackButton(HandleBackButton);
-    }
-
-    private void HandleBackButton()
-    {
-        if (GoBack())
-            return;
-
-        ExitPC();
-    }
-
-    private void ExitPC()
-    {
-        pcActive = false;
-
-        if (UIController.Instance != null)
-            UIController.Instance.HideBackButton();
-
-        Cursor.visible = false;
-        Cursor.lockState = CursorLockMode.Locked;
-
+        ResolveReferences();
+        pcActive = true;
+        isOn = true;
+        ResetNavigation();
         if (_virtualCanvasCursor != null)
-            _virtualCanvasCursor.enabled = false;
-
-        if (_player == null)
-            return;
-
-        _player.SetCanInteract(true, "");
-        _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
+            _virtualCanvasCursor.enabled = true;
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Confined;
+        ShowPCBackButton();
+        OpenRootMenu();
+        ClearCurrentProfileSelection();
     }
 
     public void OpenScreen(GameObject screen)
     {
-        CloseAllScreens();
-
-        suspectListScreen.SetActive(screen == suspectListScreen);
-        mainScreen.SetActive(screen == mainScreen);
-
-        if (screen == mainScreen)
-            RefreshMainMenu();
-
-        RefreshUpDirectoryButton(screen);
-        RefreshMouseNow();
-        StartCoroutine(WaitAndRefreshMouse());
+        OpenRootMenu();
     }
 
-    public void DebugSetCurrentDay(int currentDay)
+    public void CloseAllScreens()
     {
-        _debugCurrentDayOverride = currentDay;
+        SetViewActive(fileListView, false);
+        SetViewActive(profileView, false);
+        SetViewActive(newsView, false);
+        if (mainScreen != null) mainScreen.SetActive(false);
+        if (suspectListScreen != null) suspectListScreen.SetActive(false);
+        if (profilePage != null) profilePage.gameObject.SetActive(false);
+    }
+    public void OpenRegistry()
+    {
+        PushCurrentState();
+        _currentState = new NavState { Screen = TerminalScreen.RegistryMenu, Section = _currentSection };
+        ShowFileList("Registry", "Folders", new List<PCListItemModel>
+        {
+            new PCListItemModel("All", PCListItemIcon.Folder, OpenAll),
+            new PCListItemModel("Residents", PCListItemIcon.Folder, OpenResidents),
+            new PCListItemModel("Quarantine", PCListItemIcon.Folder, OpenQuarantine),
+            new PCListItemModel("Deceased", PCListItemIcon.Folder, OpenDeceased)
+        });
     }
 
-    public void DebugOpenTerminal()
+    public void OpenResidents() => OpenSuspectList(TerminalSection.Residents, $"RESIDENTS: {GetAllNamedSuspects().Count}", GetAllNamedSuspects(), false);
+    public void OpenAll() => OpenSuspectList(TerminalSection.All, $"RECORDS: {GetAllNamedSuspects().Count}", GetAllNamedSuspects(), false);
+    public void OpenDeceased() => OpenSuspectList(TerminalSection.Deceased, $"DECEASED: {GetDeceasedCount()}", GetAllNamedSuspects().Where(IsDeceased), false);
+
+    public void OpenQuarantine()
     {
-        _mainMenuMode = MainMenuMode.Root;
-        pcActive = true;
-        isOn = true;
-        ResetTerminalNavigation();
+        int day = GetCurrentDay();
+        int active = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.GetActiveQuarantineCount(day) : 0;
+        int open = Mathf.Max(0, SuspectRunRecords.QuarantineSlotLimit - active);
+        IEnumerable<SuspectData> suspects = SuspectRunRecords.Instance != null
+            ? SuspectRunRecords.Instance.GetActiveQuarantineRecords(day).Where(r => r?.SuspectData != null).Select(r => r.SuspectData)
+            : Enumerable.Empty<SuspectData>();
+        OpenSuspectList(TerminalSection.Quarantine, $"QUARANTINE: {active}/{SuspectRunRecords.QuarantineSlotLimit} USED, {open} OPEN", suspects, true);
+    }
 
-        if (_virtualCanvasCursor != null)
-            _virtualCanvasCursor.enabled = true;
-
-        Cursor.visible = false;
-        Cursor.lockState = CursorLockMode.Confined;
-
-        ShowPCBackButton();
-        OpenScreen(mainScreen);
-        RefreshMouseNow();
+    public void OpenNews()
+    {
+        PushCurrentState();
+        _currentSection = TerminalSection.News;
+        _showQuarantineDays = false;
+        _currentBaseList = new List<SuspectData>();
+        _currentVisibleList = new List<SuspectData>();
+        _currentNewsEntries = BuildNewsEntries();
+        _currentNewsIndex = -1;
         ClearCurrentProfileSelection();
+        _currentState = new NavState { Screen = TerminalScreen.List, Section = TerminalSection.News };
+        ShowFileList("News", GetSectionSummary(), BuildNewsItems());
     }
 
-    private IEnumerator WaitAndRefreshMouse()
+    public void OpenProfilePage(SuspectData suspectData) => OpenProfilePage(suspectData, true);
+    public void OpenNewsEntryPage(TerminalNewsEntry newsEntry) => OpenNewsEntryPage(newsEntry, true);
+
+    public void OpenNextProfile()
     {
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForEndOfFrame();
-        RefreshMouseNow();
+        List<SuspectData> list = GetProfileNavigationList();
+        if (list.Count == 0 || _currentProfileIndex < 0) return;
+        OpenProfilePage(list[Mathf.Min(_currentProfileIndex + 1, list.Count - 1)], false);
+    }
+
+    public void OpenPreviousProfile()
+    {
+        List<SuspectData> list = GetProfileNavigationList();
+        if (list.Count == 0 || _currentProfileIndex < 0) return;
+        OpenProfilePage(list[Mathf.Max(0, _currentProfileIndex - 1)], false);
+    }
+
+    public bool CanOpenNextProfile() => GetProfileNavigationList().Count > 0 && _currentProfileIndex >= 0 && _currentProfileIndex < GetProfileNavigationList().Count - 1;
+    public bool CanOpenPreviousProfile() => GetProfileNavigationList().Count > 0 && _currentProfileIndex > 0;
+
+    public string GetTerminalStatus(SuspectData suspectData)
+    {
+        string status = GetBaseStatus(suspectData);
+        if (status != "QUARANTINED" || !_showQuarantineDays)
+            return status;
+        int daysLeft = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.GetRemainingQuarantineDays(suspectData, GetCurrentDay()) : 0;
+        return $"QUARANTINED - {daysLeft} {(daysLeft == 1 ? "DAY" : "DAYS")} LEFT";
+    }
+
+    public void FilterAF() => FilterByLastNameRange('A', 'F');
+    public void FilterGL() => FilterByLastNameRange('G', 'L');
+    public void FilterMR() => FilterByLastNameRange('M', 'R');
+    public void FilterSZ() => FilterByLastNameRange('S', 'Z');
+
+    public void ClearLetterFilter()
+    {
+        if (_currentSection == TerminalSection.News)
+        {
+            ShowFileList("News", GetSectionSummary(), BuildNewsItems());
+            return;
+        }
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
+        RenderCurrentList();
     }
 
     private void OpenRootMenu()
     {
-        _mainMenuMode = MainMenuMode.Root;
-        _upDirectoryBackAction = null;
-        _currentNavigationState = TerminalNavigationState.Root();
-        OpenScreen(mainScreen);
+        _currentState = NavState.Root();
+        ShowFileList(VillageName, $"Population: {GetPopulationAliveForTerminal()}", new List<PCListItemModel>
+        {
+            new PCListItemModel("Registry", PCListItemIcon.Folder, OpenRegistry),
+            new PCListItemModel("News", PCListItemIcon.Folder, OpenNews)
+        });
     }
 
-    private void ResetTerminalNavigation()
+    private void OpenSuspectList(TerminalSection section, string label, IEnumerable<SuspectData> suspects, bool showQuarantineDays)
     {
-        _terminalBackStack.Clear();
-        _currentNewsEntry = null;
-        _currentNavigationState = TerminalNavigationState.Root();
-        _upDirectoryBackAction = null;
+        PushCurrentState();
+        _currentSection = section;
+        _showQuarantineDays = showQuarantineDays;
+        _currentBaseList = SortSuspects(suspects ?? Enumerable.Empty<SuspectData>());
+        _currentVisibleList = new List<SuspectData>(_currentBaseList);
+        ClearCurrentProfileSelection();
+        _currentState = new NavState { Screen = TerminalScreen.List, Section = section };
+        ShowFileList("Registry", label, BuildSuspectItems(_currentVisibleList));
     }
 
-    private void PrepareForwardNavigation()
+    private void OpenProfilePage(SuspectData suspectData, bool recordHistory)
     {
-        if (!_restoringTerminalNavigation)
-            _terminalBackStack.Push(_currentNavigationState);
-
-        _upDirectoryBackAction = () => GoBack();
+        if (suspectData == null) return;
+        if (recordHistory) PushCurrentState();
+        _currentProfileSuspect = suspectData;
+        _currentProfileIndex = GetProfileNavigationIndex(suspectData);
+        _currentNewsIndex = -1;
+        CloseAllScreens();
+        SetHeader("Profile");
+        SetViewActive(profileView, true);
+        profileView.Show(suspectData, GetProfileEntryReason(suspectData), GetProfileLastEntryDate(suspectData), GetProfileStatus(suspectData));
+        _currentState = new NavState { Screen = TerminalScreen.Profile, Section = _currentSection, Suspect = suspectData };
+        RefreshNavigationButtons();
+        RefreshMouseDelayed();
     }
 
+    private void OpenNewsEntryPage(TerminalNewsEntry newsEntry, bool recordHistory)
+    {
+        if (newsEntry == null) return;
+        if (recordHistory) PushCurrentState();
+        _currentNewsIndex = GetNewsNavigationIndex(newsEntry);
+        ClearCurrentProfileSelection();
+        CloseAllScreens();
+        SetHeader("News");
+        SetViewActive(newsView, true);
+        newsView.Show(newsEntry);
+        _currentState = new NavState { Screen = TerminalScreen.NewsEntry, Section = TerminalSection.News, News = newsEntry };
+        RefreshNavigationButtons();
+        RefreshMouseDelayed();
+    }
+    private void OpenNextNews()
+    {
+        if (_currentNewsEntries == null || _currentNewsEntries.Count == 0 || _currentNewsIndex < 0) return;
+        OpenNewsEntryPage(_currentNewsEntries[Mathf.Min(_currentNewsIndex + 1, _currentNewsEntries.Count - 1)], false);
+    }
+
+    private void OpenPreviousNews()
+    {
+        if (_currentNewsEntries == null || _currentNewsEntries.Count == 0 || _currentNewsIndex < 0) return;
+        OpenNewsEntryPage(_currentNewsEntries[Mathf.Max(0, _currentNewsIndex - 1)], false);
+    }
+
+    private bool CanOpenNextNews() => _currentNewsEntries != null && _currentNewsIndex >= 0 && _currentNewsIndex < _currentNewsEntries.Count - 1;
+    private bool CanOpenPreviousNews() => _currentNewsEntries != null && _currentNewsIndex > 0;
+
+    private int GetNewsNavigationIndex(TerminalNewsEntry newsEntry)
+    {
+        if (newsEntry == null || _currentNewsEntries == null) return -1;
+        for (int i = 0; i < _currentNewsEntries.Count; i++)
+            if (_currentNewsEntries[i] == newsEntry || _currentNewsEntries[i]?.Day == newsEntry.Day)
+                return i;
+        return -1;
+    }
+
+    private void RenderCurrentList()
+    {
+        if (_currentSection == TerminalSection.News)
+        {
+            ShowFileList("News", GetSectionSummary(), BuildNewsItems());
+            return;
+        }
+        ShowFileList("Registry", GetSectionSummary(), BuildSuspectItems(_currentVisibleList));
+    }
+
+    private void ShowFileList(string headerText, string label, IReadOnlyList<PCListItemModel> items)
+    {
+        CloseAllScreens();
+        SetHeader(headerText);
+        SetViewActive(fileListView, true);
+        fileListView.Show(label, items);
+        RefreshNavigationButtons();
+        RefreshMouseDelayed();
+    }
+
+    private List<PCListItemModel> BuildSuspectItems(IReadOnlyList<SuspectData> suspects)
+    {
+        var items = new List<PCListItemModel>();
+        if (suspects == null) return items;
+        for (int i = 0; i < suspects.Count; i++)
+        {
+            SuspectData suspect = suspects[i];
+            if (suspect == null) continue;
+            string displayName = suspect.LastName + ", " + suspect.FirstName;
+            string status = GetTerminalStatus(suspect);
+            string text = string.IsNullOrWhiteSpace(status) ? displayName : displayName + " - " + status;
+            items.Add(new PCListItemModel(text, PCListItemIcon.Profile, () => OpenProfilePage(suspect), suspect.IDPhoto));
+        }
+        return items;
+    }
+
+    private List<PCListItemModel> BuildNewsItems()
+    {
+        var items = new List<PCListItemModel>();
+        if (_currentNewsEntries == null) return items;
+        for (int i = 0; i < _currentNewsEntries.Count; i++)
+        {
+            TerminalNewsEntry newsEntry = _currentNewsEntries[i];
+            string newsHeader = newsEntry?.Content != null ? newsEntry.Content.headerText : "MISSING NEWS ENTRY";
+            string date = newsEntry != null ? newsEntry.Date : "UNKNOWN DATE";
+            items.Add(new PCListItemModel($"{date} - {newsHeader}", PCListItemIcon.Unknown, () => OpenNewsEntryPage(newsEntry), null, newsEntry?.Content != null));
+        }
+        return items;
+    }
+
+    private void RefreshNavigationButtons()
+    {
+        ConfigureButton(backButton, _backStack.Count > 0, () => GoBack());
+        bool profileScreen = _currentState.Screen == TerminalScreen.Profile;
+        bool newsScreen = _currentState.Screen == TerminalScreen.NewsEntry;
+        ConfigureButton(previousButton, profileScreen ? CanOpenPreviousProfile() : newsScreen && CanOpenPreviousNews(), profileScreen ? OpenPreviousProfile : newsScreen ? OpenPreviousNews : null);
+        ConfigureButton(nextButton, profileScreen ? CanOpenNextProfile() : newsScreen && CanOpenNextNews(), profileScreen ? OpenNextProfile : newsScreen ? OpenNextNews : null);
+    }
+
+    private static void ConfigureButton(ClickablePCElement button, bool visible, Action onClick)
+    {
+        if (button == null) return;
+        button.gameObject.SetActive(visible);
+        button.SetClickHandler(visible ? onClick : null);
+    }
+
+    private void PushCurrentState()
+    {
+        if (!_restoring)
+            _backStack.Push(_currentState);
+    }
 
     private bool GoBack()
     {
-        if (_terminalBackStack.Count == 0)
-            return false;
-
-        TerminalNavigationState previousState = _terminalBackStack.Pop();
-        _restoringTerminalNavigation = true;
-        ApplyTerminalNavigationState(previousState);
-        _restoringTerminalNavigation = false;
+        if (_backStack.Count == 0) return false;
+        NavState previous = _backStack.Pop();
+        _restoring = true;
+        ApplyNavigationState(previous);
+        _restoring = false;
         return true;
     }
 
-    private void ApplyTerminalNavigationState(TerminalNavigationState state)
+    private void ApplyNavigationState(NavState state)
     {
         switch (state.Screen)
         {
-            case TerminalScreen.RegistryMenu:
-                OpenRegistry();
-                break;
-            case TerminalScreen.List:
-                OpenSection(state.Section);
-                break;
-            case TerminalScreen.Profile:
-                OpenProfilePage(state.ProfileSuspect, false);
-                break;
-            case TerminalScreen.NewsEntry:
-                OpenNewsEntryPage(state.NewsEntry, false);
-                break;
+            case TerminalScreen.RegistryMenu: OpenRegistry(); break;
+            case TerminalScreen.List: OpenSection(state.Section); break;
+            case TerminalScreen.Profile: OpenProfilePage(state.Suspect, false); break;
+            case TerminalScreen.NewsEntry: OpenNewsEntryPage(state.News, false); break;
             case TerminalScreen.RootMenu:
-            default:
-                OpenRootMenu();
-                break;
+            default: OpenRootMenu(); break;
         }
     }
 
@@ -309,258 +417,20 @@ public class PC : Interactable
     {
         switch (section)
         {
-            case TerminalSection.Residents:
-                OpenResidents();
-                break;
-            case TerminalSection.Deceased:
-                OpenDeceased();
-                break;
-            case TerminalSection.Quarantine:
-                OpenQuarantine();
-                break;
-            case TerminalSection.News:
-                OpenNews();
-                break;
+            case TerminalSection.Residents: OpenResidents(); break;
+            case TerminalSection.Deceased: OpenDeceased(); break;
+            case TerminalSection.Quarantine: OpenQuarantine(); break;
+            case TerminalSection.News: OpenNews(); break;
             case TerminalSection.All:
-            default:
-                OpenAll();
-                break;
+            default: OpenAll(); break;
         }
     }
 
-    private void SetCurrentListNavigationState()
+    private void ResetNavigation()
     {
-        _currentNavigationState = new TerminalNavigationState
-        {
-            Screen = TerminalScreen.List,
-            MenuMode = _mainMenuMode,
-            Section = _currentSection
-        };
-    }
-    private void RefreshUpDirectoryButton(GameObject screen)
-    {
-        CacheUpDirectoryButton();
-        if (_upDirectoryButton == null)
-            return;
-
-        bool visible = _upDirectoryBackAction != null;
-        Transform parent = screen == mainScreen && visible
-            ? mainScreen.transform
-            : _upDirectoryOriginalParent;
-        SetUpDirectoryButtonParent(parent);
-        ConfigureUpDirectoryButton(visible, _upDirectoryBackAction);
-    }
-
-    private void ConfigureUpDirectoryButton(bool visible, UnityEngine.Events.UnityAction onClick)
-    {
-        if (_upDirectoryButton == null)
-            return;
-
-        _upDirectoryButton.gameObject.SetActive(visible);
-        _upDirectoryButton.onClickEvent = new UnityEngine.Events.UnityEvent();
-        if (onClick != null)
-            _upDirectoryButton.onClickEvent.AddListener(onClick);
-    }
-    private static void ConfigureUpDirectoryButton(ClickablePCElement button, bool visible, UnityEngine.Events.UnityAction onClick)
-    {
-        if (button == null)
-            return;
-
-        button.gameObject.SetActive(visible);
-        button.onClickEvent = new UnityEngine.Events.UnityEvent();
-        if (onClick != null)
-            button.onClickEvent.AddListener(onClick);
-    }
-
-    private void RefreshProfileUpDirectoryButton()
-    {
-        CacheProfileDirectoryButton();
-        if (_profileUpDirectoryButton == null)
-            return;
-
-        ConfigureUpDirectoryButton(_profileUpDirectoryButton, _upDirectoryBackAction != null, _upDirectoryBackAction);
-    }
-
-    private void SetUpDirectoryButtonParent(Transform parent)
-    {
-        if (_upDirectoryButton == null || parent == null || _upDirectoryButton.transform.parent == parent)
-            return;
-
-        _upDirectoryButton.transform.SetParent(parent, false);
-    }
-
-    private void CacheUpDirectoryButton()
-    {
-        if (_upDirectoryButton != null)
-            return;
-
-        Transform upDirectory = FindDescendantByName(transform, UpDirectoryButtonName);
-        if (upDirectory == null)
-            return;
-
-        _upDirectoryButton = upDirectory.GetComponent<ClickablePCElement>();
-        _upDirectoryOriginalParent = upDirectory.parent;
-    }
-    private void CacheProfileDirectoryButton()
-    {
-        if (_profileUpDirectoryButton != null || profilePage == null)
-            return;
-
-        Transform upDirectory = FindDescendantByName(profilePage.transform, ProfileUpDirectoryButtonName);
-        if (upDirectory == null)
-            return;
-
-        _profileUpDirectoryButton = upDirectory.GetComponent<ClickablePCElement>();
-    }
-
-    private static Transform FindDescendantByName(Transform root, string targetName)
-    {
-        if (root == null)
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == targetName)
-                return child;
-
-            Transform result = FindDescendantByName(child, targetName);
-            if (result != null)
-                return result;
-        }
-
-        return null;
-    }
-
-    private void RefreshMouseNow()
-    {
-        if (mouseCursor != null)
-            mouseCursor.SetScreenContent();
-    }
-
-    public void CloseAllScreens()
-    {
-        suspectListScreen.SetActive(false);
-        mainScreen.SetActive(false);
-        profilePage.gameObject.SetActive(false);
-    }
-
-    public void OpenProfilePage(SuspectData suspectData)
-    {
-        OpenProfilePage(suspectData, true);
-    }
-
-    private void OpenProfilePage(SuspectData suspectData, bool recordHistory)
-    {
-        if (suspectData == null)
-            return;
-
-        if (recordHistory)
-            PrepareForwardNavigation();
-
-        _currentProfileSuspect = suspectData;
-        _currentProfileIndex = GetProfileNavigationIndex(suspectData);
-
-        CloseAllScreens();
-        profilePage.gameObject.SetActive(true);
-
-        profilePage.SetProfileData(
-            suspectData,
-            GetProfileEntryReason(suspectData),
-            GetProfileLastEntryDate(suspectData),
-            GetProfileStatus(suspectData));
-
-        UpdateProfileNavigationUI();
-        RefreshProfileUpDirectoryButton();
-        _currentNavigationState = new TerminalNavigationState
-        {
-            Screen = TerminalScreen.Profile,
-            MenuMode = _mainMenuMode,
-            Section = _currentSection,
-            ProfileSuspect = suspectData
-        };
-
-        StartCoroutine(WaitAndRefreshMouse());
-    }
-
-    private void UpdateProfileNavigationUI()
-    {
-        if (profilePage == null)
-            return;
-
-        profilePage.SetNavigationState(
-            CanOpenPreviousProfile(),
-            CanOpenNextProfile()
-        );
-    }
-
-    public void OpenNextProfile()
-    {
-        if (_currentProfileSuspect == null)
-            return;
-
-        if (_currentProfileIndex < 0)
-            _currentProfileIndex = GetProfileNavigationIndex(_currentProfileSuspect);
-
-        if (_currentProfileIndex < 0)
-            return;
-
-        int nextIndex = _currentProfileIndex + 1;
-
-        List<SuspectData> navigationList = GetProfileNavigationList();
-        if (navigationList.Count == 0)
-            return;
-
-        if (nextIndex >= navigationList.Count)
-            nextIndex = navigationList.Count - 1;
-
-        SuspectData nextSuspect = navigationList[nextIndex];
-        if (nextSuspect == null)
-            return;
-
-        OpenProfilePage(nextSuspect, false); // already updates UI
-    }
-
-    public void OpenPreviousProfile()
-    {
-        List<SuspectData> navigationList = GetProfileNavigationList();
-        if (navigationList.Count == 0)
-            return;
-
-        if (_currentProfileSuspect == null)
-            return;
-
-        if (_currentProfileIndex < 0)
-            _currentProfileIndex = GetProfileNavigationIndex(_currentProfileSuspect);
-
-        if (_currentProfileIndex < 0)
-            return;
-
-        int previousIndex = _currentProfileIndex - 1;
-
-        // Clamp to first entry
-        if (previousIndex < 0)
-            previousIndex = 0;
-
-        SuspectData previousSuspect = navigationList[previousIndex];
-        if (previousSuspect == null)
-            return;
-
-        OpenProfilePage(previousSuspect, false);
-    }
-
-    public bool CanOpenNextProfile()
-    {
-        List<SuspectData> navigationList = GetProfileNavigationList();
-        return navigationList.Count > 0
-               && _currentProfileIndex >= 0
-               && _currentProfileIndex < navigationList.Count - 1;
-    }
-
-    public bool CanOpenPreviousProfile()
-    {
-        return GetProfileNavigationList().Count > 0
-               && _currentProfileIndex > 0;
+        _backStack.Clear();
+        _currentState = NavState.Root();
+        _currentNewsIndex = -1;
     }
 
     private void ClearCurrentProfileSelection()
@@ -571,279 +441,64 @@ public class PC : Interactable
 
     private int GetProfileNavigationIndex(SuspectData suspectData)
     {
-        List<SuspectData> navigationList = GetProfileNavigationList();
-        if (suspectData == null || navigationList.Count == 0)
-            return -1;
-
-        for (int i = 0; i < navigationList.Count; i++)
-        {
-            SuspectData suspect = navigationList[i];
-
-            if (suspect == null)
-                continue;
-
-            // Best case: same object reference
-            if (suspect == suspectData)
+        List<SuspectData> list = GetProfileNavigationList();
+        if (suspectData == null || list.Count == 0) return -1;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i] == suspectData || AreSameSuspect(list[i], suspectData))
                 return i;
-
-            // Fallback: identify by core fields
-            if (AreSameSuspect(suspect, suspectData))
-                return i;
-        }
-
         return -1;
     }
 
     private List<SuspectData> GetProfileNavigationList()
     {
-        if (_currentVisibleList != null)
-            return _currentVisibleList;
-
-        if (_currentBaseList != null)
-            return _currentBaseList;
-
+        if (_currentVisibleList != null) return _currentVisibleList;
+        if (_currentBaseList != null) return _currentBaseList;
         return new List<SuspectData>();
     }
-    private bool AreSameSuspect(SuspectData a, SuspectData b)
+
+    private static bool AreSameSuspect(SuspectData a, SuspectData b)
     {
-        if (a == null || b == null)
-            return false;
-
-        return a.FirstName == b.FirstName
-               && a.LastName == b.LastName
-               && a.DateOfBirth == b.DateOfBirth;
+        return a != null && b != null && a.FirstName == b.FirstName && a.LastName == b.LastName && a.DateOfBirth == b.DateOfBirth;
     }
-
-    // --------------------------------------------------
-    // CATEGORY / FOLDER BUTTONS
-    // --------------------------------------------------
-
-    public void OpenRegistry()
-    {
-        PrepareForwardNavigation();
-        _mainMenuMode = MainMenuMode.Registry;
-        ShowPCBackButton();
-        _currentNavigationState = new TerminalNavigationState
-        {
-            Screen = TerminalScreen.RegistryMenu,
-            MenuMode = MainMenuMode.Registry,
-            Section = _currentSection
-        };
-        OpenScreen(mainScreen);
-    }
-
-    public void OpenResidents()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.Residents;
-        _showQuarantineDays = false;
-        _currentBaseList = SortSuspects(_suspectSet.suspects
-            .Where(s => s != null));
-
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(true);
-        FilterAF();
-        RenderCurrentList();
-        SelectFolderTab(0);
-    }
-
-    public void OpenNews()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.News;
-        _showQuarantineDays = false;
-        _currentBaseList = new List<SuspectData>();
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        _currentNewsEntries = BuildNewsEntries();
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(false);
-        RenderCurrentList();
-    }
-
-    public void OpenNewsEntryPage(TerminalNewsEntry newsEntry)
-    {
-        OpenNewsEntryPage(newsEntry, true);
-    }
-
-    private void OpenNewsEntryPage(TerminalNewsEntry newsEntry, bool recordHistory)
-    {
-        if (newsEntry == null)
-            return;
-
-        if (recordHistory)
-            PrepareForwardNavigation();
-
-        _currentNewsEntry = newsEntry;
-        ClearCurrentProfileSelection();
-        CloseAllScreens();
-        profilePage.gameObject.SetActive(true);
-        profilePage.SetNewsData(newsEntry);
-        RefreshProfileUpDirectoryButton();
-        _currentNavigationState = new TerminalNavigationState
-        {
-            Screen = TerminalScreen.NewsEntry,
-            MenuMode = _mainMenuMode,
-            Section = TerminalSection.News,
-            NewsEntry = newsEntry
-        };
-
-        StartCoroutine(WaitAndRefreshMouse());
-    }
-
-    public void OpenDeceased()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.Deceased;
-        _showQuarantineDays = false;
-        _currentBaseList = SortSuspects(_suspectSet.suspects
-            .Where(s =>
-            {
-                if (s == null) return false;
-                SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(s);
-                return record != null && record.isKilled;
-            }));
-
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(true);
-        FilterAF();
-        RenderCurrentList();
-        SelectFolderTab(0);
-    }
-
-    public void OpenQuarantine()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.Quarantine;
-        _showQuarantineDays = true;
-        int currentDay = GetCurrentDay();
-
-        IEnumerable<SuspectData> quarantinedSuspects = SuspectRunRecords.Instance != null
-            ? SuspectRunRecords.Instance.GetActiveQuarantineRecords(currentDay)
-                .Where(record => record?.SuspectData != null)
-                .Select(record => record.SuspectData)
-            : Enumerable.Empty<SuspectData>();
-
-        _currentBaseList = SortSuspects(quarantinedSuspects);
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(true);
-        FilterAF();
-        RenderCurrentList();
-        SelectFolderTab(0);
-    }
-
-    public void OpenAll()
-    {
-        PrepareForwardNavigation();
-        _currentSection = TerminalSection.All;
-        _showQuarantineDays = false;
-        _currentBaseList = SortSuspects(_suspectSet.suspects
-            .Where(s => s != null));
-
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        ClearCurrentProfileSelection();
-        SetCurrentListNavigationState();
-
-        OpenScreen(suspectListScreen);
-        SetFolderTabsVisible(true);
-        FilterAF();
-        RenderCurrentList();
-        SelectFolderTab(0);
-    }
-
-    public string GetTerminalStatus(SuspectData suspectData)
-    {
-        string status = GetBaseStatus(suspectData);
-        if (status != "QUARANTINED" || !_showQuarantineDays)
-            return status;
-
-        int daysLeft = SuspectRunRecords.Instance != null
-            ? SuspectRunRecords.Instance.GetRemainingQuarantineDays(suspectData, GetCurrentDay())
-            : 0;
-
-        string dayLabel = daysLeft == 1 ? "DAY" : "DAYS";
-        return $"QUARANTINED - {daysLeft} {dayLabel} LEFT";
-    }
-
     private string GetProfileEntryReason(SuspectData suspectData)
     {
-        if (suspectData == null)
-            return string.Empty;
-
-        if (!HasMetSuspect(suspectData))
-            return "unknown";
-
-        SuspectPaperworkModel paperworkModel = new SuspectPaperworkModel();
-        SuspectPaperworkService paperworkService = new SuspectPaperworkService(paperworkModel);
-        SuspectPaperworkState state = paperworkService.BuildForPreview(
-            suspectData,
-            suspectData.IDPhoto,
-            Array.Empty<string>(),
-            GetPaperworkDay(),
-            GetSuspectSetIndex(suspectData));
-
-        paperworkModel.Dispose();
-
+        if (suspectData == null) return string.Empty;
+        if (!HasMetSuspect(suspectData)) return "unknown";
+        SuspectPaperworkModel model = new SuspectPaperworkModel();
+        SuspectPaperworkService service = new SuspectPaperworkService(model);
+        SuspectPaperworkState state = service.BuildForPreview(suspectData, suspectData.IDPhoto, Array.Empty<string>(), GetPaperworkDay(), GetSuspectSetIndex(suspectData));
+        model.Dispose();
         return string.IsNullOrWhiteSpace(state.EntryReason) ? "unknown" : state.EntryReason;
     }
 
     private bool HasMetSuspect(SuspectData suspectData)
     {
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        return record != null
-               && (record.daysShown > 0
-                   || record.lastDayShown > 0
-                   || record.hasEnteredCity
-                   || record.isKilled
-                   || record.quarantinedOnDay >= 0);
+        return record != null && (record.daysShown > 0 || record.lastDayShown > 0 || record.hasEnteredCity || record.isKilled || record.quarantinedOnDay >= 0);
     }
+
     private string GetProfileLastEntryDate(SuspectData suspectData)
     {
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (record == null || record.lastDayShown <= 0)
-            return "unknown";
-
+        if (record == null || record.lastDayShown <= 0) return "unknown";
         return NewspaperStartDate.AddDays(record.lastDayShown - 1).ToString("MM/dd/yy");
     }
 
     private int GetPaperworkDay()
     {
-        if (ShiftManager.Instance != null)
-            return ShiftManager.Instance.CurrentDay;
-
-        if (CampaignManager.Instance != null)
-            return CampaignManager.Instance.CurrentDay;
-
+        if (ShiftManager.Instance != null) return ShiftManager.Instance.CurrentDay;
+        if (CampaignManager.Instance != null) return CampaignManager.Instance.CurrentDay;
         return 1;
     }
 
     private int GetSuspectSetIndex(SuspectData suspectData)
     {
-        if (suspectData == null || _suspectSet == null || _suspectSet.suspects == null)
-            return 0;
-
+        if (suspectData == null || _suspectSet == null || _suspectSet.suspects == null) return 0;
         int index = _suspectSet.suspects.IndexOf(suspectData);
         return index >= 0 ? index : 0;
     }
 
-    private string GetProfileStatus(SuspectData suspectData)
-    {
-        return ToProfileDisplayStatus(GetBaseStatus(suspectData));
-    }
+    private string GetProfileStatus(SuspectData suspectData) => ToProfileDisplayStatus(GetBaseStatus(suspectData));
 
     private static string ToProfileDisplayStatus(string status)
     {
@@ -858,73 +513,50 @@ public class PC : Interactable
 
     private string GetBaseStatus(SuspectData suspectData)
     {
-        if (suspectData == null)
-            return "CLEAR";
-
+        if (suspectData == null) return "CLEAR";
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (record == null)
-            return "CLEAR";
-
-        if (record.isReplacement)
-            return "REPLACED";
-
-        if (record.isKilled)
-            return "DECEASED";
-
-        if (SuspectRunRecords.Instance != null
-            && SuspectRunRecords.Instance.IsInActiveQuarantine(suspectData, GetCurrentDay()))
-            return "QUARANTINED";
-
+        if (record == null) return "CLEAR";
+        if (record.isReplacement) return "REPLACED";
+        if (record.isKilled) return "DECEASED";
+        if (SuspectRunRecords.Instance != null && SuspectRunRecords.Instance.IsInActiveQuarantine(suspectData, GetCurrentDay())) return "QUARANTINED";
         return "CLEAR";
     }
 
     private int GetCurrentDay()
-        => _debugCurrentDayOverride >= 0
-            ? _debugCurrentDayOverride
-            : CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+    {
+        if (_debugCurrentDayOverride >= 0) return _debugCurrentDayOverride;
+        return CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+    }
 
     private List<TerminalNewsEntry> BuildNewsEntries()
     {
         var entries = new List<TerminalNewsEntry>();
-
-        if (_newspaperContentScriptables == null || _newspaperContentScriptables.Length == 0)
-            return entries;
-
-        int currentDay = Mathf.Max(1, GetCurrentDay());
-        int lastReadableDay = Mathf.Min(currentDay, _newspaperContentScriptables.Length);
-
-        for (int day = lastReadableDay; day >= 1; day--)
+        if (_newspaperContentScriptables == null || _newspaperContentScriptables.Length == 0) return entries;
+        int lastDay = Mathf.Min(Mathf.Max(1, GetCurrentDay()), _newspaperContentScriptables.Length);
+        for (int day = lastDay; day >= 1; day--)
         {
             NewspaperContentScriptable content = _newspaperContentScriptables[day - 1];
-            if (content == null)
-                continue;
-
+            if (content == null) continue;
             string date = NewspaperStartDate.AddDays(day - 1).ToString("dd MMM yyyy").ToUpperInvariant();
             entries.Add(new TerminalNewsEntry(day, date, content));
         }
-
         return entries;
+    }
+
+    private List<SuspectData> GetAllNamedSuspects()
+    {
+        if (_suspectSet == null || _suspectSet.suspects == null) return new List<SuspectData>();
+        return SortSuspects(_suspectSet.suspects.Where(s => s != null));
     }
 
     private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
     {
-        return suspects
-            .Where(HasTerminalName)
-            .OrderBy(s => GetSortableLastName(s.LastName))
-            .ThenBy(s => s.FirstName)
-            .ToList();
+        return suspects.Where(HasTerminalName).OrderBy(s => NormalizeForAlphabet(s.LastName)).ThenBy(s => s.FirstName).ToList();
     }
 
     private static bool HasTerminalName(SuspectData suspect)
     {
-        return suspect != null
-               && !string.IsNullOrWhiteSpace(suspect.LastName)
-               && !string.IsNullOrWhiteSpace(suspect.FirstName);
-    }
-
-    private static string GetSortableLastName(string lastName)
-    {
-        return NormalizeForAlphabet(lastName);
+        return suspect != null && !string.IsNullOrWhiteSpace(suspect.LastName) && !string.IsNullOrWhiteSpace(suspect.FirstName);
     }
 
     private static char GetAlphabetFilterChar(string lastName)
@@ -935,140 +567,32 @@ public class PC : Interactable
 
     private static string NormalizeForAlphabet(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return string.Empty;
-
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
         string normalized = value.Trim().Normalize(NormalizationForm.FormD);
         StringBuilder builder = new StringBuilder(normalized.Length);
-
         for (int i = 0; i < normalized.Length; i++)
         {
             char character = normalized[i];
-            UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(character);
-            if (category != UnicodeCategory.NonSpacingMark)
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
                 builder.Append(char.ToUpperInvariant(character));
         }
-
         return builder.ToString().Normalize(NormalizationForm.FormC);
-    }
-
-    // --------------------------------------------------
-    // LETTER CHUNK BUTTONS
-    // --------------------------------------------------
-
-    public void FilterAF()
-    {
-        FilterByLastNameRange('A', 'F');
-        PCScrollbar.ResetToTop();
-        SelectFolderTab(0);
-    }
-
-    public void FilterGL()
-    {
-        FilterByLastNameRange('G', 'L');
-        PCScrollbar.ResetToTop();
-        SelectFolderTab(1);
-    }
-
-    public void FilterMR()
-    {
-        FilterByLastNameRange('M', 'R');
-        PCScrollbar.ResetToTop();
-        SelectFolderTab(2);
-    }
-
-    public void FilterSZ()
-    {
-        FilterByLastNameRange('S', 'Z');
-        PCScrollbar.ResetToTop();
-        SelectFolderTab(3);
-    }
-
-    private void SetFolderTabsVisible(bool visible)
-    {
-        if (_folderTabs == null)
-            return;
-
-        for (int i = 0; i < _folderTabs.Length; i++)
-        {
-            if (_folderTabs[i] != null)
-                _folderTabs[i].gameObject.SetActive(visible);
-        }
-    }
-
-    void SelectFolderTab(int folderTabIndex)
-    {
-        if (_folderTabs == null)
-            return;
-
-        for (int i = 0; i < _folderTabs.Length; i++)
-        {
-            if (_folderTabs[i] != null)
-                _folderTabs[i].SetFolderTabSelected(i == folderTabIndex);
-        }
-    }
-
-    public void ClearLetterFilter()
-    {
-        if (_currentSection == TerminalSection.News)
-        {
-            RenderCurrentList();
-            return;
-        }
-
-        _currentVisibleList = new List<SuspectData>(_currentBaseList);
-        RenderCurrentList();
     }
 
     private void FilterByLastNameRange(char start, char end)
     {
         if (_currentSection == TerminalSection.News)
         {
-            RenderCurrentList();
+            ShowFileList("News", GetSectionSummary(), BuildNewsItems());
             return;
         }
-
-        if (_currentBaseList == null || _currentBaseList.Count == 0)
+        _currentVisibleList = _currentBaseList.Where(s =>
         {
-            _currentVisibleList = new List<SuspectData>();
-            RenderCurrentList();
-            return;
-        }
-
-        _currentVisibleList = _currentBaseList
-            .Where(s =>
-            {
-                if (s == null || string.IsNullOrWhiteSpace(s.LastName))
-                    return false;
-
-                char firstChar = GetAlphabetFilterChar(s.LastName);
-
-                return firstChar >= start && firstChar <= end;
-            })
-            .OrderBy(s => GetSortableLastName(s.LastName))
-            .ThenBy(s => s.FirstName)
-            .ToList();
-
+            if (s == null || string.IsNullOrWhiteSpace(s.LastName)) return false;
+            char firstChar = GetAlphabetFilterChar(s.LastName);
+            return firstChar >= start && firstChar <= end;
+        }).OrderBy(s => NormalizeForAlphabet(s.LastName)).ThenBy(s => s.FirstName).ToList();
         RenderCurrentList();
-    }
-
-    // --------------------------------------------------
-    // UI RENDER
-    // --------------------------------------------------
-
-    private void RenderCurrentList()
-    {
-        if (_currentSection == TerminalSection.News)
-        {
-            terminalRecordListUI.ShowNews(_currentNewsEntries, GetSectionSummary());
-            RefreshMouseNow();
-            StartCoroutine(WaitAndRefreshMouse());
-            return;
-        }
-
-        terminalRecordListUI.ShowRecords(_currentVisibleList, GetSectionSummary());
-        RefreshMouseNow();
-        StartCoroutine(WaitAndRefreshMouse());
     }
 
     private string GetSectionSummary()
@@ -1076,213 +600,113 @@ public class PC : Interactable
         switch (_currentSection)
         {
             case TerminalSection.Quarantine:
-                int currentDay = GetCurrentDay();
-                int activeQuarantine = SuspectRunRecords.Instance != null
-                    ? SuspectRunRecords.Instance.GetActiveQuarantineCount(currentDay)
-                    : 0;
-                int remainingSlots = Mathf.Max(0, SuspectRunRecords.QuarantineSlotLimit - activeQuarantine);
-                return $"QUARANTINE: {activeQuarantine}/{SuspectRunRecords.QuarantineSlotLimit} USED, {remainingSlots} OPEN";
-
+                int day = GetCurrentDay();
+                int active = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.GetActiveQuarantineCount(day) : 0;
+                int open = Mathf.Max(0, SuspectRunRecords.QuarantineSlotLimit - active);
+                return $"QUARANTINE: {active}/{SuspectRunRecords.QuarantineSlotLimit} USED, {open} OPEN";
             case TerminalSection.Deceased:
                 return $"DECEASED: {GetDeceasedCount()}";
-
             case TerminalSection.Residents:
                 return $"RESIDENTS: {_currentBaseList?.Count ?? 0}";
-
             case TerminalSection.News:
-                int newsCount = _currentNewsEntries?.Count ?? 0;
-                return newsCount > 0
-                    ? $"NEWS ARCHIVE: {newsCount} ISSUES"
-                    : "NEWS ARCHIVE: NO ISSUES";
-
+                int count = _currentNewsEntries?.Count ?? 0;
+                return count > 0 ? $"NEWS ARCHIVE: {count} ISSUES" : "NEWS ARCHIVE: NO ISSUES";
             default:
                 return $"RECORDS: {_currentBaseList?.Count ?? 0}";
         }
     }
 
-    private int GetDeceasedCount()
+    private int GetDeceasedCount() => GetAllNamedSuspects().Count(IsDeceased);
+    private bool IsDeceased(SuspectData suspect) => SuspectRunRecords.Instance?.GetRecord(suspect)?.isKilled == true;
+    private int GetPopulationAliveForTerminal() => _populationModel != null ? _populationModel.PopulationAlive.CurrentValue : DefaultTerminalPopulation;
+    private void ResolveReferences()
     {
-        if (_suspectSet == null || _suspectSet.suspects == null)
-            return 0;
-
-        return _suspectSet.suspects.Count(suspect =>
-            HasTerminalName(suspect)
-            && SuspectRunRecords.Instance?.GetRecord(suspect)?.isKilled == true);
+        if (header == null) header = FindDescendantByName(transform, "Header")?.GetComponent<TextMeshProUGUI>();
+        if (backButton == null) backButton = FindDescendantByName(transform, "BackButton")?.GetComponent<ClickablePCElement>();
+        if (previousButton == null) previousButton = FindDescendantByName(transform, "Previous Btn")?.GetComponent<ClickablePCElement>();
+        if (nextButton == null) nextButton = FindDescendantByName(transform, "Next Btn")?.GetComponent<ClickablePCElement>();
+        if (fileListView == null) fileListView = GetOrAddView<FileListView>("File List View");
+        if (profileView == null)
+        {
+            profileView = GetOrAddView<ProfileView>("Profile View");
+            if (profileView == null) profileView = GetOrAddView<ProfileView>("Pofile View");
+        }
+        if (newsView == null) newsView = GetOrAddView<NewsView>("News View");
+        if (mouseCursor == null) mouseCursor = GetComponentInChildren<SimpleCanvasCursorFromMouseDelta>(true);
+        if (_virtualCanvasCursor == null) _virtualCanvasCursor = mouseCursor;
+        if (PCScrollbar == null) PCScrollbar = GetComponentInChildren<ClickablePCScrollbar>(true);
     }
 
-    private void RefreshMainMenu()
+    private T GetOrAddView<T>(string objectName) where T : Component
     {
-        if (mainScreen == null)
-            return;
-
-        TextMeshProUGUI[] labels = mainScreen.GetComponentsInChildren<TextMeshProUGUI>(true);
-        foreach (TextMeshProUGUI label in labels)
-        {
-            if (label == null)
-                continue;
-
-            string labelText = label.text?.Trim();
-            if (string.IsNullOrEmpty(labelText))
-                continue;
-
-            if (IsMainMenuTitle(label, labelText))
-            {
-                label.text = _mainMenuMode == MainMenuMode.Registry ? "Registry" : MainMenuVillageName;
-                label.rectTransform.anchoredPosition = MainMenuTitlePosition;
-                label.enableAutoSizing = true;
-                label.fontSizeMin = Mathf.Min(label.fontSizeMin, 14f);
-                label.fontSizeMax = Mathf.Max(label.fontSizeMax, label.fontSize);
-                EnsureMainMenuPopulationLabel(label);
-                continue;
-            }
-
-            RefreshMainMenuItem(label, labelText);
-        }
-
-        if (_mainMenuPopulationLabel != null)
-            _mainMenuPopulationLabel.gameObject.SetActive(_mainMenuMode == MainMenuMode.Root);
-    }
-    private bool IsMainMenuTitle(TextMeshProUGUI label, string labelText)
-    {
-        if (label.transform.parent != mainScreen.transform)
-            return false;
-
-        return labelText == "Archive Index"
-               || labelText == "Saplavi"
-               || labelText == "Registry"
-               || labelText.StartsWith(MainMenuVillageName, StringComparison.Ordinal);
+        Transform viewTransform = FindDescendantByName(transform, objectName);
+        if (viewTransform == null) return null;
+        return viewTransform.GetComponent<T>() ?? viewTransform.gameObject.AddComponent<T>();
     }
 
-    private void RefreshMainMenuItem(TextMeshProUGUI label, string labelText)
+    private void SetHeader(string text)
     {
-        if (_mainMenuMode == MainMenuMode.Registry)
-        {
-            RefreshRegistryMenuItem(label, labelText);
-            return;
-        }
-
-        RefreshRootMenuItem(label, labelText);
+        if (header != null) header.text = text;
     }
 
-    private void RefreshRootMenuItem(TextMeshProUGUI label, string labelText)
+    private static void SetViewActive(Component view, bool active)
     {
-        if (labelText == "Residents" || labelText == "Registry")
-        {
-            ConfigureMainMenuButton(label, "Registry", true, OpenRegistry);
-            return;
-        }
-
-        if (labelText == "Visitors" || labelText == "News")
-        {
-            ConfigureMainMenuButton(label, "News", true, OpenNews);
-            return;
-        }
-
-        if (labelText == "Show All" || labelText == "All" || labelText == "Deceased" || labelText == "Quarantine")
-            ConfigureMainMenuButton(label, labelText, false, null);
+        if (view != null) view.gameObject.SetActive(active);
     }
 
-    private void RefreshRegistryMenuItem(TextMeshProUGUI label, string labelText)
+    private void RefreshMouseNow()
     {
-        if (labelText == "Show All" || labelText == "All")
-        {
-            ConfigureMainMenuButton(label, "All", true, OpenAll);
-            return;
-        }
-
-        if (labelText == "Residents" || labelText == "Registry")
-        {
-            ConfigureMainMenuButton(label, "Residents", true, OpenResidents);
-            return;
-        }
-
-        if (labelText == "Visitors" || labelText == "News")
-        {
-            ConfigureMainMenuButton(label, labelText, false, null);
-            return;
-        }
-
-        if (labelText == "Quarantine")
-        {
-            ConfigureMainMenuButton(label, "Quarantine", true, OpenQuarantine);
-            return;
-        }
-
-        if (labelText == "Deceased")
-            ConfigureMainMenuButton(label, "Deceased", true, OpenDeceased);
+        if (mouseCursor != null) mouseCursor.SetScreenContent();
     }
 
-    private static void ConfigureMainMenuButton(TextMeshProUGUI label, string text, bool active, UnityEngine.Events.UnityAction onClick)
+    private void RefreshMouseDelayed()
     {
-        label.text = text;
-
-        ClickablePCElement button = label.GetComponentInParent<ClickablePCElement>(true);
-        if (button == null)
-            return;
-
-        button.gameObject.SetActive(active);
-        button.onClickEvent = new UnityEngine.Events.UnityEvent();
-
-        if (onClick != null)
-            button.onClickEvent.AddListener(onClick);
+        RefreshMouseNow();
+        if (gameObject.activeInHierarchy) StartCoroutine(WaitAndRefreshMouse());
     }
 
-    private int GetPopulationAliveForTerminal()
+    private IEnumerator WaitAndRefreshMouse()
     {
-        return _populationModel != null
-            ? _populationModel.PopulationAlive.CurrentValue
-            : DefaultTerminalPopulation;
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+        RefreshMouseNow();
     }
 
-    private void EnsureMainMenuPopulationLabel(TextMeshProUGUI titleLabel)
+    private void ShowPCBackButton()
     {
-        if (titleLabel == null)
-            return;
+        if (UIController.Instance == null) return;
+        UIController.Instance.HideBackButton();
+        UIController.Instance.ShowBackButton(HandleBackButton);
+    }
 
-        if (_mainMenuPopulationLabel == null)
+    private void HandleBackButton()
+    {
+        if (GoBack()) return;
+        ExitPC();
+    }
+
+    private void ExitPC()
+    {
+        pcActive = false;
+        if (UIController.Instance != null) UIController.Instance.HideBackButton();
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
+        if (_player == null) return;
+        _player.SetCanInteract(true, "");
+        _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
+    }
+
+    private static Transform FindDescendantByName(Transform root, string targetName)
+    {
+        if (root == null) return null;
+        for (int i = 0; i < root.childCount; i++)
         {
-            Transform existing = titleLabel.transform.parent != null
-                ? titleLabel.transform.parent.Find(MainMenuPopulationObjectName)
-                : null;
-
-            if (existing != null)
-            {
-                _mainMenuPopulationLabel = existing.GetComponent<TextMeshProUGUI>();
-            }
-            else
-            {
-                GameObject labelObject = new GameObject(MainMenuPopulationObjectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-                labelObject.transform.SetParent(titleLabel.transform.parent, false);
-                _mainMenuPopulationLabel = labelObject.GetComponent<TextMeshProUGUI>();
-            }
+            Transform child = root.GetChild(i);
+            if (child.name == targetName) return child;
+            Transform result = FindDescendantByName(child, targetName);
+            if (result != null) return result;
         }
-
-        RectTransform titleRect = titleLabel.rectTransform;
-        RectTransform populationRect = _mainMenuPopulationLabel.rectTransform;
-        populationRect.anchorMin = new Vector2(0.5f, 0.5f);
-        populationRect.anchorMax = new Vector2(0.5f, 0.5f);
-        populationRect.pivot = new Vector2(0.5f, 0.5f);
-        populationRect.localRotation = titleRect.localRotation;
-        populationRect.localScale = titleRect.localScale;
-        populationRect.anchoredPosition = MainMenuPopulationPosition;
-        populationRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, titleRect.sizeDelta.y);
-
-        _mainMenuPopulationLabel.text = $"Population: {GetPopulationAliveForTerminal()}";
-        _mainMenuPopulationLabel.font = titleLabel.font;
-        _mainMenuPopulationLabel.fontSharedMaterial = titleLabel.fontSharedMaterial;
-        _mainMenuPopulationLabel.color = titleLabel.color;
-        _mainMenuPopulationLabel.alignment = TextAlignmentOptions.Center;
-        _mainMenuPopulationLabel.enableAutoSizing = true;
-        _mainMenuPopulationLabel.fontSizeMin = Mathf.Min(titleLabel.fontSizeMin, 12f);
-        _mainMenuPopulationLabel.fontSizeMax = Mathf.Max(titleLabel.fontSize, 22f);
-        _mainMenuPopulationLabel.raycastTarget = false;
-        _mainMenuPopulationLabel.gameObject.SetActive(true);
-    }
-
-    private static void SetMainMenuItemActive(TextMeshProUGUI label, bool active)
-    {
-        ClickablePCElement button = label.GetComponentInParent<ClickablePCElement>(true);
-        if (button != null)
-            button.gameObject.SetActive(active);
+        return null;
     }
 }

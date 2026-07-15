@@ -13,11 +13,15 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
     [Header("Movement")]
     [SerializeField] private float sensitivity = 1f;
+    [SerializeField] private float axisDeltaMultiplier = 60f;
     [SerializeField] private float xMargin;
     [SerializeField] private float yMargin;
 
     [Header("Input")]
     [SerializeField] private KeyCode clickKey = KeyCode.Mouse0;
+
+    private const float MinUsableSensitivity = 0.1f;
+    private const float MinAxisDeltaMultiplier = 60f;
 
     private Vector3 lastMousePosition;
     private Vector2 lastMouseDelta;
@@ -56,10 +60,14 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
     private void MoveCursor()
     {
         Vector3 currentMousePosition = Input.mousePosition;
-        Vector3 mouseDelta = currentMousePosition - lastMousePosition;
+        Vector2 axisDelta = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
+        Vector2 positionDelta = currentMousePosition - lastMousePosition;
         lastMousePosition = currentMousePosition;
 
-        lastMouseDelta = new Vector2(mouseDelta.x, mouseDelta.y) * sensitivity;
+        float effectiveSensitivity = Mathf.Max(MinUsableSensitivity, sensitivity);
+        lastMouseDelta = axisDelta.sqrMagnitude > 0f
+            ? axisDelta * Mathf.Max(MinAxisDeltaMultiplier, axisDeltaMultiplier) * effectiveSensitivity
+            : positionDelta * effectiveSensitivity;
 
         Vector2 pos = cursorRect.anchoredPosition + lastMouseDelta;
 
