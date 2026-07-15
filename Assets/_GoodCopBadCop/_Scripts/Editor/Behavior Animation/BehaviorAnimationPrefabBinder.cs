@@ -25,7 +25,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
             (typeof(HyperactiveAnomaly), "Hyperactive Behavior.asset"),
         };
 
-        [MenuItem("GoodCopBadCop/Anomalies/Bind Behavior Animation Prefabs")]
+        [MenuItem("Good Cop Bad Cop/Anomalies/Bind Behavior Animation Prefabs")]
         public static void Bind()
         {
             BindPrefab(RootSuspectPrefabPath);
