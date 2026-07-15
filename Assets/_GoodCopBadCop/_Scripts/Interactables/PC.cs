@@ -145,7 +145,7 @@ public class PC : Interactable
     {
         PushCurrentState();
         _currentState = new NavState { Screen = TerminalScreen.RegistryMenu, Section = _currentSection };
-        ShowFileList("Registry", "Folders", new List<PCListItemModel>
+        ShowFileList("Registry", "Index", new List<PCListItemModel>
         {
             new PCListItemModel("All", PCListItemIcon.Folder, OpenAll),
             new PCListItemModel("Active", PCListItemIcon.Folder, OpenActive),
