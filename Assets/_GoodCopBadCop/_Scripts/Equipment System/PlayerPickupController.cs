@@ -762,7 +762,10 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        GameObject placementItem = ObjectPlacer.Instance.GetPickableObject(_heldObject.ItemData)?.gameObject;
+        bool hasPlacementPose = ObjectPlacer.Instance.TryGetPlacementPose(
+            _heldObject,
+            out Vector3 placementPosition,
+            out Quaternion placementRotation);
         DisableArmIKs();
         
         if (ObjectPlacer.Instance.PlacementBoard != null)
@@ -772,8 +775,8 @@ public class PlayerPickupController : NetworkBehaviour
         
         if (_heldObject != null)
         {
-            Vector3 dropPos = dropPoint != null ? dropPoint.position : (placementItem != null ? placementItem.transform.position : _heldObject.transform.position);
-            Quaternion dropRot = dropPoint != null ? dropPoint.rotation : (placementItem != null ? placementItem.transform.rotation : _heldObject.transform.rotation);
+            Vector3 dropPos = dropPoint != null ? dropPoint.position : (hasPlacementPose ? placementPosition : _heldObject.transform.position);
+            Quaternion dropRot = dropPoint != null ? dropPoint.rotation : (hasPlacementPose ? placementRotation : _heldObject.transform.rotation);
 
             // Remove the ParentConstraint and restore sync locally first.
             _heldObject.RemoveParent();

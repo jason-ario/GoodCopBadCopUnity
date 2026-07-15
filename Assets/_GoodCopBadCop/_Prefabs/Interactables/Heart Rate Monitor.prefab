@@ -90,16 +90,16 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1382934181349857218}
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -0.66}
-  m_LocalScale: {x: 0.35, y: 0.35, z: 0.35}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 8738039864778869044}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0.02}
+  m_AnchoredPosition: {x: -0, y: 0.38}
   m_SizeDelta: {x: 2.2, y: 0.6}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &4116283835992034864
@@ -161,7 +161,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9541d86e2fd84c1d9990edf0852d74ab, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshPro
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -171,7 +171,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: ---
+  m_text: 72 BPM
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -180,8 +180,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4284088204
-  m_fontColor: {r: 0.55, g: 1, b: 0.35, a: 1}
+    rgba: 4282449702
+  m_fontColor: {r: 0, g: 1, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -360,6 +360,50 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &3827660726939880245
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3761874710605279396}
+  - component: {fileID: 8561664788482631567}
+  m_Layer: 0
+  m_Name: Placement Anchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3761874710605279396
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3827660726939880245}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1342176238623544412}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8561664788482631567
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3827660726939880245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5ef98ee1bc6151439feb0ad9d205416, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlacementAnchor
 --- !u!1 &5026481898561848846
 GameObject:
   m_ObjectHideFlags: 0
@@ -551,7 +595,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2fcc597881599646a35e7161a5504ff, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GogoGaga.OptimizedRopesAndCables.Rope
   startPoint: {fileID: 8248077021391008706}
   midPoint: {fileID: 0}
@@ -715,6 +759,7 @@ Transform:
   - {fileID: 8738039864778869044}
   - {fileID: 827006086059865001}
   - {fileID: 4301654179352910700}
+  - {fileID: 3761874710605279396}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &2507813220654132626
@@ -805,7 +850,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 289629083
   InScenePlacedSourceGlobalObjectIdHash: 0
@@ -853,7 +898,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: HighlightPlus.Runtime::HighlightPlus.HighlightEffect
   profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
@@ -865,12 +910,12 @@ MonoBehaviour:
   effectGroupLayer:
     serializedVersion: 2
     m_Bits: 4294967295
-  effectNameFilter: 
+  effectNameFilter:
   effectNameUseRegEx: 0
   excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
   alphaCutOff: 0
-  alphaCutOffTextureName: 
+  alphaCutOffTextureName:
   cullBackFaces: 1
   ignoreObjectVisibility: 0
   reflectionProbes: 0
@@ -882,7 +927,7 @@ MonoBehaviour:
   cameraDistanceFadeNear: 0
   cameraDistanceFadeFar: 1000
   useOriginalShader: 0
-  customPassName: 
+  customPassName:
   normalsOption: 0
   ignore: 0
   _highlighted: 0
@@ -1124,7 +1169,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ede24a4b8327d194488cb283b5c2579a, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
   ShowTopMostFoldoutHeaderGroup: 1
   maxBatteryCapacity: 1
@@ -1139,27 +1184,28 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7fadfec2f2d549e45b66e91de6636b31, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::Scanner
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: 
-  highlightNameFilter: 
+  interactText:
+  highlightNameFilter:
   itemData: {fileID: 11400000, guid: 5fe8564a7140fb34eb4f9164b78b0c42, type: 2}
   readingText: {fileID: 8764016626634499277}
   maxDistance: 3
-  idleHeartRateBpm: 0
-  rampSpeed: 180
-  falloffSpeed: 240
-  rereadInterval: 0.08
+  scanDuration: 2.5
   readingJitter: 2
   screenRenderer: {fileID: 3031762353054582483}
   highColor: {r: 1, g: 0.1, b: 0.05, a: 1}
+  elevatedColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   normalColor: {r: 0.15, g: 1, b: 0.25, a: 1}
+  statusTextColor: {r: 0.35, g: 0.42, b: 0.35, a: 1}
   idleColor: {r: 0.03, g: 0.1, b: 0.05, a: 1}
-  screenAnimationSpeed: 0.45
   highHeartRateThreshold: 110
+  elevatedHeartRateThreshold: 90
   validHeartRateThreshold: 30
+  waveformWidth: 512
+  waveformHeight: 192
 --- !u!1 &7011750186030849456
 GameObject:
   m_ObjectHideFlags: 0
