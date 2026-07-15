@@ -14,26 +14,51 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: The sunset from here is extraordinary. I wish you could see it.
-    animationTrigger: 
+    npcLine: The light is extraordinary right now. You should see it from — from where
+      I am. It's been setting for months. The same sunset, for months.
+    animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     choices: []
   - type: 0
-    npcLine: I've been trying to get back. But the road keeps going. I follow it.
-    animationTrigger: 
+    npcLine: I've been trying to come back. The road keeps going. I follow it. It's
+      a very good road.
+    animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     choices: []
   - type: 0
-    npcLine: I wrote you something. I don't remember writing it. Here.
-    animationTrigger: 
-    cameraTrigger: 
+    npcLine: "Sorry \u2014 I was talking to someone. He says you should be careful.
+      I agree with him. He's been right about most things so far."
+    animationTrigger: TalkIdle
+    cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
     choices: []
   - type: 0
-    npcLine: Don't be sad. It's very beautiful where I am. Very quiet. You'll see.
-    animationTrigger: 
+    npcLine: I wrote you something. I don't remember writing it. Here. In case you
+      need it later.
+    animationTrigger: TalkPoint
     cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 1
+    npcLine: Don't be sad about it. It's very beautiful where I am. Very quiet. You'll
+      understand eventually.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices:
+    - playerChoiceText: Sandro, come back.
+      npcResponse: I would if I could find the road back. I've been looking. It doesn't
+        seem to go that direction.
+      animationTrigger: TalkLookDown
+    - playerChoiceText: Who were you talking to?
+      npcResponse: I'm not entirely sure. He's been there the whole time. He says
+        hello. He says goodbye. He changes his mind a lot.
+      animationTrigger: TalkLookAway
+  - type: 0
+    npcLine: The light is extraordinary. I wish you could see it.
+    animationTrigger: TalkLookAway
+    cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
     choices: []
