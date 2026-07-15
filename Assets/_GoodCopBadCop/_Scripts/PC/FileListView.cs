@@ -5,10 +5,6 @@ using UnityEngine.UI;
 
 public sealed class FileListView : MonoBehaviour
 {
-    private const string LabelObjectName = "Label";
-    private const string ContentObjectName = "Content";
-    private const string ListItemObjectName = "List Item";
-
     [SerializeField] private TextMeshProUGUI label;
     [SerializeField] private Transform contentRoot;
     [SerializeField] private PCListItemView itemTemplate;
@@ -18,13 +14,11 @@ public sealed class FileListView : MonoBehaviour
 
     private void Awake()
     {
-        ResolveReferences();
         HideTemplate();
     }
 
     public void Show(string listLabel, IReadOnlyList<PCListItemModel> items)
     {
-        ResolveReferences();
         Clear();
 
         if (label != null)
@@ -82,61 +76,5 @@ public sealed class FileListView : MonoBehaviour
     {
         if (itemTemplate != null)
             itemTemplate.gameObject.SetActive(false);
-    }
-
-    private void ResolveReferences()
-    {
-        if (label == null)
-            label = FindDescendantByName(transform, LabelObjectName)?.GetComponent<TextMeshProUGUI>();
-
-        if (contentRoot == null)
-            contentRoot = FindDescendantByName(transform, ContentObjectName);
-
-        if (itemTemplate == null)
-        {
-            Transform templateTransform = contentRoot != null
-                ? FindDirectChildByName(contentRoot, ListItemObjectName)
-                : FindDescendantByName(transform, ListItemObjectName);
-
-            if (templateTransform != null)
-                itemTemplate = templateTransform.GetComponent<PCListItemView>() ?? templateTransform.gameObject.AddComponent<PCListItemView>();
-        }
-
-        if (verticalScrollbar == null)
-            verticalScrollbar = GetComponentInChildren<Scrollbar>(true);
-    }
-
-    private static Transform FindDirectChildByName(Transform root, string targetName)
-    {
-        if (root == null)
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == targetName)
-                return child;
-        }
-
-        return null;
-    }
-
-    private static Transform FindDescendantByName(Transform root, string targetName)
-    {
-        if (root == null)
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == targetName)
-                return child;
-
-            Transform result = FindDescendantByName(child, targetName);
-            if (result != null)
-                return result;
-        }
-
-        return null;
     }
 }

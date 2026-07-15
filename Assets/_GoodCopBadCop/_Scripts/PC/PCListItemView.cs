@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,13 +30,6 @@ public sealed class PCListItemModel
 
 public sealed class PCListItemView : MonoBehaviour
 {
-    private const string TextObjectName = "Text";
-    private const string IconWrapperObjectName = "IconWrapper";
-    private const string FolderIconName = "Folder";
-    private const string ProfilePhotoIconName = "Pofile Photo";
-    private const string ProfilePhotoIconNameCorrected = "Profile Photo";
-    private const string UnknownIconName = "Unknown";
-
     [SerializeField] private TextMeshProUGUI textLabel;
     [SerializeField] private Image folderIcon;
     [SerializeField] private Image profileIcon;
@@ -46,14 +38,8 @@ public sealed class PCListItemView : MonoBehaviour
 
     private Sprite _profileSprite;
 
-    private void Awake()
-    {
-        ResolveReferences();
-    }
-
     public void Configure(PCListItemModel model)
     {
-        ResolveReferences();
         DestroyProfileSprite();
 
         if (textLabel != null)
@@ -106,50 +92,6 @@ public sealed class PCListItemView : MonoBehaviour
 
         image.gameObject.SetActive(active);
         image.enabled = active;
-    }
-
-    private void ResolveReferences()
-    {
-        if (textLabel == null)
-            textLabel = FindDescendantByName(transform, TextObjectName)?.GetComponent<TextMeshProUGUI>();
-
-        Transform iconWrapper = FindDescendantByName(transform, IconWrapperObjectName);
-        Transform searchRoot = iconWrapper != null ? iconWrapper : transform;
-
-        if (folderIcon == null)
-            folderIcon = FindDescendantByName(searchRoot, FolderIconName)?.GetComponent<Image>();
-
-        if (profileIcon == null)
-        {
-            profileIcon = FindDescendantByName(searchRoot, ProfilePhotoIconName)?.GetComponent<Image>();
-            if (profileIcon == null)
-                profileIcon = FindDescendantByName(searchRoot, ProfilePhotoIconNameCorrected)?.GetComponent<Image>();
-        }
-
-        if (unknownIcon == null)
-            unknownIcon = FindDescendantByName(searchRoot, UnknownIconName)?.GetComponent<Image>();
-
-        if (clickableElement == null)
-            clickableElement = GetComponent<ClickablePCElement>();
-    }
-
-    private static Transform FindDescendantByName(Transform root, string targetName)
-    {
-        if (root == null)
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == targetName)
-                return child;
-
-            Transform result = FindDescendantByName(child, targetName);
-            if (result != null)
-                return result;
-        }
-
-        return null;
     }
 
     private void DestroyProfileSprite()

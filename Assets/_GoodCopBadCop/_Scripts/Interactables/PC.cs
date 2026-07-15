@@ -48,13 +48,7 @@ public class PC : Interactable
     [SerializeField] private ClickablePCElement nextButton;
     [SerializeField] private SimpleCanvasCursorFromMouseDelta mouseCursor;
 
-    [Header("Legacy References")]
-    [SerializeField] private GameObject mainScreen;
-    [SerializeField] private GameObject suspectListScreen;
-    [SerializeField] private ProfilePage profilePage;
-    [SerializeField] private TerminalRecordListUI terminalRecordListUI;
-    [SerializeField] private ClickablePCScrollbar PCScrollbar;
-    [SerializeField] private PCFolderTab[] _folderTabs;
+
 
     [VContainer.Inject] private IPopulationModel _populationModel;
 
@@ -74,11 +68,8 @@ public class PC : Interactable
     private NavState _currentState = NavState.Root();
     private bool _restoring;
 
-    private void Awake() => ResolveReferences();
-
     private void Start()
     {
-        ResolveReferences();
         CloseAllScreens();
         RefreshNavigationButtons();
     }
@@ -86,7 +77,6 @@ public class PC : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
-        ResolveReferences();
         player.playerMovementController.SetCanControl(false);
         player.SetCanInteract(false, "");
         Cursor.visible = false;
@@ -128,7 +118,6 @@ public class PC : Interactable
 
     public void DebugOpenTerminal()
     {
-        ResolveReferences();
         pcActive = true;
         isOn = true;
         ResetNavigation();
@@ -151,9 +140,6 @@ public class PC : Interactable
         SetViewActive(fileListView, false);
         SetViewActive(profileView, false);
         SetViewActive(newsView, false);
-        if (mainScreen != null) mainScreen.SetActive(false);
-        if (suspectListScreen != null) suspectListScreen.SetActive(false);
-        if (profilePage != null) profilePage.gameObject.SetActive(false);
     }
     public void OpenRegistry()
     {
@@ -619,31 +605,6 @@ public class PC : Interactable
     private int GetDeceasedCount() => GetAllNamedSuspects().Count(IsDeceased);
     private bool IsDeceased(SuspectData suspect) => SuspectRunRecords.Instance?.GetRecord(suspect)?.isKilled == true;
     private int GetPopulationAliveForTerminal() => _populationModel != null ? _populationModel.PopulationAlive.CurrentValue : DefaultTerminalPopulation;
-    private void ResolveReferences()
-    {
-        if (header == null) header = FindDescendantByName(transform, "Header")?.GetComponent<TextMeshProUGUI>();
-        if (backButton == null) backButton = FindDescendantByName(transform, "BackButton")?.GetComponent<ClickablePCElement>();
-        if (previousButton == null) previousButton = FindDescendantByName(transform, "Previous Btn")?.GetComponent<ClickablePCElement>();
-        if (nextButton == null) nextButton = FindDescendantByName(transform, "Next Btn")?.GetComponent<ClickablePCElement>();
-        if (fileListView == null) fileListView = GetOrAddView<FileListView>("File List View");
-        if (profileView == null)
-        {
-            profileView = GetOrAddView<ProfileView>("Profile View");
-            if (profileView == null) profileView = GetOrAddView<ProfileView>("Pofile View");
-        }
-        if (newsView == null) newsView = GetOrAddView<NewsView>("News View");
-        if (mouseCursor == null) mouseCursor = GetComponentInChildren<SimpleCanvasCursorFromMouseDelta>(true);
-        if (_virtualCanvasCursor == null) _virtualCanvasCursor = mouseCursor;
-        if (PCScrollbar == null) PCScrollbar = GetComponentInChildren<ClickablePCScrollbar>(true);
-    }
-
-    private T GetOrAddView<T>(string objectName) where T : Component
-    {
-        Transform viewTransform = FindDescendantByName(transform, objectName);
-        if (viewTransform == null) return null;
-        return viewTransform.GetComponent<T>() ?? viewTransform.gameObject.AddComponent<T>();
-    }
-
     private void SetHeader(string text)
     {
         if (header != null) header.text = text;
@@ -697,16 +658,4 @@ public class PC : Interactable
         _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
     }
 
-    private static Transform FindDescendantByName(Transform root, string targetName)
-    {
-        if (root == null) return null;
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == targetName) return child;
-            Transform result = FindDescendantByName(child, targetName);
-            if (result != null) return result;
-        }
-        return null;
-    }
 }
