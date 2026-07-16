@@ -11,6 +11,7 @@ namespace GoodCopBadCop.XRay
     {
         private const string ShaderName = "GoodCopBadCop/XRayAnatomy";
         private const string AnatomyRootName = "__XRayAnatomy";
+        private const string AnatomyPrefabResourcePath = "XRay/CharacterRigSkin";
 
         private readonly struct BoneSegment
         {
@@ -40,13 +41,26 @@ namespace GoodCopBadCop.XRay
             }
         }
 
+        private sealed class ImportedRigBinding
+        {
+            public Transform ModelBone;
+            public Transform TargetBone;
+            public Transform ModelScaleReference;
+            public Transform TargetScaleReference;
+            public float SourceLength;
+        }
+
         private readonly Dictionary<Renderer, Material[]> _originalMaterials = new();
         private readonly List<BoneSegment> _boneSegments = new();
         private readonly List<BoneAnchor> _boneAnchors = new();
+        private readonly List<ImportedRigBinding> _importedRigBindings = new();
         private readonly List<GameObjectLayerState> _layerStates = new();
 
         private Animator _animator;
         private GameObject _anatomyRoot;
+        private GameObject _importedAnatomy;
+        private Animator _importedAnimator;
+        private float _importedVisualScale = 1f;
         private Material _bodyMaterial;
         private Material _anatomyMaterial;
         private Material _anomalyMaterial;
@@ -78,6 +92,10 @@ namespace GoodCopBadCop.XRay
 
                 ApplyBodyMaterial();
                 _anatomyRoot.SetActive(true);
+                // Cursor scanning renders immediately after this method and hides the anatomy
+                // again before LateUpdate. Evaluate the retargeted pose now so the first (and
+                // sometimes only) X-ray camera render never sees the prefab's T-pose.
+                SyncImportedAnimator();
                 _isXRayVisible = true;
                 return;
             }
@@ -165,6 +183,10 @@ namespace GoodCopBadCop.XRay
 
                 anchor.Transform.SetPositionAndRotation(anchor.Bone.position, anchor.Bone.rotation);
             }
+
+            // Imported anatomy bones are directly parented to their Humanoid counterparts.
+            // The imported Animator receives the suspect's state below.
+            SyncImportedAnimator();
         }
 
         private void OnDestroy()
@@ -197,6 +219,10 @@ namespace GoodCopBadCop.XRay
                 _anatomyRoot = null;
                 _boneSegments.Clear();
                 _boneAnchors.Clear();
+                _importedRigBindings.Clear();
+                _importedAnatomy = null;
+                _importedAnimator = null;
+                _importedVisualScale = 1f;
                 _animator = activeAnimator;
                 _hasLoggedMissingHumanoid = false;
             }
@@ -213,8 +239,12 @@ namespace GoodCopBadCop.XRay
             };
             _anatomyRoot.transform.SetParent(transform, false);
 
-            BuildSkeleton();
-            BuildOrgans();
+            if (!BuildImportedAnatomy())
+            {
+                Debug.LogWarning("[XRayAnatomyView] Imported anatomy prefab was not available; using primitive fallback.", this);
+                BuildSkeleton();
+                BuildOrgans();
+            }
             _anatomyRoot.SetActive(false);
             return true;
         }
@@ -264,6 +294,157 @@ namespace GoodCopBadCop.XRay
             _anomalyMaterial.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.Always);
             _anomalyMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent + 11;
             return true;
+        }
+
+        private bool BuildImportedAnatomy()
+        {
+            GameObject prefab = Resources.Load<GameObject>(AnatomyPrefabResourcePath);
+            if (prefab == null)
+                return false;
+
+            _importedAnatomy = Instantiate(prefab, _anatomyRoot.transform);
+            _importedAnatomy.name = "Imported Skeleton And Organs";
+            _importedAnatomy.hideFlags = HideFlags.DontSave;
+
+            _importedAnimator = _importedAnatomy.GetComponentInChildren<Animator>(true);
+            if (!ConfigureImportedAnimator())
+                return false;
+
+            foreach (Collider collider in _importedAnatomy.GetComponentsInChildren<Collider>(true))
+                collider.enabled = false;
+
+            foreach (Renderer renderer in _importedAnatomy.GetComponentsInChildren<Renderer>(true))
+            {
+                // The source pack includes an optional skin mesh. The real suspect already supplies
+                // the X-ray silhouette, so only its skeleton and organs belong in this overlay.
+                if (IsSourceSkinRenderer(renderer))
+                {
+                    renderer.enabled = false;
+                    continue;
+                }
+
+                renderer.sharedMaterial = _anatomyMaterial;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            // The pack's mesh offsets are authored in its own bind pose. A single height-based
+            // scale keeps those offsets (and therefore the organs) inside characters of different
+            // proportions; individual bones are positioned separately below.
+            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+            Transform sourceHead = FindDescendant(_importedAnatomy.transform, "rig:Head");
+            Transform targetHips = Bone(HumanBodyBones.Hips);
+            Transform targetHead = Bone(HumanBodyBones.Head);
+            if (sourceHips != null && sourceHead != null && targetHips != null && targetHead != null)
+            {
+                float sourceHeight = Vector3.Distance(sourceHips.position, sourceHead.position);
+                float targetHeight = Vector3.Distance(targetHips.position, targetHead.position);
+                if (sourceHeight > 0.001f)
+                    _importedVisualScale = Mathf.Clamp(targetHeight / sourceHeight, 0.25f, 2f);
+            }
+            _importedAnatomy.transform.localScale = Vector3.one * _importedVisualScale;
+
+            return true;
+        }
+
+        private bool ConfigureImportedAnimator()
+        {
+            if (_importedAnimator == null || !_importedAnimator.isHuman || _animator == null || _animator.runtimeAnimatorController == null)
+            {
+                Debug.LogWarning("[XRayAnatomyView] Imported anatomy or suspect has no compatible Humanoid Animator.", this);
+                return false;
+            }
+
+            // Keep the imported model's Avatar, but evaluate exactly the same state machine as the
+            // suspect. Mecanim then retargets the Humanoid pose to the anatomy rig automatically.
+            _importedAnimator.runtimeAnimatorController = _animator.runtimeAnimatorController;
+            _importedAnimator.applyRootMotion = false;
+            _importedAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            _importedAnimator.updateMode = _animator.updateMode;
+            _importedAnimator.enabled = true;
+            return true;
+        }
+
+        private void SyncImportedAnimator()
+        {
+            if (_importedAnimator == null || _animator == null || !_importedAnimator.enabled)
+                return;
+
+            foreach (AnimatorControllerParameter parameter in _animator.parameters)
+            {
+                switch (parameter.type)
+                {
+                    case AnimatorControllerParameterType.Float:
+                        _importedAnimator.SetFloat(parameter.nameHash, _animator.GetFloat(parameter.nameHash));
+                        break;
+                    case AnimatorControllerParameterType.Int:
+                        _importedAnimator.SetInteger(parameter.nameHash, _animator.GetInteger(parameter.nameHash));
+                        break;
+                    case AnimatorControllerParameterType.Bool:
+                        _importedAnimator.SetBool(parameter.nameHash, _animator.GetBool(parameter.nameHash));
+                        break;
+                }
+            }
+
+            int layerCount = Mathf.Min(_animator.layerCount, _importedAnimator.layerCount);
+            for (int layer = 0; layer < layerCount; layer++)
+            {
+                AnimatorStateInfo state = _animator.GetCurrentAnimatorStateInfo(layer);
+                if (state.fullPathHash != 0)
+                    _importedAnimator.Play(state.fullPathHash, layer, state.normalizedTime);
+            }
+            _importedAnimator.Update(0f);
+        }
+
+        private static bool IsSourceSkinRenderer(Renderer renderer)
+        {
+            // CharacterRigSkin is a full demonstrator character. These renderers are its ordinary
+            // skin/clothing, not anatomy. Keeping any one of them makes it look as if a second
+            // person in a T-pose is standing inside the suspect.
+            return renderer.name.Contains("Character")
+                || renderer.name == "Body"
+                || renderer.name == "Eyelashes"
+                || renderer.name == "Shirt"
+                || renderer.name == "Pants"
+                || renderer.name == "Sneakers"
+                || renderer.name == "LeftKnee"
+                || renderer.name == "RightKnee";
+        }
+
+        private void AddImportedRigBinding(string modelBoneName, HumanBodyBones targetBone, string modelScaleReferenceName, HumanBodyBones targetScaleReference)
+        {
+            Transform modelBone = FindDescendant(_importedAnatomy.transform, modelBoneName);
+            Transform target = Bone(targetBone);
+            if (modelBone == null || target == null)
+                return;
+
+            Transform modelReference = string.IsNullOrEmpty(modelScaleReferenceName)
+                ? null
+                : FindDescendant(_importedAnatomy.transform, modelScaleReferenceName);
+            Transform targetReference = targetScaleReference == HumanBodyBones.LastBone
+                ? null
+                : Bone(targetScaleReference);
+            float sourceLength = modelReference == null ? 0f : Vector3.Distance(modelBone.position, modelReference.position);
+
+            _importedRigBindings.Add(new ImportedRigBinding
+            {
+                ModelBone = modelBone,
+                TargetBone = target,
+                ModelScaleReference = modelReference,
+                TargetScaleReference = targetReference,
+                SourceLength = sourceLength
+            });
+        }
+
+        private static Transform FindDescendant(Transform root, string targetName)
+        {
+            foreach (Transform transform in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (transform.name == targetName)
+                    return transform;
+            }
+
+            return null;
         }
 
         private void BuildSkeleton()
