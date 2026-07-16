@@ -111,6 +111,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.TeleportToPowerStation();
             SetVisible(false);
         }));
+
+        _cheats.Add(("Day 4 — Fuse Power Outage + Power Station", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay4FusePowerOutage());
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

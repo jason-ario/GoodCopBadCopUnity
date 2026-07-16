@@ -795,6 +795,60 @@ public class DebugConsole : MonoBehaviour
     /// Assign <see cref="_powerStationSpawnPoint"/> in the Inspector to the
     /// "Player Spawn Pos - At Power Station" scene object.
     /// </summary>
+    /// <summary>
+    /// Loads Day 4, starts the shift, triggers a fuse-required power outage, and
+    /// teleports the local player to the power station — for testing the fuse-box puzzle.
+    /// </summary>
+    public void SkipToDay4FusePowerOutage()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay4FusePowerOutage: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        if (_powerStationSpawnPoint == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay4FusePowerOutage: _powerStationSpawnPoint not assigned in the Inspector.");
+            return;
+        }
+
+        SkipToDay(4);
+        StartCoroutine(SkipToDay4FusePowerOutageAfterDelay());
+    }
+
+    private IEnumerator SkipToDay4FusePowerOutageAfterDelay()
+    {
+        // One frame for Day 4 to activate and subscribe events.
+        yield return null;
+
+        FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Two frames for the shift ClientRpc and NetworkVariables to propagate.
+        yield return null;
+        yield return null;
+
+        // Trigger the fuse-required power outage.
+        ElectricityController ec = _electricityController != null
+            ? _electricityController
+            : FindAnyObjectByType<ElectricityController>();
+
+        if (ec != null)
+            ec.PowerOffFuseRequired();
+        else
+            Debug.LogWarning("[DebugConsole] SkipToDay4FusePowerOutage: ElectricityController not found — power state unchanged.");
+
+        // Teleport to the power station.
+        if (PlayerInstance.Instance != null)
+            PlayerInstance.Instance.SetPosition(_powerStationSpawnPoint);
+        else
+            Debug.LogWarning("[DebugConsole] SkipToDay4FusePowerOutage: PlayerInstance not found — teleport skipped.");
+
+        Debug.Log("[DebugConsole] Day 4 fuse-power-outage cheat applied — power is out (fuse required), player at power station.");
+    }
+
     public void TeleportToPowerStation()
     {
         if (_powerStationSpawnPoint == null)
