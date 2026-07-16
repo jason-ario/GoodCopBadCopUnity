@@ -25,6 +25,9 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - TCP2_BLACK_EYES
+  - TCP2_BLUE_VEINS
+  - TCP2_LESION
   - TCP2_UV_NORMALS_FULL
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -63,11 +66,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EyeMaskMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 4780e490aeb40f4499fd90c69f522f9e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _LesionMaskMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 64817e0f16ffd5748807100ed69b41d9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -99,7 +102,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _VeinMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: c7edf7c1a7105f948bae3c72aaee245f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -119,7 +122,7 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _BlackEyesStrength: 0
+    - _BlackEyesStrength: 1
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -135,7 +138,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
-    - _LesionStrength: 0
+    - _LesionStrength: 1
     - _Metallic: 0
     - _Mode: 0
     - _NormalsSource: 0
@@ -157,9 +160,9 @@ Material:
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _UVSec: 0
-    - _UseBlackEyes: 0
-    - _UseBlueVeins: 0
-    - _UseLesion: 0
+    - _UseBlackEyes: 1
+    - _UseBlueVeins: 1
+    - _UseLesion: 1
     - _UseNormalMap: 0
     - _UseSketch: 0
     - _VeinEdgeSoftness: 0.5
