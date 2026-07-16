@@ -1,3 +1,4 @@
+using GoodCopBadCop.XRay;
 using UnityEngine;
 
 /// <summary>
@@ -59,6 +60,7 @@ public class XRayJoystickController : Interactable, IHeldItemPassthrough
     // Cached so they can be restored on exit.
     private GameObject _playerArms;
     private GameObject _playerBody;
+    private XRayAnatomyView _activeXRayAnatomy;
 
     // ─── Computed positions ───────────────────────────────────────────────────
 
@@ -148,6 +150,8 @@ public class XRayJoystickController : Interactable, IHeldItemPassthrough
         if (_xRayCameraGO != null)
             _xRayCameraGO.SetActive(true);
 
+        SetCurrentSuspectXRayVisible(true);
+
         UIController.Instance.ShowBackButton(ExitJoystickView);
     }
 
@@ -163,6 +167,8 @@ public class XRayJoystickController : Interactable, IHeldItemPassthrough
 
         if (_xRayCameraGO != null)
             _xRayCameraGO.SetActive(false);
+
+        SetCurrentSuspectXRayVisible(false);
 
         if (_playerArms != null)
         {
@@ -183,6 +189,39 @@ public class XRayJoystickController : Interactable, IHeldItemPassthrough
             _currentPlayer.playerMovementController.SetCanControl(true);
             _currentPlayer = null;
         }
+    }
+
+    private void OnDisable()
+    {
+        SetCurrentSuspectXRayVisible(false);
+    }
+
+    /// <summary>
+    /// Enables the local procedural anatomy only for the suspect currently at the booth.
+    /// This is intentionally a local visual operation: it never changes NetworkVariables or RPC state.
+    /// </summary>
+    private void SetCurrentSuspectXRayVisible(bool visible)
+    {
+        if (!visible)
+        {
+            if (_activeXRayAnatomy != null)
+                _activeXRayAnatomy.SetXRayVisible(false);
+            _activeXRayAnatomy = null;
+            return;
+        }
+
+        SuspectCharacter suspect = SuspectController.Instance?.CurrentSuspect;
+        if (suspect == null)
+        {
+            Debug.LogWarning("[XRayJoystickController] No current suspect is available for the X-ray view.", this);
+            return;
+        }
+
+        _activeXRayAnatomy = suspect.GetComponent<XRayAnatomyView>();
+        if (_activeXRayAnatomy == null)
+            _activeXRayAnatomy = suspect.gameObject.AddComponent<XRayAnatomyView>();
+
+        _activeXRayAnatomy.SetXRayVisible(true);
     }
 
     // ─── Monitor helpers ─────────────────────────────────────────────────────

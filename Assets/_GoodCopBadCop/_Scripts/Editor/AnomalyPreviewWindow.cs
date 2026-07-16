@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using GoodCopBadCop.SuspectBehaviorAnimation;
 using GoodCopBadCop.SuspectPaperwork;
+using GoodCopBadCop.XRay;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -168,6 +169,8 @@ namespace GoodCopBadCop.Editor
                 EditorGUILayout.Space(8f);
                 DrawAnimationPreviewControls();
                 EditorGUILayout.Space(8f);
+                DrawXRayCursorScanControls();
+                EditorGUILayout.Space(8f);
                 DrawVitalsReadouts();
                 EditorGUILayout.Space(8f);
                 DrawClearPreviewControls();
@@ -322,6 +325,60 @@ namespace GoodCopBadCop.Editor
                 DrawReadoutRow("Heart Rate", $"{suspect.heartRateBpm} bpm", FormatHeartRateNote());
                 DrawReadoutRow("Radiation", suspect.radiationAmount.ToString(), FormatRadiationNote());
             }
+        }
+
+        private void DrawXRayCursorScanControls()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("X-Ray Cursor Scanner", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    "In the sandbox Game view, hover the suspect to reveal a square X-ray crop under the cursor.",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                bool canUseScanner = EditorApplication.isPlaying && IsSandboxSceneActive() && GetPreviewSuspect() != null && Camera.main != null;
+                XRayCursorScannerPreview scanner = Camera.main != null
+                    ? Camera.main.GetComponent<XRayCursorScannerPreview>()
+                    : null;
+
+                using (new EditorGUI.DisabledScope(!canUseScanner))
+                {
+                    string label = scanner == null ? "Enable Cursor X-Ray" : "Disable Cursor X-Ray";
+                    if (GUILayout.Button(label, GUILayout.Height(26f)))
+                        ToggleXRayCursorScanner(scanner);
+                }
+
+                if (!EditorApplication.isPlaying || !IsSandboxSceneActive())
+                    EditorGUILayout.LabelField("Spawn the selected suspect into the Play Mode sandbox first.", EditorStyles.miniLabel);
+                else if (GetPreviewSuspect() == null)
+                    EditorGUILayout.LabelField("No preview suspect is available.", EditorStyles.miniLabel);
+            }
+        }
+
+        private void ToggleXRayCursorScanner(XRayCursorScannerPreview scanner)
+        {
+            if (scanner != null)
+            {
+                Destroy(scanner);
+                status = "Cursor X-ray scanner disabled.";
+                return;
+            }
+
+            global::SuspectCharacter suspect = GetPreviewSuspect();
+            Camera camera = Camera.main;
+            if (suspect == null || camera == null)
+            {
+                status = "Cursor X-ray scanner needs an active preview suspect and Main Camera.";
+                return;
+            }
+
+            XRayAnatomyView anatomyView = suspect.GetComponent<XRayAnatomyView>();
+            if (anatomyView == null)
+                anatomyView = suspect.gameObject.AddComponent<XRayAnatomyView>();
+
+            scanner = camera.gameObject.AddComponent<XRayCursorScannerPreview>();
+            scanner.Configure(camera, suspect.gameObject, anatomyView);
+            status = "Cursor X-ray scanner enabled. Hover the suspect in the Game view.";
         }
 
         private void DrawReadoutRow(string label, string value, string note)
@@ -1260,6 +1317,12 @@ namespace GoodCopBadCop.Editor
 
         private void ClearPreviewInstance()
         {
+            XRayCursorScannerPreview scanner = Camera.main != null
+                ? Camera.main.GetComponent<XRayCursorScannerPreview>()
+                : null;
+            if (scanner != null)
+                Destroy(scanner);
+
             ClearPreviewDocuments();
 
             DestroyPreviewObject(previewRoot);
