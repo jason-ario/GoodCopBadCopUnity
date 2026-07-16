@@ -10844,6 +10844,9 @@ MonoBehaviour:
   lookDownLerpSpeed: 20
   maxCameraOffsetForLean: 0.3
   gravity: -20
+  underwaterGravityMultiplier: 0.2
+  underwaterSpeedMultiplier: 0.55
+  underwaterTerminalVelocity: -3
   jumpForce: 7
   jumpSound: {fileID: 0}
   landSound: {fileID: 8300000, guid: 6b09870ea7284f7458f54e2873e673c6, type: 3}
@@ -11169,6 +11172,8 @@ MonoBehaviour:
   headTransform: {fileID: 6616138626675467207}
   bodyArmsMesh: {fileID: 6203034436640246515}
   firstPersonArms: {fileID: 2112641185356085190}
+  underwaterLinearDamping: 4
+  underwaterAngularDamping: 4
 --- !u!114 &2434796521106099578
 MonoBehaviour:
   m_ObjectHideFlags: 0
