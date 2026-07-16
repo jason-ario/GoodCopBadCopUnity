@@ -24,7 +24,8 @@ public class CircuitBox : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void ToggleCircuitBoxServerRpc()
     {
-        if (!electricityController.IsPowerOn)
+        // Block normal restore if this outage requires the fuse-box puzzle.
+        if (!electricityController.IsPowerOn && !electricityController.RequiresFuseBoxRestore)
         {
             electricityController.PowerOn();
         }

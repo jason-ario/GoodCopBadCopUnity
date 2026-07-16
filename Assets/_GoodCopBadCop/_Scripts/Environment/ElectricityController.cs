@@ -19,12 +19,29 @@ public class ElectricityController : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>
+    /// When true the standard circuit breaker cannot restore power — only the
+    /// fuse-box puzzle + power switch can. Reset to false by <see cref="PowerOn"/>.
+    /// </summary>
+    private NetworkVariable<bool> _requiresFuseBoxRestore = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     /// <summary>Returns the current power state, readable by all clients.</summary>
     public bool IsPowerOn => _isPowerOn.Value;
+
+    /// <summary>
+    /// True when the current outage can only be cleared via the fuse-box puzzle.
+    /// The normal <see cref="CircuitBox"/> interaction will be blocked while this is set.
+    /// </summary>
+    public bool RequiresFuseBoxRestore => _requiresFuseBoxRestore.Value;
 
     public override void OnNetworkSpawn()
     {
         _isPowerOn.OnValueChanged += OnPowerStateChanged;
+        _requiresFuseBoxRestore.OnValueChanged += OnFuseRequirementChanged;
     }
 
     private void Start()
@@ -49,6 +66,7 @@ public class ElectricityController : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         _isPowerOn.OnValueChanged -= OnPowerStateChanged;
+        _requiresFuseBoxRestore.OnValueChanged -= OnFuseRequirementChanged;
     }
 
     // ------------------------------------------------------------------
@@ -95,11 +113,25 @@ public class ElectricityController : NetworkBehaviour
         PowerOffClientRpc();
     }
 
+    /// <summary>
+    /// Cuts power and marks the outage as requiring the fuse-box puzzle to resolve.
+    /// The standard <see cref="CircuitBox"/> will silently reject restore attempts.
+    /// </summary>
+    [ContextMenu("Power Off (Fuse Required)")]
+    public void PowerOffFuseRequired()
+    {
+        if (!IsServer) return;
+
+        _requiresFuseBoxRestore.Value = true;
+        PowerOff();
+    }
+
     [ContextMenu("Power On")]
     public void PowerOn()
     {
         if (!IsServer) return;
 
+        _requiresFuseBoxRestore.Value = false;
         _isPowerOn.Value = true;
         PowerOnClientRpc();
 
@@ -154,8 +186,13 @@ public class ElectricityController : NetworkBehaviour
     }
 
     // ------------------------------------------------------------------
-    // NetworkVariable change callback (handles late-joining clients)
+    // NetworkVariable change callbacks (handle late-joining clients)
     // ------------------------------------------------------------------
+
+    private void OnFuseRequirementChanged(bool previous, bool current)
+    {
+        // No visual response needed — consumers poll RequiresFuseBoxRestore directly.
+    }
 
     private void OnPowerStateChanged(bool previous, bool current)
     {

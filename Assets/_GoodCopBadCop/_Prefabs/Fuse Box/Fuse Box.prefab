@@ -3370,6 +3370,13 @@ MonoBehaviour:
   _audioSource: {fileID: 5474268906634732374}
   _doorOpenClip: {fileID: 8300000, guid: f9e3aab5f2668b44895f898efbdc9672, type: 3}
   _doorCloseClip: {fileID: 8300000, guid: 8da92a9d9cb8cf049890b104bb2aed68, type: 3}
+  _fuseSlots:
+  - {fileID: 4674881994603733725}
+  - {fileID: 6778475775245144300}
+  - {fileID: 6129746237785390049}
+  _statusLight: {fileID: 0}
+  _readyColor: {r: 0, g: 1, b: 0, a: 1}
+  _notReadyColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &2959699720760396482
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3634,7 +3641,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 25
+  rmsCount: 34
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0
@@ -3889,6 +3896,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+--- !u!114 &4674881994603733725 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1068126877943872532, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+  m_PrefabInstance: {fileID: 5634631898561879753}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cbccf41469f2e446a0733f0d0510233, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FuseSlot
 --- !u!4 &8527231342861552210 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4063641463744533659, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
@@ -3963,6 +3981,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+--- !u!114 &6778475775245144300 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1068126877943872532, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+  m_PrefabInstance: {fileID: 5819570398852279544}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cbccf41469f2e446a0733f0d0510233, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FuseSlot
 --- !u!4 &7541189685263824995 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4063641463744533659, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
@@ -4037,6 +4066,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+--- !u!114 &6129746237785390049 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1068126877943872532, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
+  m_PrefabInstance: {fileID: 6612273837144279029}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cbccf41469f2e446a0733f0d0510233, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FuseSlot
 --- !u!4 &7180831705959404398 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4063641463744533659, guid: ab8c107ad0380fe4bac242c87c5ae7e7, type: 3}
