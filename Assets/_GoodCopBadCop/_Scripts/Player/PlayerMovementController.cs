@@ -62,6 +62,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float underwaterSpeedMultiplier = 0.55f;
     [Tooltip("Maximum downward velocity while underwater (must be negative).")]
     [SerializeField] private float underwaterTerminalVelocity = -3f;
+    [Tooltip("Target upward velocity reached when holding Jump underwater.")]
+    [SerializeField] private float underwaterSwimUpSpeed = 3f;
+    [Tooltip("How quickly vertical velocity ramps toward swim speed when Jump is held.")]
+    [SerializeField] private float underwaterSwimAcceleration = 8f;
 
     private bool _isUnderwater;
 
@@ -287,13 +291,21 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 SFXController.Instance.Play(landSound);
             }
 
-            _verticalVelocity = -2f; // Small constant to keep grounded
-
-            if (Input.GetButtonDown("Jump") && !_isCrouching)
+            if (_isUnderwater && Input.GetButton("Jump") && !_isCrouching)
             {
-                _verticalVelocity = jumpForce;
-                _playerAnimationController.TriggerJumpAnim();
-                SFXController.Instance.Play(jumpSound);
+                // Swim up from the seafloor — ramp toward swim speed instead of snapping to -2
+                _verticalVelocity = Mathf.MoveTowards(_verticalVelocity, underwaterSwimUpSpeed, underwaterSwimAcceleration * Time.deltaTime);
+            }
+            else
+            {
+                _verticalVelocity = -2f; // Small constant to keep grounded
+
+                if (!_isUnderwater && Input.GetButtonDown("Jump") && !_isCrouching)
+                {
+                    _verticalVelocity = jumpForce;
+                    _playerAnimationController.TriggerJumpAnim();
+                    SFXController.Instance.Play(jumpSound);
+                }
             }
         }
         else
@@ -301,8 +313,15 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             float effectiveGravity = _isUnderwater ? gravity * underwaterGravityMultiplier : gravity;
             _verticalVelocity += effectiveGravity * Time.deltaTime;
 
-            if (_isUnderwater && _verticalVelocity < underwaterTerminalVelocity)
-                _verticalVelocity = underwaterTerminalVelocity;
+            if (_isUnderwater)
+            {
+                // Hold Jump to swim upward through the water column
+                if (Input.GetButton("Jump") && !_isCrouching)
+                    _verticalVelocity = Mathf.MoveTowards(_verticalVelocity, underwaterSwimUpSpeed, underwaterSwimAcceleration * Time.deltaTime);
+
+                if (_verticalVelocity < underwaterTerminalVelocity)
+                    _verticalVelocity = underwaterTerminalVelocity;
+            }
         }
 
         _wasGrounded = isGrounded;
