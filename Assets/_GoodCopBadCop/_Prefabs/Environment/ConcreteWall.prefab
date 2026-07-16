@@ -115,6 +115,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3021439161037098007, guid: 40cba1edb9f1f2741ad21f34b84534a8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2740653642072722474}
+    - targetCorrespondingSourceObject: {fileID: 3021439161037098007, guid: 40cba1edb9f1f2741ad21f34b84534a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5678620222370620556}
   m_SourcePrefab: {fileID: 100100000, guid: 40cba1edb9f1f2741ad21f34b84534a8, type: 3}
 --- !u!1 &8439960631993022811 stripped
 GameObject:
@@ -142,3 +145,21 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.000921963, y: 0.02060719, z: 0.06769382}
   m_Center: {x: 2.724586e-12, y: 0.000054492622, z: -0.000102276}
+--- !u!114 &5678620222370620556
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8439960631993022811}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6757b231cedd544c583ef8aeaf773b2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Obi::Obi.ObiCollider
+  thickness: 0
+  inverted: 0
+  material: {fileID: 0}
+  filter: -65535
+  m_SourceCollider: {fileID: 2740653642072722474}
+  m_DistanceField: {fileID: 0}

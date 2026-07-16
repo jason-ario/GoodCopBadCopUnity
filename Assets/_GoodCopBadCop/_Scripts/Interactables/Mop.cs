@@ -33,6 +33,20 @@ public class Mop : PickableObject
     [Tooltip("Layer mask for the graffiti collider. Must include the Interactable layer.")]
     [SerializeField] private LayerMask _graffitiLayerMask;
 
+    [Header("VFX")]
+    [Tooltip("Particle system played while the mop is in use and touching any surface. " +
+             "Repositioned each frame to the closest point on the contacted collider.")]
+    [SerializeField] private ParticleSystem _scrubParticles;
+
+    [Tooltip("Layers the mop can trigger scrub particles against (walls, floors, props, etc.). " +
+             "Keep this broader than _graffitiLayerMask.")]
+    [SerializeField] private LayerMask _surfaceLayerMask;
+
+    [Header("Audio")]
+    [Tooltip("Looping AudioSource played in sync with the scrub particles. " +
+             "Set the AudioSource clip, loop = true, and Play On Awake = false in the Inspector.")]
+    [SerializeField] private AudioSource _scrubAudio;
+
     private Coroutine _scrubRoutine;
     private GraffitiInteractable _activeGraffiti;
 
@@ -67,6 +81,9 @@ public class Mop : PickableObject
             _scrubRoutine = null;
         }
 
+        _scrubParticles?.Stop();
+        _scrubAudio?.Stop();
+
         // Notify the graffiti that this mop is no longer contributing.
         NotifyStopScrubbing();
     }
@@ -77,7 +94,8 @@ public class Mop : PickableObject
     {
         while (isUsing)
         {
-            GraffitiInteractable found = FindGraffitiInRange();
+            Collider hitCollider;
+            GraffitiInteractable found = FindGraffitiInRange(out hitCollider);
 
             // Unity's == operator treats destroyed MonoBehaviours as null, so comparing
             // a destroyed _activeGraffiti against a null found will evaluate correctly.
@@ -92,10 +110,57 @@ public class Mop : PickableObject
                     _activeGraffiti.StartScrubServerRpc();
             }
 
+            // Position particles at the closest surface point — graffiti takes priority,
+            // but any surface collider in range will do.
+            Collider particleCollider = hitCollider ?? FindSurfaceInRange();
+            if (particleCollider != null)
+            {
+                if (_scrubParticles != null)
+                {
+                    Vector3 closestPoint = particleCollider.ClosestPoint(transform.position);
+                    Vector3 toSurface    = closestPoint - transform.position;
+                    float   dist         = toSurface.magnitude;
+
+                    // Raycast from the mop centre toward the surface to get the real normal.
+                    // This correctly handles angled contact (e.g. mopping the floor while
+                    // holding the handle at an angle), unlike the mop-to-surface approximation.
+                    Vector3 hitPoint      = closestPoint;
+                    Vector3 surfaceNormal = dist > 0.001f ? -toSurface.normalized : Vector3.up;
+                    if (dist > 0.001f)
+                    {
+                        RaycastHit hit;
+                        if (Physics.Raycast(transform.position, toSurface.normalized,
+                                            out hit, dist + 0.05f,
+                                            _graffitiLayerMask | _surfaceLayerMask))
+                        {
+                            hitPoint      = hit.point;
+                            surfaceNormal = hit.normal;
+                        }
+                    }
+
+                    _scrubParticles.transform.position = hitPoint;
+                    if (surfaceNormal != Vector3.zero)
+                        _scrubParticles.transform.rotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
+                    if (!_scrubParticles.isPlaying)
+                    {
+                        _scrubParticles.Play();
+                        if (_scrubAudio != null && !_scrubAudio.isPlaying)
+                            _scrubAudio.Play();
+                    }
+                }
+            }
+            else if (_scrubParticles != null && _scrubParticles.isPlaying)
+            {
+                _scrubParticles.Stop();
+                _scrubAudio?.Stop();
+            }
+
             yield return null;
         }
 
         // Clean up after the loop exits (isUsing became false).
+        _scrubParticles?.Stop();
+        _scrubAudio?.Stop();
         NotifyStopScrubbing();
         _scrubRoutine = null;
     }
@@ -115,8 +180,9 @@ public class Mop : PickableObject
 
     // ── Detection ──────────────────────────────────────────────────────────────
 
-    private GraffitiInteractable FindGraffitiInRange()
+    private GraffitiInteractable FindGraffitiInRange(out Collider hitCollider)
     {
+        hitCollider = null;
         if (!IsHeld) return null;
 
         Collider[] hits = Physics.OverlapSphere(transform.position, _scrubRadius, _graffitiLayerMask);
@@ -126,10 +192,40 @@ public class Mop : PickableObject
             GraffitiInteractable graffiti = col.GetComponent<GraffitiInteractable>()
                                          ?? col.GetComponentInParent<GraffitiInteractable>();
             if (graffiti != null)
+            {
+                hitCollider = col;
                 return graffiti;
+            }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns the collider in <see cref="_surfaceLayerMask"/> whose surface point is closest
+    /// to the mop centre, or null if nothing is in range. Used to drive scrub particles on
+    /// any surface, not just graffiti.
+    /// </summary>
+    private Collider FindSurfaceInRange()
+    {
+        if (!IsHeld) return null;
+
+        Collider[] hits = Physics.OverlapSphere(transform.position, _scrubRadius, _surfaceLayerMask);
+
+        Collider closest = null;
+        float closestSqDist = float.MaxValue;
+
+        foreach (Collider col in hits)
+        {
+            float sqDist = (col.ClosestPoint(transform.position) - transform.position).sqrMagnitude;
+            if (sqDist < closestSqDist)
+            {
+                closestSqDist = sqDist;
+                closest = col;
+            }
+        }
+
+        return closest;
     }
 
     // ── Editor ─────────────────────────────────────────────────────────────────

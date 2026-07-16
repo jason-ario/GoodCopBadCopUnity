@@ -32,14 +32,6 @@ public class GraffitiInteractable : NetworkBehaviour
              "Assign a material using a URP Lit or Unlit shader with Transparent surface type.")]
     [SerializeField] private Renderer _graffitiRenderer;
 
-    [Header("VFX")]
-    [Tooltip("Optional particle system played while scrubbing is active.")]
-    [SerializeField] private ParticleSystem _scrubParticles;
-
-    [Header("Audio")]
-    [SerializeField] private AudioClip _scrubSound;
-    [SerializeField] [Range(0f, 1f)] private float _scrubSoundVolume = 1f;
-
     // ── Networked state ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -99,10 +91,7 @@ public class GraffitiInteractable : NetworkBehaviour
         _activeScrubbers++;
 
         if (_progressCoroutine == null)
-        {
-            PlayScrubEffectClientRpc(transform.position);
             _progressCoroutine = StartCoroutine(ProgressRoutine());
-        }
     }
 
     /// <summary>
@@ -117,7 +106,6 @@ public class GraffitiInteractable : NetworkBehaviour
         {
             StopCoroutine(_progressCoroutine);
             _progressCoroutine = null;
-            StopScrubEffectClientRpc();
         }
     }
 
@@ -169,19 +157,5 @@ public class GraffitiInteractable : NetworkBehaviour
     }
 
     // ── Effects ────────────────────────────────────────────────────────────────
-
-    [ClientRpc]
-    private void PlayScrubEffectClientRpc(Vector3 position)
-    {
-        _scrubParticles?.Play();
-
-        if (SFXController.Instance != null && _scrubSound != null)
-            SFXController.Instance.PlayAtPosition(_scrubSound, position, _scrubSoundVolume);
-    }
-
-    [ClientRpc]
-    private void StopScrubEffectClientRpc()
-    {
-        _scrubParticles?.Stop();
-    }
+    // Scrub VFX and audio are driven locally by the Mop component.
 }
