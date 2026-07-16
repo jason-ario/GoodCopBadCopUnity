@@ -331,7 +331,7 @@ namespace GoodCopBadCop.Editor
         {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("X-Ray Cursor Scanner", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("X-Ray Modes", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField(
                     "In the sandbox Game view, hover the suspect to reveal a square X-ray crop under the cursor.",
                     EditorStyles.wordWrappedMiniLabel);
@@ -340,12 +340,19 @@ namespace GoodCopBadCop.Editor
                 XRayCursorScannerPreview scanner = Camera.main != null
                     ? Camera.main.GetComponent<XRayCursorScannerPreview>()
                     : null;
+                XRayFullPreview fullPreview = Camera.main != null
+                    ? Camera.main.GetComponent<XRayFullPreview>()
+                    : null;
 
                 using (new EditorGUI.DisabledScope(!canUseScanner))
                 {
                     string label = scanner == null ? "Enable Cursor X-Ray" : "Disable Cursor X-Ray";
                     if (GUILayout.Button(label, GUILayout.Height(26f)))
-                        ToggleXRayCursorScanner(scanner);
+                        ToggleXRayCursorScanner(scanner, fullPreview);
+
+                    string fullLabel = fullPreview == null ? "Enable Full X-Ray" : "Disable Full X-Ray";
+                    if (GUILayout.Button(fullLabel, GUILayout.Height(26f)))
+                        ToggleFullXRay(fullPreview, scanner);
                 }
 
                 if (!EditorApplication.isPlaying || !IsSandboxSceneActive())
@@ -355,7 +362,7 @@ namespace GoodCopBadCop.Editor
             }
         }
 
-        private void ToggleXRayCursorScanner(XRayCursorScannerPreview scanner)
+        private void ToggleXRayCursorScanner(XRayCursorScannerPreview scanner, XRayFullPreview fullPreview)
         {
             if (scanner != null)
             {
@@ -376,9 +383,41 @@ namespace GoodCopBadCop.Editor
             if (anatomyView == null)
                 anatomyView = suspect.gameObject.AddComponent<XRayAnatomyView>();
 
+            if (fullPreview != null)
+                Destroy(fullPreview);
+
             scanner = camera.gameObject.AddComponent<XRayCursorScannerPreview>();
             scanner.Configure(camera, suspect.gameObject, anatomyView);
             status = "Cursor X-ray scanner enabled. Hover the suspect in the Game view.";
+        }
+
+        private void ToggleFullXRay(XRayFullPreview fullPreview, XRayCursorScannerPreview scanner)
+        {
+            if (fullPreview != null)
+            {
+                Destroy(fullPreview);
+                status = "Full X-ray disabled.";
+                return;
+            }
+
+            global::SuspectCharacter suspect = GetPreviewSuspect();
+            Camera camera = Camera.main;
+            if (suspect == null || camera == null)
+            {
+                status = "Full X-ray needs an active preview suspect and Main Camera.";
+                return;
+            }
+
+            if (scanner != null)
+                Destroy(scanner);
+
+            XRayAnatomyView anatomyView = suspect.GetComponent<XRayAnatomyView>();
+            if (anatomyView == null)
+                anatomyView = suspect.gameObject.AddComponent<XRayAnatomyView>();
+
+            fullPreview = camera.gameObject.AddComponent<XRayFullPreview>();
+            fullPreview.Configure(anatomyView);
+            status = "Full X-ray enabled for the entire suspect.";
         }
 
         private void DrawReadoutRow(string label, string value, string note)
@@ -1322,6 +1361,12 @@ namespace GoodCopBadCop.Editor
                 : null;
             if (scanner != null)
                 Destroy(scanner);
+
+            XRayFullPreview fullPreview = Camera.main != null
+                ? Camera.main.GetComponent<XRayFullPreview>()
+                : null;
+            if (fullPreview != null)
+                Destroy(fullPreview);
 
             ClearPreviewDocuments();
 
