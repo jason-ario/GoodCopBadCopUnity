@@ -10,12 +10,12 @@ GameObject:
   m_Component:
   - component: {fileID: 4301654179352910700}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: Handle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &4301654179352910700
 Transform:
   m_ObjectHideFlags: 0
@@ -180,7 +180,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4282449702
+    rgba: 4278255360
   m_fontColor: {r: 0, g: 1, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -421,7 +421,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &827006086059865001
 Transform:
   m_ObjectHideFlags: 0
@@ -488,35 +488,17 @@ LineRenderer:
   m_MaskInteraction: 0
   m_Positions:
   - {x: 2.8231332, y: 1.9404635, z: -1.574756}
-  - {x: 2.820229, y: 1.9468064, z: -1.5734285}
-  - {x: 2.8173244, y: 1.9536009, z: -1.5721009}
-  - {x: 2.8144197, y: 1.9608469, z: -1.5707734}
-  - {x: 2.8115156, y: 1.9685446, z: -1.569446}
-  - {x: 2.8086107, y: 1.9766935, z: -1.5681181}
-  - {x: 2.8057067, y: 1.9852943, z: -1.5667908}
-  - {x: 2.802802, y: 1.9943464, z: -1.5654632}
-  - {x: 2.7998977, y: 2.0038502, z: -1.5641357}
-  - {x: 2.796993, y: 2.0138054, z: -1.562808}
-  - {x: 2.7940886, y: 2.0242126, z: -1.5614805}
-  - {x: 2.791184, y: 2.0350707, z: -1.5601529}
-  - {x: 2.7882798, y: 2.0463808, z: -1.5588254}
-  - {x: 2.7853756, y: 2.0581422, z: -1.5574979}
-  - {x: 2.7824707, y: 2.0703552, z: -1.5561701}
-  - {x: 2.7795663, y: 2.0830197, z: -1.5548427}
-  - {x: 2.7766619, y: 2.096136, z: -1.5535152}
-  - {x: 2.7737575, y: 2.1097035, z: -1.5521876}
-  - {x: 2.770853, y: 2.1237228, z: -1.5508599}
-  - {x: 2.7679484, y: 2.1381936, z: -1.5495324}
-  - {x: 2.7650442, y: 2.153116, z: -1.5482049}
-  - {x: 2.7621396, y: 2.16849, z: -1.5468774}
-  - {x: 2.759235, y: 2.1843152, z: -1.5455496}
-  - {x: 2.7563307, y: 2.200592, z: -1.5442221}
-  - {x: 2.7534263, y: 2.217321, z: -1.5428946}
-  - {x: 2.750522, y: 2.234501, z: -1.5415671}
-  - {x: 2.7476175, y: 2.2521324, z: -1.5402396}
-  - {x: 2.7447128, y: 2.2702155, z: -1.5389118}
-  - {x: 2.7418084, y: 2.2887502, z: -1.5375844}
-  - {x: 2.738904, y: 2.3077366, z: -1.5362568}
+  - {x: 2.8158722, y: 1.9726896, z: -1.5714371}
+  - {x: 2.8086107, y: 2.0049152, z: -1.5681181}
+  - {x: 2.8013499, y: 2.0371413, z: -1.5647993}
+  - {x: 2.7940886, y: 2.0693674, z: -1.5614805}
+  - {x: 2.7868276, y: 2.1015933, z: -1.5581617}
+  - {x: 2.7795663, y: 2.133819, z: -1.5548427}
+  - {x: 2.7723053, y: 2.166045, z: -1.5515238}
+  - {x: 2.7650442, y: 2.1982708, z: -1.5482049}
+  - {x: 2.757783, y: 2.230497, z: -1.5448859}
+  - {x: 2.750522, y: 2.2627227, z: -1.5415671}
+  - {x: 2.7432609, y: 2.2949486, z: -1.5382482}
   - {x: 2.7359996, y: 2.3271744, z: -1.5349293}
   m_Parameters:
     serializedVersion: 3
@@ -600,10 +582,10 @@ MonoBehaviour:
   startPoint: {fileID: 8248077021391008706}
   midPoint: {fileID: 0}
   endPoint: {fileID: 3426476540133799323}
-  linePoints: 30
-  stiffness: 350
-  damping: 15
-  ropeLength: 0.5
+  linePoints: 12
+  stiffness: 2000
+  damping: 50
+  ropeLength: 0.05
   ropeWidth: 0.62
   midPointWeight: 1
   midPointPosition: 0.5
@@ -715,7 +697,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
@@ -1193,6 +1175,11 @@ MonoBehaviour:
   itemData: {fileID: 11400000, guid: 5fe8564a7140fb34eb4f9164b78b0c42, type: 2}
   readingText: {fileID: 8764016626634499277}
   maxDistance: 3
+  handle: {fileID: 4301654179352910700}
+  cordStart: {fileID: 8248077021391008706}
+  cordEnd: {fileID: 3426476540133799323}
+  cordLine: {fileID: 1878937577096569663}
+  rope: {fileID: 3365841498454917894}
   scanDuration: 2.5
   readingJitter: 2
   screenRenderer: {fileID: 3031762353054582483}
@@ -1314,7 +1301,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}

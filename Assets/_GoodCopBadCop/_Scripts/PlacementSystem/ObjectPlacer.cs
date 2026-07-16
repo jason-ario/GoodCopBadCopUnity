@@ -190,6 +190,7 @@ public class ObjectPlacer : MonoBehaviour
             parentConstraint.constraintActive = false;
 
         DisableAllColliders(_clonedItem.gameObject);
+        DisableGhostRopes(_clonedItem.gameObject);
         SetupGhostMaterials(_clonedItem.gameObject);
     }
 
@@ -200,6 +201,17 @@ public class ObjectPlacer : MonoBehaviour
     {
         foreach (Collider col in root.GetComponentsInChildren<Collider>(true))
             col.enabled = false;
+    }
+
+    private void DisableGhostRopes(GameObject root)
+    {
+        foreach (GogoGaga.OptimizedRopesAndCables.Rope rope in root.GetComponentsInChildren<GogoGaga.OptimizedRopesAndCables.Rope>(true))
+        {
+            rope.enabled = false;
+
+            LineRenderer ropeRenderer = rope.GetComponent<LineRenderer>();
+            if (ropeRenderer != null) ropeRenderer.enabled = false;
+        }
     }
 
     private static readonly int SurfaceProperty = Shader.PropertyToID("_Surface");

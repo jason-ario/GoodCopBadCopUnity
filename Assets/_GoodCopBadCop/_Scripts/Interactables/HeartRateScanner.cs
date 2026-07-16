@@ -1,12 +1,20 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using GogoGaga.OptimizedRopesAndCables;
 
 [RequireComponent(typeof(InternalBattery))]
 public class HeartRateScanner : PickableObject
 {
     [SerializeField] private TextMeshPro readingText;
     [SerializeField] private float maxDistance = 3f;
+
+    [Header("Two-Handed Presentation")]
+    [SerializeField] private Transform handle;
+    [SerializeField] private Transform cordStart;
+    [SerializeField] private Transform cordEnd;
+    [SerializeField] private LineRenderer cordLine;
+    [SerializeField] private Rope rope;
 
     [Header("Reading Behavior")]
     [SerializeField] private float scanDuration = 2.5f;
@@ -33,17 +41,67 @@ public class HeartRateScanner : PickableObject
     private bool hasCompletedReading;
     private SuspectCharacter scanTarget;
     private int sampledBpm;
+    private ObjectContainer equippedHandleContainer;
+    private Transform defaultCordEnd;
+    private Coroutine twoHandedPresentationRoutine;
 
     protected override void Awake()
     {
         base.Awake();
         internalBattery = GetComponent<InternalBattery>();
+        ResolveTwoHandedReferences();
         if (screenRenderer == null)
             screenRenderer = FindScreenRenderer();
 
         CreateWaveformTexture();
         ResetDisplay();
     }
+
+    public override void OnEquipped(PlayerPickupController player)
+    {
+        // Body-hand container entries are inactive visual copies. They must not run
+        // pickup animation, two-handed presentation, or coroutines.
+        if (!isActiveAndEnabled) return;
+
+        ResolveTwoHandedReferences();
+        base.OnEquipped(player);
+        SetInternalHandles(true);
+        if (twoHandedPresentationRoutine != null)
+            StopCoroutine(twoHandedPresentationRoutine);
+
+        twoHandedPresentationRoutine = StartCoroutine(EnableTwoHandedPresentation(player));
+    }
+
+    public override void OnUnequip(PlayerPickupController player)
+    {
+        // The inactive body visual has no initialized Rope and is not a held world item.
+        if (!isActiveAndEnabled) return;
+
+        RestoreWorldPresentation();
+        base.OnUnequip(player);
+    }
+
+    public override void OnDropped()
+    {
+        RestoreWorldPresentation();
+        base.OnDropped();
+    }
+
+    private IEnumerator EnableTwoHandedPresentation(PlayerPickupController player)
+    {
+        yield return null;
+        if (player == null) yield break;
+
+        equippedHandleContainer = GetSecondaryHandContainer(player);
+        SetTwoHandedPresentation(true);
+
+        // The right-hand object is reparented after OnEquipped. Run once more after
+        // that operation so its built-in handle cannot become visible for a frame.
+        yield return new WaitForEndOfFrame();
+        SetInternalHandles(true);
+        twoHandedPresentationRoutine = null;
+    }
+
 
     private void OnDestroy()
     {
@@ -339,6 +397,128 @@ public class HeartRateScanner : PickableObject
                 y0 += stepY;
             }
         }
+    }
+
+    private void ResolveTwoHandedReferences()
+    {
+        handle ??= transform.Find("Handle");
+        cordStart ??= FindDescendant(transform, "Cord Start");
+        defaultCordEnd ??= handle != null ? FindDescendant(handle, "Cord End") : null;
+        defaultCordEnd ??= FindDescendant(transform, "Cord End");
+        cordEnd ??= defaultCordEnd;
+        cordLine ??= GetComponentInChildren<LineRenderer>(true);
+        rope ??= GetComponentInChildren<Rope>(true);
+    }
+
+    private void SetTwoHandedPresentation(bool equipped)
+    {
+        SetInternalHandles(equipped);
+
+        if (equippedHandleContainer != null)
+        {
+            Transform proxyCordEnd = equippedHandleContainer.SetSecondaryHeldVisual(ItemData, equipped);
+            if (equipped && proxyCordEnd != null) cordEnd = proxyCordEnd;
+        }
+
+        if (!equipped)
+        {
+            cordEnd = defaultCordEnd;
+            equippedHandleContainer = null;
+        }
+
+        if (rope != null)
+        {
+            rope.enabled = true;
+            rope.SetStartPoint(cordStart, true);
+            rope.SetEndPoint(cordEnd, true);
+        }
+    }
+
+    private void SetInternalHandles(bool equipped)
+    {
+        if (handle != null) handle.gameObject.SetActive(!equipped);
+
+        if (playerPickupController == null) return;
+
+        SetInternalHandleInContainer(playerPickupController.RightArmCamObjectContainer, equipped);
+        SetInternalHandleInContainer(playerPickupController.RightArmBodyObjectContainer, equipped);
+    }
+
+    private void SetInternalHandleInContainer(ObjectContainer container, bool equipped)
+    {
+        if (container == null) return;
+
+        foreach (PickableObject item in container.ItemsHeld)
+        {
+            if (item == null || item.ItemData != ItemData) continue;
+
+            Transform internalHandle = FindDescendant(item.transform, "Handle");
+            if (internalHandle != null) internalHandle.gameObject.SetActive(!equipped);
+        }
+
+        // Some Object Hold Point entries are prefab visuals, not ItemsHeld entries.
+        // They still must not show the monitor's built-in handle while the separate
+        // left-hand handle is active.
+        foreach (Transform monitor in container.GetComponentsInChildren<Transform>(true))
+        {
+            if (monitor.name != "Heart Rate Monitor") continue;
+
+            Transform internalHandle = monitor.Find("Handle");
+            if (internalHandle != null) internalHandle.gameObject.SetActive(!equipped);
+        }
+    }
+
+    private void RestoreWorldPresentation()
+    {
+        ResolveTwoHandedReferences();
+
+        if (twoHandedPresentationRoutine != null)
+        {
+            StopCoroutine(twoHandedPresentationRoutine);
+            twoHandedPresentationRoutine = null;
+        }
+
+        SetTwoHandedPresentation(false);
+
+        if (rope == null) return;
+
+        rope.enabled = true;
+        rope.SetStartPoint(cordStart, true);
+        rope.SetEndPoint(defaultCordEnd, true);
+        StartCoroutine(RefreshWorldCordAfterDrop());
+    }
+
+    private IEnumerator RefreshWorldCordAfterDrop()
+    {
+        // Placement changes the monitor transform later in the same frame. Refresh
+        // endpoints after that change so the world/stand loop renders immediately.
+        yield return null;
+
+        if (rope == null) yield break;
+
+        rope.enabled = true;
+        rope.SetStartPoint(cordStart, true);
+        rope.SetEndPoint(defaultCordEnd, true);
+    }
+
+    private ObjectContainer GetSecondaryHandContainer(PlayerPickupController player)
+    {
+        if (player.RightArmBodyObjectContainer != null && transform.IsChildOf(player.RightArmBodyObjectContainer.transform))
+            return player.LeftArmBodyObjectContainer;
+
+        return player.LeftArmCamObjectContainer;
+    }
+
+    private static Transform FindDescendant(Transform root, string objectName)
+    {
+        if (root == null) return null;
+
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (child.name == objectName) return child;
+        }
+
+        return null;
     }
 
     private MeshRenderer FindScreenRenderer()

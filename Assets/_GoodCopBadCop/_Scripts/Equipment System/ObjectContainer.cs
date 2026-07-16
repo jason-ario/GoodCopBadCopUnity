@@ -5,10 +5,19 @@ using UnityEngine;
 public class ObjectContainer : MonoBehaviour
 {
     [SerializeField] private PickableObject[] itemsHeld;
+    [SerializeField] private SecondaryHeldVisual[] secondaryHeldVisuals;
     public PickableObject[] ItemsHeld => itemsHeld;
     private PickableObject currentlyEquippedItem;
     public PickableObject CurrentlyEquippedItem => currentlyEquippedItem;
     public bool overrideLayer = true;
+
+    [Serializable]
+    public class SecondaryHeldVisual
+    {
+        public PickableItemData itemData;
+        public GameObject visual;
+        public Transform cordEnd;
+    }
 
     public enum ParentContainerType
     {
@@ -97,6 +106,24 @@ public class ObjectContainer : MonoBehaviour
         }
             
         currentlyEquippedItem = null;
+    }
+
+    public Transform SetSecondaryHeldVisual(PickableItemData itemData, bool active)
+    {
+        if (secondaryHeldVisuals == null) return null;
+
+        Transform cordEnd = null;
+
+        foreach (var secondaryVisual in secondaryHeldVisuals)
+        {
+            if (secondaryVisual == null || secondaryVisual.visual == null) continue;
+
+            bool isMatch = secondaryVisual.itemData == itemData;
+            secondaryVisual.visual.SetActive(active && isMatch);
+            if (isMatch) cordEnd = secondaryVisual.cordEnd;
+        }
+
+        return cordEnd;
     }
 
     public int ItemIndex(PickableItemData itemData)
