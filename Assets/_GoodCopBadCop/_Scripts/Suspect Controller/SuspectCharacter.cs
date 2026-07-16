@@ -699,9 +699,15 @@ public class SuspectCharacter : Interactable
 
         if (record.IsFullyMutated)
         {
+            ActivateFullMutantForm();
             OnSuspectPresentingUncanny?.Invoke(this, record.infectionScore);
             SetMutantVoiceClientRpc();
             PlayUncannyArriveSoundClientRpc();
+        }
+        else
+        {
+            if (_baseVersion != null) _baseVersion.SetActive(true);
+            if (_mutatedVersion != null) _mutatedVersion.SetActive(false);
         }
     }
 

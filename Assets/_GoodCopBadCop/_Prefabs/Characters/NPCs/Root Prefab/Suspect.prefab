@@ -1100,7 +1100,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 523296109
+  GlobalObjectIdHash: 3615840691
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1137,7 +1137,6 @@ MonoBehaviour:
   animator: {fileID: 3144101779491009765}
   audioSource: {fileID: 1751970679333441786}
   speaking: {fileID: 7888620099599006139}
-  idPhoto: {fileID: 0}
   interactionCollider: {fileID: 7460938723757500394}
   bloodExplosion: {fileID: 8015446583675946598}
   lookPos: {fileID: 5330771091470271895}
@@ -1162,6 +1161,8 @@ MonoBehaviour:
   _uncannyArrivesSound: {fileID: 8300000, guid: 10ff9e0a540b91a45aa40cfb33de721a, type: 3}
   _suspectCam: {fileID: 7165712762372772399}
   _suspectFaceCam: {fileID: 5417930054641599086}
+  _mutantSuspectCam: {fileID: 0}
+  _mutantFaceCam: {fileID: 0}
   _walkSpeed: 1.5
   _angularSpeed: 240
   _stoppingDistance: 0.1
@@ -1854,6 +1855,9 @@ MonoBehaviour:
     infectionScore: 0
     pendingVaccineReset: 0
     isKilled: 0
+    hasEnteredCity: 0
+    populationKillPending: 0
+    populationDeathRecorded: 0
     killedOnDay: 0
     isReplacement: 0
     quarantinedOnDay: 0
