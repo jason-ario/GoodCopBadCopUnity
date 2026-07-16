@@ -38,6 +38,22 @@ public class ElectricityController : NetworkBehaviour
     /// </summary>
     public bool RequiresFuseBoxRestore => _requiresFuseBoxRestore.Value;
 
+    // ── Server-side events ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired on the server when a fuse-required outage begins via
+    /// <see cref="PowerOffFuseRequired"/>. Subscribe to spawn fuses, trigger
+    /// environment changes, etc.
+    /// </summary>
+    public event System.Action OnFuseRequiredOutageStarted;
+
+    /// <summary>
+    /// Fired on the server when <see cref="PowerOn"/> is called after a fuse-required
+    /// outage (i.e. <see cref="RequiresFuseBoxRestore"/> was true). Use this to clean
+    /// up any spawned objects that should be removed once power is restored.
+    /// </summary>
+    public event System.Action OnFuseOutageResolved;
+
     public override void OnNetworkSpawn()
     {
         _isPowerOn.OnValueChanged += OnPowerStateChanged;
@@ -123,6 +139,7 @@ public class ElectricityController : NetworkBehaviour
         if (!IsServer) return;
 
         _requiresFuseBoxRestore.Value = true;
+        OnFuseRequiredOutageStarted?.Invoke();
         PowerOff();
     }
 
@@ -131,9 +148,13 @@ public class ElectricityController : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        bool wasFuseOutage = _requiresFuseBoxRestore.Value;
         _requiresFuseBoxRestore.Value = false;
         _isPowerOn.Value = true;
         PowerOnClientRpc();
+
+        if (wasFuseOutage)
+            OnFuseOutageResolved?.Invoke();
 
         if (enablePowerOutage)
             StartCoroutine(WaitAndShutDown());
