@@ -31,10 +31,32 @@ namespace GoodCopBadCop.EnvironmentSystem
         /// <summary>Fired whenever the camera crosses into or out of the underwater zone.</summary>
         public static event Action<bool> OnUnderwaterStateChanged;
 
+        /// <summary>
+        /// Fired whenever the player's root body crosses into or out of the underwater zone.
+        /// Used by movement and ragdoll systems so physics reacts to body position, not camera position.
+        /// </summary>
+        public static event Action<bool> OnPlayerBodyUnderwaterStateChanged;
+
+        private static Transform _playerBodyTransform;
+
+        /// <summary>
+        /// Register the local player's root transform so all zones track body position independently.
+        /// Call from <c>PlayerMovementController.OnNetworkSpawn</c> for the local player only.
+        /// </summary>
+        public static void RegisterPlayerBody(Transform t) => _playerBodyTransform = t;
+
+        /// <summary>Unregister the body transform on despawn.</summary>
+        public static void UnregisterPlayerBody(Transform t)
+        {
+            if (_playerBodyTransform == t)
+                _playerBodyTransform = null;
+        }
+
         private Volume _volume;
         private BoxCollider _collider;
         private AudioLowPassFilter _lowPassFilter;
         private bool _isUnderwater;
+        private bool _isPlayerBodyUnderwater;
 
         private void Awake()
         {
@@ -66,11 +88,22 @@ namespace GoodCopBadCop.EnvironmentSystem
             float targetWeight = inside ? 1f : 0f;
             _volume.weight = Mathf.MoveTowards(_volume.weight, targetWeight, transitionSpeed * Time.deltaTime);
 
-            // Broadcast state change
+            // Broadcast camera state change (drives visuals + audio)
             if (inside != _isUnderwater)
             {
                 _isUnderwater = inside;
                 OnUnderwaterStateChanged?.Invoke(_isUnderwater);
+            }
+
+            // Broadcast body state change (drives movement + ragdoll)
+            if (_playerBodyTransform != null)
+            {
+                bool bodyInside = _collider.bounds.Contains(_playerBodyTransform.position);
+                if (bodyInside != _isPlayerBodyUnderwater)
+                {
+                    _isPlayerBodyUnderwater = bodyInside;
+                    OnPlayerBodyUnderwaterStateChanged?.Invoke(_isPlayerBodyUnderwater);
+                }
             }
 
             // Transition audio filter
@@ -91,6 +124,12 @@ namespace GoodCopBadCop.EnvironmentSystem
             {
                 _isUnderwater = false;
                 OnUnderwaterStateChanged?.Invoke(false);
+            }
+
+            if (_isPlayerBodyUnderwater)
+            {
+                _isPlayerBodyUnderwater = false;
+                OnPlayerBodyUnderwaterStateChanged?.Invoke(false);
             }
 
             if (_lowPassFilter != null)

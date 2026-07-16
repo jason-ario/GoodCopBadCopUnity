@@ -211,22 +211,48 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
 
         if (IsLocalPlayer)
-            GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged += HandleUnderwaterStateChanged;
+        {
+            GoodCopBadCop.EnvironmentSystem.UnderwaterZone.RegisterPlayerBody(transform);
+            // Entry activates on camera submersion (head goes under) so the player
+            // falls at full speed through the surface before physics slow down.
+            GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged += HandleCameraUnderwaterChanged;
+            // Exit + jump fires when the body root (feet) leave the zone so the
+            // player swims all the way to the top before launching out.
+            GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged += HandleBodyUnderwaterChanged;
+        }
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleUnderwaterStateChanged;
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.UnregisterPlayerBody(transform);
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleCameraUnderwaterChanged;
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged -= HandleBodyUnderwaterChanged;
     }
 
-    private void HandleUnderwaterStateChanged(bool isUnderwater)
+    // Camera crosses INTO zone → activate underwater physics (player is fully submerged)
+    private void HandleCameraUnderwaterChanged(bool isUnderwater)
     {
-        _isUnderwater = isUnderwater;
+        if (!isUnderwater || _isUnderwater) return;
 
-        // Dampen any fast downward velocity on entry so the player doesn't plunge through the zone
-        if (isUnderwater && _verticalVelocity < -2f)
+        _isUnderwater = true;
+        if (_verticalVelocity < -2f)
             _verticalVelocity *= 0.15f;
+    }
+
+    // Body root crosses OUT of zone → deactivate and jump if surfacing
+    private void HandleBodyUnderwaterChanged(bool isUnderwater)
+    {
+        if (isUnderwater || !_isUnderwater) return;
+
+        _isUnderwater = false;
+
+        if (Input.GetButton("Jump") && !_isCrouching && _verticalVelocity > 0f)
+        {
+            _verticalVelocity = jumpForce;
+            _playerAnimationController?.TriggerJumpAnim();
+            SFXController.Instance?.Play(jumpSound);
+        }
     }
     
 
@@ -329,8 +355,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // Keep IsGrounded false for the entire jump animation window so systems
         // that read this property (e.g. the animation controller) don't see a
         // grounded flicker the instant the player's feet leave the ground.
+        // Also suppress it when underwater: the player is always "swimming", never walking.
         bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
-        IsGrounded = isGrounded && !jumpAnimActive;
+        IsGrounded = isGrounded && !jumpAnimActive && !_isUnderwater;
 
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 

@@ -38,6 +38,7 @@ public class HQOrderScreen : MonoBehaviour
         if (_respawnButton == null) return;
 
         bool hasFunds = GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value >= RespawnCost;
+        bool hasTeammate = false;
         bool hasDeadTeammate = false;
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -45,14 +46,16 @@ public class HQOrderScreen : MonoBehaviour
             if (client.PlayerObject != null)
             {
                 var player = client.PlayerObject.GetComponent<PlayerInstance>();
-                if (player != null && player != PlayerInstance.Instance && player.PlayerHealth.IsDead)
+                if (player != null && player != PlayerInstance.Instance)
                 {
-                    hasDeadTeammate = true;
-                    break;
+                    hasTeammate = true;
+                    if (player.PlayerHealth.IsDead)
+                        hasDeadTeammate = true;
                 }
             }
         }
 
+        _respawnButton.gameObject.SetActive(hasTeammate);
         _respawnButton.interactable = hasFunds && hasDeadTeammate;
     }
 

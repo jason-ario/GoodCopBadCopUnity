@@ -67,12 +67,12 @@ public class RagdollController : MonoBehaviour
 
     private void OnEnable()
     {
-        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged += HandleUnderwaterStateChanged;
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged += HandleUnderwaterStateChanged;
     }
 
     private void OnDisable()
     {
-        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleUnderwaterStateChanged;
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged -= HandleUnderwaterStateChanged;
     }
 
     private void OnDestroy()
