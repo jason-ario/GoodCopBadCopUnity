@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -15,11 +16,22 @@ public class RagdollController : MonoBehaviour
     [SerializeField] private GameObject bodyArmsMesh;
     [SerializeField] private GameObject firstPersonArms;
 
+    [Header("Underwater Settings")]
+    [Tooltip("Linear damping applied to all ragdoll Rigidbodies when inside an underwater zone.")]
+    [SerializeField] private float underwaterLinearDamping = 4f;
+    [Tooltip("Angular damping applied to all ragdoll Rigidbodies when inside an underwater zone.")]
+    [SerializeField] private float underwaterAngularDamping = 4f;
+
     private PlayerHealth _playerHealth;
     private CharacterController _characterController;
     private NetworkTransform _networkTransform;
     private NetworkAnimator _networkAnimator;
     private PlayerAnimationController _playerAnimationController;
+    private NetworkObject _networkObject;
+
+    private float[] _originalLinearDamping;
+    private float[] _originalAngularDamping;
+    private bool _isUnderwater;
 
     private const int DefaultLayer = 0;
 
@@ -35,17 +47,58 @@ public class RagdollController : MonoBehaviour
         _networkTransform = GetComponent<NetworkTransform>();
         _networkAnimator = GetComponent<NetworkAnimator>();
         _playerAnimationController = GetComponent<PlayerAnimationController>();
+        _networkObject = GetComponent<NetworkObject>();
         _playerHealth = GetComponent<PlayerHealth>();
         if (_playerHealth != null)
             _playerHealth.OnDeath += OnDeath;
 
+        // Cache original damping values so they can be restored on zone exit
+        _originalLinearDamping = new float[ragdollRigidbodies.Length];
+        _originalAngularDamping = new float[ragdollRigidbodies.Length];
+        for (int i = 0; i < ragdollRigidbodies.Length; i++)
+        {
+            if (ragdollRigidbodies[i] == null) continue;
+            _originalLinearDamping[i] = ragdollRigidbodies[i].linearDamping;
+            _originalAngularDamping[i] = ragdollRigidbodies[i].angularDamping;
+        }
+
         SetRagdollActive(activateOnAwake);
+    }
+
+    private void OnEnable()
+    {
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged += HandleUnderwaterStateChanged;
+    }
+
+    private void OnDisable()
+    {
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleUnderwaterStateChanged;
     }
 
     private void OnDestroy()
     {
         if (_playerHealth != null)
             _playerHealth.OnDeath -= OnDeath;
+    }
+
+    private void HandleUnderwaterStateChanged(bool isUnderwater)
+    {
+        // Only apply to the local player's ragdoll
+        if (_networkObject != null && !_networkObject.IsOwner)
+            return;
+
+        _isUnderwater = isUnderwater;
+        ApplyUnderwaterPhysics(isUnderwater);
+    }
+
+    private void ApplyUnderwaterPhysics(bool underwater)
+    {
+        for (int i = 0; i < ragdollRigidbodies.Length; i++)
+        {
+            if (ragdollRigidbodies[i] == null) continue;
+            ragdollRigidbodies[i].linearDamping  = underwater ? underwaterLinearDamping  : _originalLinearDamping[i];
+            ragdollRigidbodies[i].angularDamping = underwater ? underwaterAngularDamping : _originalAngularDamping[i];
+        }
     }
 
     private void OnDeath()
@@ -98,6 +151,10 @@ public class RagdollController : MonoBehaviour
             rb.angularVelocity = Vector3.zero;
             rb.WakeUp();
         }
+
+        // If already inside an underwater zone, apply buoyancy damping immediately
+        if (_isUnderwater)
+            ApplyUnderwaterPhysics(true);
     }
 
     /// <summary>Enables or disables ragdoll physics, toggling the animator and rigidbody/collider states.</summary>

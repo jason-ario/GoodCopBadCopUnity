@@ -55,6 +55,16 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [Header("Gravity Settings")]
     [SerializeField] private float gravity = -20f;
 
+    [Header("Underwater Settings")]
+    [Tooltip("Gravity multiplier applied when the camera is inside an underwater zone.")]
+    [SerializeField] private float underwaterGravityMultiplier = 0.2f;
+    [Tooltip("Movement speed multiplier applied when underwater.")]
+    [SerializeField] private float underwaterSpeedMultiplier = 0.55f;
+    [Tooltip("Maximum downward velocity while underwater (must be negative).")]
+    [SerializeField] private float underwaterTerminalVelocity = -3f;
+
+    private bool _isUnderwater;
+
     [Header("Jump Settings")]
     [SerializeField] private float jumpForce = 7f;
     [SerializeField] private AudioClip jumpSound;
@@ -195,6 +205,24 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             // players don't produce extra render passes or duplicate AudioListener warnings.
             if (camera != null) camera.gameObject.SetActive(false);
         }
+
+        if (IsLocalPlayer)
+            GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged += HandleUnderwaterStateChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleUnderwaterStateChanged;
+    }
+
+    private void HandleUnderwaterStateChanged(bool isUnderwater)
+    {
+        _isUnderwater = isUnderwater;
+
+        // Dampen any fast downward velocity on entry so the player doesn't plunge through the zone
+        if (isUnderwater && _verticalVelocity < -2f)
+            _verticalVelocity *= 0.15f;
     }
     
 
@@ -242,6 +270,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         // Pick speed
         float currentSpeed = _isCrouching ? crouchSpeed : (isRunning ? runSpeed : characterSpeed);
+        if (_isUnderwater) currentSpeed *= underwaterSpeedMultiplier;
 
         // Calculate desired direction based on input
         Vector3 inputDir = new Vector3(MoveX, 0, MoveZ);
@@ -269,7 +298,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
         else
         {
-            _verticalVelocity += gravity * Time.deltaTime;
+            float effectiveGravity = _isUnderwater ? gravity * underwaterGravityMultiplier : gravity;
+            _verticalVelocity += effectiveGravity * Time.deltaTime;
+
+            if (_isUnderwater && _verticalVelocity < underwaterTerminalVelocity)
+                _verticalVelocity = underwaterTerminalVelocity;
         }
 
         _wasGrounded = isGrounded;
