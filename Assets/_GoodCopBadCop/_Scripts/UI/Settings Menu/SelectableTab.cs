@@ -7,11 +7,13 @@ using UnityEngine.UI;
 public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHandler
 {
     private static readonly Color SelectedBackgroundColor = Color.white;
-    private static readonly Color DeselectedBackgroundColor = Color.black;
-    private static readonly Color SelectedTextColor = Color.black;
-    private static readonly Color DeselectedTextColor = Color.white;
+    private static readonly Color DeselectedBackgroundColor = Color.white;
+    private static readonly Color SelectedTextColor = Color.white;
+    private static readonly Color DeselectedTextColor = new(0.58f, 0.58f, 0.58f, 1f);
 
     private bool isSelected = false;
+    [SerializeField] private Sprite selectedBackgroundSprite;
+    [SerializeField] private Sprite deselectedBackgroundSprite;
     private Image backgroundImage;
     private TextMeshProUGUI labelText;
     private readonly Subject<SelectableTab> selected = new();
@@ -52,6 +54,7 @@ public class SelectableTab : MonoBehaviour, IPointerDownHandler, IPointerClickHa
 
         if (backgroundImage != null)
         {
+            backgroundImage.sprite = selected ? selectedBackgroundSprite : deselectedBackgroundSprite;
             backgroundImage.color = selected ? SelectedBackgroundColor : DeselectedBackgroundColor;
         }
 
