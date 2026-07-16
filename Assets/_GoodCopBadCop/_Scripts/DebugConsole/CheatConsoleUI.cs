@@ -105,6 +105,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDemo());
             SetVisible(false);
         }));
+
+        _cheats.Add(("Teleport to Power Station", () =>
+        {
+            DebugConsole.Instance.TeleportToPowerStation();
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

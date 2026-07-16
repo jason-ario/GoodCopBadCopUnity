@@ -3,28 +3,22 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// A single labelled slot inside the fuse-box panel that accepts one specific-colored
-/// <see cref="FusePickup"/>.
+/// A slot inside the fuse-box panel that accepts any <see cref="FusePickup"/>.
 ///
-/// Implements <see cref="IHeldItemPassthrough"/> so <see cref="PlayerInteractionController"/>
-/// routes the LMB event to <see cref="Interact"/> even while the player is holding an item
-/// — bypassing the normal <c>itemsThatCanInteractWith</c> array check.
+/// Interaction rules:
+///   – Empty slot + player holding a FusePickup  → inserts the fuse (snaps it to the slot).
+///   – Filled slot + empty-handed player          → extracts the fuse (player picks it up).
 ///
-/// When a player aims at this slot while holding a <see cref="FusePickup"/> whose
-/// <see cref="FusePickup.FuseColor"/> matches <see cref="_expectedColor"/> and presses LMB:
-///   1. The fuse is consumed via <see cref="PlayerPickupController.DestroyEquippedItem"/>.
-///   2. A server RPC marks this slot as filled.
-///   3. The <see cref="_emptyVisual"/> is hidden and <see cref="_filledVisual"/> is shown
-///      on every client via the <see cref="_isFilled"/> NetworkVariable.
-///   4. <see cref="OnFuseInserted"/> fires on every client for <see cref="FuseBoxPuzzleController"/>
-///      to detect puzzle completion.
+/// The fuse is kept as a live NetworkObject: it is parent-constrained to this slot on all
+/// clients (via <see cref="PickableObject.PlaceInSlotServerRpc"/>) and locked so it cannot be
+/// grabbed directly from the world while seated. Extracting reverses this in full.
 ///
 /// Setup notes:
-///   - Attach to a child of the Fuse Box prefab; one per slot (3 total).
-///   - Set <see cref="_expectedColor"/> to the slot's designated fuse color.
-///   - Assign the empty-slot and filled-slot child GameObjects to the visual fields.
-///   - Optionally assign a short insert sound clip.
-///   - Set <see cref="interactText"/> on the base Interactable to e.g. "Insert Red Fuse".
+///   - This must be a child of the Fuse Box, which requires a NetworkObject component.
+///   - Assign <see cref="_emptyVisual"/> / <see cref="_filledVisual"/> as needed.
+///     The live FusePickup mesh acts as the primary in-slot visual; _filledVisual is optional.
+///   - Assign insert / extract audio clips for feedback.
+///   - Set <see cref="Interactable.interactText"/> in the Inspector (e.g. "Insert Fuse").
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class FuseSlot : Interactable, IHeldItemPassthrough
@@ -32,123 +26,195 @@ public class FuseSlot : Interactable, IHeldItemPassthrough
     // ── Inspector ─────────────────────────────────────────────────────────────
 
     [Header("Fuse Slot")]
-    [Tooltip("The color of fuse this slot accepts.")]
-    [SerializeField] private FuseColor _expectedColor;
-
     [Tooltip("Visual shown when the slot is empty and waiting for a fuse.")]
     [SerializeField] private GameObject _emptyVisual;
 
-    [Tooltip("Visual shown after a fuse has been successfully inserted.")]
+    [Tooltip("Optional static visual shown when a fuse is seated. The live FusePickup mesh is also present.")]
     [SerializeField] private GameObject _filledVisual;
 
-    [Tooltip("Sound played on all clients when a fuse is successfully inserted.")]
+    [Tooltip("Sound played on all clients when a fuse is inserted.")]
     [SerializeField] private AudioClip _insertSound;
+
+    [Tooltip("Sound played on all clients when a fuse is extracted.")]
+    [SerializeField] private AudioClip _extractSound;
 
     // ── Networked state ───────────────────────────────────────────────────────
 
-    private readonly NetworkVariable<bool> _isFilled = new(
-        false,
+    /// <summary>
+    /// Reference to the fuse currently seated in this slot.
+    /// NetworkObjectId == 0 means the slot is empty (default struct value).
+    /// </summary>
+    private readonly NetworkVariable<NetworkObjectReference> _insertedFuse = new(
+        default,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    /// <summary>True once a matching fuse has been inserted into this slot.</summary>
-    public bool IsFilled => _isFilled.Value;
+    /// <summary>True while a fuse is seated in this slot.</summary>
+    public bool IsFilled => _insertedFuse.Value.NetworkObjectId != 0;
 
-    /// <summary>
-    /// Fired on all clients (driven by the <see cref="_isFilled"/> NetworkVariable)
-    /// when this slot receives its fuse. <see cref="FuseBoxPuzzleController"/> subscribes
-    /// to this event to detect when all slots are filled.
-    /// </summary>
+    /// <summary>Fired on all clients the moment a fuse is successfully inserted.</summary>
     public event Action OnFuseInserted;
+
+    /// <summary>Fired on all clients the moment a fuse is extracted from this slot.</summary>
+    public event Action OnFuseExtracted;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _isFilled.OnValueChanged += OnFilledChanged;
-        ApplyFilledState(_isFilled.Value);
+        _insertedFuse.OnValueChanged += OnInsertedFuseChanged;
+        // Sync visuals for late-joining clients.
+        ApplySlotState(IsFilled);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _isFilled.OnValueChanged -= OnFilledChanged;
+        _insertedFuse.OnValueChanged -= OnInsertedFuseChanged;
     }
 
-    private void OnFilledChanged(bool previous, bool current) => ApplyFilledState(current);
+    private void OnInsertedFuseChanged(NetworkObjectReference prev, NetworkObjectReference current)
+    {
+        bool wasFilled = prev.NetworkObjectId != 0;
+        bool nowFilled = current.NetworkObjectId != 0;
 
-    private void ApplyFilledState(bool filled)
+        ApplySlotState(nowFilled);
+
+        if (!wasFilled && nowFilled)
+            OnFuseInserted?.Invoke();
+        else if (wasFilled && !nowFilled)
+            OnFuseExtracted?.Invoke();
+    }
+
+    private void ApplySlotState(bool filled)
     {
         if (_emptyVisual  != null) _emptyVisual.SetActive(!filled);
         if (_filledVisual != null) _filledVisual.SetActive(filled);
-
-        // Disable the collider once filled so the reticle no longer targets this slot.
-        Collider col = GetComponent<Collider>();
-        if (col != null) col.enabled = !filled;
-
-        if (filled)
-        {
-            OnFuseInserted?.Invoke();
-        }
+        // Collider stays enabled in both states — filled slot is interactable for extraction.
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    /// <summary>Always show the interact hint so the reticle gives feedback in both states.</summary>
+    public override bool ShowInteractHint => true;
+
     /// <summary>
-    /// Called by <see cref="PlayerInteractionController.TryItemUse"/> via the
-    /// <see cref="IHeldItemPassthrough"/> path when the local player presses LMB
-    /// while holding any item and aiming at this slot.
-    ///
-    /// Validates that the held item is a <see cref="FusePickup"/> with the
-    /// matching color, then consumes it and sends an RPC to the server to mark
-    /// the slot as filled.
+    /// Routes to insert or extract depending on slot state and what the player is holding:
+    ///   – Empty + holding FusePickup → insert.
+    ///   – Filled + empty-handed      → extract.
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
-        if (_isFilled.Value) return;
+        base.Interact(player);
 
+        if (IsFilled)
+        {
+            // Only extract if the player has a free hand.
+            if (!player.pickupController.IsHoldingObject)
+                ExtractFuse(player);
+            return;
+        }
+
+        // Slot is empty — insert only if the player holds a FusePickup.
         FusePickup fuse = player.pickupController.HeldObject as FusePickup;
-        if (fuse == null)
-        {
-            Debug.Log($"[FuseSlot:{_expectedColor}] Interact: held item is not a FusePickup.");
-            return;
-        }
+        if (fuse == null) return;
 
-        if (fuse.FuseColor != _expectedColor)
-        {
-            Debug.Log($"[FuseSlot:{_expectedColor}] Interact: wrong color — held {fuse.FuseColor}.");
-            return;
-        }
+        // Use the existing PlaceInSlot infrastructure: snaps the fuse to this slot's
+        // world transform on all clients and parents it via ParentConstraint.
+        // Requires the Fuse Box (ancestor) to have a NetworkObject component.
+        player.pickupController.DropObject(transform);
 
-        // Consume the fuse from the player's hand and destroy it. This handles all
-        // local state cleanup (animations, containers, NetworkVariable itemEquippedIndex)
-        // and sends DespawnServerRpc to the server.
-        player.pickupController.DestroyEquippedItem();
-
-        // Notify the server to mark this slot as filled.
-        MarkFilledServerRpc();
-
-        Debug.Log($"[FuseSlot:{_expectedColor}] Fuse inserted by local client.");
+        // Notify the server to record the fuse reference and prevent direct pickup.
+        InsertFuseServerRpc(new NetworkObjectReference(fuse.NetworkObject));
     }
 
-    // ── Server RPC ────────────────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Received on the server: marks this slot as filled, which broadcasts the state
-    /// change to all clients via the <see cref="_isFilled"/> NetworkVariable.
-    /// Guards against a race where two clients insert simultaneously.
+    /// Picks the seated fuse back up into the player's hand and schedules a server-side
+    /// slot clear. Calls <see cref="PlayerPickupController.PickUpObject"/> directly to
+    /// bypass the <see cref="PickableObject.Interact"/> interactability guard (the fuse
+    /// collider is intentionally disabled while seated).
     /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void MarkFilledServerRpc()
+    private void ExtractFuse(PlayerInteractionController player)
     {
-        if (_isFilled.Value) return;
-        _isFilled.Value = true;
-        PlayInsertSoundClientRpc();
-        Debug.Log($"[FuseSlot:{_expectedColor}] Server: slot marked filled.");
+        if (!_insertedFuse.Value.TryGet(out NetworkObject fuseNetObj))
+        {
+            Debug.LogWarning($"[FuseSlot] ExtractFuse: could not resolve fuse NetworkObject on client {NetworkManager.Singleton.LocalClientId}.");
+            return;
+        }
+
+        if (!fuseNetObj.TryGetComponent<FusePickup>(out FusePickup fuse))
+        {
+            Debug.LogWarning($"[FuseSlot] ExtractFuse: seated object is not a FusePickup.");
+            return;
+        }
+
+        // Pick up the fuse directly — PickUpObject handles constraint swap, ownership
+        // transfer, and arm animation. No need to re-enable the collider first because
+        // PickUpObject does not check IsInteractable() itself.
+        player.pickupController.PickUpObject(fuse);
+
+        // Tell the server to clear the slot and restore the fuse's normal interactability.
+        ClearSlotServerRpc();
     }
 
-    // ── Client RPC ────────────────────────────────────────────────────────────
+    // ── Server RPCs ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Received on the server: records the inserted fuse and locks it from direct pickup.
+    /// Guards against simultaneous inserts from two clients.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void InsertFuseServerRpc(NetworkObjectReference fuseRef)
+    {
+        if (IsFilled) return;
+
+        if (!fuseRef.TryGet(out NetworkObject fuseNetObj))
+        {
+            Debug.LogWarning("[FuseSlot] InsertFuseServerRpc: could not resolve fuse ref on server.");
+            return;
+        }
+
+        // Prevent the fuse from being grabbed directly while it is seated in the slot.
+        // LockInteractableNetworked sets _networkInteractableOverride = 0 on all clients,
+        // overriding the holder-based enable that fires after ReleaseHolderServerRpc.
+        if (fuseNetObj.TryGetComponent<FusePickup>(out var fuse))
+            fuse.LockInteractableNetworked();
+
+        _insertedFuse.Value = fuseRef;
+
+        PlayInsertSoundClientRpc();
+        Debug.Log($"[FuseSlot] Fuse '{fuseNetObj.name}' inserted into slot '{name}'.");
+    }
+
+    /// <summary>
+    /// Received on the server: unlocks the fuse and clears the slot reference.
+    /// Guards against an empty-slot clear (e.g. two players extract simultaneously).
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ClearSlotServerRpc()
+    {
+        if (!IsFilled) return;
+
+        // Restore holder-based interactability on the fuse. After PickUpObject sends
+        // RequestOwnershipServerRpc, _holdingClientId will reflect the new owner,
+        // so ApplyNetworkInteractableState will correctly leave the collider disabled
+        // (object is being held) once _networkInteractableOverride returns to -1.
+        if (_insertedFuse.Value.TryGet(out NetworkObject fuseNetObj))
+        {
+            if (fuseNetObj.TryGetComponent<FusePickup>(out var fuse))
+                fuse.UnlockInteractableNetworked();
+        }
+
+        _insertedFuse.Value = default;
+
+        PlayExtractSoundClientRpc();
+        Debug.Log($"[FuseSlot] Slot '{name}' cleared.");
+    }
+
+    // ── Client RPCs ───────────────────────────────────────────────────────────
 
     [ClientRpc]
     private void PlayInsertSoundClientRpc()
@@ -157,12 +223,10 @@ public class FuseSlot : Interactable, IHeldItemPassthrough
             SFXController.Instance?.PlayAtPosition(_insertSound, transform.position);
     }
 
-    // ── Highlight override ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Returns the interact hint text based on whether the player is holding the
-    /// correct fuse. The base reticle still shows a button icon when ShowInteractHint
-    /// is true and the interactText is set.
-    /// </summary>
-    public override bool ShowInteractHint => !_isFilled.Value;
+    [ClientRpc]
+    private void PlayExtractSoundClientRpc()
+    {
+        if (_extractSound != null)
+            SFXController.Instance?.PlayAtPosition(_extractSound, transform.position);
+    }
 }

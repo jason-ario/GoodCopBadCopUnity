@@ -46,6 +46,10 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("ElectricityController scene object. Assign in Inspector. The B hack calls PowerOn() to guarantee lights are on at Day 4.")]
     [SerializeField] private ElectricityController _electricityController;
 
+    [Header("Power Station Debug")]
+    [Tooltip("Spawn point at the power station. Assign 'Player Spawn Pos - At Power Station' from the scene. Used by the P key and the cheat console button.")]
+    [SerializeField] private Transform _powerStationSpawnPoint;
+
     [Header("Gate Debug")]
     [Tooltip("Start Shift Gate — forced into post-intro state by the F12 skip so interactions toggle it instead of opening the start-shift screen.")]
     [SerializeField] private GateStartShiftController _startShiftGate;
@@ -204,6 +208,12 @@ public class DebugConsole : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.B))
         {
             ForceFullMutantButcher();
+        }
+
+        // P — teleport the local player to the power station spawn point.
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            TeleportToPowerStation();
         }
 
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
@@ -777,6 +787,52 @@ public class DebugConsole : MonoBehaviour
             Debug.LogWarning("[DebugConsole] ForceFullMutantButcher: ElectricityController not found — power state unchanged. Assign _electricityController in the Inspector.");
 
         Debug.Log("[DebugConsole] Full Mutant Butcher hack active — he arrives in ~2 s (B).");
+    }
+
+    /// <summary>
+    /// Bootstraps the game if needed, skips to Day 3 with the shift running,
+    /// then teleports the local player to the power station spawn point.
+    /// Assign <see cref="_powerStationSpawnPoint"/> in the Inspector to the
+    /// "Player Spawn Pos - At Power Station" scene object.
+    /// </summary>
+    public void TeleportToPowerStation()
+    {
+        if (_powerStationSpawnPoint == null)
+        {
+            Debug.LogWarning("[DebugConsole] TeleportToPowerStation: _powerStationSpawnPoint not assigned — assign it in the Inspector (P).");
+            return;
+        }
+
+        EnsureGameStartedThen(() =>
+        {
+            SkipToDay(3);
+            StartCoroutine(TeleportToPowerStationAfterDelay());
+        });
+    }
+
+    private IEnumerator TeleportToPowerStationAfterDelay()
+    {
+        // Wait one frame for Day_03 to activate and subscribe its events.
+        yield return null;
+
+        _startShiftGate?.ForceIntroComplete();
+
+        // Start the shift with a large first-arrival window so no suspects arrive immediately.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
+
+        if (PlayerInstance.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] TeleportToPowerStation: PlayerInstance.Instance not found after game start.");
+            yield break;
+        }
+
+        PlayerInstance.Instance.SetPosition(_powerStationSpawnPoint);
+        Debug.Log($"[DebugConsole] Teleported local player to power station at {_powerStationSpawnPoint.position} (P).");
     }
 
 }
