@@ -16,7 +16,7 @@ namespace GoodCopBadCop.Editor.BehaviorAnimation
         private const string LaughingMaleAudioPath = BehaviorAudioPath + "/Laughing_Male_Mischievous.mp3";
         private const string LaughingFemaleAudioPath = BehaviorAudioPath + "/Laughing_Female_Witch.mp3";
 
-        [MenuItem("GoodCopBadCop/Anomalies/Generate Behavior Animation Presets")]
+        [MenuItem("Good Cop Bad Cop/Anomalies/Generate Behavior Animation Presets")]
         public static void Generate()
         {
             Directory.CreateDirectory(PresetPath);

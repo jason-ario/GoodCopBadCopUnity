@@ -133,12 +133,20 @@ public class ObjectPlacer : MonoBehaviour
                 break;
             }
         }
-        if (slotTransform == null) return;
+        if (slotTransform == null && sourceItem.GetComponentInChildren<PlacementAnchor>(true) == null) return;
 
-        // Spawn clone parented to the container, using the slot's local position/rotation
+        // Spawn clone parented to the container. An optional anchor authored in the
+        // pickup prefab overrides the hand slot pose for surface placement.
         _clonedItem = Instantiate(sourceItem, container);
-        _clonedItem.transform.localPosition = slotTransform.localPosition;
-        _clonedItem.transform.localRotation = slotTransform.localRotation;
+        if (TryGetPlacementPose(sourceItem, out Vector3 placementPosition, out Quaternion placementRotation))
+        {
+            _clonedItem.transform.SetPositionAndRotation(placementPosition, placementRotation);
+        }
+        else
+        {
+            _clonedItem.transform.localPosition = slotTransform.localPosition;
+            _clonedItem.transform.localRotation = slotTransform.localRotation;
+        }
         _clonedItem.GetComponent<PickableObject>().SetPlacementClone();
         _clonedItem.GetComponent<PickableObject>().OnSpawnedAsPlacementClone();
 
@@ -182,6 +190,7 @@ public class ObjectPlacer : MonoBehaviour
             parentConstraint.constraintActive = false;
 
         DisableAllColliders(_clonedItem.gameObject);
+        DisableGhostRopes(_clonedItem.gameObject);
         SetupGhostMaterials(_clonedItem.gameObject);
     }
 
@@ -192,6 +201,17 @@ public class ObjectPlacer : MonoBehaviour
     {
         foreach (Collider col in root.GetComponentsInChildren<Collider>(true))
             col.enabled = false;
+    }
+
+    private void DisableGhostRopes(GameObject root)
+    {
+        foreach (GogoGaga.OptimizedRopesAndCables.Rope rope in root.GetComponentsInChildren<GogoGaga.OptimizedRopesAndCables.Rope>(true))
+        {
+            rope.enabled = false;
+
+            LineRenderer ropeRenderer = rope.GetComponent<LineRenderer>();
+            if (ropeRenderer != null) ropeRenderer.enabled = false;
+        }
     }
 
     private static readonly int SurfaceProperty = Shader.PropertyToID("_Surface");
@@ -289,6 +309,40 @@ public class ObjectPlacer : MonoBehaviour
         }
         
         return null;
+    }
+
+    public bool TryGetPlacementPose(PickableObject sourceItem, out Vector3 position, out Quaternion rotation)
+    {
+        if (sourceItem == null)
+        {
+            position = default;
+            rotation = default;
+            return false;
+        }
+
+        PlacementAnchor anchor = sourceItem.GetComponentInChildren<PlacementAnchor>(true);
+        if (anchor != null)
+        {
+            Transform sourceTransform = sourceItem.transform;
+            Vector3 localAnchorPosition = sourceTransform.InverseTransformPoint(anchor.transform.position);
+            Quaternion localAnchorRotation = Quaternion.Inverse(sourceTransform.rotation) * anchor.transform.rotation;
+
+            rotation = transform.rotation * Quaternion.Inverse(localAnchorRotation);
+            position = transform.position - rotation * Vector3.Scale(localAnchorPosition, sourceTransform.lossyScale);
+            return true;
+        }
+
+        GameObject placementItem = GetPickableObject(sourceItem.ItemData);
+        if (placementItem != null)
+        {
+            position = placementItem.transform.position;
+            rotation = placementItem.transform.rotation;
+            return true;
+        }
+
+        position = default;
+        rotation = default;
+        return false;
     }
 
     /// <summary>

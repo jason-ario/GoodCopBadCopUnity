@@ -13,7 +13,7 @@ public static class PCTerminalEmulatorSceneBuilder
     private static readonly Vector3 EmulatorCameraPosition = new Vector3(-0.47f, 0.527f, 0f);
     private static readonly Quaternion EmulatorCameraRotation = new Quaternion(0f, 0.7071068f, 0f, 0.7071068f);
 
-    [MenuItem("Tools/GoodCopBadCop/PC Terminal Emulator", false, -997)]
+    [MenuItem("Good Cop Bad Cop/PC Terminal Emulator", false, -997)]
     public static void CreateScene()
     {
         Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);

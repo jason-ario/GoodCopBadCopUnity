@@ -13,48 +13,77 @@ MonoBehaviour:
   m_Name: Petre
   m_EditorClassIdentifier: Assembly-CSharp::SuspectData
   FirstName: Petre
-  LastName: 
-  Nickname: 
-  Occupation: 
-  CharacterDescription: 
-  CharacterArc: 
-  DateOfBirth: 
-  Sex: 
-  EntryPermitExpiryDate: 
+  LastName: Dolidze
+  Nickname: The Poet
+  Occupation: Priest / Writer
+  CharacterDescription: A hermit priest who lives alone in the mountains. Says very
+    little and means most of it. Keeps a dog. Used to keep a wife. Has written several
+    volumes of poetry that no one outside the mountain parishes has read. Considers
+    this correct.
+  CharacterArc: "A reclusive priest from the mountain parishes who writes poetry
+    he has always considered God's words passing through him, not his own. His dog
+    mutates early in the outbreak. By the end, his lifelong artist's humility has
+    curdled into something vast and terrible \u2014 he is no longer the channel for
+    God's word. He has become convinced he is the Word itself."
+  DateOfBirth: 21/06/1949
+  Sex: Male
+  EntryPermitExpiryDate: 19 NOV
   IsResident: 1
   GivesPaperwork: 1
   handwritingFont: {fileID: 0}
   startingInfectionScore: 0
   dailyInfectionProgression: {x: 3, y: 8}
-  alterEgoName: 
+  alterEgoName: The Word
   basePersonalityDescriptors: []
-  normalBehaviorNotes: 
-  fullMutantDialogue: {fileID: 0}
+  normalBehaviorNotes: Reserved and minimal. Answers questions directly and without
+    warmth or elaboration. Has a quiet grief about his dog that he never names outright.
+    Watches the window rather than the officer. Not hostile. Simply elsewhere.
+  fullMutantDialogue: {fileID: 11400000, guid: 09e25016625a60a46a14dd5f7d2de624, type: 2}
   replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 0}
-  CharacterPrefab: {fileID: 0}
+  CharacterPrefab: {fileID: 3939644330210671579, guid: 3c6fbfb84e6c1d24387b3be1460352ed, type: 3}
   entryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Coming down from the mountain ridge for a few days.
+    - Returning to the lower parish to check the records.
+    - Here to drop a manuscript at the printing office.
+    midDaysReasons:
+    - Returning from the ridge. I needed to see something other than stone for a
+      while.
+    - Visiting the parish archive on the east side.
+    - Looking for someone who has not answered my letters.
+    finalDaysReasons:
+    - Returning to find my dog.
+    - Back from the summit. I saw the lights from there and came down.
+    - Reentering from the eastern slope.
   invalidEntryReasons:
-    earlyDaysReasons: []
-    midDaysReasons: []
-    finalDaysReasons: []
+    earlyDaysReasons:
+    - Returning from a village that burned in 1946. The people there were very kind.
+    - Coming from a debate with God. We disagreed on the ending.
+    - Here from the top of the atmosphere. The view was too good to leave quickly.
+    midDaysReasons:
+    - Returning from inside a poem I wrote in 1983. The light there is different.
+    - Coming from the fourteenth century. The pilgrimage took longer than expected.
+    - Reentering from the mountain that is not on your maps.
+    finalDaysReasons:
+    - I am an inspector dispatched from heaven to assess conditions here.
+    - Returning from the place before birth. The paperwork was fine there.
+    - Coming from inside the word of God. He sent me back with corrections.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - I had the dog with me last time. He is at home tonight.
+    - The mountain road was clear. First time in a while.
+    - Here. My papers are in order.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - My dog ran off last week. I keep checking the perimeter fence on the way in.
+    - Quieter down here than I expected. That is not a comfort.
+    - I have been writing more than usual. The words come easier when things are
+      wrong.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - If a large grey dog comes through this gate, hold him. That is mine.
+    - I am not here for anything except the dog.
+    - The manuscript is finished. I do not know what that means yet.
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
@@ -72,55 +101,94 @@ MonoBehaviour:
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Thank you. This won't take long.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - If you see my dog near the east gate, hold him for me.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - I'll be out of your way.
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - Fine. I'll wait. I have nowhere pressing to be.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - You think this matters to me. I've been in worse rooms.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
+    - Doesn't matter. I have nothing to get back to.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - 
-    - 
-    - 
+    - I had more of the manuscript left. That's all.
     dialoguesMidDays:
-    - 
-    - 
-    - 
+    - The dog would have found me eventually. Now it doesn't matter.
     dialoguesFinalDays:
-    - 
-    - 
-    - 
-  quarantineExitLines: []
-  killExitLines: []
+    - Let it be quiet.
+  quarantineExitLines:
+  - A cell is still quieter than you'd think. I've worked in worse silence.
+  - At least in isolation, no one else can ruin the quiet.
+  - If they give me something to write with, I'll use the wall.
+  killExitLines:
+  - I always wondered what God was thinking when He made me. Now I'll know.
+  - Every poem ends. Most just end badly.
+  - They were His words anyway. Not mine. I was only ever the hand.
   voiceAudioClips: []
-  introDialogue: {fileID: 0}
-  questionResponses: []
+  introDialogue: {fileID: 11400000, guid: 2b51582647a3f8340ac72eb350384322, type: 2}
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The ridge path above the northern district. I walk at dusk when
+      I can.
+    midDaysAnswer: Nowhere specific. I had to leave the mountain for a while.
+    finalDaysAnswer: The eastern slope. I was looking for something.
+    mismatchEarlyDaysAnswer: Home. I have not left in days. I don't walk the ridge
+      at night. I never do that.
+    mismatchMidDaysAnswer: The chapel. A meeting. Several of us. Very ordinary gathering.
+    mismatchFinalDaysAnswer: Inside. I have been inside this whole time. Not near
+      the slope at all.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: No. I sleep poorly but that has always been the case.
+    midDaysAnswer: I have been hearing things at night. Probably the wind through
+      the pass.
+    finalDaysAnswer: My hands don't shake but something in them wants to. I write
+      through it.
+    mismatchEarlyDaysAnswer: Nothing at all. Very clear head. The clearest I've had
+      in years. I sleep excellently.
+    mismatchMidDaysAnswer: I hear nothing unusual. The nights are very quiet. I have
+      no complaints.
+    mismatchFinalDaysAnswer: My hands are perfectly still. I am a very calm person.
+      I have always been calm.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Who do you live with?
+    earlyDaysAnswer: No one. I have my dog.
+    midDaysAnswer: Just myself now. My dog ran off last week.
+    finalDaysAnswer: Alone. Completely.
+    mismatchEarlyDaysAnswer: No one. Always alone. I don't have a dog. I've never
+      had a dog.
+    mismatchMidDaysAnswer: My family. A large family. A full house. Very warm.
+    mismatchFinalDaysAnswer: My dog. Right at my heels. He is waiting outside the
+      gate right now.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
   idleBarks:
-    earlyDays: []
-    midDays: []
-    finalDays: []
+    earlyDays:
+    - I had the dog with me last time. He is at home tonight.
+    - I write when I cannot sleep. Lately I cannot sleep very much.
+    - Quiet suits me. I don't say that as a complaint.
+    midDays:
+    - My dog has been gone for nearly two weeks. I don't know where he went.
+    - I have been writing more than usual. There is nothing else to do in the quiet.
+    - The mountain has changed. Something about the way it sits now.
+    finalDays:
+    - If you see a large grey dog near the perimeter fence, that is mine. He would
+      not have gone far on his own.
+    - I have been leaving food outside the east gate. He has not come.
+    - The words don't come from me. They never did. I was only ever the hand holding
+      the pen.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []
-  IDNumber: 
+  IDNumber: 4819203

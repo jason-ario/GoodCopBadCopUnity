@@ -75,6 +75,14 @@ public class ToolsLocker : Interactable, ILockable
         if (!IsServer) return;
         _isLocked.Value = false;
     }
+    /// <summary>Unlocks the locker and its physical padlock for debug free-play sessions.</summary>
+    public void DebugForceUnlock()
+    {
+        if (!IsServer) return;
+
+        _lockController?.ForceUnlock();
+        Unlock();
+    }
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 

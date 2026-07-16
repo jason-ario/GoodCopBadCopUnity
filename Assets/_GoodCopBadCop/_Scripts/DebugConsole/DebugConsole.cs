@@ -345,6 +345,33 @@ public class DebugConsole : MonoBehaviour
         CampaignManager.Instance.JumpToDay(targetDay);
     }
 
+    /// <summary>
+    /// Starts an ordinary, fully playable Day 4 shift in the booth. Day 4 has no tutorial
+    /// gates or mandatory opening event, and it restores the power before the shift begins.
+    /// Intended as the general-purpose sandbox entry from the F12 cheat console.
+    /// </summary>
+    public void StartFreePlay()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] StartFreePlay: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(4);
+        StartCoroutine(StartFreePlayAfterDayLoad());
+    }
+
+    private IEnumerator StartFreePlayAfterDayLoad()
+    {
+        // Let CampaignManager activate Day 4 and apply its normal setup (including power on).
+        yield return null;
+
+        FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();
+        ShiftManager.Instance?.TryStartShift();
+        Debug.Log("[DebugConsole] Free Play started — Day 4 shift is running, the tool locker is unlocked, and regular suspects will arrive.");
+    }
+
     /// <summary>Adds a one-off DebugTask to TaskRegistry for task testing.</summary>
     private void AddDebugTask()
     {
