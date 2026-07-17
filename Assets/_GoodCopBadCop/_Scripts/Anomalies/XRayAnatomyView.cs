@@ -50,16 +50,62 @@ namespace GoodCopBadCop.XRay
             public float SourceLength;
         }
 
+        private sealed class DirectMeshSegment
+        {
+            public Transform Visual;
+            public Transform From;
+            public Transform To;
+            public float NativeLength;
+            public Vector3 SourceLongAxis;
+            public float ThicknessMultiplier;
+        }
+
+        private sealed class DirectMeshAnchor
+        {
+            public Transform Visual;
+            public Transform Bone;
+            public float Scale;
+            public Quaternion LocalRotation;
+        }
+
+        private sealed class HeadMeshAnchor
+        {
+            public Transform Visual;
+            public Transform Head;
+            public Transform Neck;
+            public Quaternion SourceHeadFrame;
+            public Quaternion SourceMeshRotation;
+            public float SourceNeckHeadLength;
+        }
+
+        private sealed class ThoraxMeshBinding
+        {
+            public Transform Visual;
+            public Transform TargetChest;
+            public Transform TargetHips;
+            public Transform TargetLeftArm;
+            public Transform TargetRightArm;
+            public float SourceWidth;
+            public float SourceHeight;
+        }
+
         private readonly Dictionary<Renderer, Material[]> _originalMaterials = new();
         private readonly List<BoneSegment> _boneSegments = new();
         private readonly List<BoneAnchor> _boneAnchors = new();
         private readonly List<ImportedRigBinding> _importedRigBindings = new();
+        private readonly List<DirectMeshSegment> _directMeshSegments = new();
+        private readonly List<DirectMeshAnchor> _directMeshAnchors = new();
+        private readonly List<HeadMeshAnchor> _headMeshAnchors = new();
+        private readonly List<ThoraxMeshBinding> _thoraxMeshes = new();
         private readonly List<GameObjectLayerState> _layerStates = new();
 
         private Animator _animator;
         private GameObject _anatomyRoot;
         private GameObject _importedAnatomy;
         private Animator _importedAnimator;
+        private HumanPoseHandler _sourcePoseHandler;
+        private HumanPoseHandler _importedPoseHandler;
+        private HumanPose _humanPose;
         private float _importedVisualScale = 1f;
         private Material _bodyMaterial;
         private Material _anatomyMaterial;
@@ -184,9 +230,97 @@ namespace GoodCopBadCop.XRay
                 anchor.Transform.SetPositionAndRotation(anchor.Bone.position, anchor.Bone.rotation);
             }
 
+            foreach (DirectMeshSegment segment in _directMeshSegments)
+            {
+                if (segment.Visual == null || segment.From == null || segment.To == null)
+                    continue;
+
+                Vector3 direction = segment.To.position - segment.From.position;
+                float length = direction.magnitude;
+                if (length < 0.001f)
+                    continue;
+
+                // These cloned meshes contain raw vertices only. Most limb meshes are long on
+                // local Z, while the imported clavicles are long on local X. Map each mesh's
+                // measured primary axis onto its two target Humanoid joints instead of imposing
+                // a single axis convention on every source mesh.
+                segment.Visual.SetPositionAndRotation(
+                    Vector3.Lerp(segment.From.position, segment.To.position, 0.5f),
+                    Quaternion.FromToRotation(segment.SourceLongAxis, direction / length));
+                float ratio = length / segment.NativeLength;
+                float thickness = Mathf.Sqrt(ratio) * segment.ThicknessMultiplier;
+                segment.Visual.localScale = GetSegmentScale(segment.SourceLongAxis, thickness, ratio);
+            }
+
+            foreach (DirectMeshAnchor anchor in _directMeshAnchors)
+            {
+                if (anchor.Visual == null || anchor.Bone == null)
+                    continue;
+
+                anchor.Visual.SetPositionAndRotation(anchor.Bone.position, anchor.Bone.rotation * anchor.LocalRotation);
+                anchor.Visual.localScale = Vector3.one * anchor.Scale;
+            }
+
+            foreach (HeadMeshAnchor anchor in _headMeshAnchors)
+            {
+                if (anchor.Visual == null || anchor.Head == null || anchor.Neck == null)
+                    continue;
+
+                Quaternion targetHeadFrame = BuildHeadFrame(
+                    anchor.Neck,
+                    anchor.Head,
+                    _animator != null ? _animator.transform.forward : Vector3.forward);
+                float targetLength = Vector3.Distance(anchor.Neck.position, anchor.Head.position);
+                float scale = anchor.SourceNeckHeadLength > 0.001f
+                    ? Mathf.Clamp(targetLength / anchor.SourceNeckHeadLength * 0.55f, 0.5f, 2.5f)
+                    : 1f;
+
+                anchor.Visual.SetPositionAndRotation(
+                    anchor.Head.position,
+                    targetHeadFrame * Quaternion.Inverse(anchor.SourceHeadFrame) * anchor.SourceMeshRotation);
+                anchor.Visual.localScale = Vector3.one * scale;
+            }
+
+            foreach (ThoraxMeshBinding binding in _thoraxMeshes)
+            {
+                if (binding.Visual == null || binding.TargetChest == null || binding.TargetHips == null)
+                    continue;
+
+                float targetHeight = Vector3.Distance(binding.TargetChest.position, binding.TargetHips.position);
+                float targetWidth = Vector3.Distance(binding.TargetRightArm.position, binding.TargetLeftArm.position);
+                float heightScale = binding.SourceHeight > 0.001f
+                    ? Mathf.Clamp(targetHeight / binding.SourceHeight, 0.25f, 3f)
+                    : 1f;
+                float widthScale = binding.SourceWidth > 0.001f
+                    ? Mathf.Clamp(targetWidth / binding.SourceWidth, 0.25f, 3f)
+                    : heightScale;
+                float depthScale = Mathf.Sqrt(widthScale * heightScale);
+
+                Quaternion targetFrame = BuildAnatomicalFrame(
+                    binding.TargetHips,
+                    binding.TargetChest,
+                    binding.TargetLeftArm,
+                    binding.TargetRightArm);
+
+                // The mesh vertices are stored in the source anatomical frame (right, up,
+                // forward). Scaling this frame independently matches shoulder width and torso
+                // height instead of applying one uniform scale to every character.
+                binding.Visual.SetPositionAndRotation(binding.TargetChest.position, targetFrame);
+                binding.Visual.localScale = new Vector3(widthScale, heightScale, depthScale);
+            }
+
             // Imported anatomy bones are directly parented to their Humanoid counterparts.
             // The imported Animator receives the suspect's state below.
             SyncImportedAnimator();
+        }
+
+        private static Vector3 GetSegmentScale(Vector3 longAxis, float thickness, float length)
+        {
+            if (Mathf.Abs(longAxis.x) > 0.5f)
+                return new Vector3(length, thickness, thickness);
+            if (Mathf.Abs(longAxis.y) > 0.5f)
+                return new Vector3(thickness, length, thickness);
+            return new Vector3(thickness, thickness, length);
         }
 
         private void OnDestroy()
@@ -195,6 +329,7 @@ namespace GoodCopBadCop.XRay
             DestroyMaterial(ref _bodyMaterial);
             DestroyMaterial(ref _anatomyMaterial);
             DestroyMaterial(ref _anomalyMaterial);
+            DisposePoseHandlers();
         }
 
         private bool EnsureAnatomy()
@@ -220,8 +355,13 @@ namespace GoodCopBadCop.XRay
                 _boneSegments.Clear();
                 _boneAnchors.Clear();
                 _importedRigBindings.Clear();
+                _directMeshSegments.Clear();
+                _directMeshAnchors.Clear();
+                _headMeshAnchors.Clear();
+                _thoraxMeshes.Clear();
                 _importedAnatomy = null;
                 _importedAnimator = null;
+                DisposePoseHandlers();
                 _importedVisualScale = 1f;
                 _animator = activeAnimator;
                 _hasLoggedMissingHumanoid = false;
@@ -241,9 +381,8 @@ namespace GoodCopBadCop.XRay
 
             if (!BuildImportedAnatomy())
             {
-                Debug.LogWarning("[XRayAnatomyView] Imported anatomy prefab was not available; using primitive fallback.", this);
+                Debug.LogWarning("[XRayAnatomyView] Imported anatomy prefab was not available; using basic skeleton fallback.", this);
                 BuildSkeleton();
-                BuildOrgans();
             }
             _anatomyRoot.SetActive(false);
             return true;
@@ -315,9 +454,10 @@ namespace GoodCopBadCop.XRay
 
             foreach (Renderer renderer in _importedAnatomy.GetComponentsInChildren<Renderer>(true))
             {
-                // The source pack includes an optional skin mesh. The real suspect already supplies
-                // the X-ray silhouette, so only its skeleton and organs belong in this overlay.
-                if (IsSourceSkinRenderer(renderer))
+                // Keep the first anatomy pass deliberately readable: large skeletal forms only.
+                // Organs, fingers and other fine detail will return only after the segment adapter
+                // can place them correctly for every character.
+                if (IsSourceSkinRenderer(renderer) || IsDeferredAnatomyRenderer(renderer))
                 {
                     renderer.enabled = false;
                     continue;
@@ -328,23 +468,378 @@ namespace GoodCopBadCop.XRay
                 renderer.receiveShadows = false;
             }
 
-            // The pack's mesh offsets are authored in its own bind pose. A single height-based
-            // scale keeps those offsets (and therefore the organs) inside characters of different
-            // proportions; individual bones are positioned separately below.
-            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
-            Transform sourceHead = FindDescendant(_importedAnatomy.transform, "rig:Head");
-            Transform targetHips = Bone(HumanBodyBones.Hips);
-            Transform targetHead = Bone(HumanBodyBones.Head);
-            if (sourceHips != null && sourceHead != null && targetHips != null && targetHead != null)
-            {
-                float sourceHeight = Vector3.Distance(sourceHips.position, sourceHead.position);
-                float targetHeight = Vector3.Distance(targetHips.position, targetHead.position);
-                if (sourceHeight > 0.001f)
-                    _importedVisualScale = Mathf.Clamp(targetHeight / sourceHeight, 0.25f, 2f);
-            }
-            _importedAnatomy.transform.localScale = Vector3.one * _importedVisualScale;
+            // The pack is our mesh library. Its authored rig has different body proportions, so
+            // hide it and place only the large rigid bone meshes directly from the suspect joints.
+            foreach (Renderer renderer in _importedAnatomy.GetComponentsInChildren<Renderer>(true))
+                renderer.enabled = false;
 
+            AddDirectMeshSegment("LeftUpLeg", HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg);
+            AddDirectMeshSegment("LefLeg", HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot);
+            AddDirectMeshSegment("RightUpLeg", HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg);
+            AddDirectMeshSegment("RightLeg", HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot);
+            AddDirectMeshSegment("LeftArm", HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm);
+            AddDirectMeshSegment("LeftForeArm", HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
+            AddDirectMeshSegment("RightArm", HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm);
+            AddDirectMeshSegment("RightForeArm", HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
+            AddClavicleMesh("clavicle_l", HumanBodyBones.LeftShoulder, HumanBodyBones.LeftUpperArm);
+            AddClavicleMesh("clavicle_r", HumanBodyBones.RightShoulder, HumanBodyBones.RightUpperArm);
+            AddHeadMeshAnchor("Skull");
+            AddDirectMeshAnchor("Hips", HumanBodyBones.Hips, 1f);
+            AddFootMesh("LeftFoot", HumanBodyBones.LeftFoot, HumanBodyBones.LeftToes);
+            AddFootMesh("RightFoot", HumanBodyBones.RightFoot, HumanBodyBones.RightToes);
+            BuildImportedThorax();
             return true;
+        }
+
+        private void AddDirectMeshSegment(string sourceMeshName, HumanBodyBones fromBone, HumanBodyBones toBone, float thicknessMultiplier = 1f)
+        {
+            Mesh sourceMesh = null;
+            Transform sourceTransform = null;
+            foreach (MeshFilter candidate in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (candidate.name == sourceMeshName)
+                {
+                    sourceMesh = candidate.sharedMesh;
+                    sourceTransform = candidate.transform;
+                    break;
+                }
+            }
+
+            if (sourceMesh == null)
+            {
+                foreach (SkinnedMeshRenderer candidate in _importedAnatomy.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                {
+                    if (candidate.name == sourceMeshName)
+                    {
+                        sourceMesh = candidate.sharedMesh;
+                        sourceTransform = candidate.transform;
+                        break;
+                    }
+                }
+            }
+
+            Transform from = Bone(fromBone);
+            Transform to = Bone(toBone);
+            if (sourceMesh == null || sourceTransform == null || from == null || to == null)
+                return;
+
+            Vector3 sourceLongAxis = GetLongestMeshAxis(sourceMesh.bounds.size, out float length);
+            if (length < 0.001f)
+                return;
+
+            GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            // Source foot meshes use an ankle pivot rather than their geometric center. Every
+            // segment is positioned at the midpoint of two Humanoid joints, so center a private
+            // runtime copy first; otherwise feet appear offset even when their transforms are
+            // correctly attached to the ankle and toes.
+            visual.AddComponent<MeshFilter>().sharedMesh = CreateCenteredMesh(sourceMesh, $"XRay {sourceMeshName}");
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            _directMeshSegments.Add(new DirectMeshSegment
+            {
+                Visual = visual.transform,
+                From = from,
+                To = to,
+                NativeLength = length,
+                SourceLongAxis = sourceLongAxis,
+                ThicknessMultiplier = thicknessMultiplier
+            });
+        }
+
+        private static Mesh CreateCenteredMesh(Mesh sourceMesh, string meshName)
+        {
+            Mesh mesh = Instantiate(sourceMesh);
+            mesh.name = meshName;
+            Vector3 center = mesh.bounds.center;
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] -= center;
+            mesh.vertices = vertices;
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        private static Vector3 GetLongestMeshAxis(Vector3 size, out float length)
+        {
+            if (size.x >= size.y && size.x >= size.z)
+            {
+                length = size.x;
+                return Vector3.right;
+            }
+            if (size.y >= size.z)
+            {
+                length = size.y;
+                return Vector3.up;
+            }
+
+            length = size.z;
+            return Vector3.forward;
+        }
+
+        private void AddFootMesh(string sourceMeshName, HumanBodyBones footBone, HumanBodyBones toeBone)
+        {
+            // Feet are not anchors: their visible length and forward direction come from the
+            // ankle-to-toes segment, exactly like arms and legs. This also adapts shoe/foot size
+            // to tall and short suspects.
+            if (Bone(toeBone) != null)
+                AddDirectMeshSegment(sourceMeshName, footBone, toeBone, 0.78f);
+            else
+                AddDirectMeshAnchor(sourceMeshName, footBone, 1f);
+        }
+
+        private void AddClavicleMesh(string sourceMeshName, HumanBodyBones shoulderBone, HumanBodyBones armBone)
+        {
+            // The clavicle ends at Shoulder, not at UpperArm. Using UpperArm made the bone span
+            // the entire shoulder slope and produced the oversized V shape seen in the preview.
+            HumanBodyBones endBone = Bone(shoulderBone) != null ? shoulderBone : armBone;
+            AddDirectMeshSegment(sourceMeshName, HumanBodyBones.Chest, endBone, 0.85f);
+        }
+
+        private void AddHeadMeshAnchor(string sourceMeshName)
+        {
+            MeshFilter source = null;
+            foreach (MeshFilter candidate in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (candidate.name == sourceMeshName)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            Transform targetHead = Bone(HumanBodyBones.Head);
+            Transform targetNeck = Bone(HumanBodyBones.Neck);
+            Transform sourceHead = FindDescendant(_importedAnatomy.transform, "rig:Head");
+            Transform sourceNeck = FindDescendant(_importedAnatomy.transform, "rig:Neck");
+            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+            Transform sourceChest = FindDescendant(_importedAnatomy.transform, "rig:Spine2")
+                ?? FindDescendant(_importedAnatomy.transform, "rig:Spine1");
+            Transform sourceLeftArm = FindDescendant(_importedAnatomy.transform, "rig:LeftArm");
+            Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
+            if (source == null || source.sharedMesh == null || targetHead == null || targetNeck == null
+                || sourceHead == null || sourceNeck == null || sourceHips == null || sourceChest == null
+                || sourceLeftArm == null || sourceRightArm == null)
+                return;
+
+            Quaternion sourceBodyFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+            GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = source.sharedMesh;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            _headMeshAnchors.Add(new HeadMeshAnchor
+            {
+                Visual = visual.transform,
+                Head = targetHead,
+                Neck = targetNeck,
+                SourceHeadFrame = BuildHeadFrame(sourceNeck, sourceHead, sourceBodyFrame * Vector3.forward),
+                SourceMeshRotation = source.transform.rotation,
+                SourceNeckHeadLength = Vector3.Distance(sourceNeck.position, sourceHead.position)
+            });
+        }
+
+        private void BuildImportedThorax()
+        {
+            Transform sourceChest = FindDescendant(_importedAnatomy.transform, "rig:Spine2")
+                ?? FindDescendant(_importedAnatomy.transform, "rig:Spine1");
+            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+            Transform targetChest = Bone(HumanBodyBones.Chest)
+                ?? Bone(HumanBodyBones.UpperChest)
+                ?? Bone(HumanBodyBones.Spine);
+            Transform targetHips = Bone(HumanBodyBones.Hips);
+            Transform sourceLeftArm = FindDescendant(_importedAnatomy.transform, "rig:LeftArm");
+            Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
+            Transform targetLeftArm = Bone(HumanBodyBones.LeftUpperArm);
+            Transform targetRightArm = Bone(HumanBodyBones.RightUpperArm);
+
+            if (sourceChest == null || sourceHips == null || targetChest == null || targetHips == null
+                || sourceLeftArm == null || sourceRightArm == null || targetLeftArm == null || targetRightArm == null)
+            {
+                Debug.LogWarning("[XRayAnatomyView] Imported thorax could not be bound to the Humanoid chest.", this);
+                return;
+            }
+
+            foreach (SkinnedMeshRenderer renderer in _importedAnatomy.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (renderer.name != "Spine")
+                    continue;
+
+                Mesh baked = new Mesh { name = "XRay Imported Spine" };
+                renderer.BakeMesh(baked);
+                AddThoraxMesh(
+                    baked, renderer.transform, sourceChest, sourceHips, sourceLeftArm, sourceRightArm,
+                    targetChest, targetHips, targetLeftArm, targetRightArm, "Spine");
+                break;
+            }
+
+            foreach (MeshFilter filter in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (!filter.name.StartsWith("rib") || filter.name.EndsWith("_parent") || filter.sharedMesh == null)
+                    continue;
+
+                AddThoraxMesh(
+                    filter.sharedMesh, filter.transform, sourceChest, sourceHips, sourceLeftArm, sourceRightArm,
+                    targetChest, targetHips, targetLeftArm, targetRightArm, filter.name);
+            }
+        }
+
+        private void AddThoraxMesh(
+            Mesh sourceMesh,
+            Transform sourceMeshTransform,
+            Transform sourceChest,
+            Transform sourceHips,
+            Transform sourceLeftArm,
+            Transform sourceRightArm,
+            Transform targetChest,
+            Transform targetHips,
+            Transform targetLeftArm,
+            Transform targetRightArm,
+            string partName)
+        {
+            if (sourceMesh == null || sourceMeshTransform == null)
+                return;
+
+            Quaternion sourceFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+            Mesh mesh = Instantiate(sourceMesh);
+            mesh.name = $"XRay {partName}";
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 worldVertex = sourceMeshTransform.TransformPoint(vertices[i]);
+                vertices[i] = Quaternion.Inverse(sourceFrame) * (worldVertex - sourceChest.position);
+            }
+            mesh.vertices = vertices;
+
+            Vector3[] normals = mesh.normals;
+            if (normals != null && normals.Length == vertices.Length)
+            {
+                for (int i = 0; i < normals.Length; i++)
+                {
+                    Vector3 worldNormal = sourceMeshTransform.TransformDirection(normals[i]);
+                    normals[i] = (Quaternion.Inverse(sourceFrame) * worldNormal).normalized;
+                }
+                mesh.normals = normals;
+            }
+            mesh.RecalculateBounds();
+
+            GameObject visual = new GameObject($"XRay {partName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            _thoraxMeshes.Add(new ThoraxMeshBinding
+            {
+                Visual = visual.transform,
+                TargetChest = targetChest,
+                TargetHips = targetHips,
+                TargetLeftArm = targetLeftArm,
+                TargetRightArm = targetRightArm,
+                SourceWidth = Vector3.Distance(sourceRightArm.position, sourceLeftArm.position),
+                SourceHeight = Vector3.Distance(sourceChest.position, sourceHips.position)
+            });
+        }
+
+        private static Quaternion BuildAnatomicalFrame(Transform hips, Transform chest, Transform leftArm, Transform rightArm)
+        {
+            Vector3 up = chest.position - hips.position;
+            Vector3 right = rightArm.position - leftArm.position;
+            if (up.sqrMagnitude < 0.0001f || right.sqrMagnitude < 0.0001f)
+                return chest.rotation;
+
+            up.Normalize();
+            right.Normalize();
+            Vector3 forward = Vector3.Cross(right, up).normalized;
+            if (forward.sqrMagnitude < 0.0001f)
+                return chest.rotation;
+
+            // Cross product has two valid signs. Keep the one that agrees with the authored
+            // chest forward axis so front/back ribs and the spine retain their intended side.
+            if (Vector3.Dot(forward, chest.forward) < 0f)
+                forward = -forward;
+
+            Vector3 correctedRight = Vector3.Cross(up, forward).normalized;
+            return Quaternion.LookRotation(forward, Vector3.Cross(forward, correctedRight).normalized);
+        }
+
+        private static Quaternion BuildHeadFrame(Transform neck, Transform head, Vector3 bodyForward)
+        {
+            Vector3 up = head.position - neck.position;
+            if (up.sqrMagnitude < 0.0001f)
+                return head.rotation;
+
+            up.Normalize();
+            Vector3 forward = Vector3.ProjectOnPlane(bodyForward, up);
+            if (forward.sqrMagnitude < 0.0001f)
+                forward = Vector3.ProjectOnPlane(head.forward, up);
+            return forward.sqrMagnitude < 0.0001f
+                ? head.rotation
+                : Quaternion.LookRotation(forward.normalized, up);
+        }
+
+        private void AddBakedMeshAnchor(string sourceRendererName, HumanBodyBones bone, float scale)
+        {
+            SkinnedMeshRenderer source = null;
+            foreach (SkinnedMeshRenderer candidate in _importedAnatomy.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (candidate.name == sourceRendererName)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            Transform target = Bone(bone);
+            if (source == null || target == null)
+                return;
+
+            Mesh baked = new Mesh { name = $"XRay Baked {sourceRendererName}" };
+            source.BakeMesh(baked);
+            GameObject visual = new GameObject($"XRay {sourceRendererName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = baked;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            _directMeshAnchors.Add(new DirectMeshAnchor { Visual = visual.transform, Bone = target, Scale = scale, LocalRotation = Quaternion.identity });
+        }
+
+        private void AddDirectMeshAnchor(string sourceMeshName, HumanBodyBones bone, float scale)
+        {
+            MeshFilter source = null;
+            foreach (MeshFilter candidate in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (candidate.name == sourceMeshName)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            Transform target = Bone(bone);
+            if (source == null || source.sharedMesh == null || target == null)
+                return;
+
+            GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = source.sharedMesh;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            Quaternion localRotation = source.transform.parent == null
+                ? Quaternion.identity
+                : Quaternion.Inverse(source.transform.parent.rotation) * source.transform.rotation;
+            _directMeshAnchors.Add(new DirectMeshAnchor { Visual = visual.transform, Bone = target, Scale = scale, LocalRotation = localRotation });
         }
 
         private bool ConfigureImportedAnimator()
@@ -362,6 +857,18 @@ namespace GoodCopBadCop.XRay
             _importedAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             _importedAnimator.updateMode = _animator.updateMode;
             _importedAnimator.enabled = true;
+
+            try
+            {
+                _sourcePoseHandler = new HumanPoseHandler(_animator.avatar, _animator.transform);
+                _importedPoseHandler = new HumanPoseHandler(_importedAnimator.avatar, _importedAnimator.transform);
+            }
+            catch (System.ArgumentException exception)
+            {
+                DisposePoseHandlers();
+                Debug.LogWarning($"[XRayAnatomyView] Could not create Humanoid pose transfer: {exception.Message}", this);
+            }
+
             return true;
         }
 
@@ -394,6 +901,25 @@ namespace GoodCopBadCop.XRay
                     _importedAnimator.Play(state.fullPathHash, layer, state.normalizedTime);
             }
             _importedAnimator.Update(0f);
+
+            // Suspect clips are authored against their individual Transform hierarchies, so
+            // assigning that controller to another Avatar does not reliably retarget every limb.
+            // Copy the evaluated Humanoid muscle pose after the Animator update instead: this
+            // preserves the imported anatomy Avatar's proportions while matching the suspect's
+            // actual animated pose (including clips with generic Transform bindings).
+            if (_sourcePoseHandler != null && _importedPoseHandler != null)
+            {
+                _sourcePoseHandler.GetHumanPose(ref _humanPose);
+                _importedPoseHandler.SetHumanPose(ref _humanPose);
+            }
+        }
+
+        private void DisposePoseHandlers()
+        {
+            _sourcePoseHandler?.Dispose();
+            _importedPoseHandler?.Dispose();
+            _sourcePoseHandler = null;
+            _importedPoseHandler = null;
         }
 
         private static bool IsSourceSkinRenderer(Renderer renderer)
@@ -409,6 +935,33 @@ namespace GoodCopBadCop.XRay
                 || renderer.name == "Sneakers"
                 || renderer.name == "LeftKnee"
                 || renderer.name == "RightKnee";
+        }
+
+        private static bool IsDeferredAnatomyRenderer(Renderer renderer)
+        {
+            string name = renderer.name;
+            return name.Contains("HandIndex")
+                || name.Contains("HandMiddle")
+                || name.Contains("HandPinky")
+                || name.Contains("HandRing")
+                || name.Contains("HandThumb")
+                || name == "teeth"
+                || name == "glands"
+                || name == "heart"
+                || name == "diaphragm"
+                || name == "l_lung"
+                || name == "r_lung"
+                || name == "gallbladder"
+                || name == "liver"
+                || name == "pancreas"
+                || name == "stomach"
+                || name == "spleen"
+                || name == "trachea"
+                || name == "kidneys"
+                || name == "ureter"
+                || name == "small_intestine"
+                || name == "colon"
+                || name == "bladder";
         }
 
         private void AddImportedRigBinding(string modelBoneName, HumanBodyBones targetBone, string modelScaleReferenceName, HumanBodyBones targetScaleReference)
