@@ -166,8 +166,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             SettingsMenuControlDefinition.Dropdown("Language", new[] { "English" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Subtitles", OffOnOptions, defaultOptionIndex: 1, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Camera Shake", OffOnOptions, defaultOptionIndex: 1),
-            SettingsMenuControlDefinition.Dropdown("Head Bob", OffOnOptions, defaultOptionIndex: 1)
+            SettingsMenuControlDefinition.Dropdown("Camera Shake", OffOnOptions, defaultOptionIndex: 1, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Head Bob", OffOnOptions, defaultOptionIndex: 1, interactable: false)
         };
 
         private static readonly SettingsMenuControlDefinition[] GraphicsControlDefinitions =
@@ -189,18 +189,18 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "FPS Limit",
                 FpsLimitOptions,
                 option: ESettingsMenuControlOption.FpsLimit),
-            SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2),
-            SettingsMenuControlDefinition.Slider("Brightness", 50f),
-            SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1),
-            SettingsMenuControlDefinition.Dropdown("Chromatic Aberration", OffOnOptions, defaultOptionIndex: 1)
+            SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2, interactable: false),
+            SettingsMenuControlDefinition.Slider("Brightness", 50f, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Chromatic Aberration", OffOnOptions, defaultOptionIndex: 1, interactable: false)
         };
 
         private static readonly SettingsMenuControlDefinition[] AudioControlDefinitions =
         {
-            SettingsMenuControlDefinition.Slider("Master Volume"),
-            SettingsMenuControlDefinition.Slider("Music Volume"),
-            SettingsMenuControlDefinition.Slider("SFX Volume"),
-            SettingsMenuControlDefinition.Slider("Voice Volume"),
+            SettingsMenuControlDefinition.Slider("Master Volume", interactable: false),
+            SettingsMenuControlDefinition.Slider("Music Volume", interactable: false),
+            SettingsMenuControlDefinition.Slider("SFX Volume", interactable: false),
+            SettingsMenuControlDefinition.Slider("Voice Volume", interactable: false),
             SettingsMenuControlDefinition.Dropdown(
                 "Proximity Chat",
                 OffOnOptions,
@@ -218,7 +218,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "Voice Deafened",
                 OffOnOptions,
                 option: ESettingsMenuControlOption.VoiceChatDeafened),
-            SettingsMenuControlDefinition.Slider("Ambient Volume")
+            SettingsMenuControlDefinition.Slider("Ambient Volume", interactable: false)
         };
 
         private static readonly SettingsMenuControlDefinition[] ControlsControlDefinitions =
@@ -245,8 +245,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             SettingsMenuControlDefinition.Dropdown("Move Left", new[] { "A" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Move Right", new[] { "D" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Jump", new[] { "Space" }, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Interact", new[] { "E" }),
-            SettingsMenuControlDefinition.Dropdown("Pause", new[] { "Esc" })
+            SettingsMenuControlDefinition.Dropdown("Interact", new[] { "E" }, interactable: false),
+            SettingsMenuControlDefinition.Dropdown("Pause", new[] { "Esc" }, interactable: false)
         };
 
         [SerializeField] private GameObject gameplaySettings;

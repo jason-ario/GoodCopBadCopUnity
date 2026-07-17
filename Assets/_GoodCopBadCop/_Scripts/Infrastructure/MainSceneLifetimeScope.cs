@@ -87,7 +87,7 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<EnvironmentRenderAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<EnvironmentCampaignAdapter>(Lifetime.Scoped);
 
-            builder.RegisterComponentInHierarchy<SettingsMenuView>().As<ISettingsMenuView>();
+            builder.RegisterComponentInHierarchy<SettingsRedesignPreviewController>().As<ISettingsMenuView>();
             builder.RegisterComponentInHierarchy<MainMenuController>();
             builder.RegisterComponentInHierarchy<PauseMenuController>();
             builder.Register<SettingsMenuModel>(Lifetime.Scoped).AsSelf().As<ISettingsMenuModel>();

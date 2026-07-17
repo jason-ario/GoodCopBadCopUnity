@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
+
+using GoodCopBadCop.Settings;
 using System.Collections.Generic;
-using TMPro;
+using TMPro;using R3;
+
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -12,7 +15,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
     /// Runtime-only interaction harness for Settings Menu Redesign Preview.
     /// The production menu remains untouched until this layout is approved.
     /// </summary>
-    public sealed class SettingsRedesignPreviewController : MonoBehaviour
+    public sealed class SettingsRedesignPreviewController : MonoBehaviour, ISettingsMenuView
     {
         private const string PreferencePrefix = "settings_preview.";
         private const int RowPoolSize = 8;
@@ -79,7 +82,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Display Mode", "display_mode", "Borderless", "Fullscreen", "Windowed"),
             new Setting("Resolution", "resolution", "1920 x 1080", "1600 x 900", "1280 x 720"),
             new Setting("VSync", "vsync", "Off", "On"),
-            new Setting("FPS Limit", "fps_limit", "Unlimited", "60", "120", "144"),
+            new Setting("FPS Limit", "fps_limit", "Unlimited", "30", "60", "120", "144"),
             new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra"),
             new Setting("Brightness", "brightness", 50f),
             new Setting("Film Grain", "film_grain", "Off", "On"),
@@ -92,7 +95,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Music Volume", "music_volume", 70f),
             new Setting("SFX Volume", "sfx_volume", 80f),
             new Setting("Voice Volume", "voice_volume", 80f),
-            new Setting("Proximity Chat", "proximity_chat", "Off", "On"),
+            new Setting("Voice Chat", "voice_chat_enabled", "Off", "On"),
             new Setting("Voice Input", "voice_input", "Voice Activation", "Push To Talk"),
             new Setting("Microphone Muted", "microphone_muted", "Off", "On"),
             new Setting("Voice Deafened", "voice_deafened", "Off", "On")
@@ -124,6 +127,39 @@ private RectTransform rowsRoot;
         private TMP_Text saveText;
         private Button saveButton;
         private Button backButton;
+                private readonly Subject<int> displayModeChanged = new Subject<int>();
+        private readonly Subject<int> screenResolutionChanged = new Subject<int>();
+        private readonly Subject<bool> vSyncChanged = new Subject<bool>();
+        private readonly Subject<int> fpsLimitChanged = new Subject<int>();
+        private readonly Subject<float> mouseSensitivityChanged = new Subject<float>();
+        private readonly Subject<bool> invertYAxisChanged = new Subject<bool>();
+        private readonly Subject<int> crouchModeChanged = new Subject<int>();
+        private readonly Subject<int> sprintModeChanged = new Subject<int>();
+        private readonly Subject<bool> voiceChatEnabledChanged = new Subject<bool>();
+        private readonly Subject<bool> voiceChatMutedChanged = new Subject<bool>();
+        private readonly Subject<bool> voiceChatDeafenedChanged = new Subject<bool>();
+        private readonly Subject<int> voiceChatInputModeChanged = new Subject<int>();
+        private readonly Subject<ESettingsMenuTab> tabSelected = new Subject<ESettingsMenuTab>();
+        private readonly Subject<Unit> backRequested = new Subject<Unit>();
+        private readonly Subject<Unit> closed = new Subject<Unit>();
+        private bool isInitialized;
+
+        public Observable<int> DisplayModeChanged { get { return displayModeChanged; } }
+        public Observable<int> ScreenResolutionChanged { get { return screenResolutionChanged; } }
+        public Observable<bool> VSyncChanged { get { return vSyncChanged; } }
+        public Observable<int> FpsLimitChanged { get { return fpsLimitChanged; } }
+        public Observable<float> MouseSensitivityChanged { get { return mouseSensitivityChanged; } }
+        public Observable<bool> InvertYAxisChanged { get { return invertYAxisChanged; } }
+        public Observable<int> CrouchModeChanged { get { return crouchModeChanged; } }
+        public Observable<int> SprintModeChanged { get { return sprintModeChanged; } }
+        public Observable<bool> VoiceChatEnabledChanged { get { return voiceChatEnabledChanged; } }
+        public Observable<bool> VoiceChatMutedChanged { get { return voiceChatMutedChanged; } }
+        public Observable<bool> VoiceChatDeafenedChanged { get { return voiceChatDeafenedChanged; } }
+        public Observable<int> VoiceChatInputModeChanged { get { return voiceChatInputModeChanged; } }
+        public Observable<ESettingsMenuTab> TabSelected { get { return tabSelected; } }
+        public Observable<Unit> BackRequested { get { return backRequested; } }
+        public Observable<Unit> Closed { get { return closed; } }
+
         private Image normalBackground;
         private Sprite selectedBackground;
         
@@ -143,10 +179,29 @@ private Sprite normalBackgroundSprite;
         private int openDropdownIndex = -1;
 private Image arrowTemplate;
 
-private void Awake()
+        private void Awake()
         {
+            Initialize();
+        }
+
+        private void OnEnable()
+        {
+            if (isInitialized)
+            {
+                tabSelected.OnNext(ToSettingsMenuTab(activeTab));
+            }
+        }
+
+        private void OnDisable()
+        {
+            closed.OnNext(Unit.Default);
+        }
+
+        public void Initialize()
+        {
+            if (isInitialized) return;
+            isInitialized = true;
             EnsureEventSystem();
-            LoadPreferences();
             CacheHierarchy();
             BindTabs();
             BindFooter();
@@ -154,28 +209,7 @@ private void Awake()
             SelectRow(-1);
         }
 
-private static void LoadPreferences()
-        {
-            foreach (Setting setting in Gameplay) LoadPreference(setting);
-            foreach (Setting setting in Graphics) LoadPreference(setting);
-            foreach (Setting setting in Audio) LoadPreference(setting);
-            foreach (Setting setting in Controls) LoadPreference(setting);
-        }
-
-        private static void LoadPreference(Setting setting)
-        {
-            if (setting.Control == Control.Slider)
-            {
-                setting.Value = PlayerPrefs.GetFloat(PreferencePrefix + setting.Key, setting.Value);
-            }
-            else
-            {
-                setting.Index = PlayerPrefs.GetInt(PreferencePrefix + setting.Key, 0);
-            }
-        }
-
-
-private void CacheHierarchy()
+        private void CacheHierarchy()
         {
             selectedCategory = transform.Find("Selected Category") as RectTransform;
             sectionTitle = transform.Find("Section Title")?.GetComponent<TMP_Text>();
@@ -183,8 +217,8 @@ private void CacheHierarchy()
             saveButton = GetOrAddButton(transform.Find("Save Button")?.gameObject);
             backButton = GetOrAddButton(transform.Find("Back")?.gameObject);
             
+            rowsRoot = transform.Find("Settings Viewport/Settings Rows") as RectTransform;
             settingsScrollRect = rowsRoot != null ? rowsRoot.GetComponentInParent<ScrollRect>() : null;
-rowsRoot = transform.Find("Settings Viewport/Settings Rows") as RectTransform;
             BuildRowPool();
             Row firstRow = rows.Count > 0 ? rows[0] : null;
             selectedBackground = firstRow?.Background != null ? firstRow.Background.sprite : null;
@@ -289,7 +323,7 @@ private void BindTabs()
                 button.targetGraphic = label;
                 int index = i;
                 button.onClick.RemoveAllListeners();
-                button.onClick.AddListener(() => SelectTab((Tab)index));
+                button.onClick.AddListener(() => RequestTab((Tab)index));
                 tabLabels.Add(label);
                 tabButtons.Add(button);
             }
@@ -297,17 +331,33 @@ private void BindTabs()
 
         private void BindFooter()
         {
-            if (saveButton != null)
-            {
-                saveButton.onClick.AddListener(Save);
-            }
-
-            if (backButton != null)
-            {
-                backButton.onClick.AddListener(() => gameObject.SetActive(false));
-            }
+            if (saveButton != null) saveButton.onClick.AddListener(Save);
+            if (backButton != null) backButton.onClick.AddListener(() => backRequested.OnNext(Unit.Default));
         }
+        public void SetVisible(bool isVisible) { gameObject.SetActive(isVisible); }
+        public void ShowTab(ESettingsMenuTab tab) { SelectTab(ToInternalTab(tab)); }
+        public void SetDisplayModeValue(int value) { Graphics[0].Index = value == 1 ? 0 : value == 0 ? 1 : 2; RefreshActiveSetting("display_mode"); }
+        public void SetScreenResolutionValue(int value) { Graphics[1].Index = value; RefreshActiveSetting("resolution"); }
+        public void SetVSyncValue(bool value) { Graphics[2].Index = value ? 1 : 0; RefreshActiveSetting("vsync"); }
+        public void SetFpsLimitValue(int value) { Graphics[3].Index = value; RefreshActiveSetting("fps_limit"); }
+        public void SetMouseSensitivityValue(float value) { Controls[0].Value = value; RefreshActiveSetting("mouse_sensitivity"); }
+        public void SetInvertYAxisValue(bool value) { Controls[1].Index = value ? 1 : 0; RefreshActiveSetting("invert_y"); }
+        public void SetCrouchModeValue(int value) { Controls[2].Index = value; RefreshActiveSetting("crouch_mode"); }
+        public void SetSprintModeValue(int value) { Controls[3].Index = value; RefreshActiveSetting("sprint_mode"); }
+        public void SetVoiceChatEnabledValue(bool value) { Audio[4].Index = value ? 1 : 0; RefreshActiveSetting("voice_chat_enabled"); }
+        public void SetVoiceChatMutedValue(bool value) { Audio[6].Index = value ? 1 : 0; RefreshActiveSetting("microphone_muted"); }
+        public void SetVoiceChatDeafenedValue(bool value) { Audio[7].Index = value ? 1 : 0; RefreshActiveSetting("voice_deafened"); }
+        public void SetVoiceChatInputModeValue(int value) { Audio[5].Index = value; RefreshActiveSetting("voice_input"); }
 
+        private void RequestTab(Tab tab) { tabSelected.OnNext(ToSettingsMenuTab(tab)); }
+        private static ESettingsMenuTab ToSettingsMenuTab(Tab tab) { return (ESettingsMenuTab)(int)tab; }
+        private static Tab ToInternalTab(ESettingsMenuTab tab) { return (Tab)(int)tab; }
+        private void RefreshActiveSetting(string key)
+        {
+            if (activeSettings == null) return;
+            for (int i = 0; i < activeSettings.Length && i < rows.Count; i++)
+                if (activeSettings[i].Key == key) { BindRow(i); return; }
+        }
 private void SelectTab(Tab tab)
         {
             CloseDropdown();
@@ -365,33 +415,96 @@ private void BindRow(int index)
         {
             Row row = rows[index];
             Setting setting = activeSettings[index];
+            bool supported = IsSupported(setting);
+            bool slider = setting.Control == Control.Slider;
+
             row.Label.text = setting.Label;
             row.Value.text = setting.DisplayValue;
+            EnsureRowVisuals(row, slider);
 
             if (row.Button != null)
             {
                 row.Button.transition = Selectable.Transition.None;
+                row.Button.interactable = supported;
                 row.Button.onClick.RemoveAllListeners();
-                if (setting.Control == Control.Dropdown)
+                if (supported && setting.Control == Control.Dropdown)
                 {
                     row.Button.onClick.AddListener(() => ToggleDropdown(index));
                 }
             }
 
-            bool slider = setting.Control == Control.Slider;
-            EnsureRowVisuals(row, slider);
             if (row.Arrow != null)
             {
                 row.Arrow.gameObject.SetActive(!slider);
-                row.Arrow.color = new Color(1f, 1f, 1f, .5f);
+                row.Arrow.color = new Color(1f, 1f, 1f, supported ? .5f : .18f);
             }
 
             if (slider)
             {
                 ConfigureSliderTrigger(row, index);
+                row.SliderHitArea.gameObject.SetActive(supported);
                 UpdateSliderVisual(row, setting.Value);
             }
+
+            ApplyRowAppearance(row, supported);
         }
+
+private static void ApplyRowAppearance(Row row, bool supported)
+        {
+            if (row.Background != null)
+            {
+                row.Background.color = supported
+                    ? new Color(1f, 1f, 1f, .48f)
+                    : new Color(.36f, .38f, .36f, .28f);
+            }
+
+            Color textColor = supported
+                ? new Color(.58f, .60f, .58f, 1f)
+                : new Color(.42f, .44f, .42f, .55f);
+            row.Label.color = textColor;
+            row.Value.color = textColor;
+
+            SetGraphicColor(row.Track, supported);
+            SetGraphicColor(row.Fill, supported);
+            SetGraphicColor(row.Handle, supported);
+        }
+
+        private static void SetGraphicColor(RectTransform rectTransform, bool supported)
+        {
+            if (rectTransform == null)
+            {
+                return;
+            }
+
+            Image image = rectTransform.GetComponent<Image>();
+            if (image != null)
+            {
+                image.color = supported ? Color.white : new Color(.45f, .46f, .45f, .42f);
+            }
+        }
+
+        private static bool IsSupported(Setting setting)
+        {
+            switch (setting.Key)
+            {
+                case "display_mode":
+                case "resolution":
+                case "vsync":
+                case "fps_limit":
+                case "voice_chat_enabled":
+                case "voice_input":
+                case "microphone_muted":
+                case "voice_deafened":
+                case "mouse_sensitivity":
+                case "invert_y":
+                case "crouch_mode":
+                case "sprint_mode":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
 
         private void EnsureRowVisuals(Row row, bool slider)
         {
@@ -652,73 +765,47 @@ private void SetScrollingLocked(bool locked)
 
 private void SelectRow(int index)
         {
-            // Category selection and setting-row focus are independent.
-            // No row is enlarged merely because a category or dropdown is opened.
             for (int i = 0; i < rows.Count; i++)
             {
                 Row row = rows[i];
-                if (!row.Root.gameObject.activeSelf || row.Background == null)
+                if (!row.Root.gameObject.activeSelf || row.Background == null || i >= activeSettings.Length)
                 {
                     continue;
                 }
 
                 row.Background.sprite = normalBackgroundSprite;
-                row.Background.color = new Color(1f, 1f, 1f, .48f);
                 row.Background.rectTransform.sizeDelta = new Vector2(1110.5f, 56f);
-                row.Label.color = new Color(.56f, .58f, .56f, 1f);
-                row.Value.color = new Color(.58f, .60f, .58f, 1f);
+                ApplyRowAppearance(row, IsSupported(activeSettings[i]));
             }
         }
 
         private void Apply(Setting setting)
         {
+            if (!IsSupported(setting)) return;
             switch (setting.Key)
             {
-                case "display_mode":
-                    Screen.fullScreenMode = setting.Index == 0 ? FullScreenMode.FullScreenWindow : setting.Index == 1 ? FullScreenMode.ExclusiveFullScreen : FullScreenMode.Windowed;
-                    break;
-                case "vsync":
-                    QualitySettings.vSyncCount = setting.Index;
-                    break;
-                case "fps_limit":
-                    Application.targetFrameRate = setting.Index == 0 ? -1 : int.Parse(setting.DisplayValue);
-                    break;
-                case "master_volume":
-                    AudioListener.volume = setting.Value / 100f;
-                    break;
-                case "brightness":
-                    if (normalBackground != null)
-                    {
-                        Color color = normalBackground.color;
-                        color.a = Mathf.Lerp(.68f, .18f, setting.Value / 100f);
-                        normalBackground.color = color;
-                    }
-                    break;
+                case "display_mode": displayModeChanged.OnNext(setting.Index == 0 ? 1 : setting.Index == 1 ? 0 : 2); break;
+                case "resolution": screenResolutionChanged.OnNext(setting.Index); break;
+                case "vsync": vSyncChanged.OnNext(setting.Index == 1); break;
+                case "fps_limit": fpsLimitChanged.OnNext(setting.Index); break;
+                case "voice_chat_enabled": voiceChatEnabledChanged.OnNext(setting.Index == 1); break;
+                case "voice_input": voiceChatInputModeChanged.OnNext(setting.Index); break;
+                case "microphone_muted": voiceChatMutedChanged.OnNext(setting.Index == 1); break;
+                case "voice_deafened": voiceChatDeafenedChanged.OnNext(setting.Index == 1); break;
+                case "mouse_sensitivity": mouseSensitivityChanged.OnNext(setting.Value); break;
+                case "invert_y": invertYAxisChanged.OnNext(setting.Index == 1); break;
+                case "crouch_mode": crouchModeChanged.OnNext(setting.Index); break;
+                case "sprint_mode": sprintModeChanged.OnNext(setting.Index); break;
             }
         }
-
         private void Save()
         {
             CloseDropdown();
-            foreach (Setting setting in Gameplay) SaveSetting(setting);
-            foreach (Setting setting in Graphics) SaveSetting(setting);
-            foreach (Setting setting in Audio) SaveSetting(setting);
-            foreach (Setting setting in Controls) SaveSetting(setting);
-            PlayerPrefs.Save();
+            closed.OnNext(Unit.Default);
             StartCoroutine(ShowSaved());
         }
 
-        private static void SaveSetting(Setting setting)
-        {
-            if (setting.Control == Control.Slider)
-            {
-                PlayerPrefs.SetFloat(PreferencePrefix + setting.Key, setting.Value);
-            }
-            else
-            {
-                PlayerPrefs.SetInt(PreferencePrefix + setting.Key, setting.Index);
-            }
-        }
+
 
         private IEnumerator ShowSaved()
         {
