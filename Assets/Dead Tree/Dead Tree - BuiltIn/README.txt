@@ -1,0 +1,1 @@
+This folder contains the Built-In Render Pipeline version of the assets.
