@@ -3,10 +3,10 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Displays the active task names from <see cref="TaskRegistry"/> as a
-/// compact list in the player HUD. Sits below the currency display in the top-right
-/// corner. Instantiates a <see cref="_taskRowPrefab"/> per task and hides the
-/// container automatically when there are no tasks.
+/// Displays active <see cref="TutorialTask"/> entries from <see cref="TaskRegistry"/>
+/// as a compact list in the player HUD. Only tutorial tasks (Day 1 step prompts, etc.)
+/// appear here; regular systemic-threat tasks are shown exclusively on the Task Page.
+/// Hides the container automatically when there are no tutorial tasks.
 /// </summary>
 public class HUDTaskList : MonoBehaviour
 {
@@ -48,20 +48,28 @@ public class HUDTaskList : MonoBehaviour
         if (_rowContainer == null)
             return;
 
-        IReadOnlyList<ISystemicThreat> threats = TaskRegistry.Instance != null
+        IReadOnlyList<ISystemicThreat> allThreats = TaskRegistry.Instance != null
             ? TaskRegistry.Instance.Threats
             : System.Array.Empty<ISystemicThreat>();
 
-        bool hasThreats = threats.Count > 0;
+        // Only display tutorial tasks in the HUD; regular tasks live on the Task Page.
+        var tutorialTasks = new List<ISystemicThreat>();
+        foreach (ISystemicThreat threat in allThreats)
+        {
+            if (threat is TutorialTask)
+                tutorialTasks.Add(threat);
+        }
+
+        bool hasTutorialTasks = tutorialTasks.Count > 0;
 
         // Show/hide the row container rather than this MonoBehaviour so that
         // registry events are still received when the list is empty.
-        _rowContainer.gameObject.SetActive(hasThreats);
+        _rowContainer.gameObject.SetActive(hasTutorialTasks);
 
-        if (!hasThreats || _taskRowPrefab == null)
+        if (!hasTutorialTasks || _taskRowPrefab == null)
             return;
 
-        foreach (ISystemicThreat threat in threats)
+        foreach (ISystemicThreat threat in tutorialTasks)
             SpawnRow(threat);
     }
 

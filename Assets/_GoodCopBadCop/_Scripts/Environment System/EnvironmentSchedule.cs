@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace GoodCopBadCop.EnvironmentSystem
@@ -5,7 +6,14 @@ namespace GoodCopBadCop.EnvironmentSystem
     [CreateAssetMenu(fileName = "EnvironmentSchedule", menuName = "GoodCopBadCop/Environment Schedule")]
     public sealed class EnvironmentSchedule : ScriptableObject
     {
-        [SerializeField] private EnvironmentPreset[] dayLoop;
+        [Serializable]
+        public struct ScheduleEntry
+        {
+            public EnvironmentPreset preset;
+            public bool rainEnabled;
+        }
+
+        [SerializeField] private ScheduleEntry[] dayLoop;
 
         public int Count => dayLoop != null ? dayLoop.Length : 0;
 
@@ -18,7 +26,19 @@ namespace GoodCopBadCop.EnvironmentSystem
 
             int safeDay = Mathf.Max(1, day);
             int index = (safeDay - 1) % dayLoop.Length;
-            return dayLoop[index];
+            return dayLoop[index].preset;
+        }
+
+        public bool GetRainEnabledForDay(int day)
+        {
+            if (dayLoop == null || dayLoop.Length == 0)
+            {
+                return false;
+            }
+
+            int safeDay = Mathf.Max(1, day);
+            int index = (safeDay - 1) % dayLoop.Length;
+            return dayLoop[index].rainEnabled;
         }
 
         public EnvironmentPreset GetPresetAtLoopIndex(int index)
@@ -29,7 +49,7 @@ namespace GoodCopBadCop.EnvironmentSystem
             }
 
             int wrappedIndex = ((index % dayLoop.Length) + dayLoop.Length) % dayLoop.Length;
-            return dayLoop[wrappedIndex];
+            return dayLoop[wrappedIndex].preset;
         }
     }
 

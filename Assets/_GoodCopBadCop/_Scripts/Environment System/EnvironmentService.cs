@@ -37,6 +37,7 @@ namespace GoodCopBadCop.EnvironmentSystem
             }
 
             model.SelectPreset(preset);
+            model.SelectRainEnabled(schedule.GetRainEnabledForDay(safeDay));
         }
 
         public void ApplyPreset(EnvironmentPreset preset)
