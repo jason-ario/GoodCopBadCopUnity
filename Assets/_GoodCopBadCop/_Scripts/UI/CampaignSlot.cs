@@ -82,9 +82,8 @@ public class CampaignSlot : MonoBehaviour, IPointerEnterHandler
     /// <summary>Called by the delete button — deletes save data after confirmation.</summary>
     public void OnDeletePressed()
     {
-        // TODO: Drive a confirmation dialog before deleting.
-        SaveDataManager.Instance.DeleteSlot(slotIndex);
-        Refresh();
+        SFXController.Instance?.Play(clickClip);
+        _screen?.RequestDeleteSlot(slotIndex);
     }
 
     /// <summary>Plays the hover sound when the pointer enters the slot.</summary>
