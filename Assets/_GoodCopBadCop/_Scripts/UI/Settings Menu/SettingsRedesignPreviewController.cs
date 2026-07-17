@@ -119,7 +119,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private Tab activeTab = Tab.Graphics;
         private Setting[] activeSettings;
         [SerializeField] private GameObject rowPrefab;
-        
+
         private ScrollRect settingsScrollRect;
 private RectTransform rowsRoot;
         private RectTransform selectedCategory;
@@ -143,6 +143,7 @@ private RectTransform rowsRoot;
         private readonly Subject<Unit> backRequested = new Subject<Unit>();
         private readonly Subject<Unit> closed = new Subject<Unit>();
         private bool isInitialized;
+        private bool isCloseRequested;
 
         public Observable<int> DisplayModeChanged { get { return displayModeChanged; } }
         public Observable<int> ScreenResolutionChanged { get { return screenResolutionChanged; } }
@@ -162,15 +163,15 @@ private RectTransform rowsRoot;
 
         private Image normalBackground;
         private Sprite selectedBackground;
-        
-        
+
+
         [SerializeField] private Sprite dropdownSelectedSprite;
 private Sprite tabHighlightSprite;
 private Sprite normalBackgroundSprite;
         private RectTransform trackTemplate;
         private RectTransform fillTemplate;
         private RectTransform handleTemplate;
-        
+
 
         private const float TabHighlightX = -647.5f;
         private static readonly Vector2 TabHighlightSize = new Vector2(290f, 82.5f);
@@ -184,13 +185,26 @@ private Image arrowTemplate;
             Initialize();
         }
 
-        private void OnEnable()
-        {
-            if (isInitialized)
-            {
-                tabSelected.OnNext(ToSettingsMenuTab(activeTab));
-            }
-        }
+private void OnEnable()
+{
+    isCloseRequested = false;
+
+    if (isInitialized)
+    {
+        tabSelected.OnNext(ToSettingsMenuTab(activeTab));
+    }
+}
+
+private void Update()
+{
+    UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+    bool closePressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+
+    if (closePressed || Input.GetKeyDown(KeyCode.Escape))
+    {
+        RequestClose();
+    }
+}
 
         private void OnDisable()
         {
@@ -216,7 +230,7 @@ private Image arrowTemplate;
             saveText = transform.Find("Save Button/Save Label")?.GetComponent<TMP_Text>();
             saveButton = GetOrAddButton(transform.Find("Save Button")?.gameObject);
             backButton = GetOrAddButton(transform.Find("Back")?.gameObject);
-            
+
             rowsRoot = transform.Find("Settings Viewport/Settings Rows") as RectTransform;
             settingsScrollRect = rowsRoot != null ? rowsRoot.GetComponentInParent<ScrollRect>() : null;
             BuildRowPool();
@@ -329,11 +343,32 @@ private void BindTabs()
             }
         }
 
-        private void BindFooter()
-        {
-            if (saveButton != null) saveButton.onClick.AddListener(Save);
-            if (backButton != null) backButton.onClick.AddListener(() => backRequested.OnNext(Unit.Default));
-        }
+private void BindFooter()
+{
+    if (saveButton != null) saveButton.onClick.AddListener(Save);
+
+    BindCloseButton(backButton);
+    BindCloseButton(GetOrAddButton(transform.Find("Esc")?.gameObject));
+    BindCloseButton(GetOrAddButton(transform.Find("Esc Ring")?.gameObject));
+}
+
+private void BindCloseButton(Button button)
+{
+    if (button == null)
+    {
+        return;
+    }
+
+    Graphic graphic = button.GetComponent<Graphic>();
+    if (graphic != null)
+    {
+        graphic.raycastTarget = true;
+        button.targetGraphic = graphic;
+    }
+
+    button.onClick.AddListener(RequestClose);
+}
+
         public void SetVisible(bool isVisible) { gameObject.SetActive(isVisible); }
         public void ShowTab(ESettingsMenuTab tab) { SelectTab(ToInternalTab(tab)); }
         public void SetDisplayModeValue(int value) { Graphics[0].Index = value == 1 ? 0 : value == 0 ? 1 : 2; RefreshActiveSetting("display_mode"); }
@@ -532,7 +567,7 @@ private static void ApplyRowAppearance(Row row, bool supported)
             {
                 row.Fill.gameObject.SetActive(slider);
             }
-            
+
             if (row.SliderHitArea != null)
             {
                 row.SliderHitArea.gameObject.SetActive(slider);
@@ -651,7 +686,7 @@ private void ShowDropdown(int index)
             openDropdownIndex = index;
             openDropdownRow = rows[index];
 
-            
+
             SetScrollingLocked(true);
 dropdownPanel.gameObject.SetActive(true);
             dropdownPanel.SetAsLastSibling();
@@ -730,7 +765,7 @@ private void SelectDropdownOption(int settingIndex, int optionIndex)
                 Destroy(dropdownPanel.GetChild(i).gameObject);
             }
 
-            
+
             SetScrollingLocked(false);
 dropdownPanel.gameObject.SetActive(false);
             openDropdownRow = null;
@@ -738,26 +773,32 @@ dropdownPanel.gameObject.SetActive(false);
         }
 
 private void SetScrollingLocked(bool locked)
-        {
-            if (settingsScrollRect == null && rowsRoot != null)
-            {
-                settingsScrollRect = rowsRoot.GetComponentInParent<ScrollRect>();
-            }
+{
+    if (settingsScrollRect == null && rowsRoot != null)
+    {
+        settingsScrollRect = rowsRoot.GetComponentInParent<ScrollRect>();
+    }
 
-            if (settingsScrollRect == null)
-            {
-                return;
-            }
+    if (settingsScrollRect == null)
+    {
+        return;
+    }
 
-            settingsScrollRect.velocity = Vector2.zero;
-            settingsScrollRect.vertical = !locked;
+    settingsScrollRect.velocity = Vector2.zero;
+    settingsScrollRect.vertical = true;
 
-            Scrollbar scrollbar = settingsScrollRect.verticalScrollbar;
-            if (scrollbar != null)
-            {
-                scrollbar.interactable = !locked;
-            }
-        }
+    SettingsPreviewScrollRect previewScrollRect = settingsScrollRect as SettingsPreviewScrollRect;
+    if (previewScrollRect != null)
+    {
+        previewScrollRect.InputLocked = locked;
+    }
+
+    Scrollbar scrollbar = settingsScrollRect.verticalScrollbar;
+    if (scrollbar != null)
+    {
+        scrollbar.interactable = !locked;
+    }
+}
 
 
 
@@ -798,12 +839,22 @@ private void SelectRow(int index)
                 case "sprint_mode": sprintModeChanged.OnNext(setting.Index); break;
             }
         }
-        private void Save()
-        {
-            CloseDropdown();
-            closed.OnNext(Unit.Default);
-            StartCoroutine(ShowSaved());
-        }
+private void Save()
+{
+    RequestClose();
+}
+
+private void RequestClose()
+{
+    if (!gameObject.activeInHierarchy || isCloseRequested)
+    {
+        return;
+    }
+
+    isCloseRequested = true;
+    CloseDropdown();
+    backRequested.OnNext(Unit.Default);
+}
 
 
 

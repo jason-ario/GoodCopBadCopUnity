@@ -8,8 +8,17 @@ namespace GoodCopBadCop.UI.SettingsMenu
     /// </summary>
     public sealed class SettingsPreviewScrollRect : ScrollRect
     {
+        public bool InputLocked { get; set; }
         public override void OnBeginDrag(PointerEventData eventData) { }
         public override void OnDrag(PointerEventData eventData) { }
-        public override void OnEndDrag(PointerEventData eventData) { }
+
+        public override void OnScroll(PointerEventData eventData)
+        {
+            if (!InputLocked)
+            {
+                base.OnScroll(eventData);
+            }
+        }
+public override void OnEndDrag(PointerEventData eventData) { }
     }
 }
