@@ -23,6 +23,10 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Header("Splash")]
         [Tooltip("Particle prefab to spawn at the water surface when the player enters or exits the zone.")]
         [SerializeField] private ParticleSystem splashEffectPrefab;
+        [Tooltip("Audio clip to play at the water surface on entry and exit.")]
+        [SerializeField] private AudioClip splashSoundClip;
+        [Tooltip("Volume of the splash sound.")]
+        [SerializeField] [Range(0f, 1f)] private float splashVolume = 1f;
 
         [Header("Audio")]
         [Tooltip("Normal (dry) AudioLowPassFilter cutoff in Hz. 22000 = full range.")]
@@ -143,14 +147,18 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         private void SpawnSplash(Vector3 bodyPosition)
         {
-            if (splashEffectPrefab == null) return;
-
             float surfaceY = _collider.bounds.max.y;
             Vector3 splashPos = new Vector3(bodyPosition.x, surfaceY, bodyPosition.z);
 
-            ParticleSystem ps = Instantiate(splashEffectPrefab, splashPos, Quaternion.identity);
-            float autoDestroyDelay = ps.main.duration + ps.main.startLifetime.constantMax;
-            Destroy(ps.gameObject, autoDestroyDelay);
+            if (splashEffectPrefab != null)
+            {
+                ParticleSystem ps = Instantiate(splashEffectPrefab, splashPos, Quaternion.identity);
+                float autoDestroyDelay = ps.main.duration + ps.main.startLifetime.constantMax;
+                Destroy(ps.gameObject, autoDestroyDelay);
+            }
+
+            if (splashSoundClip != null)
+                AudioSource.PlayClipAtPoint(splashSoundClip, splashPos, splashVolume);
         }
 
         private void TryInitAudioFilter()
