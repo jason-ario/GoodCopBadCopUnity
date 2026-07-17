@@ -289,15 +289,40 @@ public class Flamethrower : PickableObject, IAmmoProvider
         RaycastHit[] hits = Physics.SphereCastAll(origin, _flameWidth, direction, effectiveRange, ~0, QueryTriggerInteraction.Collide);
         foreach (RaycastHit hit in hits)
         {
+            // ── Mutant enemies ────────────────────────────────────────────────
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy == null || enemy.IsDead) continue;
+            if (enemy != null)
+            {
+                if (!enemy.IsDead)
+                {
+                    // Skip enemies already at max flames — SetOnFire handles re-ignition
+                    // automatically once emitters burn out and the count drops below the cap.
+                    SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
+                    if (setOnFire != null && !setOnFire.IsAtMaxFire)
+                        IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
+                }
+                continue;
+            }
 
-            // Skip enemies already at max flames — SetOnFire handles re-ignition
-            // automatically once emitters burn out and the count drops below the cap.
-            SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
-            if (setOnFire == null || setOnFire.IsAtMaxFire) continue;
+            // ── Dead player corpses ───────────────────────────────────────────
+            // A dead player body can be permanently burned to prevent resurrection.
+            CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
+            if (corpse == null) continue;
 
-            IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
+            PlayerHealth playerHealth = corpse.GetComponent<PlayerHealth>();
+            if (playerHealth == null || !playerHealth.IsDead) continue;
+
+            // Cancel resurrection on the server.
+            corpse.BurnCorpse();
+
+            // Trigger fire VFX on all clients (requires SetOnFire on the player prefab).
+            NetworkObject corpseNetObj = corpse.GetComponent<NetworkObject>();
+            if (corpseNetObj != null)
+            {
+                SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
+                if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
+                    IgniteEnemyClientRpc(new NetworkObjectReference(corpseNetObj));
+            }
         }
     }
 

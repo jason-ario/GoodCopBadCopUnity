@@ -706,11 +706,11 @@ public class ShiftManager : NetworkBehaviour
         }
     }
 
-    public void ResetEnvironment()
+    public void ResetEnvironment(bool silent = false)
     {
         windowLampController.TurnRed();
         lever.Reset();
-        _doorController?.Reset();
+        _doorController?.Reset(silent);
         _bunkerDoorController?.Reset();
 
         if (_timecardMachine != null)
@@ -734,10 +734,10 @@ public class ShiftManager : NetworkBehaviour
         shiftStarted.Value = false;
     }
 
-    private void ResetEverything()
+    private void ResetEverything(bool silent = false)
     {
         ResetShiftData();
-        ResetEnvironment();
+        ResetEnvironment(silent);
         ResetSuspectsProcessed();
         if (PlayerInstance.Instance != null)
         {
@@ -952,9 +952,9 @@ public class ShiftManager : NetworkBehaviour
     {
         ambientAudio.DOFade(0, 2);
         yield return new WaitForSeconds(2f);
-        ResetEverything();
+        ResetEverything(true);
         yield return new WaitForSeconds(1);
-        ResetEverything(); // Called twice — player position was not resetting reliably in a single call
+        ResetEverything(true); // Called twice — player position was not resetting reliably in a single call
 
         _playingDirector = ActiveIntroCutscene;
 
@@ -1190,7 +1190,7 @@ public class ShiftManager : NetworkBehaviour
 
         ResetShiftData();
         ResetSuspectsProcessed();
-        ResetEnvironment();
+        ResetEnvironment(true);
         SuspectController.Instance.ResetSuspects();
 
         if (PlayerInstance.Instance != null)

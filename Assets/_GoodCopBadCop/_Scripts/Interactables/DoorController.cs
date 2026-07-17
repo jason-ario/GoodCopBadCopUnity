@@ -251,19 +251,20 @@ public class DoorController : Interactable, IMutantPassable, IHeldItemPassthroug
             _unlockedIndicator.SetActive(!isLocked);
     }
 
-    public void Reset()
+    public void Reset(bool silent = false)
     {
         if (!IsServer) return;
         _doorOpen.Value = false;
         _openedIn.Value = false;
-        ForceCloseVisualsClientRpc();
+        ForceCloseVisualsClientRpc(silent);
     }
 
     [ClientRpc]
-    private void ForceCloseVisualsClientRpc()
+    private void ForceCloseVisualsClientRpc(bool silent = false)
     {
         ApplyDoorVisuals(false, false);
-        audioSource.PlayOneShot(doorCloseClip);
+        if (!silent)
+            audioSource.PlayOneShot(doorCloseClip);
     }
 
     /// <summary>

@@ -150,6 +150,12 @@ public class DialogueManager : NetworkBehaviour
 
     IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null)
     {
+        // Reset pitch before starting. A previous coroutine stopped mid-shift would leave
+        // the AudioSource in a dirty state; reading it as basePitch would compound the shift
+        // on every subsequent call. Dialogue AudioSources are always expected to start at 1.
+        audioSource.pitch = 1f;
+        float basePitch = 1f;
+
         float duration = dialogue.Length * secondsPerCharacter * 0.5f;
         float timer = 0;
         int lastClipIndex = -1;
@@ -173,7 +179,6 @@ public class DialogueManager : NetworkBehaviour
             lastClipIndex = randomIndex;
             AudioClip clip = audioClips[randomIndex];
 
-            float basePitch = audioSource.pitch;
             if (UnityEngine.Random.value < _pitchShiftChance)
                 audioSource.pitch = basePitch * UnityEngine.Random.Range(_pitchShiftMin, _pitchShiftMax);
 
@@ -191,6 +196,7 @@ public class DialogueManager : NetworkBehaviour
             timer += clipDuration + extraDelay;
         }
 
+        audioSource.pitch = basePitch;
         onComplete?.Invoke();
         audioDialogueCoroutine = null;
     }

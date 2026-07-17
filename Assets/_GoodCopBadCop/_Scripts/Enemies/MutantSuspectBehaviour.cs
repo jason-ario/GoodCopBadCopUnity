@@ -257,17 +257,15 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             float endTime = Time.time + _data.losesInterestAfterSeconds;
             while (!_isDone && Time.time < endTime)
             {
-                SetAttackClientRpc(true);
+                SetAttackClientRpc();
                 HitShutterClientRpc();
                 yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
-                SetAttackClientRpc(false);
                 yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
             }
 
             if (_isDone) yield break;
 
-            // Lost interest — clear the attack state then either despawn or retreat.
-            SetAttackClientRpc(false);
+            // Lost interest — either despawn or retreat.
 
             if (DespawnInsteadOfRetreat)
             {
@@ -293,10 +291,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 yield break;
             }
 
-            SetAttackClientRpc(true);
+            SetAttackClientRpc();
             HitShutterClientRpc();
             yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
-            SetAttackClientRpc(false);
             yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
         }
 
@@ -473,12 +470,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _animator.SetBool(ClimbingAnimBool, climbing);
     }
 
-    /// <summary>Sets the BangOnShutters animator bool on all clients. Used to drive the shutter-attack animation.</summary>
+    /// <summary>Fires the BangOnShutters animator trigger on all clients. Used to drive the shutter-attack animation.</summary>
     [ClientRpc]
-    private void SetAttackClientRpc(bool attacking)
+    private void SetAttackClientRpc()
     {
         if (_animator != null)
-            _animator.SetBool(BangOnShuttersAnimBool, attacking);
+            _animator.SetTrigger(BangOnShuttersAnimBool);
     }
 
     /// <summary>Fires an animator trigger on all clients.</summary>

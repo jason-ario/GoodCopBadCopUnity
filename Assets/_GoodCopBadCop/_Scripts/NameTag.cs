@@ -55,14 +55,17 @@ public class NameTag : NetworkBehaviour
             Debug.Log($"[NameTag] Publishing Steam name: {steamName}");
             _ownerName.Value = new FixedString64Bytes(steamName);
 
-            // Hide the local player's own name tag.
+            // Ensure the local player's own name tag stays hidden.
             if (nameTagObject != null)
                 nameTagObject.SetActive(false);
 
             return;
         }
 
-        // Non-owner: apply immediately if the name snapshot already arrived (e.g. late joiner).
+        // Non-owner: show the name tag and apply immediately if the name snapshot already arrived (e.g. late joiner).
+        if (nameTagObject != null)
+            nameTagObject.SetActive(true);
+
         string existingName = _ownerName.Value.ToString();
         if (!string.IsNullOrEmpty(existingName))
         {

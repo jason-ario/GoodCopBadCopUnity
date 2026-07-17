@@ -300,7 +300,7 @@ public class SuspectCharacter : Interactable
         StopNavigation();
         enabled = false;
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
-        SetMutantVoiceClientRpc();
+        SetMutantVoiceClientRpc(true);
 
         // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
         // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
@@ -349,9 +349,9 @@ public class SuspectCharacter : Interactable
     }
 
     [ClientRpc]
-    private void SetMutantVoiceClientRpc()
+    private void SetMutantVoiceClientRpc(bool isMutant = true)
     {
-        speaking?.SetMutantVoice(true);
+        speaking?.SetMutantVoice(isMutant);
     }
 
     [ClientRpc]
@@ -701,13 +701,14 @@ public class SuspectCharacter : Interactable
         {
             ActivateFullMutantForm();
             OnSuspectPresentingUncanny?.Invoke(this, record.infectionScore);
-            SetMutantVoiceClientRpc();
+            SetMutantVoiceClientRpc(true);
             PlayUncannyArriveSoundClientRpc();
         }
         else
         {
             if (_baseVersion != null) _baseVersion.SetActive(true);
             if (_mutatedVersion != null) _mutatedVersion.SetActive(false);
+            SetMutantVoiceClientRpc(false);
         }
     }
 
