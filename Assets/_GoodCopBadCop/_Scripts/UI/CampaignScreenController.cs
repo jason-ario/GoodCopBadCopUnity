@@ -15,11 +15,11 @@ public class CampaignScreenController : MonoBehaviour
     [SerializeField] private ConfirmationDialogController confirmationOverlay;
 
 
-private void OnEnable()
-{
-    confirmationOverlay?.Hide();
-    RefreshAllSlots();
-}
+    private void OnEnable()
+    {
+        confirmationOverlay?.Hide();
+        RefreshAllSlots();
+    }
 
     // ---------------------------------------------------------------------------
     // Slot Management

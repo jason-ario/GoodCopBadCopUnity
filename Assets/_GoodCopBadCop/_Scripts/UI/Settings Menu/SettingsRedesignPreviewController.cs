@@ -3,7 +3,8 @@ using System.Collections;
 
 using GoodCopBadCop.Settings;
 using System.Collections.Generic;
-using TMPro;using R3;
+using TMPro;
+using R3;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -52,7 +53,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Value = value;
             }
 
-            public string DisplayValue => Control == Control.Slider ? Value.ToString("0") : Options[Mathf.Clamp(Index, 0, Options.Length - 1)];
+            public string DisplayValue =>
+                Control == Control.Slider
+                    ? Value.ToString("0")
+                    : Options[Mathf.Clamp(Index, 0, Options.Length - 1)];
         }
 
         private sealed class Row
@@ -121,13 +125,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
         [SerializeField] private GameObject rowPrefab;
 
         private ScrollRect settingsScrollRect;
-private RectTransform rowsRoot;
+        private RectTransform rowsRoot;
         private RectTransform selectedCategory;
         private TMP_Text sectionTitle;
         private TMP_Text saveText;
         private Button saveButton;
         private Button backButton;
-                private readonly Subject<int> displayModeChanged = new Subject<int>();
+        private readonly Subject<int> displayModeChanged = new Subject<int>();
         private readonly Subject<int> screenResolutionChanged = new Subject<int>();
         private readonly Subject<bool> vSyncChanged = new Subject<bool>();
         private readonly Subject<int> fpsLimitChanged = new Subject<int>();
@@ -166,8 +170,8 @@ private RectTransform rowsRoot;
 
 
         [SerializeField] private Sprite dropdownSelectedSprite;
-private Sprite tabHighlightSprite;
-private Sprite normalBackgroundSprite;
+        private Sprite tabHighlightSprite;
+        private Sprite normalBackgroundSprite;
         private RectTransform trackTemplate;
         private RectTransform fillTemplate;
         private RectTransform handleTemplate;
@@ -178,33 +182,33 @@ private Sprite normalBackgroundSprite;
         private RectTransform dropdownPanel;
         private Row openDropdownRow;
         private int openDropdownIndex = -1;
-private Image arrowTemplate;
+        private Image arrowTemplate;
 
         private void Awake()
         {
             Initialize();
         }
 
-private void OnEnable()
-{
-    isCloseRequested = false;
+        private void OnEnable()
+        {
+            isCloseRequested = false;
 
-    if (isInitialized)
-    {
-        tabSelected.OnNext(ToSettingsMenuTab(activeTab));
-    }
-}
+            if (isInitialized)
+            {
+                tabSelected.OnNext(ToSettingsMenuTab(activeTab));
+            }
+        }
 
-private void Update()
-{
-    UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
-    bool closePressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+        private void Update()
+        {
+            UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+            bool closePressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
 
-    if (closePressed || Input.GetKeyDown(KeyCode.Escape))
-    {
-        RequestClose();
-    }
-}
+            if (closePressed || Input.GetKeyDown(KeyCode.Escape))
+            {
+                RequestClose();
+            }
+        }
 
         private void OnDisable()
         {
@@ -247,7 +251,7 @@ private void Update()
             arrowTemplate = rows.Find(row => row.Arrow != null)?.Arrow;
         }
 
-private void BuildRowPool()
+        private void BuildRowPool()
         {
             rows.Clear();
             if (rowsRoot == null || rowPrefab == null)
@@ -293,7 +297,7 @@ private void BuildRowPool()
         }
 
 
-private void EnsureDropdownPanel()
+        private void EnsureDropdownPanel()
         {
             if (dropdownPanel != null)
             {
@@ -320,7 +324,7 @@ private void EnsureDropdownPanel()
         }
 
 
-private void BindTabs()
+        private void BindTabs()
         {
             string[] names = { "Gameplay", "Graphics", "Audio", "Controls" };
             for (int i = 0; i < names.Length; i++)
@@ -343,35 +347,39 @@ private void BindTabs()
             }
         }
 
-private void BindFooter()
-{
-    if (saveButton != null) saveButton.onClick.AddListener(Save);
+        private void BindFooter()
+        {
+            if (saveButton != null) saveButton.onClick.AddListener(Save);
 
-    BindCloseButton(backButton);
-    BindCloseButton(GetOrAddButton(transform.Find("Esc")?.gameObject));
-    BindCloseButton(GetOrAddButton(transform.Find("Esc Ring")?.gameObject));
-}
+            BindCloseButton(backButton);
+            BindCloseButton(GetOrAddButton(transform.Find("Esc")?.gameObject));
+            BindCloseButton(GetOrAddButton(transform.Find("Esc Ring")?.gameObject));
+        }
 
-private void BindCloseButton(Button button)
-{
-    if (button == null)
-    {
-        return;
-    }
+        private void BindCloseButton(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
 
-    Graphic graphic = button.GetComponent<Graphic>();
-    if (graphic != null)
-    {
-        graphic.raycastTarget = true;
-        button.targetGraphic = graphic;
-    }
+            Graphic graphic = button.GetComponent<Graphic>();
+            if (graphic != null)
+            {
+                graphic.raycastTarget = true;
+                button.targetGraphic = graphic;
+            }
 
-    button.onClick.AddListener(RequestClose);
-}
+            button.onClick.AddListener(RequestClose);
+        }
 
         public void SetVisible(bool isVisible) { gameObject.SetActive(isVisible); }
         public void ShowTab(ESettingsMenuTab tab) { SelectTab(ToInternalTab(tab)); }
-        public void SetDisplayModeValue(int value) { Graphics[0].Index = value == 1 ? 0 : value == 0 ? 1 : 2; RefreshActiveSetting("display_mode"); }
+        public void SetDisplayModeValue(int value)
+        {
+            Graphics[0].Index = value == 1 ? 0 : value == 0 ? 1 : 2;
+            RefreshActiveSetting("display_mode");
+        }
         public void SetScreenResolutionValue(int value) { Graphics[1].Index = value; RefreshActiveSetting("resolution"); }
         public void SetVSyncValue(bool value) { Graphics[2].Index = value ? 1 : 0; RefreshActiveSetting("vsync"); }
         public void SetFpsLimitValue(int value) { Graphics[3].Index = value; RefreshActiveSetting("fps_limit"); }
@@ -393,7 +401,7 @@ private void BindCloseButton(Button button)
             for (int i = 0; i < activeSettings.Length && i < rows.Count; i++)
                 if (activeSettings[i].Key == key) { BindRow(i); return; }
         }
-private void SelectTab(Tab tab)
+        private void SelectTab(Tab tab)
         {
             CloseDropdown();
             activeTab = tab;
@@ -446,7 +454,7 @@ private void SelectTab(Tab tab)
             }
         }
 
-private void BindRow(int index)
+        private void BindRow(int index)
         {
             Row row = rows[index];
             Setting setting = activeSettings[index];
@@ -484,7 +492,7 @@ private void BindRow(int index)
             ApplyRowAppearance(row, supported);
         }
 
-private static void ApplyRowAppearance(Row row, bool supported)
+        private static void ApplyRowAppearance(Row row, bool supported)
         {
             if (row.Background != null)
             {
@@ -572,13 +580,13 @@ private static void ApplyRowAppearance(Row row, bool supported)
             {
                 row.SliderHitArea.gameObject.SetActive(slider);
             }
-if (row.Handle != null)
+            if (row.Handle != null)
             {
                 row.Handle.gameObject.SetActive(slider);
             }
         }
 
-private void ConfigureSliderTrigger(Row row, int index)
+        private void ConfigureSliderTrigger(Row row, int index)
         {
             if (row.Track == null)
             {
@@ -628,7 +636,12 @@ private void ConfigureSliderTrigger(Row row, int index)
             }
 
             Row row = rows[index];
-            if (row.Track == null || !RectTransformUtility.ScreenPointToLocalPointInRectangle(row.Track, eventData.position, eventData.pressEventCamera, out Vector2 local))
+            if (row.Track == null ||
+                !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    row.Track,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out Vector2 local))
             {
                 return;
             }
@@ -640,7 +653,7 @@ private void ConfigureSliderTrigger(Row row, int index)
             Apply(activeSettings[index]);
         }
 
-private void UpdateSliderVisual(Row row, float value)
+        private void UpdateSliderVisual(Row row, float value)
         {
             if (row.Track == null || row.Fill == null || row.Handle == null)
             {
@@ -663,7 +676,7 @@ private void UpdateSliderVisual(Row row, float value)
             row.Handle.anchoredPosition = handlePosition;
         }
 
-private void ToggleDropdown(int index)
+        private void ToggleDropdown(int index)
         {
             if (index >= activeSettings.Length || activeSettings[index].Control != Control.Dropdown)
             {
@@ -680,7 +693,7 @@ private void ToggleDropdown(int index)
             ShowDropdown(index);
         }
 
-private void ShowDropdown(int index)
+        private void ShowDropdown(int index)
         {
             Setting setting = activeSettings[index];
             openDropdownIndex = index;
@@ -688,7 +701,7 @@ private void ShowDropdown(int index)
 
 
             SetScrollingLocked(true);
-dropdownPanel.gameObject.SetActive(true);
+            dropdownPanel.gameObject.SetActive(true);
             dropdownPanel.SetAsLastSibling();
             dropdownPanel.sizeDelta = new Vector2(360f, setting.Options.Length * 48f + 12f);
 
@@ -706,7 +719,12 @@ dropdownPanel.gameObject.SetActive(true);
             for (int i = 0; i < setting.Options.Length; i++)
             {
                 int optionIndex = i;
-                GameObject optionObject = new GameObject("Option " + setting.Options[i], typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+                GameObject optionObject = new GameObject(
+                    "Option " + setting.Options[i],
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image),
+                    typeof(Button));
                 RectTransform optionRect = optionObject.GetComponent<RectTransform>();
                 optionRect.SetParent(dropdownPanel, false);
                 optionRect.anchorMin = new Vector2(0f, 1f);
@@ -744,7 +762,7 @@ dropdownPanel.gameObject.SetActive(true);
             }
         }
 
-private void SelectDropdownOption(int settingIndex, int optionIndex)
+        private void SelectDropdownOption(int settingIndex, int optionIndex)
         {
             Setting setting = activeSettings[settingIndex];
             setting.Index = optionIndex;
@@ -767,44 +785,44 @@ private void SelectDropdownOption(int settingIndex, int optionIndex)
 
 
             SetScrollingLocked(false);
-dropdownPanel.gameObject.SetActive(false);
+            dropdownPanel.gameObject.SetActive(false);
             openDropdownRow = null;
             openDropdownIndex = -1;
         }
 
-private void SetScrollingLocked(bool locked)
-{
-    if (settingsScrollRect == null && rowsRoot != null)
-    {
-        settingsScrollRect = rowsRoot.GetComponentInParent<ScrollRect>();
-    }
+        private void SetScrollingLocked(bool locked)
+        {
+            if (settingsScrollRect == null && rowsRoot != null)
+            {
+                settingsScrollRect = rowsRoot.GetComponentInParent<ScrollRect>();
+            }
 
-    if (settingsScrollRect == null)
-    {
-        return;
-    }
+            if (settingsScrollRect == null)
+            {
+                return;
+            }
 
-    settingsScrollRect.velocity = Vector2.zero;
-    settingsScrollRect.vertical = true;
+            settingsScrollRect.velocity = Vector2.zero;
+            settingsScrollRect.vertical = true;
 
-    SettingsPreviewScrollRect previewScrollRect = settingsScrollRect as SettingsPreviewScrollRect;
-    if (previewScrollRect != null)
-    {
-        previewScrollRect.InputLocked = locked;
-    }
+            SettingsPreviewScrollRect previewScrollRect = settingsScrollRect as SettingsPreviewScrollRect;
+            if (previewScrollRect != null)
+            {
+                previewScrollRect.InputLocked = locked;
+            }
 
-    Scrollbar scrollbar = settingsScrollRect.verticalScrollbar;
-    if (scrollbar != null)
-    {
-        scrollbar.interactable = !locked;
-    }
-}
-
-
+            Scrollbar scrollbar = settingsScrollRect.verticalScrollbar;
+            if (scrollbar != null)
+            {
+                scrollbar.interactable = !locked;
+            }
+        }
 
 
 
-private void SelectRow(int index)
+
+
+        private void SelectRow(int index)
         {
             for (int i = 0; i < rows.Count; i++)
             {
@@ -839,22 +857,22 @@ private void SelectRow(int index)
                 case "sprint_mode": sprintModeChanged.OnNext(setting.Index); break;
             }
         }
-private void Save()
-{
-    RequestClose();
-}
+        private void Save()
+        {
+            RequestClose();
+        }
 
-private void RequestClose()
-{
-    if (!gameObject.activeInHierarchy || isCloseRequested)
-    {
-        return;
-    }
+        private void RequestClose()
+        {
+            if (!gameObject.activeInHierarchy || isCloseRequested)
+            {
+                return;
+            }
 
-    isCloseRequested = true;
-    CloseDropdown();
-    backRequested.OnNext(Unit.Default);
-}
+            isCloseRequested = true;
+            CloseDropdown();
+            backRequested.OnNext(Unit.Default);
+        }
 
 
 

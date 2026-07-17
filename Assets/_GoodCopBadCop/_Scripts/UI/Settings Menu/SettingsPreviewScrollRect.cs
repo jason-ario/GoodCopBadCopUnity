@@ -19,6 +19,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 base.OnScroll(eventData);
             }
         }
-public override void OnEndDrag(PointerEventData eventData) { }
+
+        public override void OnEndDrag(PointerEventData eventData) { }
     }
 }

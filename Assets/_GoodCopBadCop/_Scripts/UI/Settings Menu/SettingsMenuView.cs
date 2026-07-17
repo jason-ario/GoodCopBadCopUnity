@@ -189,7 +189,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 "FPS Limit",
                 FpsLimitOptions,
                 option: ESettingsMenuControlOption.FpsLimit),
-            SettingsMenuControlDefinition.Dropdown("Quality Preset", new[] { "Low", "Medium", "High", "Ultra" }, defaultOptionIndex: 2, interactable: false),
+            SettingsMenuControlDefinition.Dropdown(
+                "Quality Preset",
+                new[] { "Low", "Medium", "High", "Ultra" },
+                defaultOptionIndex: 2,
+                interactable: false),
             SettingsMenuControlDefinition.Slider("Brightness", 50f, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Chromatic Aberration", OffOnOptions, defaultOptionIndex: 1, interactable: false)
@@ -1490,7 +1494,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         }
     }
 
-    internal sealed class DropdownOptionHoverVisual : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+    internal sealed class DropdownOptionHoverVisual : MonoBehaviour,
+        IPointerEnterHandler,
+        IPointerExitHandler,
+        IPointerDownHandler,
+        IPointerUpHandler
     {
         private static readonly Color NormalColor = new(0f, 0f, 0f, 0.42f);
         private static readonly Color HoverColor = new(1f, 1f, 1f, 0.22f);
