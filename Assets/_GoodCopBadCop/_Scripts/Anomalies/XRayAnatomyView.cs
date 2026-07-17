@@ -57,7 +57,10 @@ namespace GoodCopBadCop.XRay
             public Transform To;
             public float NativeLength;
             public Vector3 SourceLongAxis;
+            public Vector3 SourceSecondaryAxis;
             public float ThicknessMultiplier;
+            public float LengthMultiplier;
+            public bool AlignSecondaryAxisToBodyUp;
         }
 
         private sealed class DirectMeshAnchor
@@ -73,8 +76,6 @@ namespace GoodCopBadCop.XRay
             public Transform Visual;
             public Transform Head;
             public Transform Neck;
-            public Quaternion SourceHeadFrame;
-            public Quaternion SourceMeshRotation;
             public float SourceNeckHeadLength;
         }
 
@@ -85,8 +86,39 @@ namespace GoodCopBadCop.XRay
             public Transform TargetHips;
             public Transform TargetLeftArm;
             public Transform TargetRightArm;
+            public Transform TargetNeck;
+            public Transform TargetHead;
             public float SourceWidth;
             public float SourceHeight;
+            public float SourceMinY;
+            public float SourceMaxY;
+            public bool IsSpine;
+        }
+
+        private sealed class ShoulderMeshBinding
+        {
+            public Transform Visual;
+            public Transform TargetShoulder;
+            public Transform TargetHips;
+            public Transform TargetChest;
+            public Transform TargetNeck;
+            public Transform TargetLeftArm;
+            public Transform TargetRightArm;
+            public float SourceWidth;
+            public float SourceHeight;
+        }
+
+        private sealed class PelvisMeshBinding
+        {
+            public Transform Visual;
+            public Transform TargetHips;
+            public Transform TargetChest;
+            public Transform TargetLeftArm;
+            public Transform TargetRightArm;
+            public Transform TargetLeftLeg;
+            public Transform TargetRightLeg;
+            public float SourceLegWidth;
+            public float SourceTorsoHeight;
         }
 
         private readonly Dictionary<Renderer, Material[]> _originalMaterials = new();
@@ -97,6 +129,8 @@ namespace GoodCopBadCop.XRay
         private readonly List<DirectMeshAnchor> _directMeshAnchors = new();
         private readonly List<HeadMeshAnchor> _headMeshAnchors = new();
         private readonly List<ThoraxMeshBinding> _thoraxMeshes = new();
+        private readonly List<PelvisMeshBinding> _pelvisMeshes = new();
+        private readonly List<ShoulderMeshBinding> _shoulderMeshes = new();
         private readonly List<GameObjectLayerState> _layerStates = new();
 
         private Animator _animator;
@@ -106,7 +140,6 @@ namespace GoodCopBadCop.XRay
         private HumanPoseHandler _sourcePoseHandler;
         private HumanPoseHandler _importedPoseHandler;
         private HumanPose _humanPose;
-        private float _importedVisualScale = 1f;
         private Material _bodyMaterial;
         private Material _anatomyMaterial;
         private Material _anomalyMaterial;
@@ -246,8 +279,8 @@ namespace GoodCopBadCop.XRay
                 // a single axis convention on every source mesh.
                 segment.Visual.SetPositionAndRotation(
                     Vector3.Lerp(segment.From.position, segment.To.position, 0.5f),
-                    Quaternion.FromToRotation(segment.SourceLongAxis, direction / length));
-                float ratio = length / segment.NativeLength;
+                    GetSegmentRotation(segment, direction / length));
+                float ratio = length * segment.LengthMultiplier / segment.NativeLength;
                 float thickness = Mathf.Sqrt(ratio) * segment.ThicknessMultiplier;
                 segment.Visual.localScale = GetSegmentScale(segment.SourceLongAxis, thickness, ratio);
             }
@@ -272,12 +305,12 @@ namespace GoodCopBadCop.XRay
                     _animator != null ? _animator.transform.forward : Vector3.forward);
                 float targetLength = Vector3.Distance(anchor.Neck.position, anchor.Head.position);
                 float scale = anchor.SourceNeckHeadLength > 0.001f
-                    ? Mathf.Clamp(targetLength / anchor.SourceNeckHeadLength * 0.55f, 0.5f, 2.5f)
+                    ? Mathf.Clamp(targetLength / anchor.SourceNeckHeadLength * 0.80f, 0.5f, 2.9f)
                     : 1f;
 
                 anchor.Visual.SetPositionAndRotation(
                     anchor.Head.position,
-                    targetHeadFrame * Quaternion.Inverse(anchor.SourceHeadFrame) * anchor.SourceMeshRotation);
+                    targetHeadFrame);
                 anchor.Visual.localScale = Vector3.one * scale;
             }
 
@@ -286,27 +319,121 @@ namespace GoodCopBadCop.XRay
                 if (binding.Visual == null || binding.TargetChest == null || binding.TargetHips == null)
                     continue;
 
-                float targetHeight = Vector3.Distance(binding.TargetChest.position, binding.TargetHips.position);
+                Quaternion targetFrame = BuildAnatomicalFrame(
+                    binding.TargetHips,
+                    binding.TargetChest,
+                    binding.TargetLeftArm,
+                    binding.TargetRightArm);
+                Vector3 up = targetFrame * Vector3.up;
+                Vector3 visualPosition = binding.TargetChest.position;
+                bool fitSpineEndpoints = binding.IsSpine && binding.TargetNeck != null
+                    && binding.SourceMaxY - binding.SourceMinY > 0.001f;
+                Vector3 spineTop = binding.TargetHead != null
+                    ? Vector3.Lerp(binding.TargetNeck.position, binding.TargetHead.position, 0.35f)
+                    : binding.TargetNeck != null ? binding.TargetNeck.position : binding.TargetChest.position;
+                float targetHeight = fitSpineEndpoints
+                    ? Vector3.Dot(spineTop - binding.TargetHips.position, up)
+                    : Vector3.Distance(binding.TargetChest.position, binding.TargetHips.position);
+                float sourceHeight = fitSpineEndpoints
+                    ? binding.SourceMaxY - binding.SourceMinY
+                    : binding.SourceHeight;
                 float targetWidth = Vector3.Distance(binding.TargetRightArm.position, binding.TargetLeftArm.position);
-                float heightScale = binding.SourceHeight > 0.001f
-                    ? Mathf.Clamp(targetHeight / binding.SourceHeight, 0.25f, 3f)
+                float heightScale = sourceHeight > 0.001f
+                    ? Mathf.Clamp(targetHeight / sourceHeight, 0.25f, 3.5f)
                     : 1f;
                 float widthScale = binding.SourceWidth > 0.001f
                     ? Mathf.Clamp(targetWidth / binding.SourceWidth, 0.25f, 3f)
                     : heightScale;
                 float depthScale = Mathf.Sqrt(widthScale * heightScale);
 
+                if (fitSpineEndpoints)
+                {
+                    float targetHipsY = Vector3.Dot(binding.TargetHips.position - binding.TargetChest.position, up);
+                    visualPosition += up * (targetHipsY - binding.SourceMinY * heightScale);
+                }
+                else if (binding.TargetNeck != null)
+                {
+                    // Ribs sit in the upper thorax. The source pack's rib root is a little low
+                    // relative to its chest bone, so lift only the rib cluster toward the neck.
+                    visualPosition += up * Vector3.Dot(binding.TargetNeck.position - binding.TargetChest.position, up) * 0.45f;
+                }
+
+                // The mesh vertices are stored in the source anatomical frame (right, up,
+                // forward). Scaling this frame independently matches shoulder width and torso
+                // height instead of applying one uniform scale to every character.
+                binding.Visual.SetPositionAndRotation(visualPosition, targetFrame);
+                binding.Visual.localScale = new Vector3(widthScale, heightScale, depthScale);
+            }
+
+            foreach (PelvisMeshBinding binding in _pelvisMeshes)
+            {
+                if (binding.Visual == null || binding.TargetHips == null || binding.TargetChest == null
+                    || binding.TargetLeftArm == null || binding.TargetRightArm == null
+                    || binding.TargetLeftLeg == null || binding.TargetRightLeg == null)
+                    continue;
+
+                float targetLegWidth = Vector3.Distance(binding.TargetRightLeg.position, binding.TargetLeftLeg.position);
+                float targetTorsoHeight = Vector3.Distance(binding.TargetChest.position, binding.TargetHips.position);
+                float widthScale = binding.SourceLegWidth > 0.001f
+                    ? Mathf.Clamp(targetLegWidth / binding.SourceLegWidth, 0.25f, 3f)
+                    : 1f;
+                float heightScale = binding.SourceTorsoHeight > 0.001f
+                    ? Mathf.Clamp(targetTorsoHeight / binding.SourceTorsoHeight, 0.25f, 3f)
+                    : widthScale;
+                float depthScale = Mathf.Sqrt(widthScale * heightScale);
                 Quaternion targetFrame = BuildAnatomicalFrame(
                     binding.TargetHips,
                     binding.TargetChest,
                     binding.TargetLeftArm,
                     binding.TargetRightArm);
 
-                // The mesh vertices are stored in the source anatomical frame (right, up,
-                // forward). Scaling this frame independently matches shoulder width and torso
-                // height instead of applying one uniform scale to every character.
-                binding.Visual.SetPositionAndRotation(binding.TargetChest.position, targetFrame);
+                binding.Visual.SetPositionAndRotation(binding.TargetHips.position, targetFrame);
                 binding.Visual.localScale = new Vector3(widthScale, heightScale, depthScale);
+            }
+
+            foreach (ShoulderMeshBinding binding in _shoulderMeshes)
+            {
+                if (binding.Visual == null || binding.TargetShoulder == null || binding.TargetHips == null
+                    || binding.TargetChest == null || binding.TargetLeftArm == null || binding.TargetRightArm == null)
+                    continue;
+
+                float targetWidth = Vector3.Distance(binding.TargetRightArm.position, binding.TargetLeftArm.position);
+                float targetHeight = Vector3.Distance(binding.TargetChest.position, binding.TargetHips.position);
+                float widthScale = binding.SourceWidth > 0.001f
+                    ? Mathf.Clamp(targetWidth / binding.SourceWidth, 0.25f, 3f)
+                    : 1f;
+                float heightScale = binding.SourceHeight > 0.001f
+                    ? Mathf.Clamp(targetHeight / binding.SourceHeight, 0.25f, 3f)
+                    : widthScale;
+                Quaternion targetFrame = BuildAnatomicalFrame(
+                    binding.TargetHips,
+                    binding.TargetChest,
+                    binding.TargetLeftArm,
+                    binding.TargetRightArm);
+                Vector3 scale = new Vector3(widthScale, heightScale, Mathf.Sqrt(widthScale * heightScale));
+
+                // A scapula sits on the upper back, not at either the shoulder joint or a raw
+                // offset copied from the imported rig.  Build that point from the target chest,
+                // neck and shoulder span: it follows the torso, while its lateral position still
+                // follows a raised/lowered arm.
+                Vector3 up = targetFrame * Vector3.up;
+                Vector3 right = targetFrame * Vector3.right;
+                Vector3 forward = targetFrame * Vector3.forward;
+                Vector3 shoulderDelta = binding.TargetShoulder.position - binding.TargetChest.position;
+                float lateral = Vector3.Dot(shoulderDelta, right);
+                float shoulderHeight = Vector3.Dot(shoulderDelta, up);
+                float neckHeight = binding.TargetNeck == null
+                    ? shoulderHeight
+                    : Vector3.Dot(binding.TargetNeck.position - binding.TargetChest.position, up);
+                float bladeHeight = Mathf.Max(shoulderHeight + neckHeight * 0.15f, neckHeight * 0.65f);
+                Vector3 bladePosition = binding.TargetChest.position
+                    + right * (lateral * 0.60f)
+                    + up * bladeHeight
+                    - forward * (targetWidth * 0.10f);
+
+                binding.Visual.SetPositionAndRotation(bladePosition, targetFrame);
+                const float shoulderScale = 1.20f;
+                binding.Visual.localScale = scale * shoulderScale;
             }
 
             // Imported anatomy bones are directly parented to their Humanoid counterparts.
@@ -321,6 +448,28 @@ namespace GoodCopBadCop.XRay
             if (Mathf.Abs(longAxis.y) > 0.5f)
                 return new Vector3(thickness, length, thickness);
             return new Vector3(thickness, thickness, length);
+        }
+
+        private Quaternion GetSegmentRotation(DirectMeshSegment segment, Vector3 direction)
+        {
+            Quaternion rotation = Quaternion.FromToRotation(segment.SourceLongAxis, direction);
+            if (!segment.AlignSecondaryAxisToBodyUp)
+                return rotation;
+
+            Vector3 sourceSecondary = segment.SourceSecondaryAxis.sqrMagnitude > 0.0001f
+                ? segment.SourceSecondaryAxis
+                : Mathf.Abs(Vector3.Dot(segment.SourceLongAxis, Vector3.up)) < 0.9f
+                    ? Vector3.up
+                    : Vector3.right;
+            Vector3 rotatedSecondary = Vector3.ProjectOnPlane(rotation * sourceSecondary, direction);
+            Vector3 targetUp = _animator == null
+                ? Vector3.ProjectOnPlane(Vector3.up, direction)
+                : Vector3.ProjectOnPlane(_animator.transform.up, direction);
+            if (rotatedSecondary.sqrMagnitude < 0.0001f || targetUp.sqrMagnitude < 0.0001f)
+                return rotation;
+
+            float twist = Vector3.SignedAngle(rotatedSecondary, targetUp, direction);
+            return Quaternion.AngleAxis(twist, direction) * rotation;
         }
 
         private void OnDestroy()
@@ -359,10 +508,11 @@ namespace GoodCopBadCop.XRay
                 _directMeshAnchors.Clear();
                 _headMeshAnchors.Clear();
                 _thoraxMeshes.Clear();
+                _pelvisMeshes.Clear();
+                _shoulderMeshes.Clear();
                 _importedAnatomy = null;
                 _importedAnimator = null;
                 DisposePoseHandlers();
-                _importedVisualScale = 1f;
                 _animator = activeAnimator;
                 _hasLoggedMissingHumanoid = false;
             }
@@ -473,25 +623,33 @@ namespace GoodCopBadCop.XRay
             foreach (Renderer renderer in _importedAnatomy.GetComponentsInChildren<Renderer>(true))
                 renderer.enabled = false;
 
-            AddDirectMeshSegment("LeftUpLeg", HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg);
-            AddDirectMeshSegment("LefLeg", HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot);
-            AddDirectMeshSegment("RightUpLeg", HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg);
-            AddDirectMeshSegment("RightLeg", HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot);
-            AddDirectMeshSegment("LeftArm", HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm);
-            AddDirectMeshSegment("LeftForeArm", HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
-            AddDirectMeshSegment("RightArm", HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm);
-            AddDirectMeshSegment("RightForeArm", HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
+            AddDirectMeshSegment("LeftUpLeg", HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, 1f, 1f, true);
+            AddDirectMeshSegment("LefLeg", HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot, 1f, 1f, true);
+            AddDirectMeshSegment("RightUpLeg", HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, 1f, 1f, true);
+            AddDirectMeshSegment("RightLeg", HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot, 1f, 1f, true);
+            AddArmMesh("LeftArm", HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm);
+            AddArmMesh("LeftForeArm", HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
+            AddArmMesh("RightArm", HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm);
+            AddArmMesh("RightForeArm", HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
             AddClavicleMesh("clavicle_l", HumanBodyBones.LeftShoulder, HumanBodyBones.LeftUpperArm);
             AddClavicleMesh("clavicle_r", HumanBodyBones.RightShoulder, HumanBodyBones.RightUpperArm);
             AddHeadMeshAnchor("Skull");
-            AddDirectMeshAnchor("Hips", HumanBodyBones.Hips, 1f);
+            AddShoulderBladeMesh("LeftShoulder", "rig:LeftShoulder", HumanBodyBones.LeftShoulder);
+            AddShoulderBladeMesh("RightShoulder", "rig:RightShoulder", HumanBodyBones.RightShoulder);
+            AddPelvisMesh();
             AddFootMesh("LeftFoot", HumanBodyBones.LeftFoot, HumanBodyBones.LeftToes);
             AddFootMesh("RightFoot", HumanBodyBones.RightFoot, HumanBodyBones.RightToes);
             BuildImportedThorax();
             return true;
         }
 
-        private void AddDirectMeshSegment(string sourceMeshName, HumanBodyBones fromBone, HumanBodyBones toBone, float thicknessMultiplier = 1f)
+        private void AddDirectMeshSegment(
+            string sourceMeshName,
+            HumanBodyBones fromBone,
+            HumanBodyBones toBone,
+            float thicknessMultiplier = 1f,
+            float lengthMultiplier = 1f,
+            bool alignSecondaryAxisToBodyUp = false)
         {
             Mesh sourceMesh = null;
             Transform sourceTransform = null;
@@ -527,6 +685,21 @@ namespace GoodCopBadCop.XRay
             if (length < 0.001f)
                 return;
 
+            Vector3 sourceSecondaryAxis = Vector3.zero;
+            if (alignSecondaryAxisToBodyUp)
+            {
+                Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+                Transform sourceChest = FindDescendant(_importedAnatomy.transform, "rig:Spine2")
+                    ?? FindDescendant(_importedAnatomy.transform, "rig:Spine1");
+                Transform sourceLeftArm = FindDescendant(_importedAnatomy.transform, "rig:LeftArm");
+                Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
+                if (sourceHips != null && sourceChest != null && sourceLeftArm != null && sourceRightArm != null)
+                {
+                    Quaternion sourceFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+                    sourceSecondaryAxis = sourceTransform.InverseTransformDirection(sourceFrame * Vector3.up);
+                }
+            }
+
             GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
             visual.transform.SetParent(_anatomyRoot.transform, false);
             // Source foot meshes use an ankle pivot rather than their geometric center. Every
@@ -545,8 +718,18 @@ namespace GoodCopBadCop.XRay
                 To = to,
                 NativeLength = length,
                 SourceLongAxis = sourceLongAxis,
-                ThicknessMultiplier = thicknessMultiplier
+                SourceSecondaryAxis = sourceSecondaryAxis,
+                ThicknessMultiplier = thicknessMultiplier,
+                LengthMultiplier = lengthMultiplier,
+                AlignSecondaryAxisToBodyUp = alignSecondaryAxisToBodyUp
             });
+        }
+
+        private void AddArmMesh(string sourceMeshName, HumanBodyBones fromBone, HumanBodyBones toBone)
+        {
+            // Imported limb meshes end slightly before their raw bounds. A small overlap at the
+            // elbow/wrist avoids visible gaps on broad or long-armed characters.
+            AddDirectMeshSegment(sourceMeshName, fromBone, toBone, 1f, 1.08f, true);
         }
 
         private static Mesh CreateCenteredMesh(Mesh sourceMesh, string meshName)
@@ -585,7 +768,7 @@ namespace GoodCopBadCop.XRay
             // ankle-to-toes segment, exactly like arms and legs. This also adapts shoe/foot size
             // to tall and short suspects.
             if (Bone(toeBone) != null)
-                AddDirectMeshSegment(sourceMeshName, footBone, toeBone, 0.78f);
+                AddDirectMeshSegment(sourceMeshName, footBone, toeBone, 0.78f, 1f, true);
             else
                 AddDirectMeshAnchor(sourceMeshName, footBone, 1f);
         }
@@ -595,7 +778,10 @@ namespace GoodCopBadCop.XRay
             // The clavicle ends at Shoulder, not at UpperArm. Using UpperArm made the bone span
             // the entire shoulder slope and produced the oversized V shape seen in the preview.
             HumanBodyBones endBone = Bone(shoulderBone) != null ? shoulderBone : armBone;
-            AddDirectMeshSegment(sourceMeshName, HumanBodyBones.Chest, endBone, 0.85f);
+            HumanBodyBones startBone = Bone(HumanBodyBones.UpperChest) != null
+                ? HumanBodyBones.UpperChest
+                : HumanBodyBones.Chest;
+            AddDirectMeshSegment(sourceMeshName, startBone, endBone, 0.85f);
         }
 
         private void AddHeadMeshAnchor(string sourceMeshName)
@@ -625,9 +811,29 @@ namespace GoodCopBadCop.XRay
                 return;
 
             Quaternion sourceBodyFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+            Quaternion sourceHeadFrame = BuildHeadFrame(sourceNeck, sourceHead, sourceBodyFrame * Vector3.forward);
+            Mesh mesh = Instantiate(source.sharedMesh);
+            mesh.name = $"XRay {sourceMeshName}";
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 worldVertex = source.transform.TransformPoint(vertices[i]);
+                vertices[i] = Quaternion.Inverse(sourceHeadFrame) * (worldVertex - sourceHead.position);
+            }
+            mesh.vertices = vertices;
+
+            Vector3[] normals = mesh.normals;
+            if (normals != null && normals.Length == vertices.Length)
+            {
+                for (int i = 0; i < normals.Length; i++)
+                    normals[i] = (Quaternion.Inverse(sourceHeadFrame) * source.transform.TransformDirection(normals[i])).normalized;
+                mesh.normals = normals;
+            }
+            mesh.RecalculateBounds();
+
             GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
             visual.transform.SetParent(_anatomyRoot.transform, false);
-            visual.AddComponent<MeshFilter>().sharedMesh = source.sharedMesh;
+            visual.AddComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = _anatomyMaterial;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -638,9 +844,155 @@ namespace GoodCopBadCop.XRay
                 Visual = visual.transform,
                 Head = targetHead,
                 Neck = targetNeck,
-                SourceHeadFrame = BuildHeadFrame(sourceNeck, sourceHead, sourceBodyFrame * Vector3.forward),
-                SourceMeshRotation = source.transform.rotation,
                 SourceNeckHeadLength = Vector3.Distance(sourceNeck.position, sourceHead.position)
+            });
+        }
+
+        private void AddShoulderBladeMesh(string sourceMeshName, string sourceBoneName, HumanBodyBones targetBone)
+        {
+            MeshFilter source = null;
+            foreach (MeshFilter candidate in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (candidate.name == sourceMeshName)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            Transform sourceAnchor = FindDescendant(_importedAnatomy.transform, sourceBoneName);
+            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+            Transform sourceChest = FindDescendant(_importedAnatomy.transform, "rig:Spine2")
+                ?? FindDescendant(_importedAnatomy.transform, "rig:Spine1");
+            Transform sourceLeftArm = FindDescendant(_importedAnatomy.transform, "rig:LeftArm");
+            Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
+            Transform targetShoulder = Bone(targetBone);
+            Transform targetHips = Bone(HumanBodyBones.Hips);
+            Transform targetChest = Bone(HumanBodyBones.Chest)
+                ?? Bone(HumanBodyBones.UpperChest)
+                ?? Bone(HumanBodyBones.Spine);
+            Transform targetNeck = Bone(HumanBodyBones.Neck);
+            Transform targetLeftArm = Bone(HumanBodyBones.LeftUpperArm);
+            Transform targetRightArm = Bone(HumanBodyBones.RightUpperArm);
+            if (source == null || source.sharedMesh == null || sourceAnchor == null || sourceHips == null || sourceChest == null
+                || sourceLeftArm == null || sourceRightArm == null || targetShoulder == null || targetHips == null
+                || targetChest == null || targetNeck == null || targetLeftArm == null || targetRightArm == null)
+                return;
+
+            Quaternion sourceFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+            Mesh mesh = Instantiate(source.sharedMesh);
+            mesh.name = $"XRay {sourceMeshName}";
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 worldVertex = source.transform.TransformPoint(vertices[i]);
+                vertices[i] = Quaternion.Inverse(sourceFrame) * (worldVertex - sourceAnchor.position);
+            }
+            mesh.vertices = vertices;
+
+            Vector3[] normals = mesh.normals;
+            if (normals != null && normals.Length == vertices.Length)
+            {
+                for (int i = 0; i < normals.Length; i++)
+                    normals[i] = (Quaternion.Inverse(sourceFrame) * source.transform.TransformDirection(normals[i])).normalized;
+                mesh.normals = normals;
+            }
+            mesh.RecalculateBounds();
+
+            GameObject visual = new GameObject($"XRay {sourceMeshName}") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            _shoulderMeshes.Add(new ShoulderMeshBinding
+            {
+                Visual = visual.transform,
+                TargetShoulder = targetShoulder,
+                TargetHips = targetHips,
+                TargetChest = targetChest,
+                TargetNeck = targetNeck,
+                TargetLeftArm = targetLeftArm,
+                TargetRightArm = targetRightArm,
+                SourceWidth = Vector3.Distance(sourceRightArm.position, sourceLeftArm.position),
+                SourceHeight = Vector3.Distance(sourceChest.position, sourceHips.position)
+            });
+        }
+
+        private void AddPelvisMesh()
+        {
+            MeshFilter source = null;
+            foreach (MeshFilter candidate in _importedAnatomy.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (candidate.name == "Hips")
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            Transform sourceHips = FindDescendant(_importedAnatomy.transform, "rig:Hips");
+            Transform sourceChest = FindDescendant(_importedAnatomy.transform, "rig:Spine2")
+                ?? FindDescendant(_importedAnatomy.transform, "rig:Spine1");
+            Transform sourceLeftArm = FindDescendant(_importedAnatomy.transform, "rig:LeftArm");
+            Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
+            Transform sourceLeftLeg = FindDescendant(_importedAnatomy.transform, "rig:LeftUpLeg");
+            Transform sourceRightLeg = FindDescendant(_importedAnatomy.transform, "rig:RightUpLeg");
+            Transform targetHips = Bone(HumanBodyBones.Hips);
+            Transform targetChest = Bone(HumanBodyBones.Chest)
+                ?? Bone(HumanBodyBones.UpperChest)
+                ?? Bone(HumanBodyBones.Spine);
+            Transform targetLeftArm = Bone(HumanBodyBones.LeftUpperArm);
+            Transform targetRightArm = Bone(HumanBodyBones.RightUpperArm);
+            Transform targetLeftLeg = Bone(HumanBodyBones.LeftUpperLeg);
+            Transform targetRightLeg = Bone(HumanBodyBones.RightUpperLeg);
+            if (source == null || source.sharedMesh == null || sourceHips == null || sourceChest == null
+                || sourceLeftArm == null || sourceRightArm == null || sourceLeftLeg == null || sourceRightLeg == null
+                || targetHips == null || targetChest == null || targetLeftArm == null || targetRightArm == null
+                || targetLeftLeg == null || targetRightLeg == null)
+                return;
+
+            Quaternion sourceFrame = BuildAnatomicalFrame(sourceHips, sourceChest, sourceLeftArm, sourceRightArm);
+            Mesh mesh = Instantiate(source.sharedMesh);
+            mesh.name = "XRay Hips";
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 worldVertex = source.transform.TransformPoint(vertices[i]);
+                vertices[i] = Quaternion.Inverse(sourceFrame) * (worldVertex - sourceHips.position);
+            }
+            mesh.vertices = vertices;
+
+            Vector3[] normals = mesh.normals;
+            if (normals != null && normals.Length == vertices.Length)
+            {
+                for (int i = 0; i < normals.Length; i++)
+                    normals[i] = (Quaternion.Inverse(sourceFrame) * source.transform.TransformDirection(normals[i])).normalized;
+                mesh.normals = normals;
+            }
+            mesh.RecalculateBounds();
+
+            GameObject visual = new GameObject("XRay Hips") { hideFlags = HideFlags.DontSave };
+            visual.transform.SetParent(_anatomyRoot.transform, false);
+            visual.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = visual.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _anatomyMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            _pelvisMeshes.Add(new PelvisMeshBinding
+            {
+                Visual = visual.transform,
+                TargetHips = targetHips,
+                TargetChest = targetChest,
+                TargetLeftArm = targetLeftArm,
+                TargetRightArm = targetRightArm,
+                TargetLeftLeg = targetLeftLeg,
+                TargetRightLeg = targetRightLeg,
+                SourceLegWidth = Vector3.Distance(sourceRightLeg.position, sourceLeftLeg.position),
+                SourceTorsoHeight = Vector3.Distance(sourceChest.position, sourceHips.position)
             });
         }
 
@@ -657,6 +1009,8 @@ namespace GoodCopBadCop.XRay
             Transform sourceRightArm = FindDescendant(_importedAnatomy.transform, "rig:RightArm");
             Transform targetLeftArm = Bone(HumanBodyBones.LeftUpperArm);
             Transform targetRightArm = Bone(HumanBodyBones.RightUpperArm);
+            Transform targetNeck = Bone(HumanBodyBones.Neck);
+            Transform targetHead = Bone(HumanBodyBones.Head);
 
             if (sourceChest == null || sourceHips == null || targetChest == null || targetHips == null
                 || sourceLeftArm == null || sourceRightArm == null || targetLeftArm == null || targetRightArm == null)
@@ -674,7 +1028,7 @@ namespace GoodCopBadCop.XRay
                 renderer.BakeMesh(baked);
                 AddThoraxMesh(
                     baked, renderer.transform, sourceChest, sourceHips, sourceLeftArm, sourceRightArm,
-                    targetChest, targetHips, targetLeftArm, targetRightArm, "Spine");
+                    targetChest, targetHips, targetLeftArm, targetRightArm, targetNeck, targetHead, "Spine", true);
                 break;
             }
 
@@ -685,7 +1039,7 @@ namespace GoodCopBadCop.XRay
 
                 AddThoraxMesh(
                     filter.sharedMesh, filter.transform, sourceChest, sourceHips, sourceLeftArm, sourceRightArm,
-                    targetChest, targetHips, targetLeftArm, targetRightArm, filter.name);
+                    targetChest, targetHips, targetLeftArm, targetRightArm, targetNeck, targetHead, filter.name, false);
             }
         }
 
@@ -700,7 +1054,10 @@ namespace GoodCopBadCop.XRay
             Transform targetHips,
             Transform targetLeftArm,
             Transform targetRightArm,
-            string partName)
+            Transform targetNeck,
+            Transform targetHead,
+            string partName,
+            bool isSpine)
         {
             if (sourceMesh == null || sourceMeshTransform == null)
                 return;
@@ -709,10 +1066,14 @@ namespace GoodCopBadCop.XRay
             Mesh mesh = Instantiate(sourceMesh);
             mesh.name = $"XRay {partName}";
             Vector3[] vertices = mesh.vertices;
+            float sourceMinY = float.PositiveInfinity;
+            float sourceMaxY = float.NegativeInfinity;
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 worldVertex = sourceMeshTransform.TransformPoint(vertices[i]);
                 vertices[i] = Quaternion.Inverse(sourceFrame) * (worldVertex - sourceChest.position);
+                sourceMinY = Mathf.Min(sourceMinY, vertices[i].y);
+                sourceMaxY = Mathf.Max(sourceMaxY, vertices[i].y);
             }
             mesh.vertices = vertices;
 
@@ -743,8 +1104,13 @@ namespace GoodCopBadCop.XRay
                 TargetHips = targetHips,
                 TargetLeftArm = targetLeftArm,
                 TargetRightArm = targetRightArm,
+                TargetNeck = targetNeck,
+                TargetHead = targetHead,
                 SourceWidth = Vector3.Distance(sourceRightArm.position, sourceLeftArm.position),
-                SourceHeight = Vector3.Distance(sourceChest.position, sourceHips.position)
+                SourceHeight = Vector3.Distance(sourceChest.position, sourceHips.position),
+                SourceMinY = sourceMinY,
+                SourceMaxY = sourceMaxY,
+                IsSpine = isSpine
             });
         }
 
