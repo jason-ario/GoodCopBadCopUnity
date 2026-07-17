@@ -20,6 +20,10 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Tooltip("The camera to track. Falls back to Camera.main if not assigned.")]
         [SerializeField] private Camera targetCamera;
 
+        [Header("Splash")]
+        [Tooltip("Particle prefab to spawn at the water surface when the player enters or exits the zone.")]
+        [SerializeField] private ParticleSystem splashEffectPrefab;
+
         [Header("Audio")]
         [Tooltip("Normal (dry) AudioLowPassFilter cutoff in Hz. 22000 = full range.")]
         [SerializeField] private float normalCutoffHz = 22000f;
@@ -103,6 +107,7 @@ namespace GoodCopBadCop.EnvironmentSystem
                 {
                     _isPlayerBodyUnderwater = bodyInside;
                     OnPlayerBodyUnderwaterStateChanged?.Invoke(_isPlayerBodyUnderwater);
+                    SpawnSplash(_playerBodyTransform.position);
                 }
             }
 
@@ -134,6 +139,18 @@ namespace GoodCopBadCop.EnvironmentSystem
 
             if (_lowPassFilter != null)
                 Destroy(_lowPassFilter);
+        }
+
+        private void SpawnSplash(Vector3 bodyPosition)
+        {
+            if (splashEffectPrefab == null) return;
+
+            float surfaceY = _collider.bounds.max.y;
+            Vector3 splashPos = new Vector3(bodyPosition.x, surfaceY, bodyPosition.z);
+
+            ParticleSystem ps = Instantiate(splashEffectPrefab, splashPos, Quaternion.identity);
+            float autoDestroyDelay = ps.main.duration + ps.main.startLifetime.constantMax;
+            Destroy(ps.gameObject, autoDestroyDelay);
         }
 
         private void TryInitAudioFilter()

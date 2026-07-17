@@ -1,69 +1,52 @@
-using System;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Swaps SkinnedMeshRenderer materials and meshes based on player index.
-/// Player 1 is the host (clientId 0). Player 2 is any non-host client.
+/// Activates and deactivates GameObjects based on whether this player instance
+/// is Player 1 (host / ServerClientId) or Player 2 (any non-host client).
 ///
-/// Runs inside OnNetworkSpawn, which fires on every client — including late-joiners
-/// and pure observers — guaranteeing consistent visuals across the network without
-/// additional RPCs or NetworkVariables.
+/// Assign each player's root appearance objects (body, arms rig, etc.) to the
+/// corresponding array in the Inspector. On NetworkSpawn the correct set is
+/// enabled and the other is disabled on every client, including late-joiners.
 /// </summary>
 public class PlayerAppearanceController : NetworkBehaviour
 {
-    /// <summary>
-    /// Maps a single SkinnedMeshRenderer to its Player 2 overrides.
-    /// Leave a field empty / null to keep the prefab default for that property.
-    /// </summary>
-    [Serializable]
-    public struct AppearanceEntry
-    {
-        [Tooltip("The SkinnedMeshRenderer to target for this entry.")]
-        public SkinnedMeshRenderer renderer;
-
-        [Header("Player 2 Overrides")]
-        [Tooltip("Replacement mesh for Player 2. Leave null to keep the prefab mesh.")]
-        public Mesh player2Mesh;
-
-        [Tooltip("Replacement material set for Player 2. Leave empty to keep the prefab materials.")]
-        public Material[] player2Materials;
-    }
+    [SerializeField]
+    [Tooltip("GameObjects to activate when this player is Player 1 (host).")]
+    private GameObject[] _player1Objects = System.Array.Empty<GameObject>();
 
     [SerializeField]
-    [Tooltip("Renderers whose mesh and/or materials should be swapped when this player is Player 2.")]
-    private AppearanceEntry[] _appearanceEntries = Array.Empty<AppearanceEntry>();
+    [Tooltip("GameObjects to activate when this player is Player 2 (non-host client).")]
+    private GameObject[] _player2Objects = System.Array.Empty<GameObject>();
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        //ApplyAppearance();
+        ApplyAppearance();
     }
 
     /// <summary>
-    /// Evaluates the owner's client ID and applies the appropriate appearance overrides.
-    /// Called on every client automatically through OnNetworkSpawn.
+    /// Enables the correct set of appearance objects and disables the other.
     /// </summary>
     private void ApplyAppearance()
     {
-        bool isPlayer2 = OwnerClientId != NetworkManager.ServerClientId;
+        bool isPlayer1 = OwnerClientId == NetworkManager.ServerClientId;
 
-        if (!isPlayer2)
-            return;
+        SetActive(_player1Objects, isPlayer1);
+        SetActive(_player2Objects, !isPlayer1);
+    }
 
-        foreach (var entry in _appearanceEntries)
+    private static void SetActive(GameObject[] objects, bool active)
+    {
+        foreach (var go in objects)
         {
-            if (entry.renderer == null)
+            if (go == null)
             {
-                Debug.LogWarning("[PlayerAppearanceController] An AppearanceEntry has a null renderer and will be skipped.", this);
+                Debug.LogWarning("[PlayerAppearanceController] A null entry was found in an appearance array and will be skipped.");
                 continue;
             }
 
-            if (entry.player2Mesh != null)
-                entry.renderer.sharedMesh = entry.player2Mesh;
-
-            if (entry.player2Materials is { Length: > 0 })
-                entry.renderer.sharedMaterials = entry.player2Materials;
+            go.SetActive(active);
         }
     }
 }
