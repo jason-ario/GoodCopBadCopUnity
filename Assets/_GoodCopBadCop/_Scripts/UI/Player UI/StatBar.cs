@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,7 @@ public class StatBar : MonoBehaviour
 {
     [SerializeField] private Image fillImage;
     [SerializeField] private RectTransform glowRect;
+    [SerializeField] private TMP_Text percentageText;
     [SerializeField] private bool glowEnabled = true;
     [SerializeField] private float glowLingerDuration = 0.5f;
     [SerializeField] private bool glowOnDecrease = false;
@@ -51,6 +53,9 @@ public class StatBar : MonoBehaviour
 
         float newFill = max > 0f ? current / max : 0f;
         fillImage.fillAmount = newFill;
+
+        if (percentageText != null)
+            percentageText.text = $"{Mathf.RoundToInt(newFill * 100f)}%";
 
         bool isChangeSignificant = glowOnDecrease 
             ? newFill < _previousFillAmount 

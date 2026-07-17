@@ -108,17 +108,12 @@ public class GeigerCounterUI : MonoBehaviour
         {
             arcBgImage.type          = Image.Type.Filled;
             arcBgImage.fillMethod    = Image.FillMethod.Radial180;
-            arcBgImage.fillOrigin    = (int)Image.Origin180.Top;
             arcBgImage.fillClockwise = false;   // sweeps left → right
             arcBgImage.fillAmount    = 1f;      // always full – shows the gauge range
         }
 
         if (arcFillImage != null)
         {
-            arcFillImage.type          = Image.Type.Filled;
-            arcFillImage.fillMethod    = Image.FillMethod.Radial180;
-            arcFillImage.fillOrigin    = (int)Image.Origin180.Top;
-            arcFillImage.fillClockwise = false;
             arcFillImage.fillAmount    = 0f;
             arcFillImage.color         = arcColorLow;
         }

@@ -35,6 +35,6 @@ public class MoneyText : MonoBehaviour
     private void UpdateText(int previousValue, int newValue)
     {
         Debug.Log("Should Update Money");
-        moneyText.text = GlobalHostVariables.Instance.money.Value.ToString() + "  <sprite=0>";    
+        moneyText.text = GlobalHostVariables.Instance.money.Value.ToString();    
     }
 }
