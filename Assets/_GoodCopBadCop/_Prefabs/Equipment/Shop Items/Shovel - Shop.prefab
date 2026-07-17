@@ -75,21 +75,48 @@ PrefabInstance:
     - {fileID: 3482608735917021689, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
     - {fileID: 2197934688884658941, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
     - {fileID: 7759325571883448781, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
+    - {fileID: 1653480067909921365, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
+    - {fileID: 1117282607132087583, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 1648277645992685808, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6925821752553561116}
+      insertIndex: 3
+      addedObject: {fileID: 1317198515110519609}
     - targetCorrespondingSourceObject: {fileID: 1648277645992685808, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1317198515110519609}
+      addedObject: {fileID: 6925821752553561116}
   m_SourcePrefab: {fileID: 100100000, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
 --- !u!1 &8712734670380456326 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1648277645992685808, guid: 9da0e625864efae40ab4f447949e2e8c, type: 3}
   m_PrefabInstance: {fileID: 7941536970593642870}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1317198515110519609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8712734670380456326}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1570708703
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &6925821752553561116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -108,28 +135,3 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: 0, z: 0}
   customPurchaseAction: {fileID: 0}
   _unlockedByDefault: 1
---- !u!114 &1317198515110519609
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8712734670380456326}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0

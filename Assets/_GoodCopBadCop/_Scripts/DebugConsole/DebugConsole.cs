@@ -341,6 +341,8 @@ public class DebugConsole : MonoBehaviour
     /// Skips booth-ready setup and immediately jumps CampaignManager to the given day.
     /// Runs SkipToBoothReady first if the game is not yet in the shift, then applies
     /// the target day on top. Server-only.
+    /// For any day other than Day 1, ink stamps are unlocked after one frame so that
+    /// Day 1's tutorial locks do not carry over into later-day debug skips.
     /// </summary>
     public void SkipToDay(int targetDay)
     {
@@ -353,6 +355,24 @@ public class DebugConsole : MonoBehaviour
         ShiftManager.SuppressFanfare = true;
         ShiftManager.Instance.SkipToBoothReady();
         CampaignManager.Instance.JumpToDay(targetDay);
+
+        if (targetDay != 1)
+            StartCoroutine(UnlockInkStampsAfterDelay());
+    }
+
+    /// <summary>
+    /// Waits one frame (to allow the day's DayActivated to complete), then forces all
+    /// InkStamp slots interactable. Prevents Day 1's tutorial locks from persisting
+    /// when skipping to a later day.
+    /// </summary>
+    private IEnumerator UnlockInkStampsAfterDelay()
+    {
+        yield return null;
+
+        foreach (var stamp in FindObjectsByType<InkStamp>(FindObjectsSortMode.None))
+            stamp.SetSlotInteractable(true);
+
+        Debug.Log("[DebugConsole] Ink stamps unlocked for non-Day-1 skip.");
     }
 
     /// <summary>
@@ -380,6 +400,33 @@ public class DebugConsole : MonoBehaviour
         FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();
         ShiftManager.Instance?.TryStartShift();
         Debug.Log("[DebugConsole] Free Play started — Day 4 shift is running, the tool locker is unlocked, and regular suspects will arrive.");
+    }
+
+    /// <summary>
+    /// Starts an ordinary, fully playable Day 5 shift in the booth with all stamps unlocked
+    /// and the tool locker open. Mirrors StartFreePlay but targets Day 5.
+    /// </summary>
+    public void StartFreePlayDay5()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] StartFreePlayDay5: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(5);
+        StartCoroutine(StartFreePlayDay5AfterDayLoad());
+    }
+
+    private IEnumerator StartFreePlayDay5AfterDayLoad()
+    {
+        // Let CampaignManager activate Day 5 and apply its normal setup.
+        // UnlockInkStampsAfterDelay (launched by SkipToDay) also runs this frame.
+        yield return null;
+
+        FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();
+        ShiftManager.Instance?.TryStartShift();
+        Debug.Log("[DebugConsole] Free Play Day 5 started — shift is running, tool locker unlocked, stamps interactable.");
     }
 
     /// <summary>Adds a one-off DebugTask to TaskRegistry for task testing.</summary>

@@ -174,4 +174,47 @@ public class AnomalyUnlockManager : MonoBehaviour
         OnAnomalyUnlocked?.Invoke(typeName);
         Debug.Log($"[AnomalyUnlockManager] Anomaly unlocked: '{typeName}'.");
     }
+
+    /// <summary>
+    /// Cheat / debug helper: unlocks every anomaly defined in the progression asset,
+    /// including all scripted and post-scripted entries across every category.
+    /// Guidebook pages update automatically via <see cref="OnAnomalyUnlocked"/>.
+    /// </summary>
+    public void UnlockAllAnomalies()
+    {
+        if (_progression == null)
+        {
+            Debug.LogWarning("[AnomalyUnlockManager] No AnomalyUnlockProgressionSO assigned — cannot unlock all anomalies.");
+            return;
+        }
+
+        int count = 0;
+
+        // Scripted day entries (may include anomalies not present in AllCategories).
+        for (int day = 1; day <= _progression.LastScriptedDay; day++)
+        {
+            foreach (string typeName in _progression.GetScriptedUnlocksForDay(day))
+            {
+                if (string.IsNullOrEmpty(typeName)) continue;
+                if (IsAnomalyUnlocked(typeName)) continue;
+                UnlockAnomaly(typeName);
+                count++;
+            }
+        }
+
+        // Full category lists — covers every anomaly in the game.
+        foreach (var category in _progression.AllCategories)
+        {
+            if (category?.AnomalyTypeNames == null) continue;
+            foreach (string typeName in category.AnomalyTypeNames)
+            {
+                if (string.IsNullOrEmpty(typeName)) continue;
+                if (IsAnomalyUnlocked(typeName)) continue;
+                UnlockAnomaly(typeName);
+                count++;
+            }
+        }
+
+        Debug.Log($"[AnomalyUnlockManager] Unlock All: {count} anomalies newly unlocked.");
+    }
 }

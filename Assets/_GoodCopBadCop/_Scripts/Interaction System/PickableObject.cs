@@ -7,6 +7,9 @@ using UnityEngine.Animations;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(ParentConstraint))]
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(NetworkRigidbody))]
+[RequireComponent(typeof(PickableColliderController))]
 public class PickableObject : Interactable
 {
     // Virtual methods allow overriding
@@ -18,6 +21,8 @@ public class PickableObject : Interactable
     private ParentConstraint _parentConstraint;
     private SocketFollow _socketFollow;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
+    protected Rigidbody _rb;
+    private PickableColliderController _colliderController;
     public UnityAction OnEquip;
     public UnityAction OnUnEquip;
 
@@ -122,6 +127,12 @@ public class PickableObject : Interactable
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
+        // Update trigger state on all clients, independent of the interactable lock.
+        if (current != ulong.MaxValue)
+            _colliderController?.SetHeld();
+        else
+            _colliderController?.SetReleased();
+
         if (_interactableLocked) return;
         // Only apply holder-based logic when no tutorial override is active.
         if (_networkInteractableOverride.Value == -1)
@@ -212,6 +223,9 @@ public class PickableObject : Interactable
         interactableColliders = GetComponentsInChildren<InteractableCollider>(true);
         _parentConstraint = GetComponent<ParentConstraint>();
         _socketFollow = GetComponent<SocketFollow>();
+        _rb = GetComponent<Rigidbody>();
+        if (_rb != null) _rb.isKinematic = true;
+        _colliderController = GetComponent<PickableColliderController>();
     }
 
     /// <summary>Registers the caller as the player holding this object on the server.</summary>
@@ -332,8 +346,11 @@ public class PickableObject : Interactable
 
         // Stay kinematic while in the slot; AutoObjectParentSync stays false so
         // NGO does not try to replicate the local constraint-driven parent.
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null) rb.isKinematic = true;
+        if (_rb != null) _rb.isKinematic = true;
+
+        // Placed objects are solid — restore non-trigger state so they sit correctly
+        // in their slot and don't pass through surrounding geometry.
+        _colliderController?.SetReleased();
 
         if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
         {
@@ -406,11 +423,62 @@ public class PickableObject : Interactable
 
         NetworkObject.AutoObjectParentSync = true;
 
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null) rb.isKinematic = false;
+        if (_rb != null) _rb.isKinematic = false;
 
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;
+    }
+
+    /// <summary>
+    /// Called from the throwing client after <see cref="PlayerPickupController.ReleaseHeldObjectForThrow"/>.
+    /// Authoritatively positions the object, applies throw velocity on the server (new owner),
+    /// re-enables NetworkTransform, and broadcasts to all clients. When <c>NetworkRigidbody</c>
+    /// is present, it automatically keeps non-owner clients kinematic and driven by NT while
+    /// the server runs the physics simulation.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ThrowServerRpc(Vector3 position, Vector3 velocity)
+    {
+        RemoveParent();
+        transform.position = position;
+
+        // Ensure server is the owner so NT authority (and NetworkRigidbody authority) is here.
+        NetworkObject.RemoveOwnership();
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        if (_rb != null)
+        {
+            _rb.isKinematic = false;
+            _rb.linearVelocity = velocity;
+        }
+
+        ThrowBroadcastClientRpc(position, velocity);
+    }
+
+    /// <summary>
+    /// Received on all clients after a throw. Repositions the object and re-enables
+    /// <c>NetworkTransform</c>. Non-owner clients stay kinematic — NT drives their position
+    /// from the server's authoritative physics simulation. The server already has physics
+    /// active from <see cref="ThrowServerRpc"/>.
+    /// </summary>
+    [ClientRpc]
+    private void ThrowBroadcastClientRpc(Vector3 position, Vector3 velocity)
+    {
+        RemoveParent();
+        ClearSocketFollow();
+        transform.position = position;
+
+        NetworkObject.AutoObjectParentSync = true;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        // Non-owner clients stay kinematic; NT replicates the server physics simulation.
+        // The server instance set isKinematic = false in ThrowServerRpc.
+        if (IsServer) return;
+        if (_rb != null) _rb.isKinematic = true;
     }
 
     public virtual void OnPickedUp()
@@ -426,6 +494,11 @@ public class PickableObject : Interactable
 
     public virtual void OnDropped()
     {
+        // Immediate local revert to solid before the _holdingClientId NetworkVariable
+        // propagates back from the server (avoids a brief window where the thrown/dropped
+        // object is still a trigger on the local client).
+        _colliderController?.SetReleased();
+
         OnDroppedEvent?.Invoke();
 
         if (itemData != null && itemData.PickupSound != null)
@@ -507,6 +580,10 @@ public class PickableObject : Interactable
     public virtual void OnEquipped(PlayerPickupController player)
     {
         SetInteractable(false);
+        // Re-enable physics colliders as triggers so the held object passes through
+        // world geometry without blocking. SetInteractable disabled them; we restore
+        // them here as triggers so they still detect overlaps but don't physically block.
+        _colliderController?.SetHeld();
 
         playerPickupController = player;
 
@@ -656,6 +733,13 @@ public class PickableObject : Interactable
     public void SetPlacementClone()
     {
         _parentConstraint.enabled = false;
+        if (_rb != null) _rb.isKinematic = true;
+        // Disable InteractableCollider raycast markers so the ghost can't be picked up.
+        SetInteractable(false);
+        // Re-enable physics colliders as triggers: ghost must not physically block anything
+        // but should still pass through world geometry cleanly without disabling colliders
+        // (disabled colliders on a Rigidbody generate spurious physics warnings).
+        _colliderController?.SetHeld();
     }
 
     /// <summary>

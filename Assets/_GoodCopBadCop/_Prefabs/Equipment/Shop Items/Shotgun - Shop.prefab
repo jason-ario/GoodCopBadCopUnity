@@ -68,6 +68,10 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 277429
       objectReference: {fileID: 0}
+    - target: {fileID: 3804797240425420665, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
+      propertyPath: _cinemachineImpulseSource
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 7959678698419180783, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -79,9 +83,15 @@ PrefabInstance:
     - {fileID: 2429729831691827577, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
     - {fileID: 6682373423046766962, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
     - {fileID: 9154853421323154830, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
+    - {fileID: 4859736821122862369, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
+    - {fileID: 8477597233043351824, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
+    - {fileID: 5390276454454513954, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1009598486669414524, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -1763125657530503350}
     - targetCorrespondingSourceObject: {fileID: 1009598486669414524, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8816666248284628860}
@@ -91,6 +101,31 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 1009598486669414524, guid: 6a8588104850e894ea674be4323f60ab, type: 3}
   m_PrefabInstance: {fileID: 4871120037223910559}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &-1763125657530503350
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5592170723318111459}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 3871209749
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &8816666248284628860
 MonoBehaviour:
   m_ObjectHideFlags: 0

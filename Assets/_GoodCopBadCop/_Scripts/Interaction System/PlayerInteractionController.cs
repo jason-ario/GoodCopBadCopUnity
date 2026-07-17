@@ -22,6 +22,7 @@ public class PlayerInteractionController : NetworkBehaviour
     public PlayerAnimationController playerAnimationController; 
     Interactable lastInteractable;
     private PlayerPickupController _playerPickupController;
+    private ThrowController _throwController;
     [SerializeField] float objectPlacerLerpSpeed = 10f;
 
     /// <summary>
@@ -62,6 +63,7 @@ public class PlayerInteractionController : NetworkBehaviour
         playerAnimationController = GetComponent<PlayerAnimationController>();
         playerMovementController = GetComponent<PlayerMovementController>();
         _playerPickupController = GetComponent<PlayerPickupController>();
+        _throwController = GetComponent<ThrowController>();
     }
     
     public void SetCanInteract(bool value, string interactText)
@@ -120,8 +122,35 @@ public class PlayerInteractionController : NetworkBehaviour
             else
                 TryItemUse();
         }
+
+        HandleThrowInput();
     }
     
+    /// <summary>
+    /// Routes F key input to <see cref="ThrowController"/>. Automatically cancels
+    /// any in-progress charge when the player is no longer holding an item
+    /// (e.g. item was snatched by another player or dropped via other means).
+    /// </summary>
+    private void HandleThrowInput()
+    {
+        if (_throwController == null) return;
+
+        if (!_playerPickupController.IsHoldingObject)
+        {
+            if (_throwController.IsCharging) _throwController.CancelCharge();
+            return;
+        }
+
+        if (Input.GetMouseButtonDown(2))
+            _throwController.StartCharge();
+
+        if (_throwController.IsCharging)
+            _throwController.UpdateCharge(Time.deltaTime);
+
+        if (Input.GetMouseButtonUp(2))
+            _throwController.ReleaseThrow();
+    }
+
     void HandleReticle()
     {
         if (_suspectCamActive)
@@ -158,7 +187,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         // Increase distance significantly to detect "Too Far" objects
-        if (Physics.Raycast(ray, out RaycastHit hit, 10f, interactLayer))
+        if (Physics.Raycast(ray, out RaycastHit hit, 10f, interactLayer, QueryTriggerInteraction.Ignore))
         {
             Interactable interactable = hit.collider.GetComponent<Interactable>(); 
             InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
@@ -281,7 +310,7 @@ public class PlayerInteractionController : NetworkBehaviour
             
             lastInteractable = null;
         }
-        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer))
+        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
         {
             // No interactable hit but we did hit a placement surface — handle free placement
             if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))

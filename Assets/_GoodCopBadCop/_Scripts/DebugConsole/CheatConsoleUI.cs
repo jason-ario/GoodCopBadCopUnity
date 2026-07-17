@@ -100,6 +100,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Free Play — Day 5 Booth", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlayDay5());
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Skip to End of Demo (Thanks For Playing)", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDemo());
@@ -115,6 +121,15 @@ public class CheatConsoleUI : MonoBehaviour
         _cheats.Add(("Day 4 — Fuse Power Outage + Power Station", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay4FusePowerOutage());
+            SetVisible(false);
+        }));
+
+        _cheats.Add(("Unlock All Anomalies + Guidebook Pages", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() =>
+            {
+                AnomalyUnlockManager.Instance?.UnlockAllAnomalies();
+            });
             SetVisible(false);
         }));
     }

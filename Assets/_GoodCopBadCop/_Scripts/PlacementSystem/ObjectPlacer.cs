@@ -189,13 +189,15 @@ public class ObjectPlacer : MonoBehaviour
         if (parentConstraint != null)
             parentConstraint.constraintActive = false;
 
-        DisableAllColliders(_clonedItem.gameObject);
         DisableGhostRopes(_clonedItem.gameObject);
         SetupGhostMaterials(_clonedItem.gameObject);
     }
 
     /// <summary>
-    /// Disables every Collider on the ghost clone and all of its children.
+    /// Previously disabled all colliders on the ghost clone. Collider state is now
+    /// managed by <see cref="PickableObject.SetPlacementClone"/>: physics colliders
+    /// are set as triggers, InteractableCollider children are disabled.
+    /// Method retained to avoid breaking any subclass or external references.
     /// </summary>
     private void DisableAllColliders(GameObject root)
     {
