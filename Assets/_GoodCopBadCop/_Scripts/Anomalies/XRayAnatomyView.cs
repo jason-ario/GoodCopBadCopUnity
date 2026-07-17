@@ -12,6 +12,7 @@ namespace GoodCopBadCop.XRay
         private const string ShaderName = "GoodCopBadCop/XRayAnatomy";
         private const string AnatomyRootName = "__XRayAnatomy";
         private const string AnatomyPrefabResourcePath = "XRay/CharacterRigSkin";
+        private const float PrimitiveBoneThickness = 0.58f;
 
         private readonly struct BoneSegment
         {
@@ -19,13 +20,15 @@ namespace GoodCopBadCop.XRay
             public readonly Transform From;
             public readonly Transform To;
             public readonly float Radius;
+            public readonly float EndRadius;
 
-            public BoneSegment(Transform transform, Transform from, Transform to, float radius)
+            public BoneSegment(Transform transform, Transform from, Transform to, float radius, float endRadius)
             {
                 Transform = transform;
                 From = from;
                 To = to;
                 Radius = radius;
+                EndRadius = endRadius;
             }
         }
 
@@ -252,7 +255,8 @@ namespace GoodCopBadCop.XRay
 
                 segment.Transform.position = Vector3.Lerp(segment.From.position, segment.To.position, 0.5f);
                 segment.Transform.rotation = Quaternion.FromToRotation(Vector3.up, direction);
-                segment.Transform.localScale = new Vector3(segment.Radius * 2f, length * 0.5f, segment.Radius * 2f);
+                float shaftLength = Mathf.Max(length - segment.EndRadius * 1.4f, segment.Radius * 2f);
+                segment.Transform.localScale = new Vector3(segment.Radius * 2f, shaftLength * 0.5f, segment.Radius * 2f);
             }
 
             foreach (BoneAnchor anchor in _boneAnchors)
@@ -529,11 +533,10 @@ namespace GoodCopBadCop.XRay
             };
             _anatomyRoot.transform.SetParent(transform, false);
 
-            if (!BuildImportedAnatomy())
-            {
-                Debug.LogWarning("[XRayAnatomyView] Imported anatomy prefab was not available; using basic skeleton fallback.", this);
-                BuildSkeleton();
-            }
+            // The imported anatomy asset has incompatible mesh pivots and proportions across
+            // suspect prefabs.  The visible X-ray skeleton is therefore built directly from
+            // this character's Humanoid joints; every segment has an unambiguous pair of points.
+            BuildPrimitiveAnatomy();
             _anatomyRoot.SetActive(false);
             return true;
         }
@@ -1366,30 +1369,48 @@ namespace GoodCopBadCop.XRay
             return null;
         }
 
+        private void BuildPrimitiveAnatomy()
+        {
+            BuildSkeleton();
+        }
+
         private void BuildSkeleton()
         {
-            CreateBoneBetween("Pelvis", HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg, 0.11f);
-            CreateBoneBetween("Spine", HumanBodyBones.Hips, HumanBodyBones.Spine, 0.075f);
-            CreateBoneBetween("Chest", HumanBodyBones.Spine, HumanBodyBones.Chest, 0.08f);
-            CreateBoneBetween("UpperChest", HumanBodyBones.Chest, HumanBodyBones.UpperChest, 0.075f);
-            CreateBoneBetween("Neck", HumanBodyBones.UpperChest, HumanBodyBones.Neck, 0.05f);
-            CreateBoneBetween("Head", HumanBodyBones.Neck, HumanBodyBones.Head, 0.09f);
+            float unit = GetBodyUnit();
+            Transform chest = Bone(HumanBodyBones.UpperChest) ?? Bone(HumanBodyBones.Chest) ?? Bone(HumanBodyBones.Spine);
+            HumanBodyBones chestBone = Bone(HumanBodyBones.UpperChest) != null
+                ? HumanBodyBones.UpperChest
+                : Bone(HumanBodyBones.Chest) != null ? HumanBodyBones.Chest : HumanBodyBones.Spine;
 
-            CreateLimb("LeftArm", HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
-            CreateLimb("RightArm", HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
-            CreateLimb("LeftLeg", HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot);
-            CreateLimb("RightLeg", HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot);
+            CreateBoneBetween("PelvisBridge", HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg, unit * 0.13f);
+            CreateBoneBetween("PelvisLeft", HumanBodyBones.Hips, HumanBodyBones.LeftUpperLeg, unit * 0.12f);
+            CreateBoneBetween("PelvisRight", HumanBodyBones.Hips, HumanBodyBones.RightUpperLeg, unit * 0.12f);
+            CreateBoneBetween("LowerSpine", HumanBodyBones.Hips, HumanBodyBones.Spine, unit * 0.12f);
+            CreateBoneBetween("UpperSpine", HumanBodyBones.Spine, HumanBodyBones.Chest, unit * 0.13f);
+            CreateBoneBetween("UpperChest", HumanBodyBones.Chest, HumanBodyBones.UpperChest, unit * 0.12f);
+            CreateBoneBetween("Neck", chestBone, HumanBodyBones.Neck, unit * 0.075f);
 
-            Transform chest = Bone(HumanBodyBones.Chest) ?? Bone(HumanBodyBones.UpperChest);
+            CreateBoneBetween("LeftClavicle", chestBone, HumanBodyBones.LeftShoulder, unit * 0.075f);
+            CreateBoneBetween("RightClavicle", chestBone, HumanBodyBones.RightShoulder, unit * 0.075f);
+            CreateBoneBetween("LeftShoulder", HumanBodyBones.LeftShoulder, HumanBodyBones.LeftUpperArm, unit * 0.09f);
+            CreateBoneBetween("RightShoulder", HumanBodyBones.RightShoulder, HumanBodyBones.RightUpperArm, unit * 0.09f);
+
+            CreateLimb("LeftArm", HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand, unit);
+            CreateLimb("RightArm", HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand, unit);
+            CreateLimb("LeftLeg", HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot, unit);
+            CreateLimb("RightLeg", HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot, unit);
+            CreateBoneBetween("LeftFoot", HumanBodyBones.LeftFoot, HumanBodyBones.LeftToes, unit * 0.06f);
+            CreateBoneBetween("RightFoot", HumanBodyBones.RightFoot, HumanBodyBones.RightToes, unit * 0.06f);
+
             if (chest == null)
                 return;
 
             Transform chestAnchor = CreateBoneAnchor("Chest Anatomy Anchor", chest);
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 5; i++)
             {
-                float y = 0.04f - i * 0.09f;
-                CreateLocalCylinder($"Rib_{i + 1}", chestAnchor, new Vector3(0f, y, 0.01f), Quaternion.Euler(0f, 0f, 90f), 0.32f - i * 0.025f, 0.025f);
+                float y = unit * (0.18f - i * 0.14f);
+                CreateRib($"Rib_{i + 1}", chestAnchor, y, unit * (1.05f - i * 0.06f), unit * (0.038f + i * 0.002f));
             }
         }
 
@@ -1399,20 +1420,31 @@ namespace GoodCopBadCop.XRay
             if (chest == null)
                 return;
 
+            float unit = GetBodyUnit();
             Transform chestAnchor = CreateBoneAnchor("Organ Anatomy Anchor", chest);
 
-            CreateLocalPrimitive("Heart", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.08f, -0.02f, 0.10f), new Vector3(0.19f, 0.24f, 0.16f), _anatomyMaterial);
-            CreateLocalPrimitive("LeftLung", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.16f, 0.06f, 0.06f), new Vector3(0.25f, 0.34f, 0.16f), _anatomyMaterial);
-            CreateLocalPrimitive("RightLung", PrimitiveType.Sphere, chestAnchor, new Vector3(0.16f, 0.06f, 0.06f), new Vector3(0.25f, 0.34f, 0.16f), _anatomyMaterial);
-            CreateLocalPrimitive("Liver", PrimitiveType.Sphere, chestAnchor, new Vector3(0.12f, -0.18f, 0.08f), new Vector3(0.38f, 0.16f, 0.19f), _anatomyMaterial);
-            CreateLocalPrimitive("Stomach", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.1f, -0.2f, 0.08f), new Vector3(0.27f, 0.19f, 0.18f), _anatomyMaterial);
-            CreateLocalPrimitive("Anomalous Organ", PrimitiveType.Sphere, chestAnchor, new Vector3(0.02f, -0.06f, 0.16f), new Vector3(0.24f, 0.24f, 0.2f), _anomalyMaterial);
+            CreateLocalPrimitive("Heart", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.15f, -0.04f, 0.20f) * unit, new Vector3(0.34f, 0.44f, 0.30f) * unit, _anatomyMaterial);
+            CreateLocalPrimitive("LeftLung", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.30f, 0.12f, 0.12f) * unit, new Vector3(0.44f, 0.62f, 0.30f) * unit, _anatomyMaterial);
+            CreateLocalPrimitive("RightLung", PrimitiveType.Sphere, chestAnchor, new Vector3(0.30f, 0.12f, 0.12f) * unit, new Vector3(0.44f, 0.62f, 0.30f) * unit, _anatomyMaterial);
+            CreateLocalPrimitive("Liver", PrimitiveType.Sphere, chestAnchor, new Vector3(0.23f, -0.33f, 0.16f) * unit, new Vector3(0.66f, 0.30f, 0.34f) * unit, _anatomyMaterial);
+            CreateLocalPrimitive("Stomach", PrimitiveType.Sphere, chestAnchor, new Vector3(-0.19f, -0.37f, 0.16f) * unit, new Vector3(0.50f, 0.36f, 0.32f) * unit, _anatomyMaterial);
+            CreateLocalPrimitive("Anomalous Organ", PrimitiveType.Sphere, chestAnchor, new Vector3(0.04f, -0.12f, 0.28f) * unit, new Vector3(0.42f, 0.42f, 0.36f) * unit, _anomalyMaterial);
         }
 
-        private void CreateLimb(string namePrefix, HumanBodyBones upper, HumanBodyBones lower, HumanBodyBones handOrFoot)
+        private float GetBodyUnit()
         {
-            CreateBoneBetween($"{namePrefix}_Upper", upper, lower, 0.055f);
-            CreateBoneBetween($"{namePrefix}_Lower", lower, handOrFoot, 0.045f);
+            Transform hips = Bone(HumanBodyBones.Hips);
+            Transform chest = Bone(HumanBodyBones.UpperChest) ?? Bone(HumanBodyBones.Chest) ?? Bone(HumanBodyBones.Spine);
+            if (hips == null || chest == null)
+                return 0.5f;
+
+            return Mathf.Max(Vector3.Distance(hips.position, chest.position), 0.05f);
+        }
+
+        private void CreateLimb(string namePrefix, HumanBodyBones upper, HumanBodyBones lower, HumanBodyBones handOrFoot, float unit)
+        {
+            CreateBoneBetween($"{namePrefix}_Upper", upper, lower, unit * 0.10f);
+            CreateBoneBetween($"{namePrefix}_Lower", lower, handOrFoot, unit * 0.08f);
         }
 
         private void CreateBoneBetween(string partName, HumanBodyBones fromBone, HumanBodyBones toBone, float radius)
@@ -1427,21 +1459,43 @@ namespace GoodCopBadCop.XRay
             if (length < 0.001f)
                 return;
 
-            GameObject part = CreatePrimitive(partName, PrimitiveType.Cylinder, _anatomyRoot.transform, _anatomyMaterial);
+            float visualRadius = radius * PrimitiveBoneThickness;
+            float endRadius = visualRadius * 1.45f;
+            GameObject part = CreatePrimitive(partName, PrimitiveType.Capsule, _anatomyRoot.transform, _anatomyMaterial);
             Transform partTransform = part.transform;
             partTransform.position = Vector3.Lerp(from.position, to.position, 0.5f);
             partTransform.rotation = Quaternion.FromToRotation(Vector3.up, direction);
-            partTransform.localScale = new Vector3(radius * 2f, length * 0.5f, radius * 2f);
-            _boneSegments.Add(new BoneSegment(partTransform, from, to, radius));
+            float shaftLength = Mathf.Max(length - endRadius * 1.4f, visualRadius * 2f);
+            partTransform.localScale = new Vector3(visualRadius * 2f, shaftLength * 0.5f, visualRadius * 2f);
+            _boneSegments.Add(new BoneSegment(partTransform, from, to, visualRadius, endRadius));
+            CreateBoneEnd($"{partName} Start", from, endRadius);
+            CreateBoneEnd($"{partName} End", to, endRadius);
         }
 
-        private void CreateLocalCylinder(string partName, Transform parent, Vector3 localPosition, Quaternion localRotation, float width, float radius)
+        private void CreateLocalCapsule(string partName, Transform parent, Vector3 localPosition, Quaternion localRotation, float width, float radius)
         {
-            GameObject part = CreatePrimitive(partName, PrimitiveType.Cylinder, parent, _anatomyMaterial);
+            float visualRadius = radius * PrimitiveBoneThickness;
+            GameObject part = CreatePrimitive(partName, PrimitiveType.Capsule, parent, _anatomyMaterial);
             Transform partTransform = part.transform;
             partTransform.localPosition = localPosition;
             partTransform.localRotation = localRotation;
-            partTransform.localScale = new Vector3(radius * 2f, width * 0.5f, radius * 2f);
+            partTransform.localScale = new Vector3(visualRadius * 2f, width * 0.5f, visualRadius * 2f);
+        }
+
+        private void CreateRib(string ribName, Transform parent, float y, float width, float radius)
+        {
+            // Three overlapping capsules make a shallow rounded arch, which reads as a rib cage
+            // rather than a set of perfectly straight horizontal rods.
+            float centerWidth = width * 0.28f;
+            float sideWidth = width * 0.42f;
+            float sideOffset = width * 0.30f;
+            float archDrop = width * 0.055f;
+            CreateLocalCapsule($"{ribName} Center", parent, new Vector3(0f, y + archDrop, 0f),
+                Quaternion.Euler(0f, 0f, 90f), centerWidth, radius);
+            CreateLocalCapsule($"{ribName} Left", parent, new Vector3(-sideOffset, y, 0f),
+                Quaternion.Euler(0f, 0f, 64f), sideWidth, radius);
+            CreateLocalCapsule($"{ribName} Right", parent, new Vector3(sideOffset, y, 0f),
+                Quaternion.Euler(0f, 0f, -64f), sideWidth, radius);
         }
 
         private void CreateLocalPrimitive(string partName, PrimitiveType primitiveType, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)
@@ -1464,6 +1518,13 @@ namespace GoodCopBadCop.XRay
             anchorTransform.SetPositionAndRotation(bone.position, bone.rotation);
             _boneAnchors.Add(new BoneAnchor(anchorTransform, bone));
             return anchorTransform;
+        }
+
+        private void CreateBoneEnd(string endName, Transform bone, float radius)
+        {
+            Transform anchor = CreateBoneAnchor($"{endName} Anchor", bone);
+            GameObject sphere = CreatePrimitive(endName, PrimitiveType.Sphere, anchor, _anatomyMaterial);
+            sphere.transform.localScale = Vector3.one * (radius * 2f);
         }
 
         private static GameObject CreatePrimitive(string partName, PrimitiveType primitiveType, Transform parent, Material material)
