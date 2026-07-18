@@ -138,6 +138,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         get => canControl;
         set
         {
+            // Guard: never re-enable control while a scripted cutscene or dialogue session
+            // is active. Interaction coroutines (phone grab, diegetic-view close, etc.) use
+            // delayed WaitForSeconds and can call SetCanControl(true) after EnterScriptedDialogueMode
+            // has locked things, re-locking the cursor and restoring look. Disabling calls are
+            // always allowed so the cutscene entry path works correctly.
+            if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+                return;
+
             canControl = value;
 
             if (canControl)
@@ -493,6 +501,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     public void SetCanLook(bool value)
     {
+        // Guard: same race-condition protection as the CanControl setter. Deferred coroutines
+        // (dumpster deposit, coin-slot insertion, etc.) call SetCanLook(true) after yielding;
+        // if a cutscene started during that yield, look must stay disabled.
+        if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+            return;
         CanLook = value;
     }
 

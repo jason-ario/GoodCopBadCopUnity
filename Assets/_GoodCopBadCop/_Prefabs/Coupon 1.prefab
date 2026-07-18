@@ -128,7 +128,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: HighlightPlus.Runtime::HighlightPlus.HighlightEffect
-  profile: {fileID: 0}
+  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
   camerasLayerMask:
     serializedVersion: 2
@@ -137,14 +137,14 @@ MonoBehaviour:
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
   excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
-  alphaCutOff: 0
+  alphaCutOff: 0.5
   alphaCutOffTextureName: 
-  cullBackFaces: 1
+  cullBackFaces: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
   GPUInstancing: 1
@@ -176,7 +176,7 @@ MonoBehaviour:
   overlayMinIntensity: 0.5
   overlayBlending: 1
   overlayTexture: {fileID: 0}
-  overlayTextureUVSpace: 1
+  overlayTextureUVSpace: 0
   overlayTextureScale: 1
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
@@ -186,7 +186,7 @@ MonoBehaviour:
   overlayPatternSoftness: 0.02
   overlayPatternRotation: 0
   outline: 1
-  outlineColor: {r: 0, g: 0, b: 0, a: 1}
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -219,15 +219,15 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.45
-  outlineBlurPasses: 2
-  outlineQuality: 3
+  outlineWidth: 0.1
+  outlineBlurPasses: 1
+  outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
   outlineDistanceScaleBias: 25
   outlineSharpness: 1
   outlineDownsampling: 1
-  outlineVisibility: 0
+  outlineVisibility: 1
   glowBlendMode: 0
   outlineBlitDebug: 0
   outlineIndependent: 0
@@ -249,8 +249,8 @@ MonoBehaviour:
   outlineDashGap: 0.3
   outlineDashSpeed: 2
   glow: 0
-  glowWidth: 0.4
-  glowQuality: 3
+  glowWidth: 0.5
+  glowQuality: 2
   glowBlurMethod: 0
   glowHighPrecision: 1
   glowDistanceScaleBias: 25
@@ -261,7 +261,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 0
+  glowVisibility: 1
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:
@@ -303,7 +303,7 @@ MonoBehaviour:
   targetFXRotationAngle: 0
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
-  targetFXScaleToRenderBounds: 1
+  targetFXScaleToRenderBounds: 0
   targetFXUseEnclosingBounds: 0
   targetFXSquare: 1
   targetFXAlignToGround: 0
@@ -311,7 +311,7 @@ MonoBehaviour:
   targetFxCenterOnHitPosition: 0
   targetFxAlignToNormal: 0
   targetFXFadePower: 32
-  targetFXGroundMaxDistance: 10
+  targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -355,12 +355,12 @@ MonoBehaviour:
   labelScaleByDistance: 0
   labelScaleMin: 1
   labelScaleMax: 1
-  labelWorldSpaceScale: 0.005
+  labelWorldSpaceScale: 0.01
   seeThrough: 2
   seeThroughOccluderMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  seeThroughOccluderThreshold: 0.3
+  seeThroughOccluderThreshold: 0.4
   seeThroughOccluderMaskAccurate: 0
   seeThroughOccluderCheckInterval: 1
   seeThroughOccluderCheckIndividualObjects: 0
@@ -428,7 +428,7 @@ MonoBehaviour:
   itemsThatCanInteractWith: []
   interactText: 
   highlightNameFilter: 
-  _couponAmount: 1
+  _couponAmount: 5
   _pickupSound: {fileID: 8300000, guid: 8a45ea65eb0db124ea164783986b1985, type: 3}
 --- !u!54 &3882126012006445154
 Rigidbody:

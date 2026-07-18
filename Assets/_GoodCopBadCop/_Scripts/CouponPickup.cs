@@ -13,6 +13,12 @@ public class CouponPickup : Interactable
     [Tooltip("Amount of coupon currency awarded to the shared pool on pickup.")]
     [SerializeField] private int _couponAmount = 5;
 
+    /// <summary>
+    /// The currency value of this coupon. Used by the ATM to determine how many
+    /// physical coupons to spawn for a given monetary amount.
+    /// </summary>
+    public int CouponValue => _couponAmount;
+
     [Header("Audio")]
     [Tooltip("Sound played for all clients on pickup.")]
     [SerializeField] private AudioClip _pickupSound;

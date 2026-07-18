@@ -94,13 +94,20 @@ public class ATM : NetworkBehaviour
     // ── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Plays the ATM dispense sound and spawns <paramref name="amount"/> coupon pickup
-    /// objects one after another at the spawn point. SERVER ONLY.
+    /// Plays the ATM dispense sound and spawns coupon pickup objects one after another
+    /// at the spawn point. The number of coupons spawned is <paramref name="amount"/>
+    /// divided by the individual coupon's value (rounded down, minimum 1). SERVER ONLY.
     /// </summary>
     public void SpawnCoupons(int amount)
     {
         if (!IsServer) return;
         if (amount <= 0) return;
+
+        int couponValue = _couponPickupPrefab != null
+            ? (_couponPickupPrefab.GetComponent<CouponPickup>()?.CouponValue ?? 1)
+            : 1;
+
+        int count = Mathf.Max(1, amount / couponValue);
 
         PlayDispenseSound();
 
@@ -109,7 +116,7 @@ public class ATM : NetworkBehaviour
         else
             _screenController?.ShowPayment(amount);
 
-        StartCoroutine(SpawnCouponsRoutine(amount));
+        StartCoroutine(SpawnCouponsRoutine(count));
     }
 
     // ── Private ──────────────────────────────────────────────────────────────
