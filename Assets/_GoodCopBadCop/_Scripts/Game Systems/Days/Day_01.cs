@@ -305,6 +305,8 @@ public class Day_01 : DayBase
         // Re-enable telephone calls.
         Telephone.BlockAllCalls = false;
 
+        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
@@ -355,6 +357,8 @@ public class Day_01 : DayBase
 
         ShiftManager.OverrideSuspectArrivalInterval = null;
         Telephone.BlockAllCalls = false;
+
+        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
@@ -430,8 +434,9 @@ public class Day_01 : DayBase
     ///   - Opens and locks the rolling shutter.
     ///   - Arms the Vlad intercept on the first suspect spawn slot (no paperwork, no entry line).
     ///   - Auto-starts the shift (bypassing the switch button for this scripted day).
-    ///   - Overrides the first suspect arrival interval to fire immediately so Vlad
-    ///     begins walking as soon as the shift's window sequence completes.
+    ///   - Subscribes to <see cref="ShiftManager.OnNextSuspectReadyForBell"/> once so Vlad
+    ///     is summoned automatically when the shift is ready — bypassing the bell mechanic
+    ///     for this scripted tutorial character only.
     /// </summary>
     private IEnumerator Day1OpeningSequence()
     {
@@ -454,13 +459,25 @@ public class Day_01 : DayBase
         SuspectController.ForceNextSuspectSkipEntryDialogue = true;
         SuspectController.InterceptNextSuspectSpawn = () => SuspectController.Instance.SpawnScriptedSuspect(_vladPrefab);
 
-        // Fire immediately once the shift's opening window sequence finishes.
-        ShiftManager.OverrideFirstArrivalInterval = new UnityEngine.Vector2(0f, 0f);
+        // Vlad is a tutorial character — bypass the bell mechanic for his slot only.
+        // When the shift signals the first suspect is ready, auto-summon him immediately.
+        ShiftManager.OnNextSuspectReadyForBell += AutoSummonVlad;
 
         // Start the shift automatically — no switch press required on Day 1.
         ShiftManager.Instance.TryStartShift();
 
         Debug.Log("[Day_01] Shutter opened and Vlad intercept armed — shift auto-started.");
+    }
+
+    /// <summary>
+    /// Auto-summons the first suspect (Vlad) without requiring the player to ring the bell.
+    /// Subscribed once to <see cref="ShiftManager.OnNextSuspectReadyForBell"/> at the start
+    /// of the Day 1 opening sequence and self-unsubscribes after one use.
+    /// </summary>
+    private void AutoSummonVlad()
+    {
+        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
+        SuspectController.Instance?.NextSuspect();
     }
 
     // -------------------------------------------------------------------------

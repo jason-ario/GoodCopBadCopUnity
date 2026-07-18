@@ -289,6 +289,15 @@ public class Flamethrower : PickableObject, IAmmoProvider
         RaycastHit[] hits = Physics.SphereCastAll(origin, _flameWidth, direction, effectiveRange, ~0, QueryTriggerInteraction.Collide);
         foreach (RaycastHit hit in hits)
         {
+            // ── Fire pits ─────────────────────────────────────────────────────
+            FirePit firePit = hit.collider.GetComponentInParent<FirePit>();
+            if (firePit != null)
+            {
+                if (!firePit.IsLit)
+                    firePit.Ignite();
+                continue;
+            }
+
             // ── Mutant enemies ────────────────────────────────────────────────
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy != null)

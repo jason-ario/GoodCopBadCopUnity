@@ -104,6 +104,19 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>True when a suspect arrival is queued and waiting for <see cref="PauseSuspectScheduling"/> to clear.</summary>
     private bool _pendingNextSuspect = false;
 
+    /// <summary>
+    /// Fired on the server when the next suspect is ready to be summoned by ringing the table bell.
+    /// Replaces the automatic arrival timer — the player must ring the bell to call the next suspect.
+    /// </summary>
+    public static event Action OnNextSuspectReadyForBell;
+
+    /// <summary>
+    /// True on the server when a suspect is queued and waiting for the table bell to be rung.
+    /// Cleared by <see cref="SuspectController.NextSuspect"/> when the suspect is actually spawned,
+    /// and by <see cref="EndShift"/> when the shift ends.
+    /// </summary>
+    public static bool NextSuspectReadyForBell = false;
+
     private Coroutine _suspectSchedulerCoroutine;
 
     #region Events & Date Helpers
@@ -233,10 +246,8 @@ public class ShiftManager : NetworkBehaviour
             return;
         }
 
-        if (_suspectSchedulerCoroutine != null)
-            StopCoroutine(_suspectSchedulerCoroutine);
-
-        _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival());
+        NextSuspectReadyForBell = true;
+        OnNextSuspectReadyForBell?.Invoke();
     }
 
     /// <summary>
@@ -346,15 +357,15 @@ public class ShiftManager : NetworkBehaviour
 
         yield return new WaitForSeconds(3f);
 
-        // First suspect arrives quickly on the server — use the shorter initial interval.
+        // Notify the table bell that the first suspect is ready to be called.
         if (IsServer)
         {
             if (_suspectSchedulerCoroutine != null)
                 StopCoroutine(_suspectSchedulerCoroutine);
 
-            Vector2 firstInterval = OverrideFirstArrivalInterval ?? firstSuspectArrivalInterval;
             OverrideFirstArrivalInterval = null;
-            _suspectSchedulerCoroutine = StartCoroutine(ScheduledSuspectArrival(firstInterval));
+            NextSuspectReadyForBell = true;
+            OnNextSuspectReadyForBell?.Invoke();
         }
     }
 
@@ -374,6 +385,7 @@ public class ShiftManager : NetworkBehaviour
         OverrideSuspectArrivalInterval  = null;
         PauseSuspectScheduling          = false;
         _pendingNextSuspect             = false;
+        NextSuspectReadyForBell         = false;
 
         // Reset the shift flag so the bed interaction becomes available.
         shiftStarted.Value = false;

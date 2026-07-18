@@ -38,11 +38,21 @@ public class FaxMachine : NetworkBehaviour
 
     private void SpawnNewspaper()
     {
+        if (ShiftManager.Instance.CurrentDay <= 1)
+        {
+            Debug.Log("[FaxMachine] Day 1 — skipping newspaper spawn.");
+            return;
+        }
         StartCoroutine(WaitAndSpawnNewspaper());
     }
 
     private void SpawnDailyFax()
     {
+        if (ShiftManager.Instance.CurrentDay <= 1)
+        {
+            Debug.Log("[FaxMachine] Day 1 — skipping daily fax spawn.");
+            return;
+        }
         StartCoroutine(WaitAndSpawnFax());
     }
 

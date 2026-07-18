@@ -200,6 +200,7 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        ShiftManager.NextSuspectReadyForBell = false;
         StartCoroutine(WaitAndSpawnNextSuspect());
     }
 
@@ -881,17 +882,23 @@ public class SuspectController : NetworkBehaviour
         if (!paperworkState.DocumentsVisible)
             return;
         
-        Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
+        Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0f, 1f));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newIDCard = Instantiate(idCard, randomPos, Quaternion.identity) as NetworkObject;
         newIDCard.Spawn();
+        newIDCard.transform.position = randomPos;
+        Rigidbody idCardRb = newIDCard.GetComponent<Rigidbody>();
+        if (idCardRb != null) idCardRb.isKinematic = true;
         newIDCard.GetComponent<IDCard>().SetPaperworkState(paperworkState, suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
-        randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0,1));
+        randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0f, 1f));
         randomPos.y = documentSpawnEndPos.position.y;
         NetworkObject newApplicationForm = Instantiate(applicationForm, randomPos, Quaternion.identity) as NetworkObject;
         newApplicationForm.Spawn();
+        newApplicationForm.transform.position = randomPos;
+        Rigidbody appFormRb = newApplicationForm.GetComponent<Rigidbody>();
+        if (appFormRb != null) appFormRb.isKinematic = true;
         newApplicationForm.GetComponent<ApplicationLetter>().SetPaperworkState(paperworkState, suspectCharacter.Data);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
 

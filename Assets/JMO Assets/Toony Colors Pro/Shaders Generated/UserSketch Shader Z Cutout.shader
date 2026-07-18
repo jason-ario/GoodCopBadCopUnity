@@ -299,11 +299,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader Z Cutout"
 
 			// Injection Point: 'Outline Pass/Vertex Shader/End'
 
-			// PS1-style vertex snapping
-			#if !defined(SHADOWCASTER_PASS)
-			output.vertex.xy = floor(output.vertex.xy / output.vertex.w * _SnapResolution + 0.5) / _SnapResolution * output.vertex.w;
-			#endif
-
 			return output;
 		}
 

@@ -314,11 +314,6 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			output.vcolor.xyzw = __outlineColorVertex;
 			output.pack1.x = ComputeFogFactor(output.vertex.z);
 
-			// PS1-style vertex snapping
-			#if !defined(SHADOWCASTER_PASS)
-			output.vertex.xy = floor(output.vertex.xy / output.vertex.w * _SnapResolution + 0.5) / _SnapResolution * output.vertex.w;
-			#endif
-
 			return output;
 		}
 

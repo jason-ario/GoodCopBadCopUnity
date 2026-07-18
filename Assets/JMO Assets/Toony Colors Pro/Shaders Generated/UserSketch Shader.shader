@@ -280,8 +280,6 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 		
 		#if !defined(SHADOWCASTER_PASS)
 			output.vertex = UnityObjectToClipPos(v.vertex.xyz);
-			// Snap base position first so outline base aligns with main pass snapped vertices
-			output.vertex.xy = floor(output.vertex.xy / output.vertex.w * _SnapResolution + 0.5) / _SnapResolution * output.vertex.w;
 			normal = mul(UNITY_MATRIX_M, float4(normal, 0)).xyz;
 			float2 clipNormals = normalize(mul(UNITY_MATRIX_VP, float4(normal,0)).xy);
 			half2 screenRatio = half2(1.0, _ScreenParams.x / _ScreenParams.y);
