@@ -112,16 +112,16 @@ public class DialogueManager : NetworkBehaviour
         }
 
         SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, waitForInput);
-        PlayDialogueAudio(dialogue, speaking.VoiceAudioClips, speaking.AudioSource);
+        PlayDialogueAudio(dialogue, speaking.VoiceAudioClips, speaking.AudioSource, isMutant: speaking.IsMutantVoiceActive);
     }
 
-    public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null)
+    public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null, bool isMutant = false)
     {
         StopDialogueAudio();
         if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
         if (audioSource == null) { onComplete?.Invoke(); return; }
         
-        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete));
+        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete, isMutant));
     }
 
     /// <summary>
@@ -145,10 +145,10 @@ public class DialogueManager : NetworkBehaviour
         {
             _megaphoneAudioCoroutine = null;
             onComplete?.Invoke();
-        }));
+        }, isMutant: false));
     }
 
-    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null)
+    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null, bool isMutant = false)
     {
         // Reset pitch before starting. A previous coroutine stopped mid-shift would leave
         // the AudioSource in a dirty state; reading it as basePitch would compound the shift
@@ -179,7 +179,7 @@ public class DialogueManager : NetworkBehaviour
             lastClipIndex = randomIndex;
             AudioClip clip = audioClips[randomIndex];
 
-            if (UnityEngine.Random.value < _pitchShiftChance)
+            if (isMutant && UnityEngine.Random.value < _pitchShiftChance)
                 audioSource.pitch = basePitch * UnityEngine.Random.Range(_pitchShiftMin, _pitchShiftMax);
 
             audioSource.PlayOneShot(clip);

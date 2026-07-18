@@ -21,6 +21,14 @@ public class SpeakingInteraction : NetworkBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float _mutantDistortionLevel = 0.35f;
 
+    private bool _isMutantVoiceActive;
+
+    /// <summary>
+    /// True once <see cref="SetMutantVoice"/> has been called with <c>true</c>.
+    /// Used by DialogueManager to restrict pitch shifting to fully-mutated characters only.
+    /// </summary>
+    public bool IsMutantVoiceActive => _isMutantVoiceActive;
+
     /// <summary>
     /// Returns the voice clips for this speaker. When a <see cref="SuspectData"/> asset is
     /// assigned and it contains clips, those take priority over the local serialized array —
@@ -73,7 +81,7 @@ public class SpeakingInteraction : NetworkBehaviour
         AudioClip[] clips = VoiceAudioClips;
         if (clips != null && clips.Length > 0 && audioSource != null)
         {
-            DialogueManager.Instance.PlayDialogueAudio(dialogue, clips, audioSource);
+            DialogueManager.Instance.PlayDialogueAudio(dialogue, clips, audioSource, isMutant: _isMutantVoiceActive);
         }
     }
 
@@ -118,6 +126,8 @@ public class SpeakingInteraction : NetworkBehaviour
     public void SetMutantVoice(bool isMutant)
     {
         if (audioSource == null) return;
+
+        _isMutantVoiceActive = isMutant;
 
         AudioDistortionFilter distortion = audioSource.gameObject.GetComponent<AudioDistortionFilter>();
 
