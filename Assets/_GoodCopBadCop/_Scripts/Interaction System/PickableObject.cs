@@ -348,9 +348,10 @@ public class PickableObject : Interactable
         // NGO does not try to replicate the local constraint-driven parent.
         if (_rb != null) _rb.isKinematic = true;
 
-        // Placed objects are solid — restore non-trigger state so they sit correctly
-        // in their slot and don't pass through surrounding geometry.
-        _colliderController?.SetReleased();
+        // Keep colliders as triggers while the object is constrained to a slot.
+        // Solid colliders on a parented object fight the slot geometry and can block
+        // trigger-based placement detection (e.g. PlaceObjectSlot raycasts).
+        _colliderController?.SetHeld();
 
         if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
         {

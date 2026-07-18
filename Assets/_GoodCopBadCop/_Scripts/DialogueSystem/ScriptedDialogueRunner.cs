@@ -363,6 +363,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Target EnterScriptedMode to participants only — far-away players should NOT be
         // pulled into scripted mode until they walk within _joinRadius (LateJoinClientRpc).
+        // Player UI is broadcast to ALL clients so the HUD never overlaps a cutscene shot,
+        // even for non-participants who won't receive EnterScriptedModeClientRpc.
+        SetPlayerUIVisibleClientRpc(false);
         EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, BuildParticipantRpcParams());
         yield return null; // flush RPCs before the first line
 
@@ -807,6 +810,21 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _clientSpeakerNetId = 0;
     }
 
+    /// <summary>
+    /// Broadcasts a player-UI visibility change to ALL clients regardless of participant status.
+    /// Called at the start of every scripted dialogue sequence so the HUD never overlaps a
+    /// cutscene camera shot, even on clients who are not dialogue participants.
+    /// Restoration is handled by the existing <see cref="ExitScriptedModeClientRpc"/> broadcast.
+    /// </summary>
+    [ClientRpc]
+    private void SetPlayerUIVisibleClientRpc(bool visible)
+    {
+        if (visible)
+            UIController.Instance?.ShowPlayerUI();
+        else
+            UIController.Instance?.ClosePlayerUI();
+    }
+
     // -------------------------------------------------------------------------
     // Client RPCs — advance timer UI
     // -------------------------------------------------------------------------
@@ -889,7 +907,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // "suspect face" is an alias for SuspectFaceCam (close-up shot of the current speaker).
         if (key == "SuspectCam" || key == "SuspectFaceCam" || key == "suspect face")
         {
-            GameObject speakerCam = ResolveSpeakerCamera(key);
+            // If the booth glass is still intact it would obscure a face-cam close-up.
+            // Redirect to the wider SuspectCam so the shot makes sense through the glass.
+            string resolvedKey = key;
+            if ((key == "SuspectFaceCam" || key == "suspect face") &&
+                BreakableGlassController.Instance != null &&
+                BreakableGlassController.Instance.IsWindowVisible)
+            {
+                resolvedKey = "SuspectCam";
+            }
+
+            GameObject speakerCam = ResolveSpeakerCamera(resolvedKey);
             if (speakerCam != null)
             {
                 speakerCam.SetActive(true);

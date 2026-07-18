@@ -34,24 +34,26 @@ public class PickableColliderController : MonoBehaviour
     }
 
     /// <summary>
-    /// Switches all physics colliders to trigger mode.
-    /// Called when the object is picked up so it no longer physically blocks world geometry.
+    /// Disables all physics colliders while the object is held.
+    /// Disabled colliders are invisible to all raycasts regardless of layer mask or
+    /// QueryTriggerInteraction mode, preventing the held item from blocking the
+    /// player's interaction raycast (e.g. placing a paper into a folder).
+    /// Also prevents physical contact with world geometry while carried.
     /// </summary>
     public void SetHeld()
     {
         foreach (Collider col in _physicsColliders)
         {
             if (col == null) continue;
-            col.enabled = true;
-            col.isTrigger = true;
+            col.enabled = false;
         }
     }
 
     /// <summary>
-    /// Reverts all physics colliders to solid (non-trigger).
+    /// Re-enables and restores all physics colliders to solid (non-trigger).
     /// Does a live scan of the full hierarchy rather than relying solely on the cached array,
     /// so any child colliders that were triggers by default or added after Awake are also caught.
-    /// Called when the object is dropped or thrown so it interacts correctly with the world.
+    /// Called when the object is dropped, thrown, or placed so it interacts correctly with the world.
     /// </summary>
     public void SetReleased()
     {
@@ -59,6 +61,7 @@ public class PickableColliderController : MonoBehaviour
         {
             if (col == null) continue;
             if (col.GetComponent<InteractableCollider>() != null) continue;
+            col.enabled = true;
             col.isTrigger = false;
         }
     }

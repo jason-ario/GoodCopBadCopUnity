@@ -78,6 +78,15 @@ public class BreakableGlassController : MonoBehaviour
     /// <summary>True when the glass has received enough hits to be fully smashed.</summary>
     public bool IsSmashed => _hits >= _maxHits;
 
+    /// <summary>
+    /// True on all clients while the intact glass pane is visible.
+    /// Updated via <see cref="ApplySmash"/> so it is reliable on every client,
+    /// unlike <see cref="IsSmashed"/> which is server-side only.
+    /// Used by <see cref="ScriptedDialogueRunner"/> to suppress the face-cam when the
+    /// glass would obscure the close-up view.
+    /// </summary>
+    public bool IsWindowVisible => _normalGlass != null && _normalGlass.activeSelf;
+
     /// <summary>Current server-side hit count.</summary>
     public int CurrentHits => _hits;
 

@@ -641,6 +641,11 @@ public class FolderController : PickableObject
     {
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
 
+        // Pin the folder in place for the full duration of the stamp sequence so it
+        // cannot be nudged by physics contacts during the animation.
+        bool wasKinematic = _rb != null && _rb.isKinematic;
+        if (_rb != null) _rb.isKinematic = true;
+
         // Capture into a local so that any subsequent write to the instance field
         // (e.g. from OnEquipped on another interaction) cannot corrupt this coroutine
         // across its yield points.
@@ -791,6 +796,9 @@ public class FolderController : PickableObject
         }
 
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
+
+        // Restore the kinematic state the folder had before the stamp sequence began.
+        if (_rb != null) _rb.isKinematic = wasKinematic;
 
         // Restore interactability now that the sequence is done.
         // Skip if the folder was picked up mid-sequence — _holdingClientId already
