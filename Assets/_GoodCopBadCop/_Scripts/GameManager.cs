@@ -52,6 +52,15 @@ public class GameManager : NetworkBehaviour
     /// <summary>Clears the transition flag without running the sequence. Call on lobby creation failure.</summary>
     public void CancelLobbyTransition() => IsTransitioningToLobby = false;
 
+    /// <summary>
+    /// Plays the transition-to-gameplay stinger immediately.
+    /// Call this at the same moment the screen-fade starts so audio and visual are in sync.
+    /// </summary>
+    public void PlayTransitionStinger()
+    {
+        SFXController.Instance.Play(transitionToGameplayStinger);
+    }
+
     public void TryStartGame(bool skipTransition = false)
     {
         if (IsServer)

@@ -298,10 +298,11 @@ public class MainMenuController : MonoBehaviour
             SaveDataManager.Instance.SelectSlot(slotIndex);
             GameManager.Instance.BeginLobbyTransition();
 
-            // Start the fade before creating the lobby so that Netcode's automatic
+            // Start the fade and stinger before creating the lobby so that Netcode's automatic
             // player-prefab spawn (which fires the moment the host connects) is hidden
             // behind the dark screen — preventing a mid-transition camera jump.
             UIController.Instance.FadeIn();
+            GameManager.Instance.PlayTransitionStinger();
             await Task.Delay(TimeSpan.FromSeconds(UIController.Instance.FadeInDuration));
 
             bool success = await LobbyManager.Instance.CreateLobby();
