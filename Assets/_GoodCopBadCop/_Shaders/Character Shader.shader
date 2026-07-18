@@ -530,6 +530,14 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 				
 				albedo *= __mainColor.rgb;
 
+				// Lesion effect — blend into albedo so it receives toon shading, not raw unlit colour.
+				#if defined(TCP2_LESION)
+				{
+					half4 lesionSample = TCP2_TEX2D_SAMPLE(_LesionMaskMap, _LesionMaskMap, input.pack1.xy * _LesionMaskMap_ST.xy + _LesionMaskMap_ST.zw);
+					albedo.rgb = lerp(albedo.rgb, lesionSample.rgb, lesionSample.a * _LesionStrength);
+				}
+				#endif
+
 				// main light: direction, color, distanceAttenuation, shadowAttenuation
 			#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
 				float4 shadowCoord = input.shadowCoord;
@@ -716,16 +724,6 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 					half eyeMask = TCP2_TEX2D_SAMPLE(_EyeMaskMap, _EyeMaskMap, input.pack1.xy * _EyeMaskMap_ST.xy + _EyeMaskMap_ST.zw).r;
 					half blackWeight = eyeMask * _BlackEyesStrength;
 					color = lerp(color, half3(0, 0, 0), blackWeight);
-				}
-				#endif
-
-				// Lesion effect — alpha-masked overlay using the texture's own RGBA.
-				// Transparent areas are ignored; opaque areas (including black) replace the surface color.
-				// _LesionStrength scales the alpha so the effect can be animated in/out.
-				#if defined(TCP2_LESION)
-				{
-					half4 lesionSample = TCP2_TEX2D_SAMPLE(_LesionMaskMap, _LesionMaskMap, input.pack1.xy * _LesionMaskMap_ST.xy + _LesionMaskMap_ST.zw);
-					color.rgb = lerp(color.rgb, lesionSample.rgb, lesionSample.a * _LesionStrength);
 				}
 				#endif
 
