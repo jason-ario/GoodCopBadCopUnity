@@ -1,4 +1,5 @@
 using DG.Tweening;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -26,6 +27,15 @@ public class BreakableGlassController : MonoBehaviour
 
     [Tooltip("The pre-shattered glass pieces child. Kept inactive until fully smashed.")]
     [SerializeField] private GameObject _brokenGlass;
+
+    [Tooltip("Prefab used to re-instantiate the broken glass after a repair purchase. " +
+             "Create this prefab from the Broken Glass scene child — ensure its root is inactive so " +
+             "AddForceOnAwake fires only when the glass actually shatters.")]
+    [SerializeField] private GameObject _brokenGlassPrefab;
+
+    [Tooltip("The purchase interactable shown when the glass is smashed. " +
+             "Should start inactive in the scene; activated automatically when the glass breaks.")]
+    [SerializeField] private WorldPurchaseActionInteractable _repairInteractable;
 
     [Tooltip("Material using the GoodCopBadCop/GlassCrackOverlay shader. " +
              "Instantiated as a crack overlay at runtime on top of the normal glass mesh.")]
@@ -58,6 +68,21 @@ public class BreakableGlassController : MonoBehaviour
     [Tooltip("Oscillation count during the shake.")]
     [SerializeField] private int _shakeVibrato = 14;
 
+    [Header("Repair Feedback")]
+    [Tooltip("Sound played on all clients when the glass is successfully repaired.")]
+    [SerializeField] private AudioClip _repairClip;
+
+    [Tooltip("Volume scale for the repair sound.")]
+    [SerializeField] [Range(0f, 2f)] private float _repairVolume = 1f;
+
+    [Tooltip("Particle system played on all clients when the glass is repaired. " +
+             "Assign the in-scene RepairParticles child of this GameObject.")]
+    [SerializeField] private ParticleSystem _repairParticles;
+
+    [Header("Broken Glass Despawn")]
+    [Tooltip("Seconds after shattering before the broken glass pieces are destroyed.")]
+    [SerializeField] private float _brokenGlassDespawnDelay = 3f;
+
     // ── Private state ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -70,6 +95,12 @@ public class BreakableGlassController : MonoBehaviour
     private MaterialPropertyBlock _mpb;
     private AudioSource _audioSource;
     private Tween _shakeTween;
+    private Coroutine _despawnCoroutine;
+
+    // Cached spawn data so the broken glass can be re-instantiated at the original transform.
+    private Transform  _brokenGlassParent;
+    private Vector3    _brokenGlassLocalPos;
+    private Quaternion _brokenGlassLocalRot;
 
     private static readonly int CrackProgressId = Shader.PropertyToID("_CrackProgress");
 
@@ -104,8 +135,26 @@ public class BreakableGlassController : MonoBehaviour
         if (_normalGlass != null)
             BuildCrackOverlay();
 
+        // Cache broken glass spawn data so it can be re-instantiated after despawn.
+        if (_brokenGlass != null)
+        {
+            _brokenGlassParent   = _brokenGlass.transform.parent;
+            _brokenGlassLocalPos = _brokenGlass.transform.localPosition;
+            _brokenGlassLocalRot = _brokenGlass.transform.localRotation;
+        }
+
         // Start fully transparent / undamaged.
         RefreshCrackOverlay(0);
+    }
+
+    /// <summary>
+    /// Restores glass and repair interactable state from the save file after one frame,
+    /// giving the network manager time to fully initialise before we broadcast.
+    /// </summary>
+    private System.Collections.IEnumerator Start()
+    {
+        yield return null;
+        RestoreGlassStateFromSave();
     }
 
     private void BuildCrackOverlay()
@@ -149,6 +198,17 @@ public class BreakableGlassController : MonoBehaviour
         return _hits;
     }
 
+    /// <summary>
+    /// Debug helper — immediately applies the fully smashed state locally.
+    /// Useful for cheat console testing. Sets the server-side hit counter so
+    /// <see cref="IsSmashed"/> is also consistent.
+    /// </summary>
+    public void ForceSmash()
+    {
+        _hits = _maxHits;
+        ApplySmash();
+    }
+
     // ── Public client-side (visual) API ───────────────────────────────────────
 
     /// <summary>
@@ -163,8 +223,8 @@ public class BreakableGlassController : MonoBehaviour
 
     /// <summary>
     /// Transitions to the fully smashed state on all clients:
-    /// hides the intact glass (and its collider), activates the broken shards,
-    /// and plays the smash sound.
+    /// hides the intact glass, activates the broken shards, plays the smash sound,
+    /// shows the repair interactable, and schedules the broken pieces for destruction.
     /// Called on all clients via ClientRpc on the final blow.
     /// </summary>
     public void ApplySmash()
@@ -176,27 +236,164 @@ public class BreakableGlassController : MonoBehaviour
             _normalGlass.SetActive(false);
 
         if (_brokenGlass != null)
+        {
             _brokenGlass.SetActive(true);
+
+            // Destroy the shards after a short delay — runs on all clients since ApplySmash
+            // is already called in a ClientRpc context.
+            if (_despawnCoroutine != null) StopCoroutine(_despawnCoroutine);
+            _despawnCoroutine = StartCoroutine(DespawnBrokenGlassCoroutine());
+        }
+
+        // Show the repair option — safe to call directly since ApplySmash already runs on all clients.
+        _repairInteractable?.SetAvailable(true);
+
+        // The repair interactable's GameObject starts inactive so NGO never auto-spawns its
+        // NetworkObject.  We must spawn it explicitly from the server so that the purchase
+        // ServerRpc / ClientRpc path can route correctly.
+        if (_repairInteractable != null)
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm != null && (nm.IsServer || nm.IsHost))
+            {
+                var repairNetObj = _repairInteractable.NetworkObject;
+                if (repairNetObj != null && !repairNetObj.IsSpawned)
+                    repairNetObj.Spawn(true);   // true = destroyWithScene
+            }
+        }
+
+        // Persist the smashed state (server/host only — SaveDataManager.Save() guards writes).
+        SaveDataManager.Instance?.SetGlassSmashed(true);
     }
 
     /// <summary>
-    /// Resets the glass to full health and restores undamaged visuals.
-    /// Call at the start of each new session/day (analogous to ShutterController.ResetShutter).
+    /// Resets the glass to full health on all clients:
+    /// cancels any pending despawn, destroys leftover broken shards, re-enables the intact pane,
+    /// and pre-instantiates a fresh (inactive) broken glass ready for the next smash.
     /// </summary>
     public void ResetGlass()
     {
         _hits = 0;
 
-        if (_normalGlass != null)
-            _normalGlass.SetActive(true);
+        // Cancel any in-flight despawn so we can clean up and respawn cleanly.
+        if (_despawnCoroutine != null)
+        {
+            StopCoroutine(_despawnCoroutine);
+            _despawnCoroutine = null;
+        }
 
+        // Destroy remaining broken glass pieces if they are still present.
         if (_brokenGlass != null)
-            _brokenGlass.SetActive(false);
+        {
+            Destroy(_brokenGlass);
+            _brokenGlass = null;
+        }
+
+        // Restore the intact pane, clear crack overlay, and pop it in with a punch scale.
+        if (_normalGlass != null)
+        {
+            _normalGlass.SetActive(true);
+            _normalGlass.transform.DOKill();
+            _normalGlass.transform.DOPunchScale(Vector3.one * 0.12f, 0.35f, 6, 0.5f);
+        }
 
         RefreshCrackOverlay(0);
+
+        // Play repair feedback on all clients (ResetGlass is called inside ExecutePurchaseClientRpc).
+        if (_audioSource != null && _repairClip != null)
+            _audioSource.PlayOneShot(_repairClip, _repairVolume);
+
+        _repairParticles?.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        _repairParticles?.Play();
+
+        // Pre-instantiate a fresh, inactive broken glass so it is ready for the next smash.
+        RespawnBrokenGlass();
+
+        // Hide the repair interactable — safe to call directly since ResetGlass already runs on all clients.
+        _repairInteractable?.SetAvailable(false);
+
+        // Persist the restored state (server/host only).
+        SaveDataManager.Instance?.SetGlassSmashed(false);
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Reads the saved glass state and re-applies it at session start.
+    /// Glass visuals are restored locally on all peers; the repair interactable's
+    /// visibility is then broadcast from the server so every client stays in sync.
+    /// The broken glass pieces are intentionally left inactive on load — they were
+    /// despawned in the previous session and will reappear only on the next smash.
+    /// </summary>
+    private void RestoreGlassStateFromSave()
+    {
+        if (SaveDataManager.Instance == null || !SaveDataManager.Instance.IsGlassSmashed) return;
+
+        // Glass was smashed and not yet repaired — hide the intact pane.
+        _hits = _maxHits;
+        if (_normalGlass != null) _normalGlass.SetActive(false);
+        // Broken glass pieces were already despawned; leave _brokenGlass inactive.
+
+        if (_repairInteractable == null) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening)
+        {
+            // Offline / editor — set directly on the local instance.
+            _repairInteractable.SetAvailable(true);
+        }
+        else if (nm.IsServer || nm.IsHost)
+        {
+            // The repair interactable starts inactive so NGO never auto-spawns its NetworkObject.
+            // Activate and spawn it manually before broadcasting so SetAvailableServerRpc can route.
+            var repairNetObj = _repairInteractable.NetworkObject;
+            if (repairNetObj != null && !repairNetObj.IsSpawned)
+            {
+                _repairInteractable.gameObject.SetActive(true);
+                repairNetObj.Spawn(true);   // true = destroyWithScene
+            }
+            // Host broadcasts availability to all connected clients.
+            _repairInteractable.SetAvailableServerRpc(true);
+        }
+        // Clients will receive the availability change via the ClientRpc triggered above.
+    }
+
+    /// <summary>
+    /// Waits for <see cref="_brokenGlassDespawnDelay"/> seconds then destroys the broken glass pieces.
+    /// </summary>
+    private System.Collections.IEnumerator DespawnBrokenGlassCoroutine()
+    {
+        yield return new WaitForSeconds(_brokenGlassDespawnDelay);
+
+        if (_brokenGlass != null)
+        {
+            Destroy(_brokenGlass);
+            _brokenGlass = null;
+        }
+
+        _despawnCoroutine = null;
+    }
+
+    /// <summary>
+    /// Instantiates a fresh broken glass object as an inactive child, ready for the next smash.
+    /// Logs a warning and skips silently if <see cref="_brokenGlassPrefab"/> is not assigned.
+    /// </summary>
+    private void RespawnBrokenGlass()
+    {
+        if (_brokenGlassPrefab == null)
+        {
+            Debug.LogWarning("[BreakableGlassController] _brokenGlassPrefab is not assigned — " +
+                             "broken glass will not respawn after repair. " +
+                             "Assign the Broken Glass prefab in the Inspector.");
+            return;
+        }
+
+        _brokenGlass = Instantiate(_brokenGlassPrefab, _brokenGlassParent);
+        _brokenGlass.transform.SetLocalPositionAndRotation(_brokenGlassLocalPos, _brokenGlassLocalRot);
+
+        // Keep it inactive until the next smash triggers ApplySmash().
+        _brokenGlass.SetActive(false);
+    }
 
     /// <summary>Sets the _CrackProgress material property to reflect the given hit count.</summary>
     private void RefreshCrackOverlay(int hitCount)

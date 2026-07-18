@@ -207,7 +207,7 @@ GameObject:
   - component: {fileID: 1071357629086097708}
   - component: {fileID: 8222012675908406969}
   m_Layer: 0
-  m_Name: Matches
+  m_Name: MatchBox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -221,7 +221,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4357347456851723669}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.000000037748947, y: 0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.038587, y: 1.6467, z: -11.225381}
   m_LocalScale: {x: 0.07863868, y: 0.07863868, z: 0.07863868}
   m_ConstrainProportionsScale: 0
@@ -242,14 +242,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 289970417
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2093313446
+  InScenePlacedSourceGlobalObjectIdHash: 289970417
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 0
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 0
@@ -271,7 +271,7 @@ MonoBehaviour:
   itemsThatCanInteractWith: []
   interactText: 
   highlightNameFilter: 
-  itemData: {fileID: 0}
+  itemData: {fileID: 11400000, guid: db9d49d3e39b2244ca933c8f1f8c0aa9, type: 2}
   _flameVFX: {fileID: 0}
   _crackleAudio: {fileID: 0}
   _lightAnimDuration: 1.5
@@ -562,12 +562,12 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.6, y: 0.6, z: 1.4}
-  m_Center: {x: 0, y: 0.3, z: -0.4}
+  m_Size: {x: 1.8049778, y: 0.55951476, z: 2.1522431}
+  m_Center: {x: -0.0073006307, y: -0.33184674, z: -0.40258908}
 --- !u!1773428102 &6898800494706656384
 ParentConstraint:
   m_ObjectHideFlags: 0

@@ -23,11 +23,41 @@ public class SwitchButton : Interactable
         ShiftManager.Instance.OnShiftReady += OnShiftReady;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        if (!IsServer) return;
+
+        ShiftManager.OnNextSuspectReadyForBell += HandleNextSuspectReady;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        ShiftManager.OnNextSuspectReadyForBell -= HandleNextSuspectReady;
+    }
+
     void OnShiftReady()
     {
         // Day 1 switch readiness is driven by Day_01's tutorial sequence — skip auto-ready.
         if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
         SetReady(true);
+    }
+
+    /// <summary>
+    /// Called server-side when the next suspect is ready to be summoned.
+    /// Defers one frame so that any scripted auto-summon (e.g. Vlad on Day 1) that runs
+    /// synchronously on the same event can clear the flag before the switch lights up.
+    /// </summary>
+    private void HandleNextSuspectReady()
+    {
+        StartCoroutine(SetReadyIfStillPending());
+    }
+
+    private IEnumerator SetReadyIfStillPending()
+    {
+        yield return null;
+        if (ShiftManager.NextSuspectReadyForBell)
+            SetReady(true);
     }
 
     public void PowerOff()
@@ -117,6 +147,11 @@ public class SwitchButton : Interactable
         if (!ShiftManager.Instance.shiftStarted.Value)
         {
             ShiftManager.Instance.TryStartShift();
+        }
+        else if (ShiftManager.NextSuspectReadyForBell)
+        {
+            ShiftManager.Instance.PlayBuzzerSoundNetworked();
+            SuspectController.Instance.NextSuspect();
         }
     }
 

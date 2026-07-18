@@ -58,6 +58,21 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject pauseMenu;
     private bool pauseMenuOpened = false;
 
+    [Header("Transition Effect")]
+    [Tooltip("Tentacle blackout controller for the menu → gameplay transition. " +
+             "Falls back to the screenFade Animator when null.")]
+    [SerializeField] private TentacleBlackoutController _tentacleBlackout;
+
+    [Tooltip("Duration in seconds for the fade-to-black animation. " +
+             "Should complete before the 2-second wait used by transition coroutines.")]
+    [SerializeField] private float _fadeInDuration = 3.0f;
+
+    [Tooltip("Duration in seconds for the reveal-from-black animation.")]
+    [SerializeField] private float _fadeOutDuration = 0.8f;
+
+    /// <summary>How long the fade-to-black animation takes in seconds.</summary>
+    public float FadeInDuration => _fadeInDuration;
+
     private Action _onGuardPurchaseConfirmed;
     
     bool showedCursorBeforePaused = false;
@@ -188,31 +203,70 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(true);
     }
     
-    public void FadeIn()
-    { 
+    public void FadeIn(Action onComplete = null)
+    {
         CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
-
-        foreach (var canvasGroup in canvasGroups)
+        foreach (CanvasGroup canvasGroup in canvasGroups)
         {
             canvasGroup.interactable = false;
             canvasGroup.blocksRaycasts = false;
-
         }
-        
-        screenFade.SetBool("Black", true);
+
+        if (_tentacleBlackout != null)
+            _tentacleBlackout.FadeToBlack(_fadeInDuration, onComplete);
+        else
+        {
+            screenFade.SetBool("Black", true);
+            // Animator-based fade has no callback — caller should use WaitForSeconds.
+        }
     }
-    
+
+    /// <summary>
+    /// Starts the fade-to-black and yields until the screen is fully dark.
+    /// Safe to call even if a fade is already in progress or complete:
+    /// — already black (progress ≥ 0.99): returns immediately.
+    /// — already animating: waits for the in-progress animation to finish without restarting it.
+    /// — idle at 0: starts the animation and waits for it.
+    /// </summary>
+    public IEnumerator FadeInAndWait()
+    {
+        if (_tentacleBlackout != null)
+        {
+            // Already fully dark — nothing to do
+            if (_tentacleBlackout.CurrentProgress >= 0.99f)
+                yield break;
+
+            // A fade-to-black started by an earlier call is still running — wait for it
+            // instead of restarting it from the beginning (which would cause a visible flash)
+            if (_tentacleBlackout.IsPlaying)
+            {
+                yield return new WaitUntil(() => !_tentacleBlackout.IsPlaying);
+                yield break;
+            }
+        }
+
+        bool done = false;
+        FadeIn(onComplete: () => done = true);
+
+        if (_tentacleBlackout != null)
+            yield return new WaitUntil(() => done);
+        else
+            yield return new WaitForSeconds(2f); // legacy animator fallback
+    }
+
     public void FadeOut()
     {
-        screenFade.SetBool("Black", false);
-        
         CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
-
-        foreach (var canvasGroup in canvasGroups)
+        foreach (CanvasGroup canvasGroup in canvasGroups)
         {
             canvasGroup.interactable = true;
             canvasGroup.blocksRaycasts = true;
         }
+
+        if (_tentacleBlackout != null)
+            _tentacleBlackout.FadeFromBlack(_fadeOutDuration);
+        else
+            screenFade.SetBool("Black", false);
     }
     
 
@@ -309,14 +363,17 @@ public class UIController : MonoBehaviour
 
     /// <summary>
     /// Opens the Shop Item Purchase Popup over the diegetic locker view.
-    /// Shows "Buy [itemName]", the coupon price, a live 3-D preview, and a Buy button.
+    /// Shows "Buy [itemName]" (or <paramref name="titleOverride"/> when provided), the coupon price, and a Buy button.
     /// </summary>
     /// <param name="item">The shop item to display and purchase.</param>
     /// <param name="onBuy">Callback invoked when the player confirms the purchase.</param>
     /// <param name="onCancel">Callback invoked when the player presses the No button.</param>
-    public void OpenShopItemPurchasePopup(ShopItem item, Action onBuy, Action onCancel)
+    /// <param name="titleOverride">
+    /// When non-null and non-empty, replaces the default "Buy {item.Name}" title.
+    /// </param>
+    public void OpenShopItemPurchasePopup(ShopItem item, Action onBuy, Action onCancel, string titleOverride = null)
     {
-        shopItemPurchasePopupUI.Setup(item, onBuy, onCancel);
+        shopItemPurchasePopupUI.Setup(item, onBuy, onCancel, titleOverride);
         shopItemPurchasePopup.SetActive(true);
     }
 

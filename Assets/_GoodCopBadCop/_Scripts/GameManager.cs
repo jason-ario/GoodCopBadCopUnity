@@ -77,30 +77,56 @@ public class GameManager : NetworkBehaviour
         StartCoroutine(LobbyTransitionSequence());
     }
 
+    /// <summary>
+    /// Set to true by <see cref="LobbySpawnCompleteClientRpc"/> once the server has finished
+    /// spawning all players. Clients wait on this before starting the fade-out so the camera
+    /// never switches mid-reveal.
+    /// </summary>
+    private bool _lobbyRevealReady;
+
     private IEnumerator LobbyTransitionSequence()
     {
-        UIController.Instance.FadeIn();
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);
 
-        yield return new WaitForSeconds(2f);
+        // Wait until the screen is fully dark before spawning or moving anything.
+        yield return StartCoroutine(UIController.Instance.FadeInAndWait());
 
         if (IsServer)
         {
             SpawnAllPlayersAtLobby();
             IsTransitioningToLobby = false;
+            // Signal all clients (including self) that all players are spawned
+            // and it is safe to start the reveal.
+            LobbySpawnCompleteClientRpc();
         }
+
+        // All clients — including the server-as-host — wait for the server's spawn-complete
+        // signal before calling FadeOut. This prevents the camera from switching mid-fade
+        // on non-server clients whose spawn RPC arrives after their fade completes.
+        yield return new WaitUntil(() => _lobbyRevealReady);
+        _lobbyRevealReady = false;
 
         MainMenuController.Instance.TransitionToGameplay();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
 
         // Wait for the fade-out animation to finish before revealing the HUD.
-        const float FadeOutDuration = 0.65f;
+        const float FadeOutDuration = 0.8f;
         yield return new WaitForSeconds(FadeOutDuration);
 
         UIController.Instance.ShowPlayerUI();
         OnGameStart?.Invoke();
+    }
+
+    /// <summary>
+    /// Sent by the server after all players have been spawned in the lobby.
+    /// Sets the reveal-ready flag so every client's transition coroutine can proceed.
+    /// </summary>
+    [ClientRpc]
+    private void LobbySpawnCompleteClientRpc()
+    {
+        _lobbyRevealReady = true;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -163,10 +189,23 @@ public class GameManager : NetworkBehaviour
     private IEnumerator LobbyJoinClientSequence(bool gameAlreadyStarted)
     {
         Debug.Log("[GameManager] LobbyJoinClientSequence: fading in");
-        UIController.Instance.FadeIn();
         AudioManager.Instance.FadeOutAmbientAudio();
 
-        yield return new WaitForSeconds(2f);
+        // Wait until the screen is fully dark before transitioning.
+        yield return StartCoroutine(UIController.Instance.FadeInAndWait());
+
+        Debug.Log("[GameManager] LobbyJoinClientSequence: waiting for local player spawn");
+
+        // The server spawns this client's player object around the same time it sends
+        // this RPC, but the NetworkObject spawn message may arrive a frame or two later.
+        // Wait until PlayerInstance is live before revealing to avoid a mid-fade camera cut.
+        const float SpawnTimeout = 5f;
+        float spawnWaited = 0f;
+        while (PlayerInstance.Instance == null && spawnWaited < SpawnTimeout)
+        {
+            yield return null;
+            spawnWaited += Time.unscaledDeltaTime;
+        }
 
         Debug.Log("[GameManager] LobbyJoinClientSequence: transitioning to gameplay");
         MainMenuController.Instance.TransitionToGameplay();

@@ -30,12 +30,16 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
     /// <param name="item">The shop item to display and purchase.</param>
     /// <param name="onBuy">Callback invoked when the player confirms the purchase.</param>
     /// <param name="onCancel">Callback invoked when the player presses the No button.</param>
-    public void Setup(ShopItem item, Action onBuy, Action onCancel)
+    /// <param name="titleOverride">
+    /// When non-null and non-empty, replaces the default "Buy {item.Name}" title.
+    /// Pass the item name directly to skip the "Buy " prefix for action-style interactables.
+    /// </param>
+    public void Setup(ShopItem item, Action onBuy, Action onCancel, string titleOverride = null)
     {
         _onBuy = onBuy;
         _onCancel = onCancel;
         _price = item.Price;
-        _titleLabel.text = $"Buy {item.Name}";
+        _titleLabel.text = string.IsNullOrEmpty(titleOverride) ? $"Buy {item.Name}" : titleOverride;
         _priceLabel.text = $"<sprite=0>  {item.Price}";
         // Preview is handled by the in-world Cinemachine zoom camera.
     }

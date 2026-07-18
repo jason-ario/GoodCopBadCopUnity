@@ -341,6 +341,21 @@ public class ShiftManager : NetworkBehaviour
         buzzerSound.Play();
     }
 
+    /// <summary>
+    /// Plays the buzzer sound on every client. Must be called on the server.
+    /// </summary>
+    public void PlayBuzzerSoundNetworked()
+    {
+        if (!IsServer) return;
+        PlayBuzzerSoundClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayBuzzerSoundClientRpc()
+    {
+        buzzerSound.Play();
+    }
+
     private IEnumerator OpenWindowSequence()
     {
         ResetSuspectsProcessed();
@@ -947,7 +962,6 @@ public class ShiftManager : NetworkBehaviour
 
     private void RunInitiateIntroCutscene()
     {
-        UIController.Instance.FadeIn();
         UIController.Instance.ClosePlayerUI();
         PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.SetCanMove(false);
@@ -962,8 +976,12 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator PlayIntroCutscene()
     {
+        // Start the audio fade immediately so it runs concurrently with the screen fade.
         ambientAudio.DOFade(0, 2);
-        yield return new WaitForSeconds(2f);
+
+        // Wait until the screen is fully dark before teleporting the player.
+        yield return StartCoroutine(UIController.Instance.FadeInAndWait());
+
         ResetEverything(true);
         yield return new WaitForSeconds(1);
         ResetEverything(true); // Called twice — player position was not resetting reliably in a single call

@@ -4,29 +4,15 @@ using UnityEngine;
 
 /// <summary>
 /// A networked table bell the player can ring by interacting with it.
-///
-/// Two modes of operation:
-///
-/// 1. SUMMON MODE — when <see cref="ShiftManager.NextSuspectReadyForBell"/> is set, the bell
-///    rings periodically (<see cref="_bellReadyRingInterval"/>) to alert the player that a
-///    suspect is waiting in line. Interacting with it calls
-///    <see cref="SuspectController.NextSuspect"/>, spawning the next suspect.
-///
-/// 2. WAITING MODE — when a suspect has already arrived at the booth window and no player is
-///    present, the bell rings periodically (<see cref="_suspectRingInterval"/>) to prompt the
-///    player to approach. Ringing stops once a player enters the booth.
+/// Also supports autonomous suspect-driven ringing: when a suspect arrives at the booth
+/// and no player is inside, the bell rings every <see cref="_suspectRingInterval"/> seconds
+/// until a player enters the booth (after which it stops permanently for that suspect).
 /// </summary>
 public class TableBell : Interactable
 {
     [SerializeField] private AudioSource _ringSource;
-
-    [Tooltip("How often (seconds) the bell auto-rings while waiting for the player to call the next suspect.")]
-    [SerializeField] private float _bellReadyRingInterval = 15f;
-
-    [Tooltip("How often (seconds) the bell auto-rings while a suspect is waiting at the booth window with no player present.")]
     [SerializeField] private float _suspectRingInterval = 10f;
 
-    private Coroutine _bellReadyCoroutine;
     private Coroutine _suspectRingCoroutine;
 
     /// <summary>
@@ -47,16 +33,14 @@ public class TableBell : Interactable
 
         if (!IsServer) return;
 
-        ShiftManager.OnNextSuspectReadyForBell  += HandleNextSuspectReady;
         SuspectController.OnSuspectWaitingAtBooth += HandleSuspectWaiting;
-        SuspectController.OnBoothBecameReady      += HandleBoothBecameReady;
+        SuspectController.OnBoothBecameReady += HandleBoothBecameReady;
     }
 
     public override void OnNetworkDespawn()
     {
-        ShiftManager.OnNextSuspectReadyForBell    -= HandleNextSuspectReady;
         SuspectController.OnSuspectWaitingAtBooth -= HandleSuspectWaiting;
-        SuspectController.OnBoothBecameReady      -= HandleBoothBecameReady;
+        SuspectController.OnBoothBecameReady -= HandleBoothBecameReady;
     }
 
     // -------------------------------------------------------------------------
@@ -68,68 +52,19 @@ public class TableBell : Interactable
         base.Interact(player);
 
         if (IsServer)
-            HandleInteractServer();
+            PlayBellClientRpc();
         else
-            RequestInteractServerRpc();
+            RequestRingServerRpc();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestInteractServerRpc()
+    private void RequestRingServerRpc()
     {
-        HandleInteractServer();
-    }
-
-    /// <summary>
-    /// Server-side interaction logic. If a suspect is ready to be called, summons them;
-    /// otherwise just rings the bell for feedback.
-    /// </summary>
-    private void HandleInteractServer()
-    {
-        if (ShiftManager.NextSuspectReadyForBell)
-        {
-            StopBellReadyCoroutine();
-            SuspectController.Instance.NextSuspect();
-        }
-
         PlayBellClientRpc();
     }
 
     // -------------------------------------------------------------------------
-    // Summon-mode ringing (server-side) — bell rings to indicate next suspect is ready
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Called on the server when the shift signals the next suspect can be summoned.
-    /// Begins a periodic ringing coroutine so the player knows to ring the bell.
-    /// </summary>
-    private void HandleNextSuspectReady()
-    {
-        StopBellReadyCoroutine();
-        _bellReadyCoroutine = StartCoroutine(BellReadyCoroutine());
-    }
-
-    private IEnumerator BellReadyCoroutine()
-    {
-        while (ShiftManager.NextSuspectReadyForBell)
-        {
-            yield return new WaitForSeconds(_bellReadyRingInterval);
-
-            if (ShiftManager.NextSuspectReadyForBell)
-                PlayBellClientRpc();
-        }
-
-        _bellReadyCoroutine = null;
-    }
-
-    private void StopBellReadyCoroutine()
-    {
-        if (_bellReadyCoroutine == null) return;
-        StopCoroutine(_bellReadyCoroutine);
-        _bellReadyCoroutine = null;
-    }
-
-    // -------------------------------------------------------------------------
-    // Suspect-at-window ringing (server-side) — suspect arrived but booth not ready
+    // Suspect-driven ringing (server-side)
     // -------------------------------------------------------------------------
 
     /// <summary>

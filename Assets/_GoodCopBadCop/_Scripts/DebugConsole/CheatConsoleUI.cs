@@ -132,6 +132,12 @@ public class CheatConsoleUI : MonoBehaviour
             });
             SetVisible(false);
         }));
+
+        _cheats.Add(("Smash Booth Glass", () =>
+        {
+            DebugConsole.Instance.SmashGlass();
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

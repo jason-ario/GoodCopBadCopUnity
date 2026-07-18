@@ -936,4 +936,20 @@ public class DebugConsole : MonoBehaviour
         Debug.Log($"[DebugConsole] Teleported local player to power station at {_powerStationSpawnPoint.position} (P).");
     }
 
+    /// <summary>
+    /// Forces the booth window glass into the fully smashed state on the local client.
+    /// Useful for testing the glass repair purchase flow without waiting for a mutant visit.
+    /// </summary>
+    public void SmashGlass()
+    {
+        if (BreakableGlassController.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SmashGlass: BreakableGlassController.Instance not found — is the Main scene loaded?");
+            return;
+        }
+
+        BreakableGlassController.Instance.ForceSmash();
+        Debug.Log("[DebugConsole] Glass force-smashed.");
+    }
+
 }

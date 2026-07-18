@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using DG.Tweening;
 using GoodCopBadCop.UI.SettingsMenu;
 using Unity.VisualScripting;
@@ -296,6 +297,13 @@ public class MainMenuController : MonoBehaviour
         {
             SaveDataManager.Instance.SelectSlot(slotIndex);
             GameManager.Instance.BeginLobbyTransition();
+
+            // Start the fade before creating the lobby so that Netcode's automatic
+            // player-prefab spawn (which fires the moment the host connects) is hidden
+            // behind the dark screen — preventing a mid-transition camera jump.
+            UIController.Instance.FadeIn();
+            await Task.Delay(TimeSpan.FromSeconds(UIController.Instance.FadeInDuration));
+
             bool success = await LobbyManager.Instance.CreateLobby();
 
             if (success)
@@ -308,12 +316,14 @@ public class MainMenuController : MonoBehaviour
             else
             {
                 Debug.LogError("[ContinueGame] CreateLobby failed — cancelling transition.");
+                UIController.Instance.FadeOut();
                 GameManager.Instance.CancelLobbyTransition();
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"[ContinueGame] Unhandled exception: {e}");
+            UIController.Instance.FadeOut();
             GameManager.Instance.CancelLobbyTransition();
         }
     }

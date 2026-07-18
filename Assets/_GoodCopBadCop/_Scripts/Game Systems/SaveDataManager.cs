@@ -246,6 +246,25 @@ public class SaveDataManager : MonoBehaviour
         return ActiveSlot?.Population ?? new PopulationSaveData();
     }
 
+    // -------------------------------------------------------------------------
+    // Glass State
+    // -------------------------------------------------------------------------
+
+    /// <summary>True when the booth glass is saved as fully smashed in the active slot.</summary>
+    public bool IsGlassSmashed => ActiveSlot?.IsGlassSmashed ?? false;
+
+    /// <summary>
+    /// Records the booth glass smashed/restored state in the active slot and persists to disk.
+    /// Only the host writes to disk; clients update in-memory state only.
+    /// </summary>
+    public void SetGlassSmashed(bool smashed)
+    {
+        if (ActiveSlot == null) return;
+        ActiveSlot.IsGlassSmashed = smashed;
+        Save();
+        Debug.Log($"[SaveDataManager] Glass smashed state saved: {smashed}.");
+    }
+
     // ---------------------------------------------------------------------------
     // Unity Lifecycle
     // ---------------------------------------------------------------------------
@@ -560,6 +579,12 @@ public class SaveSlot
 
     /// <summary>Aggregate town population state for the active campaign run.</summary>
     public PopulationSaveData Population = new PopulationSaveData();
+
+    /// <summary>
+    /// True when the booth window glass has been fully smashed and not yet repaired.
+    /// Persisted so the broken state survives across play sessions.
+    /// </summary>
+    public bool IsGlassSmashed;
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;
