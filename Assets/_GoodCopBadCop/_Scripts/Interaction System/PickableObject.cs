@@ -392,7 +392,7 @@ public class PickableObject : Interactable
     /// pickup time, which may differ if the character moved while carrying the object).
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void DropServerRpc(Vector3 position, Quaternion rotation)
+    public void DropServerRpc(Vector3 position, Quaternion rotation, bool stayKinematic = false)
     {
         RemoveParent();
 
@@ -405,16 +405,18 @@ public class PickableObject : Interactable
         NetworkObject.RemoveOwnership();
 
         // Tell every client the exact drop position so they set it before re-enabling NT.
-        DropBroadcastClientRpc(position, rotation);
+        DropBroadcastClientRpc(position, rotation, stayKinematic);
     }
 
     /// <summary>
     /// Received on all clients after a free drop. Sets the drop position before re-enabling NT
     /// so NT never has a chance to interpolate from its stale pre-pickup buffer position.
     /// Also restores physics and parent sync that were suppressed during the hold.
+    /// When <paramref name="stayKinematic"/> is true (e.g. placed on a hanging board),
+    /// the Rigidbody is kept kinematic so the object does not fall off the surface.
     /// </summary>
     [ClientRpc]
-    private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation)
+    private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation, bool stayKinematic)
     {
         RemoveParent();
         ClearSocketFollow();
@@ -423,7 +425,7 @@ public class PickableObject : Interactable
 
         NetworkObject.AutoObjectParentSync = true;
 
-        if (_rb != null) _rb.isKinematic = false;
+        if (_rb != null) _rb.isKinematic = stayKinematic;
 
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;

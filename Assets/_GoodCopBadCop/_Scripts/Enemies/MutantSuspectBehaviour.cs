@@ -79,6 +79,19 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private const string ClimbingAnimBool = "climbing";
     private const string BangOnShuttersAnimBool = "BangOnShutters";
 
+    /// <summary>
+    /// Returns true when there is a physical barrier for the mutant to bang against.
+    /// Returns false — suppressing the BangOnShutters trigger — when the shutter is open
+    /// AND the glass pane is already smashed, meaning nothing is left to hit.
+    /// </summary>
+    private bool HasBarrierToBangOn()
+    {
+        bool shutterOpen = _shutterController != null && _shutterController.IsOpen;
+        bool glassGone   = BreakableGlassController.Instance == null
+                           || BreakableGlassController.Instance.IsSmashed;
+        return !shutterOpen || !glassGone;
+    }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -163,7 +176,15 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (_isDone) yield break;
 
         if (canClimb && _shutterController != null && _shutterController.IsOpen)
-            yield return StartCoroutine(ClimbThroughSequence());
+        {
+            // Glass is exposed (shutter up). If it's already smashed, climb straight through;
+            // otherwise attack it until it breaks or we give up.
+            var glass = BreakableGlassController.Instance;
+            if (glass == null || glass.IsSmashed)
+                yield return StartCoroutine(ClimbThroughSequence());
+            else
+                yield return StartCoroutine(GlassAttackSequence());
+        }
         else
             yield return StartCoroutine(ShutterBangSequence());
     }
@@ -257,9 +278,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             float endTime = Time.time + _data.losesInterestAfterSeconds;
             while (!_isDone && Time.time < endTime)
             {
-                SetAttackClientRpc();
+                if (HasBarrierToBangOn()) SetAttackClientRpc(true);
                 HitShutterClientRpc();
                 yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+                SetAttackClientRpc(false);
                 yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
             }
 
@@ -291,15 +313,87 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 yield break;
             }
 
-            SetAttackClientRpc();
+            if (HasBarrierToBangOn()) SetAttackClientRpc(true);
             HitShutterClientRpc();
             yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+            SetAttackClientRpc(false);
             yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
         }
 
         if (_isDone) yield break;
 
         // Give up: brief pause, then either despawn or retreat.
+        yield return new WaitForSeconds(GiveUpPauseDuration);
+
+        if (_isDone) yield break;
+
+        if (DespawnInsteadOfRetreat)
+        {
+            _isDone = true;
+            _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+            OnSequenceComplete?.Invoke(false);
+            if (NetworkObject.IsSpawned) NetworkObject.Despawn();
+            yield break;
+        }
+
+        yield return StartCoroutine(RetreatingSequence(notifyController: true));
+    }
+
+    /// <summary>
+    /// Attacks the exposed glass when the shutter is open.
+    /// Each bang deals one hit to <see cref="BreakableGlassController"/>. If the glass shatters,
+    /// the mutant immediately transitions to <see cref="ClimbThroughSequence"/>. If the glass
+    /// survives all bangs or the shutter closes during the attack, the mutant retreats.
+    /// Damage accumulates across visits — the glass health persists until
+    /// <see cref="BreakableGlassController.ResetGlass"/> is called.
+    /// </summary>
+    private IEnumerator GlassAttackSequence()
+    {
+        if (!IsServer || _isDone) yield break;
+
+        var glass = BreakableGlassController.Instance;
+
+        for (int i = 0; i < _data.shutterBangCount; i++)
+        {
+            if (_isDone) yield break;
+
+            // Player closed the shutter mid-attack — glass is now protected.
+            if (_shutterController != null && !_shutterController.IsOpen)
+                break;
+
+            SetAttackClientRpc(true);
+
+            // Wait for the animation to reach the impact point, then register the hit.
+            yield return new WaitForSeconds(0.5f);
+
+            if (glass != null)
+            {
+                int newHits = glass.RegisterHit();
+
+                if (glass.IsSmashed)
+                {
+                    // Final blow — transition to broken glass on all clients, then climb through.
+                    SmashGlassClientRpc();
+                    yield return new WaitForSeconds(Mathf.Max(0f, _data.attackAnimDurationSeconds - 0.5f));
+                    SetAttackClientRpc(false);
+                    yield return StartCoroutine(ClimbThroughSequence());
+                    yield break;
+                }
+                else
+                {
+                    // Intermediate hit — update crack visual on all clients.
+                    UpdateGlassClientRpc(newHits);
+                }
+            }
+
+            yield return new WaitForSeconds(Mathf.Max(0f, _data.attackAnimDurationSeconds - 0.5f));
+            SetAttackClientRpc(false);
+            yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
+        }
+
+        if (_isDone) yield break;
+
+        // Exhausted attack budget without breaking the glass — give up and retreat.
         yield return new WaitForSeconds(GiveUpPauseDuration);
 
         if (_isDone) yield break;
@@ -434,7 +528,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (_isDone) yield break;
 
         if (canClimb && _shutterController != null && _shutterController.IsOpen)
-            yield return StartCoroutine(ClimbThroughSequence());
+        {
+            var glass = BreakableGlassController.Instance;
+            if (glass == null || glass.IsSmashed)
+                yield return StartCoroutine(ClimbThroughSequence());
+            else
+                yield return StartCoroutine(GlassAttackSequence());
+        }
         else
             yield return StartCoroutine(ShutterBangSequence());
     }
@@ -470,12 +570,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _animator.SetBool(ClimbingAnimBool, climbing);
     }
 
-    /// <summary>Fires the BangOnShutters animator trigger on all clients. Used to drive the shutter-attack animation.</summary>
+    /// <summary>Sets the BangOnShutters animator bool on all clients. Used to drive the shutter-attack animation.</summary>
     [ClientRpc]
-    private void SetAttackClientRpc()
+    private void SetAttackClientRpc(bool attacking)
     {
         if (_animator != null)
-            _animator.SetTrigger(BangOnShuttersAnimBool);
+            _animator.SetBool(BangOnShuttersAnimBool, attacking);
     }
 
     /// <summary>Fires an animator trigger on all clients.</summary>
@@ -507,6 +607,26 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private void HitShutterClientRpc()
     {
         ShutterController.Instance?.OnHitByMutant();
+    }
+
+    /// <summary>
+    /// Updates the glass crack overlay to the given intermediate hit count on all clients.
+    /// Called after every non-smashing hit in <see cref="GlassAttackSequence"/>.
+    /// </summary>
+    [ClientRpc]
+    private void UpdateGlassClientRpc(int hitCount)
+    {
+        BreakableGlassController.Instance?.OnHitByMutant(hitCount);
+    }
+
+    /// <summary>
+    /// Transitions the glass to the fully smashed state on all clients (hides normal glass,
+    /// activates broken shards). Called on the final blow in <see cref="GlassAttackSequence"/>.
+    /// </summary>
+    [ClientRpc]
+    private void SmashGlassClientRpc()
+    {
+        BreakableGlassController.Instance?.ApplySmash();
     }
 
     /// <summary>Plays the climb-through sound at full volume on all clients.</summary>

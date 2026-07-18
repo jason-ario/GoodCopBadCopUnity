@@ -822,7 +822,10 @@ public class PlayerPickupController : NetworkBehaviour
                 // transform and re-enables NetworkTransform there — do NOT re-enable NT here
                 // on the client, because NT would immediately interpolate back toward the
                 // last server-known position (the held slot) before the RPC lands.
-                _heldObject.DropServerRpc(dropPos, dropRot);
+                // Keep the Rigidbody kinematic when placing on a hanging board so the object
+                // sticks to the wall instead of falling under gravity.
+                bool isHangingPlacement = ObjectPlacer.Instance.PlacementBoard?.IsHanging == true;
+                _heldObject.DropServerRpc(dropPos, dropRot, stayKinematic: isHangingPlacement);
             }
 
             _heldObject.ReleaseHolderServerRpc();
