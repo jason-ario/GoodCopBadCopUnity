@@ -23,6 +23,7 @@ public class StartCampaignScreen : MonoBehaviour
     [Header("Lobby Info")]
     [SerializeField] private TextMeshProUGUI inviteCodeText;
     [SerializeField] private GameObject inviteCodeSection;
+    [SerializeField] private Button copyInviteCodeButton;
 
     [Header("Host Controls")]
     [SerializeField] private Button startButton;
@@ -51,6 +52,9 @@ public class StartCampaignScreen : MonoBehaviour
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
         LobbyManager.Instance.OnKicked += OnKicked;
 
+        if (copyInviteCodeButton != null)
+            copyInviteCodeButton.onClick.AddListener(CopyInviteCode);
+
         RefreshUI();
     }
 
@@ -63,6 +67,9 @@ public class StartCampaignScreen : MonoBehaviour
             LobbyManager.Instance.OnLobbyUpdated -= RefreshUI;
             LobbyManager.Instance.OnKicked -= OnKicked;
         }
+
+        if (copyInviteCodeButton != null)
+            copyInviteCodeButton.onClick.RemoveListener(CopyInviteCode);
     }
 
     // ---------------------------------------------------------------------------
@@ -143,19 +150,20 @@ public class StartCampaignScreen : MonoBehaviour
 
         if (hasLobby)
         {
+            ulong hostSteamId = LobbyManager.Instance.CurrentLobby.Owner.Id.Value;
             foreach (var member in members)
             {
                 ulong steamId = member.Id.Value;
                 // Solo: always show green READY. Multi: use actual ready state.
                 bool ready = !hasSecondPlayer || (_readyStates.TryGetValue(steamId, out bool r) && r);
-                SpawnPanel(member.Name, ready);
+                SpawnPanel(member.Name, ready, isHost: steamId == hostSteamId);
             }
         }
         else
         {
             // Lobby not yet available — show the local player as a placeholder.
             string localName = SteamClient.IsValid ? SteamClient.Name : "Player";
-            SpawnPanel(localName, isReady: true);
+            SpawnPanel(localName, isReady: true, isHost: true);
         }
 
         EvaluateStartButton(members);
@@ -165,13 +173,13 @@ public class StartCampaignScreen : MonoBehaviour
     }
 
     /// <summary>Instantiates one panel and adds it to the tracked list.</summary>
-    private void SpawnPanel(string playerName, bool isReady)
+    private void SpawnPanel(string playerName, bool isReady, bool isHost = false)
     {
         if (panelPrefab == null || panelsContainer == null) return;
 
         PlayerInfoPanel panel = Instantiate(panelPrefab, panelsContainer);
         panel.gameObject.SetActive(true);
-        panel.PopulateInfo(playerName, isReady);
+        panel.PopulateInfo(playerName, isReady, isHost);
         _spawnedPanels.Add(panel);
     }
 
@@ -238,6 +246,14 @@ public class StartCampaignScreen : MonoBehaviour
     public void InviteFriend()
     {
         LobbyManager.Instance.OpenInviteFriendsPopup();
+    }
+
+    /// <summary>Copies the current join code to the system clipboard.</summary>
+    public void CopyInviteCode()
+    {
+        string code = LobbyManager.Instance.CurrentJoinCode;
+        if (!string.IsNullOrEmpty(code))
+            GUIUtility.systemCopyBuffer = code;
     }
 
     // ---------------------------------------------------------------------------

@@ -44,6 +44,9 @@ public class MainMenuController : MonoBehaviour
 
     [SerializeField] public CanvasGroup canvasGroup;
 
+    [Header("Quit")]
+    [SerializeField] private ConfirmationDialogController quitConfirmationDialog;
+
     [Header("Debug")]
     [SerializeField] private bool _debugSkipToGame;
     [SerializeField] private int _debugSlotIndex = 0;
@@ -337,6 +340,25 @@ public class MainMenuController : MonoBehaviour
     {
         StopAllCoroutines();
         GameManager.Instance.TryStartGame();
+    }
+
+    /// <summary>Opens the quit confirmation dialog. Quitting the application on confirm.</summary>
+    public void ShowQuitConfirmation()
+    {
+        if (quitConfirmationDialog == null)
+        {
+            Debug.LogWarning("[ShowQuitConfirmation] No quit confirmation dialog assigned.");
+            return;
+        }
+
+        quitConfirmationDialog.Show(
+            title: "Quit Game",
+            body: "Are you sure you want to quit?",
+            confirmText: "Yes",
+            cancelText: "No",
+            confirmCallback: () => Application.Quit(),
+            cancelCallback: null
+        );
     }
 
     public void HideAllMenus()

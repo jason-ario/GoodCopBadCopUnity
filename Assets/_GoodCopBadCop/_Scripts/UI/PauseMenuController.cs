@@ -13,6 +13,8 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private TextButton[] _textButtons;
     [SerializeField] private RectTransform rootRectTransform;
     [SerializeField] private TextMeshProUGUI lobbyCodeText;
+    [SerializeField] private GameObject menuBackground;
+    [SerializeField] private GameObject menuHeader;
 
     private const string LobbyCodePrefix = "LOBBY CODE: ";
     private const string ReturnToMainMenuTitle = "Return to main menu?";
@@ -70,6 +72,12 @@ public class PauseMenuController : MonoBehaviour
         }
     }
 
+    private void SetPauseMenuShellVisible(bool visible)
+    {
+        if (menuBackground != null) menuBackground.SetActive(visible);
+        if (menuHeader != null) menuHeader.SetActive(visible);
+    }
+
     public void ShowAreYouSureMainMenu()
     {
         ShowMainMenu();
@@ -79,6 +87,7 @@ public class PauseMenuController : MonoBehaviour
     public void ShowMainMenu()
     {
         mainMenu.SetActive(false);
+        SetPauseMenuShellVisible(false);
         settingsMenuView.SetVisible(false);
         isSettingsOpen = false;
 
@@ -94,6 +103,7 @@ public class PauseMenuController : MonoBehaviour
     public void ShowSettingsMenu()
     {
         mainMenu.SetActive(false);
+        SetPauseMenuShellVisible(false);
         confirmationDialog.Hide();
         isSettingsOpen = true;
         settingsMenuView.SetVisible(true);
@@ -102,6 +112,7 @@ public class PauseMenuController : MonoBehaviour
     public void ShowAreYouSureQuitMenu()
     {
         mainMenu.SetActive(false);
+        SetPauseMenuShellVisible(false);
         settingsMenuView.SetVisible(false);
         isSettingsOpen = false;
 
@@ -118,6 +129,7 @@ public class PauseMenuController : MonoBehaviour
     {
         HideTransientPanels();
         mainMenu.SetActive(true);
+        SetPauseMenuShellVisible(true);
     }
 
     private void CloseSettingsMenu()

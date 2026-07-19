@@ -8,6 +8,7 @@ public class JoinLobbyScreen : MonoBehaviour
 {
     [SerializeField] private TMP_InputField inviteCodeInput;
     [SerializeField] private TMP_Text statusLabel;
+    [SerializeField] private GameObject connectingAnimation;
 
     private const string ErrorEmptyCode     = "NO CODE ENTERED";
     private const string ErrorInvalidCode   = "INVALID JOIN CODE";
@@ -24,12 +25,14 @@ public class JoinLobbyScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnJoinFailed += OnJoinFailed;
+        SetConnectingAnimationVisible(false);
         RefreshUI();
     }
 
     private void OnDisable()
     {
         LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
+        SetConnectingAnimationVisible(false);
     }
 
     /// <summary>
@@ -72,6 +75,7 @@ public class JoinLobbyScreen : MonoBehaviour
         }
 
         Debug.Log($"[JoinLobbyScreen] Joining Steam lobby by code: {code}");
+        SetConnectingAnimationVisible(true);
         LobbyManager.Instance.JoinLobbyByCode(code);
     }
 
@@ -90,13 +94,21 @@ public class JoinLobbyScreen : MonoBehaviour
         }
 
         Debug.Log($"[JoinLobbyScreen] Joining LAN host at {address}");
+        SetConnectingAnimationVisible(true);
         LobbyManager.Instance.JoinLobbyLAN(address);
     }
 
     private void OnJoinFailed(string reason)
     {
         Debug.LogWarning($"Join failed: {reason}");
+        SetConnectingAnimationVisible(false);
         SetStatus(ErrorLobbyNotFound);
+    }
+
+    private void SetConnectingAnimationVisible(bool visible)
+    {
+        if (connectingAnimation != null)
+            connectingAnimation.SetActive(visible);
     }
 
     private void SetStatus(string message) => statusLabel.text = message;
@@ -114,8 +126,6 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
 
         bool isUnityTransport = NetworkManager.Singleton.NetworkConfig.NetworkTransport is UnityTransport;
-
-        inviteCodeInput.gameObject.SetActive(!isUnityTransport);
 
         if (isUnityTransport)
         {

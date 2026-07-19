@@ -10,7 +10,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
     public sealed class SettingsMenuModel : ISettingsMenuModel, IDisposable
     {
-        public readonly ReactiveProperty<ESettingsMenuTab> SelectedTabMutable = new(ESettingsMenuTab.Graphics);
+        public readonly ReactiveProperty<ESettingsMenuTab> SelectedTabMutable = new(ESettingsMenuTab.Gameplay);
 
         public ReadOnlyReactiveProperty<ESettingsMenuTab> SelectedTab => SelectedTabMutable;
 

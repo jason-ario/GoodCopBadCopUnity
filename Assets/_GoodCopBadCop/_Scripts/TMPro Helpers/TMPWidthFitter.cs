@@ -4,7 +4,9 @@ using UnityEngine;
 /// <summary>
 /// Automatically resizes the RectTransform width to match the TextMeshProUGUI
 /// preferred text width. Padding is added on each horizontal side.
-/// Hooks into TMP's text-changed event for zero-overhead updates.
+/// Hooks into Canvas.willRenderCanvases so TMP's mesh is always fully rebuilt
+/// before we measure — avoiding stale textInfo reads that occurred with
+/// TMPro_EventManager.TEXT_CHANGED_EVENT (which fires before TMP rebuilds).
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(TextMeshProUGUI))]
@@ -27,23 +29,33 @@ public class TMPWidthFitter : MonoBehaviour
     private void OnEnable()
     {
         CacheComponents();
-        TMPro_EventManager.TEXT_CHANGED_EVENT.Add(OnTextChanged);
-        UpdateWidth();
+        Canvas.willRenderCanvases += OnWillRenderCanvases;
+        ForceUpdateWidth();
     }
 
     private void OnDisable()
     {
-        TMPro_EventManager.TEXT_CHANGED_EVENT.Remove(OnTextChanged);
+        Canvas.willRenderCanvases -= OnWillRenderCanvases;
     }
 
     private void OnValidate()
     {
         CacheComponents();
-        UpdateWidth();
+        ForceUpdateWidth();
     }
 
-    // Catches font size changes (e.g. auto-sizing) which don't fire TEXT_CHANGED_EVENT.
-    private void LateUpdate()
+    /// <summary>Sets the horizontal padding and immediately refreshes the width.</summary>
+    public void SetHorizontalPadding(float padding)
+    {
+        horizontalPadding = padding;
+        ForceUpdateWidth();
+    }
+
+    /// <summary>
+    /// Called just before canvases are rendered — TMP has already rebuilt its mesh
+    /// at this point, so textInfo and characterInfo reflect the current text.
+    /// </summary>
+    private void OnWillRenderCanvases()
     {
         if (tmp == null)
             return;
@@ -55,10 +67,17 @@ public class TMPWidthFitter : MonoBehaviour
             UpdateWidth();
     }
 
-    /// <summary>Sets the horizontal padding and immediately refreshes the width.</summary>
-    public void SetHorizontalPadding(float padding)
+    /// <summary>
+    /// Forces TMP to immediately rebuild its mesh before measuring.
+    /// Use this for calls that happen outside the normal canvas rebuild cycle
+    /// (OnEnable, OnValidate, SetHorizontalPadding).
+    /// </summary>
+    private void ForceUpdateWidth()
     {
-        horizontalPadding = padding;
+        if (tmp == null || rectTransform == null)
+            return;
+
+        tmp.ForceMeshUpdate();
         UpdateWidth();
     }
 
@@ -73,7 +92,6 @@ public class TMPWidthFitter : MonoBehaviour
 
         rectTransform.sizeDelta = new Vector2(targetWidth, rectTransform.sizeDelta.y);
 
-        // Cache state to avoid redundant updates in LateUpdate.
         lastText = tmp.text;
         lastFontSize = tmp.fontSize;
     }
@@ -102,12 +120,6 @@ public class TMPWidthFitter : MonoBehaviour
         int lastStringIndex = info.characterInfo[maxVisible - 1].index;
         string visiblePortion = tmp.text.Substring(0, lastStringIndex + 1);
         return tmp.GetPreferredValues(visiblePortion, float.MaxValue, float.MaxValue).x;
-    }
-
-    private void OnTextChanged(Object obj)
-    {
-        if (obj == tmp)
-            UpdateWidth();
     }
 
     private void CacheComponents()

@@ -392,6 +392,7 @@ public class SaveDataManager : MonoBehaviour
 
         _saveData.Slots[index] = new SaveSlot();
         Save();
+        SaveScreenshotManager.DeleteScreenshot(index);
         Debug.Log($"[SaveDataManager] Slot {index} deleted.");
 
         if (ActiveSlotIndex == index)

@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -84,6 +85,18 @@ public class MainMenuSceneSetup : MonoBehaviour
 
         EnableVignette();
         EnableBreakableGlass();
+
+        // The BreakableGlassController.Start() coroutine may have been interrupted while
+        // Breakable Glass was inactive during the main menu. RefreshFromSave() re-runs the
+        // save-state restore (guarded against double-execution) with a one-frame delay to
+        // match the original coroutine timing and ensure NetworkManager is ready.
+        StartCoroutine(RefreshGlassFromSaveNextFrame());
+    }
+
+    private IEnumerator RefreshGlassFromSaveNextFrame()
+    {
+        yield return null;
+        BreakableGlassController.Instance?.RefreshFromSave();
     }
 
     private void EnableVignette()

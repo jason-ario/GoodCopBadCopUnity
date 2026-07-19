@@ -90,6 +90,7 @@ public class BreakableGlassController : MonoBehaviour
     /// which is called exclusively on the server inside MutantSuspectBehaviour.
     /// </summary>
     private int _hits;
+    private bool _saveRestoreComplete;
 
     private MeshRenderer _crackRenderer;
     private MaterialPropertyBlock _mpb;
@@ -154,6 +155,22 @@ public class BreakableGlassController : MonoBehaviour
     private System.Collections.IEnumerator Start()
     {
         yield return null;
+        if (!_saveRestoreComplete)
+        {
+            _saveRestoreComplete = true;
+            RestoreGlassStateFromSave();
+        }
+    }
+
+    /// <summary>
+    /// Explicitly re-runs the save-state restore. Safe to call from outside if the internal
+    /// Start() coroutine was interrupted (e.g. the GameObject was deactivated during the main menu).
+    /// No-ops if the restore has already completed.
+    /// </summary>
+    public void RefreshFromSave()
+    {
+        if (_saveRestoreComplete) return;
+        _saveRestoreComplete = true;
         RestoreGlassStateFromSave();
     }
 

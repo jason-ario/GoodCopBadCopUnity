@@ -35,6 +35,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public readonly string[] Options;
             public int Index;
             public float Value;
+            private readonly int defaultIndex;
+            private readonly float defaultValue;
 
             public Setting(string label, string key, params string[] options)
             {
@@ -43,6 +45,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Control = Control.Dropdown;
                 Options = options;
                 Index = 0;
+                defaultIndex = 0;
             }
 
             public Setting(string label, string key, float value)
@@ -51,6 +54,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Key = key;
                 Control = Control.Slider;
                 Value = value;
+                defaultValue = value;
+            }
+
+            public void ResetToDefault()
+            {
+                Index = defaultIndex;
+                Value = defaultValue;
             }
 
             public string DisplayValue =>
@@ -120,9 +130,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly List<Row> rows = new List<Row>();
         private readonly List<Button> tabButtons = new List<Button>();
         private readonly List<TMP_Text> tabLabels = new List<TMP_Text>();
-        private Tab activeTab = Tab.Graphics;
+        private Tab activeTab = Tab.Gameplay;
         private Setting[] activeSettings;
         [SerializeField] private GameObject rowPrefab;
+        [SerializeField] private TextButton gameplayTabButton;
+        [SerializeField] private TextButton graphicsTabButton;
+        [SerializeField] private TextButton audioTabButton;
+        [SerializeField] private TextButton controlsTabButton;
 
         private ScrollRect settingsScrollRect;
         private RectTransform rowsRoot;
@@ -131,6 +145,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private TMP_Text saveText;
         private Button saveButton;
         private Button backButton;
+        private Button restoreDefaultButton;
+        private ConfirmationDialogController confirmationDialog;
         private readonly Subject<int> displayModeChanged = new Subject<int>();
         private readonly Subject<int> screenResolutionChanged = new Subject<int>();
         private readonly Subject<bool> vSyncChanged = new Subject<bool>();
@@ -223,7 +239,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             CacheHierarchy();
             BindTabs();
             BindFooter();
-            SelectTab(Tab.Graphics);
+            SelectTab(Tab.Gameplay);
             SelectRow(-1);
         }
 
@@ -232,8 +248,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             selectedCategory = transform.Find("Selected Category") as RectTransform;
             sectionTitle = transform.Find("Section Title")?.GetComponent<TMP_Text>();
             saveText = transform.Find("Save Button/Save Label")?.GetComponent<TMP_Text>();
-            saveButton = GetOrAddButton(transform.Find("Save Button")?.gameObject);
-            backButton = GetOrAddButton(transform.Find("Back")?.gameObject);
+            saveButton = GetOrAddButton(transform.Find("Buttons/Save Button")?.gameObject);
+            restoreDefaultButton = GetOrAddButton(transform.Find("Buttons/Restore Default")?.gameObject);
+            backButton = GetOrAddButton(transform.Find("Back button/Back")?.gameObject);
+            confirmationDialog = GetComponentInChildren<ConfirmationDialogController>(true);
 
             rowsRoot = transform.Find("Settings Viewport/Settings Rows") as RectTransform;
             settingsScrollRect = rowsRoot != null ? rowsRoot.GetComponentInParent<ScrollRect>() : null;
@@ -249,6 +267,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             handleTemplate = sliderSource?.Handle;
             EnsureDropdownPanel();
             arrowTemplate = rows.Find(row => row.Arrow != null)?.Arrow;
+
         }
 
         private void BuildRowPool()
@@ -350,10 +369,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void BindFooter()
         {
             if (saveButton != null) saveButton.onClick.AddListener(Save);
+            if (restoreDefaultButton != null) restoreDefaultButton.onClick.AddListener(RequestRestoreDefaults);
 
             BindCloseButton(backButton);
-            BindCloseButton(GetOrAddButton(transform.Find("Esc")?.gameObject));
-            BindCloseButton(GetOrAddButton(transform.Find("Esc Ring")?.gameObject));
+            BindCloseButton(GetOrAddButton(transform.Find("Back button/Esc")?.gameObject));
+            BindCloseButton(GetOrAddButton(transform.Find("Back button/Esc Ring")?.gameObject));
         }
 
         private void BindCloseButton(Button button)
@@ -393,6 +413,24 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetVoiceChatInputModeValue(int value) { Audio[5].Index = value; RefreshActiveSetting("voice_input"); }
 
         private void RequestTab(Tab tab) { tabSelected.OnNext(ToSettingsMenuTab(tab)); }
+
+        private void UpdateTabButtonStates(int activeIndex)
+        {
+            TextButton[] tabs = { gameplayTabButton, graphicsTabButton, audioTabButton, controlsTabButton };
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                if (tabs[i] == null) continue;
+                if (i == activeIndex)
+                    tabs[i].SetActiveTab(true);
+                else
+                    tabs[i].Reset();
+            }
+        }
+
+        public void OpenGameplayTab()  { UpdateTabButtonStates(0); RequestTab(Tab.Gameplay); }
+        public void OpenGraphicsTab()  { UpdateTabButtonStates(1); RequestTab(Tab.Graphics); }
+        public void OpenAudioTab()     { UpdateTabButtonStates(2); RequestTab(Tab.Audio); }
+        public void OpenControlsTab()  { UpdateTabButtonStates(3); RequestTab(Tab.Controls); }
         private static ESettingsMenuTab ToSettingsMenuTab(Tab tab) { return (ESettingsMenuTab)(int)tab; }
         private static Tab ToInternalTab(ESettingsMenuTab tab) { return (Tab)(int)tab; }
         private void RefreshActiveSetting(string key)
@@ -452,6 +490,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     scrollRect.verticalNormalizedPosition = 1f;
                 }
             }
+
+            UpdateTabButtonStates((int)tab);
         }
 
         private void BindRow(int index)
@@ -860,6 +900,33 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void Save()
         {
             RequestClose();
+        }
+
+        public void SaveSettings() => Save();
+
+        public void RequestRestoreDefaults()
+        {
+            if (confirmationDialog == null) return;
+            confirmationDialog.Show(
+                "Restore Defaults",
+                "Reset all settings to their default values?",
+                "Restore",
+                "Cancel",
+                RestoreAllDefaults);
+        }
+
+        private void RestoreAllDefaults()
+        {
+            Setting[][] allTabs = { Gameplay, Graphics, Audio, Controls };
+            foreach (Setting[] tab in allTabs)
+                foreach (Setting setting in tab)
+                    setting.ResetToDefault();
+
+            foreach (Setting[] tab in allTabs)
+                foreach (Setting setting in tab)
+                    Apply(setting);
+
+            SelectTab(activeTab);
         }
 
         private void RequestClose()
