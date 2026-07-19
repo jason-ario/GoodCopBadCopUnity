@@ -225,7 +225,25 @@ public class Pistol : PickableObject, IAmmoProvider
         if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, _bulletRange))
         {
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            enemy?.TakeDamage(_damage, hit.point);
+            if (enemy != null)
+            {
+                enemy.TakeDamage(_damage, hit.point);
+            }
+            else
+            {
+                // Check for breakable glass — register the hit server-side and broadcast visuals
+                // to all clients via ClientRpc, mirroring MutantSuspectBehaviour's glass pattern.
+                BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
+                if (glass != null && !glass.IsSmashed)
+                {
+                    int newHits = glass.RegisterHit();
+                    Debug.Log($"[Pistol] Shot breakable glass at {hit.point}. Hits={newHits}");
+                    if (glass.IsSmashed)
+                        PistolSmashGlassClientRpc();
+                    else
+                        PistolUpdateGlassClientRpc(newHits);
+                }
+            }
         }
 
         // Relay VFX to every other connected client; shooter already played it locally.
@@ -243,6 +261,26 @@ public class Pistol : PickableObject, IAmmoProvider
                 Send = new ClientRpcSendParams { TargetClientIds = others }
             });
         }
+    }
+
+    /// <summary>
+    /// Received by all clients when a pistol shot lands an intermediate hit on the glass.
+    /// Mirrors UpdateGlassClientRpc on MutantSuspectBehaviour.
+    /// </summary>
+    [ClientRpc]
+    private void PistolUpdateGlassClientRpc(int hitCount)
+    {
+        BreakableGlassController.Instance?.OnHitByMutant(hitCount);
+    }
+
+    /// <summary>
+    /// Received by all clients when a pistol shot fully smashes the glass.
+    /// Mirrors SmashGlassClientRpc on MutantSuspectBehaviour.
+    /// </summary>
+    [ClientRpc]
+    private void PistolSmashGlassClientRpc()
+    {
+        BreakableGlassController.Instance?.ApplySmash();
     }
 
     /// <summary>

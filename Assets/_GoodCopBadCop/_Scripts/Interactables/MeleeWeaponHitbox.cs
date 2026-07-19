@@ -160,6 +160,22 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
+            // Check for breakable glass — registers the hit server-side then broadcasts visuals
+            // to all clients via ClientRpc, mirroring MutantSuspectBehaviour's glass attack pattern.
+            BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
+            if (glass != null && !glass.IsSmashed)
+            {
+                int newHits = glass.RegisterHit();
+                Vector3 glassHitPos = col.ClosestPoint(attackOrigin);
+                Debug.Log($"[MeleeWeaponHitbox] Hit breakable glass at {glassHitPos}. Hits={newHits}", this);
+                if (glass.IsSmashed)
+                    SmashGlassClientRpc();
+                else
+                    UpdateGlassClientRpc(newHits);
+                NotifyHitClientRpc(glassHitPos, ownerParams);
+                return;
+            }
+
             // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter - no tag dependency.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
@@ -192,6 +208,26 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
 
     // Client
+
+    /// <summary>
+    /// Received by all clients when the player lands an intermediate melee hit on the glass.
+    /// Mirrors UpdateGlassClientRpc on MutantSuspectBehaviour.
+    /// </summary>
+    [ClientRpc]
+    private void UpdateGlassClientRpc(int hitCount)
+    {
+        BreakableGlassController.Instance?.OnHitByMutant(hitCount);
+    }
+
+    /// <summary>
+    /// Received by all clients when the player's melee strike fully smashes the glass.
+    /// Mirrors SmashGlassClientRpc on MutantSuspectBehaviour.
+    /// </summary>
+    [ClientRpc]
+    private void SmashGlassClientRpc()
+    {
+        BreakableGlassController.Instance?.ApplySmash();
+    }
 
     [ClientRpc]
     private void NotifyHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
