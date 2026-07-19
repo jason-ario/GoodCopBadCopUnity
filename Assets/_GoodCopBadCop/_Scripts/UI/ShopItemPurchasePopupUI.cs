@@ -17,6 +17,9 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
     [SerializeField] private Button _noButton;
     [SerializeField] private ItemPreviewSpawner _previewSpawner;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip _purchaseSound;
+
     private Action _onBuy;
     private Action _onCancel;
     private int _price;
@@ -47,6 +50,9 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
     /// <summary>Called by the Buy button's OnClick event.</summary>
     public void OnBuyClicked()
     {
+        if (_purchaseSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(_purchaseSound);
+
         _onBuy?.Invoke();
     }
 

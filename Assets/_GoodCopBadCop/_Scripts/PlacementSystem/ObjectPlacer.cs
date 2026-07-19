@@ -20,6 +20,10 @@ public class ObjectPlacer : MonoBehaviour
     [SerializeField] private Color ghostInRangeColor = new Color(0f, 1f, 0f, 0.5f);
     [SerializeField] private Color ghostOutOfRangeColor = new Color(1f, 0f, 0f, 0.5f);
 
+    [Header("Placement Feedback")]
+    [SerializeField] private PlacementFeedback _placementFeedback;
+    public PlacementFeedback PlacementFeedback => _placementFeedback;
+
     private PickableItemData _pickableItemData;
     private PickableObject _clonedItem;
     private PlacementBoard _currentPlacementBoard;

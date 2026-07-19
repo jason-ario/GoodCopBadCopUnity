@@ -829,6 +829,14 @@ public class PlayerPickupController : NetworkBehaviour
             if (_heldObject is Flashlight flashlight)
                 flashlight.TurnOff();
             _heldObject.OnDropped();
+
+            // Placement feedback: punch scale + surface poof particle.
+            if (ObjectPlacer.Instance != null && ObjectPlacer.Instance.PlacementFeedback != null)
+            {
+                Vector3 surfaceNormal = ObjectPlacer.Instance.transform.up;
+                ObjectPlacer.Instance.PlacementFeedback.PlayPlacementFeedback(
+                    _heldObject.transform, dropPos, surfaceNormal);
+            }
         }
 
         rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
