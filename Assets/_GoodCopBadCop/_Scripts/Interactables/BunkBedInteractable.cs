@@ -22,7 +22,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     [SerializeField] private AudioClip _endDaySFX;
 
     private const string InteractTextReady    = "Sleep";
-    private const string InteractTextNotReady = "Can't sleep yet";
+    private const string InteractTextNotReady = "Finish remaining tasks to end the day";
 
     /// <summary>
     /// Fired locally when the player confirms ending the day at the bunk bed.

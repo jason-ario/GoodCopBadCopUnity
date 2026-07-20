@@ -11,6 +11,9 @@ public class StartShiftScreen : MonoBehaviour
     
     public void ShowDayNumber(int dayNumber)
     {
+        // Re-enable the text object — it is disabled at the end of each play so it
+        // must be explicitly re-activated before starting the reveal coroutine again.
+        dayNumberText.gameObject.SetActive(true);
         gameObject.SetActive(true);
         StartCoroutine(StartShift(dayNumber));
     }

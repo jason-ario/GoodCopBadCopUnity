@@ -1109,15 +1109,16 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Shows the accuracy-payout tutorial overlay after the quarantine task list finishes
-    /// clearing. Falls through to <see cref="ReshowSubjectCounter"/> immediately if the
-    /// overlay is unavailable.
+    /// clearing. The subject counter task is re-added immediately (independently of the overlay)
+    /// so the two systems don't block each other.
     /// </summary>
     private void ShowAccuracyPayoutOverlay()
     {
-        if (TutorialOverlay.Instance != null)
-            TutorialOverlay.Instance.ShowAccuracyPayoutTutorial(ReshowSubjectCounter);
-        else
-            ReshowSubjectCounter();
+        // Re-show the subject counter right away — the overlay is a separate system.
+        ReshowSubjectCounter();
+
+        // Show the overlay independently; its onComplete is not used to gate the task list.
+        TutorialOverlay.Instance?.ShowAccuracyPayoutTutorial();
     }
 
     /// <summary>

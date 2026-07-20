@@ -93,7 +93,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         _barkCanvas.SetActive(false);
 
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
-        GameManager.Instance.OnGameStart += OnGameStart;
 
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
         GuidebookController.OnGuidebookOpened += OnGuidebookOpened;
@@ -102,12 +101,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     private void OnDestroy()
     {
         if (ShiftManager.Instance != null)
-        {
             ShiftManager.Instance.OnShiftStart -= OnShiftStart;
-        }
-
-        if (GameManager.Instance != null)
-            GameManager.Instance.OnGameStart -= OnGameStart;
 
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
         GuidebookController.OnGuidebookOpened -= OnGuidebookOpened;
@@ -116,25 +110,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // ---------------------------------------------------------------------------
     // Gameplay Event Hooks
     // ---------------------------------------------------------------------------
-
-    private void OnGameStart()
-    {
-        StartCoroutine(GameStartBarkCoroutine());
-    }
-
-    private IEnumerator GameStartBarkCoroutine()
-    {
-        yield return new WaitForSeconds(120f);
-
-        // Only fire if the intro cutscene was never triggered — if the player already
-        // started it, they don't need a nudge.
-        if (GameManager.Instance != null && GameManager.Instance.HasIntroCutsceneStarted) yield break;
-        if (_isSpeaking) yield break;
-
-        const string text = "All inspectors please report to duty.";
-        DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Megaphone, "Megaphone", text);
-        StartCoroutine(ShowBarkSequence(text));
-    }
 
     private void OnShiftStart()
     {
