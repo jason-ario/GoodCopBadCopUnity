@@ -26,36 +26,50 @@ public class PlayerTutorialUI : MonoBehaviour
 
         if (textReveal == null)
             Debug.LogError("[PlayerTutorialUI] textReveal is not assigned. Assign the Text (TMP) child in the Inspector.", this);
+
+        // Fire when the local player first spawns — works across all start paths
+        // (normal lobby, debug skip, autoStart) without needing OnGameStart.
+        PlayerInstance.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
     }
 
     private void Start()
     {
-        GameManager.Instance.OnGameStart += OnGameStart;
         gameObject.SetActive(false);
     }
 
     private void OnDestroy()
     {
-        if (GameManager.Instance != null)
-            GameManager.Instance.OnGameStart -= OnGameStart;
+        PlayerInstance.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
     }
 
-    private void OnGameStart()
+    /// <summary>
+    /// Fires once when the local player's NetworkObject spawns. Shows the movement tutorial
+    /// on Day 1 only; one-shot so respawns never re-trigger it.
+    /// </summary>
+    private void OnLocalPlayerSpawned()
     {
-        if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
+        PlayerInstance.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
 
-        // Only show the booth guidance message on Day 1 — it is a one-time orientation hint
-        // for a player's first session. On subsequent days the player already knows the drill.
+        if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
         if (CampaignManager.Instance == null || CampaignManager.Instance.CurrentDay != 1) return;
 
         gameObject.SetActive(true);
-        StartCoroutine(DelayedShow("Go to the booth to start your shift.", 3f));
+        StartCoroutine(DelayedShowMovementTutorial(3f));
     }
 
-    private IEnumerator DelayedShow(string message, float delay)
+    private IEnumerator DelayedShowMovementTutorial(float delay)
     {
         yield return new WaitForSeconds(delay);
-        Show(message);
+
+        if (TutorialOverlay.Instance != null)
+            TutorialOverlay.Instance.ShowMovementTutorial(ShowBoothMessage);
+        else
+            ShowBoothMessage();
+    }
+
+    private void ShowBoothMessage()
+    {
+        Show("Go to the booth to start your shift.");
     }
 
     /// <summary>Shows the cinematic black bars without any text. Holds for the specified duration then dismisses. Interrupts any running sequence.</summary>

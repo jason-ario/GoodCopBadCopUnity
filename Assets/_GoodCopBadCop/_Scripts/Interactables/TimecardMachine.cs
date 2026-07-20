@@ -4,9 +4,15 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// A timecard machine the player interacts with to clock out at the end of a shift.
-/// Becomes interactable only after ShiftManager signals that all suspects have been processed.
-/// Interacting plays the punch animation and sound, then triggers EndShift after a short delay.
+/// A timecard machine the player interacts with to clock in at the start of a shift
+/// and clock out at the end.
+///
+/// Clock-in: enabled by <see cref="EnableClockIn"/> (server). Fires
+/// <see cref="OnClockInAllClients"/> on every client when the punch lands.
+///
+/// Clock-out: enabled by <see cref="EnableClockOut"/> (server) when ShiftManager signals
+/// all suspects have been processed. Fires <see cref="OnClockOutServer"/> on the server
+/// then triggers EndShift after a short delay.
 /// </summary>
 public class TimecardMachine : Interactable
 {
@@ -16,6 +22,14 @@ public class TimecardMachine : Interactable
     /// should feel like a direct consequence of the player clocking out.
     /// </summary>
     public static event Action OnClockOutServer;
+
+    /// <summary>
+    /// Fired on ALL clients the moment a clock-in punch is accepted.
+    /// Subscribe in Day_01 (or any day) to drive tutorial task progression that
+    /// should react immediately once the player clocks in.
+    /// </summary>
+    public static event Action OnClockInAllClients;
+
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
@@ -28,6 +42,10 @@ public class TimecardMachine : Interactable
     [Tooltip("Fanfare clip played when the timecard machine is primed for clock-out.")]
     [SerializeField] private AudioClip _fanfareClip;
 
+    [Header("Interact Text")]
+    [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
+    [SerializeField] private string _clockInInteractText = "Clock In";
+
     /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift.</summary>
     [SerializeField] private float _punchToReportDelay = 1.5f;
 
@@ -35,9 +53,30 @@ public class TimecardMachine : Interactable
     private static readonly int ReadyBool    = Animator.StringToHash("Ready");
 
     private bool _clockOutReady = false;
+    private bool _clockInReady  = false;
+
+    // Cached from the Inspector-assigned interactText so we can restore it after clock-in.
+    private string _clockOutInteractText;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _clockOutInteractText = interactText;
+    }
 
     public override void Interact(PlayerInteractionController player)
     {
+        // Clock-in takes priority — checked first so it can fire before clock-out is ever armed.
+        if (_clockInReady)
+        {
+            base.Interact(player);
+            if (IsServer)
+                HandleClockIn();
+            else
+                RequestClockInServerRpc();
+            return;
+        }
+
         if (!_clockOutReady) return;
 
         base.Interact(player);
@@ -47,6 +86,53 @@ public class TimecardMachine : Interactable
         else
             RequestClockOutServerRpc();
     }
+
+    // ── Clock-In ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by the server (e.g. Day_01) when it is time for the player to clock in.
+    /// Enables the clock-in interaction on all clients.
+    /// </summary>
+    public void EnableClockIn()
+    {
+        if (!IsServer) return;
+        _clockInReady = true;
+        EnableClockInClientRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestClockInServerRpc() => HandleClockIn();
+
+    private void HandleClockIn()
+    {
+        if (!_clockInReady) return;
+        _clockInReady = false;
+        PunchClockInClientRpc();
+    }
+
+    [ClientRpc]
+    private void EnableClockInClientRpc()
+    {
+        _clockInReady = true;
+        interactText  = _clockInInteractText;
+    }
+
+    [ClientRpc]
+    private void PunchClockInClientRpc()
+    {
+        _clockInReady = false;
+        interactText  = _clockOutInteractText;
+
+        if (_audioSource != null && _clockOutSound != null)
+            _audioSource.PlayOneShot(_clockOutSound);
+
+        if (_animator != null)
+            _animator.SetTrigger(PunchTrigger);
+
+        OnClockInAllClients?.Invoke();
+    }
+
+    // ── Clock-Out ─────────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestClockOutServerRpc()
@@ -86,6 +172,7 @@ public class TimecardMachine : Interactable
     public void Reset()
     {
         _clockOutReady = false;
+        _clockInReady  = false;
         SetLightReady(false);
     }
 

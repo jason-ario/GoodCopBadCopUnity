@@ -69,10 +69,11 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // ProfileLoad applies visual style settings from the profile but does not
         // touch the 'highlighted' state, so call it first.
         highlightEffect.ProfileLoad(highlightEffect.profile);
-        // Keep the component ENABLED so that HighlightEffect.Start() runs and
-        // SetupMaterial() builds the renderer list (rms). Disabling the component
-        // here prevents Start() from ever running, leaving rms null and causing the
+        // Force the component enabled so that HighlightEffect.Start() always runs and
+        // SetupMaterial() builds the renderer list (rms). If a prefab was saved with
+        // the component disabled, Start() never fires, leaving rms null and causing the
         // first hover to silently fail to render. Visibility is gated by 'highlighted'.
+        highlightEffect.enabled = true;
         highlightEffect.highlighted = false;
 
         if (!string.IsNullOrEmpty(highlightNameFilter))

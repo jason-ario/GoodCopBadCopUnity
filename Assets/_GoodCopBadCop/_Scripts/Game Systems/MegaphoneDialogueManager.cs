@@ -43,7 +43,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     [Header("Settings")]
     [Tooltip("When true, all dialogue output is suppressed.")]
-    public bool disabled;
+    public bool disabled = true;
 
     private static readonly int SpeakingParam = Animator.StringToHash("Speaking");
     private const float PostSpeakHideDuration = 3f;
@@ -124,10 +124,16 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     private IEnumerator GameStartBarkCoroutine()
     {
-        yield return new WaitForSeconds(12f);
+        yield return new WaitForSeconds(120f);
 
-        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutside)
-            ShowDialogue("All inspectors please report to duty.");
+        // Only fire if the intro cutscene was never triggered — if the player already
+        // started it, they don't need a nudge.
+        if (GameManager.Instance != null && GameManager.Instance.HasIntroCutsceneStarted) yield break;
+        if (_isSpeaking) yield break;
+
+        const string text = "All inspectors please report to duty.";
+        DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Megaphone, "Megaphone", text);
+        StartCoroutine(ShowBarkSequence(text));
     }
 
     private void OnShiftStart()

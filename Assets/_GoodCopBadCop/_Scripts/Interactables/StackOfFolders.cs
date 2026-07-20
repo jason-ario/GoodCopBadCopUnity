@@ -11,6 +11,18 @@ public class StackOfFolders : Interactable
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>
+    /// When false the stack is locked and cannot be interacted with.
+    /// Defaults to true so the stack works normally outside of Day 1.
+    /// On Day 1, <see cref="Day_01"/> locks it at start and unlocks it when the folder
+    /// tutorial step begins.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isInteractable = new NetworkVariable<bool>(
+        true,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     private void Start()
     {
         SuspectController.Instance.OnTakeFolder += OnShiftEnd;
@@ -28,8 +40,25 @@ public class StackOfFolders : Interactable
             _folderGrabbedAlready.Value = false;
     }
 
+    /// <summary>
+    /// Locks or unlocks the stack. When locked, players cannot grab a folder from it.
+    /// Safe to call from any client — forwards to the server if needed.
+    /// </summary>
+    public void SetInteractable(bool value)
+    {
+        if (IsServer)
+            _isInteractable.Value = value;
+        else
+            SetInteractableServerRpc(value);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetInteractableServerRpc(bool value) => _isInteractable.Value = value;
+
     public override void Interact(PlayerInteractionController player)
     {
+        if (!_isInteractable.Value) return;
+
         base.Interact(player);
 
         if (_folderGrabbedAlready.Value)

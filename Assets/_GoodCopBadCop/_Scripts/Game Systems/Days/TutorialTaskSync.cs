@@ -31,6 +31,18 @@ public class TutorialTaskSync : NetworkBehaviour
     /// <summary>Fired on all clients when any exam notebook page is filed during the tutorial.</summary>
     public static event Action OnExamPageFiledAllClients;
 
+    /// <summary>
+    /// Fired on all clients after the post-clock-in megaphone dialogue completes,
+    /// signalling that it is time to show the "Press the button" task and arm the switch.
+    /// </summary>
+    public static event Action OnPressButtonReadyAllClients;
+
+    /// <summary>
+    /// Fired on ALL clients once the clock-in nag dialogue finishes and the time card machine
+    /// is enabled. Signals that it is time to show the clock-in task and marker.
+    /// </summary>
+    public static event Action OnClockInReadyAllClients;
+
     // ── Server-side counters / guards ─────────────────────────────────────────
 
     private int  _vladDocsPickedUpCount;
@@ -145,5 +157,43 @@ public class TutorialTaskSync : NetworkBehaviour
     {
         ExamNotebook.AnyPageFiled = true;
         OnExamPageFiledAllClients?.Invoke();
+    }
+
+    // ── Press-button ready ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Called after the post-clock-in megaphone dialogue finishes.
+    /// Broadcasts to all clients that it is time to show the "Press the button" task
+    /// and arm the switch button.
+    /// </summary>
+    public void BroadcastPressButtonReadyServer()
+    {
+        if (!IsServer) return;
+        BroadcastPressButtonReadyClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastPressButtonReadyClientRpc()
+    {
+        OnPressButtonReadyAllClients?.Invoke();
+    }
+
+    // ── Clock-in ready ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Called after the clock-in nag dialogue finishes and the time card
+    /// machine has been enabled. Broadcasts to all clients that the clock-in task
+    /// and marker should now be shown.
+    /// </summary>
+    public void BroadcastClockInReadyServer()
+    {
+        if (!IsServer) return;
+        BroadcastClockInReadyClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastClockInReadyClientRpc()
+    {
+        OnClockInReadyAllClients?.Invoke();
     }
 }

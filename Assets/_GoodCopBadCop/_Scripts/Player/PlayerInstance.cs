@@ -1,3 +1,4 @@
+using System;
 using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
@@ -5,6 +6,12 @@ using UnityEngine;
 public class PlayerInstance : NetworkBehaviour
 {
     public static PlayerInstance Instance;
+
+    /// <summary>
+    /// Fired on the owning client the moment the local player's NetworkObject spawns.
+    /// Subscribe to this to trigger any first-spawn logic (e.g. tutorial overlays).
+    /// </summary>
+    public static event Action OnLocalPlayerSpawned;
 
     [SerializeField] private GameObject playerLight;
     [SerializeField] private GameObject nameTag;
@@ -104,17 +111,13 @@ public class PlayerInstance : NetworkBehaviour
             PlayerHealth.OnDeath += Die;
             PlayerHealth.OnRespawn += Respawn;
 
-            // Clean up any lingering death/spectator state from a previous player object
-            // (e.g. when this is a fresh spawn after the player was revived).
             SpectateManager.Instance?.StopSpectating();
             UIController.Instance?.HideDeathScreen();
 
-            // Revival via despawn+respawn creates a fresh NetworkObject and never fires
-            // PlayerHealth.OnRespawn, so Respawn() is never invoked. Re-enable the reticle
-            // and reset interaction state explicitly so the player can interact immediately.
-            // On a first-ever spawn these calls are harmless no-ops.
             EnableReticle();
             SetCanInteract(true);
+
+            OnLocalPlayerSpawned?.Invoke();
         }
     }
 
