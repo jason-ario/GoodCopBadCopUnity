@@ -1,0 +1,94 @@
+using System.Collections;
+using UnityEngine;
+
+/// <summary>
+/// Displays the "Dusk" notification banner at the top of the screen when the player clocks out.
+/// Fades in over <see cref="_fadeInDuration"/> seconds, holds for <see cref="_holdDuration"/> seconds,
+/// then fades out over <see cref="_fadeOutDuration"/> seconds. Plays a bell chime on show.
+///
+/// The notification panel is auto-discovered as the first child with a CanvasGroup component.
+/// </summary>
+public class DuskNotificationUI : MonoBehaviour
+{
+    [Tooltip("Bell chime clip played when the notification appears.")]
+    [SerializeField] private AudioClip _chimeClip;
+
+    [Header("Timing")]
+    [SerializeField] private float _fadeInDuration  = 1f;
+    [SerializeField] private float _holdDuration    = 2f;
+    [SerializeField] private float _fadeOutDuration = 1f;
+
+    private GameObject _notificationPanel;
+    private CanvasGroup _canvasGroup;
+    private Animator    _panelAnimator;
+    private Coroutine   _routine;
+
+    private void Awake()
+    {
+        // Auto-discover the child panel — finds the first child CanvasGroup (inactive included).
+        _canvasGroup = GetComponentInChildren<CanvasGroup>(true);
+
+        if (_canvasGroup != null)
+        {
+            _notificationPanel = _canvasGroup.gameObject;
+            _panelAnimator     = _notificationPanel.GetComponent<Animator>();
+        }
+        else
+        {
+            Debug.LogError("[DuskNotificationUI] No CanvasGroup found in children. " +
+                           "Ensure the notification panel child has a CanvasGroup component.", this);
+        }
+    }
+
+    private void OnEnable()  => TimecardMachine.OnClockOutAllClients += ShowDusk;
+    private void OnDisable() => TimecardMachine.OnClockOutAllClients -= ShowDusk;
+
+    private void ShowDusk()
+    {
+        if (_notificationPanel == null || _canvasGroup == null) return;
+
+        if (_routine != null)
+            StopCoroutine(_routine);
+
+        _routine = StartCoroutine(NotificationRoutine());
+    }
+
+    private IEnumerator NotificationRoutine()
+    {
+        // Disable the Animator so we drive the CanvasGroup alpha directly.
+        if (_panelAnimator != null)
+            _panelAnimator.enabled = false;
+
+        _notificationPanel.SetActive(true);
+        _canvasGroup.alpha = 0f;
+
+        if (_chimeClip != null && SFXController.Instance != null)
+            SFXController.Instance.Play(_chimeClip);
+
+        yield return FadeAlpha(0f, 1f, _fadeInDuration);
+        yield return new WaitForSeconds(_holdDuration);
+        yield return FadeAlpha(1f, 0f, _fadeOutDuration);
+
+        _notificationPanel.SetActive(false);
+        _routine = null;
+    }
+
+    private IEnumerator FadeAlpha(float from, float to, float duration)
+    {
+        if (duration <= 0f)
+        {
+            _canvasGroup.alpha = to;
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            _canvasGroup.alpha = Mathf.Lerp(from, to, elapsed / duration);
+            yield return null;
+        }
+
+        _canvasGroup.alpha = to;
+    }
+}

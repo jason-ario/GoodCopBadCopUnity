@@ -30,6 +30,12 @@ public class TimecardMachine : Interactable
     /// </summary>
     public static event Action OnClockInAllClients;
 
+    /// <summary>
+    /// Fired on ALL clients the moment a clock-out punch is accepted.
+    /// Subscribe to drive client-side reactions such as UI notifications.
+    /// </summary>
+    public static event Action OnClockOutAllClients;
+
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
@@ -201,6 +207,8 @@ public class TimecardMachine : Interactable
 
         if (_animator != null)
             _animator.SetTrigger(PunchTrigger);
+
+        OnClockOutAllClients?.Invoke();
     }
 
     /// <summary>Sets the 'Ready' bool on the small light animator to drive the blink animation.</summary>

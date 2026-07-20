@@ -161,6 +161,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void OnNetworkValueChanged<T>(T previous, T current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnProgressChanged?.Invoke();
     }
 
     /// <summary>
@@ -182,6 +183,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
         OnAllItemsDeposited                       = null;
+        OnProgressChanged                         = null;
     }
 
     // ── ISystemicThreat stubs ────────────────────────────────────────────────
@@ -199,6 +201,18 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Subscribe server-side (e.g. AlexeiController) to trigger clock-out.
     /// </summary>
     public static event Action OnAllItemsDeposited;
+
+    /// <summary>
+    /// Fired on every client whenever <see cref="DepositedCount"/> or <see cref="TotalCount"/>
+    /// changes. Subscribe to drive live count updates in tutorial UI.
+    /// </summary>
+    public static event Action OnProgressChanged;
+
+    /// <summary>Items deposited in the dumpster so far this task run.</summary>
+    public int DepositedCount => _depositedCount.Value;
+
+    /// <summary>Total junk items for this task run (spawned + pre-existing).</summary>
+    public int TotalCount => _totalCount.Value;
 
     // ── Public API ────────────────────────────────────────────────────────────
 

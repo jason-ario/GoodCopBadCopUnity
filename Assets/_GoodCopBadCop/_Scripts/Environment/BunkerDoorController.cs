@@ -1,4 +1,5 @@
 using DG.Tweening;
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -33,6 +34,12 @@ public class BunkerDoorController : NetworkBehaviour
 
     /// <summary>Whether the bunker door is currently open (synced across all clients).</summary>
     public bool IsOpen => _isOpen.Value;
+
+    /// <summary>
+    /// Fired on every client the moment the door transitions to the open state.
+    /// Subscribe server-side to chain tutorial steps after the door is opened.
+    /// </summary>
+    public static event Action OnDoorOpened;
 
     // ─── NetworkBehaviour lifecycle ───────────────────────────────────────────
 
@@ -118,6 +125,7 @@ public class BunkerDoorController : NetworkBehaviour
         if (current)
         {
             TweenDoorZ(OpenAngleZ);
+            OnDoorOpened?.Invoke();
         }
         else
         {

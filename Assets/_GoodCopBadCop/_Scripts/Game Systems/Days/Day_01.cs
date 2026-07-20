@@ -81,7 +81,16 @@ public class Day_01 : DayBase
              "Overrides SuspectController's default standPos for the soldier's walk-in.")]
     [SerializeField] private Transform _soldierBoothPos;
 
-    [Header("Day 1 — Ivan Documentation Tutorial")]
+    [Header("Day 1 — Trash Task Tutorial")]
+    [Tooltip("Base label shown in the objective list for the end-of-shift trash task. " +
+             "The deposited/total count is appended automatically, e.g. 'Throw away trash 2/10'.")]
+    [SerializeField] private string _taskThrowTrashText = "Throw away trash";
+
+    [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
+    [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
+
+    [Tooltip("Objective label shown after the bunker is open, prompting the player to sleep in the bunk bed.")]
+    [SerializeField] private string _taskGoToBedText = "Go to bed";
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
 
@@ -245,6 +254,12 @@ public class Day_01 : DayBase
     [Tooltip("World-space point above the yellow stamp slot — marker shown during 'grab quarantine stamp' task.")]
     [SerializeField] private Transform _markerYellowStamp;
 
+    [Tooltip("World-space point above the bunker door — marker shown during 'Open the bunker' end-of-shift task.")]
+    [SerializeField] private Transform _markerBunkerDoor;
+
+    [Tooltip("World-space point above the bunk bed — marker shown during 'Go to bed' end-of-shift task.")]
+    [SerializeField] private Transform _markerBunkBed;
+
     [Header("Day 1 — Quarantine Tutorial")]
     [Tooltip("Task text shown while the player needs to grab the quarantine stamp.")]
     [SerializeField] private string _taskGrabQuarantineStampText = "Grab the quarantine stamp";
@@ -297,6 +312,11 @@ public class Day_01 : DayBase
     private TutorialObjectiveItem _taskCollectCoupons;
     private TutorialObjectiveItem _taskClockIn;
     private TutorialObjectiveItem _taskPressButton;
+
+    // End-of-shift trash task shown after the Alexei sequence.
+    private TutorialObjectiveItem _taskThrowTrash;
+    private TutorialObjectiveItem _taskOpenBunker;
+    private TutorialObjectiveItem _taskGoToBed;
 
     // "Process N subjects" counter task — shown after Vlad's tutorial sequence ends.
     private const int SubjectsToProcess = 5;
@@ -505,6 +525,12 @@ public class Day_01 : DayBase
         CouponPickup.OnAnyPickedUp             -= OnCouponPickedUp;
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
         TimecardMachine.OnClockInAllClients    -= OnTimecardClockInSync;
+
+        // Trash task tutorial cleanup (safe to call even if task never started).
+        TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+        BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
+        BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -1803,11 +1829,13 @@ public class Day_01 : DayBase
                     {
                         Debug.Log("[Day_01] Post-Alexei dialogue onComplete — calling TriggerEndOfShiftSetup.");
                         AlexeiController.Instance?.TriggerEndOfShiftSetup();
+                        ShowTrashTask();
                     });
                 else
                 {
                     Debug.LogWarning("[Day_01] _postAlexeiDialogue is not assigned — triggering end-of-shift setup immediately.");
                     AlexeiController.Instance?.TriggerEndOfShiftSetup();
+                    ShowTrashTask();
                 }
             };
 
@@ -1854,11 +1882,137 @@ public class Day_01 : DayBase
             ShutterController.Instance.ShutterLockedOpen = false;
         _lever?.SetInteractable(true);
 
+        // Show a tutorial arrow on the lever and dismiss it once the player pulls it.
+        ShowLeverMarker(true);
+        StartCoroutine(HideLeverMarkerOnUse());
+
         // Give the player a moment to react before Alexei begins climbing.
         if (AlexeiController.Instance != null)
             yield return new WaitForSeconds(AlexeiController.Instance.BehaviourActivationDelay);
 
         AlexeiController.Instance?.ActivateAttackBehaviour();
+    }
+
+    // -------------------------------------------------------------------------
+    // Networked Marker Helpers
+    // -------------------------------------------------------------------------
+
+    private void ShowLeverMarker(bool show)
+    {
+        if (_lever == null) return;
+        NetworkObject netObj = _lever.GetComponent<NetworkObject>();
+        if (netObj == null) return;
+        if (show) MegaphoneDialogueManager.Instance?.ShowMarkerSynced(netObj);
+        else      MegaphoneDialogueManager.Instance?.HideMarkerSynced(netObj);
+    }
+
+    private IEnumerator HideLeverMarkerOnUse()
+    {
+        // The lever starts in the up (open) position. Wait until the player pulls
+        // it down to close the shutter — that's the "used" moment.
+        yield return new WaitUntil(() => _lever == null || !_lever.IsUp);
+        ShowLeverMarker(false);
+    }
+
+    // -------------------------------------------------------------------------
+    // Trash Task Tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the "Throw away trash X/Total" objective and subscribes to live progress
+    /// updates. Called on the server immediately after TriggerEndOfShiftSetup so the
+    /// total count is already set when the first SetText runs.
+    /// </summary>
+    private void ShowTrashTask()
+    {
+        if (TakeOutTrashTask.Instance == null) return;
+
+        _taskThrowTrash = TutorialObjectiveList.Instance?.AddObjective(
+            GetTrashTaskText(TakeOutTrashTask.Instance.DepositedCount,
+                             TakeOutTrashTask.Instance.TotalCount));
+
+        TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
+    }
+
+    private void OnTrashProgressChanged()
+    {
+        if (TakeOutTrashTask.Instance == null) return;
+        _taskThrowTrash?.SetText(
+            GetTrashTaskText(TakeOutTrashTask.Instance.DepositedCount,
+                             TakeOutTrashTask.Instance.TotalCount));
+    }
+
+    private void OnTrashTaskComplete()
+    {
+        TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskThrowTrash);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
+        _taskThrowTrash = null;
+    }
+
+    private string GetTrashTaskText(int deposited, int total) =>
+        total > 0
+            ? $"{_taskThrowTrashText} {deposited}/{total}"
+            : _taskThrowTrashText;
+
+    // ── Open Bunker ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows the "Open the bunker" objective and a world-space arrow above the bunker door.
+    /// Called as the onComplete of HideAndClear once the trash task finishes.
+    /// </summary>
+    private void ShowOpenBunkerTask()
+    {
+        _taskOpenBunker = TutorialObjectiveList.Instance?.AddObjective(_taskOpenBunkerText);
+
+        if (TutorialMarkerManager.Instance != null && _markerBunkerDoor != null)
+            TutorialMarkerManager.Instance.Mark(_markerBunkerDoor);
+
+        BunkerDoorController.OnDoorOpened += OnBunkerDoorOpened;
+    }
+
+    private void OnBunkerDoorOpened()
+    {
+        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpened;
+
+        if (TutorialMarkerManager.Instance != null && _markerBunkerDoor != null)
+            TutorialMarkerManager.Instance.Unmark(_markerBunkerDoor);
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskOpenBunker);
+        _taskOpenBunker = null;
+
+        ShowGoToBedTask();
+    }
+
+    // ── Go to Bed ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Adds the "Go to bed" objective and a world-space arrow above the bunk bed.
+    /// Called immediately after the bunker door opens.
+    /// </summary>
+    private void ShowGoToBedTask()
+    {
+        _taskGoToBed = TutorialObjectiveList.Instance?.AddObjective(_taskGoToBedText);
+
+        if (TutorialMarkerManager.Instance != null && _markerBunkBed != null)
+            TutorialMarkerManager.Instance.Mark(_markerBunkBed);
+
+        BunkBedInteractable.OnSleepConfirmed += OnGoToBedSleepConfirmed;
+    }
+
+    private void OnGoToBedSleepConfirmed()
+    {
+        BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
+
+        if (TutorialMarkerManager.Instance != null && _markerBunkBed != null)
+            TutorialMarkerManager.Instance.Unmark(_markerBunkBed);
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskGoToBed);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        _taskGoToBed = null;
     }
 
     // -------------------------------------------------------------------------

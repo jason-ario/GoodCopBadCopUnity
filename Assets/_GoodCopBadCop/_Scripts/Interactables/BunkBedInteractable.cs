@@ -1,3 +1,4 @@
+using System;
 using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
@@ -22,6 +23,12 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
     private const string InteractTextReady    = "Sleep";
     private const string InteractTextNotReady = "Can't sleep yet";
+
+    /// <summary>
+    /// Fired locally when the player confirms ending the day at the bunk bed.
+    /// Subscribe server-side (e.g. Day_01) to dismiss the "Go to bed" tutorial task.
+    /// </summary>
+    public static event Action OnSleepConfirmed;
 
     private PlayerInteractionController _interactingPlayer;
 
@@ -186,6 +193,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         CloseBedView();
 
         GoToBunkerTask.CompleteAndRemove();
+
+        OnSleepConfirmed?.Invoke();
 
         if (SFXController.Instance != null && _endDaySFX != null)
             SFXController.Instance.Play(_endDaySFX);
