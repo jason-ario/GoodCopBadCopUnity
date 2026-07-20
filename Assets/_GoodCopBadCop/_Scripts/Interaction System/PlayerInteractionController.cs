@@ -115,11 +115,13 @@ public class PlayerInteractionController : NetworkBehaviour
         // LMB triggers primary interaction (Interact — pickup, use).
         // E triggers alternate interaction (InteractAlternate — extract, secondary action).
         // When holding an item, both keys route to TryItemUse regardless.
+        // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
+        // ClickDetector — skip TryItemUse so it doesn't double-fire and call OnStartUse again.
         if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E))
         {
             if (_playerPickupController.HeldObject == null)
                 TryWorldInteract(alternate: Input.GetKeyDown(KeyCode.E));
-            else
+            else if (!Cursor.visible || Input.GetKeyDown(KeyCode.E))
                 TryItemUse();
         }
 

@@ -131,6 +131,27 @@ public class ExamNotebook : PickableObject
         }
     }
 
+    private void Start()
+    {
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart += OnDayStarted;
+    }
+
+    private void OnDestroy()
+    {
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= OnDayStarted;
+    }
+
+    /// <summary>
+    /// Re-renders all page RTs at the start of each day so the checklist view is never blank
+    /// when the player first opens the notebook during a shift.
+    /// </summary>
+    private void OnDayStarted()
+    {
+        SnapshotAllPages();
+    }
+
     /// <summary>
     /// Rebuilds the notebook's InteractableCollider cache excluding any colliders that belong
     /// to a page. Pages manage their own collider state — the notebook must not touch them.
@@ -604,6 +625,9 @@ public class ExamNotebook : PickableObject
         {
             return;
         }
+
+        // Re-render all page RTs so the overlay is always up-to-date when the view opens.
+        SnapshotAllPages();
 
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
         playerPickupController.CanPickUpAndPlace = false;

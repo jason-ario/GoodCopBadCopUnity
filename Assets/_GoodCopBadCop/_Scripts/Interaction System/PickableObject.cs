@@ -540,6 +540,8 @@ public class PickableObject : Interactable
     /// Enables the <see cref="SocketFollow"/> component on this object and points it at
     /// <paramref name="slot"/> so it tracks the slot's world transform every LateUpdate.
     /// Creates the component lazily if the prefab does not already have one.
+    /// The Rigidbody is forced kinematic and physics colliders are disabled so the object
+    /// follows its slot cleanly without fighting the physics simulation.
     /// </summary>
     public void SetSocketFollow(Transform slot)
     {
@@ -548,6 +550,9 @@ public class PickableObject : Interactable
 
         _socketFollow.SetTarget(slot);
         _socketFollow.enabled = true;
+
+        if (_rb != null) _rb.isKinematic = true;
+        _colliderController?.SetHeld();
     }
 
     /// <summary>
@@ -558,6 +563,8 @@ public class PickableObject : Interactable
     /// <c>source.rotation * localRotation</c>, so the result always reflects the source's
     /// definitive per-frame transform — including pitch applied after animation rigging.
     /// Creates the component lazily if the prefab does not already have one.
+    /// The Rigidbody is forced kinematic and physics colliders are disabled so the object
+    /// follows its source cleanly without fighting the physics simulation.
     /// </summary>
     public void SetSocketFollowWithLocalOffset(Transform source, Vector3 localPosition, Quaternion localRotation)
     {
@@ -566,6 +573,9 @@ public class PickableObject : Interactable
 
         _socketFollow.SetTargetWithLocalOffset(source, localPosition, localRotation);
         _socketFollow.enabled = true;
+
+        if (_rb != null) _rb.isKinematic = true;
+        _colliderController?.SetHeld();
     }
 
     /// <summary>

@@ -51,6 +51,13 @@ public class ExamPage : FolderItem
     /// calls to RefreshLockStates always produce a consistent result.
     /// </summary>
     private Vector3[] _originalItemPositions;
+
+    /// <summary>
+    /// Tracks the last interactable state applied by SetChecklistInteractable so that
+    /// RefreshLockStates can re-apply the correct state rather than relying on the
+    /// transient IsChecking animation flag.
+    /// </summary>
+    private bool _checklistInteractable;
     // ─────────────────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -224,7 +231,9 @@ public class ExamPage : FolderItem
 
         // Re-sync interactable state so newly-unlocked items can be clicked
         // if the exam is already open, and locked items remain blocked.
-        SetChecklistInteractable(IsChecking);
+        // Use _checklistInteractable (last value set by ApplyCurrentPage) rather than
+        // IsChecking, which is only true during the 0.5-second IK arm animation.
+        SetChecklistInteractable(_checklistInteractable);
 
         SnapshotChecklist();
     }
@@ -358,6 +367,7 @@ public class ExamPage : FolderItem
 
     public void SetChecklistInteractable(bool b)
     {
+        _checklistInteractable = b;
         foreach (ChecklistItem item in _checklistItems)
             item.SetInteractable(b);
     }

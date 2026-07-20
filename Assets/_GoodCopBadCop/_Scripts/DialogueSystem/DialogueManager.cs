@@ -12,6 +12,8 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private float secondsPerCharacter = 0.06f;
     [SerializeField] private float subtitleLingerSeconds = 1f;
     Coroutine audioDialogueCoroutine;
+    private AudioSource _activeDialogueSource;
+    private AudioSource _activeMegaphoneSource;
     private Coroutine _subtitleDestroyCoroutine;
 
     /// <summary>
@@ -138,6 +140,12 @@ public class DialogueManager : NetworkBehaviour
             _megaphoneAudioCoroutine = null;
         }
 
+        if (_activeMegaphoneSource != null)
+        {
+            _activeMegaphoneSource.Stop();
+            _activeMegaphoneSource = null;
+        }
+
         if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
         if (audioSource == null) { onComplete?.Invoke(); return; }
 
@@ -155,6 +163,13 @@ public class DialogueManager : NetworkBehaviour
         // on every subsequent call. Dialogue AudioSources are always expected to start at 1.
         audioSource.pitch = 1f;
         float basePitch = 1f;
+
+        // Track the active source so StopDialogueAudio / megaphone stop can call Stop() on it.
+        bool isMegaphone = _megaphoneAudioCoroutine != null && onComplete != null;
+        if (isMegaphone)
+            _activeMegaphoneSource = audioSource;
+        else
+            _activeDialogueSource = audioSource;
 
         float duration = dialogue.Length * secondsPerCharacter * 0.5f;
         float timer = 0;
@@ -182,13 +197,13 @@ public class DialogueManager : NetworkBehaviour
             if (isMutant && UnityEngine.Random.value < _pitchShiftChance)
                 audioSource.pitch = basePitch * UnityEngine.Random.Range(_pitchShiftMin, _pitchShiftMax);
 
-            audioSource.PlayOneShot(clip);
+            audioSource.clip = clip;
+            audioSource.Play();
 
             float clipDuration = clip.length;
             yield return new WaitForSeconds(clipDuration);
 
             audioSource.pitch = basePitch;
-            yield return new WaitForSeconds(clipDuration);
 
             float extraDelay = UnityEngine.Random.Range(minDelayBetweenClips, maxDelayBetweenClips);
             yield return new WaitForSeconds(extraDelay);
@@ -197,6 +212,12 @@ public class DialogueManager : NetworkBehaviour
         }
 
         audioSource.pitch = basePitch;
+
+        if (isMegaphone)
+            _activeMegaphoneSource = null;
+        else
+            _activeDialogueSource = null;
+
         onComplete?.Invoke();
         audioDialogueCoroutine = null;
     }
@@ -207,6 +228,12 @@ public class DialogueManager : NetworkBehaviour
         {
             StopCoroutine(audioDialogueCoroutine);
             audioDialogueCoroutine = null;
+        }
+
+        if (_activeDialogueSource != null)
+        {
+            _activeDialogueSource.Stop();
+            _activeDialogueSource = null;
         }
     }
 

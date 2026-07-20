@@ -732,12 +732,10 @@ public class Day_01 : DayBase
         if (appForm != null)
             appForm.OnPickedUpEvent += OnVladDocumentPickedUp;
 
-        // Show the handling-items tutorial overlay. The pick-up task and marker appear
-        // after the player closes it, keeping the UI clean during the tutorial.
-        if (TutorialOverlay.Instance != null)
-            TutorialOverlay.Instance.ShowHandlingItemsTutorial(ShowVladPickUpTask);
-        else
-            ShowVladPickUpTask();
+        // Show the pick-up task immediately, then show the overlay independently so
+        // the objective list doesn't wait for the player to dismiss the tutorial.
+        ShowVladPickUpTask();
+        TutorialOverlay.Instance?.ShowHandlingItemsTutorial();
     }
 
     /// <summary>

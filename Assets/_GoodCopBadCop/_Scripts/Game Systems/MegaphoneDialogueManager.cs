@@ -76,8 +76,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// </summary>
     public bool IsSpeakingSynced => _isSpeakingNetwork.Value;
 
-    // Guards the one-time guidebook hint so it only fires the first time the guidebook is opened.
-    private bool _guidebookHintShown;
 
     // ---------------------------------------------------------------------------
     // Unity / Network Lifecycle
@@ -95,7 +93,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
 
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
-        GuidebookController.OnGuidebookOpened += OnGuidebookOpened;
     }
 
     private void OnDestroy()
@@ -104,7 +101,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
             ShiftManager.Instance.OnShiftStart -= OnShiftStart;
 
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
-        GuidebookController.OnGuidebookOpened -= OnGuidebookOpened;
     }
 
     // ---------------------------------------------------------------------------
@@ -133,20 +129,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         ShowDialogue("Judging by the looks of you, I give you a week, tops.");
         yield return new WaitForSeconds(5f);
         ShowDialogue("But to give you the best shot, I'll be here to help out.");
-    }
-
-    private void OnGuidebookOpened()
-    {
-        if (_guidebookHintShown) return;
-        _guidebookHintShown = true;
-        StartCoroutine(GuidebookOpenedHintCoroutine());
-    }
-
-    private IEnumerator GuidebookOpenedHintCoroutine()
-    {
-        yield return new WaitUntil(() => !_isSpeaking);
-        yield return new WaitForSeconds(1f);
-        ShowDialogue("Use Q and E to flip through the pages. It covers everything you need to know to do your job.");
     }
 
     // ---------------------------------------------------------------------------

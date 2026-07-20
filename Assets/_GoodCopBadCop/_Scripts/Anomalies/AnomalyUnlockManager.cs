@@ -35,6 +35,14 @@ public class AnomalyUnlockManager : MonoBehaviour
     /// </summary>
     public static event Action<string> OnAnomalyUnlocked;
 
+    /// <summary>
+    /// In-memory set of anomaly type names unlocked during this session.
+    /// Populated by <see cref="UnlockAnomaly"/> before <see cref="OnAnomalyUnlocked"/> fires,
+    /// so <see cref="IsAnomalyUnlocked"/> always reflects the current session state even when
+    /// <see cref="SaveDataManager"/> has no active slot (e.g. debug skip cheats).
+    /// </summary>
+    private readonly HashSet<string> _runtimeUnlocked = new HashSet<string>(StringComparer.Ordinal);
+
     // -------------------------------------------------------------------------
     // Unity Lifecycle
     // -------------------------------------------------------------------------
@@ -157,6 +165,9 @@ public class AnomalyUnlockManager : MonoBehaviour
             if (string.Equals(alwaysName, typeName, StringComparison.Ordinal))
                 return true;
 
+        if (_runtimeUnlocked.Contains(typeName))
+            return true;
+
         return SaveDataManager.Instance != null && SaveDataManager.Instance.IsAnomalyUnlocked(typeName);
     }
 
@@ -170,6 +181,11 @@ public class AnomalyUnlockManager : MonoBehaviour
         if (string.IsNullOrEmpty(typeName)) return;
         if (IsAnomalyUnlocked(typeName)) return;
 
+        // Track in memory BEFORE firing the event so any IsAnomalyUnlocked check
+        // inside OnAnomalyUnlocked handlers (e.g. RefreshLockStates) sees the new state.
+        // This also ensures correctness when SaveDataManager has no active slot
+        // (e.g. debug skip cheats), where the save write is silently skipped.
+        _runtimeUnlocked.Add(typeName);
         SaveDataManager.Instance?.UnlockAnomaly(typeName);
         OnAnomalyUnlocked?.Invoke(typeName);
         Debug.Log($"[AnomalyUnlockManager] Anomaly unlocked: '{typeName}'.");
