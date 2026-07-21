@@ -25,6 +25,12 @@ public class EndOfShiftReportUI : MonoBehaviour
     [Header("Rows")]
     [SerializeField] private List<EndOfShiftReportRow> rows = new List<EndOfShiftReportRow>();
 
+    [Header("Civilians Killed")]
+    [SerializeField] private GameObject civiliansKilledRoot;
+    [SerializeField] private TextMeshProUGUI civiliansKilledText;
+    [SerializeField] private TMPTextReveal civiliansKilledReveal;
+    [SerializeField] private TMPWobbleText civiliansKilledWobble;
+
     [Header("Net Earnings")]
     [SerializeField] private GameObject netEarningsRoot;
     [SerializeField] private TextMeshProUGUI netEarningsText;
@@ -64,7 +70,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         HideAll();
     }
 
-    public void PlayReport(List<ReportRowData> reportRows)
+    public void PlayReport(List<ReportRowData> reportRows, int civiliansKilledOvernight = 0)
     {
         if (revealRoutine != null)
             StopCoroutine(revealRoutine);
@@ -72,7 +78,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         gameObject.SetActive(true);
         _contentContainer?.SetActive(true);
 
-        revealRoutine = StartCoroutine(RevealReportRoutine(reportRows));
+        revealRoutine = StartCoroutine(RevealReportRoutine(reportRows, civiliansKilledOvernight));
     }
 
     public void HideAll()
@@ -91,6 +97,15 @@ public class EndOfShiftReportUI : MonoBehaviour
         
         Canvas.ForceUpdateCanvases();
 
+        if (civiliansKilledRoot != null)
+            civiliansKilledRoot.SetActive(false);
+        if (civiliansKilledReveal != null)
+            civiliansKilledReveal.Clear();
+        else if (civiliansKilledText != null)
+            civiliansKilledText.text = "";
+        if (civiliansKilledWobble != null)
+            civiliansKilledWobble.StopWobble();
+
         if (netEarningsRoot != null)
             netEarningsRoot.SetActive(false);
 
@@ -106,7 +121,7 @@ public class EndOfShiftReportUI : MonoBehaviour
             continueButton.SetActive(false);
     }
 
-    private IEnumerator RevealReportRoutine(List<ReportRowData> reportRows)
+    private IEnumerator RevealReportRoutine(List<ReportRowData> reportRows, int civiliansKilledOvernight)
     {
         HideAll();
 
@@ -155,12 +170,38 @@ public class EndOfShiftReportUI : MonoBehaviour
         
         yield return RevealNetTotal(total);
 
+        // Reveal overnight civilians killed panel (purely informational — no monetary impact).
+        yield return RevealCiviliansKilled(civiliansKilledOvernight);
+
         yield return new WaitForSeconds(finalDelayBeforeContinue);
 
         if (continueButton != null)
             continueButton.SetActive(true);
 
         revealRoutine = null;
+    }
+
+    private IEnumerator RevealCiviliansKilled(int count)
+    {
+        if (civiliansKilledRoot == null)
+            yield break;
+
+        civiliansKilledRoot.SetActive(true);
+
+        string label = $"Civilians Killed: {count}";
+
+        if (civiliansKilledWobble != null && penaltyValueProfile != null)
+        {
+            civiliansKilledWobble.SetProfile(penaltyValueProfile, true);
+            civiliansKilledWobble.StartWobble();
+        }
+
+        if (civiliansKilledReveal != null)
+            yield return civiliansKilledReveal.RevealText(label);
+        else if (civiliansKilledText != null)
+            civiliansKilledText.text = label;
+
+        yield return new WaitForSeconds(lineRevealDelay);
     }
 
     private IEnumerator RevealNetTotal(int total)
@@ -193,7 +234,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         {
             return "0";
         }
-        return isPenalty ? $"Penalty -{absAmount}" : $"Reward +{absAmount}";
+        return isPenalty ? $"Penalty {absAmount}" : $"Rewards {absAmount}";
     }
 
     private string FormatSignedNumber(int value)

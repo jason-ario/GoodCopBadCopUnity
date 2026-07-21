@@ -53,14 +53,18 @@ public class ShiftManager : NetworkBehaviour
     public int suspectsKilledWrong = 0;
 
     [Header("End of Shift Rewards")]
-    [Tooltip("Coupons earned for correctly passing a non-infected citizen.")]
+    [Tooltip("Coupons earned for each citizen correctly passed (non-infected).")]
     [SerializeField] private int rewardPerCorrectPass = 10;
-    [Tooltip("Coupons deducted for incorrectly passing an infected suspect.")]
+    [Tooltip("Coupons deducted for each infected citizen incorrectly passed (Non-Effected).")]
     [SerializeField] private int penaltyPerWrongPass = 15;
-    [Tooltip("Coupons earned for correctly eliminating an infected suspect.")]
+    [Tooltip("Coupons earned for correctly eliminating an infected suspect. (Unused — kills are now always penalised.)")]
     [SerializeField] private int rewardPerCorrectKill = 10;
-    [Tooltip("Coupons deducted for incorrectly eliminating a non-infected citizen.")]
+    [Tooltip("Coupons deducted for incorrectly eliminating a non-infected citizen. (Unused — replaced by penaltyPerKill.)")]
     [SerializeField] private int penaltyPerWrongKill = 20;
+    [Tooltip("Coupons earned for each citizen successfully quarantined.")]
+    [SerializeField] private int rewardPerQuarantine = 8;
+    [Tooltip("Coupons deducted per kill, regardless of whether the target was infected. Killing is always penalised.")]
+    [SerializeField] private int penaltyPerKill = 12;
 
     private int _taskCompletedCount = 0;
     private bool _campaignAdvancedForCurrentReport;
@@ -608,34 +612,34 @@ public class ShiftManager : NetworkBehaviour
         int quarantined, int killedCorrect, int killedWrong,
         int populationAlive, int deadOvernight)
     {
+        int totalKilled = killedCorrect + killedWrong;
+
         var reportData = new List<EndOfShiftReportUI.ReportRowData>
         {
+            // Header — informational only, no reward.
             new EndOfShiftReportUI.ReportRowData(
                 $"Citizens Processed: {processed}", 0, false, isHeader: true),
 
+            // Green rows — positive outcomes that earn money.
             new EndOfShiftReportUI.ReportRowData(
-                $"Correctly Passed: {passedCorrect}",
+                $"Passed: {passedCorrect}",
                 passedCorrect * rewardPerCorrectPass),
 
             new EndOfShiftReportUI.ReportRowData(
-                $"Incorrectly Passed: {passedWrong}",
+                $"Quarantined: {quarantined}",
+                quarantined * rewardPerQuarantine),
+
+            // Red rows — negative outcomes that cost money.
+            new EndOfShiftReportUI.ReportRowData(
+                $"Killed: {totalKilled}",
+                totalKilled * penaltyPerKill, isPenalty: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Non-Effected: {passedWrong}",
                 passedWrong * penaltyPerWrongPass, isPenalty: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Quarantined: {quarantined}", 0),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Correctly Eliminated: {killedCorrect}",
-                killedCorrect * rewardPerCorrectKill),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Wrongly Eliminated: {killedWrong}",
-                killedWrong * penaltyPerWrongKill, isPenalty: true),
         };
 
-        AppendPopulationRows(reportData, populationAlive, deadOvernight);
-
-        UIController.Instance.ShowEndShiftReport(reportData);
+        UIController.Instance.ShowEndShiftReport(reportData, deadOvernight);
     }
 
     private static void AppendPopulationRows(
