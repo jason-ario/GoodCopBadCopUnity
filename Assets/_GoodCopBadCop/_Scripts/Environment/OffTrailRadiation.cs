@@ -15,10 +15,10 @@ using UnityEngine;
 /// </summary>
 public class OffTrailRadiation : MonoBehaviour
 {
-    [Header("Trail Reference")]
-    [Tooltip("The TrailController whose spline defines the safe corridor. " +
-             "Can be the same GameObject or a separate one.")]
-    [SerializeField] private TrailController trail;
+    [Header("Trail References")]
+    [Tooltip("One or more TrailControllers whose splines define safe corridors. " +
+             "A player is considered on-trail if they are within safeRadius of ANY listed trail.")]
+    [SerializeField] private List<TrailController> trails = new();
 
     [Header("Safe Zones")]
     [Tooltip("RadiationSafeZone volumes (camps, shelters, etc.) that exempt players from the " +
@@ -69,7 +69,7 @@ public class OffTrailRadiation : MonoBehaviour
         if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
             return;
 
-        if (trail == null) return;
+        if (trails == null || trails.Count == 0) return;
 
         // Rebuild the player list periodically rather than every frame.
         _refreshTimer -= Time.deltaTime;
@@ -118,32 +118,37 @@ public class OffTrailRadiation : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns the minimum distance from <paramref name="worldPos"/> to the spline,
-    /// computed by sampling <see cref="splineSampleCount"/> evenly-spaced points.
-    /// Respects <see cref="ignoreYAxis"/>.
+    /// Returns the minimum distance from <paramref name="worldPos"/> to the nearest spline
+    /// across all registered trails, computed by sampling <see cref="splineSampleCount"/>
+    /// evenly-spaced points per trail. Respects <see cref="ignoreYAxis"/>.
     /// </summary>
     private float GetDistanceToSpline(Vector3 worldPos)
     {
         float minSqr = float.MaxValue;
         float step = 1f / splineSampleCount;
 
-        for (int i = 0; i <= splineSampleCount; i++)
+        foreach (TrailController trail in trails)
         {
-            Vector3 sp = trail.SampleSpline(i * step);
+            if (trail == null) continue;
 
-            float sqr;
-            if (ignoreYAxis)
+            for (int i = 0; i <= splineSampleCount; i++)
             {
-                float dx = worldPos.x - sp.x;
-                float dz = worldPos.z - sp.z;
-                sqr = dx * dx + dz * dz;
-            }
-            else
-            {
-                sqr = (worldPos - sp).sqrMagnitude;
-            }
+                Vector3 sp = trail.SampleSpline(i * step);
 
-            if (sqr < minSqr) minSqr = sqr;
+                float sqr;
+                if (ignoreYAxis)
+                {
+                    float dx = worldPos.x - sp.x;
+                    float dz = worldPos.z - sp.z;
+                    sqr = dx * dx + dz * dz;
+                }
+                else
+                {
+                    sqr = (worldPos - sp).sqrMagnitude;
+                }
+
+                if (sqr < minSqr) minSqr = sqr;
+            }
         }
 
         return Mathf.Sqrt(minSqr);
@@ -154,32 +159,37 @@ public class OffTrailRadiation : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        if (trail == null || trail.Waypoints == null || trail.Waypoints.Count < 2) return;
-
-        for (int i = 0; i <= gizmoCorridorSections; i++)
+        foreach (TrailController trail in trails)
         {
-            float t  = (float)i / gizmoCorridorSections;
-            Vector3 pt = trail.SampleSpline(t);
+            if (trail == null || trail.Waypoints == null || trail.Waypoints.Count < 2) continue;
 
-            // Safe corridor — green tinted tube.
-            Gizmos.color = safeZoneColor;
-            Gizmos.DrawWireSphere(pt, safeRadius);
+            for (int i = 0; i <= gizmoCorridorSections; i++)
+            {
+                float t  = (float)i / gizmoCorridorSections;
+                Vector3 pt = trail.SampleSpline(t);
+
+                Gizmos.color = safeZoneColor;
+                Gizmos.DrawWireSphere(pt, safeRadius);
+            }
         }
     }
 
     private void OnDrawGizmosSelected()
     {
-        if (trail == null || trail.Waypoints == null || trail.Waypoints.Count < 2) return;
-
-        // When selected, also draw the outer danger boundary so it's clear what players feel.
         float dangerRadius = safeRadius * 1.5f;
-        for (int i = 0; i <= gizmoCorridorSections; i++)
-        {
-            float t    = (float)i / gizmoCorridorSections;
-            Vector3 pt = trail.SampleSpline(t);
 
-            Gizmos.color = dangerZoneColor;
-            Gizmos.DrawWireSphere(pt, dangerRadius);
+        foreach (TrailController trail in trails)
+        {
+            if (trail == null || trail.Waypoints == null || trail.Waypoints.Count < 2) continue;
+
+            for (int i = 0; i <= gizmoCorridorSections; i++)
+            {
+                float t    = (float)i / gizmoCorridorSections;
+                Vector3 pt = trail.SampleSpline(t);
+
+                Gizmos.color = dangerZoneColor;
+                Gizmos.DrawWireSphere(pt, dangerRadius);
+            }
         }
     }
 #endif
