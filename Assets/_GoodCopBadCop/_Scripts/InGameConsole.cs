@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 public class InGameConsole : MonoBehaviour
 {
-    public KeyCode toggleKey = KeyCode.BackQuote; // ` key
+    public KeyCode toggleKey = KeyCode.Home;
     public int maxLogs = 200;
 
     private bool showConsole = false;
