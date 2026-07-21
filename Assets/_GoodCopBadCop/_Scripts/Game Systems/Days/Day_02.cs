@@ -115,6 +115,15 @@ public class Day_02 : DayBase
     // Set by DebugSkipOpening to bypass Day2OpeningSequence entirely.
     private bool _debugSkipOpening;
 
+    [Header("Day 2 — Graffiti Tutorial")]
+    [Tooltip("Base objective text shown in the tutorial list. The scrubbed/total count is appended automatically, " +
+             "e.g. 'Clean graffiti using mop 0/4'.")]
+    [SerializeField] private string _taskCleanGraffitiText = "Clean graffiti using mop";
+
+    // Active tutorial objective item for the graffiti task — kept as a field so
+    // OnGraffitiProgress can update its text from outside the coroutine.
+    private TutorialObjectiveItem _graffitiObjectiveItem;
+
     // -------------------------------------------------------------------------
     // Day 2 Post-Shift Vlad Sequence (Out Back)
     // -------------------------------------------------------------------------
@@ -262,6 +271,11 @@ public class Day_02 : DayBase
         if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
 
+        // Spawn graffiti at the very start of Day 2 for the night-phase cleaning tutorial.
+        // Graffiti is visible throughout the shift and cleaned during the night phase.
+        if (NetworkManager.Singleton.IsServer)
+            CleanGraffitiTask.Instance?.TriggerDailyTask();
+
         // ── Opening Sequence Setup ──────────────────────────────────────────────
 
         _introDialogueTriggered      = false;
@@ -292,6 +306,10 @@ public class Day_02 : DayBase
 
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
+
+        // Clean up graffiti tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
+        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
+        _graffitiObjectiveItem = null;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -517,6 +535,10 @@ public class Day_02 : DayBase
             yield return new WaitUntil(() => lockerDone);
         }
 
+        // Show the graffiti tutorial objective and track progress independently of Vlad's exit.
+        // The graffiti lines are the last two nodes of _vladToolLockerDialogue — already spoken above.
+        StartCoroutine(GraffitiObjectiveSequence());
+
         // ── Phase 5: Vlad leaves ────────────────────────────────────────────────
         yield return new WaitForSeconds(_vladExitDelay);
 
@@ -611,6 +633,61 @@ public class Day_02 : DayBase
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Graffiti Tutorial Objective
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Shows the graffiti tutorial objective and keeps its count label live until
+    /// all graffiti pieces are scrubbed. Runs independently so Vlad can exit
+    /// while the task is still in progress. Server-side only (CleanGraffitiTask
+    /// state is replicated so the text on clients stays in sync via OnProgressChanged).
+    /// </summary>
+    private IEnumerator GraffitiObjectiveSequence()
+    {
+        if (TutorialObjectiveList.Instance == null || CleanGraffitiTask.Instance == null)
+            yield break;
+
+        int total = CleanGraffitiTask.Instance.TotalGraffitiCount;
+        _graffitiObjectiveItem = TutorialObjectiveList.Instance.AddObjective(
+            BuildGraffitiObjectiveText(CleanGraffitiTask.Instance.ScrubbedCount, total));
+
+        CleanGraffitiTask.OnProgressChanged += OnGraffitiProgress;
+
+        bool taskDone = false;
+        void OnTaskCompleted() => taskDone = true;
+        CleanGraffitiTask.Instance.OnDailyTaskCompleted += OnTaskCompleted;
+
+        yield return new WaitUntil(() => taskDone || CleanGraffitiTask.Instance == null);
+
+        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
+        if (CleanGraffitiTask.Instance != null)
+            CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnTaskCompleted;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_graffitiObjectiveItem);
+        yield return new WaitForSeconds(2f);
+        TutorialObjectiveList.Instance?.HideAndClear();
+        _graffitiObjectiveItem = null;
+
+        Debug.Log("[Day_02] Graffiti tutorial objective complete.");
+    }
+
+    /// <summary>
+    /// Called whenever <see cref="CleanGraffitiTask.OnProgressChanged"/> fires.
+    /// Updates the live count label on the tutorial objective row.
+    /// </summary>
+    private void OnGraffitiProgress()
+    {
+        if (_graffitiObjectiveItem == null || CleanGraffitiTask.Instance == null) return;
+        _graffitiObjectiveItem.SetText(
+            BuildGraffitiObjectiveText(
+                CleanGraffitiTask.Instance.ScrubbedCount,
+                CleanGraffitiTask.Instance.TotalGraffitiCount));
+    }
+
+    private string BuildGraffitiObjectiveText(int scrubbed, int total) =>
+        $"{_taskCleanGraffitiText} {scrubbed}/{total}";
 
     // -------------------------------------------------------------------------
     // Suspect arrival — fire tutorial once on the first suspect with a mutation anomaly

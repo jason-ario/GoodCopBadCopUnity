@@ -30,17 +30,20 @@ public class DialogueChoice : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         choiceTextUI.text  = picked ? "✓ " + choiceText : choiceText;
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
+    /// <summary>
+    /// Applies or clears the hover "> " prefix visually. Used by the controller navigation
+    /// path in <see cref="DialogueChoiceSystem"/> to show selection without mouse input.
+    /// No-ops when this choice has already been picked.
+    /// </summary>
+    public void SetHoverState(bool hovered)
     {
         if (_isPicked) return;
-        choiceTextUI.text = "> " + choiceText;
+        choiceTextUI.text = hovered ? "> " + choiceText : choiceText;
     }
 
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (_isPicked) return;
-        choiceTextUI.text = choiceText;
-    }
+    public void OnPointerEnter(PointerEventData eventData) => SetHoverState(true);
+
+    public void OnPointerExit(PointerEventData eventData) => SetHoverState(false);
 
     public void OnChooseChoice()
     {

@@ -2,6 +2,7 @@ using DG.Tweening;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// A lever-style power switch located at the power station.
@@ -97,6 +98,9 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         _isDown.OnValueChanged -= OnSwitchStateChanged;
     }
 
+    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
+
     // ── Update ────────────────────────────────────────────────────────────────
 
     private void Update()
@@ -104,7 +108,7 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        if (Input.GetMouseButton(0))
+        if (LmbHeld)
         {
             // Dragging down = positive Mouse Y maps to negative because "down" is visually pulling.
             _dragT = Mathf.Clamp01(_dragT - Input.GetAxis("Mouse Y") * _dragSensitivity);
@@ -112,7 +116,7 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
             CheckAudioThreshold();
         }
 
-        if (Input.GetMouseButtonUp(0))
+        if (LmbUp)
         {
             CommitSwitch();
             _exitCoroutine = StartCoroutine(ExitSwitchView());

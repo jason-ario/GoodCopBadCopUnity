@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
@@ -60,7 +61,7 @@ public class TutorialOverlay : MonoBehaviour
     {
         if (!_isShowing) return;
 
-        if (Input.GetKey(KeyCode.R))
+        if (Input.GetKey(KeyCode.R) || (Gamepad.current?.buttonWest.isPressed ?? false))
         {
             _holdProgress = Mathf.Min(_holdProgress + Time.deltaTime, holdDuration);
         }

@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 // LateUpdate must run after PlayerAnimationController (default order 0) so the world object
@@ -200,6 +201,11 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    // RT (rightTrigger) = LMB, LT (leftTrigger) = RMB — mirrors PlayerInteractionController.
+    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed             ?? false);
+    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame  ?? false);
+    private bool RmbUp   => Input.GetMouseButtonUp(1) || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
+
     void Update()
     {
         if (IsLocalPlayer == false)
@@ -211,8 +217,8 @@ public class PlayerPickupController : NetworkBehaviour
 
         if (HeldObject != null)
         {
-            // Release right-click: place the held object only if the placer is active and in range
-            if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(0))
+            // Release right-click / LT: place the held object only if the placer is active and in range
+            if (RmbUp && !LmbHeld)
             {
                 if (HeldObject == null)
                 {
@@ -232,7 +238,7 @@ public class PlayerPickupController : NetworkBehaviour
                 }
             }
             
-            if (Input.GetMouseButtonUp(0) && pickUpCooldownComplete)
+            if (LmbUp && pickUpCooldownComplete)
             {
                 StopUsingObject();
             }

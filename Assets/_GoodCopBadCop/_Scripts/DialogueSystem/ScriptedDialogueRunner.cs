@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Maps a string key defined in <see cref="ScriptedDialogueNode.cameraTrigger"/> to a
@@ -322,10 +323,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool overUI = UnityEngine.EventSystems.EventSystem.current != null &&
                       UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
 
-        bool pressedE     = Input.GetKeyDown(KeyCode.E);
-        bool pressedClick = Input.GetMouseButtonDown(0) && !overUI;
+        bool pressedE       = Input.GetKeyDown(KeyCode.E);
+        bool pressedClick   = Input.GetMouseButtonDown(0) && !overUI;
+        bool pressedGamepad = AnyGamepadButtonThisFrame();
 
-        if (!pressedE && !pressedClick) return;
+        if (!pressedE && !pressedClick && !pressedGamepad) return;
 
         if (DialogueManager.Instance.IsAnySubtitleRevealing())
         {
@@ -342,6 +344,30 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
     // Internal sequence
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns true if any gamepad button was pressed this frame, excluding Start and Select
+    /// (reserved for pause / guidebook).
+    /// </summary>
+    private static bool AnyGamepadButtonThisFrame()
+    {
+        Gamepad gp = Gamepad.current;
+        if (gp == null) return false;
+        return gp.buttonSouth.wasPressedThisFrame
+            || gp.buttonNorth.wasPressedThisFrame
+            || gp.buttonWest.wasPressedThisFrame
+            || gp.buttonEast.wasPressedThisFrame
+            || gp.leftShoulder.wasPressedThisFrame
+            || gp.rightShoulder.wasPressedThisFrame
+            || gp.leftTrigger.wasPressedThisFrame
+            || gp.rightTrigger.wasPressedThisFrame
+            || gp.leftStickButton.wasPressedThisFrame
+            || gp.rightStickButton.wasPressedThisFrame
+            || gp.dpad.up.wasPressedThisFrame
+            || gp.dpad.down.wasPressedThisFrame
+            || gp.dpad.left.wasPressedThisFrame
+            || gp.dpad.right.wasPressedThisFrame;
+    }
 
     private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false)

@@ -103,6 +103,11 @@ public class BetweenShiftTaskManager : MonoBehaviour
         {
             foreach (ISystemicThreat threat in _threats) threat?.BeginNightPhase();
             _performanceEvaluator?.BeginSampling(_threats);
+
+            // Auto-activate the trash task for any JunkItems already in the scene
+            // (e.g. a soldier body left at the end of a scripted shift sequence).
+            // If TakeOutTrashTask was already triggered explicitly this cycle, this is a no-op.
+            TakeOutTrashTask.Instance?.ActivateForExistingItems();
         }
 
         TaskRegistry.Instance?.SetThreats(_threats);

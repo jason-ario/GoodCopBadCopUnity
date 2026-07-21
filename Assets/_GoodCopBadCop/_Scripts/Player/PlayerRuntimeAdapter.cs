@@ -44,7 +44,9 @@ namespace GoodCopBadCop.Player
 
         private void RefreshLocalPlayer()
         {
-            NetworkObject playerObject = networkManager != null && networkManager.SpawnManager != null
+            NetworkObject playerObject = networkManager != null
+                && networkManager.SpawnManager != null
+                && networkManager.IsConnectedClient
                 ? networkManager.SpawnManager.GetLocalPlayerObject()
                 : null;
 

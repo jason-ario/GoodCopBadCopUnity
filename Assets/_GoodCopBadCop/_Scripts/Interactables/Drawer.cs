@@ -3,6 +3,7 @@ using System.Collections;
 using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class Drawer : Interactable, IHeldItemPassthrough
 {
@@ -30,6 +31,9 @@ public class Drawer : Interactable, IHeldItemPassthrough
     [Header("Drag")]
     [Tooltip("Drag speed magnitude. The drag direction is computed automatically from the camera angle relative to the drawer's slide axis — sign is ignored.")]
     [SerializeField] private float _dragSensitivity = 0.01f;
+
+    [Tooltip("Units per second the drawer travels at full right-stick deflection (controller only).")]
+    [SerializeField] private float _controllerDragSpeed = 1.5f;
 
     [Tooltip("Duration of the smooth lerp when remote clients receive a state change.")]
     [SerializeField] private float _snapDuration = 0.2f;
@@ -118,6 +122,9 @@ public class Drawer : Interactable, IHeldItemPassthrough
         _networkDragT.OnValueChanged -= OnNetworkDragTChanged;
     }
 
+    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
+
     // ── Input loop ────────────────────────────────────────────────────────────
 
     private void Update()
@@ -125,8 +132,8 @@ public class Drawer : Interactable, IHeldItemPassthrough
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        // Held → scrub drawer position. Accept both LMB and E so either key can drag.
-        if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.E))
+        // Held → scrub drawer position. Accept both LMB / RT and E so either input can drag.
+        if (LmbHeld || Input.GetKey(KeyCode.E))
         {
             _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
             ApplyDragPosition();
@@ -134,7 +141,7 @@ public class Drawer : Interactable, IHeldItemPassthrough
         }
 
         // Released → commit and exit. Fire when whichever input triggered the grab is released.
-        if (Input.GetMouseButtonUp(0) || Input.GetKeyUp(KeyCode.E))
+        if (LmbUp || Input.GetKeyUp(KeyCode.E))
         {
             CommitDrawer();
             _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
@@ -297,6 +304,20 @@ public class Drawer : Interactable, IHeldItemPassthrough
 
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
+
+        // Controller fallback: inject right stick into the projection math.
+        // Scale so that full deflection produces _controllerDragSpeed units/sec of _dragT travel.
+        if (Mathf.Abs(mouseX) < 0.001f && Mathf.Abs(mouseY) < 0.001f && Gamepad.current != null)
+        {
+            Vector2 stick = Gamepad.current.rightStick.ReadValue();
+            if (stick.sqrMagnitude > 0.001f)
+            {
+                // Divide out _dragSensitivity so the scale cancels when it's applied below.
+                float scale = _controllerDragSpeed * Time.deltaTime / Mathf.Max(Mathf.Abs(_dragSensitivity), 0.0001f);
+                mouseX = stick.x * scale;
+                mouseY = stick.y * scale;
+            }
+        }
 
         // Planar delta: how much mouse movement aligns with the drawer's screen-space direction.
         float planarDelta = screenLen > 0.01f

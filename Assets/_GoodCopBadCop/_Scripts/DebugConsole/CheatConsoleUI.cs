@@ -43,8 +43,8 @@ public class CheatConsoleUI : MonoBehaviour
     private void Awake()
     {
         RegisterCheats();
-        BuildUI();
-        SetVisible(false);
+        // UI is built lazily on first show so the Canvas render pipeline
+        // is fully initialised before TMP registers with RectMask2D.
     }
 
     private void Update()
@@ -62,6 +62,12 @@ public class CheatConsoleUI : MonoBehaviour
         _cheats.Add(("Skip to Day 1 — Booth Start", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay(1));
+            SetVisible(false);
+        }));
+
+        _cheats.Add(("Free Play — Day 1 Booth (No Tutorial)", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlayDay1());
             SetVisible(false);
         }));
 
@@ -149,13 +155,22 @@ public class CheatConsoleUI : MonoBehaviour
     private void SetVisible(bool visible)
     {
         _isVisible = visible;
-        _canvasRoot.SetActive(visible);
 
         if (visible)
         {
+            if (_canvasRoot == null)
+                BuildUI();
+
+            _canvasRoot.SetActive(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible   = true;
             RebuildLayout();
+            foreach (var tmp in _canvasRoot.GetComponentsInChildren<TextMeshProUGUI>())
+                tmp.ForceMeshUpdate();
+        }
+        else if (_canvasRoot != null)
+        {
+            _canvasRoot.SetActive(false);
         }
     }
 
@@ -305,7 +320,19 @@ public class CheatConsoleUI : MonoBehaviour
         var le = go.AddComponent<LayoutElement>();
         le.minHeight = le.preferredHeight = height;
 
-        var tmp = go.AddComponent<TextMeshProUGUI>();
+        // Use a child GO with explicit fill anchors so TMP gets a properly sized
+        // RectTransform regardless of the parent LayoutGroup's sizing pass.
+        // This mirrors AddButton's label pattern and fixes text not rendering.
+        var textGO = new GameObject("Text");
+        textGO.transform.SetParent(go.transform, false);
+        var textRT = textGO.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        var tmp = textGO.AddComponent<TextMeshProUGUI>();
+        tmp.font      = TMP_Settings.defaultFontAsset;
         tmp.text      = text;
         tmp.fontSize  = fontSize;
         tmp.color     = color;
@@ -344,6 +371,7 @@ public class CheatConsoleUI : MonoBehaviour
         labelRT.offsetMax = new Vector2(-16f, 0f);
 
         var tmp = labelGO.AddComponent<TextMeshProUGUI>();
+        tmp.font      = TMP_Settings.defaultFontAsset;
         tmp.text      = label;
         tmp.fontSize  = ButtonFontSize;
         tmp.color     = Color.white;

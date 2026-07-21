@@ -96,6 +96,7 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
         UIController.Instance.ShowCursor();
         UIController.Instance.ShowBackButton(CloseView);
+        UIController.Instance.ClosePlayerUI();
 
         if (_openSFX != null && SFXController.Instance != null)
             SFXController.Instance.PlayAtPosition(_openSFX, transform.position);
@@ -126,6 +127,7 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
+        UIController.Instance.ShowPlayerUI();
 
         // Re-enable player movement and interaction.
         if (_interactingPlayer != null)

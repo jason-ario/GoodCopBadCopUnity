@@ -163,6 +163,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             {
                 if (!CanLook) return;
                 Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
                 GetComponent<PlayerInteractionController>().SetReticleActive(true);
 
             }

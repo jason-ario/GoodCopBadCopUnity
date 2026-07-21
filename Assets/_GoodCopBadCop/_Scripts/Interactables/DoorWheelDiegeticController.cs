@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Diegetic view controller for the bunker door wheel knob.
@@ -29,6 +30,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
            + "Increase for a faster-responding wheel; decrease for a heavier feel.")]
     [SerializeField] private float _sensitivity = 1f;
 
+    [Tooltip("Degrees per second the wheel spins at full right-stick deflection (controller only). "
+           + "Stick left = CCW (unlocks door); stick right = CW.")]
+    [SerializeField] private float _controllerRotateSpeed = 120f;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     /// <summary>True while the player is holding LMB and dragging the wheel.</summary>
@@ -53,6 +58,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     /// <summary>Suppress the camera pan while the player is actively dragging the wheel.</summary>
     protected override bool SuppressCameraMovement => _isDragging;
+
+    private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
+    private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
+    private bool LmbUp   => Input.GetMouseButtonUp(0)   || (Gamepad.current?.rightTrigger.wasReleasedThisFrame  ?? false);
 
     protected override void OnOpened()
     {
@@ -84,15 +93,15 @@ public class DoorWheelDiegeticController : DiegeticViewController
         if (cam == null || _wheelTransform == null) return;
 
         // In case the button was released before the first OnUpdate (edge case).
-        if (_isDragging && !Input.GetMouseButton(0) && !Input.GetMouseButtonUp(0))
+        if (_isDragging && !LmbHeld && !LmbUp)
         {
             _isDragging = false;
             Close();
             return;
         }
 
-        // Mouse down while view is active and not yet dragging (e.g. player re-pressed).
-        if (!_isDragging && Input.GetMouseButtonDown(0))
+        // Mouse / RT down while view is active and not yet dragging (e.g. player re-pressed).
+        if (!_isDragging && LmbDown)
         {
             _isDragging = true;
             _lastMouseAngle = GetMouseAngleAroundWheel(cam);
@@ -100,7 +109,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         }
 
         // Release → exit the view.
-        if (Input.GetMouseButtonUp(0))
+        if (LmbUp)
         {
             _isDragging = false;
             Close();
@@ -111,10 +120,24 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         // ── Compute angular delta ─────────────────────────────────────────────
 
-        float currentMouseAngle = GetMouseAngleAroundWheel(cam);
-        // DeltaAngle handles wrap-around: positive = CCW, negative = CW.
-        float delta = Mathf.DeltaAngle(_lastMouseAngle, currentMouseAngle) * _sensitivity;
-        _lastMouseAngle = currentMouseAngle;
+        float delta;
+        Vector2 stick = Gamepad.current?.rightStick.ReadValue() ?? Vector2.zero;
+
+        if (stick.sqrMagnitude > 0.01f)
+        {
+            // Controller: right stick X drives CW/CCW.
+            // Stick left (negative X) = CCW = positive delta.
+            delta = -stick.x * _controllerRotateSpeed * Time.deltaTime * _sensitivity;
+            // Keep _lastMouseAngle current so there's no jump if the player switches to mouse mid-drag.
+            _lastMouseAngle = GetMouseAngleAroundWheel(cam);
+        }
+        else
+        {
+            float currentMouseAngle = GetMouseAngleAroundWheel(cam);
+            // DeltaAngle handles wrap-around: positive = CCW, negative = CW.
+            delta = Mathf.DeltaAngle(_lastMouseAngle, currentMouseAngle) * _sensitivity;
+            _lastMouseAngle = currentMouseAngle;
+        }
 
         // ── Apply CW clamp ────────────────────────────────────────────────────
 

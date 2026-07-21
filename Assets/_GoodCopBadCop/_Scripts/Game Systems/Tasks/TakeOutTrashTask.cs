@@ -217,6 +217,47 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Activates the trash task for any <see cref="JunkItem"/>s already present in the
+    /// scene WITHOUT spawning new items. If no active JunkItems exist the call is a no-op.
+    ///
+    /// Use this at the start of the night phase (or at any scripted moment) when items may
+    /// already be in the world — e.g. a soldier body left at the end of Day 1's shift.
+    /// Server-only.
+    /// </summary>
+    public void ActivateForExistingItems()
+    {
+        if (!IsServer) return;
+        if (_taskActive) return;
+
+        var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        int count = 0;
+        foreach (JunkItem j in existingJunk)
+        {
+            if (j.enabled && j.gameObject.activeInHierarchy)
+                count++;
+        }
+
+        if (count == 0)
+        {
+            Debug.Log("[TakeOutTrashTask] ActivateForExistingItems — no active JunkItems found, task not activated.");
+            return;
+        }
+
+        _taskActive = true;
+        _depositedCount.Value = 0;
+        _totalCount.Value = count;
+
+        UpdateThreatLevel();
+
+        JunkItem.OnAnyJunkItemCollected          += OnJunkItemCollected;
+        DumpsterInteractable.OnTrashBagDeposited += OnTrashBagDeposited;
+
+        _isActive.Value = true;
+
+        Debug.Log($"[TakeOutTrashTask] ActivateForExistingItems — activated for {count} existing JunkItem(s) (no new items spawned).");
+    }
+
+    /// <summary>
     /// Spawns a random number of trash items (between <see cref="_minSpawnCount"/> and
     /// <see cref="_maxSpawnCount"/>), counts any pre-existing <see cref="JunkItem"/>s
     /// already active in the scene (e.g. the dead soldier body), and registers this task

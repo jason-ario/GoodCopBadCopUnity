@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class DialogueChoiceSystem : NetworkBehaviour
 {
@@ -40,6 +41,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
     // Cached player arms — hidden while in dialogue mode, restored on exit.
     private GameObject _playerArms;
 
+    // ── Controller choice navigation ─────────────────────────────────────────
+
+    /// <summary>Index of the choice currently highlighted by the controller (-1 = none).</summary>
+    private int _controllerSelectedIndex = -1;
+
+    /// <summary>Earliest time the left-stick navigation can fire again (debounce).</summary>
+    private float _stickNavTime;
+
+    private const float StickNavCooldown = 0.25f;
+
     /// <summary>
     /// Matches the delay in <see cref="NPCRespondToDialogueChoice"/> so the choice panel
     /// re-appears the exact moment the NPC begins their response.
@@ -68,6 +79,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
         InitializeChoices(choices);
         dialogueChoiceContainer.SetActive(true);
+
+        // Pre-select the first choice for controller players.
+        if (Gamepad.current != null)
+            SetControllerSelection(0);
     }
 
     private void EnterDialogueMode()
@@ -281,11 +296,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
         ResetChoiceHighlights();
         InitializeChoices(choiceTexts);
         dialogueChoiceContainer.SetActive(true);
+
+        // Pre-select the first choice so the player can confirm without moving the stick first.
+        if (Gamepad.current != null)
+            SetControllerSelection(0);
     }
 
     /// <summary>Hides the choice panel without exiting dialogue mode.</summary>
     public void HideChoicePanel()
     {
+        ClearControllerSelection();
         dialogueChoiceContainer.SetActive(false);
         _scriptedChoiceCallback = null;
         _localChoiceLocked = false;
@@ -375,14 +395,101 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void Update()
     {
         if (!IsInDialogueMode) return;
+
+        // ── Controller: navigate and confirm choices ──────────────────────────
+        if (dialogueChoiceContainer.activeSelf && !_localChoiceLocked && Gamepad.current != null)
+        {
+            var gp = Gamepad.current;
+
+            bool navDown = gp.dpad.down.wasPressedThisFrame;
+            bool navUp   = gp.dpad.up.wasPressedThisFrame;
+
+            // Left stick with repeat cooldown so held input scrolls at a comfortable pace.
+            Vector2 stick = gp.leftStick.ReadValue();
+            if (stick.y < -0.5f && Time.time >= _stickNavTime) { navDown = true; _stickNavTime = Time.time + StickNavCooldown; }
+            if (stick.y >  0.5f && Time.time >= _stickNavTime) { navUp   = true; _stickNavTime = Time.time + StickNavCooldown; }
+
+            // Count only the active (populated) choice buttons.
+            int activeCount = 0;
+            foreach (var c in dialogueChoices)
+                if (c.gameObject.activeSelf) activeCount++;
+
+            if (activeCount > 0)
+            {
+                if (navDown || navUp)
+                {
+                    int dir = navDown ? 1 : -1;
+                    // Clamp rather than wrap so the selection doesn't jump from last→first.
+                    int newIdx = Mathf.Clamp(_controllerSelectedIndex + dir, 0, activeCount - 1);
+                    SetControllerSelection(newIdx);
+                }
+
+                if (gp.buttonSouth.wasPressedThisFrame && _controllerSelectedIndex >= 0)
+                    ChooseDialogueChoice(_controllerSelectedIndex);
+            }
+        }
+
+        // ── Skip NPC line while waiting to reshow choices (non-scripted mode) ─
         if (_reshowCoroutine == null) return;
-        if (!Input.GetMouseButtonDown(0)) return;
+
+        bool skipMouse   = Input.GetMouseButtonDown(0);
+        bool skipGamepad = Gamepad.current != null && AnyGamepadButtonThisFrame();
+
+        if (!skipMouse && !skipGamepad) return;
 
         // Ignore clicks that land on a UI element (e.g. the Back button).
         if (UnityEngine.EventSystems.EventSystem.current != null &&
             UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
 
         SkipNPCLine();
+    }
+
+    // ── Controller helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Moves the controller hover highlight to <paramref name="index"/>, clearing the
+    /// previous highlight. Pass -1 to clear without selecting a new choice.
+    /// </summary>
+    private void SetControllerSelection(int index)
+    {
+        if (_controllerSelectedIndex >= 0 && _controllerSelectedIndex < dialogueChoices.Length)
+            dialogueChoices[_controllerSelectedIndex].SetHoverState(false);
+
+        _controllerSelectedIndex = index;
+
+        if (_controllerSelectedIndex >= 0 && _controllerSelectedIndex < dialogueChoices.Length)
+            dialogueChoices[_controllerSelectedIndex].SetHoverState(true);
+    }
+
+    private void ClearControllerSelection()
+    {
+        if (_controllerSelectedIndex >= 0 && _controllerSelectedIndex < dialogueChoices.Length)
+            dialogueChoices[_controllerSelectedIndex].SetHoverState(false);
+        _controllerSelectedIndex = -1;
+    }
+
+    /// <summary>
+    /// Returns true if any gamepad button was pressed this frame, excluding Start and Select
+    /// (reserved for pause / guidebook).
+    /// </summary>
+    private static bool AnyGamepadButtonThisFrame()
+    {
+        Gamepad gp = Gamepad.current;
+        if (gp == null) return false;
+        return gp.buttonSouth.wasPressedThisFrame
+            || gp.buttonNorth.wasPressedThisFrame
+            || gp.buttonWest.wasPressedThisFrame
+            || gp.buttonEast.wasPressedThisFrame
+            || gp.leftShoulder.wasPressedThisFrame
+            || gp.rightShoulder.wasPressedThisFrame
+            || gp.leftTrigger.wasPressedThisFrame
+            || gp.rightTrigger.wasPressedThisFrame
+            || gp.leftStickButton.wasPressedThisFrame
+            || gp.rightStickButton.wasPressedThisFrame
+            || gp.dpad.up.wasPressedThisFrame
+            || gp.dpad.down.wasPressedThisFrame
+            || gp.dpad.left.wasPressedThisFrame
+            || gp.dpad.right.wasPressedThisFrame;
     }
 
     /// <summary>

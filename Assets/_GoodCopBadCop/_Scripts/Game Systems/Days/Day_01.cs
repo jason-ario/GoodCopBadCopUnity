@@ -2078,6 +2078,34 @@ public class Day_01 : DayBase
         Debug.Log("[Day_01] DebugSkipToSoldierSlot: Soldier intercept armed. Call SuspectController.NextSuspect() to trigger.");
     }
 
+    /// <summary>
+    /// Sets up Day 1 for free play: bypasses the entire opening sequence (Vlad, civilians,
+    /// Ivan), clears the Alexei intercept so normal suspects arrive, and unlocks all
+    /// tutorial-gated items (stamps, folder stack, doc exam shop item).
+    /// Call <c>ShiftManager.Instance.TryStartShift()</c> after this to begin the shift.
+    /// </summary>
+    public void DebugFreePlaySetup()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        // DebugSkipToSoldierSlot handles: _debugSkipActive flag, stopping coroutines,
+        // unsubscribing all scripted arrival handlers, opening/locking the shutter and
+        // lever, and clearing HandOffPoint.BlockVerdict.
+        DebugSkipToSoldierSlot();
+
+        // Free play — no soldier. Clear the intercept so the normal suspect queue runs.
+        SuspectController.InterceptNextSuspectSpawn = null;
+
+        // Unlock everything that DayActivated locked behind tutorial gates.
+        _stackOfFolders?.SetInteractable(true);
+        _documentationExamShopItem?.SetAvailable(true);
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+        _redStampSlot?.SetSlotInteractable(true);
+
+        Debug.Log("[Day_01] DebugFreePlaySetup: Day 1 configured for free play — tutorial gates bypassed, normal suspects will arrive.");
+    }
+
     // -------------------------------------------------------------------------
     // Deferred Verdict
     // -------------------------------------------------------------------------

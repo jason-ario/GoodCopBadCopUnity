@@ -1,62 +1,127 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /// <summary>
-/// Between-shift task: scrub off all graffiti pieces from the checkpoint walls using a mop.
+/// Daily graffiti-cleaning task. Graffiti is spawned at day start via
+/// <see cref="TriggerDailyTask"/> (called by <see cref="DailyTaskScheduler"/> or day scripts),
+/// then persists through the shift so players can scrub it during the night phase.
 ///
-/// On each task cycle the server randomly picks <see cref="_graffitiCount"/> spawn points,
-/// then instantiates a random graffiti prefab from the pool at each one. Once every piece
-/// has been scrubbed off the task is marked complete and the coupon reward is awarded.
+/// Implements both <see cref="ISystemicThreat"/> (HUD / performance scoring) and
+/// <see cref="IDailyTask"/> (compatible with <see cref="DailyTaskScheduler"/>).
 ///
 /// Scene setup:
 ///   - Add a NetworkObject component to this GameObject.
-///   - Assign <see cref="_graffitiPrefabs"/>: one or more prefabs, each registered as a Network Prefab.
+///   - Assign <see cref="_graffitiPrefabs"/>: one or more prefabs, each a registered Network Prefab.
 ///   - Assign <see cref="_spawnPoints"/>: Transforms placed on the checkpoint walls.
-///   - Adjust <see cref="_graffitiCount"/> to control difficulty.
-///   - Register this component on <see cref="BetweenShiftTaskManager"/> via the Inspector task list.
+///   - Set <see cref="_minGraffitiCount"/> / <see cref="_maxGraffitiCount"/> for difficulty range.
+///   - Add this task to <see cref="DailyTaskScheduler"/>'s pool in the Inspector.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
+public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 {
     public static CleanGraffitiTask Instance { get; private set; }
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName    = "Clean Graffiti";
-    [SerializeField] private int    _couponReward = 10;
-    [Tooltip("Number of graffiti pieces to spawn per task cycle.")]
-    [SerializeField] private int    _graffitiCount = 4;
+    [SerializeField] private string _taskName     = "Clean Graffiti";
+    [SerializeField] private int    _couponReward  = 10;
+
+    [Header("Daily Task")]
+    [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
+    [SerializeField] private string _dailyTaskId = "CleanGraffiti";
 
     [Header("Spawning")]
+    [Tooltip("Minimum number of graffiti pieces to spawn when triggered (inclusive).")]
+    [SerializeField] private int _minGraffitiCount = 2;
+    [Tooltip("Maximum number of graffiti pieces to spawn when triggered (inclusive).")]
+    [SerializeField] private int _maxGraffitiCount = 6;
     [Tooltip("Pool of graffiti prefabs to pick from at random. Each must be a registered Network Prefab.")]
     [SerializeField] private GameObject[] _graffitiPrefabs;
     [Tooltip("Transforms on the checkpoint walls where graffiti can appear. A point is picked at random for each piece.")]
     [SerializeField] private Transform[]  _spawnPoints;
 
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
-
-    public string TaskName    => _taskName;
-    public int    CouponReward => _couponReward;
-    public bool   IsComplete   => _isComplete;
-
-    /// <summary>Dynamic description reflects current scrub progress.</summary>
-    public string TaskDescription =>
-        _isComplete
-            ? $"All {_graffitiCount} pieces scrubbed!"
-            : $"Scrub graffiti: {_scrubbed.Value}/{_graffitiCount}";
-
     // ── Networked state ──────────────────────────────────────────────────────
 
-    private NetworkVariable<int> _scrubbed = new NetworkVariable<int>(
-        0,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<int> _scrubbed = new(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // Local flag — set on all clients via MarkCompleteClientRpc.
+    /// <summary>Total graffiti pieces spawned for this task cycle.</summary>
+    private readonly NetworkVariable<int> _totalCount = new(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Whether this task is currently active and should appear in the HUD task list.
+    /// Drives TaskRegistry registration on all clients, including late joiners.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isActive = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // ── Local state ───────────────────────────────────────────────────────────
+
+    private readonly List<NetworkObject> _spawnedGraffiti = new();
     private bool _isComplete;
 
-    // Server-side: tracks spawned graffiti so they can be cleaned up on reset.
-    private readonly List<NetworkObject> _spawnedGraffiti = new();
+    // ── ISystemicThreat ──────────────────────────────────────────────────────
+
+    public string ThreatName  => _taskName;
+    public float  ScoreWeight => 1f;
+
+    public float ThreatLevel => _totalCount.Value > 0
+        ? 1f - Mathf.Clamp01((float)_scrubbed.Value / _totalCount.Value)
+        : 0f;
+
+    /// <summary>Dynamic description reflects current scrub progress.</summary>
+    public string ThreatDescription =>
+        _isComplete
+            ? $"All {_totalCount.Value} pieces scrubbed!"
+            : _totalCount.Value > 0
+                ? $"Scrub graffiti: {_scrubbed.Value}/{_totalCount.Value}"
+                : string.Empty;
+
+    /// <summary>
+    /// No-op — graffiti is exclusively spawned at day start via <see cref="TriggerDailyTask"/>.
+    /// If graffiti was triggered that day it is already in place; the HUD entry stays
+    /// visible through the night phase via <see cref="OnTaskListChanged"/>.
+    /// </summary>
+    public void BeginNightPhase() { }
+
+    /// <summary>No-op.</summary>
+    public void EndNightPhase() { }
+
+    // ── IDailyTask ───────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public string DailyTaskId => _dailyTaskId;
+
+    /// <inheritdoc/>
+    public event Action OnDailyTaskCompleted;
+
+    /// <summary>
+    /// Spawns a random number of graffiti pieces at day start.
+    /// Despawns any leftovers from a previous cycle first.
+    /// Server-only; safe to call from <see cref="DailyTaskScheduler"/> or day scripts.
+    /// </summary>
+    public void TriggerDailyTask()
+    {
+        if (!IsServer) return;
+
+        _isComplete = false;
+        _scrubbed.Value = 0;
+        DespawnExistingGraffiti();
+
+        int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+        _totalCount.Value = count;
+
+        SpawnGraffiti(count);
+
+        // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
+        // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
+        _isActive.Value = true;
+
+        Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {count} graffiti piece(s).");
+    }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -74,7 +139,17 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _scrubbed.OnValueChanged += OnScrubbedChanged;
+        _scrubbed.OnValueChanged   += OnScrubbedChanged;
+        _totalCount.OnValueChanged += OnTotalCountChanged;
+        _isActive.OnValueChanged   += OnIsActiveChanged;
+
+        // Handle the initial value for late-joining clients.
+        if (_isActive.Value)
+            TaskRegistry.Instance?.AddThreat(this);
+
+        // Re-register whenever SetThreats clears the registry (e.g. at night-phase start),
+        // ensuring graffiti stays visible in the HUD throughout the night phase.
+        TaskRegistry.OnTaskListChanged += OnTaskListChanged;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDayStart;
@@ -83,7 +158,11 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _scrubbed.OnValueChanged -= OnScrubbedChanged;
+        _scrubbed.OnValueChanged   -= OnScrubbedChanged;
+        _totalCount.OnValueChanged -= OnTotalCountChanged;
+        _isActive.OnValueChanged   -= OnIsActiveChanged;
+
+        TaskRegistry.OnTaskListChanged -= OnTaskListChanged;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
@@ -92,75 +171,70 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
-    }
-
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Resets task state for a new night phase. Server spawns fresh graffiti;
-    /// all clients reset the local completion flag.
-    /// </summary>
-    public void ResetTask()
-    {
-        _isComplete = false;
-
-        if (!IsServer) return;
-
-        _scrubbed.Value = 0;
-        DespawnExistingGraffiti();
-        SpawnGraffiti();
+        TaskRegistry.OnTaskListChanged -= OnTaskListChanged;
+        OnDailyTaskCompleted = null;
+        OnProgressChanged    = null;
     }
 
     // ── Scrub callback (called by GraffitiInteractable on the server) ─────────
 
     /// <summary>
     /// Called by <see cref="GraffitiInteractable"/> on the server once a piece has been
-    /// fully scrubbed. Increments the progress counter and marks the task complete when
+    /// fully scrubbed. Increments the progress counter and completes the task when
     /// all pieces are done.
     /// </summary>
     public void OnGraffitiScrubbed()
     {
         if (!IsServer || _isComplete) return;
 
-        _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _graffitiCount);
+        _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
-        if (_scrubbed.Value >= _graffitiCount)
-        {
-            // Guard on server before the ClientRpc propagates.
-            _isComplete = true;
+        if (_scrubbed.Value < _totalCount.Value) return;
 
-            ATM.Instance?.SpawnCoupons(_couponReward);
+        _isComplete = true;
 
-            if (BetweenShiftTaskManager.Instance != null)
-                BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
+        ATM.Instance?.SpawnCoupons(_couponReward);
+        OnDailyTaskCompleted?.Invoke();
 
-            MarkCompleteClientRpc();
-        }
+        MarkCompleteClientRpc();
+
+        // Hide from HUD once all pieces are clean.
+        _isActive.Value = false;
+
+        Debug.Log("[CleanGraffitiTask] All graffiti scrubbed — task complete.");
     }
 
     [ClientRpc]
     private void MarkCompleteClientRpc()
     {
         _isComplete = true;
-        TaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────
 
-    /// <summary>Cleans up any remaining graffiti when a new day begins.</summary>
+    /// <summary>
+    /// Cleans up any remaining graffiti from the previous day.
+    /// Called before <see cref="TriggerDailyTask"/> so the spawn list is always fresh.
+    /// </summary>
     private void OnDayStart()
     {
         _isComplete = false;
 
         if (!IsServer) return;
 
-        _scrubbed.Value = 0;
-        DespawnExistingGraffiti();
+        if (_spawnedGraffiti.Count > 0)
+        {
+            _scrubbed.Value   = 0;
+            _totalCount.Value = 0;
+            DespawnExistingGraffiti();
+            _isActive.Value = false;
+        }
     }
 
     // ── Spawning (server only) ────────────────────────────────────────────────
 
-    private void SpawnGraffiti()
+    private void SpawnGraffiti(int count)
     {
         if (_graffitiPrefabs == null || _graffitiPrefabs.Length == 0)
         {
@@ -174,9 +248,9 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
             return;
         }
 
-        for (int i = 0; i < _graffitiCount; i++)
+        for (int i = 0; i < count; i++)
         {
-            Transform point  = _spawnPoints[Random.Range(0, _spawnPoints.Length)];
+            Transform  point  = _spawnPoints[Random.Range(0, _spawnPoints.Length)];
             GameObject prefab = _graffitiPrefabs[Random.Range(0, _graffitiPrefabs.Length)];
 
             GameObject go = Instantiate(prefab, point.position, point.rotation);
@@ -204,11 +278,56 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
         _spawnedGraffiti.Clear();
     }
 
+    // ── Registry management ───────────────────────────────────────────────────
+
+    private void OnIsActiveChanged(bool previous, bool current)
+    {
+        if (current)
+            TaskRegistry.Instance?.AddThreat(this);
+        else
+            TaskRegistry.Instance?.RemoveThreat(this);
+    }
+
+    /// <summary>
+    /// Re-registers this task when <see cref="TaskRegistry.SetThreats"/> replaces the
+    /// registry list (e.g. at night-phase start), so graffiti stays in the HUD for the
+    /// duration of the night phase if it was triggered at day start.
+    /// </summary>
+    private void OnTaskListChanged()
+    {
+        if (!_isActive.Value || TaskRegistry.Instance == null) return;
+
+        IReadOnlyList<ISystemicThreat> threats = TaskRegistry.Instance.Threats;
+        for (int i = 0; i < threats.Count; i++)
+            if (threats[i] == this) return;
+
+        TaskRegistry.Instance.AddThreat(this);
+    }
+
     // ── Progress sync ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired on every client whenever the scrubbed or total count changes.
+    /// Subscribe in day scripts to drive live count updates in tutorial UI.
+    /// </summary>
+    public static event Action OnProgressChanged;
+
+    /// <summary>Graffiti pieces scrubbed so far this task cycle.</summary>
+    public int ScrubbedCount => _scrubbed.Value;
+
+    /// <summary>Total graffiti pieces spawned for this task cycle.</summary>
+    public int TotalGraffitiCount => _totalCount.Value;
 
     private void OnScrubbedChanged(int previous, int current)
     {
-        TaskRegistry.Instance.NotifyTaskStateChanged();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnProgressChanged?.Invoke();
+    }
+
+    private void OnTotalCountChanged(int previous, int current)
+    {
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnProgressChanged?.Invoke();
     }
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────
@@ -227,8 +346,6 @@ public class CleanGraffitiTask : NetworkBehaviour, IBetweenShiftTask
             Vector3 pos = _spawnPoints[i].position;
 
             Gizmos.DrawWireSphere(pos, 0.15f);
-
-            // Draw a forward arrow so it's clear which way the graffiti faces on the wall.
             Gizmos.DrawLine(pos, pos + _spawnPoints[i].forward * 0.4f);
 
             UnityEditor.Handles.Label(pos + Vector3.up * 0.3f, $"Graffiti {i}");

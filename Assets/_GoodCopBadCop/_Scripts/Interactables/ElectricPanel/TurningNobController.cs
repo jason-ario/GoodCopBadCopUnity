@@ -1,0 +1,107 @@
+using System.Collections;
+using UnityEngine;
+
+/// <summary>
+/// Controls the turning knob on the electrical panel.
+///
+/// Rotation progress ranges 0 (Off) → 1 (On). The diegetic controller feeds
+/// screen-space angle deltas each frame via <see cref="AddDragDelta"/>. When the
+/// player releases the mouse, <see cref="OnRelease"/> springs the knob back to Off
+/// unless progress has reached <see cref="IsAtOnPosition"/>.
+/// </summary>
+public class TurningNobController : MonoBehaviour
+{
+    [Header("Transforms")]
+    [Tooltip("The knob mesh transform that visually rotates.")]
+    [SerializeField] private Transform _nobMesh;
+
+    [Tooltip("Marker whose local rotation represents the knob at the Off position.")]
+    [SerializeField] private Transform _offReference;
+
+    [Tooltip("Marker whose local rotation represents the knob at the On position.")]
+    [SerializeField] private Transform _onReference;
+
+    [Header("Feel")]
+    [Tooltip("Total screen-space rotation (degrees) required to travel from Off all the way to On.")]
+    [SerializeField] private float _degreesForFullTravel = 360f;
+
+    [Tooltip("Spring-back speed in normalised-progress units per second.")]
+    [SerializeField] private float _springBackSpeed = 1.5f;
+
+    [Tooltip("Progress fraction that counts as 'at the On position'.")]
+    [SerializeField, Range(0.85f, 1f)] private float _onThreshold = 0.95f;
+
+    // ─── State ────────────────────────────────────────────────────────────────
+
+    private float _progress; // 0 = Off, 1 = On
+    private Coroutine _springCoroutine;
+
+    /// <summary>True when the knob has been turned far enough to trigger power restore.</summary>
+    public bool IsAtOnPosition => _progress >= _onThreshold;
+
+    // ─── Public API ──────────────────────────────────────────────────────────
+
+    /// <summary>Immediately snaps the knob to the Off position. Called on power outage.</summary>
+    public void SnapToOff()
+    {
+        CancelSpring();
+        _progress = 0f;
+        ApplyRotation();
+    }
+
+    /// <summary>
+    /// Advances or retracts the knob by a screen-space angle delta (degrees).
+    /// Clockwise screen rotation (negative delta) moves toward On.
+    /// Call this each frame while the player is dragging.
+    /// </summary>
+    public void AddDragDelta(float screenAngleDelta)
+    {
+        CancelSpring();
+        // Negative screenAngleDelta = CW = advancing toward On.
+        _progress = Mathf.Clamp01(_progress - screenAngleDelta / _degreesForFullTravel);
+        ApplyRotation();
+    }
+
+    /// <summary>Called when the player releases the drag. Springs back if not yet at On.</summary>
+    public void OnRelease()
+    {
+        if (IsAtOnPosition) return;
+        _springCoroutine = StartCoroutine(SpringBackRoutine());
+    }
+
+    // ─── Private ─────────────────────────────────────────────────────────────
+
+    private void ApplyRotation()
+    {
+        if (_nobMesh == null) return;
+
+        Quaternion from = _offReference != null
+            ? _offReference.localRotation
+            : Quaternion.Euler(90f, 0f, 0f);
+
+        Quaternion to = _onReference != null
+            ? _onReference.localRotation
+            : Quaternion.Euler(90f, 270f, 0f);
+
+        _nobMesh.localRotation = Quaternion.Lerp(from, to, _progress);
+    }
+
+    private IEnumerator SpringBackRoutine()
+    {
+        while (_progress > 0f)
+        {
+            _progress = Mathf.MoveTowards(_progress, 0f, _springBackSpeed * Time.deltaTime);
+            ApplyRotation();
+            yield return null;
+        }
+
+        _springCoroutine = null;
+    }
+
+    private void CancelSpring()
+    {
+        if (_springCoroutine == null) return;
+        StopCoroutine(_springCoroutine);
+        _springCoroutine = null;
+    }
+}

@@ -2,6 +2,7 @@ using System.Collections;
 using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class Lever : Interactable, IHeldItemPassthrough
 {
@@ -41,6 +42,9 @@ public class Lever : Interactable, IHeldItemPassthrough
 
     [Tooltip("Multiplier applied to raw Mouse Y axis input. Higher = faster lever travel per mouse movement.")]
     [SerializeField] private float _dragSensitivity = 0.05f;
+
+    [Tooltip("Units per second the lever travels at full right-stick deflection (controller only).")]
+    [SerializeField] private float _controllerDragSpeed = 1.5f;
 
     [Tooltip("Duration of the snap tween when the lever commits to an end position on mouse release.")]
     [SerializeField] private float _snapDuration = 0.1f;
@@ -97,22 +101,30 @@ public class Lever : Interactable, IHeldItemPassthrough
             animator.enabled = false;
     }
 
+    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
+
     private void Update()
     {
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        // Drag while LMB is held — accumulate into _dragT.
-        // Input.GetAxis("Mouse Y") is already a per-frame delta; no Time.deltaTime needed.
-        if (Input.GetMouseButton(0))
+        // Drag while LMB / RT is held — accumulate into _dragT.
+        // Mouse Y is already a per-frame delta; controller stick is continuous so scale by Time.deltaTime.
+        if (LmbHeld)
         {
-            _dragT = Mathf.Clamp01(_dragT + Input.GetAxis("Mouse Y") * _dragSensitivity);
+            float mouseY = Input.GetAxis("Mouse Y");
+            float stickY = Gamepad.current?.rightStick.ReadValue().y ?? 0f;
+            float delta  = Mathf.Abs(mouseY) > 0.001f
+                ? mouseY * _dragSensitivity
+                : stickY * _controllerDragSpeed * Time.deltaTime;
+            _dragT = Mathf.Clamp01(_dragT + delta);
             ApplyDragRotation();
             CheckShutterThreshold();
         }
 
         // Release → commit position and exit.
-        if (Input.GetMouseButtonUp(0))
+        if (LmbUp)
         {
             CommitLever();
             _exitCoroutine = StartCoroutine(ExitLeverView());

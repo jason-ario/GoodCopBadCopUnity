@@ -429,6 +429,50 @@ public class DebugConsole : MonoBehaviour
         Debug.Log("[DebugConsole] Free Play Day 5 started — shift is running, tool locker unlocked, stamps interactable.");
     }
 
+    /// <summary>
+    /// Starts a fully playable Day 1 shift with no tutorials, no Alexei cutscene, and
+    /// no scripted opening sequence. All tutorial-gated items are unlocked up-front and
+    /// regular suspects arrive through the normal queue.
+    /// </summary>
+    public void StartFreePlayDay1()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] StartFreePlayDay1: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(1);
+        StartCoroutine(StartFreePlayDay1AfterDelay());
+    }
+
+    private IEnumerator StartFreePlayDay1AfterDelay()
+    {
+        // Wait one frame for Day_01 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_01.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] StartFreePlayDay1: Day_01.Instance not found after SkipToDay(1).");
+            yield break;
+        }
+
+        // Force the gate into post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Bypass opening sequence, clear Alexei intercept, unlock tutorial-gated items.
+        Day_01.Instance.DebugFreePlaySetup();
+
+        // SkipToDay(1) does not call UnlockInkStampsAfterDelay — do it explicitly here.
+        foreach (var stamp in FindObjectsByType<InkStamp>(FindObjectsSortMode.None))
+            stamp.SetSlotInteractable(true);
+
+        FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();
+        ShiftManager.Instance?.TryStartShift();
+
+        Debug.Log("[DebugConsole] Free Play Day 1 started — all tutorial gates bypassed, regular suspects will arrive.");
+    }
+
     /// <summary>Adds a one-off DebugTask to TaskRegistry for task testing.</summary>
     private void AddDebugTask()
     {
