@@ -251,9 +251,10 @@ public class PlayerInstance : NetworkBehaviour
             Debug.LogWarning("[PlayerInstance] Death Camera reference is null!");
         }
 
-        // Notify UI to show death screen after delay
+        // Notify UI to show death screen after delay and hide the HUD
         if (IsLocalPlayer)
         {
+            UIController.Instance?.ClosePlayerUI();
             UIController.Instance?.ShowDeathScreen(deathUIDelay);
         }
     }
@@ -283,6 +284,8 @@ public class PlayerInstance : NetworkBehaviour
 
         // Restore local visuals (head scale and arms)
         PlayerAnimationController?.SetSpectatorMode(false);
+
+        UIController.Instance?.ShowPlayerUI();
 
         Debug.Log("[PlayerInstance] Player respawned.");
     }
