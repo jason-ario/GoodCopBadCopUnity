@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Opens and closes the guidebook when the local player presses Tab.
@@ -65,9 +66,12 @@ public class GuidebookController : MonoBehaviour
     {
         if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsLocalPlayer) return;
 
-        if (!IsOpen && Input.GetButtonDown(InputButton))
+        bool guidebookInput = Input.GetButtonDown(InputButton)
+                              || (Gamepad.current?.selectButton.wasPressedThisFrame ?? false);
+
+        if (!IsOpen && guidebookInput)
             OpenGuidebook();
-        else if (IsOpen && Input.GetButtonDown(InputButton))
+        else if (IsOpen && guidebookInput)
             CloseGuidebook();
     }
 

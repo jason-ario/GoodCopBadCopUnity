@@ -16,6 +16,9 @@ public class SuspectController : NetworkBehaviour
 {
     public static SuspectController Instance;
 
+    /// <summary>Fired on the server immediately after a quarantine record is committed.</summary>
+    public static event System.Action OnSuspectQuarantined;
+
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
     [VContainer.Inject] private IPopulationService populationService;
     [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
@@ -1336,6 +1339,7 @@ public class SuspectController : NetworkBehaviour
                 quarantineRecord.populationKillPending = false;
                 quarantineRecord.quarantinedOnDay = CampaignManager.Instance?.CurrentDay ?? -1;
                 SuspectRunRecords.Instance.SaveRecords();
+                OnSuspectQuarantined?.Invoke();
             }
             suspectCharacter.animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);

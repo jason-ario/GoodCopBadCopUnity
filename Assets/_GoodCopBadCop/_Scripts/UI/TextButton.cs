@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler
+public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, ISelectHandler, IDeselectHandler
 {
     [SerializeField] private Animator anim;
     [SerializeField] private AudioClip sfxOnSelect;
@@ -39,6 +39,22 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         if (button != null && !button.interactable) return;
         SFXController.Instance?.Play(sfxOnClick);
         anim.SetBool("Selected", true);
+    }
+
+    /// <summary>Mirrors OnPointerEnter for gamepad/keyboard EventSystem navigation.</summary>
+    public void OnSelect(BaseEventData eventData)
+    {
+        if (button != null && !button.interactable) return;
+        anim.SetBool(useHover ? "Hovering" : "Selected", true);
+        SFXController.Instance?.Play(sfxOnSelect);
+    }
+
+    /// <summary>Mirrors OnPointerExit for gamepad/keyboard EventSystem navigation.</summary>
+    public void OnDeselect(BaseEventData eventData)
+    {
+        if (button != null && !button.interactable) return;
+        if (isActiveTab) return;
+        anim.SetBool(useHover ? "Hovering" : "Selected", false);
     }
 
     /// <summary>Marks this button as the active tab, keeping the selected animation state persistent.</summary>

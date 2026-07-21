@@ -74,7 +74,7 @@ public class ConfirmationDialogController : MonoBehaviour
         callback?.Invoke();
     }
 
-    private void Cancel()
+    public void Cancel()
     {
         Action callback = onCancel;
         Hide();

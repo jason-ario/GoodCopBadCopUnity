@@ -578,6 +578,24 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Debug helper — shows the end-of-shift report immediately on all clients without routing
+    /// through the ServerRpc or advancing the campaign day. Safe to call directly from the
+    /// cheat console at any point during a shift.
+    /// </summary>
+    public void DebugShowEndOfShiftReport()
+    {
+        ShowEndOfShiftReportClientRpc(
+            suspectsProcessed,
+            suspectsPassedCorrect,
+            suspectsPassedWrong,
+            suspectsQuarantined,
+            suspectsKilledCorrect,
+            suspectsKilledWrong,
+            populationModel.PopulationAlive.CurrentValue,
+            populationModel.DeadOvernight.CurrentValue);
+    }
+
+    /// <summary>
     /// Called by any client when a player confirms going to bed.
     /// Broadcasts the end-of-shift report to all clients so both players see it simultaneously.
     /// The tracked counters are passed as ints (NGO-serializable); each client rebuilds

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PlayerInteractionController : NetworkBehaviour
 {
@@ -34,6 +35,19 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _placerBlocked;
     private bool _canInteract = true;
     public bool CanInteract => _canInteract;
+
+    // ── Controller trigger helpers ─────────────────────────────────────────────
+    // RT  (rightTrigger)  = LMB — primary interact / item use
+    // LT  (leftTrigger)   = RMB — placement mode hold
+    // RB  (rightShoulder) = MMB — throw charge / release
+    // InputSystem's default press-point (0.5) converts the analog axes to the
+    // wasPressedThisFrame / isPressed / wasReleasedThisFrame digital events we need.
+    private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
+    private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
+    private bool RmbHeld => Input.GetMouseButton(1)     || (Gamepad.current?.leftTrigger.isPressed              ?? false);
+    private bool RmbUp   => Input.GetMouseButtonUp(1)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
+    private bool MmbDown => Input.GetMouseButtonDown(2) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
+    private bool MmbUp   => Input.GetMouseButtonUp(2)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
     public bool ReticleActive => reticleActive;
@@ -106,18 +120,18 @@ public class PlayerInteractionController : NetworkBehaviour
         
         if (CanInteract == false) return;
         
-        if (Input.GetMouseButtonUp(1))
+        if (RmbUp)
         {
             _placerBlocked = false;
         }
 
 
-        // LMB triggers primary interaction (Interact — pickup, use).
+        // LMB / RT triggers primary interaction (Interact — pickup, use).
         // E triggers alternate interaction (InteractAlternate — extract, secondary action).
         // When holding an item, both keys route to TryItemUse regardless.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
         // ClickDetector — skip TryItemUse so it doesn't double-fire and call OnStartUse again.
-        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E))
+        if (LmbDown || Input.GetKeyDown(KeyCode.E))
         {
             if (_playerPickupController.HeldObject == null)
                 TryWorldInteract(alternate: Input.GetKeyDown(KeyCode.E));
@@ -143,13 +157,13 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
-        if (Input.GetMouseButtonDown(2))
+        if (MmbDown)
             _throwController.StartCharge();
 
         if (_throwController.IsCharging)
             _throwController.UpdateCharge(Time.deltaTime);
 
-        if (Input.GetMouseButtonUp(2))
+        if (MmbUp)
             _throwController.ReleaseThrow();
     }
 
@@ -269,12 +283,12 @@ public class PlayerInteractionController : NetworkBehaviour
             bool placerInRange = hit.distance <= placementDistance;
             if (placerInRange)
             {
-                if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
+                if (LmbDown && RmbHeld)
                 {
                     _placerBlocked = true;
                 }
 
-                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace)
+                if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace)
                 {
                     CheckActivatePlacer(placementBoard, hit, true);
                 }
@@ -293,7 +307,7 @@ public class PlayerInteractionController : NetworkBehaviour
             else
             {
                 // Out of placement range — keep the placer visible but tint it red so the player knows they can't drop here
-                if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
+                if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
                 {
                     CheckActivatePlacer(placementBoard, hit, false);
                 }
@@ -315,12 +329,12 @@ public class PlayerInteractionController : NetworkBehaviour
         else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
         {
             // No interactable hit but we did hit a placement surface — handle free placement
-            if (Input.GetMouseButtonDown(0) && Input.GetMouseButton(1))
+            if (LmbDown && RmbHeld)
             {
                 _placerBlocked = true;
             }
 
-            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace)
+            if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace)
             {
                 CheckActivatePlacer(null, surfaceHit, true);
             }
@@ -339,7 +353,7 @@ public class PlayerInteractionController : NetworkBehaviour
         else
         {
             // Nothing hit — keep the placer visible but red if it is already active
-            if (Input.GetMouseButton(1) && !Input.GetMouseButton(0) && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject && ObjectPlacer.Instance.IsActive)
+            if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject && ObjectPlacer.Instance.IsActive)
             {
                 ObjectPlacer.Instance.SetInRange(false);
             }

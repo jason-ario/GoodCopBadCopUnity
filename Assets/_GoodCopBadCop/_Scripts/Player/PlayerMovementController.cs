@@ -4,6 +4,7 @@ using GoodCopBadCop.Settings;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.Cursor;
 
@@ -24,6 +25,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float mouseSmoothing = 10f;
     [SerializeField] private float acceleration = 20f;
     [SerializeField] private float drag = 5f;
+
+    [Header("Controller Settings")]
+    [Tooltip("Degrees per second for right stick look at full deflection.")]
+    [SerializeField] private float controllerLookSensitivity = 200f;
     private Vector3 targetLookEuler;
 
     [Header("Recoil Settings")]
@@ -75,6 +80,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private AudioClip landSound;
 
     private bool _wasGrounded;
+
+    // Input helpers — combine legacy Input Manager with gamepad polling so both
+    // keyboard/mouse and controller work simultaneously without migrating to
+    // the new Input System's action map callbacks.
+    private bool IsJumpHeld => Input.GetButton("Jump") || (Gamepad.current?.buttonSouth.isPressed ?? false);
+    private bool IsJumpDown => Input.GetButtonDown("Jump") || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false);
 
     [Header("Ground Check")]
     [Tooltip("Extra distance below the capsule base to scan for ground. Lower = stricter.")]
@@ -255,7 +266,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         _isUnderwater = false;
 
-        if (Input.GetButton("Jump") && !_isCrouching && _verticalVelocity > 0f)
+        if (IsJumpHeld && !_isCrouching && _verticalVelocity > 0f)
         {
             _verticalVelocity = jumpForce;
             _playerAnimationController?.TriggerJumpAnim();
@@ -282,7 +293,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         if (_isSitting && _canSitOrStand)
         {
-            if (Input.GetButtonDown("Back") && UIController.Instance.IsPaused == false)
+            bool standUpInput = Input.GetButtonDown("Back")
+                                || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+            if (standUpInput && UIController.Instance.IsPaused == false)
             {
                 StandUp();
             }
@@ -291,11 +304,20 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     void Move() 
     {
-        // Store input values for animation
-        MoveXRaw = Input.GetAxisRaw("Horizontal");
-        MoveZRaw = Input.GetAxisRaw("Vertical");
-        float MoveX = Input.GetAxis("Horizontal");
-        float MoveZ = Input.GetAxis("Vertical");
+        // Keyboard/D-pad input (legacy Input Manager)
+        float keyboardXRaw = Input.GetAxisRaw("Horizontal");
+        float keyboardZRaw = Input.GetAxisRaw("Vertical");
+        float keyboardX    = Input.GetAxis("Horizontal");
+        float keyboardZ    = Input.GetAxis("Vertical");
+
+        // Gamepad left stick — combined with keyboard so both devices work simultaneously
+        Vector2 leftStick = Gamepad.current?.leftStick.ReadValue() ?? Vector2.zero;
+        float MoveX = Mathf.Clamp(keyboardX + leftStick.x, -1f, 1f);
+        float MoveZ = Mathf.Clamp(keyboardZ + leftStick.y, -1f, 1f);
+
+        // Store raw values for animation
+        MoveXRaw = Mathf.Clamp(keyboardXRaw + leftStick.x, -1f, 1f);
+        MoveZRaw = Mathf.Clamp(keyboardZRaw + leftStick.y, -1f, 1f);
 
         // Check run input - blocked while crouching
         if (_isCrouching)
@@ -325,7 +347,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 SFXController.Instance.Play(landSound);
             }
 
-            if (_isUnderwater && Input.GetButton("Jump") && !_isCrouching)
+            if (_isUnderwater && IsJumpHeld && !_isCrouching)
             {
                 // Swim up from the seafloor — ramp toward swim speed instead of snapping to -2
                 _verticalVelocity = Mathf.MoveTowards(_verticalVelocity, underwaterSwimUpSpeed, underwaterSwimAcceleration * Time.deltaTime);
@@ -334,7 +356,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             {
                 _verticalVelocity = -2f; // Small constant to keep grounded
 
-                if (!_isUnderwater && Input.GetButtonDown("Jump") && !_isCrouching)
+                if (!_isUnderwater && IsJumpDown && !_isCrouching)
                 {
                     _verticalVelocity = jumpForce;
                     _playerAnimationController.TriggerJumpAnim();
@@ -350,7 +372,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             if (_isUnderwater)
             {
                 // Hold Jump to swim upward through the water column
-                if (Input.GetButton("Jump") && !_isCrouching)
+                if (IsJumpHeld && !_isCrouching)
                     _verticalVelocity = Mathf.MoveTowards(_verticalVelocity, underwaterSwimUpSpeed, underwaterSwimAcceleration * Time.deltaTime);
 
                 if (_verticalVelocity < underwaterTerminalVelocity)
@@ -401,20 +423,29 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     {
         float appliedMouseSensitivity = _baseMouseSensitivity * (_settingsMouseSensitivity / 50f);
         float verticalDirection = _invertYAxis ? -1f : 1f;
+
+        // Mouse delta — run through smoothing to eliminate jitter
         float mouseX = Input.GetAxis("Mouse X") * appliedMouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * appliedMouseSensitivity * verticalDirection;
-
-        // Smooth the raw mouse input
         _smoothedMouseX = Mathf.Lerp(_smoothedMouseX, mouseX, mouseSmoothing * Time.deltaTime);
         _smoothedMouseY = Mathf.Lerp(_smoothedMouseY, mouseY, mouseSmoothing * Time.deltaTime);
 
-        // Rotate player (Y axis) based on horizontal mouse movement
-        transform.Rotate(Vector3.up * _smoothedMouseX);
+        // Gamepad right stick — already a continuous axis value; scale by deltaTime for
+        // frame-rate-independent rotation. No extra smoothing layer to avoid added latency.
+        Vector2 rightStick = Gamepad.current?.rightStick.ReadValue() ?? Vector2.zero;
+        float controllerX =  rightStick.x * controllerLookSensitivity * Time.deltaTime;
+        float controllerY =  rightStick.y * controllerLookSensitivity * Time.deltaTime * verticalDirection;
+
+        float totalX = _smoothedMouseX + controllerX;
+        float totalY = _smoothedMouseY + controllerY;
+
+        // Rotate player (Y axis) based on horizontal look input
+        transform.Rotate(Vector3.up * totalX);
         
-        // Rotate camera (X axis) based on vertical mouse movement
+        // Rotate camera (X axis) based on vertical look input
         if (cameraTransform != null)
         {
-            _cameraPitch -= _smoothedMouseY;
+            _cameraPitch -= totalY;
             _cameraPitch = Mathf.Clamp(_cameraPitch, -maxLookAngle, maxLookAngle);
             
             // Combine base aim pitch with procedural recoil rotation
@@ -621,9 +652,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     private void UpdateCrouchInput()
     {
+        bool gamepadCrouchDown = Gamepad.current?.buttonEast.wasPressedThisFrame ?? false;
+        bool gamepadCrouchHeld = Gamepad.current?.buttonEast.isPressed ?? false;
+
         if (_crouchMode == EInputActivationMode.Toggle)
         {
-            if (Input.GetKeyDown(KeyCode.LeftControl))
+            if (Input.GetKeyDown(KeyCode.LeftControl) || gamepadCrouchDown)
             {
                 SetCrouching(!_isCrouching);
             }
@@ -631,7 +665,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             return;
         }
 
-        bool crouchHeld = Input.GetKey(KeyCode.LeftControl);
+        bool crouchHeld = Input.GetKey(KeyCode.LeftControl) || gamepadCrouchHeld;
         if (crouchHeld && !_isCrouching)
             SetCrouching(true);
         else if (!crouchHeld && _isCrouching)
@@ -640,13 +674,16 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     private bool IsSprintInputActive()
     {
-        bool sprintHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        bool sprintHeld    = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)
+                             || (Gamepad.current?.leftStickButton.isPressed ?? false);
+        bool sprintPressed = Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)
+                             || (Gamepad.current?.leftStickButton.wasPressedThisFrame ?? false);
+
         if (_sprintMode == EInputActivationMode.Hold)
         {
             return sprintHeld;
         }
 
-        bool sprintPressed = Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift);
         if (sprintPressed)
         {
             _sprintToggleActive = !_sprintToggleActive;

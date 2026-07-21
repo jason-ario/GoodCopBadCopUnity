@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Steamworks;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
@@ -103,13 +104,17 @@ public class UIController : MonoBehaviour
         // "Back" shortcut so it doesn't double-fire through the back button as well.
         if (backButtonUI.activeSelf == true && !DiegeticViewController.IsAnyViewActive)
         {
-            if(Input.GetButtonDown("Back"))
+            bool backInput = Input.GetButtonDown("Back")
+                             || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+            if (backInput)
             {
                 backButton.onClick.Invoke();
             }
         }
 
-        if (Input.GetButtonDown("Pause"))
+        bool pauseInput = Input.GetButtonDown("Pause")
+                          || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
+        if (pauseInput)
         {
             if (pauseMenuOpened)
             {

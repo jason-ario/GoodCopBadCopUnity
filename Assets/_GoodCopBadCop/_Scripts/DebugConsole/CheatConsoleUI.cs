@@ -138,6 +138,12 @@ public class CheatConsoleUI : MonoBehaviour
             DebugConsole.Instance.SmashGlass();
             SetVisible(false);
         }));
+
+        _cheats.Add(("Trigger End of Shift Report", () =>
+        {
+            ShiftManager.Instance?.DebugShowEndOfShiftReport();
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

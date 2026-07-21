@@ -6,6 +6,7 @@ using DG.Tweening;
 using GoodCopBadCop.UI.SettingsMenu;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Playables;
 using R3;
 using VContainer;
@@ -110,6 +111,38 @@ public class MainMenuController : MonoBehaviour
         SwitchToScreen(homeScreen);
         playableDirector.gameObject.SetActive(true);
         RefreshContinueButton();
+    }
+
+    private void Update()
+    {
+        if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
+
+        // Quit confirmation dialog open — B = cancel
+        if (quitConfirmationDialog != null && quitConfirmationDialog.gameObject.activeSelf)
+        {
+            quitConfirmationDialog.Cancel();
+            return;
+        }
+
+        // Settings screen open — B = close settings / back to home
+        if (isSettingsOpen)
+        {
+            CloseSettingsScreen();
+            return;
+        }
+
+        // Route back action based on the current screen
+        if (_currentScreen == campaignScreen
+            || _currentScreen == multiplayerScreen
+            || _currentScreen == preGameLobbyScreen)
+        {
+            BackToHomeScreen();
+        }
+        else if (_currentScreen == joinGameScreen)
+        {
+            BackToMultiplayerScreen();
+        }
+        // homeScreen is the root — no back action
     }
 
     // ---------------------------------------------------------------------------

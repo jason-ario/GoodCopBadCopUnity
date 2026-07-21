@@ -76,7 +76,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             StopCoroutine(revealRoutine);
         
         gameObject.SetActive(true);
-        _contentContainer?.SetActive(true);
 
         revealRoutine = StartCoroutine(RevealReportRoutine(reportRows, civiliansKilledOvernight));
     }
@@ -85,6 +84,7 @@ public class EndOfShiftReportUI : MonoBehaviour
     {
         banner.SetActive(false);
         subHeaderText.SetTextInstant(" ");
+        _contentContainer?.SetActive(false);
 
         if (rows != null)
         {
@@ -129,6 +129,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         banner.SetActive(true);
         yield return new WaitForSeconds(.5f);
         yield return subHeaderText.RevealText("Checkpoint Performance Summary");
+        _contentContainer?.SetActive(true);
         
         int count = Mathf.Min(reportRows.Count, rows.Count);
         int total = 0;
@@ -222,9 +223,12 @@ public class EndOfShiftReportUI : MonoBehaviour
         }
 
         if (netEarningsReveal != null)
+        {
             yield return netEarningsReveal.RevealText(totalString);
+            netEarningsText.text = totalString + " <sprite=0>";
+        }
         else if (netEarningsText != null)
-            netEarningsText.text = totalString;
+            netEarningsText.text = totalString + " <sprite=0>";
     }
 
     private string FormatValue(int amount, bool isPenalty)
