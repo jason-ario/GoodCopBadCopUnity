@@ -3,6 +3,7 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 public class GameManager : NetworkBehaviour
 {
@@ -20,6 +21,13 @@ public class GameManager : NetworkBehaviour
 
     private bool _isSinglePlayer;
     public bool IsSinglePlayer => _isSinglePlayer;
+
+    /// <summary>
+    /// Set to true on the server before a Restart Day scene reload so that
+    /// <see cref="OnNetworkSpawn"/> can auto-trigger the game start sequence after reload.
+    /// Static so it survives the scene reload within the same AppDomain.
+    /// </summary>
+    private static bool _isRestartingDay;
 
     public bool HasGameStarted { get; private set; }
 
@@ -342,5 +350,51 @@ public class GameManager : NetworkBehaviour
             ).position;
 
         PlayerInstance.Instance.SetIsOutside(false);
+    }
+
+    // -------------------------------------------------------------------------
+    // Restart Day
+    // -------------------------------------------------------------------------
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // After a Restart Day scene reload the server auto-runs the full lobby
+        // transition + game start sequence so all clients land back in gameplay
+        // on the same saved day, without any manual interaction.
+        if (IsServer && _isRestartingDay)
+        {
+            _isRestartingDay = false;
+            StartCoroutine(RestartDaySequence());
+        }
+    }
+
+    /// <summary>
+    /// Reloads the active scene for all connected clients via NGO's network scene manager,
+    /// preserving the network session and active save slot. After reload,
+    /// <see cref="OnNetworkSpawn"/> automatically restarts the day from the host's save file.
+    /// SERVER ONLY.
+    /// </summary>
+    public void RestartDay()
+    {
+        if (!IsServer) return;
+
+        _isRestartingDay = true;
+        string sceneName = SceneManager.GetActiveScene().name;
+
+        if (NetworkManager.Singleton.SceneManager != null)
+            NetworkManager.Singleton.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        else
+            SceneManager.LoadScene(SceneManager.GetActiveScene().path);
+    }
+
+    private IEnumerator RestartDaySequence()
+    {
+        // Wait one frame for the new scene's objects to fully initialize.
+        yield return null;
+        BeginLobbyTransition();
+        TransitionToLobby();
+        TryStartGame();
     }
 }
