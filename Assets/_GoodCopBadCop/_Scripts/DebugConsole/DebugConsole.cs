@@ -210,12 +210,6 @@ public class DebugConsole : MonoBehaviour
             ForceFullMutantButcher();
         }
 
-        // P — teleport the local player to the power station spawn point.
-        if (Input.GetKeyDown(KeyCode.P))
-        {
-            TeleportToPowerStation();
-        }
-
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
