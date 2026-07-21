@@ -1,3 +1,4 @@
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -6,9 +7,11 @@ public class DeathScreenUI : MonoBehaviour
 {
     [SerializeField] private GameObject restartDayButton;
     [SerializeField] private GameObject backToMenuButton;
+    [SerializeField] private TextMeshProUGUI daysSurvivedText;
 
     private void OnEnable()
     {
+        RefreshDaysSurvivedText();
         RefreshButtonVisibility();
         SubscribeToDeathEvents();
     }
@@ -16,6 +19,20 @@ public class DeathScreenUI : MonoBehaviour
     private void OnDisable()
     {
         UnsubscribeFromDeathEvents();
+    }
+
+    // -------------------------------------------------------------------------
+    // Days Survived Text
+    // -------------------------------------------------------------------------
+
+    private void RefreshDaysSurvivedText()
+    {
+        if (daysSurvivedText == null) return;
+
+        int day = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        daysSurvivedText.text = day == 1
+            ? "You survived 1 day"
+            : $"You survived {day} days";
     }
 
     // -------------------------------------------------------------------------
