@@ -204,12 +204,6 @@ public class DebugConsole : MonoBehaviour
             ForceAlexeiSequenceOnNextSuspect();
         }
 
-        // B — skip to Day 4 booth-ready and force the Butcher to arrive as fully mutated.
-        if (Input.GetKeyDown(KeyCode.B))
-        {
-            ForceFullMutantButcher();
-        }
-
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
