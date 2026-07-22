@@ -5,8 +5,9 @@ using UnityEngine;
 
 /// <summary>
 /// A trash bag that can be picked up, filled with JunkItems, and deposited in a
-/// DumpsterInteractable. Extends PickableObject to integrate with the existing item
-/// hold/drop system.
+/// DumpsterInteractable by throwing it with real physics (ThrowController) into the
+/// dumpster's opening. Extends PickableObject to integrate with the existing item
+/// hold/drop/throw system.
 ///
 /// Fill level is reflected on the mesh through the "Key 1" blend shape on the
 /// SkinnedMeshRenderer: weight 100 = empty bag, weight 0 = fully stuffed bag.
@@ -60,6 +61,17 @@ public class TrashBag : PickableObject, IAmmoProvider
 
     /// <summary>Maximum junk items this bag can hold (inspector-configurable).</summary>
     public int MaxJunkCapacity => _maxJunkCapacity;
+
+    /// <summary>
+    /// True once this exact bag instance has been deposited in a dumpster. Server-only state —
+    /// checked and set by <see cref="DumpsterInteractable.TryDepositThrownBag"/> so the same
+    /// bag can never be registered more than once, even if multiple trigger events fire for it
+    /// (e.g. overlapping colliders, or re-entering the deposit zone before despawn completes).
+    /// </summary>
+    public bool IsDeposited { get; private set; }
+
+    /// <summary>Marks this bag as deposited. Server-only; call exactly once, before despawning.</summary>
+    public void MarkDeposited() => IsDeposited = true;
 
     // ── IAmmoProvider ─────────────────────────────────────────────────────────
 
@@ -169,25 +181,5 @@ public class TrashBag : PickableObject, IAmmoProvider
     {
         float fillRatio = _maxJunkCapacity > 0 ? (float)junkCount / _maxJunkCapacity : 0f;
         return (1f - fillRatio) * 100f;
-    }
-
-    // ── Throw arc ─────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Broadcasts a DOTween throw arc to all clients so onlooker clients also see
-    /// the bag fly into the dumpster rather than disappearing from mid-air.
-    /// Called by DumpsterInteractable after ReleaseHeldObjectForThrow() on the
-    /// throwing client; runs on every client including the thrower.
-    /// </summary>
-    /// <param name="targetPosition">World-space landing point inside the dumpster.</param>
-    /// <param name="jumpHeight">Peak height of the arc above the straight-line path.</param>
-    /// <param name="jumpDuration">Total arc duration in seconds.</param>
-    /// <param name="ease">DOTween Ease cast to int for RPC serialization.</param>
-    [ClientRpc]
-    public void PlayThrowArcClientRpc(Vector3 targetPosition, float jumpHeight, float jumpDuration, int ease)
-    {
-        transform.DOKill();
-        transform.DOJump(targetPosition, jumpHeight, numJumps: 1, jumpDuration)
-                 .SetEase((Ease)ease);
     }
 }

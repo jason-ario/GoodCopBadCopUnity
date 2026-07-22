@@ -16,9 +16,9 @@ public class GeigerCounterUI : MonoBehaviour
     [Header("Needle")]
     [Tooltip("RectTransform of the needle. Its pivot must be at (0.5, 0) – bottom-centre.")]
     [SerializeField] private RectTransform needle;
-    [Tooltip("Z-rotation in degrees when radiation is 0 (needle pointing upper-left).")]
+    [Tooltip("Z-rotation in degrees when current exposure rate is 0 (needle pointing upper-left).")]
     [SerializeField] private float minNeedleAngle = 65f;
-    [Tooltip("Z-rotation in degrees when radiation is at max (needle pointing upper-right).")]
+    [Tooltip("Z-rotation in degrees when current exposure rate is at/above maxExposureRate (needle pointing upper-right).")]
     [SerializeField] private float maxNeedleAngle = -65f;
     [SerializeField] private float needleSmoothSpeed = 6f;
 
@@ -84,6 +84,7 @@ public class GeigerCounterUI : MonoBehaviour
         if (_playerRadiation == null && PlayerInstance.Instance?.PlayerRadiation != null)
             SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
 
+        DecayExposureRate();
         AnimateNeedle();
     }
 
@@ -131,25 +132,29 @@ public class GeigerCounterUI : MonoBehaviour
     private void OnRadiationChanged(float current, float max)
     {
         float normalized = max > 0f ? current / max : 0f;
-        _targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, normalized);
 
-        // ── Measure exposure rate ──────────────────────────────────────────────
+        // ── Measure exposure rate (current velocity, not accumulated total) ────
+        // The needle reflects how fast radiation is being gained right now; the
+        // accumulated/overall radiation is shown by a separate meter (RadiationBarUI).
         float now     = Time.time;
         float elapsed = now - _lastRadiationTime;
 
         if (elapsed > 0f && elapsed < 2f)   // ignore stale gaps (scene load, pause, etc.)
         {
-            float instantRate      = Mathf.Max(0f, current - _previousRadiation) / elapsed;
-            float normalizedRate   = Mathf.Clamp01(instantRate / Mathf.Max(0.001f, maxExposureRate));
+            float instantRate    = Mathf.Max(0f, current - _previousRadiation) / elapsed;
+            float normalizedRate = Mathf.Clamp01(instantRate / Mathf.Max(0.001f, maxExposureRate));
+
+            _targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, normalizedRate);
+
             // Square-root curve so even slow passive exposure produces visible jitter.
-            float targetJitter     = Mathf.Sqrt(normalizedRate);
+            float targetJitter = Mathf.Sqrt(normalizedRate);
             _jitterScale = Mathf.Lerp(_jitterScale, targetJitter, elapsed * jitterSmoothing);
         }
 
         _previousRadiation = current;
         _lastRadiationTime = now;
 
-        // ── Arc and text ───────────────────────────────────────────────────────
+        // ── Arc and text – still reflect the overall/accumulated radiation ─────
         if (arcFillImage != null)
         {
             arcFillImage.fillAmount = normalized;
@@ -158,6 +163,21 @@ public class GeigerCounterUI : MonoBehaviour
 
         if (radiationValueText != null)
             radiationValueText.text = string.Format(valueFormat, current) + valueSuffix;
+    }
+
+    /// <summary>
+    /// If no radiation event has arrived recently, the exposure rate is treated as
+    /// having dropped to zero so the needle settles back to <see cref="minNeedleAngle"/>
+    /// instead of freezing at the last measured rate.
+    /// </summary>
+    private void DecayExposureRate()
+    {
+        float sinceLastUpdate = Time.time - _lastRadiationTime;
+        if (sinceLastUpdate <= 0.5f)
+            return;
+
+        _targetAngle = minNeedleAngle;
+        _jitterScale = Mathf.Lerp(_jitterScale, 0f, Time.deltaTime * jitterSmoothing);
     }
 
     // ── Needle animation ───────────────────────────────────────────────────────

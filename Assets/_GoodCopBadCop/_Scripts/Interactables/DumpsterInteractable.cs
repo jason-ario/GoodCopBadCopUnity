@@ -1,61 +1,37 @@
 using System;
-using System.Collections;
-using DG.Tweening;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Interactable dumpster for the Trash Build-up systemic threat.
+/// Dumpster for the Trash Build-up systemic threat.
 ///
-/// Left-clicking the dumpster while holding a TrashBag triggers the throw sequence:
-///   1. Player controls are locked.
-///   2. A throw animation trigger is fired on the player animator (synced to all clients).
-///   3. ReleaseHeldObjectForThrow() detaches the bag without calling DropServerRpc,
-///      keeping NetworkTransform disabled so DOTween retains full control.
-///   4. DOJump arcs the real bag into the dumpster.
-///   5. The bag is despawned and controls are restored.
-///
-/// Once full, left-clicking with no held item calls HQ for pickup (from CollectableContainer.Interact).
-///
-/// Bags can also be deposited by throwing them with real physics (ThrowController's F-key
-/// charge-and-release throw) directly into the dumpster's opening — a child
+/// The ONLY way to deposit a TrashBag is to throw it with real physics (ThrowController's
+/// F-key charge-and-release throw) directly into the dumpster's opening — a child
 /// DumpsterPhysicsDepositZone trigger volume detects the in-flight bag and calls
-/// <see cref="TryDepositThrownBag"/>, which deposits it immediately without the scripted
-/// windup/animation sequence used by the left-click interact flow.
+/// <see cref="TryDepositThrownBag"/>, which validates and deposits it. There is no
+/// left-click / interact-based deposit flow; the dumpster does not accept items via
+/// InteractWithItem.
+///
+/// Each TrashBag instance can only be deposited once — <see cref="TrashBag.IsDeposited"/>
+/// is checked and set atomically in <see cref="TryDepositThrownBag"/> so a bag can never be
+/// registered twice (e.g. from overlapping trigger events in the same physics step).
 ///
 /// A world-space label hovers above the dumpster and is visible only while the player looks
-/// at it. It shows "X/Capacity" in white, "FULL" in red, or "PICKUP REQUESTED" in yellow.
+/// at it. It shows the current deposited count.
 ///
 /// Prefab setup:
 ///   - NetworkObject + HighlightEffect + Collider (Interactable layer)
-///   - Trash Bag PickableItemData assigned to itemsThatCanInteractWith
-///   - Three child Transforms assigned to _throwTargets (positions inside the dumpster opening)
 ///   - A child GameObject with a trigger Collider + DumpsterPhysicsDepositZone, positioned
 ///     inside the opening, to catch bags thrown in with physics
 /// </summary>
 public class DumpsterInteractable : CollectableContainer
 {
-    private const string ThrowAnimTrigger = "ThrowTrashBag";
-
     /// <summary>
     /// Fired on the server when a TrashBag is successfully deposited.
     /// The parameter is the number of junk items that were in the bag.
     /// </summary>
     public static event Action<int> OnTrashBagDeposited;
-
-    [Header("Throw Targets")]
-    [Tooltip("Three positions inside the dumpster opening. One is chosen at random per throw.")]
-    [SerializeField] private Transform[] _throwTargets = new Transform[3];
-
-    [Header("Throw Settings")]
-    [Tooltip("Seconds after the animation trigger fires before the bag visually leaves the hand.")]
-    [SerializeField] private float _throwWindupDelay = 0.15f;
-    [Tooltip("Peak height of the throw arc above the straight-line path.")]
-    [SerializeField] private float _jumpHeight = 1.5f;
-    [Tooltip("Total duration of the throw arc in seconds.")]
-    [SerializeField] private float _jumpDuration = 0.45f;
-    [SerializeField] private Ease _jumpEase = Ease.Linear;
 
     [Header("World Label")]
     [Tooltip("The world-space Canvas GO that contains the label. Toggled on reticle hover.")]
@@ -111,82 +87,6 @@ public class DumpsterInteractable : CollectableContainer
     /// <summary>Dumpsters have no fill limit — always accept more bags.</summary>
     public override bool IsFull => false;
 
-    // ── Interact ─────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Called via left-click while holding a TrashBag.
-    /// The Trash Bag PickableItemData must be listed in itemsThatCanInteractWith on the prefab.
-    /// </summary>
-    public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
-    {
-        TrashBag bag = item as TrashBag;
-        if (bag == null) return;
-
-        base.InteractWithItem(player, item);
-        StartCoroutine(ThrowSequence(player, bag));
-    }
-
-    // ── Throw sequence ───────────────────────────────────────────────────────
-
-    private IEnumerator ThrowSequence(PlayerInteractionController player, TrashBag bag)
-    {
-        PlayerMovementController movement = player.playerMovementController;
-        PlayerAnimationController anim    = player.playerAnimationController;
-
-        // ── 1. Lock controls ─────────────────────────────────────────────────
-        movement.SetCanMove(false);
-        movement.SetCanLook(false);
-        player.SetCanInteract(false, string.Empty);
-
-        // ── 2. Fire throw animation (synced to all clients) ──────────────────
-        anim.SetAnimTrigger(ThrowAnimTrigger);
-        anim.SetAnimBool("HoldingTrashBag", false);
-
-        // ── 3. Pick throw target ──────────────────────────────────────────────
-        Transform target     = PickThrowTarget();
-        Vector3 landPosition = target.position;
-
-        // ── 4. Release the bag from the player's hand ─────────────────────────
-        TrashBag depositedBag = bag;
-        int junkCount = bag.JunkCount; // capture before despawn clears it
-        player.pickupController.ReleaseHeldObjectForThrow();
-
-        // ── 5. Windup delay before the bag visually moves ─────────────────────
-        yield return new WaitForSeconds(_throwWindupDelay);
-
-        // ── 6. Broadcast the throw arc to ALL clients ─────────────────────────
-        depositedBag.PlayThrowArcClientRpc(landPosition, _jumpHeight, _jumpDuration, (int)_jumpEase);
-        yield return new WaitForSeconds(_jumpDuration);
-
-        // ── 7. Deposit feedback — networked so all clients hear the land sound ──
-        PlayLandSoundServerRpc(landPosition);
-
-        // ── 8. Despawn the bag ────────────────────────────────────────────────
-        depositedBag.DespawnServerRpc();
-
-        // ── 9. Increment the fill counter and notify task listeners ───────────
-        DepositBagServerRpc(junkCount);
-
-        // ── 10. Restore player controls ───────────────────────────────────────
-        movement.SetCanMove(true);
-        movement.SetCanLook(true);
-        player.SetCanInteract(true, string.Empty);
-    }
-
-    /// <summary>Picks a random non-null entry from _throwTargets; falls back to this transform.</summary>
-    private Transform PickThrowTarget()
-    {
-        var valid = System.Array.FindAll(_throwTargets, t => t != null);
-
-        if (valid.Length == 0)
-        {
-            Debug.LogWarning("[DumpsterInteractable] No throw targets assigned — using dumpster centre.");
-            return transform;
-        }
-
-        return valid[UnityEngine.Random.Range(0, valid.Length)];
-    }
-
     // ── Deposit ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -205,14 +105,14 @@ public class DumpsterInteractable : CollectableContainer
 
     /// <summary>
     /// Called by a <see cref="DumpsterPhysicsDepositZone"/> when a TrashBag thrown with real
-    /// physics (via ThrowController, not the scripted left-click throw sequence) flies into
-    /// the dumpster's opening. Deposits the bag immediately — no windup, animation, or
-    /// player-control locking, since the player is not necessarily interacting with this
-    /// dumpster directly.
+    /// physics flies into the dumpster's opening. This is the only way a TrashBag is ever
+    /// deposited — the dumpster has no interact-based deposit flow.
     ///
     /// Only a bag that is actually in free physics flight (Rigidbody non-kinematic, as set by
     /// <see cref="PickableObject.ThrowServerRpc"/>) is accepted, so bags merely resting nearby
-    /// or still held/carried do not get deposited by walking past.
+    /// or still held/carried do not get deposited by walking past. A bag that has already been
+    /// deposited (<see cref="TrashBag.IsDeposited"/>) is rejected, so the same bag instance can
+    /// never be registered more than once even if multiple trigger events fire for it.
     ///
     /// Runs only on the server; safe to call from any client's local trigger callback.
     /// </summary>
@@ -220,10 +120,15 @@ public class DumpsterInteractable : CollectableContainer
     public bool TryDepositThrownBag(TrashBag bag)
     {
         if (!IsServer) return false;
-        if (bag == null || !bag.IsSpawned) return false;
+        if (bag == null || !bag.IsSpawned || bag.IsDeposited) return false;
 
         Rigidbody rb = bag.GetComponent<Rigidbody>();
         if (rb == null || rb.isKinematic) return false;
+
+        // Mark deposited immediately, before any further processing, so this exact bag
+        // instance can never be registered again even if another trigger fires for it
+        // in the same frame.
+        bag.MarkDeposited();
 
         int     junkCount    = bag.JunkCount;
         Vector3 landPosition = bag.transform.position;
@@ -278,20 +183,4 @@ public class DumpsterInteractable : CollectableContainer
         if (SFXController.Instance != null && _depositSound != null)
             SFXController.Instance.PlayAtPosition(_depositSound, position, _depositSoundVolume);
     }
-
-    // ── Editor gizmos ─────────────────────────────────────────────────────────
-
-#if UNITY_EDITOR
-    private void OnDrawGizmosSelected()
-    {
-        if (_throwTargets == null) return;
-
-        Gizmos.color = new Color(0.2f, 0.8f, 0.2f, 0.8f);
-        foreach (Transform t in _throwTargets)
-        {
-            if (t != null)
-                Gizmos.DrawWireSphere(t.position, 0.15f);
-        }
-    }
-#endif
 }
