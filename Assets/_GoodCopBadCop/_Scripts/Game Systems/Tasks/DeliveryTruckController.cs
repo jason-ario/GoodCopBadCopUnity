@@ -1,4 +1,5 @@
 using System.Collections;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -79,6 +80,7 @@ public class DeliveryTruckController : NetworkBehaviour
     private bool _sequenceRunning;
     private Vector3 _crateRestPosition;
     private Quaternion _crateRestRotation;
+    private Sequence _driveSequence;
 
     public override void OnNetworkSpawn()
     {
@@ -175,7 +177,7 @@ public class DeliveryTruckController : NetworkBehaviour
     [ClientRpc]
     private void BeginDriveClientRpc(bool toPointB)
     {
-        StartCoroutine(DriveSequence(toPointB));
+        PlayDriveSequence(toPointB);
     }
 
     [ClientRpc]
@@ -187,57 +189,48 @@ public class DeliveryTruckController : NetworkBehaviour
     [ClientRpc]
     private void DeactivateClientRpc()
     {
-        StopCoroutine(nameof(DriveSequence));
+        _driveSequence?.Kill();
         if (truckAudioSource != null)
             truckAudioSource.Stop();
         SetVisualActive(false);
     }
 
-    private IEnumerator DriveSequence(bool toPointB)
+    /// <summary>
+    /// Drives from the current position to pointA/pointB using DOTween, after a rev delay.
+    /// Runs identically on every client (called via <see cref="BeginDriveClientRpc"/>).
+    /// </summary>
+    private void PlayDriveSequence(bool toPointB)
     {
-        PlayLoopingClip(driveClip);
-
-        // Let the engine rev before the truck actually starts moving.
-        yield return new WaitForSeconds(driveRevDelay);
-
-        Transform from = toPointB ? pointA : pointB;
-        Transform to   = toPointB ? pointB : pointA;
+        Transform to = toPointB ? pointB : pointA;
         float duration = toPointB ? driveToDuration : driveBackDuration;
 
-        if (from == null || to == null)
-            yield break;
+        if (to == null) return;
 
-        Vector3    fromPos = from.position;
-        Vector3    toPos   = to.position;
-        Quaternion fromRot = from.rotation;
-        Quaternion toRot   = to.rotation;
+        PlayLoopingClip(driveClip);
 
         float baseShakeStrength = machineShake != null ? machineShake.positionStrength : 0f;
-        float elapsed = 0f;
 
-        while (elapsed < duration)
-        {
-            float t      = elapsed / duration;
-            float curved = speedCurve.Evaluate(t);
-
-            transform.position = Vector3.Lerp(fromPos, toPos, curved);
-            transform.rotation = Quaternion.Slerp(fromRot, toRot, curved);
-
-            if (machineShake != null)
-                machineShake.positionStrength = Mathf.Lerp(baseShakeStrength, peakShakeStrength, curved);
-
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        transform.position = toPos;
-        transform.rotation = toRot;
+        _driveSequence?.Kill();
+        _driveSequence = DOTween.Sequence();
+        _driveSequence.AppendInterval(driveRevDelay);
+        _driveSequence.Append(transform.DOMove(to.position, duration).SetEase(speedCurve));
+        _driveSequence.Join(transform.DORotateQuaternion(to.rotation, duration).SetEase(speedCurve));
 
         if (machineShake != null)
-            machineShake.positionStrength = baseShakeStrength;
+        {
+            _driveSequence.Join(
+                DOTween.To(() => machineShake.positionStrength, v => machineShake.positionStrength = v, peakShakeStrength, duration)
+                    .SetEase(speedCurve));
+        }
 
-        // Back to idle audio once parked at either end.
-        PlayLoopingClip(idleClip);
+        _driveSequence.OnComplete(() =>
+        {
+            if (machineShake != null)
+                machineShake.positionStrength = baseShakeStrength;
+
+            // Back to idle audio once parked at either end.
+            PlayLoopingClip(idleClip);
+        });
     }
 
     /// <summary>
