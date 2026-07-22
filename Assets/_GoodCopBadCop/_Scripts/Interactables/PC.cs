@@ -37,6 +37,8 @@ public class PC : Interactable
     [SerializeField] private Transform lookAtTarget;
     [SerializeField] private Transform standPos;
     [SerializeField] private SimpleCanvasCursorFromMouseDelta _virtualCanvasCursor;
+    [Tooltip("The Camera that renders the terminal UI onto the monitor's render texture. Only needs to be active while a player is using the terminal.")]
+    [SerializeField] private GameObject screenRenderCamera;
 
     [Header("Terminal")]
     [SerializeField] private TextMeshProUGUI header;
@@ -72,6 +74,7 @@ public class PC : Interactable
     {
         CloseAllScreens();
         RefreshNavigationButtons();
+        SetScreenRenderCameraActive(false);
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -92,6 +95,8 @@ public class PC : Interactable
         }
         if (computerCamera != null)
             player.playerMovementController.MoveCameraTo(computerCamera.transform);
+
+        SetScreenRenderCameraActive(true);
 
         pcActive = true;
         _player = player;
@@ -126,6 +131,7 @@ public class PC : Interactable
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Confined;
         ShowPCBackButton();
+        SetScreenRenderCameraActive(true);
         OpenRootMenu();
         ClearCurrentProfileSelection();
     }
@@ -694,9 +700,16 @@ public class PC : Interactable
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
         if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
+        SetScreenRenderCameraActive(false);
         if (_player == null) return;
         _player.SetCanInteract(true, "");
         _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
+    }
+
+    private void SetScreenRenderCameraActive(bool active)
+    {
+        if (screenRenderCamera != null)
+            screenRenderCamera.SetActive(active);
     }
 
 }

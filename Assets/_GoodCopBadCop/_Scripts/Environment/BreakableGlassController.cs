@@ -76,8 +76,13 @@ public class BreakableGlassController : MonoBehaviour
     [SerializeField] [Range(0f, 2f)] private float _repairVolume = 1f;
 
     [Tooltip("Particle system played on all clients when the glass is repaired. " +
-             "Assign the in-scene RepairParticles child of this GameObject.")]
+             "Assign the in-scene RepairParticles child of this GameObject. " +
+             "Its GameObject is kept deactivated except while the repair effect is playing.")]
     [SerializeField] private ParticleSystem _repairParticles;
+
+    [Tooltip("Seconds the repair particles' GameObject stays active before being deactivated again. " +
+             "Should comfortably cover the longest sub-effect's duration.")]
+    [SerializeField] [Min(0.1f)] private float _repairParticlesActiveDuration = 3f;
 
     [Header("Broken Glass Despawn")]
     [Tooltip("Seconds after shattering before the broken glass pieces are destroyed.")]
@@ -97,6 +102,7 @@ public class BreakableGlassController : MonoBehaviour
     private AudioSource _audioSource;
     private Tween _shakeTween;
     private Coroutine _despawnCoroutine;
+    private Coroutine _repairParticlesCoroutine;
 
     // Cached spawn data so the broken glass can be re-instantiated at the original transform.
     private Transform  _brokenGlassParent;
@@ -143,6 +149,12 @@ public class BreakableGlassController : MonoBehaviour
             _brokenGlassLocalPos = _brokenGlass.transform.localPosition;
             _brokenGlassLocalRot = _brokenGlass.transform.localRotation;
         }
+
+        // The repair particle hierarchy (root sparks system plus its sub-emitters) is only
+        // needed for a few seconds after a repair purchase — keep it deactivated the rest
+        // of the time so its particle systems and renderers don't tick every frame.
+        if (_repairParticles != null)
+            _repairParticles.gameObject.SetActive(false);
 
         // Start fully transparent / undamaged.
         RefreshCrackOverlay(0);
@@ -320,8 +332,16 @@ public class BreakableGlassController : MonoBehaviour
         if (_audioSource != null && _repairClip != null)
             _audioSource.PlayOneShot(_repairClip, _repairVolume);
 
-        _repairParticles?.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        _repairParticles?.Play();
+        if (_repairParticles != null)
+        {
+            _repairParticles.gameObject.SetActive(true);
+            _repairParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            _repairParticles.Play();
+
+            if (_repairParticlesCoroutine != null) StopCoroutine(_repairParticlesCoroutine);
+            _repairParticlesCoroutine = StartCoroutine(DeactivateRepairParticlesCoroutine());
+        }
+
 
         // Pre-instantiate a fresh, inactive broken glass so it is ready for the next smash.
         RespawnBrokenGlass();
@@ -389,6 +409,21 @@ public class BreakableGlassController : MonoBehaviour
         }
 
         _despawnCoroutine = null;
+    }
+
+    /// <summary>
+    /// Waits for <see cref="_repairParticlesActiveDuration"/> seconds then deactivates the repair
+    /// particles' GameObject, taking its ParticleSystems (and sub-emitters) out of the update loop
+    /// until the next repair.
+    /// </summary>
+    private System.Collections.IEnumerator DeactivateRepairParticlesCoroutine()
+    {
+        yield return new WaitForSeconds(_repairParticlesActiveDuration);
+
+        if (_repairParticles != null)
+            _repairParticles.gameObject.SetActive(false);
+
+        _repairParticlesCoroutine = null;
     }
 
     /// <summary>
