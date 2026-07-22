@@ -150,6 +150,12 @@ public class CheatConsoleUI : MonoBehaviour
             ShiftManager.Instance?.DebugShowEndOfShiftReport();
             SetVisible(false);
         }));
+
+        _cheats.Add(("Trigger Mail Delivery Task", () =>
+        {
+            SortMailTask.Instance?.TriggerDailyTask();
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)
