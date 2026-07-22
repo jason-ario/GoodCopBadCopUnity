@@ -93,6 +93,30 @@ public class OffTrailRadiation : MonoBehaviour
         }
     }
 
+    // ── Public API — dynamic safe trails ────────────────────────────────────
+
+    /// <summary>
+    /// Dynamically registers <paramref name="trail"/> as a safe corridor, exempting players
+    /// near it from the off-trail radiation penalty. Intended for event-driven trails (e.g.
+    /// <see cref="FollowTrailThreat"/>) that should count as "on-trail" only while their event
+    /// is active. No-op if the trail is null or already registered.
+    /// </summary>
+    public void AddSafeTrail(TrailController trail)
+    {
+        if (trail == null || trails.Contains(trail)) return;
+        trails.Add(trail);
+    }
+
+    /// <summary>
+    /// Removes a trail previously registered via <see cref="AddSafeTrail"/>, so players are no
+    /// longer considered safe near it. No-op if the trail is null or not registered.
+    /// </summary>
+    public void RemoveSafeTrail(TrailController trail)
+    {
+        if (trail == null) return;
+        trails.Remove(trail);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void RefreshPlayerList()

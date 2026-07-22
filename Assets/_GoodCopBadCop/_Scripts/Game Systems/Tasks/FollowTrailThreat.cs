@@ -63,6 +63,12 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Any player within this radius of the destination point completes the follow trail task.")]
     [SerializeField] private float _destinationRadius = 10f;
 
+    [Header("Off-Trail Radiation")]
+    [Tooltip("When assigned, the active location's Trail is dynamically registered as a safe " +
+             "corridor on this OffTrailRadiation zone for the duration of the event, then removed " +
+             "the following day (on the next OnDayStart/Cleanup). Leave null to skip this integration.")]
+    [SerializeField] private OffTrailRadiation _offTrailRadiation;
+
     // ── Networked state ──────────────────────────────────────────────────────
 
     private readonly NetworkVariable<float> _networkThreatLevel = new(
@@ -102,6 +108,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>The location that was last passed to SpawnEvent — used at destination discovery time.</summary>
     private FollowTrailLocation _currentLocation;
+
+    /// <summary>
+    /// The trail currently registered as a safe corridor on <see cref="_offTrailRadiation"/>, if any.
+    /// Tracked separately from <see cref="_currentLocation"/> so <see cref="Cleanup"/> can remove the
+    /// exact trail it added, even after <see cref="_currentLocation"/> has been overwritten.
+    /// </summary>
+    private TrailController _registeredSafeTrail;
 
     private Coroutine _proximityCoroutine;
 
@@ -459,6 +472,14 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
                 spawnPositions[i] = SnapToTerrain(spawnPositions[i], _trailGroundOffset);
             Debug.Log($"[FollowTrailThreat] Spawning {spawnPositions.Count} trail particles.", this);
             SpawnTrailParticlesClientRpc(spawnPositions.ToArray());
+
+            // Mark this trail as a temporary safe corridor so players following it don't take
+            // off-trail radiation. Removed the following day (or on the next re-trigger) via Cleanup().
+            if (_offTrailRadiation != null)
+            {
+                _offTrailRadiation.AddSafeTrail(location.Trail);
+                _registeredSafeTrail = location.Trail;
+            }
         }
 
         // Begin server-side proximity check so the task auto-completes when a player reaches the end.
@@ -565,6 +586,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Always clear the encounter listener — it may have been subscribed by SpawnEvent.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
+
+        // Un-register yesterday's trail as a safe corridor now that its event window has ended.
+        if (_offTrailRadiation != null && _registeredSafeTrail != null)
+        {
+            _offTrailRadiation.RemoveSafeTrail(_registeredSafeTrail);
+            _registeredSafeTrail = null;
+        }
 
         // Reset discovery state so the next SpawnEvent can be discovered normally.
         if (IsServer)

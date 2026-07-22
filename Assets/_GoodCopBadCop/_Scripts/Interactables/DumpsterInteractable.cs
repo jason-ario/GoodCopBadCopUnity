@@ -18,6 +18,12 @@ using UnityEngine;
 ///
 /// Once full, left-clicking with no held item calls HQ for pickup (from CollectableContainer.Interact).
 ///
+/// Bags can also be deposited by throwing them with real physics (ThrowController's F-key
+/// charge-and-release throw) directly into the dumpster's opening — a child
+/// DumpsterPhysicsDepositZone trigger volume detects the in-flight bag and calls
+/// <see cref="TryDepositThrownBag"/>, which deposits it immediately without the scripted
+/// windup/animation sequence used by the left-click interact flow.
+///
 /// A world-space label hovers above the dumpster and is visible only while the player looks
 /// at it. It shows "X/Capacity" in white, "FULL" in red, or "PICKUP REQUESTED" in yellow.
 ///
@@ -25,6 +31,8 @@ using UnityEngine;
 ///   - NetworkObject + HighlightEffect + Collider (Interactable layer)
 ///   - Trash Bag PickableItemData assigned to itemsThatCanInteractWith
 ///   - Three child Transforms assigned to _throwTargets (positions inside the dumpster opening)
+///   - A child GameObject with a trigger Collider + DumpsterPhysicsDepositZone, positioned
+///     inside the opening, to catch bags thrown in with physics
 /// </summary>
 public class DumpsterInteractable : CollectableContainer
 {
@@ -191,6 +199,40 @@ public class DumpsterInteractable : CollectableContainer
         PerformDeposit();
         if (junkCount > 0)
             OnTrashBagDeposited?.Invoke(junkCount);
+    }
+
+    // ── Physics throw deposit ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by a <see cref="DumpsterPhysicsDepositZone"/> when a TrashBag thrown with real
+    /// physics (via ThrowController, not the scripted left-click throw sequence) flies into
+    /// the dumpster's opening. Deposits the bag immediately — no windup, animation, or
+    /// player-control locking, since the player is not necessarily interacting with this
+    /// dumpster directly.
+    ///
+    /// Only a bag that is actually in free physics flight (Rigidbody non-kinematic, as set by
+    /// <see cref="PickableObject.ThrowServerRpc"/>) is accepted, so bags merely resting nearby
+    /// or still held/carried do not get deposited by walking past.
+    ///
+    /// Runs only on the server; safe to call from any client's local trigger callback.
+    /// </summary>
+    /// <returns>True if the bag was deposited.</returns>
+    public bool TryDepositThrownBag(TrashBag bag)
+    {
+        if (!IsServer) return false;
+        if (bag == null || !bag.IsSpawned) return false;
+
+        Rigidbody rb = bag.GetComponent<Rigidbody>();
+        if (rb == null || rb.isKinematic) return false;
+
+        int     junkCount    = bag.JunkCount;
+        Vector3 landPosition = bag.transform.position;
+
+        PlayLandSoundServerRpc(landPosition);
+        bag.DespawnServerRpc();
+        DepositBagServerRpc(junkCount);
+
+        return true;
     }
 
     // ── NetworkVariable callbacks ─────────────────────────────────────────────
