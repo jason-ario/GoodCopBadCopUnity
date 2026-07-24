@@ -661,12 +661,27 @@ public class SuspectCharacter : Interactable
     [Tooltip("Animator trigger name to play on hit. Must exist in the suspect's Animator Controller.")]
     [SerializeField] private string hitAnimTrigger = "Hit";
 
+    [Header("Wounded Flee (pre-mutation)")]
+    [Tooltip("Damage a non-mutant suspect can absorb at the window before fleeing instead of dying. " +
+             "Intentionally high (default 150, ~6 melee hits at 25 dmg/hit) so this only fires from " +
+             "sustained, clearly intentional attacks — not an accidental stray hit.")]
+    [SerializeField] private float woundedFleeHealth = 150f;
+
+    [Tooltip("Animator trigger name to play when a non-mutant suspect flees after being beaten past " +
+             "woundedFleeHealth. Must exist in the suspect's Animator Controller.")]
+    [SerializeField] private string fleeAnimTrigger = "Flee";
+
     private float _health;
+    private float _woundedHealth;
     private bool _isDead;
     private bool _isMutant;
+    private bool _hasFled;
 
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
+
+    /// <summary>True once this suspect has fled the booth after being wounded past woundedFleeHealth.</summary>
+    public bool HasFled => _hasFled;
 
     /// <summary>Fired on the server whenever this suspect takes damage (before death check).</summary>
     public event Action OnHit;
@@ -683,6 +698,14 @@ public class SuspectCharacter : Interactable
 
     /// <summary>Raised on the server when the suspect is killed by a player melee hit.</summary>
     public static event Action<SuspectCharacter> OnSuspectKilledByPlayer;
+
+    /// <summary>
+    /// Raised on the server when a non-mutant suspect flees the booth after absorbing damage past
+    /// woundedFleeHealth without ever being stamped. They survive the encounter, but
+    /// <see cref="FleeFromWounds"/> forces their persistent infection score to the fully-mutated
+    /// threshold, guaranteeing their next appearance in the shift pool spawns as a full mutant.
+    /// </summary>
+    public static event Action<SuspectCharacter> OnSuspectFledFromWounds;
 
     [Header("Anomalies")] [SerializeField] private AnomalyController anomalyController;
     public AnomalyController AnomalyController => anomalyController;
@@ -722,6 +745,7 @@ public class SuspectCharacter : Interactable
             interactText = $"{suspectData.FirstName}";
 
         _health = maxHealth;
+        _woundedHealth = woundedFleeHealth;
 
         _junkItem = GetComponent<JunkItem>();
 
@@ -1216,19 +1240,28 @@ public class SuspectCharacter : Interactable
     /// <summary>
     /// Applies damage to this suspect. Server-only. Triggers a hit reaction and,
     /// when health reaches zero, plays the death animation on all clients.
+    /// Non-mutant suspects don't use <see cref="_health"/> at all — instead they absorb damage
+    /// into <see cref="_woundedHealth"/> and flee once it's depleted (see <see cref="FleeFromWounds"/>).
     /// </summary>
     /// <param name="amount">Damage points to subtract.</param>
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || _isDead)
+        if (!IsServer || _isDead || _hasFled)
             return;
 
         SpawnHitParticleClientRpc(hitPoint);
         OnHit?.Invoke();
 
         if (!_isMutant)
+        {
+            _woundedHealth -= amount;
+
+            if (_woundedHealth <= 0f)
+                FleeFromWounds();
+
             return;
+        }
 
         _health -= amount;
 
@@ -1270,6 +1303,32 @@ public class SuspectCharacter : Interactable
     private void DisableInteractionClientRpc()
     {
         SetCanInteract(false);
+    }
+
+    /// <summary>
+    /// Marks this non-mutant suspect as having fled the booth after absorbing damage past
+    /// woundedFleeHealth. Unlike <see cref="KillSuspect"/>, this does not despawn or kill the
+    /// suspect record — it survives, but is forced onto the fully-mutated infection threshold so
+    /// the next time it's drawn into a shift's lineup, it spawns as a full mutant automatically.
+    /// Server-only.
+    /// </summary>
+    private void FleeFromWounds()
+    {
+        _hasFled = true;
+        DisableInteractionClientRpc();
+        FleeClientRpc();
+
+        OnSuspectFledFromWounds?.Invoke(this);
+
+        SuspectRunRecords.Instance?.ForceFullMutation(suspectData);
+    }
+
+    /// <summary>Plays the flee reaction animation on all clients.</summary>
+    [ClientRpc]
+    private void FleeClientRpc()
+    {
+        if (animator != null && !string.IsNullOrEmpty(fleeAnimTrigger))
+            animator.SetTrigger(fleeAnimTrigger);
     }
 
     public void GetShot()

@@ -1547,7 +1547,10 @@ public class SuspectController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         if (IsServer)
+        {
             SuspectCharacter.OnSuspectKilledByPlayer += HandleSuspectKilledByPlayer;
+            SuspectCharacter.OnSuspectFledFromWounds += HandleSuspectFledFromWounds;
+        }
 
         suspectIndex.OnValueChanged += HandleSuspectIndexChanged;
     }
@@ -1556,6 +1559,7 @@ public class SuspectController : NetworkBehaviour
     {
         base.OnNetworkDespawn();
         SuspectCharacter.OnSuspectKilledByPlayer -= HandleSuspectKilledByPlayer;
+        SuspectCharacter.OnSuspectFledFromWounds -= HandleSuspectFledFromWounds;
         suspectIndex.OnValueChanged -= HandleSuspectIndexChanged;
     }
 
@@ -1595,6 +1599,38 @@ public class SuspectController : NetworkBehaviour
 
         CleanupSpawnedFolder();
         DespawnSuspect(killed);
+        ShiftManager.Instance.SetNextSuspectReady();
+    }
+
+    /// <summary>
+    /// Called on the server when a non-mutant suspect flees the booth after being beaten past its
+    /// wounded-flee health, without ever being stamped. Advances the lineup with no payout — the
+    /// suspect's persistent record has already been forced to the fully-mutated threshold by
+    /// <see cref="SuspectCharacter.FleeFromWounds"/>, so they return as a full mutant automatically.
+    /// </summary>
+    private void HandleSuspectFledFromWounds(SuspectCharacter fled)
+    {
+        if (!IsServer) return;
+        if (fled != suspectCharacter) return;
+
+        StartCoroutine(FledFromWoundsSequence(fled));
+    }
+
+    /// <summary>
+    /// Waits for the flee animation to play, cleans up documents and the folder, despawns the
+    /// suspect, and advances to the next suspect — with no payout, and logged separately from
+    /// killed/passed outcomes via <see cref="ShiftManager.suspectsFled"/>.
+    /// </summary>
+    private IEnumerator FledFromWoundsSequence(SuspectCharacter fled)
+    {
+        fled.GetComponent<SuspectBarkController>()?.StopBarks();
+
+        // Give the flee animation time to play before cleaning up.
+        yield return new WaitForSeconds(1.5f);
+
+        CleanupSpawnedFolder();
+        DespawnSuspect(fled);
+        ShiftManager.Instance.suspectsFled += 1;
         ShiftManager.Instance.SetNextSuspectReady();
     }
 

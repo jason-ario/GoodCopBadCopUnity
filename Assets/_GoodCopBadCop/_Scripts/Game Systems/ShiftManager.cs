@@ -51,6 +51,12 @@ public class ShiftManager : NetworkBehaviour
     public int suspectsQuarantined = 0;
     public int suspectsKilledCorrect = 0;
     public int suspectsKilledWrong = 0;
+    /// <summary>
+    /// Non-mutant suspects beaten past their wounded-flee health and released without a stamp.
+    /// No payout either way — tracked separately so end-of-shift reporting doesn't conflate this
+    /// with a deliberate kill or pass verdict. See <see cref="SuspectCharacter.FleeFromWounds"/>.
+    /// </summary>
+    public int suspectsFled = 0;
 
     [Header("End of Shift Rewards")]
     [Tooltip("Coupons earned for each citizen correctly passed (non-infected).")]
@@ -499,6 +505,9 @@ public class ShiftManager : NetworkBehaviour
             new EndOfShiftReportUI.ReportRowData(
                 $"Wrongly Eliminated: {suspectsKilledWrong}",
                 suspectsKilledWrong * penaltyPerWrongKill, isPenalty: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Fled Wounded (returns as mutant): {suspectsFled}", 0),
         };
 
         AppendPopulationRows(reportData,
@@ -591,6 +600,7 @@ public class ShiftManager : NetworkBehaviour
             suspectsQuarantined,
             suspectsKilledCorrect,
             suspectsKilledWrong,
+            suspectsFled,
             populationModel.PopulationAlive.CurrentValue,
             populationModel.DeadOvernight.CurrentValue);
     }
@@ -617,6 +627,7 @@ public class ShiftManager : NetworkBehaviour
             suspectsQuarantined,
             suspectsKilledCorrect,
             suspectsKilledWrong,
+            suspectsFled,
             populationModel.PopulationAlive.CurrentValue,
             populationModel.DeadOvernight.CurrentValue);
     }
@@ -627,7 +638,7 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void ShowEndOfShiftReportClientRpc(
         int processed, int passedCorrect, int passedWrong,
-        int quarantined, int killedCorrect, int killedWrong,
+        int quarantined, int killedCorrect, int killedWrong, int fled,
         int populationAlive, int deadOvernight)
     {
         int totalKilled = killedCorrect + killedWrong;
@@ -655,6 +666,9 @@ public class ShiftManager : NetworkBehaviour
             new EndOfShiftReportUI.ReportRowData(
                 $"Non-Effected: {passedWrong}",
                 passedWrong * penaltyPerWrongPass, isPenalty: true),
+
+            new EndOfShiftReportUI.ReportRowData(
+                $"Fled Wounded (returns as mutant): {fled}", 0),
         };
 
         UIController.Instance.ShowEndShiftReport(reportData, deadOvernight);
@@ -857,6 +871,7 @@ public class ShiftManager : NetworkBehaviour
         suspectsQuarantined = 0;
         suspectsKilledCorrect = 0;
         suspectsKilledWrong = 0;
+        suspectsFled = 0;
     }
 
     /// <summary>Plays the bell and shows the day number banner at the start of a shift.</summary>

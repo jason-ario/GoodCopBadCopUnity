@@ -187,6 +187,31 @@ public class SuspectRunRecords : MonoBehaviour
         SaveRecords();
     }
 
+    /// <summary>
+    /// Forces a suspect's persistent infection score directly to the fully-mutated threshold,
+    /// skipping normal day-by-day progression entirely. Called from
+    /// <see cref="SuspectCharacter.FleeFromWounds"/> when a non-mutant suspect is beaten past its
+    /// wounded-flee health at the booth window and escapes instead of being stamped. Guarantees
+    /// (via <see cref="AnomalyController.FULLY_MUTATED_THRESHOLD"/> and
+    /// <see cref="DailySuspectManager"/>'s existing full-mutant slot injection) that the next time
+    /// this suspect is drawn into a shift's lineup, it spawns as a full mutant automatically — no
+    /// additional injection logic is needed. Has no effect if the suspect is already fully mutated
+    /// or already permanently killed. Persists immediately. Server-only.
+    /// </summary>
+    public void ForceFullMutation(SuspectData data)
+    {
+        SuspectRecord record = GetRecord(data);
+        if (record == null || record.isKilled) return;
+
+        if (!record.IsFullyMutated)
+        {
+            record.infectionScore = AnomalyController.FULLY_MUTATED_THRESHOLD;
+            Debug.Log($"[SuspectRunRecords] '{data.name}' fled a wounded booth encounter — infection score forced to {record.infectionScore} (fully mutated on next appearance).");
+        }
+
+        SaveRecords();
+    }
+
     /// <summary>True when at least one suspect is currently eligible for a legacy-mutant world spawn.</summary>
     public bool HasLegacyMutantCandidates
     {

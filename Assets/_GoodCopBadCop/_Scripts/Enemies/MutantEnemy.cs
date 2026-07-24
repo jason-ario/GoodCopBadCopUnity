@@ -69,6 +69,33 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Particle prefab instantiated on all clients at the point of impact when this enemy is hit.")]
     [SerializeField] private GameObject hitParticlePrefab;
 
+    [Header("Gore")]
+    [Tooltip("Collider used to compute random surface spawn points for gore pieces. Defaults to a CapsuleCollider or, failing that, any Collider found on this GameObject.")]
+    [SerializeField] private Collider goreCollider;
+
+    [Tooltip("Random gore chunk/giblet prefabs that can pop out of this mutant on hit and burst out on death. Leave empty to disable gore entirely.")]
+    [SerializeField] private GameObject[] goreDropPrefabs;
+
+    [Tooltip("Chance (0-1) that a gore piece pops out each time this mutant takes damage and survives the hit.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float goreDropChanceOnHit = 0.3f;
+
+    [Tooltip("Minimum and maximum number of gore pieces spawned when a hit gore chance roll succeeds.")]
+    [SerializeField] private Vector2Int goreHitCountRange = new Vector2Int(1, 1);
+
+    [Tooltip("Minimum and maximum random pop speed (units/sec) applied to a gore piece spawned from a survived hit.")]
+    [SerializeField] private Vector2 goreHitSpeedRange = new Vector2(1.5f, 4f);
+
+    [Tooltip("Minimum and maximum number of gore pieces spawned in the burst when this mutant dies.")]
+    [SerializeField] private Vector2Int deathGoreBurstCountRange = new Vector2Int(4, 8);
+
+    [Tooltip("Minimum and maximum random pop speed (units/sec) applied to each gore piece spawned in the death burst.")]
+    [SerializeField] private Vector2 deathGoreBurstSpeedRange = new Vector2(3f, 7f);
+
+    [Tooltip("Seconds before a spawned gore piece is automatically destroyed.")]
+    [Min(0f)]
+    [SerializeField] private float goreLifetime = 10f;
+
     [Header("Aggro Target")]
     [Tooltip("If false, this mutant will never head for the booth on its own, regardless of the aggro chance roll.")]
     [SerializeField] private bool canAggro = true;
@@ -183,6 +210,9 @@ public class MutantEnemy : NetworkBehaviour
     private void Awake()
     {
         _agent = GetComponent<NavMeshAgent>();
+
+        if (goreCollider == null)
+            goreCollider = GetComponent<CapsuleCollider>() as Collider ?? GetComponent<Collider>();
     }
 
     public override void OnNetworkSpawn()
@@ -934,11 +964,145 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
+        TrySpawnHitGore();
+
         if (_hurtSounds != null && _hurtSounds.Length > 0)
         {
             int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
             PlayHurtSoundClientRpc(idx);
         }
+    }
+
+    /// <summary>
+    /// Rolls <see cref="goreDropChanceOnHit"/> and, on success, pops <see cref="goreHitCountRange"/>
+    /// random gore pieces out of random points on <see cref="goreCollider"/>'s surface.
+    /// </summary>
+    private void TrySpawnHitGore()
+    {
+        if (goreDropPrefabs == null || goreDropPrefabs.Length == 0)
+            return;
+
+        if (UnityEngine.Random.value > goreDropChanceOnHit)
+            return;
+
+        SpawnGoreBurst(goreHitCountRange, goreHitSpeedRange);
+    }
+
+    /// <summary>
+    /// Spawns a burst of <see cref="deathGoreBurstCountRange"/> gore pieces popping outward from
+    /// random points on <see cref="goreCollider"/>'s surface. Called once from the server on a
+    /// permanent death.
+    /// </summary>
+    private void SpawnDeathGoreBurst()
+    {
+        if (goreDropPrefabs == null || goreDropPrefabs.Length == 0)
+            return;
+
+        SpawnGoreBurst(deathGoreBurstCountRange, deathGoreBurstSpeedRange);
+    }
+
+    /// <summary>
+    /// Rolls a random piece count within <paramref name="countRange"/>, builds randomized spawn
+    /// data for each piece, and broadcasts a single RPC so every client spawns the same result.
+    /// </summary>
+    private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
+    {
+        int count = UnityEngine.Random.Range(countRange.x, countRange.y + 1);
+        if (count <= 0)
+            return;
+
+        Vector3[] positions = new Vector3[count];
+        int[] prefabIndices = new int[count];
+        Vector3[] velocities = new Vector3[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            positions[i] = GetRandomGoreSpawnPosition();
+            prefabIndices[i] = UnityEngine.Random.Range(0, goreDropPrefabs.Length);
+            float speed = UnityEngine.Random.Range(speedRange.x, speedRange.y);
+            velocities[i] = GetRandomPopVelocity(positions[i], speed);
+        }
+
+        SpawnGoreBurstClientRpc(positions, prefabIndices, velocities);
+    }
+
+    /// <summary>
+    /// Picks a random point on the surface of <see cref="goreCollider"/>. Falls back to this
+    /// mutant's position when no collider is assigned.
+    /// </summary>
+    private Vector3 GetRandomGoreSpawnPosition()
+    {
+        if (goreCollider == null)
+            return transform.position;
+
+        Bounds bounds = goreCollider.bounds;
+        Vector3 outsidePoint = bounds.center + Vector3.Scale(UnityEngine.Random.onUnitSphere, bounds.extents) * 2f;
+        return goreCollider.ClosestPoint(outsidePoint);
+    }
+
+    /// <summary>
+    /// Builds a velocity vector pointing outward from this mutant's body (with a bit of upward
+    /// bias and random jitter), scaled to the given speed — used to make gore pieces look like
+    /// they're popping out of the mutant rather than just falling in place.
+    /// </summary>
+    private Vector3 GetRandomPopVelocity(Vector3 spawnPosition, float speed)
+    {
+        Vector3 direction = spawnPosition - transform.position;
+        direction.y = Mathf.Max(direction.y, 0.3f);
+
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = UnityEngine.Random.onUnitSphere;
+
+        direction = (direction.normalized + UnityEngine.Random.insideUnitSphere * 0.5f).normalized;
+        return direction * speed;
+    }
+
+    /// <summary>
+    /// Disables every Collider on this mutant (and its children) so the corpse stops blocking
+    /// navigation, physics, and weapon hit detection after death.
+    /// </summary>
+    private void DisableColliders()
+    {
+        foreach (Collider col in GetComponentsInChildren<Collider>(true))
+        {
+            col.enabled = false;
+        }
+    }
+
+    [ClientRpc]
+    private void DisableCollidersClientRpc()
+    {
+        DisableColliders();
+    }
+
+    [ClientRpc]
+    private void SpawnGoreBurstClientRpc(Vector3[] positions, int[] prefabIndices, Vector3[] velocities)
+    {
+        for (int i = 0; i < positions.Length; i++)
+        {
+            SpawnGorePiece(positions[i], prefabIndices[i], velocities[i]);
+        }
+    }
+
+    private void SpawnGorePiece(Vector3 position, int prefabIndex, Vector3 velocity)
+    {
+        if (goreDropPrefabs == null || prefabIndex < 0 || prefabIndex >= goreDropPrefabs.Length)
+            return;
+
+        GameObject prefab = goreDropPrefabs[prefabIndex];
+        if (prefab == null)
+            return;
+
+        GameObject piece = Instantiate(prefab, position, UnityEngine.Random.rotation);
+
+        Rigidbody rb = piece.GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = piece.AddComponent<Rigidbody>();
+
+        rb.linearVelocity = velocity;
+        rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
+
+        Destroy(piece, goreLifetime);
     }
 
     [ClientRpc]
@@ -986,6 +1150,14 @@ public class MutantEnemy : NetworkBehaviour
 
         // Attempt to drop a MutantBit if the night phase is active.
         MutantThreat.Instance?.TryDropBitAt(transform.position);
+
+        // Pop a burst of gore pieces out of the mutant's body on a permanent kill.
+        SpawnDeathGoreBurst();
+
+        // Disable this mutant's colliders on death so the corpse no longer blocks movement,
+        // navigation, or weapon hits. Applied locally (server) and broadcast to all clients.
+        DisableColliders();
+        DisableCollidersClientRpc();
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {
