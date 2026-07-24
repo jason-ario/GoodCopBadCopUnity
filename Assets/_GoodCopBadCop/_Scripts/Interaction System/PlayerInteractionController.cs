@@ -17,6 +17,9 @@ public class PlayerInteractionController : NetworkBehaviour
     [Tooltip("Layers that count as valid free-placement surfaces (floors, desks, world geometry, etc.)")]
     public LayerMask placementLayer;
 
+    [Tooltip("When the placement raycast doesn't land exactly on a PlacementBoard's own collider (e.g. it hits the desk/mat right next to a thin board trigger), search within this radius of the hit point for a nearby PlacementBoard and snap to it instead. This makes tutorial hand-off points (like HandOffPoint) register even when the free-placement surface swallows the raycast.")]
+    [SerializeField] private float placementBoardSnapRadius = 0.15f;
+
     public PlayerPickupController pickupController;
     public PlayerMovementController playerMovementController;
     public ReticleController reticle;
@@ -235,6 +238,8 @@ public class PlayerInteractionController : NetworkBehaviour
             
             bool inRange = hit.distance <= interactDistance;
             PlacementBoard placementBoard = hit.collider.GetComponent<PlacementBoard>();
+            if (placementBoard == null)
+                placementBoard = FindNearbyPlacementBoard(hit.point);
 
             if (interactable != null && interactable.enabled)
             {
@@ -328,7 +333,11 @@ public class PlayerInteractionController : NetworkBehaviour
         }
         else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
         {
-            // No interactable hit but we did hit a placement surface — handle free placement
+            // No interactable hit but we did hit a placement surface — handle free placement.
+            // The surface itself usually isn't a PlacementBoard, but a tutorial hand-off
+            // board may sit right on top of it, so snap to one nearby if present.
+            PlacementBoard nearbyBoard = FindNearbyPlacementBoard(surfaceHit.point);
+
             if (LmbDown && RmbHeld)
             {
                 _placerBlocked = true;
@@ -336,7 +345,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
             if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace)
             {
-                CheckActivatePlacer(null, surfaceHit, true);
+                CheckActivatePlacer(nearbyBoard, surfaceHit, true);
             }
             else
             {
@@ -366,6 +375,36 @@ public class PlayerInteractionController : NetworkBehaviour
         // Reset both states if no valid target was found or returned early
         reticle.SetInteractState(false);
         reticle.SetTooFarState(false);
+    }
+
+    /// <summary>
+    /// Searches within <see cref="placementBoardSnapRadius"/> of a placement point for the closest
+    /// PlacementBoard (measured to each candidate collider's closest surface point, not its center).
+    /// Used to make thin/small PlacementBoard triggers (e.g. tutorial hand-off points) register even
+    /// when the free-placement raycast lands on the surface right next to them instead of on the
+    /// board's own collider directly.
+    /// </summary>
+    PlacementBoard FindNearbyPlacementBoard(Vector3 point)
+    {
+        Collider[] nearbyColliders = Physics.OverlapSphere(point, placementBoardSnapRadius, ~0, QueryTriggerInteraction.Collide);
+
+        PlacementBoard closestBoard = null;
+        float closestDistance = float.MaxValue;
+
+        foreach (Collider col in nearbyColliders)
+        {
+            PlacementBoard board = col.GetComponent<PlacementBoard>();
+            if (board == null) continue;
+
+            float distance = Vector3.Distance(point, col.ClosestPoint(point));
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestBoard = board;
+            }
+        }
+
+        return closestBoard;
     }
 
     /// <summary>

@@ -12,6 +12,8 @@ namespace GoodCopBadCop.Population
         ReadOnlyReactiveProperty<int> BackgroundAlive { get; }
         ReadOnlyReactiveProperty<int> BackgroundDead { get; }
         ReadOnlyReactiveProperty<int> DeadOvernight { get; }
+        /// <summary>Number of residents who fully mutated and killed civilians during the most recent overnight simulation.</summary>
+        ReadOnlyReactiveProperty<int> MutatedOvernight { get; }
         ReadOnlyReactiveProperty<int> LastSimulatedDay { get; }
     }
 
@@ -24,6 +26,7 @@ namespace GoodCopBadCop.Population
         public readonly ReactiveProperty<int> BackgroundAliveMutable = new(100);
         public readonly ReactiveProperty<int> BackgroundDeadMutable = new(0);
         public readonly ReactiveProperty<int> DeadOvernightMutable = new(0);
+        public readonly ReactiveProperty<int> MutatedOvernightMutable = new(0);
         public readonly ReactiveProperty<int> LastSimulatedDayMutable = new(0);
 
         public ReadOnlyReactiveProperty<int> TotalPopulation => TotalPopulationMutable;
@@ -33,6 +36,7 @@ namespace GoodCopBadCop.Population
         public ReadOnlyReactiveProperty<int> BackgroundAlive => BackgroundAliveMutable;
         public ReadOnlyReactiveProperty<int> BackgroundDead => BackgroundDeadMutable;
         public ReadOnlyReactiveProperty<int> DeadOvernight => DeadOvernightMutable;
+        public ReadOnlyReactiveProperty<int> MutatedOvernight => MutatedOvernightMutable;
         public ReadOnlyReactiveProperty<int> LastSimulatedDay => LastSimulatedDayMutable;
 
         public void Dispose()
@@ -44,6 +48,7 @@ namespace GoodCopBadCop.Population
             BackgroundAliveMutable.Dispose();
             BackgroundDeadMutable.Dispose();
             DeadOvernightMutable.Dispose();
+            MutatedOvernightMutable.Dispose();
             LastSimulatedDayMutable.Dispose();
         }
     }

@@ -376,6 +376,8 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnExamPageFiledAllClients               += OnExamPageFiledSync;
         TutorialTaskSync.OnPressButtonReadyAllClients            += OnPressButtonReadySync;
         TutorialTaskSync.OnClockInReadyAllClients                += OnClockInReadySync;
+        TutorialTaskSync.OnFolderPlacedOnDeskAllClients          += OnFolderPlacedOnDeskSync;
+        TutorialTaskSync.OnFolderHandedToVladAllClients          += OnFolderHandedToVladSync;
 
         // Subscribe to the clock-in event so the task can be completed on all clients.
         TimecardMachine.OnClockInAllClients += OnTimecardClockInSync;
@@ -467,6 +469,9 @@ public class Day_01 : DayBase
         if (_windowPlacementBoard != null)
             _windowPlacementBoard.OnItemPlaced -= OnFolderHandedToVlad;
 
+        TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
+        TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
+
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
@@ -537,6 +542,9 @@ public class Day_01 : DayBase
 
         if (_windowPlacementBoard != null)
             _windowPlacementBoard.OnItemPlaced -= OnFolderHandedToVlad;
+
+        TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
+        TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -1137,9 +1145,11 @@ public class Day_01 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fires when any item is placed on the desk placement board.
-    /// Checks the item is a folder, then has Vlad prompt the player to file documents.
-    /// Unsubscribes after first valid placement so the bark only fires once.
+    /// Fires when any item is placed on the desk placement board — but only on whichever
+    /// client actually performed the drop, since <see cref="PlacementBoard.OnItemPlaced"/> is
+    /// a purely local event. Validates the item and reports it to the server via
+    /// <see cref="TutorialTaskSync"/> so the resulting task/marker transition and Vlad bark are
+    /// broadcast identically to every connected client in <see cref="OnFolderPlacedOnDeskSync"/>.
     /// </summary>
     private void OnFolderPlacedOnDesk(PickableObject item)
     {
@@ -1147,6 +1157,20 @@ public class Day_01 : DayBase
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
+
+        TutorialTaskSync.Instance?.ReportFolderPlacedOnDeskServerRpc();
+    }
+
+    /// <summary>
+    /// Fires on all clients once the server confirms the tutorial folder was placed on the
+    /// desk board (relayed via <see cref="TutorialTaskSync.OnFolderPlacedOnDeskAllClients"/>).
+    /// Completes the placement task, swaps the arrow from the drawer to the desk board, and
+    /// shows the "file documents" task. The bark is only fired from the server since
+    /// <see cref="SpeakingInteraction.Say"/> already broadcasts itself to every client.
+    /// </summary>
+    private void OnFolderPlacedOnDeskSync()
+    {
+        TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
 
         if (_taskFolder != null)
         {
@@ -1162,9 +1186,12 @@ public class Day_01 : DayBase
 
         _taskFile = TutorialObjectiveList.Instance?.AddObjective(_taskPlaceDocsText);
 
-        SuspectCharacter vlad = SuspectController.Instance?.CurrentSuspect;
-        if (vlad?.Speaking != null && !string.IsNullOrEmpty(_vladFolderPlacedBark))
-            vlad.Speaking.Say(_vladFolderPlacedBark);
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
+            SuspectCharacter vlad = SuspectController.Instance?.CurrentSuspect;
+            if (vlad?.Speaking != null && !string.IsNullOrEmpty(_vladFolderPlacedBark))
+                vlad.Speaking.Say(_vladFolderPlacedBark);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1276,9 +1303,10 @@ public class Day_01 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fires when an item is placed on the window hand-off PlacementBoard.
-    /// Checks it is a folder and, server-side, starts the closing scripted dialogue after a
-    /// short delay. Unsubscribes immediately so the sequence can only trigger once.
+    /// Fires when an item is placed on the window hand-off PlacementBoard — but only on
+    /// whichever client actually performed the drop, since <see cref="PlacementBoard.OnItemPlaced"/>
+    /// is a purely local event. Validates it is a folder and reports it (with a network
+    /// reference so the server can resolve and lock it) via <see cref="TutorialTaskSync"/>.
     /// </summary>
     private void OnFolderHandedToVlad(PickableObject item)
     {
@@ -1288,8 +1316,22 @@ public class Day_01 : DayBase
         if (_windowPlacementBoard != null)
             _windowPlacementBoard.OnItemPlaced -= OnFolderHandedToVlad;
 
-        // Complete the hand-off task and dismiss the objective list on all clients
-        // that trigger this event (fires locally via PlacementBoard.OnItemPlaced).
+        NetworkObject folderNetObj = item.GetComponent<NetworkObject>();
+        if (folderNetObj != null)
+            TutorialTaskSync.Instance?.ReportFolderHandedToVladServerRpc(folderNetObj);
+    }
+
+    /// <summary>
+    /// Fires on all clients once the server confirms the stamped folder was placed at the
+    /// window (relayed via <see cref="TutorialTaskSync.OnFolderHandedToVladAllClients"/>).
+    /// Completes the hand-off task and dismisses the objective list on every client, then,
+    /// server-only, locks the folder and starts the closing scripted dialogue after a short
+    /// delay — this now runs regardless of which client physically placed the folder.
+    /// </summary>
+    private void OnFolderHandedToVladSync(NetworkObjectReference folderRef)
+    {
+        TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
+
         if (_taskHandOff != null)
         {
             TutorialObjectiveList.Instance?.CompleteObjective(_taskHandOff);
@@ -1303,8 +1345,16 @@ public class Day_01 : DayBase
 
         if (!NetworkManager.Singleton.IsServer) return;
 
+        if (!folderRef.TryGet(out NetworkObject folderNetObj))
+        {
+            Debug.LogWarning("[Day_01] OnFolderHandedToVladSync: could not resolve folder NetworkObject.");
+            return;
+        }
+
+        PickableObject item = folderNetObj.GetComponent<PickableObject>();
+
         // Lock the folder immediately so the player cannot pick it back up during the cutscene.
-        item.SetInteractableNetworked(false);
+        item?.SetInteractableNetworked(false);
 
         if (_vladClosingDialogue == null)
         {

@@ -40,6 +40,7 @@ namespace GoodCopBadCop.Population
                 model.BackgroundDeadMutable.Value = Mathf.Clamp(savedData.BackgroundDead, 0, backgroundTotal);
                 model.BackgroundAliveMutable.Value = Mathf.Max(0, backgroundTotal - model.BackgroundDeadMutable.Value);
                 model.DeadOvernightMutable.Value = Mathf.Max(0, savedData.DeadOvernight);
+                model.MutatedOvernightMutable.Value = Mathf.Max(0, savedData.MutatedOvernight);
                 model.LastSimulatedDayMutable.Value = Mathf.Max(0, savedData.LastSimulatedDay);
             }
             else
@@ -50,6 +51,7 @@ namespace GoodCopBadCop.Population
                 model.BackgroundAliveMutable.Value = backgroundTotal;
                 model.BackgroundDeadMutable.Value = 0;
                 model.DeadOvernightMutable.Value = 0;
+                model.MutatedOvernightMutable.Value = 0;
                 model.LastSimulatedDayMutable.Value = 0;
             }
 
@@ -94,6 +96,7 @@ namespace GoodCopBadCop.Population
                 return;
 
             int deaths = 0;
+            int mutatedCount = 0;
             if (suspectRecords != null)
             {
                 Vector2Int deathRange = NormalizeDeathRange(config.backgroundDeathsPerMutantPerDay);
@@ -103,6 +106,7 @@ namespace GoodCopBadCop.Population
                     if (record == null || record.isKilled || !record.populationKillPending)
                         continue;
 
+                    mutatedCount++;
                     deaths += Random.Range(deathRange.x, deathRange.y + 1);
                     record.populationKillPending = false;
                 }
@@ -112,6 +116,7 @@ namespace GoodCopBadCop.Population
             model.BackgroundAliveMutable.Value -= appliedDeaths;
             model.BackgroundDeadMutable.Value += appliedDeaths;
             model.DeadOvernightMutable.Value = appliedDeaths;
+            model.MutatedOvernightMutable.Value = mutatedCount;
             model.LastSimulatedDayMutable.Value = day;
             RecalculateAlive();
         }
@@ -125,6 +130,7 @@ namespace GoodCopBadCop.Population
                 ContactableDead = model.ContactableDeadMutable.Value,
                 BackgroundDead = model.BackgroundDeadMutable.Value,
                 DeadOvernight = model.DeadOvernightMutable.Value,
+                MutatedOvernight = model.MutatedOvernightMutable.Value,
                 LastSimulatedDay = model.LastSimulatedDayMutable.Value,
             };
         }

@@ -91,12 +91,28 @@ public class ReviveManager : NetworkBehaviour
             return;
         }
 
-        // Despawn the existing dead PlayerObject so the guard in PlayerSpawner clears
-        // and NetworkManager reassigns the PlayerObject on the fresh spawn.
         if (client.PlayerObject != null)
         {
-            Debug.Log($"[ReviveManager] Despawning dead player object for client {clientId}.");
-            client.PlayerObject.Despawn(true);
+            NetworkObject deadPlayerObject = client.PlayerObject;
+            CorpseResurrectionController corpse = deadPlayerObject.GetComponent<CorpseResurrectionController>();
+
+            if (corpse != null && corpse.HasActiveCorpse)
+            {
+                // The corpse (still inert, or already resurrected into a chasing mutant) must
+                // stay behind in the world until it's killed by fire. Despawn it as a
+                // non-player object without destroying it, then immediately respawn it as an
+                // independent, server-owned NetworkObject so it keeps running its
+                // NavMeshAgent/MutantEnemy chase logic while the client gets a fresh PlayerObject.
+                Debug.Log($"[ReviveManager] Detaching active corpse for client {clientId} instead of destroying it.");
+                deadPlayerObject.Despawn(false);
+                corpse.DetachFromPlayer();
+                deadPlayerObject.Spawn();
+            }
+            else
+            {
+                Debug.Log($"[ReviveManager] Despawning dead player object for client {clientId}.");
+                deadPlayerObject.Despawn(true);
+            }
         }
 
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;

@@ -607,7 +607,8 @@ public class ShiftManager : NetworkBehaviour
             suspectsKilledWrong,
             suspectsFled,
             populationModel.PopulationAlive.CurrentValue,
-            populationModel.DeadOvernight.CurrentValue);
+            populationModel.DeadOvernight.CurrentValue,
+            populationModel.MutatedOvernight.CurrentValue);
     }
 
     /// <summary>
@@ -634,7 +635,8 @@ public class ShiftManager : NetworkBehaviour
             suspectsKilledWrong,
             suspectsFled,
             populationModel.PopulationAlive.CurrentValue,
-            populationModel.DeadOvernight.CurrentValue);
+            populationModel.DeadOvernight.CurrentValue,
+            populationModel.MutatedOvernight.CurrentValue);
     }
 
     /// <summary>
@@ -644,7 +646,7 @@ public class ShiftManager : NetworkBehaviour
     private void ShowEndOfShiftReportClientRpc(
         int processed, int passedCorrect, int passedWrong,
         int quarantined, int killedCorrect, int killedWrong, int fled,
-        int populationAlive, int deadOvernight)
+        int populationAlive, int deadOvernight, int mutatedOvernight)
     {
         int totalKilled = killedCorrect + killedWrong;
 
@@ -676,7 +678,7 @@ public class ShiftManager : NetworkBehaviour
                 $"Fled Wounded (returns as mutant): {fled}", 0),
         };
 
-        UIController.Instance.ShowEndShiftReport(reportData, deadOvernight);
+        UIController.Instance.ShowEndShiftReport(reportData, mutatedOvernight, deadOvernight, populationAlive);
     }
 
     private static void AppendPopulationRows(

@@ -23,15 +23,28 @@ public struct FaceMaterialSwap
 ///
 /// After the player dies, a server-authoritative countdown begins. If the corpse
 /// is NOT burned before <see cref="resurrectionDelay"/> seconds elapse, the ragdoll
-/// deactivates, the body stands up with a tall, twisted silhouette, and a
-/// <see cref="NavMeshAgent"/> starts chasing living players.
+/// deactivates, the body stands up with a tall, twisted silhouette, and control of
+/// chasing/attacking is handed off to <see cref="MutantEnemy"/> — exactly like a
+/// normal mutant — so it aggros and pursues living players using the same
+/// NavMeshAgent-driven chase loop, door bashing, and melee attack pipeline.
 ///
 /// Burning is triggered by external code (e.g. <see cref="Flamethrower"/>) calling
 /// <see cref="BurnCorpse"/> on the server, which permanently cancels resurrection.
+/// Once resurrected, the same fire (via <see cref="SetOnFire"/>) applies damage
+/// directly to <see cref="MutantEnemy"/>, which is the only thing able to finish it off
+/// permanently (see <c>fleeInsteadOfDie</c> on the MutantEnemyData/MutantEnemy setup).
+///
+/// The corpse — whether still inert or already resurrected — persists independently of
+/// the owning client's respawn cycle: <see cref="HasActiveCorpse"/> and
+/// <see cref="DetachFromPlayer"/> let <see cref="ReviveManager"/> detach this
+/// GameObject from the reviving client instead of destroying it, so it keeps existing
+/// in the world until it is killed by fire.
 ///
 /// Prefab requirements:
 ///   - NavMeshAgent component on the same GameObject (disabled by default)
-///   - SetOnFire component on the same GameObject (for fire VFX when burned)
+///   - MutantEnemy component on the same GameObject (disabled/dormant by default;
+///     configured with a MutantEnemyData asset, an attack hitbox, etc.)
+///   - SetOnFire component on the same GameObject (for fire VFX/damage)
 ///   - Humanoid Animator for the bone distortion pass
 /// </summary>
 public class CorpseResurrectionController : NetworkBehaviour
@@ -40,15 +53,12 @@ public class CorpseResurrectionController : NetworkBehaviour
     [Tooltip("Seconds after death before the corpse resurrects if not burned.")]
     [SerializeField] private float resurrectionDelay = 30f;
 
-    [Header("Chase Settings")]
-    [SerializeField] private float chaseSpeed = 4f;
-    [SerializeField] private float chaseAngularSpeed = 360f;
-    [Tooltip("World-unit radius used to find the nearest living player to chase.")]
-    [SerializeField] private float detectionRadius = 30f;
-    [Tooltip("Distance at which the resurrected corpse stops moving and begins attacking.")]
-    [SerializeField] private float attackRange = 2f;
-    [SerializeField] private float attackDamage = 15f;
-    [SerializeField] private float attackCooldown = 1.5f;
+    [Header("Mutant Control")]
+    [Tooltip("The MutantEnemy component on this same GameObject that drives chasing, attacking, and death once resurrected. Kept dormant until Resurrect() calls InitialiseServer() on it.")]
+    [SerializeField] private MutantEnemy mutantEnemy;
+
+    [Tooltip("Animator Controller swapped onto the Animator on resurrection so the corpse uses mutant locomotion/attack/death animations instead of the player's own controller (e.g. the Mutant Human override controller).")]
+    [SerializeField] private RuntimeAnimatorController resurrectedAnimatorController;
 
     [Header("Twisted Visuals — Segment Stretch")]
     [Tooltip("Multiplies the Spine → Chest bone distance.")]
@@ -80,18 +90,10 @@ public class CorpseResurrectionController : NetworkBehaviour
     [Tooltip("One entry per face mesh that needs a material swap on resurrection.")]
     [SerializeField] private FaceMaterialSwap[] faceMaterialSwaps = System.Array.Empty<FaceMaterialSwap>();
 
-    [Header("Animator Parameters")]
-    [SerializeField] private string speedParameterName = "Speed";
-
     // ── Networked state ────────────────────────────────────────────────────────
 
     private readonly NetworkVariable<bool> _isResurrected = new(
         false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
-    private readonly NetworkVariable<float> _networkSpeed = new(
-        0f,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
@@ -140,8 +142,15 @@ public class CorpseResurrectionController : NetworkBehaviour
 
     private bool _hasBeenBurned;
     private Coroutine _resurrectionCoroutine;
-    private Transform _currentTarget;
-    private float _attackCooldownTimer;
+
+    /// <summary>
+    /// True from the moment this player dies until the corpse (or the mutant it resurrects
+    /// into) is permanently destroyed — i.e. killed by fire. Server-only.
+    /// <see cref="ReviveManager"/> reads this to decide whether the reviving client's old
+    /// PlayerObject must be detached and kept alive instead of destroyed.
+    /// </summary>
+    public bool HasActiveCorpse => _hasActiveCorpse;
+    private bool _hasActiveCorpse;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -153,9 +162,20 @@ public class CorpseResurrectionController : NetworkBehaviour
         _navMeshAgent     = GetComponent<NavMeshAgent>();
         _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
 
+        if (mutantEnemy == null)
+            mutantEnemy = GetComponent<MutantEnemy>();
+
         // Agent stays disabled until resurrection so it doesn't fight CharacterController.
         if (_navMeshAgent != null)
             _navMeshAgent.enabled = false;
+
+        if (mutantEnemy != null)
+        {
+            // Must run before this NetworkObject spawns so MutantEnemy stays dormant until
+            // Resurrect() explicitly calls InitialiseServer() on it.
+            mutantEnemy.DisableAutoInit();
+            mutantEnemy.enabled = false;
+        }
 
         // Cache bones and their spawn-pose localPositions now, before any ragdoll
         // or animation has a chance to move them. These are the stretch baseline values.
@@ -171,7 +191,9 @@ public class CorpseResurrectionController : NetworkBehaviour
             _playerHealth.OnDeath += OnPlayerDeath;
 
         _isResurrected.OnValueChanged += OnResurrectedChanged;
-        _networkSpeed.OnValueChanged  += OnNetworkSpeedChanged;
+
+        if (mutantEnemy != null)
+            mutantEnemy.OnRemovedFromPlay += OnMutantRemovedFromPlay;
     }
 
     public override void OnNetworkDespawn()
@@ -182,7 +204,16 @@ public class CorpseResurrectionController : NetworkBehaviour
             _playerHealth.OnDeath -= OnPlayerDeath;
 
         _isResurrected.OnValueChanged -= OnResurrectedChanged;
-        _networkSpeed.OnValueChanged  -= OnNetworkSpeedChanged;
+
+        if (mutantEnemy != null)
+            mutantEnemy.OnRemovedFromPlay -= OnMutantRemovedFromPlay;
+    }
+
+    private void OnMutantRemovedFromPlay()
+    {
+        // The resurrected mutant has been permanently destroyed (killed by fire) —
+        // this GameObject is about to be despawned by MutantEnemy itself.
+        _hasActiveCorpse = false;
     }
 
     // ── Death trigger ─────────────────────────────────────────────────────────
@@ -192,7 +223,28 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (!IsServer) return;
 
         _hasBeenBurned = false;
+        _hasActiveCorpse = true;
         _resurrectionCoroutine = StartCoroutine(ResurrectionCountdown());
+    }
+
+    // ── Detach from reviving player (server-only) ───────────────────────────────
+
+    /// <summary>
+    /// Called by <see cref="ReviveManager"/> on the server, immediately after this
+    /// NetworkObject has been despawned (without destroying it) but before it is
+    /// respawned as an independent, server-owned NetworkObject. Nothing further needs to
+    /// change here — RagdollController/Resurrect() have already left the Animator,
+    /// NavMeshAgent, and NetworkTransform in whatever state is correct for this corpse's
+    /// current stage (inert corpse vs. actively resurrected mutant); this hook exists so
+    /// the detach moment is explicit and easy to extend later (e.g. renaming the object,
+    /// clearing name-tag/UI references) without touching ReviveManager again.
+    /// </summary>
+    public void DetachFromPlayer()
+    {
+        if (!IsServer) return;
+
+        Debug.Log($"[CorpseResurrection] {gameObject.name} detached from its former player — " +
+                   $"will persist in the world as an independent {(_isResurrected.Value ? "resurrected mutant" : "corpse")} until killed by fire.");
     }
 
     // ── Burn API (server-only) ─────────────────────────────────────────────────
@@ -242,20 +294,27 @@ public class CorpseResurrectionController : NetworkBehaviour
         // Trigger visual resurrection on all clients.
         ResurrectClientRpc();
 
-        // Server: configure and enable the NavMeshAgent to drive movement.
+        // Server: enable the NavMeshAgent so MutantEnemy can drive movement.
         if (_navMeshAgent != null)
-        {
-            _navMeshAgent.enabled          = true;
-            _navMeshAgent.speed            = chaseSpeed;
-            _navMeshAgent.angularSpeed     = chaseAngularSpeed;
-            _navMeshAgent.stoppingDistance = attackRange * 0.85f;
-        }
+            _navMeshAgent.enabled = true;
 
         // Re-enable NetworkTransform so the server-driven position replicates to clients.
         if (_networkTransform != null)
             _networkTransform.enabled = true;
 
-        StartCoroutine(ChaseLoop());
+        // Hand off to MutantEnemy — it owns chasing, retargeting, door bashing, attacking,
+        // animation speed/grounded syncing, and death/fire handling from this point on.
+        if (mutantEnemy != null)
+        {
+            mutantEnemy.SetAnimator(_animator);
+            mutantEnemy.enabled = true;
+            mutantEnemy.InitialiseServer();
+        }
+        else
+        {
+            Debug.LogWarning($"[CorpseResurrection] No MutantEnemy assigned on {gameObject.name} — " +
+                               "the resurrected corpse will not chase or attack players.");
+        }
 
         Debug.Log($"[CorpseResurrection] {gameObject.name} has resurrected!");
     }
@@ -270,6 +329,11 @@ public class CorpseResurrectionController : NetworkBehaviour
 
         if (_animator != null)
         {
+            // Swap to the mutant's Animator Controller so locomotion/attack/death states
+            // (driven by MutantEnemy) play instead of the player's own controller.
+            if (resurrectedAnimatorController != null)
+                _animator.runtimeAnimatorController = resurrectedAnimatorController;
+
             _animator.enabled = true;
             // Reset to the entry/idle state so the corpse doesn't resume mid-walk.
             _animator.Rebind();
@@ -292,15 +356,15 @@ public class CorpseResurrectionController : NetworkBehaviour
 
     private void OnResurrectedChanged(bool previous, bool current)
     {
-        // Late-joiner sync: ensure the Animator is running so LateUpdate can distort bones.
+        // Late-joiner sync: ensure the Animator is running (with the mutant controller) so
+        // LateUpdate can distort bones and MutantEnemy's animation syncing takes effect.
         if (current && !previous && _animator != null)
-            _animator.enabled = true;
-    }
+        {
+            if (resurrectedAnimatorController != null)
+                _animator.runtimeAnimatorController = resurrectedAnimatorController;
 
-    private void OnNetworkSpeedChanged(float previous, float current)
-    {
-        if (_animator != null && !string.IsNullOrEmpty(speedParameterName))
-            _animator.SetFloat(speedParameterName, current);
+            _animator.enabled = true;
+        }
     }
 
     // ── Bone caching ──────────────────────────────────────────────────────────
@@ -427,98 +491,7 @@ public class CorpseResurrectionController : NetworkBehaviour
     }
 
     // ── Server chase loop ─────────────────────────────────────────────────────
-
-    private void Update()
-    {
-        if (!IsServer || !_isResurrected.Value) return;
-        if (_navMeshAgent == null || !_navMeshAgent.isActiveAndEnabled) return;
-
-        _networkSpeed.Value = _navMeshAgent.velocity.magnitude;
-
-        if (_currentTarget != null &&
-            Vector3.Distance(transform.position, _currentTarget.position) <= attackRange)
-        {
-            Vector3 toTarget = _currentTarget.position - transform.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude > 0.01f)
-            {
-                Quaternion targetRot = Quaternion.LookRotation(toTarget);
-                transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation, targetRot, chaseAngularSpeed * Time.deltaTime);
-            }
-        }
-    }
-
-    private IEnumerator ChaseLoop()
-    {
-        const float retargetInterval = 0.5f;
-
-        yield return null; // one frame for NavMeshAgent to settle
-
-        while (_isResurrected.Value)
-        {
-            if (_navMeshAgent == null || !_navMeshAgent.isOnNavMesh)
-            {
-                yield return new WaitForSeconds(retargetInterval);
-                continue;
-            }
-
-            _currentTarget = FindNearestLivingPlayer();
-
-            if (_currentTarget != null)
-            {
-                _navMeshAgent.SetDestination(_currentTarget.position);
-
-                if (Vector3.Distance(transform.position, _currentTarget.position) <= attackRange)
-                    TryAttack();
-            }
-            else
-            {
-                _navMeshAgent.ResetPath();
-            }
-
-            yield return new WaitForSeconds(retargetInterval);
-        }
-    }
-
-    private void TryAttack()
-    {
-        if (Time.time < _attackCooldownTimer) return;
-        if (_currentTarget == null) return;
-
-        PlayerHealth targetHealth = _currentTarget.GetComponent<PlayerHealth>();
-        if (targetHealth == null || targetHealth.IsDead) return;
-
-        PlayerInstance targetPlayer = _currentTarget.GetComponent<PlayerInstance>();
-        if (targetPlayer != null && targetPlayer.IsInCutscene) return;
-
-        _attackCooldownTimer = Time.time + attackCooldown;
-        targetHealth.TakeDamage(attackDamage, EffectKeys.DefaultPlayerDamage);
-    }
-
-    private Transform FindNearestLivingPlayer()
-    {
-        Transform nearest = null;
-        float nearestSqrDist = detectionRadius * detectionRadius;
-
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject == null) continue;
-
-            PlayerHealth health = client.PlayerObject.GetComponent<PlayerHealth>();
-            if (health == null || health.IsDead) continue;
-
-            PlayerInstance pi = client.PlayerObject.GetComponent<PlayerInstance>();
-            if (pi != null && pi.IsInCutscene) continue;
-
-            float sqrDist = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
-            if (sqrDist < nearestSqrDist)
-            {
-                nearestSqrDist = sqrDist;
-                nearest = client.PlayerObject.transform;
-            }
-        }
-
-        return nearest;
-    }
+    // Chasing, retargeting, door bashing, attacking, and rotation-facing are all owned by
+    // MutantEnemy once InitialiseServer() is called from Resurrect() above — no duplicate
+    // logic needed here.
 }

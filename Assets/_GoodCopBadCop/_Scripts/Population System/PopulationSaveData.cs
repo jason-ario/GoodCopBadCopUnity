@@ -10,6 +10,7 @@ namespace GoodCopBadCop.Population
         public int ContactableDead;
         public int BackgroundDead;
         public int DeadOvernight;
+        public int MutatedOvernight;
         public int LastSimulatedDay;
     }
 }

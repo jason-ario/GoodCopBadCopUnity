@@ -1147,6 +1147,20 @@ public class SuspectCharacter : Interactable
             return;
         }
 
+        // A player who backed out of (or never joined) an active scripted dialogue with this
+        // suspect can rejoin by interacting with them again — resumes wherever the dialogue
+        // presently is, rather than restarting it.
+        var runner = ScriptedDialogueRunner.Instance;
+        if (runner != null)
+        {
+            var netObj = GetComponent<NetworkObject>();
+            if (netObj != null && ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == netObj.NetworkObjectId)
+            {
+                runner.RequestRejoinScriptedDialogueServerRpc();
+                return;
+            }
+        }
+
         // Direct interaction no longer opens the dialogue view.
         // Dialogue is initiated exclusively through scripted cutscenes (ScriptedDialogueRunner).
     }

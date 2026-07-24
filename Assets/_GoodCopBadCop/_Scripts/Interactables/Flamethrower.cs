@@ -298,6 +298,34 @@ public class Flamethrower : PickableObject, IAmmoProvider
                 continue;
             }
 
+            // ── Dead player corpses / resurrected mutants ──────────────────────
+            // Must be checked BEFORE the generic MutantEnemy branch below: once a
+            // CorpseResurrectionController's dormant MutantEnemy is added to the Player
+            // prefab, GetComponentInParent<MutantEnemy>() would otherwise match every
+            // player (dead or alive) and never reach this branch.
+            CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
+            if (corpse != null)
+            {
+                PlayerHealth corpsePlayerHealth = corpse.GetComponent<PlayerHealth>();
+                if (corpsePlayerHealth != null && corpsePlayerHealth.IsDead)
+                {
+                    // Cancel any pending resurrection (no-op once already resurrected).
+                    corpse.BurnCorpse();
+
+                    // Ignite fire VFX + damage-over-time on all clients. SetOnFire ticks damage
+                    // into the same MutantEnemy component that drives the resurrected corpse,
+                    // permanently destroying it regardless of resurrection state — fire is the
+                    // only thing that can finish it off for good.
+                    SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
+                    if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
+                        IgniteEnemyClientRpc(new NetworkObjectReference(corpse.NetworkObject));
+                }
+
+                // Living players are immune to this branch entirely — never fall through to
+                // the MutantEnemy check below.
+                continue;
+            }
+
             // ── Mutant enemies ────────────────────────────────────────────────
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy != null)
@@ -311,26 +339,6 @@ public class Flamethrower : PickableObject, IAmmoProvider
                         IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
                 }
                 continue;
-            }
-
-            // ── Dead player corpses ───────────────────────────────────────────
-            // A dead player body can be permanently burned to prevent resurrection.
-            CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
-            if (corpse == null) continue;
-
-            PlayerHealth playerHealth = corpse.GetComponent<PlayerHealth>();
-            if (playerHealth == null || !playerHealth.IsDead) continue;
-
-            // Cancel resurrection on the server.
-            corpse.BurnCorpse();
-
-            // Trigger fire VFX on all clients (requires SetOnFire on the player prefab).
-            NetworkObject corpseNetObj = corpse.GetComponent<NetworkObject>();
-            if (corpseNetObj != null)
-            {
-                SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
-                if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
-                    IgniteEnemyClientRpc(new NetworkObjectReference(corpseNetObj));
             }
         }
     }

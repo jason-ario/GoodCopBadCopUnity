@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ public class PlayerTutorialUI : MonoBehaviour
 
     private Animator _animator;
     private Coroutine _sequenceCoroutine;
+    private Action _onCloseCallback;
 
     private void Awake()
     {
@@ -54,22 +56,25 @@ public class PlayerTutorialUI : MonoBehaviour
         if (CampaignManager.Instance == null || CampaignManager.Instance.CurrentDay != 1) return;
 
         gameObject.SetActive(true);
-        StartCoroutine(DelayedShowMovementTutorial(3f));
+        StartCoroutine(DelayedShowBoothMessage(3f));
     }
 
-    private IEnumerator DelayedShowMovementTutorial(float delay)
+    private IEnumerator DelayedShowBoothMessage(float delay)
     {
         yield return new WaitForSeconds(delay);
 
-        if (TutorialOverlay.Instance != null)
-            TutorialOverlay.Instance.ShowMovementTutorial(ShowBoothMessage);
-        else
-            ShowBoothMessage();
+        ShowBoothMessage();
     }
 
     private void ShowBoothMessage()
     {
-        Show("Go to the booth to start your shift.");
+        Show("Go to the booth to start your shift.", -1f, ShowMovementTutorial);
+    }
+
+    private void ShowMovementTutorial()
+    {
+        if (TutorialOverlay.Instance != null)
+            TutorialOverlay.Instance.ShowMovementTutorial();
     }
 
     /// <summary>Shows the cinematic black bars without any text. Holds for the specified duration then dismisses. Interrupts any running sequence.</summary>
@@ -78,6 +83,7 @@ public class PlayerTutorialUI : MonoBehaviour
         gameObject.SetActive(true);
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
         StopSequence();
+        _onCloseCallback = null;
         _sequenceCoroutine = StartCoroutine(BarsOnlySequenceCoroutine(duration));
     }
 
@@ -92,7 +98,7 @@ public class PlayerTutorialUI : MonoBehaviour
     }
 
     /// <summary>Shows the tutorial bars with the given message, holds for the specified duration, then hides. Interrupts any running sequence.</summary>
-    public void Show(string message, float holdDuration = -1f)
+    public void Show(string message, float holdDuration = -1f, Action onComplete = null)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -104,6 +110,7 @@ public class PlayerTutorialUI : MonoBehaviour
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
 
         StopSequence();
+        _onCloseCallback = onComplete;
         _sequenceCoroutine = StartCoroutine(SequenceCoroutine(message, duration));
     }
 
@@ -123,6 +130,7 @@ public class PlayerTutorialUI : MonoBehaviour
         float duration = holdDuration < 0f ? defaultHoldDuration : holdDuration;
 
         StopSequence();
+        _onCloseCallback = null;
         _sequenceCoroutine = StartCoroutine(TextOnlySequenceCoroutine(message, duration));
     }
 
@@ -135,6 +143,10 @@ public class PlayerTutorialUI : MonoBehaviour
         _animator.SetBool(BlackBarsOn, false);
         SetPlayerUIActive(true);
         gameObject.SetActive(false);
+
+        Action callback = _onCloseCallback;
+        _onCloseCallback = null;
+        callback?.Invoke();
     }
 
     private void SetPlayerUIActive(bool active)

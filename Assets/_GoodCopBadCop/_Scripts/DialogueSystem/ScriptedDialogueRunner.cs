@@ -117,6 +117,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // a distant player never blocks a line that only the nearby player needs to advance.
     private readonly HashSet<ulong> _participants = new();
 
+    // ClientIds who explicitly backed out of the current dialogue (Q / back button).
+    // Excluded from proximity re-join until they interact with the speaker again.
+    private readonly HashSet<ulong> _leftParticipants = new();
+
+    // True on the server while a SayAndWait gate is waiting on the choice submission gate
+    // (mirrors _awaitingScriptedInput for the choice flow). Used to know whether to kick off
+    // an unattended auto-resolve when the last participant leaves mid-choice.
+    private bool _awaitingScriptedChoice;
+
     // Transform of the current NPC speaker — used for server-side proximity checks.
     private Transform _currentSpeakerTransform;
 
@@ -160,6 +169,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// Read by <see cref="SuspectController"/> to resolve the speaker's per-character cameras.
     /// </summary>
     public ulong CurrentSpeakerNetId => _clientSpeakerNetId;
+
+    /// <summary>
+    /// Set on all clients (via broadcast RPC, regardless of participation) to the
+    /// <c>NetworkObjectId</c> of the suspect currently running a scripted dialogue, or 0 when
+    /// none is active. Unlike <see cref="IsScriptedModeActive"/> — which only reflects the
+    /// local client's own lock state — this stays valid for players who left the dialogue or
+    /// never joined it, so <see cref="SuspectCharacter.Interact"/> can detect that talking to
+    /// this suspect again should rejoin an in-progress sequence rather than no-op.
+    /// </summary>
+    public static ulong ActiveDialogueSpeakerNetId { get; private set; }
 
     private void Awake() => Instance = this;
 
@@ -251,8 +270,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (!IsServer) return;
         // Clear the server-side flag immediately so CheckProximityJoins stops running.
         IsScriptedModeActive = false;
+        ulong speakerNetId = _currentSpeakerTransform != null
+            ? _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL
+            : 0UL;
         _currentSpeakerTransform = null;
         _participants.Clear();
+        _leftParticipants.Clear();
+        HideInWorldSubtitleClientRpc(speakerNetId);
+        SetActiveDialogueSpeakerClientRpc(0);
         ExitScriptedModeClientRpc();
     }
 
@@ -319,6 +344,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // host and non-host clients can skip reveals and advance the dialogue gate.
         if (!_clientIsWaitingForInput) return;
 
+        // Q or the "Back" button lets the local player leave the scripted dialogue early —
+        // checked before the advance/skip input so it never also fires an advance vote.
+        bool pressedLeave = Input.GetKeyDown(KeyCode.Q)
+                             || Input.GetButtonDown("Back")
+                             || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+        if (pressedLeave)
+        {
+            LeaveScriptedDialogueServerRpc();
+            return;
+        }
+
         // Ignore clicks that land on any UI element (e.g. choice buttons).
         bool overUI = UnityEngine.EventSystems.EventSystem.current != null &&
                       UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
@@ -382,6 +418,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // host client is not a participant (targeted RPCs won't reach a non-participant host).
         IsScriptedModeActive = true;
 
+        // Broadcast to every client (regardless of participation) so a player who backed out,
+        // or never joined, can still detect that talking to this speaker again should rejoin.
+        SetActiveDialogueSpeakerClientRpc(speakerNetId);
+
         // Seed the participant set before broadcasting EnterScriptedMode so the advance
         // gate is correct from the very first line.
         _currentSpeakerTransform = speaker.transform;
@@ -429,6 +469,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             IsScriptedModeActive = false;
             _currentSpeakerTransform = null;
             _participants.Clear();
+            _leftParticipants.Clear();
+            HideInWorldSubtitleClientRpc(speakerNetId);
+            SetActiveDialogueSpeakerClientRpc(0);
             ExitScriptedModeClientRpc(lockOutsidePlayers);
             yield return null;
         }
@@ -444,6 +487,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Target the "input open" signal only to participants — non-participants must not
         // be able to send advance RPCs that interfere with the gate.
         SetAwaitingInputClientRpc(true, BuildParticipantRpcParams());
+
+        // While a bystander is disengaged from an otherwise-active dialogue, mirror the line
+        // as a small floating bubble above the suspect's head for everyone (see
+        // HasDisengagedBystander) instead of relying on the on-screen box they may not see.
+        if (HasDisengagedBystander)
+        {
+            ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
+            ShowInWorldSubtitleClientRpc(speakerNetId, text, speaker.Speaking != null ? speaker.Speaking.SpeakerName : speaker.name, false);
+        }
+
         DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true);
         yield return StartCoroutine(WaitForScriptedAdvance());
         // Broadcast the "input closed" signal so any late-joiner who had _clientIsWaitingForInput
@@ -549,6 +602,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void SeedParticipants(bool lockOutsidePlayers = false)
     {
         _participants.Clear();
+        _leftParticipants.Clear();
 
         // When all players are explicitly locked in, include everyone.
         if (lockOutsidePlayers || _currentSpeakerTransform == null)
@@ -595,22 +649,159 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
         {
             if (_participants.Contains(clientId)) continue;
+            // Players who explicitly left must interact with the speaker again to rejoin —
+            // proximity alone should not pull them back in.
+            if (_leftParticipants.Contains(clientId)) continue;
             if (!IsClientWithinJoinRadius(clientId, speakerPos)) continue;
 
-            _participants.Add(clientId);
-            Debug.Log($"[ScriptedDialogueRunner] Client {clientId} joined dialogue via proximity.");
+            JoinParticipant(clientId);
+        }
+    }
 
-            ulong speakerNetId = _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL;
-            var singleClientRpc = new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            };
+    /// <summary>
+    /// Adds <paramref name="clientId"/> to <see cref="_participants"/> and sends the same
+    /// camera/mode catch-up RPCs a proximity late-joiner receives. Shared by
+    /// <see cref="CheckProximityJoins"/> and <see cref="RequestRejoinScriptedDialogueServerRpc"/>.
+    /// Must be called on the server while a dialogue is active.
+    /// </summary>
+    private void JoinParticipant(ulong clientId)
+    {
+        _leftParticipants.Remove(clientId);
+        _participants.Add(clientId);
+        Debug.Log($"[ScriptedDialogueRunner] Client {clientId} joined/rejoined the dialogue.");
 
-            // Send the current camera state first so the late-joiner's view snaps to the
-            // correct camera before dialogue mode activates (avoids a one-frame camera pop).
-            SetActiveOverrideCamClientRpc(_currentCameraKey, singleClientRpc);
+        ulong speakerNetId = _currentSpeakerTransform != null
+            ? _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL
+            : 0UL;
+        var singleClientRpc = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        };
 
-            LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, singleClientRpc);
+        // Send the current camera state first so the joiner's view snaps to the
+        // correct camera before dialogue mode activates (avoids a one-frame camera pop).
+        SetActiveOverrideCamClientRpc(_currentCameraKey, singleClientRpc);
+
+        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, singleClientRpc);
+
+        // If everyone had left and the in-world subtitle bubbles were showing, hide the
+        // suspect's bubble now that a normal participant is back — future lines resume the
+        // standard on-screen dialogue for everyone.
+        if (_leftParticipants.Count == 0 && speakerNetId != 0)
+            HideInWorldSubtitleClientRpc(speakerNetId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Leave / rejoin — server-side
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called by a client pressing Q or the Back button while a scripted line is awaiting
+    /// input. Removes the sender from the advance/choice gates and restores their own movement,
+    /// camera, and interaction — the dialogue keeps running for any remaining participants.
+    /// If every participant has now left, the sequence auto-advances so it is never stuck.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void LeaveScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (!IsScriptedModeActive) return;
+
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        if (!_participants.Contains(senderId)) return;
+
+        _participants.Remove(senderId);
+        _leftParticipants.Add(senderId);
+        _advanceSet.Remove(senderId);
+        _choiceSubmissions.Remove(senderId);
+        _choicePlayerNames.Remove(senderId);
+
+        var single = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { senderId } }
+        };
+        ExitScriptedModeForClientRpc(single);
+
+        Debug.Log($"[ScriptedDialogueRunner] Client {senderId} left the dialogue " +
+                  $"({_participants.Count} participant(s) remaining).");
+
+        RecheckGatesAfterParticipantChange();
+    }
+
+    /// <summary>
+    /// Called by <see cref="SuspectCharacter.Interact"/> when a player who left (or never
+    /// joined) the current speaker's dialogue interacts with them again. Rejoins the advance
+    /// and choice gates and resumes wherever the dialogue presently is.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestRejoinScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (!IsScriptedModeActive) return;
+
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        if (_participants.Contains(senderId)) return; // already in
+
+        JoinParticipant(senderId);
+    }
+
+    /// <summary>
+    /// Restores normal gameplay state for a single client that left the dialogue, without
+    /// disturbing <see cref="IsScriptedModeActive"/> or camera state for anyone else.
+    /// </summary>
+    [ClientRpc]
+    private void ExitScriptedModeForClientRpc(ClientRpcParams rpcParams = default)
+    {
+        IsScriptedModeActive = false;
+        _clientIsWaitingForInput = false;
+
+        DeactivateOverrideCam();
+        UIController.Instance?.ShowPlayerUI();
+        DialogueChoiceSystem.Instance?.HideChoicePanel();
+
+        if (PlayerInstance.Instance == null) return;
+
+        if (PlayerInstance.Instance.IsOutsideLocal)
+            DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
+        else
+            DialogueChoiceSystem.Instance?.ExitScriptedDialogueMode();
+    }
+
+    /// <summary>
+    /// If no participants remain (every player backed out mid-line or mid-choice), immediately
+    /// starts the same auto-advance timer normally kicked off by the first submission, so the
+    /// sequence continues on its own instead of waiting forever for input that will never come.
+    /// </summary>
+    private void TryAutoAdvanceIfUnattended()
+    {
+        if (_participants.Count > 0) return;
+
+        if (_awaitingScriptedInput && !_scriptedAdvanceReady && _advanceTimerCoroutine == null)
+            _advanceTimerCoroutine = StartCoroutine(AdvanceTimeoutCoroutine());
+
+        if (_awaitingScriptedChoice && !_choiceResolved && _choiceTimerCoroutine == null)
+            _choiceTimerCoroutine = StartCoroutine(ChoiceTimeoutCoroutine());
+    }
+
+    /// <summary>
+    /// Re-evaluates the advance and choice gates after <see cref="_participants"/> shrinks
+    /// (a player left). Opens a gate immediately if the remaining participants have already
+    /// all submitted, and otherwise falls back to <see cref="TryAutoAdvanceIfUnattended"/> for
+    /// the fully-unattended case.
+    /// </summary>
+    private void RecheckGatesAfterParticipantChange()
+    {
+        int required = Mathf.Max(1, _participants.Count);
+
+        if (_awaitingScriptedInput && !_scriptedAdvanceReady && _advanceSet.Count >= required)
+        {
+            OpenAdvanceGate();
+        }
+        else if (_awaitingScriptedChoice && !_choiceResolved && _choiceSubmissions.Count >= required)
+        {
+            ResolveChoices();
+        }
+        else
+        {
+            TryAutoAdvanceIfUnattended();
         }
     }
 
@@ -752,14 +943,31 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _choicePlayerNames.Clear();
         _choiceResolved = false;
         _resolvedChoiceIndex = -1;
+        _awaitingScriptedChoice = true;
         ShowChoicesClientRpc(node.choices[0].playerChoiceText, node.choices[1].playerChoiceText, BuildParticipantRpcParams());
 
         yield return new WaitUntil(() => _choiceResolved);
+        _awaitingScriptedChoice = false;
 
         // Broadcast the finalized choice: hide the panel, clear highlights, and show the
         // winning player's spoken line as a subtitle on all clients.
         var chosen = node.choices[_resolvedChoiceIndex];
-        FinalizeChoiceClientRpc(chosen.playerChoiceText, FindWinnerName(_resolvedChoiceIndex));
+        string winnerName = FindWinnerName(_resolvedChoiceIndex);
+        FinalizeChoiceClientRpc(chosen.playerChoiceText, winnerName);
+
+        // Mirror the chosen line above the winning player's head for any disengaged bystander,
+        // as if they'd said it out loud.
+        if (HasDisengagedBystander)
+        {
+            ulong winnerClientId = FindWinnerClientId(_resolvedChoiceIndex);
+            if (winnerClientId != ulong.MaxValue &&
+                NetworkManager.Singleton.ConnectedClients.TryGetValue(winnerClientId, out var winnerClient) &&
+                winnerClient.PlayerObject != null)
+            {
+                ShowInWorldSubtitleClientRpc(winnerClient.PlayerObject.NetworkObjectId, chosen.playerChoiceText, winnerName, true);
+            }
+        }
+
         yield return null; // flush the RPC before playing the NPC response
 
         ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
@@ -770,6 +978,44 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
     // Client RPCs — mode
     // -------------------------------------------------------------------------
+
+    [ClientRpc]
+    private void SetActiveDialogueSpeakerClientRpc(ulong speakerNetId)
+    {
+        ActiveDialogueSpeakerNetId = speakerNetId;
+    }
+
+    /// <summary>
+    /// True while at least one participant is still engaged in the dialogue and at least one
+    /// other player has backed out. Only in this "mixed" state do the small in-world subtitle
+    /// bubbles appear above the suspect's and active player's heads — in single-player, or once
+    /// every player has backed out, the dialogue simply continues using the normal on-screen
+    /// subtitle box for whoever remains.
+    /// </summary>
+    private bool HasDisengagedBystander => _leftParticipants.Count > 0 && _participants.Count > 0;
+
+    /// <summary>
+    /// Shows a small world-space subtitle bubble above <paramref name="ownerNetId"/>'s head
+    /// (a suspect or a player). Only sent while <see cref="HasDisengagedBystander"/> is true.
+    /// </summary>
+    [ClientRpc]
+    private void ShowInWorldSubtitleClientRpc(ulong ownerNetId, string text, string speakerName, bool isPlayerLine)
+    {
+        if (ownerNetId == 0) return;
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(ownerNetId, out var netObj)) return;
+
+        var anchor = netObj.GetComponent<InWorldSubtitleAnchor>();
+        anchor?.Subtitle?.ShowLine(text, speakerName, isPlayerLine ? Color.cyan : Color.white);
+    }
+
+    [ClientRpc]
+    private void HideInWorldSubtitleClientRpc(ulong ownerNetId)
+    {
+        if (ownerNetId == 0) return;
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(ownerNetId, out var netObj)) return;
+
+        netObj.GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.Hide();
+    }
 
     [ClientRpc]
     private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
@@ -1202,6 +1448,20 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                 return name;
         }
         return "Detective";
+    }
+
+    /// <summary>
+    /// Finds the clientId of the player who submitted <paramref name="winningIndex"/>.
+    /// Returns <see cref="ulong.MaxValue"/> if no submission matches (e.g. an unattended timeout).
+    /// </summary>
+    private ulong FindWinnerClientId(int winningIndex)
+    {
+        foreach (var kvp in _choiceSubmissions)
+        {
+            if (kvp.Value == winningIndex)
+                return kvp.Key;
+        }
+        return ulong.MaxValue;
     }
 
     /// <summary>

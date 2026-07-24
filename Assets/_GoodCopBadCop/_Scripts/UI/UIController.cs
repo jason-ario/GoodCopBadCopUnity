@@ -288,13 +288,18 @@ public class UIController : MonoBehaviour
     }
 
 
-    public void ShowEndShiftReport(List<EndOfShiftReportUI.ReportRowData> reportRowDatas, int civiliansKilledOvernight = 0)
+    public void ShowEndShiftReport(
+        List<EndOfShiftReportUI.ReportRowData> reportRowDatas,
+        int residentsFullyMutatedOvernight = 0,
+        int civiliansKilledOvernight = 0,
+        int currentPopulation = 0)
     {
         if (PlayerInstance.Instance != null)
             PlayerInstance.Instance.CanControl = false;
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(false, string.Empty);
         ShowCursor();
-        endOfShiftReportUI.PlayReport(reportRowDatas, civiliansKilledOvernight);
+        endOfShiftReportUI.PlayReport(
+            reportRowDatas, residentsFullyMutatedOvernight, civiliansKilledOvernight, currentPopulation);
         OnReportShown?.Invoke();
     }
 

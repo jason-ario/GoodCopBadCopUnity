@@ -25,6 +25,12 @@ public class EndOfShiftReportUI : MonoBehaviour
     [Header("Rows")]
     [SerializeField] private List<EndOfShiftReportRow> rows = new List<EndOfShiftReportRow>();
 
+    [Header("Residents Who Fully Mutated")]
+    [SerializeField] private GameObject residentsMutatedRoot;
+    [SerializeField] private TextMeshProUGUI residentsMutatedText;
+    [SerializeField] private TMPTextReveal residentsMutatedReveal;
+    [SerializeField] private TMPWobbleText residentsMutatedWobble;
+
     [Header("Civilians Killed")]
     [SerializeField] private GameObject civiliansKilledRoot;
     [SerializeField] private TextMeshProUGUI civiliansKilledText;
@@ -36,6 +42,12 @@ public class EndOfShiftReportUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI netEarningsText;
     [SerializeField] private TMPTextReveal netEarningsReveal;
     [SerializeField] private TMPWobbleText netEarningsWobble;
+
+    [Header("Current Population")]
+    [SerializeField] private GameObject currentPopulationRoot;
+    [SerializeField] private TextMeshProUGUI currentPopulationText;
+    [SerializeField] private TMPTextReveal currentPopulationReveal;
+    [SerializeField] private TMPWobbleText currentPopulationWobble;
 
     [Header("Continue")]
     [SerializeField] private GameObject continueButton;
@@ -70,14 +82,19 @@ public class EndOfShiftReportUI : MonoBehaviour
         HideAll();
     }
 
-    public void PlayReport(List<ReportRowData> reportRows, int civiliansKilledOvernight = 0)
+    public void PlayReport(
+        List<ReportRowData> reportRows,
+        int residentsFullyMutatedOvernight = 0,
+        int civiliansKilledOvernight = 0,
+        int currentPopulation = 0)
     {
         if (revealRoutine != null)
             StopCoroutine(revealRoutine);
         
         gameObject.SetActive(true);
 
-        revealRoutine = StartCoroutine(RevealReportRoutine(reportRows, civiliansKilledOvernight));
+        revealRoutine = StartCoroutine(RevealReportRoutine(
+            reportRows, residentsFullyMutatedOvernight, civiliansKilledOvernight, currentPopulation));
     }
 
     public void HideAll()
@@ -96,6 +113,15 @@ public class EndOfShiftReportUI : MonoBehaviour
         }
         
         Canvas.ForceUpdateCanvases();
+
+        if (residentsMutatedRoot != null)
+            residentsMutatedRoot.SetActive(false);
+        if (residentsMutatedReveal != null)
+            residentsMutatedReveal.Clear();
+        else if (residentsMutatedText != null)
+            residentsMutatedText.text = "";
+        if (residentsMutatedWobble != null)
+            residentsMutatedWobble.StopWobble();
 
         if (civiliansKilledRoot != null)
             civiliansKilledRoot.SetActive(false);
@@ -117,11 +143,24 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (netEarningsWobble != null)
             netEarningsWobble.StopWobble();
 
+        if (currentPopulationRoot != null)
+            currentPopulationRoot.SetActive(false);
+        if (currentPopulationReveal != null)
+            currentPopulationReveal.Clear();
+        else if (currentPopulationText != null)
+            currentPopulationText.text = "";
+        if (currentPopulationWobble != null)
+            currentPopulationWobble.StopWobble();
+
         if (continueButton != null)
             continueButton.SetActive(false);
     }
 
-    private IEnumerator RevealReportRoutine(List<ReportRowData> reportRows, int civiliansKilledOvernight)
+    private IEnumerator RevealReportRoutine(
+        List<ReportRowData> reportRows,
+        int residentsFullyMutatedOvernight,
+        int civiliansKilledOvernight,
+        int currentPopulation)
     {
         HideAll();
 
@@ -171,8 +210,14 @@ public class EndOfShiftReportUI : MonoBehaviour
         
         yield return RevealNetTotal(total);
 
+        // Reveal residents who fully mutated overnight and went on to kill civilians.
+        yield return RevealResidentsMutated(residentsFullyMutatedOvernight);
+
         // Reveal overnight civilians killed panel (purely informational — no monetary impact).
         yield return RevealCiviliansKilled(civiliansKilledOvernight);
+
+        // Reveal the updated current population, accounting for any overnight civilian deaths.
+        yield return RevealCurrentPopulation(currentPopulation);
 
         yield return new WaitForSeconds(finalDelayBeforeContinue);
 
@@ -180,6 +225,29 @@ public class EndOfShiftReportUI : MonoBehaviour
             continueButton.SetActive(true);
 
         revealRoutine = null;
+    }
+
+    private IEnumerator RevealResidentsMutated(int count)
+    {
+        if (residentsMutatedRoot == null)
+            yield break;
+
+        residentsMutatedRoot.SetActive(true);
+
+        string label = $"Residents Who Fully Mutated: {count}";
+
+        if (residentsMutatedWobble != null && penaltyValueProfile != null)
+        {
+            residentsMutatedWobble.SetProfile(penaltyValueProfile, true);
+            residentsMutatedWobble.StartWobble();
+        }
+
+        if (residentsMutatedReveal != null)
+            yield return residentsMutatedReveal.RevealText(label);
+        else if (residentsMutatedText != null)
+            residentsMutatedText.text = label;
+
+        yield return new WaitForSeconds(lineRevealDelay);
     }
 
     private IEnumerator RevealCiviliansKilled(int count)
@@ -201,6 +269,29 @@ public class EndOfShiftReportUI : MonoBehaviour
             yield return civiliansKilledReveal.RevealText(label);
         else if (civiliansKilledText != null)
             civiliansKilledText.text = label;
+
+        yield return new WaitForSeconds(lineRevealDelay);
+    }
+
+    private IEnumerator RevealCurrentPopulation(int count)
+    {
+        if (currentPopulationRoot == null)
+            yield break;
+
+        currentPopulationRoot.SetActive(true);
+
+        string label = $"Current Population: {count}";
+
+        if (currentPopulationWobble != null && positiveTotalProfile != null)
+        {
+            currentPopulationWobble.SetProfile(positiveTotalProfile, true);
+            currentPopulationWobble.StartWobble();
+        }
+
+        if (currentPopulationReveal != null)
+            yield return currentPopulationReveal.RevealText(label);
+        else if (currentPopulationText != null)
+            currentPopulationText.text = label;
 
         yield return new WaitForSeconds(lineRevealDelay);
     }

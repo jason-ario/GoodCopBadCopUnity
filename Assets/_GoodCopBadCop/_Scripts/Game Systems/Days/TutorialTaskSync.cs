@@ -43,11 +43,28 @@ public class TutorialTaskSync : NetworkBehaviour
     /// </summary>
     public static event Action OnClockInReadyAllClients;
 
+    /// <summary>
+    /// Fired on all clients once the server confirms the tutorial folder was placed on the
+    /// desk placement board. <see cref="PlacementBoard.OnItemPlaced"/> only fires locally on
+    /// whichever client performs the drop, so this relay is required to keep the task list and
+    /// tutorial arrow in sync for every connected client.
+    /// </summary>
+    public static event Action OnFolderPlacedOnDeskAllClients;
+
+    /// <summary>
+    /// Fired on all clients once the server confirms the stamped folder was placed on the
+    /// window hand-off placement board, carrying a reference to the folder so the server can
+    /// lock it and start the closing dialogue regardless of which client performed the drop.
+    /// </summary>
+    public static event Action<NetworkObjectReference> OnFolderHandedToVladAllClients;
+
     // ── Server-side counters / guards ─────────────────────────────────────────
 
     private int  _vladDocsPickedUpCount;
     private bool _ivanTutorialBroadcast;
     private bool _examPickedUpBroadcast;
+    private bool _deskFolderPlacedBroadcast;
+    private bool _windowHandOffBroadcast;
 
     // ── NetworkBehaviour lifecycle ────────────────────────────────────────────
 
@@ -75,6 +92,8 @@ public class TutorialTaskSync : NetworkBehaviour
         _vladDocsPickedUpCount = 0;
         _ivanTutorialBroadcast = false;
         _examPickedUpBroadcast = false;
+        _deskFolderPlacedBroadcast = false;
+        _windowHandOffBroadcast = false;
     }
 
     // ── Vlad document pickup ──────────────────────────────────────────────────
@@ -195,5 +214,47 @@ public class TutorialTaskSync : NetworkBehaviour
     private void BroadcastClockInReadyClientRpc()
     {
         OnClockInReadyAllClients?.Invoke();
+    }
+
+    // ── Folder placed on desk ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by whichever client places the tutorial folder on the desk placement board.
+    /// The server ensures the broadcast fires exactly once even if reported more than once.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ReportFolderPlacedOnDeskServerRpc()
+    {
+        if (_deskFolderPlacedBroadcast) return;
+        _deskFolderPlacedBroadcast = true;
+        BroadcastFolderPlacedOnDeskClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastFolderPlacedOnDeskClientRpc()
+    {
+        OnFolderPlacedOnDeskAllClients?.Invoke();
+    }
+
+    // ── Folder handed to Vlad at the window ───────────────────────────────────
+
+    /// <summary>
+    /// Called by whichever client places the stamped folder on the window hand-off board.
+    /// Carries a reference to the folder so the server can lock it and start the closing
+    /// dialogue regardless of which client performed the drop. The server ensures the
+    /// broadcast fires exactly once even if reported more than once.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ReportFolderHandedToVladServerRpc(NetworkObjectReference folderRef)
+    {
+        if (_windowHandOffBroadcast) return;
+        _windowHandOffBroadcast = true;
+        BroadcastFolderHandedToVladClientRpc(folderRef);
+    }
+
+    [ClientRpc]
+    private void BroadcastFolderHandedToVladClientRpc(NetworkObjectReference folderRef)
+    {
+        OnFolderHandedToVladAllClients?.Invoke(folderRef);
     }
 }
