@@ -16,6 +16,10 @@ namespace GoodCopBadCop.EnvironmentSystem
     /// </summary>
     public sealed class EnvironmentRenderAdapter : IInitializable, IDisposable, ITickable
     {
+        private static readonly int TintId = Shader.PropertyToID("_Tint");
+        private static readonly int ExposureId = Shader.PropertyToID("_Exposure");
+        private static readonly int RotationId = Shader.PropertyToID("_Rotation");
+
         private readonly IEnvironmentModel model;
         private readonly VolumetricFog volumetricFog;
         private readonly float blendSecondsToTarget;
@@ -26,7 +30,8 @@ namespace GoodCopBadCop.EnvironmentSystem
         private float targetProgress;
         private float currentProgress;
         private VolumetricFogProfile blendedFogProfile;
-        private Material appliedSkybox;
+        private Material blendedSkyboxMaterial;
+        private Material blendedSkyboxSource;
 
         public EnvironmentRenderAdapter(IEnvironmentModel model, VolumetricFog volumetricFog, EnvironmentSchedule schedule)
         {
@@ -66,6 +71,14 @@ namespace GoodCopBadCop.EnvironmentSystem
             model.DayNightProgress
                 .Subscribe(progress => targetProgress = Mathf.Clamp01(progress))
                 .AddTo(ref disposables);
+
+            model.ForceDayNightProgressRequested
+                .Subscribe(_ =>
+                {
+                    currentProgress = targetProgress;
+                    ApplyBlend();
+                })
+                .AddTo(ref disposables);
         }
 
         public void Dispose()
@@ -76,6 +89,12 @@ namespace GoodCopBadCop.EnvironmentSystem
             {
                 UnityEngine.Object.Destroy(blendedFogProfile);
                 blendedFogProfile = null;
+            }
+
+            if (blendedSkyboxMaterial != null)
+            {
+                UnityEngine.Object.Destroy(blendedSkyboxMaterial);
+                blendedSkyboxMaterial = null;
             }
         }
 
@@ -128,19 +147,67 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         private void ApplySkybox(float t)
         {
-            // Skybox materials can't be blended generically, so the swap happens once the
-            // lerp crosses the midpoint rather than at the very start/end of the shift.
-            Material targetSkybox = (nightPreset == null || t < 0.5f)
-                ? dayPreset.Skybox
-                : nightPreset.Skybox;
+            Material daySkybox = dayPreset.Skybox;
+            Material nightSkybox = nightPreset != null ? nightPreset.Skybox : null;
 
-            if (targetSkybox == appliedSkybox)
+            if (nightSkybox == null)
             {
+                RenderSettings.skybox = daySkybox;
                 return;
             }
 
-            appliedSkybox = targetSkybox;
-            RenderSettings.skybox = targetSkybox;
+            // The project's skyboxes all share the same shader (Skybox/Cubemap) and differ
+            // only by their _Tint/_Exposure/_Rotation values, so blend those properties on a
+            // persistent instanced material instead of hard-swapping between two materials.
+            if (CanBlendSkyboxProperties(daySkybox, nightSkybox))
+            {
+                Material blended = GetOrCreateBlendedSkybox(daySkybox);
+                blended.SetColor(TintId, Color.Lerp(daySkybox.GetColor(TintId), nightSkybox.GetColor(TintId), t));
+
+                if (daySkybox.HasProperty(ExposureId) && nightSkybox.HasProperty(ExposureId))
+                {
+                    blended.SetFloat(ExposureId, Mathf.Lerp(daySkybox.GetFloat(ExposureId), nightSkybox.GetFloat(ExposureId), t));
+                }
+
+                if (daySkybox.HasProperty(RotationId) && nightSkybox.HasProperty(RotationId))
+                {
+                    blended.SetFloat(RotationId, Mathf.Lerp(daySkybox.GetFloat(RotationId), nightSkybox.GetFloat(RotationId), t));
+                }
+
+                RenderSettings.skybox = blended;
+            }
+            else
+            {
+                // Fallback for skyboxes that don't share a blendable shader/tint: hard swap
+                // at the midpoint rather than crashing or blending incompatible materials.
+                RenderSettings.skybox = t < 0.5f ? daySkybox : nightSkybox;
+            }
+        }
+
+        private static bool CanBlendSkyboxProperties(Material day, Material night)
+        {
+            if (day == null || night == null)
+            {
+                return false;
+            }
+
+            return day.shader == night.shader && day.HasProperty(TintId) && night.HasProperty(TintId);
+        }
+
+        private Material GetOrCreateBlendedSkybox(Material source)
+        {
+            if (blendedSkyboxMaterial == null || blendedSkyboxSource != source)
+            {
+                if (blendedSkyboxMaterial != null)
+                {
+                    UnityEngine.Object.Destroy(blendedSkyboxMaterial);
+                }
+
+                blendedSkyboxMaterial = new Material(source);
+                blendedSkyboxSource = source;
+            }
+
+            return blendedSkyboxMaterial;
         }
 
         private void ApplyVolumetricFog(float t)

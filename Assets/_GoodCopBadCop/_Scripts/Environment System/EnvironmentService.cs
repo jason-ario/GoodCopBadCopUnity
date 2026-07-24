@@ -6,6 +6,7 @@ namespace GoodCopBadCop.EnvironmentSystem
     {
         void ApplyDay(int day);
         void ApplyPreset(EnvironmentPreset preset);
+        void ApplyNightPreset(EnvironmentPreset preset);
         void ApplyNext();
         void ApplyPrevious();
 
@@ -16,6 +17,13 @@ namespace GoodCopBadCop.EnvironmentSystem
         /// <paramref name="totalSuspects"/> it targets the night preset for the current day.
         /// </summary>
         void SetSuspectProgress(int suspectsProcessed, int totalSuspects);
+
+        /// <summary>
+        /// Same calculation as <see cref="SetSuspectProgress"/>, but snaps the environment to
+        /// the resulting blend immediately instead of smoothing toward it. Intended for editor
+        /// debug tooling previews.
+        /// </summary>
+        void ForceSuspectProgress(int suspectsProcessed, int totalSuspects);
     }
 
     public sealed class EnvironmentService : IEnvironmentService
@@ -65,6 +73,17 @@ namespace GoodCopBadCop.EnvironmentSystem
             model.SelectPreset(preset);
         }
 
+        public void ApplyNightPreset(EnvironmentPreset preset)
+        {
+            if (preset == null)
+            {
+                Debug.LogWarning("[EnvironmentService] Cannot apply a null night environment preset.");
+                return;
+            }
+
+            model.SelectNightPreset(preset);
+        }
+
         public void ApplyNext()
         {
             ApplyDay(model.CurrentDayMutable.Value + 1);
@@ -77,11 +96,19 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         public void SetSuspectProgress(int suspectsProcessed, int totalSuspects)
         {
-            float progress = totalSuspects > 0
+            model.SelectDayNightProgress(CalculateProgress(suspectsProcessed, totalSuspects));
+        }
+
+        public void ForceSuspectProgress(int suspectsProcessed, int totalSuspects)
+        {
+            model.ForceDayNightProgress(CalculateProgress(suspectsProcessed, totalSuspects));
+        }
+
+        private static float CalculateProgress(int suspectsProcessed, int totalSuspects)
+        {
+            return totalSuspects > 0
                 ? Mathf.Clamp01((float)suspectsProcessed / totalSuspects)
                 : 0f;
-
-            model.SelectDayNightProgress(progress);
         }
     }
 

@@ -841,6 +841,7 @@ GameObject:
   - component: {fileID: 4425771342621210441}
   - component: {fileID: 8154835080764322672}
   - component: {fileID: 4018783668865833290}
+  - component: {fileID: 9123456789012345}
   m_Layer: 11
   m_Name: Suspect
   m_TagString: Untagged
@@ -1158,6 +1159,7 @@ MonoBehaviour:
   _mutantEnemy: {fileID: 4425771342621210441}
   _mutantSuspectBehaviour: {fileID: 8154835080764322672}
   _fullMutantIntruderData: {fileID: 11400000, guid: c4c02e4ee1dcc594888335cc8c4b68c5, type: 2}
+  _setOnFire: {fileID: 9123456789012345}
   _uncannyArrivesSound: {fileID: 8300000, guid: 10ff9e0a540b91a45aa40cfb33de721a, type: 3}
   _suspectCam: {fileID: 7165712762372772399}
   _suspectFaceCam: {fileID: 5417930054641599086}
@@ -2101,6 +2103,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HeartRateAnomaly
   elevatedHeartRateBpm: 140
+--- !u!114 &9123456789012345
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4331289234258202243}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47896547466ac8d4bb21a5d14b1eb3a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SetOnFire
+  animator: {fileID: 0}
+  firePrefab: {fileID: 100000, guid: a817de05addd7b64faa73b34c74013ce, type: 3}
+  spawnInterval: 0.3
+  maxFireInstances: 8
+  burnDuration: 5
+  fireDamagePerTick: 5
 --- !u!1 &4528955243091184220
 GameObject:
   m_ObjectHideFlags: 0

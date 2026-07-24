@@ -52,6 +52,9 @@ public class ATM : NetworkBehaviour
     [Tooltip("Screen controller that flashes the payment amount on the ATM display.")]
     [SerializeField] private ATMScreenController _screenController;
 
+    [Tooltip("Seconds to wait after coupon spawning begins before showing the payment amount on the ATM screen.")]
+    [SerializeField] private float _paymentTextDelay = 2f;
+
     [Header("Debug")]
     [Tooltip("Number of coupons to dispense when pressing M in a development build or the editor.")]
     [SerializeField] private int _debugDispenseAmount = 5;
@@ -111,12 +114,8 @@ public class ATM : NetworkBehaviour
 
         PlayDispenseSound();
 
-        if (IsNetworked)
-            ShowPaymentClientRpc(amount);
-        else
-            _screenController?.ShowPayment(amount);
-
         StartCoroutine(SpawnCouponsRoutine(count));
+        StartCoroutine(ShowPaymentDelayedRoutine(amount));
     }
 
     // ── Private ──────────────────────────────────────────────────────────────
@@ -144,6 +143,21 @@ public class ATM : NetworkBehaviour
             position,
             maxDistance: _couponSpawnSfxMaxDistance
         );
+    }
+
+    /// <summary>
+    /// Waits <see cref="_paymentTextDelay"/> seconds after coupon spawning begins,
+    /// then shows the payment amount on the ATM screen (locally or via RPC to all clients).
+    /// </summary>
+    private IEnumerator ShowPaymentDelayedRoutine(int amount)
+    {
+        if (_paymentTextDelay > 0f)
+            yield return new WaitForSeconds(_paymentTextDelay);
+
+        if (IsNetworked)
+            ShowPaymentClientRpc(amount);
+        else
+            _screenController?.ShowPayment(amount);
     }
 
     private IEnumerator SpawnCouponsRoutine(int amount)

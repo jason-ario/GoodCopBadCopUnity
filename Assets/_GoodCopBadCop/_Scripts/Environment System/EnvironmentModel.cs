@@ -10,6 +10,13 @@ namespace GoodCopBadCop.EnvironmentSystem
         ReadOnlyReactiveProperty<EnvironmentPreset> CurrentNightPreset { get; }
         ReadOnlyReactiveProperty<float> DayNightProgress { get; }
         ReadOnlyReactiveProperty<bool> CurrentRainEnabled { get; }
+
+        /// <summary>
+        /// Fires whenever the day/night blend should snap immediately to
+        /// <see cref="DayNightProgress"/>'s current value instead of smoothing toward it over
+        /// time. Used by editor debug tooling so previewing a step is instant.
+        /// </summary>
+        Observable<Unit> ForceDayNightProgressRequested { get; }
     }
 
     public sealed class EnvironmentModel : IEnvironmentModel, IDisposable
@@ -24,12 +31,14 @@ namespace GoodCopBadCop.EnvironmentSystem
         /// </summary>
         public readonly ReactiveProperty<float> DayNightProgressMutable = new(0f);
         public readonly ReactiveProperty<bool> CurrentRainEnabledMutable = new(false);
+        private readonly Subject<Unit> forceDayNightProgressRequested = new();
 
         public ReadOnlyReactiveProperty<int> CurrentDay => CurrentDayMutable;
         public ReadOnlyReactiveProperty<EnvironmentPreset> CurrentPreset => CurrentPresetMutable;
         public ReadOnlyReactiveProperty<EnvironmentPreset> CurrentNightPreset => CurrentNightPresetMutable;
         public ReadOnlyReactiveProperty<float> DayNightProgress => DayNightProgressMutable;
         public ReadOnlyReactiveProperty<bool> CurrentRainEnabled => CurrentRainEnabledMutable;
+        public Observable<Unit> ForceDayNightProgressRequested => forceDayNightProgressRequested;
 
         public void SelectDay(int day)
         {
@@ -74,6 +83,16 @@ namespace GoodCopBadCop.EnvironmentSystem
             DayNightProgressMutable.Value = progress;
         }
 
+        /// <summary>
+        /// Sets the day/night blend target and immediately snaps to it, bypassing
+        /// EnvironmentRenderAdapter's normal smoothing. Intended for editor debug tooling.
+        /// </summary>
+        public void ForceDayNightProgress(float progress)
+        {
+            DayNightProgressMutable.Value = progress;
+            forceDayNightProgressRequested.OnNext(Unit.Default);
+        }
+
         public void SelectRainEnabled(bool enabled)
         {
             CurrentRainEnabledMutable.Value = enabled;
@@ -86,6 +105,7 @@ namespace GoodCopBadCop.EnvironmentSystem
             CurrentNightPresetMutable.Dispose();
             DayNightProgressMutable.Dispose();
             CurrentRainEnabledMutable.Dispose();
+            forceDayNightProgressRequested.Dispose();
         }
     }
 

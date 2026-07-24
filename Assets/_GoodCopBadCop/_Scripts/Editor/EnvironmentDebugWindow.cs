@@ -18,6 +18,9 @@ namespace GoodCopBadCop.Editor
         [SerializeField]
         private EnvironmentPreset presetToApply;
 
+        [SerializeField]
+        private EnvironmentPreset nightPresetToApply;
+
         [SerializeField, Range(0f, 1f)]
         private float suspectProgressToApply;
 
@@ -33,6 +36,13 @@ namespace GoodCopBadCop.Editor
         private EnvironmentPreset currentPreset;
         private EnvironmentPreset currentNightPreset;
         private float currentDayNightProgress;
+
+        /// <summary>
+        /// Tracks whether Apply Next/Apply Previous are currently parked on the night half of
+        /// <see cref="currentDay"/>, so stepping interleaves each day's morning and night look
+        /// instead of jumping straight from one day's morning preset to the next day's.
+        /// </summary>
+        private bool isNightPhase;
 
         [MenuItem(EditorConstants.EnvironmentDebugMenuPath, false, EditorConstants.RootMenuPriority)]
         private static void Open()
@@ -75,22 +85,64 @@ namespace GoodCopBadCop.Editor
         [ShowInInspector, ReadOnly, PropertyOrder(-7)]
         private float CurrentDayNightProgress => currentDayNightProgress;
 
+        [ShowInInspector, ReadOnly, PropertyOrder(-6)]
+        private EnvironmentPreset ScheduledNightPresetForDayToApply => environmentSchedule != null
+            ? environmentSchedule.GetNightPresetForDay(dayToApply)
+            : null;
+
+        [ShowInInspector, ReadOnly, PropertyOrder(-5)]
+        private string SteppingPhase => isNightPhase ? "Night" : "Day";
+
         [Button(ButtonSizes.Large), HorizontalGroup("Navigation"), EnableIf(nameof(CanUseRuntimeServices))]
         private void ApplyPrevious()
         {
-            service?.ApplyPrevious();
+            if (service == null)
+            {
+                return;
+            }
+
+            if (isNightPhase)
+            {
+                // Step back from this day's night look to its own morning look first.
+                service.ForceSuspectProgress(0, 1);
+                isNightPhase = false;
+            }
+            else
+            {
+                // Step back into the previous day, parked on its night look.
+                service.ApplyPrevious();
+                service.ForceSuspectProgress(1, 1);
+                isNightPhase = true;
+            }
         }
 
         [Button(ButtonSizes.Large), HorizontalGroup("Navigation"), EnableIf(nameof(CanUseRuntimeServices))]
         private void ApplyNext()
         {
-            service?.ApplyNext();
+            if (service == null)
+            {
+                return;
+            }
+
+            if (isNightPhase)
+            {
+                // Step forward into the next day, starting on its morning look.
+                service.ApplyNext();
+                isNightPhase = false;
+            }
+            else
+            {
+                // Step forward from this day's morning look to its own night look.
+                service.ForceSuspectProgress(1, 1);
+                isNightPhase = true;
+            }
         }
 
         [Button(ButtonSizes.Medium), EnableIf(nameof(CanUseRuntimeServices))]
         private void ApplyDay()
         {
             service?.ApplyDay(dayToApply);
+            isNightPhase = false;
         }
 
         [Button(ButtonSizes.Medium), EnableIf(nameof(CanApplySelectedPreset))]
@@ -99,10 +151,17 @@ namespace GoodCopBadCop.Editor
             service?.ApplyPreset(presetToApply);
         }
 
+        [Button(ButtonSizes.Medium), EnableIf(nameof(CanApplySelectedNightPreset))]
+        private void ApplySelectedNightPreset()
+        {
+            service?.ApplyNightPreset(nightPresetToApply);
+        }
+
         [Button(ButtonSizes.Medium), EnableIf(nameof(CanUseRuntimeServices))]
         private void ApplySuspectProgress()
         {
-            service?.SetSuspectProgress(Mathf.RoundToInt(suspectProgressToApply * 100f), 100);
+            service?.ForceSuspectProgress(Mathf.RoundToInt(suspectProgressToApply * 100f), 100);
+            isNightPhase = suspectProgressToApply >= 0.5f;
         }
 
         [Button(ButtonSizes.Small)]
@@ -169,6 +228,7 @@ namespace GoodCopBadCop.Editor
             currentPreset = model.CurrentPreset.CurrentValue;
             currentNightPreset = model.CurrentNightPreset.CurrentValue;
             currentDayNightProgress = model.DayNightProgress.CurrentValue;
+            isNightPhase = currentDayNightProgress >= 0.5f;
             status = "Ready.";
 
             currentDaySubscription = model.CurrentDay.Subscribe(day =>
@@ -218,6 +278,7 @@ namespace GoodCopBadCop.Editor
             currentPreset = null;
             currentNightPreset = null;
             currentDayNightProgress = 0f;
+            isNightPhase = false;
             status = newStatus;
         }
 
@@ -229,6 +290,11 @@ namespace GoodCopBadCop.Editor
         private bool CanApplySelectedPreset()
         {
             return presetToApply != null && CanUseRuntimeServices();
+        }
+
+        private bool CanApplySelectedNightPreset()
+        {
+            return nightPresetToApply != null && CanUseRuntimeServices();
         }
 
         private static bool TryGetContainer(out IObjectResolver container)

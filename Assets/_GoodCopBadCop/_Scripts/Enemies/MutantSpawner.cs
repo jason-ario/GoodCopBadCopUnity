@@ -93,6 +93,19 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Maximum active enemy cap at sparse intensity.")]
     [SerializeField] private int sparseMaxActiveEnemies = 1;
 
+    [Header("Legacy Mutants")]
+    [Tooltip("When enabled, this spawner is eligible to spawn previously-escaped residents — " +
+             "suspects who were beaten as full mutants and fled rather than died (tracked via " +
+             "SuspectRunRecords.isLegacyMutant) — in their full-mutant SuspectCharacter form instead " +
+             "of a random entry from mutantPrefabs. Requires a SuspectRunRecords instance in the scene.")]
+    [SerializeField] private bool spawnLegacyMutants = false;
+
+    [Tooltip("Probability (0-1) that an individual burst spawn rolls for a legacy mutant instead of " +
+             "a random mutantPrefabs entry. Ignored — falls back to mutantPrefabs — when no legacy " +
+             "mutant is currently eligible.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float legacyMutantChance = 0.3f;
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _activeEnemies = new List<NetworkObject>();
@@ -279,7 +292,16 @@ public class MutantSpawner : NetworkBehaviour
         Vector3 spawnPosition = transform.TransformPoint(localOffset);
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-        GameObject prefab = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+        // Roll for a legacy mutant — a resident who previously escaped a full-mutant encounter —
+        // before falling back to the normal random mutantPrefabs pool.
+        SuspectRecord legacyRecord = null;
+        if (spawnLegacyMutants && SuspectRunRecords.Instance != null && Random.value < legacyMutantChance)
+            legacyRecord = SuspectRunRecords.Instance.GetRandomLegacyMutantRecord();
+
+        GameObject prefab = legacyRecord != null
+            ? legacyRecord.SuspectData.CharacterPrefab.gameObject
+            : mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+
         GameObject instance = Instantiate(prefab, spawnPosition, spawnRotation);
         NetworkObject netObj = instance.GetComponent<NetworkObject>();
 
@@ -290,15 +312,28 @@ public class MutantSpawner : NetworkBehaviour
             return;
         }
 
-        // Assign the aggro target before Spawn() so InitialiseServer can read it.
-        MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
-        if (aggroTarget != null)
-            enemy?.SetAggroTarget(aggroTarget);
-        if (forceAggro)
-            enemy?.SetForceAggro(true);
+        SuspectCharacter legacyCharacter = legacyRecord != null ? instance.GetComponent<SuspectCharacter>() : null;
+
+        if (legacyCharacter == null)
+        {
+            // Normal path — assign the aggro target before Spawn() so InitialiseServer can read it.
+            MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
+            if (aggroTarget != null)
+                enemy?.SetAggroTarget(aggroTarget);
+            if (forceAggro)
+                enemy?.SetForceAggro(true);
+        }
 
         netObj.Spawn(true);
         _activeEnemies.Add(netObj);
+
+        if (legacyCharacter != null)
+        {
+            // Legacy path — skip the booth cutscene/window-breach entirely and drop straight
+            // into active MutantEnemy behaviour, forced hostile toward the aggro target.
+            legacyCharacter.ActivateAsLegacyMutant(aggroTarget);
+            Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
+        }
     }
 
     /// <summary>

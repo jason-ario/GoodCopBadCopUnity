@@ -155,6 +155,15 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public bool IsDead => _isDead;
 
+    /// <summary>
+    /// Valid only once <see cref="OnRemovedFromPlay"/> has fired. True when this enemy's removal
+    /// was a genuine permanent death (normal kill, or a fire kill on a flee-instead-of-die unit).
+    /// False when it was a flee-and-despawn (fleeInsteadOfDie unit killed by non-fire damage).
+    /// <see cref="SuspectCharacter"/> reads this inside its OnRemovedFromPlay handler to decide
+    /// whether to register or clear the legacy-mutant record for this suspect.
+    /// </summary>
+    public bool DiedPermanently { get; private set; }
+
     // Synced animator speed so non-owners see movement blend correctly
     private readonly NetworkVariable<float> _networkSpeed = new NetworkVariable<float>(
         0f,
@@ -905,7 +914,12 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     /// <param name="amount">Damage to apply.</param>
     /// <param name="hitPoint">World-space point of impact used to position the hit particle.</param>
-    public void TakeDamage(float amount, Vector3 hitPoint)
+    /// <param name="isFireDamage">
+    /// True when this damage tick came from <see cref="SetOnFire"/>. Fire damage always kills
+    /// permanently, even on units with <see cref="fleeInsteadOfDie"/> enabled — it's the only
+    /// way to finish off a fully-mutated resident for good.
+    /// </param>
+    public void TakeDamage(float amount, Vector3 hitPoint, bool isFireDamage = false)
     {
         if (!IsServer || _isDead)
             return;
@@ -916,7 +930,7 @@ public class MutantEnemy : NetworkBehaviour
 
         if (_health <= 0f)
         {
-            Die();
+            Die(isFireDamage);
             return;
         }
 
@@ -939,14 +953,22 @@ public class MutantEnemy : NetworkBehaviour
             fx.AddComponent<AutoDestroy>();
     }
 
-    private void Die()
+    /// <summary>
+    /// Resolves the killing blow. Fire damage (<paramref name="killedByFire"/>) always results in a
+    /// permanent death, even when <see cref="fleeInsteadOfDie"/> is set — otherwise a
+    /// fleeInsteadOfDie unit flees and survives to be re-encountered later.
+    /// </summary>
+    private void Die(bool killedByFire)
     {
         _isDead = true;
         _agent.ResetPath();
         _agent.enabled = false;
         _networkSpeed.Value = 0f;
 
-        if (fleeInsteadOfDie)
+        bool permanentDeath = !fleeInsteadOfDie || killedByFire;
+        DiedPermanently = permanentDeath;
+
+        if (!permanentDeath)
         {
             // Restore health so IsDead stays true (flee path) but the unit remains functional
             // long enough to run the flee coroutine. _isDead prevents re-entry from TakeDamage.
@@ -988,6 +1010,8 @@ public class MutantEnemy : NetworkBehaviour
     private IEnumerator FleeAndDespawn()
     {
         if (!IsServer) yield break;
+
+        DiedPermanently = false;
 
         // Boost speed, stop any attack animation, and stop chase music on all clients.
         _agent.speed = fleeSpeed;

@@ -91,6 +91,12 @@ public class SuspectCharacter : Interactable
              "cutscene. Controls walk, climb, and shutter-bang timings. Assign a MutantIntruderData asset.")]
     [SerializeField] private MutantIntruderData _fullMutantIntruderData;
 
+    [Tooltip("The SetOnFire component on this prefab. Assign in the Inspector; falls back to " +
+             "GetComponent at runtime. Re-targeted to the Mutated Version's Animator whenever the " +
+             "full-mutant form activates, so flamethrower fire spawns on the correct skeleton — " +
+             "burning to death is the only way to permanently kill a fully-mutated resident.")]
+    [SerializeField] private SetOnFire _setOnFire;
+
     // Booth references injected by SuspectController at spawn time for the window-breach phase.
     private Transform _fullMutantStandPos;
     private Transform _fullMutantDespawnPos;
@@ -146,6 +152,7 @@ public class SuspectCharacter : Interactable
 
         _mutantEnemy?.SetAnimator(mutantAnim);
         _mutantSuspectBehaviour?.SetAnimator(mutantAnim);
+        _setOnFire?.SetAnimator(mutantAnim);
 
         // Remap the FLookAnimator bone chain to the mutant skeleton so look-at tracking
         // follows the mutant head instead of the now-disabled civilian bones.
@@ -302,6 +309,12 @@ public class SuspectCharacter : Interactable
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
         SetMutantVoiceClientRpc(true);
 
+        // Track how this encounter resolves (permanently killed vs. beaten-and-fled) so the
+        // legacy-mutant pool in SuspectRunRecords stays in sync. Subscribed once here regardless
+        // of which path below actually enables MutantEnemy, since both fire the same event.
+        if (_mutantEnemy != null)
+            _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
+
         // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
         // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
         if (_mutantSuspectBehaviour != null && _fullMutantIntruderData != null
@@ -333,6 +346,66 @@ public class SuspectCharacter : Interactable
     private void EnableMutantEnemyClientRpc()
     {
         if (_mutantEnemy != null) _mutantEnemy.enabled = true;
+    }
+
+    /// <summary>
+    /// Fired once when this suspect's full-mutant encounter (booth or legacy world spawn) is
+    /// resolved — either a permanent kill (<see cref="MutantEnemy.DiedPermanently"/>, which
+    /// requires fire since these units have fleeInsteadOfDie enabled) or a beaten-and-fled
+    /// escape. Updates <see cref="SuspectRunRecords"/> so this resident's legacy-mutant
+    /// eligibility stays accurate for future <see cref="MutantSpawner"/> world spawns. Server-only.
+    /// </summary>
+    private void HandleFullMutantResolved()
+    {
+        if (_mutantEnemy != null)
+            _mutantEnemy.OnRemovedFromPlay -= HandleFullMutantResolved;
+
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+        if (runRecords == null || suspectData == null) return;
+
+        if (_mutantEnemy != null && _mutantEnemy.DiedPermanently)
+            runRecords.ClearLegacyMutant(suspectData);
+        else
+            runRecords.MarkAsLegacyMutant(suspectData);
+    }
+
+    /// <summary>
+    /// Spawns this suspect directly in full-mutant form as a roaming world threat, bypassing the
+    /// booth cutscene and window-breach sequence entirely. Used by <see cref="MutantSpawner"/> to
+    /// re-introduce a resident who previously escaped a full-mutant encounter (tracked via
+    /// <see cref="SuspectRecord.isLegacyMutant"/>) as a "legacy mutant". <see cref="MutantEnemy"/>
+    /// is enabled immediately with all its normal chase/attack/flee behaviour active.
+    /// Must be called on the server immediately after this instance's NetworkObject is spawned.
+    /// </summary>
+    /// <param name="initialAggroTarget">
+    /// Optional target (e.g. the player or booth) the mutant heads toward on spawn, mirroring
+    /// <see cref="MutantSpawner"/>'s aggroTarget. Forces aggro so the legacy mutant is
+    /// immediately hostile rather than rolling the normal aggroChance.
+    /// </param>
+    public void ActivateAsLegacyMutant(Transform initialAggroTarget)
+    {
+        if (!IsServer) return;
+
+        ActivateFullMutantForm();
+        _isMutant = true;
+        enabled = false;
+        TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
+        SetMutantVoiceClientRpc(true);
+
+        if (_mutantEnemy == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}' has no MutantEnemy — cannot activate as a legacy mutant.", this);
+            return;
+        }
+
+        _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
+
+        if (initialAggroTarget != null)
+            _mutantEnemy.SetAggroTarget(initialAggroTarget);
+        _mutantEnemy.SetForceAggro(true);
+        _mutantEnemy.enabled = true;
+        _mutantEnemy.InitialiseServer();
+        EnableMutantEnemyClientRpc();
     }
 
     /// <summary>

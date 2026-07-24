@@ -35,6 +35,17 @@ public class SuspectRecord
     public bool isKilled;
 
     /// <summary>
+    /// True when this suspect has escaped a full-mutant booth encounter alive — beaten (health
+    /// depleted by non-fire damage while <see cref="MutantEnemy"/>'s fleeInsteadOfDie is active)
+    /// and fled into the woods instead of dying. While true this suspect is a candidate for
+    /// <see cref="MutantSpawner"/>'s legacy-mutant pool, allowing them to re-appear as a roaming
+    /// full mutant. Cleared (and <see cref="isKilled"/> set) if they are ever permanently killed
+    /// with fire. Set via <see cref="SuspectRunRecords.MarkAsLegacyMutant"/> /
+    /// <see cref="SuspectRunRecords.ClearLegacyMutant"/>.
+    /// </summary>
+    public bool isLegacyMutant;
+
+    /// <summary>
     /// True once this suspect has been passed through the gate into the city.
     /// This is persisted as historical state; population deaths are driven by
     /// <see cref="populationKillPending"/> so a passed mutant only gets one night.

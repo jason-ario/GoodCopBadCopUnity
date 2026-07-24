@@ -50,6 +50,13 @@ public class SetOnFire : MonoBehaviour
             animator = GetComponentInChildren<Animator>();
     }
 
+    /// <summary>
+    /// Reassigns the Animator used for bone collection. Call this when the character's active
+    /// skeleton changes at runtime (e.g. <see cref="SuspectCharacter"/> swapping from its civilian
+    /// mesh to its Mutated Version mesh), so <see cref="Ignite"/> spawns fire on the correct bones.
+    /// </summary>
+    public void SetAnimator(Animator a) => animator = a;
+
     public void Ignite()
     {
         if (LiveFireCount() >= maxFireInstances) return;
@@ -185,7 +192,7 @@ public class SetOnFire : MonoBehaviour
             if (!_isOnFire) break;
 
             if (enemy != null && enemy.IsServer)
-                enemy.TakeDamage(fireDamagePerTick, transform.position);
+                enemy.TakeDamage(fireDamagePerTick, transform.position, isFireDamage: true);
         }
 
         _isDamaging = false;

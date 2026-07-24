@@ -211,6 +211,7 @@ public class SaveDataManager : MonoBehaviour
                 IsReplacement    = r.isReplacement,
                 QuarantinedOnDay = r.quarantinedOnDay,
                 InfectionScore   = r.infectionScore,
+                IsLegacyMutant   = r.isLegacyMutant,
             };
         }
 
@@ -529,6 +530,12 @@ public class SuspectSaveEntry
 
     /// <summary>Accumulated infection score, advanced each day by <see cref="SuspectRunRecords.AdvanceDayInfection"/>.</summary>
     public int InfectionScore;
+
+    /// <summary>
+    /// True when this suspect escaped a full-mutant booth encounter alive (beaten and fled rather
+    /// than killed) and is currently a candidate for <see cref="MutantSpawner"/>'s legacy-mutant pool.
+    /// </summary>
+    public bool IsLegacyMutant;
 }
 
 [Serializable]

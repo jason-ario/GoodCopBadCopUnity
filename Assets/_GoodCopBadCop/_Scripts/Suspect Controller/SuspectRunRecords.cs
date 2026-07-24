@@ -70,6 +70,7 @@ public class SuspectRunRecords : MonoBehaviour
             record.isReplacement           = entry.IsReplacement;
             record.quarantinedOnDay        = entry.QuarantinedOnDay;
             record.infectionScore          = entry.InfectionScore;
+            record.isLegacyMutant          = entry.IsLegacyMutant;
             applied++;
         }
 
@@ -138,6 +139,94 @@ public class SuspectRunRecords : MonoBehaviour
 
         int elapsedDays = currentDay - record.quarantinedOnDay;
         return Mathf.Clamp(QuarantineDurationDays - elapsedDays, 0, QuarantineDurationDays);
+    }
+
+    // -------------------------------------------------------------------------
+    // Legacy Mutants
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Marks a suspect as a legacy mutant — they escaped a full-mutant booth encounter alive
+    /// (beaten and fled into the woods rather than killed). Called from
+    /// <see cref="SuspectCharacter"/> when its <see cref="MutantEnemy"/> flees instead of dying.
+    /// Persists immediately. Server-only.
+    /// </summary>
+    public void MarkAsLegacyMutant(SuspectData data)
+    {
+        SuspectRecord record = GetRecord(data);
+        if (record == null) return;
+
+        if (!record.isLegacyMutant)
+        {
+            record.isLegacyMutant = true;
+            Debug.Log($"[SuspectRunRecords] '{data.name}' escaped as a full mutant — added to the legacy mutant pool.");
+        }
+
+        SaveRecords();
+    }
+
+    /// <summary>
+    /// Permanently removes a suspect from the legacy mutant pool and marks them killed —
+    /// called when a legacy mutant is finally destroyed with fire (the only way to
+    /// permanently kill a fully-mutated resident). Mirrors the standard kill bookkeeping
+    /// (<see cref="SuspectRecord.isKilled"/> / <see cref="SuspectRecord.killedOnDay"/>) so this
+    /// resident never re-appears at the booth or in the legacy pool again. Persists immediately.
+    /// Server-only.
+    /// </summary>
+    public void ClearLegacyMutant(SuspectData data)
+    {
+        SuspectRecord record = GetRecord(data);
+        if (record == null) return;
+
+        record.isLegacyMutant = false;
+        record.isKilled = true;
+        if (record.killedOnDay < 0)
+            record.killedOnDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+
+        Debug.Log($"[SuspectRunRecords] '{data.name}' permanently destroyed by fire — removed from the legacy mutant pool.");
+        SaveRecords();
+    }
+
+    /// <summary>True when at least one suspect is currently eligible for a legacy-mutant world spawn.</summary>
+    public bool HasLegacyMutantCandidates
+    {
+        get
+        {
+            foreach (SuspectRecord record in records)
+            {
+                if (IsEligibleLegacyMutant(record))
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns a random eligible legacy mutant record, or null if none are available.
+    /// Eligible records have <see cref="SuspectRecord.isLegacyMutant"/> set, are not killed, and
+    /// have a valid <see cref="SuspectData.CharacterPrefab"/> to spawn. Used by
+    /// <see cref="MutantSpawner"/> to populate world spawns with previously-escaped residents.
+    /// </summary>
+    public SuspectRecord GetRandomLegacyMutantRecord()
+    {
+        List<SuspectRecord> candidates = new List<SuspectRecord>();
+        foreach (SuspectRecord record in records)
+        {
+            if (IsEligibleLegacyMutant(record))
+                candidates.Add(record);
+        }
+
+        if (candidates.Count == 0) return null;
+        return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+    }
+
+    private static bool IsEligibleLegacyMutant(SuspectRecord record)
+    {
+        return record != null
+               && record.isLegacyMutant
+               && !record.isKilled
+               && record.SuspectData != null
+               && record.SuspectData.CharacterPrefab != null;
     }
 
     /// <summary>
