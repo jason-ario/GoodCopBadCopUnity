@@ -21,20 +21,20 @@ public class CosmeticsMenuUI : MonoBehaviour
     [SerializeField] private Button _buttonTemplate;
 
     [Header("Selection Visuals")]
-    [Tooltip("Tint colour applied to the button whose hat is currently equipped.")]
-    [SerializeField] private Color _selectedColor = new Color(0.4f, 0.8f, 1f, 1f);
+    [Tooltip("Animator trigger name fired on the button whose hat is currently equipped.")]
+    [SerializeField] private string _selectedTrigger = "Selected";
 
-    [Tooltip("Tint colour applied to all other (unselected) buttons.")]
-    [SerializeField] private Color _deselectedColor = Color.white;
+    [Tooltip("Animator trigger name fired on all other (unselected) buttons.")]
+    [SerializeField] private string _deselectedTrigger = "Normal";
 
     [Header("Audio")]
-    [Tooltip("Sound played when the player selects a hat button.")]
+    [Tooltip("Sound played when the player presses a hat button.")]
     [SerializeField] private AudioClip _hatSwapSFX;
 
     // ─── Private state ────────────────────────────────────────────────────────
 
     private PlayerHatController _hatController;
-    private readonly List<(Button btn, int hatIndex)> _buttons = new();
+    private readonly List<(Button btn, Animator anim, int hatIndex)> _buttons = new();
     private bool _isOpen;
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -108,15 +108,13 @@ public class CosmeticsMenuUI : MonoBehaviour
         if (tmp != null)
             tmp.text = label;
 
-        // Optional icon — looks for an Image child named "Icon".
-        if (icon != null)
+        // Icon — looks for an Image child named "Hat Icon". Hidden when the hat has no preview sprite
+        // (e.g. the "No Hat" entry).
+        Image iconImg = btn.transform.Find("Hat Icon")?.GetComponent<Image>();
+        if (iconImg != null)
         {
-            Image iconImg = btn.transform.Find("Icon")?.GetComponent<Image>();
-            if (iconImg != null)
-            {
-                iconImg.sprite = icon;
-                iconImg.enabled = true;
-            }
+            iconImg.sprite = icon;
+            iconImg.gameObject.SetActive(icon != null);
         }
 
         int capturedIndex = hatIndex;
@@ -131,26 +129,24 @@ public class CosmeticsMenuUI : MonoBehaviour
             RefreshSelection(capturedIndex);
         });
 
-        _buttons.Add((btn, hatIndex));
+        Animator anim = btn.GetComponent<Animator>();
+        _buttons.Add((btn, anim, hatIndex));
     }
 
     private void RefreshSelection(int equippedIndex)
     {
-        foreach (var (btn, hatIndex) in _buttons)
+        foreach (var (btn, anim, hatIndex) in _buttons)
         {
-            if (btn == null) continue;
+            if (btn == null || anim == null) continue;
 
             bool selected = hatIndex == equippedIndex;
-            ColorBlock cb = btn.colors;
-            cb.normalColor   = selected ? _selectedColor : _deselectedColor;
-            cb.selectedColor = cb.normalColor;
-            btn.colors = cb;
+            anim.SetTrigger(selected ? _selectedTrigger : _deselectedTrigger);
         }
     }
 
     private void ClearButtons()
     {
-        foreach (var (btn, _) in _buttons)
+        foreach (var (btn, _, _) in _buttons)
         {
             if (btn != null)
                 Destroy(btn.gameObject);
