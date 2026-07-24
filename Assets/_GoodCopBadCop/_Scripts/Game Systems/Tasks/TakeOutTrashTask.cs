@@ -302,6 +302,47 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                   $"pre-existing {preExistingCount}, total {_totalCount.Value}.");
     }
 
+    /// <summary>
+    /// Returns true when <paramref name="worldPosition"/> falls within any of this task's
+    /// configured yard <see cref="SpawnZone"/>s. Used by external systems (e.g. gore chunks
+    /// dropped by killed <see cref="MutantEnemy"/> instances) to decide whether something they
+    /// spawn should count toward this task instead of just being cosmetic debris.
+    /// </summary>
+    public bool IsPositionInYard(Vector3 worldPosition)
+    {
+        if (_spawnZones == null)
+            return false;
+
+        foreach (SpawnZone zone in _spawnZones)
+        {
+            if (zone != null && zone.Contains(worldPosition))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Registers an externally-spawned <see cref="JunkItem"/>'s NetworkObject with this task
+    /// (e.g. a gore chunk dropped by a killed mutant that landed inside the yard). Collection
+    /// is already tracked generically via the static <see cref="JunkItem.OnAnyJunkItemCollected"/>
+    /// event, so this only needs to keep the HUD denominator accurate: if the task is currently
+    /// active, the item is added to the tracked list and the total count is incremented
+    /// immediately. If the task hasn't started yet, this is a no-op — the item will be picked
+    /// up automatically by <see cref="TriggerTask"/> or <see cref="ActivateForExistingItems"/>
+    /// once the task begins, since it will already be an active JunkItem in the scene.
+    /// Server-only.
+    /// </summary>
+    public void RegisterExternalJunkItem(NetworkObject netObj)
+    {
+        if (!IsServer || netObj == null || !_taskActive)
+            return;
+
+        _spawnedItems.Add(netObj);
+        _totalCount.Value++;
+        UpdateThreatLevel();
+    }
+
     // ── Private ────────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -19,6 +19,17 @@ public class SpawnZone : MonoBehaviour
         return transform.position + new Vector3(randomX, 0f, randomZ);
     }
 
+    /// <summary>
+    /// Returns true when <paramref name="worldPosition"/> falls within this zone's horizontal
+    /// bounds (X/Z half-extents around the zone's position). Height (Y) is ignored, matching
+    /// <see cref="GetRandomPosition"/>'s horizontal-only placement.
+    /// </summary>
+    public bool Contains(Vector3 worldPosition)
+    {
+        Vector3 local = worldPosition - transform.position;
+        return Mathf.Abs(local.x) <= HalfExtents.x && Mathf.Abs(local.z) <= HalfExtents.z;
+    }
+
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {

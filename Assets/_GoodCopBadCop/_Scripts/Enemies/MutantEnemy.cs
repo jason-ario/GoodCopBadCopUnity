@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -1002,8 +1003,11 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Rolls a random piece count within <paramref name="countRange"/>, builds randomized spawn
-    /// data for each piece, and broadcasts a single RPC so every client spawns the same result.
+    /// Rolls a random piece count within <paramref name="countRange"/> and builds randomized
+    /// spawn data for each piece. Pieces that land inside the Trash Task's yard area are
+    /// spawned server-side as real <see cref="JunkItem"/> NetworkObjects that count toward the
+    /// task; all other pieces are purely cosmetic and broadcast in a single RPC so every client
+    /// spawns the same non-networked result.
     /// </summary>
     private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
     {
@@ -1011,19 +1015,82 @@ public class MutantEnemy : NetworkBehaviour
         if (count <= 0)
             return;
 
-        Vector3[] positions = new Vector3[count];
-        int[] prefabIndices = new int[count];
-        Vector3[] velocities = new Vector3[count];
+        List<Vector3> cosmeticPositions = new List<Vector3>();
+        List<int> cosmeticPrefabIndices = new List<int>();
+        List<Vector3> cosmeticVelocities = new List<Vector3>();
 
         for (int i = 0; i < count; i++)
         {
-            positions[i] = GetRandomGoreSpawnPosition();
-            prefabIndices[i] = UnityEngine.Random.Range(0, goreDropPrefabs.Length);
+            Vector3 position = GetRandomGoreSpawnPosition();
+            int prefabIndex = UnityEngine.Random.Range(0, goreDropPrefabs.Length);
             float speed = UnityEngine.Random.Range(speedRange.x, speedRange.y);
-            velocities[i] = GetRandomPopVelocity(positions[i], speed);
+            Vector3 velocity = GetRandomPopVelocity(position, speed);
+
+            if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(position)
+                && SpawnGoreJunkItem(position, prefabIndex, velocity))
+            {
+                continue;
+            }
+
+            cosmeticPositions.Add(position);
+            cosmeticPrefabIndices.Add(prefabIndex);
+            cosmeticVelocities.Add(velocity);
         }
 
-        SpawnGoreBurstClientRpc(positions, prefabIndices, velocities);
+        if (cosmeticPositions.Count > 0)
+            SpawnGoreBurstClientRpc(cosmeticPositions.ToArray(), cosmeticPrefabIndices.ToArray(), cosmeticVelocities.ToArray());
+    }
+
+    /// <summary>
+    /// Server-side spawn for a gore piece that landed inside the Trash Task's yard area.
+    /// Instantiates the prefab, spawns it as a real NetworkObject (so it replicates to every
+    /// client like any other <see cref="JunkItem"/>), enables its (pre-attached, disabled)
+    /// <see cref="JunkItem"/> component, and registers it with <see cref="TakeOutTrashTask"/>.
+    ///
+    /// Requires the gore prefab to already have a NetworkObject (registered as a Network Prefab
+    /// in the NetworkManager) and a disabled <see cref="JunkItem"/> component, matching the same
+    /// pre-attached-but-disabled pattern documented on <see cref="JunkItem"/> for SuspectCharacter
+    /// bodies. Returns false (and destroys the instantiated piece) if either is missing, so the
+    /// caller can fall back to spawning it as ordinary cosmetic debris instead.
+    /// </summary>
+    private bool SpawnGoreJunkItem(Vector3 position, int prefabIndex, Vector3 velocity)
+    {
+        if (!IsServer)
+            return false;
+
+        if (goreDropPrefabs == null || prefabIndex < 0 || prefabIndex >= goreDropPrefabs.Length)
+            return false;
+
+        GameObject prefab = goreDropPrefabs[prefabIndex];
+        if (prefab == null)
+            return false;
+
+        GameObject piece = Instantiate(prefab, position, UnityEngine.Random.rotation);
+        NetworkObject netObj = piece.GetComponent<NetworkObject>();
+        JunkItem junk = piece.GetComponent<JunkItem>();
+
+        if (netObj == null || junk == null)
+        {
+            Debug.LogWarning("[MutantEnemy] Gore prefab landed in the yard but is missing a NetworkObject " +
+                              "and/or a disabled JunkItem component — it must have both to count toward the " +
+                              "Trash Task. Falling back to cosmetic debris instead.");
+            Destroy(piece);
+            return false;
+        }
+
+        Rigidbody rb = piece.GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = piece.AddComponent<Rigidbody>();
+
+        rb.linearVelocity = velocity;
+        rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
+
+        junk.enabled = true;
+        netObj.Spawn(destroyWithScene: true);
+
+        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(netObj);
+
+        return true;
     }
 
     /// <summary>
