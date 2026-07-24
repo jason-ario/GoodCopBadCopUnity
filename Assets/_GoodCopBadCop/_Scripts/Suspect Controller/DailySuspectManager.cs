@@ -389,12 +389,17 @@ public class DailySuspectManager : MonoBehaviour
     /// Scans the final populated lineup and registers any slot whose suspect has crossed the
     /// fully-mutated threshold, OR is a returning <see cref="SuspectRecord.isLegacyMutant"/>
     /// (previously escaped a full-mutant encounter and hasn't been permanently killed by fire) —
-    /// AND has a <see cref="SuspectData.fullMutantDialogue"/> assigned.
+    /// AND has a <see cref="SuspectData.fullMutantDialogue"/> assigned. Skips any suspect that
+    /// already has a live full-mutant instance elsewhere in the scene (e.g. currently roaming as
+    /// a <see cref="MutantSpawner"/> world spawn) — see <see cref="SuspectRunRecords.IsFullMutantInstanceActive"/>
+    /// — since only one instance of a given character may exist at a time.
     /// Must run after all other injections so indices are stable.
     /// Doppelganger, mutant-intruder, and replacement slots are never double-flagged.
     /// </summary>
     private void InjectFullMutantSlots()
     {
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+
         for (int i = 0; i < shiftSuspects.Count; i++)
         {
             SuspectData suspect = shiftSuspects[i];
@@ -405,8 +410,14 @@ public class DailySuspectManager : MonoBehaviour
 
             if (suspect.fullMutantDialogue == null) continue;
 
-            SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
+            SuspectRecord record = runRecords?.GetRecord(suspect);
             if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) continue;
+
+            if (runRecords.IsFullMutantInstanceActive(suspect))
+            {
+                Debug.Log($"[DailySuspectManager] '{suspect.name}' already has a live full-mutant instance elsewhere — slot {i} not flagged as full mutant.");
+                continue;
+            }
 
             _fullMutantSlotIndices.Add(i);
             Debug.Log($"[DailySuspectManager] '{suspect.name}' is {(record.IsFullyMutated ? "fully mutated" : "a legacy mutant")} — slot {i} flagged as full mutant.");

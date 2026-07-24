@@ -146,6 +146,43 @@ public class SuspectRunRecords : MonoBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Runtime-only (never persisted) set of suspects that currently have a live full-mutant
+    /// instance somewhere in the scene — either at the booth window or roaming the world via a
+    /// <see cref="MutantSpawner"/>. Each character is unique: only one full-mutant instance of a
+    /// given <see cref="SuspectData"/> may exist at a time. Registered right before that instance's
+    /// <see cref="MutantEnemy"/> is enabled and unregistered when its
+    /// <see cref="MutantEnemy.OnRemovedFromPlay"/> fires (see <see cref="SuspectCharacter.HandleFullMutantResolved"/>).
+    /// </summary>
+    private readonly HashSet<SuspectData> _activeFullMutantInstances = new HashSet<SuspectData>();
+
+    /// <summary>True if a full-mutant instance of this suspect is currently active in the scene.</summary>
+    public bool IsFullMutantInstanceActive(SuspectData data)
+    {
+        return data != null && _activeFullMutantInstances.Contains(data);
+    }
+
+    /// <summary>
+    /// Marks a suspect's full-mutant instance as active so no second instance of the same
+    /// character can be spawned (at the booth or by a <see cref="MutantSpawner"/>) while this one
+    /// is alive. Server-only.
+    /// </summary>
+    public void RegisterActiveFullMutant(SuspectData data)
+    {
+        if (data == null) return;
+        _activeFullMutantInstances.Add(data);
+    }
+
+    /// <summary>
+    /// Clears the active-instance flag for a suspect once their full-mutant instance is removed
+    /// from play (killed by fire or fled/despawned). Server-only.
+    /// </summary>
+    public void UnregisterActiveFullMutant(SuspectData data)
+    {
+        if (data == null) return;
+        _activeFullMutantInstances.Remove(data);
+    }
+
+    /// <summary>
     /// Marks a suspect as a legacy mutant — they escaped a full-mutant booth encounter alive
     /// (beaten and fled into the woods rather than killed). Called from
     /// <see cref="SuspectCharacter"/> when its <see cref="MutantEnemy"/> flees instead of dying.
@@ -228,9 +265,10 @@ public class SuspectRunRecords : MonoBehaviour
 
     /// <summary>
     /// Returns a random eligible legacy mutant record, or null if none are available.
-    /// Eligible records have <see cref="SuspectRecord.isLegacyMutant"/> set, are not killed, and
-    /// have a valid <see cref="SuspectData.CharacterPrefab"/> to spawn. Used by
-    /// <see cref="MutantSpawner"/> to populate world spawns with previously-escaped residents.
+    /// Eligible records have <see cref="SuspectRecord.isLegacyMutant"/> set, are not killed, have
+    /// a valid <see cref="SuspectData.CharacterPrefab"/> to spawn, and don't already have a live
+    /// full-mutant instance elsewhere in the scene (see <see cref="IsFullMutantInstanceActive"/>).
+    /// Used by <see cref="MutantSpawner"/> to populate world spawns with previously-escaped residents.
     /// </summary>
     public SuspectRecord GetRandomLegacyMutantRecord()
     {
@@ -245,13 +283,14 @@ public class SuspectRunRecords : MonoBehaviour
         return candidates[UnityEngine.Random.Range(0, candidates.Count)];
     }
 
-    private static bool IsEligibleLegacyMutant(SuspectRecord record)
+    private bool IsEligibleLegacyMutant(SuspectRecord record)
     {
         return record != null
                && record.isLegacyMutant
                && !record.isKilled
                && record.SuspectData != null
-               && record.SuspectData.CharacterPrefab != null;
+               && record.SuspectData.CharacterPrefab != null
+               && !IsFullMutantInstanceActive(record.SuspectData);
     }
 
     /// <summary>

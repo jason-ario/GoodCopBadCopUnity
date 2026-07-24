@@ -315,6 +315,11 @@ public class SuspectCharacter : Interactable
         if (_mutantEnemy != null)
             _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
 
+        // Flag this character as having a live full-mutant instance so no second instance of the
+        // same SuspectData can be spawned elsewhere (e.g. a MutantSpawner world spawn) while this
+        // booth encounter is still in progress.
+        SuspectRunRecords.Instance?.RegisterActiveFullMutant(suspectData);
+
         // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
         // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
         if (_mutantSuspectBehaviour != null && _fullMutantIntruderData != null
@@ -353,7 +358,8 @@ public class SuspectCharacter : Interactable
     /// resolved — either a permanent kill (<see cref="MutantEnemy.DiedPermanently"/>, which
     /// requires fire since these units have fleeInsteadOfDie enabled) or a beaten-and-fled
     /// escape. Updates <see cref="SuspectRunRecords"/> so this resident's legacy-mutant
-    /// eligibility stays accurate for future <see cref="MutantSpawner"/> world spawns. Server-only.
+    /// eligibility stays accurate for future <see cref="MutantSpawner"/> world spawns, and clears
+    /// the active-instance flag so this character becomes spawnable again. Server-only.
     /// </summary>
     private void HandleFullMutantResolved()
     {
@@ -362,6 +368,8 @@ public class SuspectCharacter : Interactable
 
         SuspectRunRecords runRecords = SuspectRunRecords.Instance;
         if (runRecords == null || suspectData == null) return;
+
+        runRecords.UnregisterActiveFullMutant(suspectData);
 
         if (_mutantEnemy != null && _mutantEnemy.DiedPermanently)
             runRecords.ClearLegacyMutant(suspectData);
@@ -399,6 +407,11 @@ public class SuspectCharacter : Interactable
         }
 
         _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
+
+        // Flag this character as having a live full-mutant instance so no second instance of the
+        // same SuspectData can be spawned elsewhere (booth or another MutantSpawner) while this
+        // one is alive.
+        SuspectRunRecords.Instance?.RegisterActiveFullMutant(suspectData);
 
         if (initialAggroTarget != null)
             _mutantEnemy.SetAggroTarget(initialAggroTarget);
