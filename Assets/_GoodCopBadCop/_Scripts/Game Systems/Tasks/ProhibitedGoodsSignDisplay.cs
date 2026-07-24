@@ -40,6 +40,10 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
              "RenderTexture. Kept inactive except while snapshotting.")]
     [SerializeField] private GameObject _renderCamera;
 
+    [Tooltip("The WorldSpace canvas holding the sign's HiddenUI text. Kept inactive except while " +
+             "the render camera is capturing it, so it never sits around doing nothing.")]
+    [SerializeField] private GameObject _signCanvas;
+
     private SortMailTask _boundTask;
     private Coroutine _snapshotCoroutine;
 
@@ -110,6 +114,11 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
 
     private IEnumerator SnapshotRoutine()
     {
+        // Bring the canvas back to life before the camera captures it — it deactivates again
+        // below once the render is done, so it never sits around active without being rendered.
+        if (_signCanvas != null)
+            _signCanvas.SetActive(true);
+
         // Let the TMP text changes above finish their mesh rebuild before the camera captures a
         // frame, then hold the camera active for one more frame so the render actually lands in
         // the RenderTexture before switching it back off.
@@ -117,6 +126,10 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
         _renderCamera.SetActive(true);
         yield return new WaitForEndOfFrame();
         _renderCamera.SetActive(false);
+
+        if (_signCanvas != null)
+            _signCanvas.SetActive(false);
+
         _snapshotCoroutine = null;
     }
 }

@@ -54,6 +54,10 @@ public class DailyFaxContentsController : MonoBehaviour
     /// <summary>Populates all fax text fields for the given day number.</summary>
     private void PopulateFromDay(int day)
     {
+        // Reactivate the hidden content (it deactivates itself again at the end of the snapshot
+        // routine below) so its TMP text is actually renderable while the camera captures it.
+        gameObject.SetActive(true);
+
         Debug.Log($"[DailyFaxContentsController] Populating fax for day {day}.");
 
         int index = day - 1;
@@ -90,11 +94,17 @@ public class DailyFaxContentsController : MonoBehaviour
         return Regex.Replace(stripped, "(?<!^)([A-Z])", " $1").ToUpper();
     }
 
+    /// <summary>
+    /// Activates the render camera for exactly one frame after TMP geometry has been submitted,
+    /// then deactivates both the camera and this content root — nothing needs to be active (or
+    /// rendered) again until the next populate call reactivates it.
+    /// </summary>
     private IEnumerator CameraSnapshot()
     {
         yield return new WaitForEndOfFrame();
         camera.SetActive(true);
         yield return new WaitForEndOfFrame();
         camera.SetActive(false);
+        gameObject.SetActive(false);
     }
 }

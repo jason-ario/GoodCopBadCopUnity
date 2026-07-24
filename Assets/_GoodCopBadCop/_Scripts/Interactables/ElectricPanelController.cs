@@ -43,6 +43,9 @@ public class ElectricPanelController : Interactable
     [SerializeField] private CircuitSwitch[]                 _switches;
     [SerializeField] private TurningNobController            _nob;
 
+    [Tooltip("Tracks whether another player is currently using this panel's diegetic view.")]
+    [SerializeField] private DiegeticOccupancy _occupancy;
+
     // ─── Network state ────────────────────────────────────────────────────────
 
     private NetworkVariable<bool> _isDoorOpen = new NetworkVariable<bool>(
@@ -79,6 +82,8 @@ public class ElectricPanelController : Interactable
 
         if (DiegeticViewController.IsAnyViewActive) return;
 
+        if (_occupancy != null && !_occupancy.TryClaim(player)) return;
+
         // Request door open on the server — all clients will animate via NetworkVariable callback.
         OpenDoorServerRpc();
 
@@ -113,9 +118,13 @@ public class ElectricPanelController : Interactable
 
     /// <summary>
     /// Called by <see cref="ElectricPanelDiegeticController.OnClosed"/> when the player
-    /// exits the view. Requests the door to close on all clients.
+    /// exits the view. Requests the door to close on all clients and releases occupancy.
     /// </summary>
-    public void OnViewClosed() => CloseDoorServerRpc();
+    public void OnViewClosed()
+    {
+        CloseDoorServerRpc();
+        _occupancy?.Release();
+    }
 
     // ─── ServerRpcs ──────────────────────────────────────────────────────────
 

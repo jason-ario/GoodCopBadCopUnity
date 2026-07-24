@@ -40,6 +40,9 @@ public class ToolsLocker : Interactable, ILockable
     [Tooltip("The LockController padlock on this locker. Animated alongside the door when locked.")]
     [SerializeField] private LockController _lockController;
 
+    [Tooltip("Tracks whether another player is currently using this locker's diegetic view.")]
+    [SerializeField] private DiegeticOccupancy _occupancy;
+
     // ── Networked state ───────────────────────────────────────────────────────
 
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
@@ -122,6 +125,9 @@ public class ToolsLocker : Interactable, ILockable
             return;
         }
 
+        if (_occupancy != null && !_occupancy.TryClaim(player))
+            return;
+
         Debug.Log("Toggle Tool Locker");
 
         if (_diegeticController != null)
@@ -152,6 +158,8 @@ public class ToolsLocker : Interactable, ILockable
         viewerCount.Value = Mathf.Max(0, viewerCount.Value - 1);
         if (viewerCount.Value == 0)
             CloseLockerInternal();
+
+        _occupancy?.Release();
     }
 
     [ServerRpc(RequireOwnership = false)]

@@ -43,6 +43,10 @@ public class NewspaperContentsController : MonoBehaviour
     /// </summary>
     private void PopulateFromDay(int day)
     {
+        // Reactivate the hidden content (it deactivates itself again at the end of the snapshot
+        // routine below) so its TMP text is actually renderable while the camera captures it.
+        gameObject.SetActive(true);
+
         Debug.Log("Populating Newspaper Contents");
         int index = day - 1;
         string date = StartDate.AddDays(index).ToString("dd MMM yyyy");
@@ -58,11 +62,17 @@ public class NewspaperContentsController : MonoBehaviour
         StartCoroutine(CameraSnapshot());
     }
 
+    /// <summary>
+    /// Activates the render camera for exactly one frame after TMP geometry has been submitted,
+    /// then deactivates both the camera and this content root — nothing needs to be active (or
+    /// rendered) again until the next populate call reactivates it.
+    /// </summary>
     IEnumerator CameraSnapshot()
     {
         yield return new WaitForEndOfFrame();
         camera.SetActive(true);
         yield return new WaitForEndOfFrame();
         camera.SetActive(false);
+        gameObject.SetActive(false);
     }
 }

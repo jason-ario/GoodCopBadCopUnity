@@ -12,46 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b8ddcb15cb455540b55ff70bafa7433, type: 3}
   m_Name: AnomalyUnlockProgression
   m_EditorClassIdentifier: Assembly-CSharp::AnomalyUnlockProgressionSO
-  _scriptedDayUnlocks:
-  - Day: 1
-    UnlockTypeNames:
-    - NameWrongAnomaly
-    - BirthDateWrongAnomaly
-    - MissingDocumentAnomaly
-  - Day: 2
-    UnlockTypeNames:
-    - RandomTumorAnomaly
-    - RandomTentacleAnomaly
-    - LesionAnomaly
-    - BlackEyesAnomaly
-    - ExpirationDateAnomaly
-  - Day: 3
-    UnlockTypeNames:
-    - VomitAnomaly
-    - HeartRateAnomaly
-    - HighRadiationAnomaly
-    - BlueVeinsAnomaly
-    - StoryMismatchAnomaly
-  - Day: 4
-    UnlockTypeNames:
-    - FearfulAnomaly
-    - LaughingAnomaly
-    - DizzyAnomaly
-    - HighTemperatureAnomaly
-    - TwitchingAnomaly
-    - DistractedAnomaly
-  - Day: 5
-    UnlockTypeNames:
-    - DisembodiedVoicesAnomaly
-    - GlitchingAnomaly
-    - NotShowingInCameraAnomaly
-    - ViolentAnomaly
-    - TwitchingAnomaly
-    - BreathingRateAnomaly
-    - SupernaturalAnomaly
-    - FakeIdAnomaly
   _allCategories:
   - CategoryName: Documentation
+    UnlockDay: 1
     AnomalyTypeNames:
     - ExpirationDateAnomaly
     - InvalidEntryReasonAnomaly
@@ -64,6 +27,7 @@ MonoBehaviour:
     - StoryMismatchAnomaly
     - FakeIdAnomaly
   - CategoryName: Physical
+    UnlockDay: 2
     AnomalyTypeNames:
     - RandomTumorAnomaly
     - RandomTentacleAnomaly
@@ -73,6 +37,7 @@ MonoBehaviour:
     - TwitchingAnomaly
     - SupernaturalAnomaly
   - CategoryName: Vitals
+    UnlockDay: 3
     AnomalyTypeNames:
     - VomitAnomaly
     - HeartRateAnomaly
@@ -82,6 +47,7 @@ MonoBehaviour:
     - BreathingRateAnomaly
     - ReflexesAnomaly
   - CategoryName: Behavior
+    UnlockDay: 4
     AnomalyTypeNames:
     - FearfulAnomaly
     - LaughingAnomaly
@@ -91,6 +57,7 @@ MonoBehaviour:
     - DistractedAnomaly
     - HyperactiveAnomaly
   - CategoryName: Supernatural
+    UnlockDay: 5
     AnomalyTypeNames:
     - DisembodiedVoicesAnomaly
     - GlitchingAnomaly

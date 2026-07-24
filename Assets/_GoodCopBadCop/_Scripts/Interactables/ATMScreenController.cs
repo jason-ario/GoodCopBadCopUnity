@@ -57,6 +57,10 @@ public class ATMScreenController : MonoBehaviour
         if (_scrollRoutine != null)
             StopCoroutine(_scrollRoutine);
 
+        // Reactivate the hidden content (it deactivates itself again once the whole marquee
+        // finishes below) so its TMP text is actually renderable while the camera captures it.
+        gameObject.SetActive(true);
+
         _scrollRoutine = StartCoroutine(ScrollRoutine(amount));
     }
 
@@ -86,6 +90,10 @@ public class ATMScreenController : MonoBehaviour
         yield return StartCoroutine(CameraSnapshot());
 
         _scrollRoutine = null;
+
+        // The whole marquee is done — nothing needs to be active (or rendered) again until the
+        // next ShowPayment call reactivates this content.
+        gameObject.SetActive(false);
     }
 
     // ── Render-texture helpers ────────────────────────────────────────────────

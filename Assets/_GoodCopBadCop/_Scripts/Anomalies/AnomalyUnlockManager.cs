@@ -10,7 +10,7 @@ using UnityEngine;
 /// Unlock sources (checked in order):
 /// <list type="bullet">
 ///   <item><see cref="_alwaysUnlockedTypeNames"/> — Inspector override; never requires save data.</item>
-///   <item><see cref="AnomalyUnlockProgressionSO"/> — day-driven progression applied via <see cref="CampaignManager.OnDayChanged"/>.</item>
+///   <item><see cref="AnomalyUnlockProgressionSO"/> — whole-category progression applied via <see cref="CampaignManager.OnDayChanged"/>.</item>
 ///   <item><see cref="SaveDataManager"/> — persisted unlocks earned through gameplay.</item>
 /// </list>
 /// </summary>
@@ -78,9 +78,11 @@ public class AnomalyUnlockManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies all scripted unlocks for days 1 through <paramref name="currentDay"/>
-    /// cumulatively, then handles one random-deterministic unlock per active category
-    /// for any days beyond the scripted range. Idempotent — safe to call repeatedly.
+    /// Unlocks every anomaly whose category becomes available on any day from 1 through
+    /// <paramref name="currentDay"/>. Each category unlocks in one shot — every anomaly it
+    /// contains becomes available as soon as its <see cref="AnomalyUnlockProgressionSO.AnomalyCategoryData.UnlockDay"/>
+    /// is reached, with no further per-day trickling within that category. Idempotent — safe
+    /// to call repeatedly.
     /// </summary>
     private void ApplyProgressionUpToDay(int currentDay)
     {
@@ -90,62 +92,11 @@ public class AnomalyUnlockManager : MonoBehaviour
             return;
         }
 
-        int lastScriptedDay = _progression.LastScriptedDay;
-
-        // --- Scripted days ---
-        for (int day = 1; day <= Mathf.Min(currentDay, lastScriptedDay); day++)
+        for (int day = 1; day <= currentDay; day++)
         {
-            foreach (string typeName in _progression.GetScriptedUnlocksForDay(day))
+            foreach (string typeName in _progression.GetNewUnlocksForDay(day))
                 UnlockAnomaly(typeName);
         }
-
-        // --- Post-scripted days: 1 random per active category ---
-        if (currentDay > lastScriptedDay)
-        {
-            // Start with the full set already unlocked (scripted + saved) so each
-            // simulated day knows exactly which anomalies are still available to pick.
-            HashSet<string> cumulative = BuildCurrentUnlockedSet();
-
-            for (int day = lastScriptedDay + 1; day <= currentDay; day++)
-            {
-                foreach (var category in _progression.AllCategories)
-                {
-                    string pick = _progression.GetRandomLockedAnomaly(category, day, cumulative);
-                    if (pick != null)
-                    {
-                        UnlockAnomaly(pick);
-                        cumulative.Add(pick);
-                    }
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Builds the complete set of anomaly type names that are already unlocked,
-    /// including always-on overrides and save-data-backed unlocks from scripted days.
-    /// Used as a seed when simulating which anomalies remain locked for post-scripted days.
-    /// </summary>
-    private HashSet<string> BuildCurrentUnlockedSet()
-    {
-        var set = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (string name in _alwaysUnlockedTypeNames)
-            if (!string.IsNullOrEmpty(name)) set.Add(name);
-
-        if (_progression != null)
-        {
-            for (int day = 1; day <= _progression.LastScriptedDay; day++)
-                foreach (string name in _progression.GetScriptedUnlocksForDay(day))
-                    if (!string.IsNullOrEmpty(name)) set.Add(name);
-        }
-
-        string[] saved = SaveDataManager.Instance?.ActiveSlot?.UnlockedAnomalyTypeNames;
-        if (saved != null)
-            foreach (string name in saved)
-                if (!string.IsNullOrEmpty(name)) set.Add(name);
-
-        return set;
     }
 
     // -------------------------------------------------------------------------
@@ -193,7 +144,7 @@ public class AnomalyUnlockManager : MonoBehaviour
 
     /// <summary>
     /// Cheat / debug helper: unlocks every anomaly defined in the progression asset,
-    /// including all scripted and post-scripted entries across every category.
+    /// across every category regardless of UnlockDay.
     /// Guidebook pages update automatically via <see cref="OnAnomalyUnlocked"/>.
     /// </summary>
     public void UnlockAllAnomalies()
@@ -206,19 +157,6 @@ public class AnomalyUnlockManager : MonoBehaviour
 
         int count = 0;
 
-        // Scripted day entries (may include anomalies not present in AllCategories).
-        for (int day = 1; day <= _progression.LastScriptedDay; day++)
-        {
-            foreach (string typeName in _progression.GetScriptedUnlocksForDay(day))
-            {
-                if (string.IsNullOrEmpty(typeName)) continue;
-                if (IsAnomalyUnlocked(typeName)) continue;
-                UnlockAnomaly(typeName);
-                count++;
-            }
-        }
-
-        // Full category lists — covers every anomaly in the game.
         foreach (var category in _progression.AllCategories)
         {
             if (category?.AnomalyTypeNames == null) continue;

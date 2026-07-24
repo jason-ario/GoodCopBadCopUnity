@@ -10,6 +10,9 @@ public class MiniFridge : Interactable
     [SerializeField] private ElectricityController _electricityController;
     [SerializeField] private MiniFridgeDiegeticController _diegeticController;
 
+    [Tooltip("Tracks whether another player is currently using this fridge's diegetic view.")]
+    [SerializeField] private DiegeticOccupancy _occupancy;
+
     /// <summary>True when the fridge has an electricity source and that source is powered on.</summary>
     public bool IsPowered => _electricityController != null && _electricityController.IsPowerOn;
 
@@ -39,6 +42,9 @@ public class MiniFridge : Interactable
 
         if (_diegeticController != null && !_isOpen.Value)
         {
+            if (_occupancy != null && !_occupancy.TryClaim(player))
+                return;
+
             // Open the door and enter the diegetic view together.
             RequestOpenServerRpc();
             _diegeticController.Open(player, this);
@@ -51,13 +57,15 @@ public class MiniFridge : Interactable
     }
 
     /// <summary>
-    /// Closes the fridge door over the network.
+    /// Closes the fridge door over the network and releases occupancy.
     /// Called by <see cref="MiniFridgeDiegeticController"/> when the player exits the view.
     /// </summary>
     public void RequestClose()
     {
         if (_isOpen.Value)
             RequestCloseServerRpc();
+
+        _occupancy?.Release();
     }
 
     // ─── ServerRpcs ──────────────────────────────────────────────────────────

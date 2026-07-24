@@ -18,6 +18,19 @@ public class PickableObject : Interactable
     protected PlayerPickupController playerPickupController;
     [SerializeField] PickableItemData itemData;
     public PickableItemData ItemData => itemData;
+
+    [Header("Throw Impact Audio")]
+    [Tooltip("How long after being thrown this object will play its place/impact sound when it hits things.")]
+    [SerializeField] private float throwImpactSfxDuration = 3.5f;
+
+    [Tooltip("Minimum time between impact sounds while the throw impact window is active, so bumping multiple things in quick succession doesn't spam the sound.")]
+    [SerializeField] private float throwImpactSfxCooldown = 0.5f;
+
+    /// <summary>Time.time value after which impact sounds no longer play. -1 while inactive.</summary>
+    private float _throwImpactWindowEndTime = -1f;
+
+    /// <summary>Earliest Time.time at which the next impact sound is allowed to play.</summary>
+    private float _nextImpactSfxAllowedTime;
     private ParentConstraint _parentConstraint;
     private SocketFollow _socketFollow;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
@@ -477,15 +490,42 @@ public class PickableObject : Interactable
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;
 
+        StartThrowImpactSfxWindow();
+
         // Non-owner clients stay kinematic; NT replicates the server physics simulation.
         // The server instance set isKinematic = false in ThrowServerRpc.
         if (IsServer) return;
         if (_rb != null) _rb.isKinematic = true;
     }
 
+    /// <summary>
+    /// Opens the window during which collisions play the item's place/impact sound.
+    /// Called on every client (and the host) right when a throw is broadcast.
+    /// </summary>
+    private void StartThrowImpactSfxWindow()
+    {
+        _throwImpactWindowEndTime = Time.time + throwImpactSfxDuration;
+        _nextImpactSfxAllowedTime = Time.time;
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (Time.time > _throwImpactWindowEndTime) return;
+        if (Time.time < _nextImpactSfxAllowedTime) return;
+        if (itemData == null || itemData.PickupSound == null) return;
+        if (SFXController.Instance == null) return;
+
+        SFXController.Instance.PlayAtPosition(itemData.PickupSound, transform.position);
+        _nextImpactSfxAllowedTime = Time.time + throwImpactSfxCooldown;
+    }
+
     public virtual void OnPickedUp()
     {
         OnPickedUpEvent?.Invoke();
+
+        // Being picked up ends any active throw-impact window; colliders are disabled while
+        // held anyway, but this also prevents a stale window from carrying into the next throw.
+        _throwImpactWindowEndTime = -1f;
 
         if (itemData != null && itemData.PickupSound != null)
         {

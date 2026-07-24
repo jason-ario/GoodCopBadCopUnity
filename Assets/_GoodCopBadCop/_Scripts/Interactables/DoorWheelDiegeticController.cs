@@ -1,3 +1,4 @@
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -34,6 +35,22 @@ public class DoorWheelDiegeticController : DiegeticViewController
            + "Stick left = CCW (unlocks door); stick right = CW.")]
     [SerializeField] private float _controllerRotateSpeed = 120f;
 
+    [Tooltip("Tracks occupancy of this door so it can be released when the view closes.")]
+    [SerializeField] private DiegeticOccupancy _occupancy;
+
+    [Header("Audio")]
+    [Tooltip("Audio source that plays the looping spin sound while the wheel is being turned.")]
+    [SerializeField] private AudioSource _spinAudioSource;
+
+    [Tooltip("Looping sound played for as long as the player is dragging the wheel.")]
+    [SerializeField] private AudioClip _spinLoopSound;
+
+    [Tooltip("Minimum angular velocity (degrees/second) the wheel must be spinning at for the loop sound to play.")]
+    [SerializeField] private float _spinAudioVelocityThreshold = 0.1f;
+
+    [Tooltip("Cinemachine impulse fired when the wheel is fully spun and the door unlocks.")]
+    [SerializeField] private CinemachineImpulseSource _openImpulseSource;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     /// <summary>True while the player is holding LMB and dragging the wheel.</summary>
@@ -69,7 +86,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         _totalCCWDegrees     = 0f;
 
         // The view was opened via a mouse-down, so we begin dragging immediately.
-        _isDragging = true;
+        SetDragging(true);
         Camera cam = RaycastCamera;
         if (cam != null && _wheelTransform != null)
             _lastMouseAngle = GetMouseAngleAroundWheel(cam);
@@ -77,7 +94,8 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     protected override void OnClosed()
     {
-        _isDragging = false;
+        SetDragging(false);
+        _occupancy?.Release();
     }
 
     protected override void OnUpdate()
@@ -95,7 +113,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         // In case the button was released before the first OnUpdate (edge case).
         if (_isDragging && !LmbHeld && !LmbUp)
         {
-            _isDragging = false;
+            SetDragging(false);
             Close();
             return;
         }
@@ -103,7 +121,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         // Mouse / RT down while view is active and not yet dragging (e.g. player re-pressed).
         if (!_isDragging && LmbDown)
         {
-            _isDragging = true;
+            SetDragging(true);
             _lastMouseAngle = GetMouseAngleAroundWheel(cam);
             return;
         }
@@ -111,12 +129,16 @@ public class DoorWheelDiegeticController : DiegeticViewController
         // Release → exit the view.
         if (LmbUp)
         {
-            _isDragging = false;
+            SetDragging(false);
             Close();
             return;
         }
 
-        if (!_isDragging) return;
+        if (!_isDragging)
+        {
+            UpdateSpinAudio(0f);
+            return;
+        }
 
         // ── Compute angular delta ─────────────────────────────────────────────
 
@@ -151,6 +173,11 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         _accumulatedRotation = newAccumulation;
 
+        // ── Drive the spin loop sound from actual angular velocity ───────────
+
+        float angularVelocity = Mathf.Abs(delta) / Mathf.Max(Time.deltaTime, 0.0001f);
+        UpdateSpinAudio(angularVelocity);
+
         // ── Spin the wheel ────────────────────────────────────────────────────
 
         // Rotate on the wheel's local Z axis. Per convention: negative Z = CCW.
@@ -171,6 +198,42 @@ public class DoorWheelDiegeticController : DiegeticViewController
     // ─── Private helpers ─────────────────────────────────────────────────────
 
     /// <summary>
+    /// Sets the dragging state. Stops the spin loop sound as a safety net whenever
+    /// dragging ends; playback while dragging is driven per-frame by <see cref="UpdateSpinAudio"/>
+    /// based on actual angular velocity, not merely whether the wheel is held.
+    /// </summary>
+    private void SetDragging(bool dragging)
+    {
+        _isDragging = dragging;
+
+        if (!dragging)
+            UpdateSpinAudio(0f);
+    }
+
+    /// <summary>
+    /// Starts or stops the looping spin sound depending on whether the wheel's current
+    /// angular velocity (degrees/second) exceeds <see cref="_spinAudioVelocityThreshold"/>.
+    /// </summary>
+    private void UpdateSpinAudio(float angularVelocityDegPerSec)
+    {
+        if (_spinAudioSource == null || _spinLoopSound == null) return;
+
+        bool shouldPlay = angularVelocityDegPerSec > _spinAudioVelocityThreshold;
+
+        if (shouldPlay)
+        {
+            if (_spinAudioSource.isPlaying && _spinAudioSource.clip == _spinLoopSound) return;
+            _spinAudioSource.clip = _spinLoopSound;
+            _spinAudioSource.loop = true;
+            _spinAudioSource.Play();
+        }
+        else if (_spinAudioSource.isPlaying)
+        {
+            _spinAudioSource.Stop();
+        }
+    }
+
+    /// <summary>
     /// Returns the screen-space angle (degrees) of the mouse cursor relative to the
     /// wheel's projected screen position. Uses <c>Atan2</c> so the range is [-180, 180].
     /// </summary>
@@ -183,6 +246,8 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     private void TriggerDoorOpen()
     {
+        _openImpulseSource?.GenerateImpulse();
+
         // Exit the view first so the camera transition feels responsive.
         Close();
         _bunkerDoor?.Open();
