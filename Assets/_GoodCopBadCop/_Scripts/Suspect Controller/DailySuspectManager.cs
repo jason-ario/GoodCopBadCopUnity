@@ -22,10 +22,13 @@ public class DailySuspectManager : MonoBehaviour
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
 
     /// <summary>
-    /// Tracks which lineup slot indices belong to fully-mutated civilians.
+    /// Tracks which lineup slot indices belong to full-mutant civilians — either freshly
+    /// fully-mutated (<see cref="SuspectRecord.IsFullyMutated"/>) or a returning
+    /// <see cref="SuspectRecord.isLegacyMutant"/> who previously escaped a full-mutant encounter
+    /// and hasn't been permanently killed by fire yet.
     /// Populated by <see cref="InjectFullMutantSlots"/> after all other slot injections.
     /// The corresponding <see cref="SuspectData"/> for each index always has
-    /// <see cref="SuspectData.fullMutantDialogue"/> assigned and a <see cref="SuspectRecord.IsFullyMutated"/> record.
+    /// <see cref="SuspectData.fullMutantDialogue"/> assigned.
     /// </summary>
     private readonly HashSet<int> _fullMutantSlotIndices = new HashSet<int>();
 
@@ -384,7 +387,9 @@ public class DailySuspectManager : MonoBehaviour
 
     /// <summary>
     /// Scans the final populated lineup and registers any slot whose suspect has crossed the
-    /// fully-mutated threshold AND has a <see cref="SuspectData.fullMutantDialogue"/> assigned.
+    /// fully-mutated threshold, OR is a returning <see cref="SuspectRecord.isLegacyMutant"/>
+    /// (previously escaped a full-mutant encounter and hasn't been permanently killed by fire) —
+    /// AND has a <see cref="SuspectData.fullMutantDialogue"/> assigned.
     /// Must run after all other injections so indices are stable.
     /// Doppelganger, mutant-intruder, and replacement slots are never double-flagged.
     /// </summary>
@@ -401,10 +406,10 @@ public class DailySuspectManager : MonoBehaviour
             if (suspect.fullMutantDialogue == null) continue;
 
             SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
-            if (record == null || !record.IsFullyMutated) continue;
+            if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) continue;
 
             _fullMutantSlotIndices.Add(i);
-            Debug.Log($"[DailySuspectManager] '{suspect.name}' is fully mutated — slot {i} flagged as full mutant.");
+            Debug.Log($"[DailySuspectManager] '{suspect.name}' is {(record.IsFullyMutated ? "fully mutated" : "a legacy mutant")} — slot {i} flagged as full mutant.");
         }
     }
 
