@@ -36,8 +36,14 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
     [SerializeField] private CosmeticsMenuUI _menuUI;
 
     [Header("Audio")]
+    [Tooltip("AudioSource used to play the open/close SFX. Auto-resolved from this GameObject if left empty.")]
+    [SerializeField] private AudioSource _audioSource;
+
     [Tooltip("Sound played when the locker view opens.")]
     [SerializeField] private AudioClip _openSFX;
+
+    [Tooltip("Sound played when the locker view closes.")]
+    [SerializeField] private AudioClip _closeSFX;
 
     private PlayerInteractionController _interactingPlayer;
     private PlayerThirdPersonView _thirdPersonView;
@@ -51,6 +57,10 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
         // Auto-resolve the facing target from a child of this locker.
         if (_playerFacingTarget == null)
             _playerFacingTarget = transform.Find("Player Facing Target");
+
+        // Auto-resolve the AudioSource used for open/close SFX.
+        if (_audioSource == null)
+            _audioSource = GetComponent<AudioSource>();
     }
 
     // ─── IInteractable ───────────────────────────────────────────────────────
@@ -98,8 +108,7 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
         UIController.Instance.ShowBackButton(CloseView);
         UIController.Instance.ClosePlayerUI();
 
-        if (_openSFX != null && SFXController.Instance != null)
-            SFXController.Instance.PlayAtPosition(_openSFX, transform.position);
+        PlaySFX(_openSFX);
 
         // Open the cosmetics menu UI and bind the local player's hat controller.
         if (_menuUI != null)
@@ -111,6 +120,8 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
     private void CloseView()
     {
+        PlaySFX(_closeSFX);
+
         // Stop any in-progress rotation.
         if (_rotationCoroutine != null)
         {
@@ -136,6 +147,17 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
             _interactingPlayer.playerMovementController.SetCanControl(true);
             _interactingPlayer = null;
         }
+    }
+
+    // ─── Audio ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Plays <paramref name="clip"/> as a one-shot through the locker's own <see cref="_audioSource"/>.
+    /// </summary>
+    private void PlaySFX(AudioClip clip)
+    {
+        if (clip == null || _audioSource == null) return;
+        _audioSource.PlayOneShot(clip);
     }
 
     // ─── Rotation coroutine ──────────────────────────────────────────────────
