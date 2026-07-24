@@ -478,8 +478,10 @@ public class LobbyManager : MonoBehaviour
         }
         else if (!GameManager.Instance.IsTransitioningToLobby)
         {
-            Debug.Log($"[Host] Spawning lobby joiner for clientId={clientId}");
-            GameManager.Instance.SpawnPlayerAtLobbyServer(clientId);
+            // Host is still on the pre-game ready-up screen — bring the joining client there too.
+            // Player spawning is deferred until the host actually presses Start Game
+            // (GameManager.SpawnAllPlayersAtLobby handles every connected client at that point).
+            Debug.Log($"[Host] Host still in pre-game lobby — sending clientId={clientId} to the ready-up screen");
             GameManager.Instance.InitializeLobbyJoinClient(clientId, gameAlreadyStarted: false);
         }
         else

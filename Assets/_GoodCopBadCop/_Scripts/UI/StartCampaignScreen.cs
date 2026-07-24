@@ -52,6 +52,9 @@ public class StartCampaignScreen : MonoBehaviour
         LobbyManager.Instance.OnLobbyUpdated += RefreshUI;
         LobbyManager.Instance.OnKicked += OnKicked;
 
+        if (PlayerReadyManager.Instance != null)
+            PlayerReadyManager.Instance.OnReadyStatesChanged += OnReadyStatesChanged;
+
         if (copyInviteCodeButton != null)
             copyInviteCodeButton.onClick.AddListener(CopyInviteCode);
 
@@ -67,6 +70,9 @@ public class StartCampaignScreen : MonoBehaviour
             LobbyManager.Instance.OnLobbyUpdated -= RefreshUI;
             LobbyManager.Instance.OnKicked -= OnKicked;
         }
+
+        if (PlayerReadyManager.Instance != null)
+            PlayerReadyManager.Instance.OnReadyStatesChanged -= OnReadyStatesChanged;
 
         if (copyInviteCodeButton != null)
             copyInviteCodeButton.onClick.RemoveListener(CopyInviteCode);
@@ -262,17 +268,16 @@ public class StartCampaignScreen : MonoBehaviour
 
     /// <summary>
     /// Host-only. Starts the game for all connected players.
-    /// TransitionToLobby was already called when the lobby was created,
-    /// so here we only need to kick off the game start sequence.
+    /// Runs the full transition: fades out the menu, spawns every connected player into the
+    /// lobby, switches cameras, then starts the campaign — all via ClientRpc broadcasts, so
+    /// every currently connected client (including anyone who joined while ready-ing up)
+    /// transitions into gameplay at the same time as the host.
     /// </summary>
     public void StartGame()
     {
         // Commit the slot to disk now that the player has confirmed they want to play.
         SaveDataManager.Instance.InitialiseActiveSlot();
 
-        // Run the full transition: fade out UI, play fanfare stinger, spawn players,
-        // switch cameras, then fade back in. TryStartGame sets HasGameStarted so
-        // late-joining logic works correctly.
         GameManager.Instance.TransitionToLobby();
         GameManager.Instance.TryStartGame();
     }

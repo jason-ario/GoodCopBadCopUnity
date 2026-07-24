@@ -15,6 +15,9 @@ GameObject:
   - component: {fileID: 3881077180065813497}
   - component: {fileID: 6585842700757045066}
   - component: {fileID: 282384237523726109}
+  - component: {fileID: 4474365230572348162}
+  - component: {fileID: 4171407302865007667}
+  - component: {fileID: 7419772826873096754}
   m_Layer: 0
   m_Name: Newspaper
   m_TagString: Untagged
@@ -50,7 +53,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1094695709
+  GlobalObjectIdHash: 4160091637
   InScenePlacedSourceGlobalObjectIdHash: 4160091637
   DeferredDespawnTick: 0
   Ownership: 1
@@ -80,6 +83,8 @@ MonoBehaviour:
   interactText: 
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: b461997275e72d04cb8437e4c40c335b, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
 --- !u!114 &3173807929048326888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -441,6 +446,62 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.51, y: 0.02, z: 0.63}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!54 &4474365230572348162
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450350962883066535}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &4171407302865007667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450350962883066535}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkRigidbody
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkRigidbodyBaseExpanded: 0
+  UseRigidBodyForMotion: 0
+  AutoUpdateKinematicState: 1
+  AutoSetKinematicOnDespawn: 1
+--- !u!114 &7419772826873096754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450350962883066535}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!1 &9051897634547409115
 GameObject:
   m_ObjectHideFlags: 0

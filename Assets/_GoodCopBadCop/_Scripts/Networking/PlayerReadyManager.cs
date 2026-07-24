@@ -2,17 +2,22 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Steamworks;
 
 /// <summary>
 /// Tracks the ready state of each connected client in the pre-game lobby.
 /// Lives as a NetworkBehaviour so state changes are authoritative on the server
 /// and broadcast to all clients via ClientRpc.
+///
+/// States are keyed by Steam ID (self-reported by the ready-ing client) rather than NGO
+/// clientId, because <see cref="StartCampaignScreen"/> displays and matches players using the
+/// Steam lobby member list (Friend.Id), not NGO client IDs.
 /// </summary>
 public class PlayerReadyManager : NetworkBehaviour
 {
     public static PlayerReadyManager Instance { get; private set; }
 
-    /// <summary>Fired on all clients whenever any player's ready state changes.</summary>
+    /// <summary>Fired on all clients whenever any player's ready state changes. Keyed by Steam ID.</summary>
     public event Action<Dictionary<ulong, bool>> OnReadyStatesChanged;
 
     private readonly Dictionary<ulong, bool> _readyStates = new Dictionary<ulong, bool>();
@@ -47,7 +52,8 @@ public class PlayerReadyManager : NetworkBehaviour
     /// </summary>
     public void SetReady(bool isReady)
     {
-        SetReadyServerRpc(isReady);
+        ulong steamId = SteamClient.IsValid ? SteamClient.SteamId.Value : 0;
+        SetReadyServerRpc(isReady, steamId);
     }
 
     /// <summary>Resets all ready states. Call before a new session begins.</summary>
@@ -63,12 +69,11 @@ public class PlayerReadyManager : NetworkBehaviour
     // ---------------------------------------------------------------------------
 
     [ServerRpc(RequireOwnership = false)]
-    private void SetReadyServerRpc(bool isReady, ServerRpcParams rpcParams = default)
+    private void SetReadyServerRpc(bool isReady, ulong steamId, ServerRpcParams rpcParams = default)
     {
-        ulong clientId = rpcParams.Receive.SenderClientId;
-        _readyStates[clientId] = isReady;
+        _readyStates[steamId] = isReady;
 
-        Debug.Log($"[PlayerReadyManager] Client {clientId} ready={isReady}");
+        Debug.Log($"[PlayerReadyManager] SteamId {steamId} ready={isReady}");
         BroadcastReadyStates();
     }
 

@@ -252,6 +252,10 @@ public class MainMenuController : MonoBehaviour
     /// <summary>
     /// Creates a lobby and navigates to the pre-game lobby screen as host.
     /// Called from the "Host Game" button in the multiplayer hub.
+    /// The actual world transition (spawning players, revealing gameplay) is deferred
+    /// until the host presses Start Game — see <see cref="StartCampaignScreen.StartGame"/> —
+    /// so that clients who join while everyone is still readying up are handled correctly
+    /// by <see cref="LobbyManager.OnClientConnected"/> instead of being silently ignored.
     /// </summary>
     public async void HostMultiplayerGame()
     {
@@ -263,7 +267,7 @@ public class MainMenuController : MonoBehaviour
             if (success)
             {
                 await WaitUntilHostReady();
-                GameManager.Instance.TransitionToLobby();
+                GameManager.Instance.CancelLobbyTransition();
                 OpenPreGameLobbyScreen(multiplayerMode: true);
             }
             else
@@ -284,8 +288,9 @@ public class MainMenuController : MonoBehaviour
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Starts a new solo session. Creates a lobby, transitions to the lobby area,
-    /// and opens the pre-game lobby screen.
+    /// Starts a new solo session. Creates a lobby and opens the pre-game lobby screen.
+    /// The world transition (spawning players, revealing gameplay) happens later, when
+    /// Start Game is pressed — see <see cref="StartCampaignScreen.StartGame"/>.
     /// Called after the player has selected a save slot.
     /// </summary>
     public async void StartNewGame()
@@ -299,6 +304,7 @@ public class MainMenuController : MonoBehaviour
             if (success)
             {
                 await WaitUntilHostReady();
+                GameManager.Instance.CancelLobbyTransition();
                 Debug.Log($"[StartNewGame] Lobby ready — opening pre-game lobby screen.");
                 OpenPreGameLobbyScreen(multiplayerMode: true);
             }

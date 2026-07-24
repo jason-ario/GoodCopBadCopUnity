@@ -205,6 +205,17 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator LobbyJoinClientSequence(bool gameAlreadyStarted)
     {
+        if (!gameAlreadyStarted)
+        {
+            // Host hasn't pressed Start Game yet — show the same ready-up screen the host is
+            // using instead of dropping the client straight into gameplay. Player info and
+            // ready state are already kept in sync via LobbyManager (Steam lobby members) and
+            // PlayerReadyManager, so simply switching screens here is enough.
+            Debug.Log("[GameManager] LobbyJoinClientSequence: host still in pre-game lobby — opening ready-up screen");
+            MainMenuController.Instance.OpenPreGameLobbyScreen(multiplayerMode: true);
+            yield break;
+        }
+
         Debug.Log("[GameManager] LobbyJoinClientSequence: fading in");
         AudioManager.Instance.FadeOutAmbientAudio();
 
@@ -230,10 +241,10 @@ public class GameManager : NetworkBehaviour
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
 
-        // If the game was already running when this client joined (missed StartGameClientRpc),
-        // bootstrap the current day so DayActivated() fires and all tutorial subscriptions are set up.
-        if (gameAlreadyStarted)
-            CampaignManager.Instance.StartCampaign();
+        // The game was already running when this client joined (missed StartGameClientRpc),
+        // so bootstrap the current day here so DayActivated() fires and all tutorial
+        // subscriptions are set up.
+        CampaignManager.Instance.StartCampaign();
 
         OnGameStart?.Invoke();
     }

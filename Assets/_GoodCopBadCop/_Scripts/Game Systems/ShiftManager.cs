@@ -378,6 +378,11 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(3f);
 
         OnShiftStart?.Invoke();
+
+        // Lock the booth door for the duration of the shift if the active day requires it.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)
+            OnDoorLock?.Invoke();
+
         yield return new WaitForSeconds(0.5f);
 
         yield return new WaitForSeconds(3f);
