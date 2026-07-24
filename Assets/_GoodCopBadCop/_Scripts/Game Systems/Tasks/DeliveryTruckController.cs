@@ -3,6 +3,7 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Networked delivery-truck cutscene, driven the same way as <see cref="BusCutsceneController"/>:
@@ -14,13 +15,20 @@ using UnityEngine.Animations;
 ///   1. Truck activates at _pointA (engine idle audio, visual shown) and the delivery crate
 ///      appears mounted on its roof via a <see cref="ParentConstraint"/>.
 ///   2. Drives from _pointA to _pointB (drive audio, with a rev delay before it starts moving) —
-///      the crate rides along on the roof for the whole trip.
-///   3. On arrival, the roof constraint is released and the crate tumbles down to its resting
-///      spot on the ground. Once it settles, the server spawns the mail delivery via
+///      the crate rides along on the roof for the whole trip. _pointB sits in front of the
+///      checkpoint gate.
+///   3. On arrival at _pointB, the truck stops and the checkpoint gate is opened. The truck waits
+///      _gateOpenWaitDuration (e.g. ~3s) for the gate to finish opening before continuing.
+///   4. Drives from _pointB through the (now open) gate to _pointC — the crate still rides along.
+///   5. On arrival at _pointC, the roof constraint is released and the crate tumbles down to its
+///      resting spot on the ground. Once it settles, the server spawns the mail delivery via
 ///      <see cref="SortMailTask.TriggerTask"/>.
-///   4. Idles at _pointB for the remainder of _idleDurationAtDestination.
-///   5. Drives back from _pointB to _pointA (drive audio again) — the crate stays behind.
-///   6. Deactivates (visual hidden, audio stopped) until the next delivery day.
+///   6. Idles at _pointC for the remainder of _idleDurationAtDestination.
+///   7. Drives backwards from _pointC all the way to _pointA (drive audio again, same facing
+///      direction — a reverse, not a turn-around) — the crate stays behind. Shortly after the
+///      truck passes back through the checkpoint gate on this leg, the gate automatically closes
+///      (_gateCloseDelayAfterPassing after passing it).
+///   8. Deactivates (visual hidden, audio stopped) until the next delivery day.
 ///
 /// Both the truck visual and the delivery crate start inactive/hidden by default and are only
 /// switched on for the duration of the sequence, so they cost nothing while idle.
@@ -31,17 +39,28 @@ using UnityEngine.Animations;
 [RequireComponent(typeof(NetworkObject))]
 public class DeliveryTruckController : NetworkBehaviour
 {
+    private enum DriveLeg
+    {
+        ToPointB,
+        ToPointC,
+        Back
+    }
+
     [Header("References")]
     [Tooltip("Root of the truck's visual model — toggled on/off to 'activate'/'deactivate' the truck.")]
     [SerializeField] private GameObject truckVisual;
     [SerializeField] private AudioSource truckAudioSource;
     [SerializeField] private MachineShake machineShake;
+    [Tooltip("The checkpoint gate's Animator (drives its 'IsOpen' bool parameter). Opened when the truck stops at pointB and closed shortly after it passes back through on the return leg.")]
+    [SerializeField] private Animator checkpointGateAnimator;
 
     [Header("Waypoints")]
     [Tooltip("Parked / starting position the truck drives from and returns to.")]
     [SerializeField] private Transform pointA;
-    [Tooltip("Delivery position the truck drives to — packages spawn once it arrives here.")]
+    [Tooltip("Stop position just before the checkpoint gate — the truck pauses here while the gate opens.")]
     [SerializeField] private Transform pointB;
+    [Tooltip("Final delivery position beyond the checkpoint gate — the crate is dropped once the truck arrives here.")]
+    [SerializeField] private Transform pointC;
 
     [Header("Delivery Crate")]
     [Tooltip("The crate that rides on the truck's roof until arrival, then tumbles down to its resting spot. Starts hidden and only appears once the truck activates.")]
@@ -66,16 +85,34 @@ public class DeliveryTruckController : NetworkBehaviour
     [SerializeField] private float driveRevDelay = 1.5f;
 
     [Header("Timing")]
-    [Tooltip("How long the truck idles at pointB before driving back — packages are spawned as soon as it arrives.")]
+    [Tooltip("How long the truck idles at pointC after dropping the crate before driving back — packages are spawned as soon as the crate settles.")]
+    [FormerlySerializedAs("idleDurationAtDestination")]
     [SerializeField] private float idleDurationAtDestination = 8f;
+    [Tooltip("How long the truck waits at pointB for the checkpoint gate to finish opening before continuing to pointC.")]
+    [SerializeField] private float gateOpenWaitDuration = 3f;
+    [Tooltip("How long after the truck passes back through the checkpoint gate (on the pointC-to-pointA return leg) before the gate closes.")]
+    [SerializeField] private float gateCloseDelayAfterPassing = 1f;
 
     [Header("Movement")]
-    [SerializeField] private float driveToDuration = 6f;
-    [SerializeField] private float driveBackDuration = 6f;
+    [Tooltip("Duration of the pointA -> pointB leg.")]
+    [FormerlySerializedAs("driveToDuration")]
+    [SerializeField] private float driveToPointBDuration = 6f;
+    [Tooltip("Duration of the pointB -> pointC leg (through the checkpoint gate).")]
+    [SerializeField] private float driveToPointCDuration = 6f;
+    [Tooltip("Duration of the pointC -> pointA return leg.")]
+    [SerializeField] private float driveBackDuration = 10f;
     [Tooltip("Shapes acceleration/deceleration over each leg of the drive. X = normalised time (0-1), Y = position lerp fraction (0-1).")]
     [SerializeField] private AnimationCurve speedCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [Tooltip("Peak MachineShake.positionStrength reached while driving at full speed.")]
     [SerializeField] private float peakShakeStrength = 0.05f;
+
+    private static readonly int CheckpointGateIsOpenParam = Animator.StringToHash("IsOpen");
+
+    private readonly NetworkVariable<bool> _checkpointGateOpen = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
     private bool _sequenceRunning;
     private Vector3 _crateRestPosition;
@@ -85,6 +122,9 @@ public class DeliveryTruckController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        _checkpointGateOpen.OnValueChanged += OnCheckpointGateOpenChanged;
+        ApplyCheckpointGateVisual(_checkpointGateOpen.Value);
 
         // Start parked and hidden — the truck only appears once a delivery begins.
         if (pointA != null)
@@ -106,6 +146,20 @@ public class DeliveryTruckController : NetworkBehaviour
             crateParentConstraint.constraintActive = false;
     }
 
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _checkpointGateOpen.OnValueChanged -= OnCheckpointGateOpenChanged;
+    }
+
+    private void OnCheckpointGateOpenChanged(bool oldValue, bool newValue) => ApplyCheckpointGateVisual(newValue);
+
+    private void ApplyCheckpointGateVisual(bool isOpen)
+    {
+        if (checkpointGateAnimator != null)
+            checkpointGateAnimator.SetBool(CheckpointGateIsOpenParam, isOpen);
+    }
+
     // -------------------------------------------------------------------------
     // Server
     // -------------------------------------------------------------------------
@@ -123,10 +177,14 @@ public class DeliveryTruckController : NetworkBehaviour
             Debug.LogWarning("[DeliveryTruckController] BeginDeliverySequence called while a sequence is already running — ignored.");
             return;
         }
-        if (pointA == null || pointB == null)
+        if (pointA == null || pointB == null || pointC == null)
         {
-            Debug.LogError("[DeliveryTruckController] pointA/pointB not assigned — cannot run delivery sequence.");
+            Debug.LogError("[DeliveryTruckController] pointA/pointB/pointC not assigned — cannot run delivery sequence.");
             return;
+        }
+        if (checkpointGateAnimator == null)
+        {
+            Debug.LogWarning("[DeliveryTruckController] checkpointGateAnimator not assigned — the truck will skip the gate wait/close steps.");
         }
 
         StartCoroutine(ServerSequence());
@@ -137,10 +195,21 @@ public class DeliveryTruckController : NetworkBehaviour
         _sequenceRunning = true;
 
         ActivateClientRpc();
-        BeginDriveClientRpc(toPointB: true);
-        yield return new WaitForSeconds(driveRevDelay + driveToDuration);
+        BeginDriveClientRpc(DriveLeg.ToPointB);
+        yield return new WaitForSeconds(driveRevDelay + driveToPointBDuration);
 
-        // Truck has arrived at pointB — release the crate and let it tumble down onto its resting spot.
+        // Truck has stopped at pointB, right in front of the checkpoint gate — open it and wait
+        // for it to finish before driving through.
+        if (checkpointGateAnimator != null)
+        {
+            _checkpointGateOpen.Value = true;
+            yield return new WaitForSeconds(gateOpenWaitDuration);
+        }
+
+        BeginDriveClientRpc(DriveLeg.ToPointC);
+        yield return new WaitForSeconds(driveRevDelay + driveToPointCDuration);
+
+        // Truck has arrived at pointC — release the crate and let it tumble down onto its resting spot.
         ReleaseCrateClientRpc();
         yield return new WaitForSeconds(crateTumbleDuration);
 
@@ -149,12 +218,35 @@ public class DeliveryTruckController : NetworkBehaviour
 
         yield return new WaitForSeconds(idleDurationAtDestination);
 
-        BeginDriveClientRpc(toPointB: false);
+        BeginDriveClientRpc(DriveLeg.Back);
+        if (checkpointGateAnimator != null)
+            StartCoroutine(CloseGateAfterPassing());
+
         yield return new WaitForSeconds(driveRevDelay + driveBackDuration);
 
         DeactivateClientRpc();
 
         _sequenceRunning = false;
+    }
+
+    /// <summary>
+    /// Server-only. Waits until the truck has driven far enough along the pointC -> pointA leg to
+    /// have passed the checkpoint gate, then waits <see cref="gateCloseDelayAfterPassing"/> more
+    /// before closing it. Timing is derived from <see cref="speedCurve"/> so it lines up with the
+    /// actual DOTween movement played back on clients.
+    /// </summary>
+    private IEnumerator CloseGateAfterPassing()
+    {
+        if (pointA == null || pointC == null || checkpointGateAnimator == null) yield break;
+
+        float fraction = GetFractionAlongLine(pointC.position, pointA.position, checkpointGateAnimator.transform.position);
+        float normalizedTimeAtGate = InverseEvaluateCurve(speedCurve, fraction);
+        float timeUntilPass = driveRevDelay + normalizedTimeAtGate * driveBackDuration;
+
+        yield return new WaitForSeconds(timeUntilPass);
+        yield return new WaitForSeconds(gateCloseDelayAfterPassing);
+
+        _checkpointGateOpen.Value = false;
     }
 
     // -------------------------------------------------------------------------
@@ -175,9 +267,9 @@ public class DeliveryTruckController : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void BeginDriveClientRpc(bool toPointB)
+    private void BeginDriveClientRpc(DriveLeg leg)
     {
-        PlayDriveSequence(toPointB);
+        PlayDriveSequence(leg);
     }
 
     [ClientRpc]
@@ -196,13 +288,28 @@ public class DeliveryTruckController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Drives from the current position to pointA/pointB using DOTween, after a rev delay.
-    /// Runs identically on every client (called via <see cref="BeginDriveClientRpc"/>).
+    /// Drives from the current position to the target waypoint for the given leg using DOTween,
+    /// after a rev delay. Runs identically on every client (called via <see cref="BeginDriveClientRpc"/>).
     /// </summary>
-    private void PlayDriveSequence(bool toPointB)
+    private void PlayDriveSequence(DriveLeg leg)
     {
-        Transform to = toPointB ? pointB : pointA;
-        float duration = toPointB ? driveToDuration : driveBackDuration;
+        Transform to;
+        float duration;
+        switch (leg)
+        {
+            case DriveLeg.ToPointB:
+                to = pointB;
+                duration = driveToPointBDuration;
+                break;
+            case DriveLeg.ToPointC:
+                to = pointC;
+                duration = driveToPointCDuration;
+                break;
+            default:
+                to = pointA;
+                duration = driveBackDuration;
+                break;
+        }
 
         if (to == null) return;
 
@@ -308,6 +415,41 @@ public class DeliveryTruckController : NetworkBehaviour
         truckAudioSource.loop = true;
         truckAudioSource.clip = clip;
         truckAudioSource.Play();
+    }
+
+    /// <summary>
+    /// Returns how far along the line from <paramref name="from"/> to <paramref name="to"/> the
+    /// closest point to <paramref name="point"/> lies, as a 0-1 fraction (clamped).
+    /// </summary>
+    private static float GetFractionAlongLine(Vector3 from, Vector3 to, Vector3 point)
+    {
+        Vector3 line = to - from;
+        float sqrLength = line.sqrMagnitude;
+        if (sqrLength < 0.0001f) return 0f;
+
+        float t = Vector3.Dot(point - from, line) / sqrLength;
+        return Mathf.Clamp01(t);
+    }
+
+    /// <summary>
+    /// Numerically inverts a monotonically increasing 0-1 AnimationCurve: given a target output
+    /// value, returns the normalised time (0-1) at which the curve reaches it. Used to line up
+    /// real-world position fractions (e.g. "where the gate sits along the drive") with the
+    /// eased/normalised time used by <see cref="speedCurve"/>.
+    /// </summary>
+    private static float InverseEvaluateCurve(AnimationCurve curve, float targetValue)
+    {
+        float low = 0f;
+        float high = 1f;
+        for (int i = 0; i < 24; i++)
+        {
+            float mid = (low + high) * 0.5f;
+            if (curve.Evaluate(mid) < targetValue)
+                low = mid;
+            else
+                high = mid;
+        }
+        return (low + high) * 0.5f;
     }
 
     // -------------------------------------------------------------------------

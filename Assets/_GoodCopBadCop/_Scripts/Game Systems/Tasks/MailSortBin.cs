@@ -1,12 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// Placed on each of the three mail bins ("Mail Bin - Delivery", "Mail Bin - Quarantine",
-/// "Mail Bin - Confiscate"). Detects a <see cref="MailPackageItem"/> being physically dropped
-/// inside via a trigger collider and forwards the sort attempt to the server.
+/// Placed on the generic mail bins ("Mail Bin - Quarantine", "Mail Bin - Confiscate"). Detects a
+/// <see cref="MailPackageItem"/> being physically dropped inside via a trigger collider and
+/// forwards the sort attempt to the server.
+///
+/// There is no generic "Mail Bin - Delivery": deliverable packages must instead be dropped into
+/// the addressee's own cubby — see <see cref="MailCubbySlot"/> on the "Mail Cubbies" prefab.
 ///
 /// Setup:
-///   - Assign <see cref="_binType"/> to match this bin's label.
+///   - Assign <see cref="_binType"/> to match this bin's label (Quarantine or Confiscate).
 ///   - Assign <see cref="_triggerZone"/> to a Collider (isTrigger = true) covering the bin's
 ///     opening. If left unassigned, this component falls back to the first Collider found on
 ///     this GameObject — make sure that collider is marked as a trigger, or add a dedicated
@@ -40,6 +43,6 @@ public class MailSortBin : MonoBehaviour
         if (package.IsHeld) return; // ignore momentary overlaps while a player carries a package past the bin
         if (package.IsResolved) return;
 
-        package.RequestSortServerRpc((int)_binType);
+        package.RequestSortServerRpc((int)_binType, string.Empty);
     }
 }

@@ -180,6 +180,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
 
     private FootstepsAudio _footstepsAudio;
+    private PlayerCameraController _playerCameraController;
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
@@ -197,6 +198,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         _characterController = GetComponent<CharacterController>();
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         _footstepsAudio = GetComponent<FootstepsAudio>();
+        _playerCameraController = GetComponent<PlayerCameraController>();
         
         CanMove = true;
         CanLook = true;
@@ -328,6 +330,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         bool isRunning = !_isCrouching && IsSprintInputActive();
         IsRunning = isRunning;
+        if (_playerCameraController != null)
+            _playerCameraController.UpdateMovementShake(isRunning);
 
         // Pick speed
         float currentSpeed = _isCrouching ? crouchSpeed : (isRunning ? runSpeed : characterSpeed);
@@ -515,6 +519,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             MoveZRaw = 0f;
             IsRunning = false;
             _sprintToggleActive = false;
+            if (_playerCameraController != null)
+                _playerCameraController.UpdateMovementShake(false);
         }
     }
 
@@ -528,6 +534,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             MoveZRaw = 0f;
             IsRunning = false;
             _sprintToggleActive = false;
+            if (_playerCameraController != null)
+                _playerCameraController.UpdateMovementShake(false);
         }
     }
 

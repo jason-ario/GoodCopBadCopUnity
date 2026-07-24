@@ -14,9 +14,13 @@ using Random = UnityEngine.Random;
 /// The player must physically carry each package and drop it into the correct bin:
 ///   - Confiscate bin  — goods category is on the prohibited list.
 ///   - Quarantine bin  — the addressee is currently serving quarantine.
-///   - Delivery bin    — the addressee is alive, not quarantined, and the goods are allowed.
+///   - Addressee's cubby (Mail Cubbies) — the addressee is alive, not quarantined, and the goods
+///     are allowed. There is no generic "Delivery" bin: the package must land in the specific
+///     <see cref="MailCubbySlot"/> assigned to that resident, or it is bounced back out even
+///     though it is a deliverable package.
 ///
-/// Sorting is detected by <see cref="MailSortBin"/> trigger volumes, which call
+/// Sorting is detected by <see cref="MailSortBin"/> (Confiscate/Quarantine) and
+/// <see cref="MailCubbySlot"/> (Delivery) trigger volumes, which call
 /// <see cref="EvaluateSort"/> via <see cref="MailPackageItem.RequestSortServerRpc"/>.
 ///
 /// Each day, <see cref="_prohibitedCountPerDay"/> categories are drawn at random from
@@ -116,6 +120,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private bool _taskActive;
     private int _lastTriggeredDay = -1;
 
+    /// <summary>Last day for which <see cref="ChooseTodaysProhibitedGoods"/> has run — tracked
+    /// separately from <see cref="_lastTriggeredDay"/> since the goods roll happens every day
+    /// (including Day 1), while the delivery itself only triggers after Day 1.</summary>
+    private int _lastGoodsRollDay = -1;
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _threatName;
@@ -133,6 +142,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public string DailyTaskId => _dailyTaskId;
     public void TriggerDailyTask()
     {
+        // Not normally reached — this task fires unconditionally off CampaignManager.OnDayChanged
+        // rather than via DailyTaskScheduler (see class remarks). Roll today's categories here too
+        // in case some other system calls this entry point directly, so packages are never spawned
+        // against an empty goods pool.
+        ChooseTodaysProhibitedGoods();
+
         if (_deliveryTruck != null)
             _deliveryTruck.BeginDeliverySequence();
         else
@@ -223,14 +238,25 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Day trigger ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Fires on every day change. Triggers the mail delivery once per day, for every day after
-    /// Day 1 — independent of DailyTaskScheduler, so it never competes with other daily tasks.
-    /// If a <see cref="_deliveryTruck"/> is assigned, the truck's drive-in cutscene decides when
+    /// Fires on every day change, including Day 1. Rolls today's prohibited-goods categories
+    /// immediately (so replicated UI such as the prohibited-goods sign updates right at day
+    /// start, not whenever the mail task itself actually kicks off — and even on Day 1, which
+    /// never gets an actual delivery) — see <see cref="_lastGoodsRollDay"/>. Then, for every day
+    /// after Day 1, triggers the mail delivery once per day — independent of
+    /// DailyTaskScheduler, so it never competes with other daily tasks. If a
+    /// <see cref="_deliveryTruck"/> is assigned, the truck's drive-in cutscene decides when
     /// packages actually spawn (on arrival); otherwise packages spawn immediately.
     /// </summary>
     private void OnDayChanged(int day)
     {
         if (!IsServer) return;
+
+        if (day != _lastGoodsRollDay)
+        {
+            _lastGoodsRollDay = day;
+            ChooseTodaysProhibitedGoods();
+        }
+
         if (day <= 1) return;
         if (day == _lastTriggeredDay) return;
 
@@ -246,7 +272,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Despawns any leftover packages, spawns a fresh delivery, and registers this task in the
-    /// HUD. Server-only.
+    /// HUD. Server-only. Assumes <see cref="ChooseTodaysProhibitedGoods"/> has already been
+    /// called for today (done at day start in <see cref="OnDayChanged"/>).
     /// </summary>
     public void TriggerTask()
     {
@@ -255,8 +282,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         DespawnExistingPackages();
         _taskActive = true;
         _sortedCount.Value = 0;
-
-        ChooseTodaysProhibitedGoods();
 
         List<SuspectRecord> addressPool = BuildAddressablePool();
         if (addressPool.Count == 0)
@@ -282,15 +307,26 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Called by <see cref="MailPackageItem.RequestSortServerRpc"/> when a package is dropped
-    /// into a bin. Server-only; validates the placement and either despawns the package (correct)
-    /// or bounces it back out (incorrect).
+    /// into a bin or cubby slot. Server-only; validates the placement and either despawns the
+    /// package (correct) or bounces it back out (incorrect).
+    ///
+    /// For <see cref="MailSortBinType.Delivery"/>, correctness additionally requires that
+    /// <paramref name="slotResidentName"/> (the resident assigned to the specific
+    /// <see cref="MailCubbySlot"/> the package was dropped into) matches the package's addressee —
+    /// dropping a deliverable package into the wrong resident's cubby is treated as incorrect,
+    /// even though the bin type matches.
     /// </summary>
-    public void EvaluateSort(MailPackageItem package, MailSortBinType binType)
+    public void EvaluateSort(MailPackageItem package, MailSortBinType binType, string slotResidentName = "")
     {
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
 
-        if (package.CorrectBin == binType)
+        bool isCorrect = binType == MailSortBinType.Delivery
+            ? package.CorrectBin == MailSortBinType.Delivery &&
+              string.Equals(slotResidentName?.Trim(), package.ResidentName?.Trim(), StringComparison.OrdinalIgnoreCase)
+            : package.CorrectBin == binType;
+
+        if (isCorrect)
         {
             package.MarkResolved();
             _spawnedPackages.Remove(package.NetworkObject);
@@ -309,8 +345,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             if (away.sqrMagnitude < 0.01f) away = UnityEngine.Random.insideUnitSphere;
             package.RejectFromBin(away);
 
-            Debug.Log($"[SortMailTask] Wrong bin for '{package.ResidentName}' ({package.GoodsLabel}) — " +
-                      $"dropped in {binType}, belongs in {package.CorrectBin}.");
+            string reason = binType == MailSortBinType.Delivery && package.CorrectBin == MailSortBinType.Delivery
+                ? $"wrong cubby (dropped in '{slotResidentName}' cubby, belongs to '{package.ResidentName}')"
+                : $"dropped in {binType}, belongs in {package.CorrectBin}";
+            Debug.Log($"[SortMailTask] Wrong bin for '{package.ResidentName}' ({package.GoodsLabel}) — {reason}.");
         }
     }
 

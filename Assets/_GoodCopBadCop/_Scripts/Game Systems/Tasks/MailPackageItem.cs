@@ -95,14 +95,21 @@ public class MailPackageItem : PickableObject
     public void MarkResolved() => IsResolved = true;
 
     /// <summary>
-    /// Called by <see cref="MailSortBin"/> (any client) when this package is dropped into a bin.
-    /// Routes the sort attempt to the server, which owns <see cref="SortMailTask"/> and decides
-    /// whether the placement was correct.
+    /// Called by <see cref="MailSortBin"/> or <see cref="MailCubbySlot"/> (any client) when this
+    /// package is dropped into a bin or cubby slot. Routes the sort attempt to the server, which
+    /// owns <see cref="SortMailTask"/> and decides whether the placement was correct.
     /// </summary>
+    /// <param name="binType">Which sorting outcome the package was dropped into.</param>
+    /// <param name="slotResidentName">
+    /// When <paramref name="binType"/> is <see cref="MailSortBinType.Delivery"/>, the resident
+    /// name assigned to the specific cubby slot the package was dropped into (see
+    /// <see cref="MailCubbySlot"/>). Ignored for Quarantine/Confiscate. Empty if dropped into a
+    /// generic bin rather than a labelled cubby.
+    /// </param>
     [ServerRpc(RequireOwnership = false)]
-    public void RequestSortServerRpc(int binType)
+    public void RequestSortServerRpc(int binType, string slotResidentName = "")
     {
-        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType);
+        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType, slotResidentName);
     }
 
     /// <summary>

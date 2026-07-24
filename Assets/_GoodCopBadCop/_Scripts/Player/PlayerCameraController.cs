@@ -13,18 +13,59 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float amplitudeGainRumble;
     [SerializeField] private float frequencyGainRumble;
 
+    [Header("Running Shake")]
+    [Tooltip("Optional noise profile used while the player is running. Falls back to normalNoiseSettings when unset.")]
+    [SerializeField] private NoiseSettings runningNoiseSettings;
+    [SerializeField] private float amplitudeGainRunning = 1.6f;
+    [SerializeField] private float frequencyGainRunning = 2f;
+
     private CinemachineCameraFeedbackExtension _cameraFeedbackExtension;
+    private CinemachineBasicMultiChannelPerlin _perlin;
     private Sequence _swaySequence;
     private Sequence _cameraKickSequence;
     private Vector3 _swayEulerOffset;
     private Vector3 _cameraKickEulerOffset;
     private float _swayFieldOfViewOffset;
     private float _cameraKickFieldOfViewOffset;
+    private bool _isRunning;
+    private bool _rumbleActive;
 
     private void OnDisable()
     {
         StopSway();
         StopCameraKick();
+    }
+
+    /// <summary>Called every frame by the movement controller to keep the camera shake in sync with the run state.</summary>
+    public void UpdateMovementShake(bool isRunning)
+    {
+        if (_isRunning == isRunning)
+            return;
+
+        _isRunning = isRunning;
+        RefreshMovementNoise();
+    }
+
+    private void RefreshMovementNoise()
+    {
+        if (_rumbleActive)
+            return;
+
+        CinemachineBasicMultiChannelPerlin perlin = GetPerlin();
+        if (perlin == null)
+            return;
+
+        perlin.NoiseProfile = _isRunning && runningNoiseSettings != null ? runningNoiseSettings : normalNoiseSettings;
+        perlin.AmplitudeGain = _isRunning ? amplitudeGainRunning : amplitudeGainNormal;
+        perlin.FrequencyGain = _isRunning ? frequencyGainRunning : frequencyGainNormal;
+    }
+
+    private CinemachineBasicMultiChannelPerlin GetPerlin()
+    {
+        if (_perlin == null && camera != null)
+            _perlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
+
+        return _perlin;
     }
 
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>
@@ -42,18 +83,21 @@ public class PlayerCameraController : MonoBehaviour
 
     public void TurnOnRumble()
     {
-        CinemachineBasicMultiChannelPerlin cinemachineBasicMultiChannelPerlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
-        cinemachineBasicMultiChannelPerlin.NoiseProfile = rumbleNoiseSettings;
-        cinemachineBasicMultiChannelPerlin.AmplitudeGain = amplitudeGainRumble;
-        cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainRumble;
+        _rumbleActive = true;
+
+        CinemachineBasicMultiChannelPerlin perlin = GetPerlin();
+        if (perlin == null)
+            return;
+
+        perlin.NoiseProfile = rumbleNoiseSettings;
+        perlin.AmplitudeGain = amplitudeGainRumble;
+        perlin.FrequencyGain = frequencyGainRumble;
     }
 
     public void TurnOffRumble()
     {
-        CinemachineBasicMultiChannelPerlin cinemachineBasicMultiChannelPerlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
-        cinemachineBasicMultiChannelPerlin.NoiseProfile = normalNoiseSettings;
-        cinemachineBasicMultiChannelPerlin.AmplitudeGain = amplitudeGainNormal;
-        cinemachineBasicMultiChannelPerlin.FrequencyGain = frequencyGainNormal;
+        _rumbleActive = false;
+        RefreshMovementNoise();
     }
 
     public void PlaySway(CameraSwaySettings settings)
