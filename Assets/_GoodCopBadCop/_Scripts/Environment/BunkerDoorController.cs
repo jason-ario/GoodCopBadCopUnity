@@ -39,6 +39,10 @@ public class BunkerDoorController : NetworkBehaviour
     [Tooltip("Sound played when the door is slammed shut by a player. Cuts off the open sound if it's still playing.")]
     [SerializeField] private AudioClip _slamSound;
 
+    [Header("Particles")]
+    [Tooltip("Particle effect played the moment the door starts to open, and again the moment it finishes slamming fully closed.")]
+    [SerializeField] private ParticleSystem _poofFx;
+
     private const float ClosedAngleZ = 0f;
     private const float OpenAngleZ   = 120f;
 
@@ -163,7 +167,7 @@ public class BunkerDoorController : NetworkBehaviour
     [ClientRpc]
     private void PlayOpenClientRpc()
     {
-        TweenDoorZ(OpenAngleZ, _openDuration, _openEase);
+        TweenDoorZ(OpenAngleZ, _openDuration, _openEase, onComplete: null);
 
         // Played on the main track (not PlayOneShot) so a mid-play Close() can cut it off.
         if (_audioSource != null && _openSound != null)
@@ -173,13 +177,15 @@ public class BunkerDoorController : NetworkBehaviour
             _audioSource.Play();
         }
 
+        _poofFx?.Play(true);
+
         OnDoorOpened?.Invoke();
     }
 
     [ClientRpc]
     private void PlaySlamClientRpc()
     {
-        TweenDoorZ(ClosedAngleZ, _slamDuration, _slamEase);
+        TweenDoorZ(ClosedAngleZ, _slamDuration, _slamEase, onComplete: () => _poofFx?.Play(true));
 
         if (_audioSource != null)
         {
@@ -225,12 +231,13 @@ public class BunkerDoorController : NetworkBehaviour
 
     // ─── Private helpers ─────────────────────────────────────────────────────
 
-    private void TweenDoorZ(float targetZ, float duration, Ease ease)
+    private void TweenDoorZ(float targetZ, float duration, Ease ease, Action onComplete)
     {
         if (_door == null) return;
         _door.DOKill();
         _door.DOLocalRotateQuaternion(Quaternion.Euler(0f, 0f, targetZ), duration)
-             .SetEase(ease);
+             .SetEase(ease)
+             .OnComplete(() => onComplete?.Invoke());
     }
 
     private void SnapToAngle(float z)

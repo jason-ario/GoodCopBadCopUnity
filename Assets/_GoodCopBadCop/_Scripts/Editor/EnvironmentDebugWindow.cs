@@ -18,14 +18,21 @@ namespace GoodCopBadCop.Editor
         [SerializeField]
         private EnvironmentPreset presetToApply;
 
+        [SerializeField, Range(0f, 1f)]
+        private float suspectProgressToApply;
+
         private EnvironmentSchedule environmentSchedule;
         private IEnvironmentService service;
         private IEnvironmentModel model;
         private IDisposable currentDaySubscription;
         private IDisposable currentPresetSubscription;
+        private IDisposable currentNightPresetSubscription;
+        private IDisposable dayNightProgressSubscription;
         private string status = "Not connected.";
         private int currentDay;
         private EnvironmentPreset currentPreset;
+        private EnvironmentPreset currentNightPreset;
+        private float currentDayNightProgress;
 
         [MenuItem(EditorConstants.EnvironmentDebugMenuPath, false, EditorConstants.RootMenuPriority)]
         private static void Open()
@@ -62,6 +69,12 @@ namespace GoodCopBadCop.Editor
         [ShowInInspector, ReadOnly, PropertyOrder(-9)]
         private EnvironmentPreset CurrentPreset => currentPreset;
 
+        [ShowInInspector, ReadOnly, PropertyOrder(-8)]
+        private EnvironmentPreset CurrentNightPreset => currentNightPreset;
+
+        [ShowInInspector, ReadOnly, PropertyOrder(-7)]
+        private float CurrentDayNightProgress => currentDayNightProgress;
+
         [Button(ButtonSizes.Large), HorizontalGroup("Navigation"), EnableIf(nameof(CanUseRuntimeServices))]
         private void ApplyPrevious()
         {
@@ -84,6 +97,12 @@ namespace GoodCopBadCop.Editor
         private void ApplySelectedPreset()
         {
             service?.ApplyPreset(presetToApply);
+        }
+
+        [Button(ButtonSizes.Medium), EnableIf(nameof(CanUseRuntimeServices))]
+        private void ApplySuspectProgress()
+        {
+            service?.SetSuspectProgress(Mathf.RoundToInt(suspectProgressToApply * 100f), 100);
         }
 
         [Button(ButtonSizes.Small)]
@@ -117,6 +136,8 @@ namespace GoodCopBadCop.Editor
             model = null;
             currentDay = 0;
             currentPreset = null;
+            currentNightPreset = null;
+            currentDayNightProgress = 0f;
 
             if (!EditorApplication.isPlaying)
             {
@@ -146,6 +167,8 @@ namespace GoodCopBadCop.Editor
 
             currentDay = model.CurrentDay.CurrentValue;
             currentPreset = model.CurrentPreset.CurrentValue;
+            currentNightPreset = model.CurrentNightPreset.CurrentValue;
+            currentDayNightProgress = model.DayNightProgress.CurrentValue;
             status = "Ready.";
 
             currentDaySubscription = model.CurrentDay.Subscribe(day =>
@@ -159,14 +182,30 @@ namespace GoodCopBadCop.Editor
                 currentPreset = preset;
                 Repaint();
             });
+
+            currentNightPresetSubscription = model.CurrentNightPreset.Subscribe(preset =>
+            {
+                currentNightPreset = preset;
+                Repaint();
+            });
+
+            dayNightProgressSubscription = model.DayNightProgress.Subscribe(progress =>
+            {
+                currentDayNightProgress = progress;
+                Repaint();
+            });
         }
 
         private void DisposeSubscriptions()
         {
             currentDaySubscription?.Dispose();
             currentPresetSubscription?.Dispose();
+            currentNightPresetSubscription?.Dispose();
+            dayNightProgressSubscription?.Dispose();
             currentDaySubscription = null;
             currentPresetSubscription = null;
+            currentNightPresetSubscription = null;
+            dayNightProgressSubscription = null;
         }
 
         private void ClearRuntimeReferences(string newStatus)
@@ -177,6 +216,8 @@ namespace GoodCopBadCop.Editor
             model = null;
             currentDay = 0;
             currentPreset = null;
+            currentNightPreset = null;
+            currentDayNightProgress = 0f;
             status = newStatus;
         }
 

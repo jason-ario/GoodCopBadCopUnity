@@ -159,6 +159,14 @@ public class PlayerAnimationController : NetworkBehaviour
     private NetworkVariable<bool> netIsRunning =
         new NetworkVariable<bool>(writePerm: NetworkVariableWritePermission.Owner);
 
+    /// <summary>
+    /// Synced ground contact state driving the animator's "Grounded" parameter,
+    /// so the Fall/Land transitions react the instant the player's physics
+    /// state actually changes rather than relying on the parameter's default.
+    /// </summary>
+    private NetworkVariable<bool> netGrounded =
+        new NetworkVariable<bool>(true, writePerm: NetworkVariableWritePermission.Owner);
+
     private NetworkVariable<float> netLayer1Weight =
         new NetworkVariable<float>(writePerm: NetworkVariableWritePermission.Owner);
 
@@ -584,6 +592,8 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetFloat("MoveX", netMoveX.Value);
             armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
             bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
+            bodyAnimator.SetBool("Grounded", netGrounded.Value);
+            armsAnimator.SetBool("Grounded", netGrounded.Value);
 
             // Apply layer weights from the owner.
             bodyAnimator.SetLayerWeight(1, netLayer1Weight.Value);
@@ -614,6 +624,11 @@ public class PlayerAnimationController : NetworkBehaviour
         netIsRunning.Value = isRunning;
 
         bodyAnimator.SetBool("IsRunning", isRunning);
+
+        bool grounded = _playerMovementController.RawGrounded;
+        netGrounded.Value = grounded;
+        bodyAnimator.SetBool("Grounded", grounded);
+        armsAnimator.SetBool("Grounded", grounded);
         
         // Set the smoothed values to the animator
         bodyAnimator.SetFloat("MoveX", currentMoveX);

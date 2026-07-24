@@ -78,8 +78,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float jumpForce = 7f;
     [SerializeField] private AudioClip jumpSound;
     [SerializeField] private AudioClip landSound;
+    [Tooltip("How many seconds before actual ground contact the land sound should play, predicted from the current fall speed and a lookahead ground scan.")]
+    [SerializeField] private float landSoundAnticipation = 0.5f;
 
     private bool _wasGrounded;
+    private bool _landSoundPlayedForCurrentFall;
 
     // Input helpers — combine legacy Input Manager with gamepad polling so both
     // keyboard/mouse and controller work simultaneously without migrating to
@@ -113,6 +116,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     public float MoveZRaw { get; private set; }
     public bool IsRunning { get; private set; }
     public bool IsGrounded { get; private set; }
+
+    /// <summary>
+    /// Raw physics ground check result for this frame, unaffected by the jump
+    /// animation suppression window that <see cref="IsGrounded"/> applies.
+    /// Used to drive the animator's "Grounded" parameter so the Fall/Land
+    /// transitions react the instant the player actually touches the ground.
+    /// </summary>
+    public bool RawGrounded { get; private set; }
 
     /// <summary>
     /// Current vertical look pitch in degrees, clamped to [-maxLookAngle, maxLookAngle].
@@ -343,14 +354,20 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         // Apply gravity
         bool isGrounded = CheckGrounded();
+        RawGrounded = isGrounded;
 
         if (isGrounded)
         {
             // Landing: transitioned from airborne to grounded while falling
             if (!_wasGrounded && _verticalVelocity < 0f)
             {
-                SFXController.Instance.Play(landSound);
+                // Fallback in case the predictive lookahead below never caught this fall
+                // (e.g. an uneven or steep surface the lookahead ray missed).
+                if (!_landSoundPlayedForCurrentFall)
+                    SFXController.Instance.Play(landSound);
             }
+
+            _landSoundPlayedForCurrentFall = false;
 
             if (_isUnderwater && IsJumpHeld && !_isCrouching)
             {
@@ -383,6 +400,22 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 if (_verticalVelocity < underwaterTerminalVelocity)
                     _verticalVelocity = underwaterTerminalVelocity;
             }
+            else if (!_landSoundPlayedForCurrentFall && _verticalVelocity < 0f)
+            {
+                // Predict how far the player will fall in the next landSoundAnticipation
+                // seconds (using basic kinematics under the current gravity) and scan that
+                // far below for ground. If found, play the land sound now so it lands on the
+                // player's ear roughly landSoundAnticipation seconds before actual contact.
+                float fallSpeed = -_verticalVelocity;
+                float lookaheadDistance = fallSpeed * landSoundAnticipation
+                    + 0.5f * -effectiveGravity * landSoundAnticipation * landSoundAnticipation;
+
+                if (CheckGroundedAhead(lookaheadDistance))
+                {
+                    SFXController.Instance.Play(landSound);
+                    _landSoundPlayedForCurrentFall = true;
+                }
+            }
         }
 
         _wasGrounded = isGrounded;
@@ -398,6 +431,30 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         // Apply movement
         _characterController.Move(moveVector * Time.deltaTime);
+    }
+
+    /// <summary>
+    /// Same downward sphere cast as <see cref="CheckGrounded"/>, but with a caller-supplied
+    /// scan distance. Used to predict ground contact before it actually happens (e.g. to
+    /// anticipate the land sound) rather than to drive the authoritative grounded state.
+    /// </summary>
+    private bool CheckGroundedAhead(float distance)
+    {
+        if (distance <= 0f) return false;
+
+        Vector3 bottomSphereCentre = transform.position
+            + _characterController.center
+            + Vector3.down * (_characterController.height * 0.5f - _characterController.radius);
+
+        return Physics.SphereCast(
+            bottomSphereCentre,
+            _characterController.radius * 0.9f,
+            Vector3.down,
+            out _,
+            distance,
+            groundMask,
+            QueryTriggerInteraction.Ignore
+        );
     }
 
     /// <summary>

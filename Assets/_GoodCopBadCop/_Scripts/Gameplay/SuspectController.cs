@@ -19,6 +19,14 @@ public class SuspectController : NetworkBehaviour
     /// <summary>Fired on the server immediately after a quarantine record is committed.</summary>
     public static event System.Action OnSuspectQuarantined;
 
+    /// <summary>
+    /// Fired on every peer (server and clients) whenever <see cref="suspectIndex"/> changes,
+    /// carrying the new lineup index and the total number of suspects for the current shift.
+    /// Consumed by <see cref="GoodCopBadCop.EnvironmentSystem.EnvironmentSuspectProgressAdapter"/>
+    /// to drive the day/night environment lerp as the lineup is processed.
+    /// </summary>
+    public static event System.Action<int, int> OnSuspectProgressChanged;
+
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
     [VContainer.Inject] private IPopulationService populationService;
     [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
@@ -1540,12 +1548,26 @@ public class SuspectController : NetworkBehaviour
         base.OnNetworkSpawn();
         if (IsServer)
             SuspectCharacter.OnSuspectKilledByPlayer += HandleSuspectKilledByPlayer;
+
+        suspectIndex.OnValueChanged += HandleSuspectIndexChanged;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         SuspectCharacter.OnSuspectKilledByPlayer -= HandleSuspectKilledByPlayer;
+        suspectIndex.OnValueChanged -= HandleSuspectIndexChanged;
+    }
+
+    /// <summary>
+    /// Raises <see cref="OnSuspectProgressChanged"/> whenever the lineup index changes.
+    /// NetworkVariable.OnValueChanged fires locally on every peer (host and clients), so this
+    /// keeps the day/night environment blend in sync without any extra RPCs.
+    /// </summary>
+    private void HandleSuspectIndexChanged(int previousValue, int newValue)
+    {
+        int total = dailySuspectManager != null ? dailySuspectManager.shiftSuspects.Count : 0;
+        OnSuspectProgressChanged?.Invoke(newValue, total);
     }
 
     /// <summary>

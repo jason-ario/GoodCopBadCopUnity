@@ -39,6 +39,14 @@ public class PC : Interactable
     [SerializeField] private SimpleCanvasCursorFromMouseDelta _virtualCanvasCursor;
     [Tooltip("The Camera that renders the terminal UI onto the monitor's render texture. Only needs to be active while a player is using the terminal.")]
     [SerializeField] private GameObject screenRenderCamera;
+    [SerializeField] private AudioClip enterPCViewSfx;
+
+    [Header("Idle Sound")]
+    [Tooltip("Dedicated looping AudioSource used for the terminal's idle hum while the PC view is active. Should have loop enabled and playOnAwake disabled.")]
+    [SerializeField] private AudioSource idleAudioSource;
+    [SerializeField] private AudioClip idleSfx;
+    [SerializeField, Range(0f, 1f)] private float idleSfxVolume = 1f;
+    [SerializeField] private float idleFadeDuration = 0.5f;
 
     [Header("Terminal")]
     [SerializeField] private TextMeshProUGUI header;
@@ -69,6 +77,7 @@ public class PC : Interactable
     private readonly Stack<NavState> _backStack = new();
     private NavState _currentState = NavState.Root();
     private bool _restoring;
+    private Coroutine _idleFadeCoroutine;
 
     private void Start()
     {
@@ -80,6 +89,8 @@ public class PC : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
+        SFXController.Instance?.Play(enterPCViewSfx);
+        PlayIdleSound();
         player.playerMovementController.SetCanControl(false);
         player.SetCanInteract(false, "");
         Cursor.visible = false;
@@ -132,6 +143,7 @@ public class PC : Interactable
         Cursor.lockState = CursorLockMode.Confined;
         ShowPCBackButton();
         SetScreenRenderCameraActive(true);
+        PlayIdleSound();
         OpenRootMenu();
         ClearCurrentProfileSelection();
     }
@@ -701,9 +713,60 @@ public class PC : Interactable
         Cursor.lockState = CursorLockMode.Locked;
         if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
         SetScreenRenderCameraActive(false);
+        StopIdleSound();
         if (_player == null) return;
         _player.SetCanInteract(true, "");
         _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));
+    }
+
+    private void PlayIdleSound()
+    {
+        if (idleAudioSource == null || idleSfx == null)
+            return;
+
+        if (_idleFadeCoroutine != null)
+            StopCoroutine(_idleFadeCoroutine);
+
+        idleAudioSource.clip = idleSfx;
+        idleAudioSource.loop = true;
+        if (!idleAudioSource.isPlaying)
+            idleAudioSource.Play();
+
+        _idleFadeCoroutine = StartCoroutine(FadeIdleVolume(idleSfxVolume, idleFadeDuration, stopOnComplete: false));
+    }
+
+    private void StopIdleSound()
+    {
+        if (idleAudioSource == null || !idleAudioSource.isPlaying)
+            return;
+
+        if (_idleFadeCoroutine != null)
+            StopCoroutine(_idleFadeCoroutine);
+
+        _idleFadeCoroutine = StartCoroutine(FadeIdleVolume(0f, idleFadeDuration, stopOnComplete: true));
+    }
+
+    private IEnumerator FadeIdleVolume(float targetVolume, float duration, bool stopOnComplete)
+    {
+        float startVolume = idleAudioSource.volume;
+        float elapsed = 0f;
+
+        if (duration > 0f)
+        {
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                idleAudioSource.volume = Mathf.Lerp(startVolume, targetVolume, elapsed / duration);
+                yield return null;
+            }
+        }
+
+        idleAudioSource.volume = targetVolume;
+
+        if (stopOnComplete)
+            idleAudioSource.Stop();
+
+        _idleFadeCoroutine = null;
     }
 
     private void SetScreenRenderCameraActive(bool active)

@@ -3,18 +3,22 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Diegetic view controller for the bunker door wheel knob.
-/// The player opens this view by clicking the wheel. While the view is active and the
-/// mouse button is held, rotating the mouse around the wheel's screen-centre spins the
-/// wheel visually. Enough counter-clockwise rotation unlocks and opens the door. A
-/// configurable clockwise limit prevents the wheel from spinning past the "fully tight"
-/// stop. Releasing the mouse button exits the view.
+/// Diegetic view controller for a bunker door wheel knob (one instance per side of the door).
+/// The view is opened externally (see <see cref="BunkerDoorInteractable"/>) by clicking
+/// anywhere on the door. Once open, clicking specifically on the wheel and dragging spins
+/// it — rotating the mouse around the wheel's screen-centre while held. Releasing the mouse
+/// button stops the spin but does NOT exit the view; the view only closes when the wheel is
+/// fully spun (opening the door) or the player presses the exit key.
+/// A configurable clockwise limit prevents the wheel from spinning past the "fully tight" stop.
 /// </summary>
 public class DoorWheelDiegeticController : DiegeticViewController
 {
     [Header("Wheel")]
     [Tooltip("The Transform that visually spins (the wheel mesh root).")]
     [SerializeField] private Transform _wheelTransform;
+
+    [Tooltip("The wheel's own collider — clicking and dragging on this (while the view is open) spins the wheel.")]
+    [SerializeField] private Collider _wheelCollider;
 
     [Tooltip("The BunkerDoorController to call Open() on when the door is unlocked.")]
     [SerializeField] private BunkerDoorController _bunkerDoor;
@@ -70,9 +74,6 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     // ─── DiegeticViewController overrides ────────────────────────────────────
 
-    /// <summary>No back button — the view exits on mouse release.</summary>
-    protected override bool ShowBackButton => false;
-
     /// <summary>Suppress the camera pan while the player is actively dragging the wheel.</summary>
     protected override bool SuppressCameraMovement => _isDragging;
 
@@ -84,12 +85,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
     {
         _accumulatedRotation = 0f;
         _totalCCWDegrees     = 0f;
-
-        // The view was opened via a mouse-down, so we begin dragging immediately.
-        SetDragging(true);
-        Camera cam = RaycastCamera;
-        if (cam != null && _wheelTransform != null)
-            _lastMouseAngle = GetMouseAngleAroundWheel(cam);
+        _isDragging          = false;
     }
 
     protected override void OnClosed()
@@ -110,33 +106,34 @@ public class DoorWheelDiegeticController : DiegeticViewController
         Camera cam = RaycastCamera;
         if (cam == null || _wheelTransform == null) return;
 
-        // In case the button was released before the first OnUpdate (edge case).
-        if (_isDragging && !LmbHeld && !LmbUp)
+        // Not yet dragging: only a click that actually lands on the wheel starts a drag.
+        // Letting go of the mouse elsewhere, or missing the wheel, has no effect — the
+        // view itself stays open until the wheel is fully spun or the exit key is pressed.
+        if (!_isDragging)
         {
+            if (LmbDown && IsPointerOverWheel(cam))
+            {
+                SetDragging(true);
+                _lastMouseAngle = GetMouseAngleAroundWheel(cam);
+            }
+            else
+            {
+                UpdateSpinAudio(0f);
+            }
+            return;
+        }
+
+        // Dragging and released: stop spinning, but do NOT close the view.
+        if (!LmbHeld && !LmbUp)
+        {
+            // In case the button was released before the first OnUpdate (edge case).
             SetDragging(false);
-            Close();
             return;
         }
 
-        // Mouse / RT down while view is active and not yet dragging (e.g. player re-pressed).
-        if (!_isDragging && LmbDown)
-        {
-            SetDragging(true);
-            _lastMouseAngle = GetMouseAngleAroundWheel(cam);
-            return;
-        }
-
-        // Release → exit the view.
         if (LmbUp)
         {
             SetDragging(false);
-            Close();
-            return;
-        }
-
-        if (!_isDragging)
-        {
-            UpdateSpinAudio(0f);
             return;
         }
 
@@ -231,6 +228,17 @@ public class DoorWheelDiegeticController : DiegeticViewController
         {
             _spinAudioSource.Stop();
         }
+    }
+
+    /// <summary>
+    /// Returns true if the mouse cursor is currently over this wheel's collider.
+    /// Used to gate starting a drag so clicks elsewhere in the view don't spin the wheel.
+    /// </summary>
+    private bool IsPointerOverWheel(Camera cam)
+    {
+        if (_wheelCollider == null) return false;
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        return _wheelCollider.Raycast(ray, out _, 100f);
     }
 
     /// <summary>

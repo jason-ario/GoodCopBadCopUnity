@@ -15,6 +15,12 @@ public class ClickablePCElement : MonoBehaviour
     [SerializeField] private Ease hoverEase = Ease.OutQuad;
     [SerializeField] private Ease clickEase = Ease.OutQuad;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip hoverSfx;
+    [SerializeField] private AudioClip clickSfx;
+    [SerializeField, Range(0f, 1f)] private float hoverSfxVolume = 1f;
+    [SerializeField, Range(0f, 1f)] private float clickSfxVolume = 1f;
+
     [Header("Legacy")]
     public UnityEvent onClickEvent;
 
@@ -63,6 +69,8 @@ public class ClickablePCElement : MonoBehaviour
 
     public virtual void OnHoverEnter()
     {
+        PlayHoverSfx();
+
         if (!animateFeedback)
             return;
 
@@ -79,6 +87,7 @@ public class ClickablePCElement : MonoBehaviour
 
     public virtual void OnClick()
     {
+        PlayClickSfx();
         PlayClickFeedback();
         _clickHandler?.Invoke();
         onClickEvent?.Invoke();
@@ -89,6 +98,18 @@ public class ClickablePCElement : MonoBehaviour
         animateFeedback = enabled;
         if (!enabled)
             ResetFeedback();
+    }
+
+    private void PlayHoverSfx()
+    {
+        if (hoverSfx != null)
+            SFXController.Instance?.Play(hoverSfx, hoverSfxVolume);
+    }
+
+    private void PlayClickSfx()
+    {
+        if (clickSfx != null)
+            SFXController.Instance?.Play(clickSfx, clickSfxVolume);
     }
 
     private void PlayClickFeedback()

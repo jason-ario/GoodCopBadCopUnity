@@ -20,6 +20,10 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
     [Header("Input")]
     [SerializeField] private KeyCode clickKey = KeyCode.Mouse0;
 
+    [Header("Scroll Drag")]
+    [Tooltip("Minimum cursor movement (in canvas units) before a press-and-drag over a scrollable area is treated as a drag instead of a click.")]
+    [SerializeField] private float dragStartThreshold = 8f;
+
     private const float MinUsableSensitivity = 0.1f;
     private const float MinAxisDeltaMultiplier = 60f;
 
@@ -27,7 +31,11 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
     private Vector2 lastMouseDelta;
 
     private ClickablePCElement currentHoveredElement;
-    private ClickablePCScrollbar currentDraggedScrollbar;
+    private IPCDraggable currentDraggedElement;
+
+    private ClickablePCElement pendingClickElement;
+    private IPCDraggable pendingDragCandidate;
+    private Vector2 pendingDownCanvasPos;
 
     private ClickablePCElement[] clickableElements = Array.Empty<ClickablePCElement>();
     private readonly Vector3[] cornersBuffer = new Vector3[4];
@@ -203,10 +211,19 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         if (currentHoveredElement == null)
             return;
 
-        if (currentHoveredElement is ClickablePCScrollbar scrollbar)
+        if (currentHoveredElement is IPCDraggable directDraggable)
         {
-            currentDraggedScrollbar = scrollbar;
-            currentDraggedScrollbar.BeginDrag();
+            currentDraggedElement = directDraggable;
+            currentDraggedElement.BeginDrag();
+            return;
+        }
+
+        IPCDraggable ancestorDraggable = FindDraggableAncestor(currentHoveredElement);
+        if (ancestorDraggable != null)
+        {
+            pendingClickElement = currentHoveredElement;
+            pendingDragCandidate = ancestorDraggable;
+            pendingDownCanvasPos = GetCursorPointInCanvasSpace();
             return;
         }
 
@@ -215,13 +232,30 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
     private void HandleDragging()
     {
-        if (currentDraggedScrollbar == null)
+        if (currentDraggedElement != null)
+        {
+            if (!Input.GetKey(clickKey))
+                return;
+
+            currentDraggedElement.DragFromCursorDelta();
+            return;
+        }
+
+        if (pendingDragCandidate == null)
             return;
 
         if (!Input.GetKey(clickKey))
             return;
 
-        currentDraggedScrollbar.DragFromCursorDelta();
+        Vector2 currentCanvasPos = GetCursorPointInCanvasSpace();
+        if ((currentCanvasPos - pendingDownCanvasPos).sqrMagnitude < dragStartThreshold * dragStartThreshold)
+            return;
+
+        currentDraggedElement = pendingDragCandidate;
+        pendingDragCandidate = null;
+        pendingClickElement = null;
+        currentDraggedElement.BeginDrag();
+        currentDraggedElement.DragFromCursorDelta();
     }
 
     private void HandleClickUp()
@@ -229,7 +263,32 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
         if (!Input.GetKeyUp(clickKey))
             return;
 
+        if (pendingClickElement != null)
+        {
+            pendingClickElement.OnClick();
+            pendingClickElement = null;
+            pendingDragCandidate = null;
+        }
+
         EndDragging();
+    }
+
+    private IPCDraggable FindDraggableAncestor(ClickablePCElement element)
+    {
+        if (element == null)
+            return null;
+
+        Transform current = element.transform.parent;
+        while (current != null && current != canvasRect)
+        {
+            IPCDraggable draggable = current.GetComponent<IPCDraggable>();
+            if (draggable != null)
+                return draggable;
+
+            current = current.parent;
+        }
+
+        return null;
     }
 
     private Vector2 GetCursorPointInCanvasSpace()
@@ -264,16 +323,18 @@ public class SimpleCanvasCursorFromMouseDelta : MonoBehaviour
 
     private void EndDragging()
     {
-        if (currentDraggedScrollbar != null)
+        if (currentDraggedElement != null)
         {
-            currentDraggedScrollbar.EndDrag();
-            currentDraggedScrollbar = null;
+            currentDraggedElement.EndDrag();
+            currentDraggedElement = null;
         }
     }
 
     private void ResetState()
     {
         SetHoveredElement(null);
+        pendingClickElement = null;
+        pendingDragCandidate = null;
         EndDragging();
     }
 

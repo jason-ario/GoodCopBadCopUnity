@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ClickablePCScrollbar : ClickablePCElement
+public class ClickablePCScrollbar : ClickablePCElement, IPCDraggable
 {
     [Header("References")]
     [SerializeField] private Scrollbar scrollbar;

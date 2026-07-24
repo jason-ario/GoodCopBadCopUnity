@@ -86,6 +86,7 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<IEnvironmentService, EnvironmentService>(Lifetime.Scoped);
             builder.RegisterEntryPoint<EnvironmentRenderAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<EnvironmentCampaignAdapter>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<EnvironmentSuspectProgressAdapter>(Lifetime.Scoped);
             builder.RegisterComponentInHierarchy<RainEffectController>();
             builder.RegisterEntryPoint<RainAdapter>(Lifetime.Scoped);
 
