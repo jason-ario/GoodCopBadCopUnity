@@ -1335,6 +1335,21 @@ public class SuspectController : NetworkBehaviour
         StartCoroutine(QuarantineSequence(serverTimeAtTimelineStart));
     }
 
+    /// <summary>
+    /// Mirrors the server-only quarantine bookkeeping in <see cref="QuarantineSequence"/> onto every
+    /// client's local <see cref="SuspectRunRecords"/> instance and re-fires
+    /// <see cref="OnSuspectQuarantined"/> there, so <see cref="QuarantineBoardController"/> refreshes
+    /// on clients too instead of only on the host.
+    /// </summary>
+    [ClientRpc]
+    private void SyncQuarantineRecordClientRpc(string suspectDataName, int quarantinedOnDay)
+    {
+        if (IsServer) return;
+
+        SuspectRunRecords.Instance?.ApplyQuarantineFromServer(suspectDataName, quarantinedOnDay);
+        OnSuspectQuarantined?.Invoke();
+    }
+
     private IEnumerator QuarantineSequence(double serverTimeAtTimelineStart = -1)
     {
         if (suspectCharacter == null)
@@ -1358,6 +1373,12 @@ public class SuspectController : NetworkBehaviour
                 quarantineRecord.quarantinedOnDay = CampaignManager.Instance?.CurrentDay ?? -1;
                 SuspectRunRecords.Instance.SaveRecords();
                 OnSuspectQuarantined?.Invoke();
+
+                // The record mutation above only happened in this server's own local
+                // SuspectRunRecords instance — clients never touched their copy of the record and
+                // never fired OnSuspectQuarantined, so their Quarantine Board never refreshed.
+                // Push the same bookkeeping + refresh event out to every client explicitly.
+                SyncQuarantineRecordClientRpc(suspectCharacter.Data.name, quarantineRecord.quarantinedOnDay);
             }
             suspectCharacter.animator.SetTrigger("Give");
             yield return new WaitForSeconds(1f);

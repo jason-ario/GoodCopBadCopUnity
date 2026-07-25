@@ -85,6 +85,35 @@ public class SuspectRunRecords : MonoBehaviour
         return records.Find(record => record.SuspectData == suspectData);
     }
 
+    /// <summary>
+    /// Returns the runtime record whose <see cref="SuspectData"/> asset name matches
+    /// <paramref name="suspectDataName"/>, or null if not found. Used to resolve a suspect
+    /// by name across the network (SuspectData asset references are identical on every peer,
+    /// but only the asset name is cheap to send over an RPC).
+    /// </summary>
+    public SuspectRecord GetRecordByName(string suspectDataName)
+    {
+        if (string.IsNullOrEmpty(suspectDataName)) return null;
+        return records.Find(record => record.SuspectData != null && record.SuspectData.name == suspectDataName);
+    }
+
+    /// <summary>
+    /// Applies the same quarantine bookkeeping as the server does locally, without persisting to
+    /// disk. Called on clients (via ClientRpc) so every peer's local <see cref="records"/> list —
+    /// and therefore <see cref="QuarantineBoardController"/> — reflects the quarantine immediately,
+    /// instead of only the host that actually mutated and saved the record.
+    /// </summary>
+    public void ApplyQuarantineFromServer(string suspectDataName, int quarantinedOnDay)
+    {
+        SuspectRecord record = GetRecordByName(suspectDataName);
+        if (record == null) return;
+
+        record.pendingVaccineReset = true;
+        record.hasEnteredCity = false;
+        record.populationKillPending = false;
+        record.quarantinedOnDay = quarantinedOnDay;
+    }
+
     public int GetActiveQuarantineCount(int currentDay)
     {
         int count = 0;
