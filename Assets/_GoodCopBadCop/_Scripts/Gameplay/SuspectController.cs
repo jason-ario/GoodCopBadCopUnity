@@ -346,12 +346,13 @@ public class SuspectController : NetworkBehaviour
 
     /// <summary>
     /// Introduces a scene-placed <see cref="SuspectCharacter"/> into the suspect flow.
-    /// If the character's GameObject is inactive (e.g. it was placed in the scene but kept
-    /// disabled until needed), this method activates it on the server and calls
-    /// <see cref="NetworkObject.Spawn"/> so NGO propagates the activation to all clients.
-    /// NGO 2.x (Unity 6) registers inactive scene NetworkObjects at scene load via
-    /// <c>FindObjectsByType(FindObjectsInactive.Include)</c>, so the client-side object is
-    /// always resolvable by its GlobalObjectIdHash when the spawn message arrives.
+    /// The character's GameObject must already be active at scene load — NGO only registers
+    /// in-scene-placed NetworkObjects for GlobalObjectIdHash resolution when they are active at
+    /// scene load, so an inactive scene object never receives its spawn message on clients that
+    /// aren't the host. To keep the character hidden until now, enable
+    /// <see cref="SuspectCharacter"/>'s <c>_hiddenUntilRevealed</c> flag instead of deactivating
+    /// the GameObject; this method calls <see cref="SuspectCharacter.RevealVisuals"/> to show it
+    /// (replicated to all clients) before teleporting it into place.
     /// The character is then teleported to the spawn point and runs the standard DOTween
     /// walk-in and arrival sequence, firing <see cref="OnSuspectArrived"/> exactly as a
     /// normally-spawned suspect would.
@@ -375,14 +376,23 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
-        // Activate and spawn if the object was kept inactive in the scene.
-        // NGO will send a spawn message to clients; they find the scene object by
-        // GlobalObjectIdHash, activate it, and mark it as spawned on their end.
+        // Activate as a fallback safety net — this should already be true. A scene-placed
+        // NetworkObject that is inactive at scene load never registers with NGO's scene-object
+        // table on non-host clients, so activating it here only fixes the host's own view.
         if (!character.gameObject.activeSelf)
+        {
+            Debug.LogWarning($"[SuspectController] IntroduceSceneSuspect: '{character.name}' was inactive at scene load. " +
+                              "Its NetworkObject may not be registered on non-host clients — keep it active and use " +
+                              "SuspectCharacter._hiddenUntilRevealed to hide it instead.");
             character.gameObject.SetActive(true);
+        }
 
         if (!netObj.IsSpawned)
             netObj.Spawn();
+
+        // Make the character visible/interactable again if it started hidden (see
+        // SuspectCharacter._hiddenUntilRevealed) — replicated to all clients.
+        character.RevealVisuals();
 
         // Teleport to spawn point. NetworkTransform syncs the new position to clients.
         character.transform.position = spawnPos.position;

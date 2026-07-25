@@ -55,9 +55,11 @@ public class Day_01 : DayBase
 
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
-             "IMPORTANT: Must be ACTIVE in the scene at load time so NGO auto-spawns his NetworkObject. " +
-             "Position him off-screen (e.g. underground) — IntroduceSceneSuspect teleports him to " +
-             "the spawn point when his sequence fires, then he walks in like a normal suspect.")]
+             "IMPORTANT: Must stay ACTIVE in the scene at load time so NGO registers his in-scene " +
+             "NetworkObject for every client. To keep him hidden until his sequence fires, enable " +
+             "'_hiddenUntilRevealed' on his SuspectCharacter instead of deactivating the GameObject — " +
+             "IntroduceSceneSuspect calls RevealVisuals() (replicated to all clients) and teleports him " +
+             "to the spawn point, then he walks in like a normal suspect.")]
     [SerializeField] private SuspectCharacter _soldierCharacter;
 
     [Tooltip("Scripted dialogue sequence to play once the Soldier sequence begins.")]
@@ -180,9 +182,6 @@ public class Day_01 : DayBase
     [SerializeField] private float _vladFolderBarkDelay = 0.8f;
 
     [Header("Day 1 — Tutorial Task HUD")]
-    [Tooltip("HUD task text shown while the player needs to pick up the documents.")]
-    [SerializeField] private string _taskPickUpDocs = "Pick up Vlad's ID card and application";
-
     [Tooltip("HUD task text shown while the player needs to grab a folder and place it on the desk.")]
     [SerializeField] private string _taskFolderDocs = "Grab a folder and place it on the desk";
 
@@ -298,7 +297,8 @@ public class Day_01 : DayBase
     private int _docsFiledCount;
 
     // Active tutorial task entries — created when each step begins, completed when done.
-    private TutorialObjectiveItem _taskPickUp;
+    // Note: the initial "pick up Vlad's documents" step is intentionally NOT added to the
+    // objective list (see ShowVladPickUpTask) — only the world-space marker guides it.
     private TutorialObjectiveItem _taskFolder;
     private TutorialObjectiveItem _taskFile;
     private TutorialObjectiveItem _taskStamp;
@@ -747,13 +747,17 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Adds the "pick up documents" task and marker. Called as the <see cref="TutorialOverlay"/>
+    /// Marks the pick-up-documents step. Called as the <see cref="TutorialOverlay"/>
     /// close callback from <see cref="OnVladPaperworkSpawned"/> so it appears after the player
     /// has seen the handling-items tutorial.
+    /// Deliberately does NOT add a <see cref="TutorialObjectiveList"/> entry — this step is
+    /// only guided by the world-space marker. It's still tracked internally: pickup events on
+    /// both documents (see <see cref="OnVladDocumentPickedUp"/>) report to the server via
+    /// <see cref="TutorialTaskSync"/>, which fires <see cref="OnVladDocsBothPickedUpSync"/> on
+    /// all clients once both are picked up, advancing to the folder task.
     /// </summary>
     private void ShowVladPickUpTask()
     {
-        _taskPickUp = TutorialObjectiveList.Instance?.AddObjective(_taskPickUpDocs);
         if (TutorialMarkerManager.Instance != null && _markerPickUpDocs != null)
             TutorialMarkerManager.Instance.Mark(_markerPickUpDocs);
     }
@@ -949,15 +953,13 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients once the server confirms both Vlad documents were picked up.
-    /// Swaps the "pick up" task to the "file documents" task and starts the folder bark
-    /// on the server so it plays exactly once.
+    /// Adds the visible "file documents" task to the objective list — the pick-up step
+    /// itself was never shown there (see <see cref="ShowVladPickUpTask"/>) — and starts the
+    /// folder bark on the server so it plays exactly once.
     /// </summary>
     private void OnVladDocsBothPickedUpSync()
     {
         TutorialTaskSync.OnVladDocsBothPickedUpAllClients -= OnVladDocsBothPickedUpSync;
-
-        if (_taskPickUp != null)
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskPickUp);
 
         if (TutorialMarkerManager.Instance != null)
         {

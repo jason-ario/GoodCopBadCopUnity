@@ -775,6 +775,12 @@ public class SuspectCharacter : Interactable
         _navAgent = GetComponent<NavMeshAgent>();
         if (_navAgent != null)
             _navAgent.enabled = false;
+
+        // Scene-placed characters that must stay active for NGO registration (e.g. the Soldier)
+        // hide their renderers/collider until RevealVisuals() is called. This runs identically on
+        // every client since it only reads local scene state, so no networking is required here.
+        if (_hiddenUntilRevealed)
+            SetVisualsHidden(true);
     }
 
     /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>
@@ -1169,6 +1175,57 @@ public class SuspectCharacter : Interactable
     {
         if (interactionCollider != null)
             interactionCollider.enabled = canInteract;
+    }
+
+    [Header("Scene-Placed Visibility")]
+    [Tooltip("When true, this character's renderers and interaction collider start disabled even " +
+             "though the GameObject itself stays active. Used for scripted, scene-placed characters " +
+             "(e.g. the Soldier on Day 1) that must remain active at scene load so NGO registers their " +
+             "in-scene NetworkObject for every client, but shouldn't be visible or interactable until " +
+             "their sequence begins. Call RevealVisuals() on the server to show the character " +
+             "(e.g. from SuspectController.IntroduceSceneSuspect).")]
+    [SerializeField] private bool _hiddenUntilRevealed = false;
+
+    private Renderer[] _cachedRenderers;
+    private bool _visualsHidden;
+
+    /// <summary>
+    /// Enables or disables all renderers and the interaction collider on this character.
+    /// Runs identically on every client since it is called from deterministic startup state
+    /// (Awake) or from a replicated RPC — it never needs to touch networked state itself.
+    /// </summary>
+    private void SetVisualsHidden(bool hidden)
+    {
+        _visualsHidden = hidden;
+
+        if (_cachedRenderers == null)
+            _cachedRenderers = GetComponentsInChildren<Renderer>(true);
+
+        foreach (Renderer r in _cachedRenderers)
+            if (r != null) r.enabled = !hidden;
+
+        SetCanInteract(!hidden);
+    }
+
+    /// <summary>
+    /// Server-only. Makes a scene-placed character that started with <see cref="_hiddenUntilRevealed"/>
+    /// visible and interactable again, and replicates the change to all clients. No-op if the
+    /// character was never hidden.
+    /// </summary>
+    public void RevealVisuals()
+    {
+        if (!IsServer) return;
+        if (!_visualsHidden) return;
+
+        SetVisualsHidden(false);
+        RevealVisualsClientRpc();
+    }
+
+    [ClientRpc]
+    private void RevealVisualsClientRpc()
+    {
+        if (IsServer) return; // already applied above
+        SetVisualsHidden(false);
     }
 
     /// <summary>
