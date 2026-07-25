@@ -1026,6 +1026,12 @@ public class ShiftManager : NetworkBehaviour
         // Wait until the screen is fully dark before teleporting the player.
         yield return StartCoroutine(UIController.Instance.FadeInAndWait());
 
+        // Fully disable the local player's own CinemachineCamera now that the screen is black.
+        // Leaving it active while ResetEverything teleports the player causes CinemachineBrain
+        // to blend toward the vcam's moving/stale transform once the cutscene vcam takes over,
+        // which is what produces the erratic camera on clients when the cutscene starts.
+        PlayerInstance.Instance?.SetOwnCameraActive(false);
+
         ResetEverything(true);
         yield return new WaitForSeconds(1);
         ResetEverything(true); // Called twice — player position was not resetting reliably in a single call
@@ -1274,6 +1280,10 @@ public class ShiftManager : NetworkBehaviour
             // Reset the camera to a neutral forward orientation so the view doesn't snap
             // to whatever angle the player was looking at before or during the cutscene.
             PlayerInstance.Instance.ResetCameraOrientation();
+            // Re-enable the player's own CinemachineCamera now, while the screen is still
+            // fully black, so the brain has already settled on it before FadeOut reveals
+            // the world again.
+            PlayerInstance.Instance.SetOwnCameraActive(true);
         }
 
         yield return new WaitForSeconds(1f);

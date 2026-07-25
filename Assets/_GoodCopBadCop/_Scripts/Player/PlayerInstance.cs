@@ -228,6 +228,22 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
+    /// Enables or disables this player's own first-person CinemachineCamera GameObject.
+    /// Use this to fully remove the vcam from CinemachineBrain consideration during scripted
+    /// sequences (e.g. the intro cutscene) instead of relying on Priority alone — while the
+    /// player is being teleported/reset off-screen, a still-active vcam can cause the brain to
+    /// blend toward its moving/stale transform, producing an erratic camera for the duration
+    /// of the blend. Mirrors the pattern already used by <see cref="Respawn"/> and
+    /// <see cref="StartSpectating"/>.
+    /// </summary>
+    public void SetOwnCameraActive(bool active)
+    {
+        Transform cameraTransform = _playerMovementController?.CameraTransform;
+        if (cameraTransform != null)
+            cameraTransform.gameObject.SetActive(active);
+    }
+
+    /// <summary>
     /// Kills the local player: disables movement and interaction, then activates the death camera.
     /// Ragdoll activation is handled automatically by <see cref="RagdollController"/> via OnDeath.
     /// </summary>
