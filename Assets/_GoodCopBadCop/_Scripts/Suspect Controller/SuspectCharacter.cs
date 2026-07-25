@@ -875,6 +875,32 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Initializes this suspect with exactly the anomaly types named in <paramref name="typeNames"/>,
+    /// bypassing <see cref="AnomalyUnlockManager"/> entirely. Every other anomaly is disabled.
+    /// Used for scripted "too far gone" tutorial suspects that must exhibit anomalies not yet
+    /// unlocked for normal gameplay. Syncs the forced anomaly state to all clients.
+    /// </summary>
+    public void InitializeWithForcedAnomalyTypes(IEnumerable<string> typeNames)
+    {
+        anomalyController.InitializeWithForcedAnomalyTypes(typeNames);
+
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null)
+        {
+            MarkSuspectShown(record);
+            suspectRecordViewer.SetRecord(record);
+        }
+
+        ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
+        ChosenSymptomResponseIndex = UnityEngine.Random.Range(0, 2);
+        ChosenWhoDoYouLiveWithIndex = UnityEngine.Random.Range(0, 2);
+
+        SyncAnomalySnapshot();
+
+        drunkBehaviour?.TryActivate();
+    }
+
+    /// <summary>
     /// Initializes this suspect with exactly <paramref name="count"/> anomalies chosen from the
     /// currently unlocked pool. The clean-chance roll is bypassed. Used for tutorial suspects
     /// that must always exhibit a specific number of anomalies.

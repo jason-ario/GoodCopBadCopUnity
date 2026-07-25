@@ -143,6 +143,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
         SetFollowTrailTaskActive(true);
         TriggerTrailEvent();
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
     }
 
     /// <inheritdoc/>

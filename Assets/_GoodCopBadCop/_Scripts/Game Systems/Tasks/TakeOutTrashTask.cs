@@ -254,6 +254,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _isActive.Value = true;
 
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
         Debug.Log($"[TakeOutTrashTask] ActivateForExistingItems — activated for {count} existing JunkItem(s) (no new items spawned).");
     }
 
@@ -297,6 +299,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
         _isActive.Value = true;
+
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         Debug.Log($"[TakeOutTrashTask] Task triggered — spawned {_spawnedItems.Count}, " +
                   $"pre-existing {preExistingCount}, total {_totalCount.Value}.");

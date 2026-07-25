@@ -299,6 +299,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _isActive.Value = true;
 
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
         NotifyDeliveryAlertClientRpc();
 
         Debug.Log($"[SortMailTask] Delivery triggered — spawned {_spawnedPackages.Count} package(s). " +

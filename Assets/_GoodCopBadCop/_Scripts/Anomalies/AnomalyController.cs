@@ -255,6 +255,39 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
+    /// Forces on exactly the anomaly types named in <paramref name="typeNames"/> (matched against
+    /// each anomaly component's C# type name, e.g. "RandomTumorAnomaly"), bypassing
+    /// <see cref="AnomalyUnlockManager"/> entirely. Every other anomaly on the prefab is disabled.
+    /// Used for scripted "too far gone" tutorial suspects that must visibly exhibit anomalies
+    /// that are not yet unlocked for normal gameplay.
+    /// </summary>
+    public void InitializeWithForcedAnomalyTypes(IEnumerable<string> typeNames)
+    {
+        ClearInitializationState(deactivateActive: true);
+
+        var wanted = new HashSet<string>(typeNames ?? System.Array.Empty<string>(), System.StringComparer.Ordinal);
+        int totalActivated = 0;
+
+        foreach (Anomaly anomaly in CollectAllAnomalies())
+        {
+            if (anomaly == null) continue;
+
+            if (wanted.Contains(anomaly.GetType().Name))
+            {
+                ActivateAnomaly(anomaly);
+                totalActivated++;
+            }
+            else
+            {
+                InitializeDisabled(anomaly);
+            }
+        }
+
+        Debug.Log($"[AnomalyController] Forced anomaly types init: {totalActivated} anomaly/ies active " +
+                  $"(bypassing unlock gate) — requested types: {string.Join(", ", wanted)}.");
+    }
+
+    /// <summary>
     /// Disables every anomaly without any transition. Guarantees a clean suspect regardless
     /// of prior state.
     /// </summary>

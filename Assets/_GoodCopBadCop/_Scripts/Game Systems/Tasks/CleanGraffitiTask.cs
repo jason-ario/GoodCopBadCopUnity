@@ -120,6 +120,8 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
         _isActive.Value = true;
 
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
         Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {count} graffiti piece(s).");
     }
 

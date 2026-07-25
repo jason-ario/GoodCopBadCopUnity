@@ -14,6 +14,13 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>Fired on the server whenever a suspect is killed.</summary>
     public static event System.Action OnSuspectKilled;
 
+    /// <summary>
+    /// Fired on the server whenever a suspect is processed (passed, killed, or quarantined),
+    /// after <see cref="suspectsProcessed"/> has been incremented. Subscribe to drive HUD
+    /// progress displays such as <see cref="ProcessResidentsTask"/>.
+    /// </summary>
+    public static event System.Action OnSuspectProcessed;
+
     [VContainer.Inject] private IPopulationModel populationModel;
 
     [Header("Network Variables")]
@@ -129,6 +136,85 @@ public class ShiftManager : NetworkBehaviour
 
     private Coroutine _suspectSchedulerCoroutine;
 
+    // ── Clock-out gating ─────────────────────────────────────────────────────
+
+    /// <summary>True on the server once every suspect for the current shift has been processed.</summary>
+    private bool _suspectsComplete;
+
+    /// <summary>
+    /// Daily tasks (trash, graffiti, mail, etc.) that have been triggered for the current day
+    /// and have not yet fired <see cref="IDailyTask.OnDailyTaskCompleted"/>. Clock-out is only
+    /// enabled once this set is empty AND <see cref="_suspectsComplete"/> is true.
+    /// </summary>
+    private readonly HashSet<IDailyTask> _pendingDailyTasks = new();
+
+    /// <summary>Per-task completion handler, kept so it can be unsubscribed reliably.</summary>
+    private readonly Dictionary<IDailyTask, Action> _pendingDailyTaskHandlers = new();
+
+    /// <summary>
+    /// Registers <paramref name="task"/> as a blocker for clock-out. Call this from a task's own
+    /// TriggerTask/TriggerDailyTask method (server-only) whenever it becomes active for the day.
+    /// The task is automatically unregistered — and clock-out re-evaluated — once it fires
+    /// <see cref="IDailyTask.OnDailyTaskCompleted"/>. Safe to call multiple times per task per day.
+    /// </summary>
+    public void RegisterPendingDailyTask(IDailyTask task)
+    {
+        if (!IsServer || task == null || _pendingDailyTasks.Contains(task)) return;
+
+        _pendingDailyTasks.Add(task);
+
+        void OnCompleted() => CompletePendingDailyTask(task);
+        _pendingDailyTaskHandlers[task] = OnCompleted;
+        task.OnDailyTaskCompleted += OnCompleted;
+
+        Debug.Log($"[ShiftManager] RegisterPendingDailyTask: '{task.DailyTaskId}' now blocking clock-out. " +
+                  $"Pending: {_pendingDailyTasks.Count}.");
+    }
+
+    private void CompletePendingDailyTask(IDailyTask task)
+    {
+        if (_pendingDailyTaskHandlers.TryGetValue(task, out Action handler))
+        {
+            task.OnDailyTaskCompleted -= handler;
+            _pendingDailyTaskHandlers.Remove(task);
+        }
+        _pendingDailyTasks.Remove(task);
+
+        Debug.Log($"[ShiftManager] CompletePendingDailyTask: '{task.DailyTaskId}' complete. " +
+                  $"Remaining pending: {_pendingDailyTasks.Count}.");
+
+        TryEnableClockOut();
+    }
+
+    /// <summary>
+    /// Clears all pending daily task tracking without waiting for completion. Call at the start
+    /// of each shift/day so leftover subscriptions from a previous day never linger.
+    /// </summary>
+    private void ClearPendingDailyTasks()
+    {
+        foreach (KeyValuePair<IDailyTask, Action> kvp in _pendingDailyTaskHandlers)
+            kvp.Key.OnDailyTaskCompleted -= kvp.Value;
+
+        _pendingDailyTaskHandlers.Clear();
+        _pendingDailyTasks.Clear();
+    }
+
+    /// <summary>
+    /// Enables clock-out only once every suspect for the day has been processed AND every
+    /// registered daily task (trash, graffiti, mail, follow-trail, etc.) has been completed.
+    /// Server-only.
+    /// </summary>
+    private void TryEnableClockOut()
+    {
+        if (!IsServer || !_suspectsComplete || _pendingDailyTasks.Count > 0) return;
+
+        if (_timecardMachine != null)
+            _timecardMachine.EnableClockOut();
+
+        NotifyClockOutReadyClientRpc();
+        Debug.Log("[ShiftManager] TryEnableClockOut: all tasks complete — timecard machine primed for clock-out.");
+    }
+
     #region Events & Date Helpers
     public Action OnShiftStart { get; set; }
     public Action OnShiftEnd { get; set; }
@@ -242,10 +328,8 @@ public class ShiftManager : NetworkBehaviour
         {
             OnLastSuspectProcessed?.Invoke();
 
-            if (_timecardMachine != null)
-                _timecardMachine.EnableClockOut();
-
-            NotifyClockOutReadyClientRpc();
+            _suspectsComplete = true;
+            TryEnableClockOut();
             return;
         }
 
@@ -448,6 +532,8 @@ public class ShiftManager : NetworkBehaviour
             suspectsPassedWrong += 1;
         else
             suspectsPassedCorrect += 1;
+
+        OnSuspectProcessed?.Invoke();
     }
 
     /// <summary>Records a killed suspect and updates the correct/wrong tally.</summary>
@@ -461,6 +547,7 @@ public class ShiftManager : NetworkBehaviour
             suspectsKilledWrong += 1;
 
         OnSuspectKilled?.Invoke();
+        OnSuspectProcessed?.Invoke();
     }
 
     /// <summary>Records a quarantined suspect and updates the correct/wrong tally.</summary>
@@ -468,6 +555,8 @@ public class ShiftManager : NetworkBehaviour
     {
         suspectsProcessed += 1;
         suspectsQuarantined += 1;
+
+        OnSuspectProcessed?.Invoke();
     }
 
     public void StartNewShift()
@@ -879,6 +968,9 @@ public class ShiftManager : NetworkBehaviour
         suspectsKilledCorrect = 0;
         suspectsKilledWrong = 0;
         suspectsFled = 0;
+
+        _suspectsComplete = false;
+        ClearPendingDailyTasks();
     }
 
     /// <summary>Plays the bell and shows the day number banner at the start of a shift.</summary>

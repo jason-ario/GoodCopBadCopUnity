@@ -53,6 +53,37 @@ public class Day_01 : DayBase
     [Tooltip("Vlad's SuspectCharacter prefab — spawned as the first visitor on Day 1 via SuspectController.")]
     [SerializeField] private SuspectCharacter _vladPrefab;
 
+    [Header("Day 1 — Too Far Gone Suspect")]
+    [Tooltip("Scripted suspect prefab spawned as the last visitor before the Soldier sequence. " +
+             "Clearly 'too far gone' — exhibits anomalies not yet unlocked for normal gameplay " +
+             "(tumors, black eyes, tentacles, vomiting) so the player learns the red (kill) stamp. " +
+             "Currently borrowed from the general suspect pool as a placeholder (a dedicated " +
+             "character will replace it later); Day_01 automatically marks his SuspectData as " +
+             "already encountered before he spawns, so any authored intro monologue is skipped " +
+             "in favour of the normal entry bark + paperwork flow.")]
+    [SerializeField] private SuspectCharacter _tooFarGoneCharacterPrefab;
+
+    [Tooltip("Anomaly component type names forced active on the too-far-gone suspect, bypassing " +
+             "AnomalyUnlockManager. Defaults to tumors, black eyes, tentacles, and vomiting.")]
+    [SerializeField]
+    private string[] _tooFarGoneAnomalyTypeNames =
+    {
+        "RandomTumorAnomaly",
+        "BlackEyesAnomaly",
+        "RandomTentacleAnomaly",
+        "VomitAnomaly",
+    };
+
+    [Tooltip("Megaphone scripted dialogue that plays once the too-far-gone suspect arrives at the " +
+             "window, after his entry bark and paperwork. Cuts between the Megaphone, Quarantine " +
+             "(suspect), and RedInk camera triggers as authored on each node. Final line ends on " +
+             "the Megaphone camera and unlocks the red stamp.")]
+    [SerializeField] private ScriptedDialogue _tooFarGoneMegaphoneDialogue;
+
+    [Tooltip("World-space point above the red stamp slot — marker shown once the too-far-gone " +
+             "megaphone sequence finishes, prompting the player to use the red (kill) stamp.")]
+    [SerializeField] private Transform _markerRedStamp;
+
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
              "IMPORTANT: Must stay ACTIVE in the scene at load time so NGO registers his in-scene " +
@@ -363,6 +394,7 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived += OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived += OnDocAnomalySuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived += OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived += OnTooFarGoneArrivedAtWindow;
         SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned; // advances through random → doc anomaly → Ivan
         FolderController.OnDocumentAdded += OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
@@ -432,6 +464,8 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnTooFarGoneArrivedAtWindow;
+
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
@@ -445,6 +479,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
+        FolderController.OnAnyFolderStamped -= OnTooFarGoneFolderStamped;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
         ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
@@ -501,6 +536,8 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnTooFarGoneArrivedAtWindow;
+
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
@@ -514,6 +551,7 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
+        FolderController.OnAnyFolderStamped -= OnTooFarGoneFolderStamped;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
         ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
@@ -1721,7 +1759,7 @@ public class Day_01 : DayBase
     /// <summary>
     /// Fires on all clients when any suspect arrives. Reacts to index 3 (a random suspect).
     /// Unlocks the green stamp (re-enabling it after the quarantine tutorial locked it for
-    /// index 2) and arms the Soldier scene sequence for after this suspect is processed.
+    /// index 2) and arms the too-far-gone suspect sequence for after this suspect is processed.
     /// </summary>
     private void OnIvanArrivedAtWindow(int index)
     {
@@ -1735,16 +1773,31 @@ public class Day_01 : DayBase
 
         if (!NetworkManager.Singleton.IsServer) return;
 
-        // Arm the Soldier scene sequence: fires when SuspectController would spawn the next
-        // suspect (i.e. after index 3 has been processed and left the window).
-        if (_soldierCharacter != null)
+        // Arm the too-far-gone suspect sequence: fires when SuspectController would spawn
+        // the next suspect (i.e. after index 3 has been processed and left the window).
+        if (_tooFarGoneCharacterPrefab != null)
         {
+            // The prefab is currently borrowed from the general suspect pool (a dedicated
+            // "too far gone" character will replace it later). Borrowed suspects usually have
+            // their own authored intro monologue on first encounter — mark that encounter as
+            // already spent so SuspectEncounterManager skips straight to the normal entry bark
+            // + paperwork flow instead of playing that monologue here.
+            if (_tooFarGoneCharacterPrefab.Data != null)
+                SuspectEncounterManager.MarkEncounteredWithoutIntro(_tooFarGoneCharacterPrefab.Data);
+
+            SuspectController.OnSuspectArrived += OnTooFarGoneArrivedAtWindow;
+
             SuspectController.InterceptNextSuspectSpawn = () =>
             {
-                StartCoroutine(ActivateAndStartSoldierDialogue());
+                SuspectController.Instance.SpawnScriptedSuspect(_tooFarGoneCharacterPrefab);
             };
 
-            Debug.Log("[Day_01] Slot 3 (index 3) arrived — Soldier scene sequence armed.");
+            Debug.Log("[Day_01] Slot 3 (index 3) arrived — too-far-gone suspect sequence armed for index 4.");
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] _tooFarGoneCharacterPrefab is not assigned — arming Soldier sequence directly instead.");
+            ArmSoldierSequence();
         }
     }
 
@@ -1765,7 +1818,110 @@ public class Day_01 : DayBase
     }
 
     // -------------------------------------------------------------------------
-    // Soldier Scene Sequence (triggered after Ivan leaves)
+    // Too-Far-Gone Suspect (index 4) — optional red-stamp tutorial moment
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 4 (the scripted
+    /// too-far-gone suspect). Server-only: forces the tumor/black-eyes/tentacle/vomit
+    /// anomalies onto him regardless of unlock state, locks the green and yellow stamps
+    /// so only the red stamp can resolve him, arms the Soldier sequence for afterward,
+    /// then kicks off the megaphone commentary sequence.
+    /// </summary>
+    private void OnTooFarGoneArrivedAtWindow(int index)
+    {
+        if (index != 4) return;
+
+        SuspectController.OnSuspectArrived -= OnTooFarGoneArrivedAtWindow;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        SuspectController.Instance.CurrentSuspect?.InitializeWithForcedAnomalyTypes(_tooFarGoneAnomalyTypeNames);
+
+        // This suspect can only be resolved with the red (kill) stamp.
+        _greenStampSlot?.SetSlotInteractable(false);
+        _yellowStampSlot?.SetSlotInteractable(false);
+
+        // Arm the Soldier scene sequence now — it fires automatically once this suspect
+        // has been processed and SuspectController tries to spawn the next one.
+        ArmSoldierSequence();
+
+        StartCoroutine(PlayTooFarGoneMegaphoneSequence());
+
+        Debug.Log("[Day_01] Too-far-gone suspect (index 4) arrived — anomalies forced, megaphone sequence starting.");
+    }
+
+    /// <summary>
+    /// Plays the too-far-gone megaphone commentary (cutting between the Megaphone, Quarantine,
+    /// and RedInk camera triggers as authored on <see cref="_tooFarGoneMegaphoneDialogue"/>).
+    /// Once it completes, unlocks the red stamp and shows the tutorial arrow above it.
+    /// </summary>
+    private IEnumerator PlayTooFarGoneMegaphoneSequence()
+    {
+        if (_tooFarGoneMegaphoneDialogue == null)
+        {
+            Debug.LogWarning("[Day_01] _tooFarGoneMegaphoneDialogue is not assigned — skipping straight to the red stamp marker.");
+            ShowTooFarGoneRedStampMarker();
+            yield break;
+        }
+
+        bool done = false;
+        ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_tooFarGoneMegaphoneDialogue, () => done = true);
+        yield return new WaitUntil(() => done);
+
+        ShowTooFarGoneRedStampMarker();
+    }
+
+    /// <summary>
+    /// Unlocks the red stamp slot and shows the tutorial arrow above it, then waits for any
+    /// folder to be stamped to clean up. This step is deliberately NOT added to the tutorial
+    /// objective list — it is optional flavor, not a tracked objective.
+    /// </summary>
+    private void ShowTooFarGoneRedStampMarker()
+    {
+        _redStampSlot?.SetSlotInteractable(true);
+
+        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
+            TutorialMarkerManager.Instance.Mark(_markerRedStamp);
+
+        FolderController.OnAnyFolderStamped += OnTooFarGoneFolderStamped;
+    }
+
+    /// <summary>
+    /// Fires on all clients when any folder is stamped after the too-far-gone sequence began.
+    /// Removes the arrow and restores the green/yellow stamps to normal availability.
+    /// </summary>
+    private void OnTooFarGoneFolderStamped()
+    {
+        FolderController.OnAnyFolderStamped -= OnTooFarGoneFolderStamped;
+
+        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
+            TutorialMarkerManager.Instance.Unmark(_markerRedStamp);
+
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+
+        Debug.Log("[Day_01] Too-far-gone suspect's folder stamped — stamps restored to normal.");
+    }
+
+    /// <summary>
+    /// Arms <see cref="SuspectController.InterceptNextSuspectSpawn"/> with the Soldier scene
+    /// sequence. Safe to call multiple times; a no-op if <see cref="_soldierCharacter"/> is unassigned.
+    /// </summary>
+    private void ArmSoldierSequence()
+    {
+        if (_soldierCharacter == null) return;
+
+        SuspectController.InterceptNextSuspectSpawn = () =>
+        {
+            StartCoroutine(ActivateAndStartSoldierDialogue());
+        };
+
+        Debug.Log("[Day_01] Soldier scene sequence armed.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Soldier Scene Sequence (triggered after the too-far-gone suspect leaves)
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -1773,7 +1929,7 @@ public class Day_01 : DayBase
     /// <see cref="SuspectController.OnSuspectArrived"/> for his arrival, then calls
     /// <see cref="SuspectController.IntroduceSceneSuspect"/> to teleport him to the
     /// spawn point and kick off the standard DOTween walk-in. Dialogue starts once
-    /// <see cref="OnSoldierArrivedAtWindow"/> fires (index 4), matching the Vlad/Ivan
+    /// <see cref="OnSoldierArrivedAtWindow"/> fires (index 5), matching the Vlad/Ivan
     /// pattern exactly.
     /// </summary>
     private IEnumerator ActivateAndStartSoldierDialogue()
@@ -1807,20 +1963,21 @@ public class Day_01 : DayBase
         // reaches standPos, at which point OnSoldierArrivedAtWindow starts his dialogue.
         SuspectController.Instance.IntroduceSceneSuspect(_soldierCharacter);
 
-        Debug.Log("[Day_01] Soldier walk-in initiated — awaiting arrival event (index 4).");
+        Debug.Log("[Day_01] Soldier walk-in initiated — awaiting arrival event (index 5).");
         yield break;
     }
 
     /// <summary>
-    /// Fires on all clients when any suspect arrives. Reacts to index 4 (the Soldier).
+    /// Fires on all clients when any suspect arrives. Reacts to index 5 (the Soldier).
     /// Server-only: starts the scripted dialogue after the settle delay.
     /// </summary>
     private void OnSoldierArrivedAtWindow(int index)
     {
-        // In normal play the soldier is always suspect index 4.
-        // When _debugSkipActive is true he is the only suspect spawned (index 0), so accept
-        // any index on the debug-skip path to avoid the guard blocking his dialogue.
-        if (!_debugSkipActive && index != 4) return;
+        // In normal play the soldier is always suspect index 5 (after the too-far-gone
+        // suspect at index 4). When _debugSkipActive is true he is the only suspect
+        // spawned (index 0), so accept any index on the debug-skip path to avoid the
+        // guard blocking his dialogue.
+        if (!_debugSkipActive && index != 5) return;
 
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
 
@@ -2102,6 +2259,7 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnTooFarGoneArrivedAtWindow;
 
         // Open and lock the shutter so the Soldier can walk up to the window.
         ShutterController.Instance?.OpenShutter();

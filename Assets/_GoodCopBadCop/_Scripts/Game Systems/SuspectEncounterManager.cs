@@ -61,6 +61,14 @@ public class SuspectEncounterManager : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    /// <summary>
+    /// Marks a suspect as already encountered without playing their intro dialogue.
+    /// Used for scripted appearances (e.g. Day 1's too-far-gone tutorial suspect) that
+    /// borrow a suspect from the general pool but must skip straight to the normal
+    /// entry bark + paperwork flow instead of that suspect's authored intro monologue.
+    /// </summary>
+    public static void MarkEncounteredWithoutIntro(SuspectData data) => MarkEncountered(data);
+
     /// <summary>Clears the encounter record for one specific suspect. Debug use only.</summary>
     public static void ResetEncounter(SuspectData data)
     {
