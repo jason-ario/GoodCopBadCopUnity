@@ -38,6 +38,19 @@ public class SuspectCharacter : Interactable
     public bool IsReplacement => _isReplacement;
     private bool _isReplacement;
     [SerializeField] Collider interactionCollider;
+
+    [Tooltip("When assigned, direct interaction (LMB / E) opens a simple 3-choice world " +
+             "conversation instead of the no-op fallthrough below. Used for scene-placed " +
+             "suspects that are talked to directly rather than through the booth/interrogation " +
+             "flow (e.g. the Day 1 Suspect_Soldier). Leave null for normal booth suspects.")]
+    [SerializeField] private SuspectWorldDialogue worldDialogue;
+
+    /// <summary>
+    /// Assigns the <see cref="SuspectWorldDialogue"/> used by direct interaction. Used by scripted
+    /// sequences that dynamically attach a world dialogue conversation to a runtime-spawned
+    /// suspect (e.g. Day_02's yard hand-off) once their scripted task is complete.
+    /// </summary>
+    public void SetWorldDialogue(SuspectWorldDialogue dialogue) => worldDialogue = dialogue;
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
     public Vector3 standPosOffset;
@@ -1191,6 +1204,14 @@ public class SuspectCharacter : Interactable
                 runner.RequestRejoinScriptedDialogueServerRpc();
                 return;
             }
+        }
+
+        // Scene-placed suspects that are talked to directly (not through the booth) can be
+        // configured with a SuspectWorldDialogue for a simple 3-choice conversation.
+        if (worldDialogue != null)
+        {
+            worldDialogue.BeginConversation();
+            return;
         }
 
         // Direct interaction no longer opens the dialogue view.

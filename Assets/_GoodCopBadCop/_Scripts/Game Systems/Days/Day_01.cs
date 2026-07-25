@@ -30,6 +30,10 @@ public class Day_01 : DayBase
     {
         Instance = this;
     }
+    [Header("Day 1 — Fire Barrel")]
+    [Tooltip("The yard fire barrel — lit for the entirety of Day 1, extinguished at the start of Day 2.")]
+    [SerializeField] private FirePit _fireBarrel;
+
     [Header("Day 1 — Booth")]
     [Tooltip("The booth drawer the player can open freely on Day 1.")]
     [SerializeField] private Drawer _drawer;
@@ -369,6 +373,10 @@ public class Day_01 : DayBase
         base.DayActivated();
 
         Debug.Log($"[Day_01] DayActivated — IsServer={NetworkManager.Singleton?.IsServer ?? false}  IsClient={NetworkManager.Singleton?.IsClient ?? false}");
+
+        // Light the yard fire barrel for the entirety of Day 1. Extinguished when Day 2 starts.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            _fireBarrel?.Ignite();
 
         _dayStartedFired = false;
         _debugSkipActive = false;

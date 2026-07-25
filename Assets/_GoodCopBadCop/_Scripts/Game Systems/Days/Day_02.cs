@@ -34,6 +34,10 @@ public class Day_02 : DayBase
     // Day 2 Tutorial (existing)
     // -------------------------------------------------------------------------
 
+    [Header("Day 2 — Fire Barrel")]
+    [Tooltip("The yard fire barrel — extinguished at the start of Day 2 (was lit for all of Day 1).")]
+    [SerializeField] private FirePit _fireBarrel;
+
     [Header("Day 2 Tutorial")]
     [Tooltip("The Mutation Exam notebook — hidden until the tutorial beat.")]
     [SerializeField] private ExamNotebook _mutationNotebook;
@@ -87,6 +91,12 @@ public class Day_02 : DayBase
 
     [Tooltip("Vlad walks here to exit after the tool locker dialogue.")]
     [SerializeField] private Transform _vladDespawnWaypoint;
+
+    [Header("Day 2 — Vlad Yard Rest Position")]
+    [Tooltip("Shared position/rotation Vlad walks to and sits at instead of despawning — used both " +
+             "after the tool locker tutorial and after the post-shift out-back sequence (the '" +
+             "Vlad In Yard' marker).")]
+    [SerializeField] private Transform _vladInYardWaypoint;
 
     [Header("Day 2 — Environment")]
     [Tooltip("The booth door Vlad opens as he passes through.")]
@@ -249,6 +259,10 @@ public class Day_02 : DayBase
     public override void DayActivated()
     {
         base.DayActivated();
+
+        // The fire barrel burned all through Day 1 — put it out now that Day 2 has begun.
+        if (NetworkManager.Singleton.IsServer)
+            _fireBarrel?.Extinguish();
 
         // Unlock the mutation exam refill in the tool locker shop for all clients.
         if (NetworkManager.Singleton.IsServer && MegaphoneDialogueManager.Instance != null)
@@ -539,16 +553,70 @@ public class Day_02 : DayBase
         // The graffiti lines are the last two nodes of _vladToolLockerDialogue — already spoken above.
         StartCoroutine(GraffitiObjectiveSequence());
 
-        // ── Phase 5: Vlad leaves ────────────────────────────────────────────────
+        // ── Phase 5: Vlad returns to the yard and settles in ───────────────────
         yield return new WaitForSeconds(_vladExitDelay);
 
-        if (_vladDespawnWaypoint != null)
-            yield return StartCoroutine(WalkVladTo(_vladDespawnWaypoint));
+        yield return StartCoroutine(SettleVladInYard(_spawnedVlad));
 
-        // Despawn and destroy the runtime instance — it was created from a prefab.
-        DespawnVladInstance(ref _spawnedVlad);
+        Debug.Log("[Day_02] Opening sequence complete — Vlad has settled in the yard.");
+    }
 
-        Debug.Log("[Day_02] Opening sequence complete — Vlad has left.");
+    // -------------------------------------------------------------------------
+    // Yard Rest Hand-off
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Walks <paramref name="character"/> to <see cref="_vladInYardWaypoint"/>, settles him into
+    /// his sitting pose, and attaches a simple world-dialogue conversation so the player can talk
+    /// to him afterward — used instead of despawning at the end of both the tool locker and
+    /// post-shift out-back sequences so the same Vlad visibly "returns to the yard" rather than
+    /// vanishing. Server-side only. Does not despawn or clear the passed-in reference; callers
+    /// (or DayDeactivated) are responsible for eventually despawning it.
+    /// </summary>
+    private IEnumerator SettleVladInYard(SuspectCharacter character)
+    {
+        if (character == null) yield break;
+
+        if (_vladInYardWaypoint != null)
+            yield return StartCoroutine(WalkVladTo(character, _vladInYardWaypoint));
+
+        character.SetAnimatorBool("Sitting", true);
+
+        SuspectWorldDialogue dialogue = character.gameObject.AddComponent<SuspectWorldDialogue>();
+        dialogue.Configure(
+            character.GetComponent<SpeakingInteraction>(),
+            character.animator,
+            new[]
+            {
+                new SuspectWorldDialogue.DaySet
+                {
+                    day = 2,
+                    greetingLine = "Catch your breath, officer. Long day.",
+                    options = new[]
+                    {
+                        new SuspectWorldDialogue.DialogueOption
+                        {
+                            playerLine = "How's it going?",
+                            npcResponse = "Better than yours, I'd wager. Sit down if your legs need it. I won't tell anyone.",
+                            animationTrigger = "TalkShrug"
+                        },
+                        new SuspectWorldDialogue.DialogueOption
+                        {
+                            playerLine = "Anything else I should know?",
+                            npcResponse = "Keep your eyes open tonight. This place doesn't stay quiet for long.",
+                            animationTrigger = "TalkSarcasticNod"
+                        },
+                        new SuspectWorldDialogue.DialogueOption
+                        {
+                            playerLine = "I'll get back to it.",
+                            npcResponse = "Go on then. I'll be right here when you need me.",
+                            animationTrigger = "TalkDismissing"
+                        }
+                    }
+                }
+            },
+            startSittingNow: true);
+        character.SetWorldDialogue(dialogue);
     }
 
     // -------------------------------------------------------------------------
@@ -820,6 +888,10 @@ public class Day_02 : DayBase
     /// </summary>
     private IEnumerator PostShiftSetupSequence()
     {
+        // The tool-locker Vlad (now sitting in the yard, if the opening sequence ran) steps away
+        // before the out-back sequence spawns a fresh instance, so we never show two Vlads at once.
+        DespawnVladInstance(ref _spawnedVlad);
+
         // Register the HUD task and bark simultaneously.
         // SetMeetVladActive sets a NetworkVariable on FollowTrailThreat → fires on all clients.
         FollowTrailThreat.Instance?.SetMeetVladActive(true);
@@ -989,19 +1061,12 @@ public class Day_02 : DayBase
         // his exit navigation stalls.
         ActivateDay2TrailEvent();
 
-        // ── Phase 10: Vlad exits ──────────────────────────────────────────────
+        // ── Phase 10: Vlad returns to the yard and settles in ──────────────────
         yield return new WaitForSeconds(_outBackVladExitDelay);
 
-        if (_vladOutBackFinalWaypoint != null)
-            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladOutBackFinalWaypoint));
+        yield return StartCoroutine(SettleVladInYard(_spawnedVladOutBack));
 
-        if (_vladOutBackDespawnWaypoint != null)
-            yield return StartCoroutine(WalkVladTo(_spawnedVladOutBack, _vladOutBackDespawnWaypoint));
-
-        // Despawn and destroy the runtime instance — it was created from a prefab.
-        DespawnVladInstance(ref _spawnedVladOutBack);
-
-        Debug.Log("[Day_02] Post-shift Vlad sequence complete — Vlad has left.");
+        Debug.Log("[Day_02] Post-shift Vlad sequence complete — Vlad has settled in the yard.");
     }
 
     /// <summary>

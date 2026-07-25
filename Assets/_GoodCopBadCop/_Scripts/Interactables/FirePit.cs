@@ -103,6 +103,23 @@ public class FirePit : Interactable, IIgnitable
         _burnCoroutine = StartCoroutine(BurnCoroutine());
     }
 
+    /// <summary>
+    /// Server-only. Immediately puts the fire out, bypassing the burn timer and fade-out.
+    /// Use for scripted day transitions (e.g. the fire should be out by the next day).
+    /// </summary>
+    public void Extinguish()
+    {
+        if (!IsServer) return;
+
+        if (_burnCoroutine != null)
+        {
+            StopCoroutine(_burnCoroutine);
+            _burnCoroutine = null;
+        }
+
+        _isLit.Value = false;
+    }
+
     // ── Interactable overrides ─────────────────────────────────────────────────
 
     /// <summary>
