@@ -888,43 +888,75 @@ public class Day_02 : DayBase
     /// </summary>
     private IEnumerator PostShiftSetupSequence()
     {
-        // The tool-locker Vlad (now sitting in the yard, if the opening sequence ran) steps away
-        // before the out-back sequence spawns a fresh instance, so we never show two Vlads at once.
-        DespawnVladInstance(ref _spawnedVlad);
-
         // Register the HUD task and bark simultaneously.
         // SetMeetVladActive sets a NetworkVariable on FollowTrailThreat → fires on all clients.
         FollowTrailThreat.Instance?.SetMeetVladActive(true);
 
         yield return ShowAndWait("Good work today. Meet me out back by the bunker. I have a special task for you.");
 
-        // Instantiate Vlad from the prefab at the out-back spawn position and network-spawn him.
-        if (_vladOutBackCharacter == null)
+        if (_spawnedVlad != null)
         {
-            Debug.LogError("[Day_02] _vladOutBackCharacter prefab not assigned — post-shift sequence aborted.", this);
-            yield break;
+            // The tool-locker Vlad is already in-world, resting in the yard — have him get up
+            // and walk over to the out-back spawn position instead of despawning and spawning a
+            // brand new instance. He then continues straight into the existing gate-unlock walk.
+            yield return StartCoroutine(StandUpAndLeaveYard(_spawnedVlad));
+
+            if (_vladOutBackSpawnPos != null)
+                yield return StartCoroutine(WalkVladTo(_spawnedVlad, _vladOutBackSpawnPos));
+
+            _spawnedVladOutBack = _spawnedVlad;
+            _spawnedVlad        = null;
         }
-
-        Vector3    spawnPos = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.position : Vector3.zero;
-        Quaternion spawnRot = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.rotation : Quaternion.identity;
-        _spawnedVladOutBack = Instantiate(_vladOutBackCharacter, spawnPos, spawnRot);
-
-        NetworkObject vladNetObj = _spawnedVladOutBack.GetComponent<NetworkObject>();
-        if (vladNetObj == null)
+        else
         {
-            Debug.LogError("[Day_02] _vladOutBackCharacter prefab is missing a NetworkObject — post-shift sequence aborted.", this);
-            Destroy(_spawnedVladOutBack.gameObject);
-            _spawnedVladOutBack = null;
-            yield break;
-        }
+            // Fallback — the opening sequence never produced a Vlad instance (e.g. day skipped
+            // mid-sequence via debug tools), so spawn a fresh one as before.
+            if (_vladOutBackCharacter == null)
+            {
+                Debug.LogError("[Day_02] _vladOutBackCharacter prefab not assigned — post-shift sequence aborted.", this);
+                yield break;
+            }
 
-        vladNetObj.Spawn(destroyWithScene: true);
-        _spawnedVladOutBack.InitNavigation();
+            Vector3    spawnPos = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.position : Vector3.zero;
+            Quaternion spawnRot = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.rotation : Quaternion.identity;
+            _spawnedVladOutBack = Instantiate(_vladOutBackCharacter, spawnPos, spawnRot);
+
+            NetworkObject vladNetObj = _spawnedVladOutBack.GetComponent<NetworkObject>();
+            if (vladNetObj == null)
+            {
+                Debug.LogError("[Day_02] _vladOutBackCharacter prefab is missing a NetworkObject — post-shift sequence aborted.", this);
+                Destroy(_spawnedVladOutBack.gameObject);
+                _spawnedVladOutBack = null;
+                yield break;
+            }
+
+            vladNetObj.Spawn(destroyWithScene: true);
+            _spawnedVladOutBack.InitNavigation();
+        }
 
         _outBackIntroDialogueTriggered  = false;
         _outBackAnimalDialogueTriggered = false;
 
         StartCoroutine(PostShiftVladSequence());
+    }
+
+    /// <summary>
+    /// Stands <paramref name="character"/> up out of his yard sitting pose and strips the yard
+    /// world-dialogue conversation so he isn't interactable while walking off to the out-back
+    /// sequence. Server-side only.
+    /// </summary>
+    private IEnumerator StandUpAndLeaveYard(SuspectCharacter character)
+    {
+        if (character == null) yield break;
+
+        character.SetWorldDialogue(null);
+
+        SuspectWorldDialogue existingDialogue = character.GetComponent<SuspectWorldDialogue>();
+        if (existingDialogue != null)
+            Destroy(existingDialogue);
+
+        character.SetAnimatorBool("Sitting", false);
+        yield return new WaitForSeconds(0.3f);
     }
 
     /// <summary>
