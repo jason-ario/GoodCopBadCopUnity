@@ -388,6 +388,11 @@ public class AlexeiController : NetworkBehaviour
             Debug.Log($"[AlexeiController] Calling TakeOutTrashTask.TriggerTask(). IsServer={IsServer}");
             TakeOutTrashTask.OnAllItemsDeposited += OnTrashTaskComplete;
             TakeOutTrashTask.Instance.TriggerTask();
+
+            // Day 1 tutorial only: highlight every piece of trash so it's easy to find.
+            // EndOfShiftSetupSequence is exclusive to Day 1 (Alexei's sequence), so this
+            // does not affect later days' triggers of this same shared task instance.
+            TakeOutTrashTask.Instance.HighlightAllItemsForTutorial();
         }
         else
         {

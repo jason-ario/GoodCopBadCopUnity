@@ -63,6 +63,15 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedGraffiti = new();
     private bool _isComplete;
 
+    /// <summary>
+    /// This client's tutorial-overlay objective row for this task run, e.g.
+    /// "Clean graffiti 1/10". Kept per-instance (not networked) since each client
+    /// drives its own local <see cref="TutorialObjectiveList"/> in response to the
+    /// networked <see cref="_scrubbed"/>/<see cref="_totalCount"/>/<see cref="_isActive"/>
+    /// values, which are already synced to everyone.
+    /// </summary>
+    private TutorialObjectiveItem _tutorialObjectiveItem;
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _taskName;
@@ -147,7 +156,10 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Handle the initial value for late-joining clients.
         if (_isActive.Value)
+        {
             TaskRegistry.Instance?.AddThreat(this);
+            _tutorialObjectiveItem = TutorialObjectiveList.Instance?.AddObjective(GetTutorialObjectiveText());
+        }
 
         // Re-register whenever SetThreats clears the registry (e.g. at night-phase start),
         // ensuring graffiti stays visible in the HUD throughout the night phase.
@@ -211,6 +223,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         _isComplete = true;
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_tutorialObjectiveItem);
+        _tutorialObjectiveItem = null;
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────
@@ -285,9 +300,23 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void OnIsActiveChanged(bool previous, bool current)
     {
         if (current)
+        {
             TaskRegistry.Instance?.AddThreat(this);
+            _tutorialObjectiveItem = TutorialObjectiveList.Instance?.AddObjective(GetTutorialObjectiveText());
+        }
         else
+        {
             TaskRegistry.Instance?.RemoveThreat(this);
+
+            // If the task was deactivated without ever completing (e.g. OnDayStart reset
+            // it for a new day), MarkCompleteClientRpc never ran to clear the reference —
+            // clear it here so a stale item isn't left dangling for the next run.
+            if (_tutorialObjectiveItem != null)
+            {
+                TutorialObjectiveList.Instance?.CompleteObjective(_tutorialObjectiveItem);
+                _tutorialObjectiveItem = null;
+            }
+        }
     }
 
     /// <summary>
@@ -324,13 +353,21 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
+        _tutorialObjectiveItem?.SetText(GetTutorialObjectiveText());
     }
 
     private void OnTotalCountChanged(int previous, int current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
+        _tutorialObjectiveItem?.SetText(GetTutorialObjectiveText());
     }
+
+    /// <summary>
+    /// Builds the tutorial-overlay objective label, e.g. "Clean graffiti 1/10".
+    /// </summary>
+    private string GetTutorialObjectiveText() =>
+        $"Clean graffiti {Mathf.Min(_scrubbed.Value, _totalCount.Value)}/{_totalCount.Value}";
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────
 

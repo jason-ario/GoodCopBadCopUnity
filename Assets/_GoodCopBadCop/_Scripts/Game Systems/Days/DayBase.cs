@@ -48,6 +48,19 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("When true, the 'Follow the Trail' event can trigger on this day.")]
     public bool CanFollowTrailEvent;
 
+    [Header("Default Guards")]
+    [Tooltip("Plain standing guard/soldier NPCs present in the scene by default (not tied to a " +
+             "GuardPurchasePoint). Deactivated when this day starts. Assign on every day this " +
+             "should hold true for (e.g. all days) so debug day-skipping still enforces it " +
+             "regardless of entry point.")]
+    public GameObject[] DefaultGuardsToDeactivate;
+
+    [Tooltip("GuardPurchasePoint instances to unlock when this day starts. Leave empty on " +
+             "days before purchase points should be available. The purchase points remain " +
+             "active NetworkObjects at all times (required by Netcode) but stay locked and " +
+             "hidden until unlocked.")]
+    public GuardPurchasePoint[] GuardPurchasePointsToActivate;
+
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses
     // -------------------------------------------------------------------------
@@ -81,6 +94,25 @@ public abstract class DayBase : MonoBehaviour
     public virtual void DayActivated()
     {
         Debug.Log($"[Day {DayNumber}] Day activated.");
+
+        if (DefaultGuardsToDeactivate != null)
+        {
+            foreach (GameObject guard in DefaultGuardsToDeactivate)
+            {
+                if (guard != null)
+                    guard.SetActive(false);
+            }
+        }
+
+        if (GuardPurchasePointsToActivate != null)
+        {
+            foreach (GuardPurchasePoint purchasePoint in GuardPurchasePointsToActivate)
+            {
+                if (purchasePoint != null)
+                    purchasePoint.SetUnlocked(true);
+            }
+        }
+
         OnDayStart?.Invoke();
     }
 

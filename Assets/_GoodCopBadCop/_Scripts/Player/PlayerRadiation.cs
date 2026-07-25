@@ -33,6 +33,7 @@ public class PlayerRadiation : NetworkBehaviour
     private bool hasTriggeredCritical;
 
     private PlayerHealth playerHealth;
+    private PlayerInstance playerInstance;
 
     public float CurrentRadiation => currentRadiation;
     public float MaxRadiation => maxRadiation;
@@ -52,6 +53,7 @@ public class PlayerRadiation : NetworkBehaviour
     private void Awake()
     {
         playerHealth = GetComponent<PlayerHealth>();
+        playerInstance = GetComponent<PlayerInstance>();
     }
 
     private void Update()
@@ -63,6 +65,14 @@ public class PlayerRadiation : NetworkBehaviour
             return;
 
         if (IsInvincible)
+            return;
+
+        // While this player is locked inside a scripted (or classic) dialogue cutscene,
+        // radiation should not accrue, drain, or damage the player at all — mirrors the
+        // cutscene guard used by MutantEnemy/MutantAttackHitbox for combat.
+        // IsInCutscene is owner-written and replicated to the server, so this check is
+        // server-authoritative even though the flag originates on the owning client.
+        if (playerInstance != null && playerInstance.IsInCutscene)
             return;
 
         AddRadiation(passiveRadiationPerSecond * RadiationMultiplier * Time.deltaTime);

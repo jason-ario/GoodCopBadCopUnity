@@ -3,14 +3,11 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Day 3 — booth mess cleanup + end-of-shift power outage.
+/// Day 3 — gore/body-part yard cleanup + end-of-shift power outage.
 ///
-/// Activates the booth mess left from the previous shift and triggers the
-/// Clean Booth Mess task at day start so players must scrub all blood splatters
-/// and bag all junk items.
-///
-/// Also plays a one-shot stinger the first time the booth door is opened on
-/// this day, giving the players a dramatic reveal of the mess.
+/// At day start, spawns gore and body-part junk items across the yard's
+/// <see cref="TakeOutTrashTask"/> spawn zones (instead of standard trash), triggering the
+/// Take Out Trash task so players must bag up every piece of gore.
 ///
 /// At the end of the shift, right after the last suspect is processed:
 ///   1. The power cuts out (via <see cref="ElectricityController"/>).
@@ -37,25 +34,6 @@ public class Day_03 : DayBase
         TimecardMachine.OnClockOutServer -= OnClockOutServer;
         Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
     }
-
-    // -------------------------------------------------------------------------
-    // Inspector — Booth Mess
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Booth Mess")]
-    [Tooltip("The Clean Booth Mess task — triggered at the start of Day 3. Server-only.")]
-    [SerializeField] private CleanBoothMessTask _cleanBoothMessTask;
-
-    // -------------------------------------------------------------------------
-    // Inspector — Door Stinger
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Door Stinger")]
-    [Tooltip("The booth door whose first open triggers the stinger.")]
-    [SerializeField] private DoorController _boothDoor;
-
-    [Tooltip("Stinger played on all clients the first time the booth door opens on Day 3.")]
-    [SerializeField] private AudioClip _boothMessStinger;
 
     // -------------------------------------------------------------------------
     // Inspector — Power Outage Sequence
@@ -95,10 +73,7 @@ public class Day_03 : DayBase
     {
         base.DayActivated();
 
-        _cleanBoothMessTask?.TriggerTask();
-
-        if (_boothDoor != null && _boothMessStinger != null)
-            _boothDoor.OnDoorOpened += OnBoothDoorFirstOpened;
+        TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
 
         // Subscribe on ALL clients so each client's TaskRegistry receives the threat.
         Telephone.OnScriptedCallAnsweredAllClients += OnScriptedCallAnsweredAllClients;
@@ -112,9 +87,6 @@ public class Day_03 : DayBase
     {
         base.DayDeactivated();
 
-        if (_boothDoor != null)
-            _boothDoor.OnDoorOpened -= OnBoothDoorFirstOpened;
-
         TimecardMachine.OnClockOutServer -= OnClockOutServer;
         Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
 
@@ -124,16 +96,6 @@ public class Day_03 : DayBase
     public override void ShiftEnded()        => base.ShiftEnded();
     public override void NightPhaseStarted() => base.NightPhaseStarted();
     public override void DayCompleted()      => base.DayCompleted();
-
-    // -------------------------------------------------------------------------
-    // Door stinger
-    // -------------------------------------------------------------------------
-
-    private void OnBoothDoorFirstOpened()
-    {
-        _boothDoor.OnDoorOpened -= OnBoothDoorFirstOpened;
-        SFXController.Instance?.Play(_boothMessStinger);
-    }
 
     // -------------------------------------------------------------------------
     // Power outage sequence (server-only)

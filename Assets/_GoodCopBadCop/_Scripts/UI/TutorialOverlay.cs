@@ -26,6 +26,8 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject movementTutorialScreen;
     [SerializeField] private GameObject handlingItemsTutorialScreen;
     [SerializeField] private GameObject accuracyPayoutTutorialScreen;
+    [SerializeField] private GameObject trashTutorialScreen;
+    [SerializeField] private GameObject graffitiTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -86,6 +88,12 @@ public class TutorialOverlay : MonoBehaviour
 
     /// <summary>Shows the accuracy-payout tutorial overlay (more accurate anomaly marking = more coupons).</summary>
     public void ShowAccuracyPayoutTutorial(Action onComplete = null) => ShowScreen(accuracyPayoutTutorialScreen, onComplete);
+
+    /// <summary>Shows the end-of-shift trash task tutorial overlay.</summary>
+    public void ShowTrashTutorial(Action onComplete = null) => ShowScreen(trashTutorialScreen, onComplete);
+
+    /// <summary>Shows the end-of-shift graffiti task tutorial overlay.</summary>
+    public void ShowGraffitiTutorial(Action onComplete = null) => ShowScreen(graffitiTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

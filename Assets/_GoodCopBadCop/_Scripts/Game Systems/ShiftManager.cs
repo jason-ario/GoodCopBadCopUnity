@@ -821,13 +821,15 @@ public class ShiftManager : NetworkBehaviour
                 CampaignManager.Instance.AdvanceDay();
         }
 
-        // Teleport the local player to their outside-bunker spawn while the screen is dark.
+        // Teleport the local player to their inside-bunker spawn while the screen is dark,
+        // and force the bunker door closed so the new day always starts locked inside.
         if (PlayerInstance.Instance != null)
         {
-            Transform bunkerSpawn = PlayerSpawner.Instance.GetOutsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+            Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
             PlayerInstance.Instance.SetPosition(bunkerSpawn);
             PlayerInstance.Instance.SetIsOutside(false);
         }
+        _bunkerDoorController?.Reset();
 
         yield return new WaitForSeconds(0.5f);
         UIController.Instance.FadeOut();
@@ -1047,6 +1049,13 @@ public class ShiftManager : NetworkBehaviour
         PlayerInstance.Instance.CanControl = true;
         PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.SetCanMove(true);
+
+        // RunInitiateIntroCutscene() disables the reticle GameObject entirely (DisableReticle())
+        // before the cutscene plays. Every other DisableReticle() call site pairs it with a
+        // matching EnableReticle() (see PlayerInstance.OnNetworkSpawn / Respawn), but the intro
+        // cutscene flow never restored it — leaving the reticle inactive, and every world
+        // interactable (gates included) permanently un-highlightable, for the rest of the day.
+        PlayerInstance.Instance.EnableReticle();
     }
 
     /// <summary>

@@ -973,6 +973,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
         _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse));
+
+        // The response has now been advanced past on every client — remove the echo of the
+        // player's choice along with it.
+        HideChoiceEchoClientRpc();
     }
 
     // -------------------------------------------------------------------------
@@ -1056,6 +1060,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false)
     {
         IsScriptedModeActive = false;
+
+        // Safety net: clear any lingering choice echo if the sequence ended before
+        // HideChoiceEchoClientRpc fired normally (e.g. an early exit or disconnect).
+        DialogueManager.Instance?.HideChoiceEcho();
 
         // Deactivate any override camera before restoring the default cam state.
         DeactivateOverrideCam();
@@ -1429,7 +1437,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
-        DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.cyan, isPlayer: true);
+        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.cyan);
+    }
+
+    /// <summary>
+    /// Hides the player-choice echo caption spawned by <see cref="FinalizeChoiceClientRpc"/>.
+    /// Sent once the NPC's response to that choice has been advanced past, so the echo
+    /// disappears together with the response subtitle instead of lingering indefinitely.
+    /// </summary>
+    [ClientRpc]
+    private void HideChoiceEchoClientRpc()
+    {
+        DialogueManager.Instance?.HideChoiceEcho();
     }
 
     // -------------------------------------------------------------------------

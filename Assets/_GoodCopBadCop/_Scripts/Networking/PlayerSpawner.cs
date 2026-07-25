@@ -26,6 +26,12 @@ public class PlayerSpawner : NetworkBehaviour
     [Tooltip("Per-client spawns used when waking up at the start of each new day (inside the bunker area).")]
     [SerializeField] private Transform[] multiplayerOutsideBunkerSpawnPoints;
 
+    [Header("Inside Bunker Spawn Points")]
+    [Tooltip("Single-player spawn used when waking up at the start of each new day (interior of the bunker, behind the closed door).")]
+    [SerializeField] private Transform singlePlayerInsideBunkerSpawnPoint;
+    [Tooltip("Per-client spawns used when waking up at the start of each new day (interior of the bunker, behind the closed door).")]
+    [SerializeField] private Transform[] multiplayerInsideBunkerSpawnPoints;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -165,5 +171,19 @@ public class PlayerSpawner : NetworkBehaviour
 
         int index = (int)(clientId % (ulong)multiplayerOutsideBunkerSpawnPoints.Length);
         return multiplayerOutsideBunkerSpawnPoints[index];
+    }
+
+    /// <summary>
+    /// Returns the inside-bunker spawn point used when waking up at the start of each new day.
+    /// Falls back to <see cref="singlePlayerSpawnPoint"/> if no inside-bunker points are assigned.
+    /// </summary>
+    public Transform GetInsideBunkerSpawnPoint(ulong clientId)
+    {
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        if (isSinglePlayer || multiplayerInsideBunkerSpawnPoints == null || multiplayerInsideBunkerSpawnPoints.Length == 0)
+            return singlePlayerInsideBunkerSpawnPoint != null ? singlePlayerInsideBunkerSpawnPoint : singlePlayerSpawnPoint;
+
+        int index = (int)(clientId % (ulong)multiplayerInsideBunkerSpawnPoints.Length);
+        return multiplayerInsideBunkerSpawnPoints[index];
     }
 }

@@ -290,6 +290,12 @@ public class Day_01 : DayBase
     [Tooltip("World-space point above the bunk bed — marker shown during 'Go to bed' end-of-shift task.")]
     [SerializeField] private Transform _markerBunkBed;
 
+    [Tooltip("The bunker door's Interactable — highlighted while the 'Open the bunker' tutorial task is active.")]
+    [SerializeField] private BunkerDoorInteractable _bunkerDoorInteractable;
+
+    [Tooltip("The bunk bed's Interactable — highlighted while the 'Go to bed' tutorial task is active.")]
+    [SerializeField] private BunkBedInteractable _bunkBedInteractable;
+
     [Header("Day 1 — Quarantine Tutorial")]
     [Tooltip("Task text shown while the player needs to grab the quarantine stamp.")]
     [SerializeField] private string _taskGrabQuarantineStampText = "Grab the quarantine stamp";
@@ -410,6 +416,7 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnClockInReadyAllClients                += OnClockInReadySync;
         TutorialTaskSync.OnFolderPlacedOnDeskAllClients          += OnFolderPlacedOnDeskSync;
         TutorialTaskSync.OnFolderHandedToVladAllClients          += OnFolderHandedToVladSync;
+        TutorialTaskSync.OnTrashTaskReadyAllClients              += OnTrashTaskReadySync;
 
         // Subscribe to the clock-in event so the task can be completed on all clients.
         TimecardMachine.OnClockInAllClients += OnTimecardClockInSync;
@@ -506,6 +513,7 @@ public class Day_01 : DayBase
 
         TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
+        TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -583,6 +591,7 @@ public class Day_01 : DayBase
 
         TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
+        TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -2037,13 +2046,13 @@ public class Day_01 : DayBase
                     {
                         Debug.Log("[Day_01] Post-Alexei dialogue onComplete — calling TriggerEndOfShiftSetup.");
                         AlexeiController.Instance?.TriggerEndOfShiftSetup();
-                        ShowTrashTask();
+                        TutorialTaskSync.Instance?.BroadcastTrashTaskReadyServer();
                     });
                 else
                 {
                     Debug.LogWarning("[Day_01] _postAlexeiDialogue is not assigned — triggering end-of-shift setup immediately.");
                     AlexeiController.Instance?.TriggerEndOfShiftSetup();
-                    ShowTrashTask();
+                    TutorialTaskSync.Instance?.BroadcastTrashTaskReadyServer();
                 }
             };
 
@@ -2127,12 +2136,19 @@ public class Day_01 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Fires on ALL clients via <see cref="TutorialTaskSync.OnTrashTaskReadyAllClients"/>.
     /// Adds the "Throw away trash X/Total" objective and subscribes to live progress
-    /// updates. Called on the server immediately after TriggerEndOfShiftSetup so the
-    /// total count is already set when the first SetText runs.
+    /// updates. Previously this ran only wherever the scripted cutscene callback executed
+    /// (the server), so the objective never appeared for remote clients — routing it
+    /// through the TutorialTaskSync broadcast fixes that for every connected player.
+    /// Also shows the trash and graffiti tutorial overlay screens back-to-back — this is
+    /// the same moment both end-of-shift tasks are first triggered (see
+    /// <see cref="AlexeiController.EndOfShiftSetupSequence"/>).
     /// </summary>
-    private void ShowTrashTask()
+    private void OnTrashTaskReadySync()
     {
+        TutorialTaskSync.OnTrashTaskReadyAllClients -= OnTrashTaskReadySync;
+
         if (TakeOutTrashTask.Instance == null) return;
 
         _taskThrowTrash = TutorialObjectiveList.Instance?.AddObjective(
@@ -2141,6 +2157,9 @@ public class Day_01 : DayBase
 
         TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
+
+        TutorialOverlay.Instance?.ShowTrashTutorial(
+            () => TutorialOverlay.Instance?.ShowGraffitiTutorial());
     }
 
     private void OnTrashProgressChanged()
@@ -2179,6 +2198,8 @@ public class Day_01 : DayBase
         if (TutorialMarkerManager.Instance != null && _markerBunkerDoor != null)
             TutorialMarkerManager.Instance.Mark(_markerBunkerDoor);
 
+        _bunkerDoorInteractable?.Highlight(true);
+
         BunkerDoorController.OnDoorOpened += OnBunkerDoorOpened;
     }
 
@@ -2188,6 +2209,8 @@ public class Day_01 : DayBase
 
         if (TutorialMarkerManager.Instance != null && _markerBunkerDoor != null)
             TutorialMarkerManager.Instance.Unmark(_markerBunkerDoor);
+
+        _bunkerDoorInteractable?.Highlight(false);
 
         TutorialObjectiveList.Instance?.CompleteObjective(_taskOpenBunker);
         _taskOpenBunker = null;
@@ -2208,6 +2231,8 @@ public class Day_01 : DayBase
         if (TutorialMarkerManager.Instance != null && _markerBunkBed != null)
             TutorialMarkerManager.Instance.Mark(_markerBunkBed);
 
+        _bunkBedInteractable?.Highlight(true);
+
         BunkBedInteractable.OnSleepConfirmed += OnGoToBedSleepConfirmed;
     }
 
@@ -2217,6 +2242,8 @@ public class Day_01 : DayBase
 
         if (TutorialMarkerManager.Instance != null && _markerBunkBed != null)
             TutorialMarkerManager.Instance.Unmark(_markerBunkBed);
+
+        _bunkBedInteractable?.Highlight(false);
 
         TutorialObjectiveList.Instance?.CompleteObjective(_taskGoToBed);
         TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);

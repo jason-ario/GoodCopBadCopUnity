@@ -5,8 +5,10 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 
 /// <summary>
-/// One-shot trash-collection task. Call <see cref="TriggerTask"/> on the server to
+/// One-shot trash-collection task. Call <see cref="TriggerTask()"/> on the server to
 /// immediately spawn a random number of trash items across the configured spawn zones.
+/// Call <see cref="TriggerTask(bool)"/> with <c>useGorePrefabs: true</c> to spawn from the
+/// <see cref="_goreJunkPrefabs"/> pool instead (e.g. gore/body parts strewn across the yard).
 ///
 /// Pre-existing <see cref="JunkItem"/> instances in the scene (e.g. the dead soldier body)
 /// are automatically counted toward the total so the HUD denominator is always accurate.
@@ -18,6 +20,8 @@ using Random = UnityEngine.Random;
 /// Scene setup:
 ///   - NetworkObject on this GameObject.
 ///   - Assign _trashPrefabs (all registered in NetworkManager's prefab list).
+///   - Assign _goreJunkPrefabs (gore/body-part variants, also registered as Network Prefabs)
+///     for days that dress the yard with gore instead of standard junk.
 ///   - Assign _spawnZones with centre Transforms and half-extents.
 ///   - Set _groundLayer to match your environment layer.
 ///   - Register this component in TaskRegistry via AlexeiController.
@@ -45,6 +49,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     [Tooltip("Pool of trash prefabs to pick from. All must be registered as Network Prefabs in the NetworkManager.")]
     [SerializeField] private GameObject[] _trashPrefabs;
+
+    [Tooltip("Pool of gore/body-part prefabs to pick from when TriggerTask is called with useGorePrefabs: true. " +
+             "All must be registered as Network Prefabs in the NetworkManager.")]
+    [SerializeField] private GameObject[] _goreJunkPrefabs;
 
     [Tooltip("One or more zones in which items are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
@@ -265,7 +273,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// already active in the scene (e.g. the dead soldier body), and registers this task
     /// in <see cref="TaskRegistry"/> on all clients. Server-only.
     /// </summary>
-    public void TriggerTask()
+    public void TriggerTask() => TriggerTask(useGorePrefabs: false);
+
+    /// <summary>
+    /// Spawns a random number of items (between <see cref="_minSpawnCount"/> and
+    /// <see cref="_maxSpawnCount"/>) across the configured <see cref="_spawnZones"/>, counts
+    /// any pre-existing <see cref="JunkItem"/>s already active in the scene (e.g. the dead
+    /// soldier body), and registers this task in <see cref="TaskRegistry"/> on all clients.
+    /// Server-only.
+    /// </summary>
+    /// <param name="useGorePrefabs">
+    /// When true, items are spawned from <see cref="_goreJunkPrefabs"/> (gore/body parts)
+    /// instead of the standard <see cref="_trashPrefabs"/> pool.
+    /// </param>
+    public void TriggerTask(bool useGorePrefabs)
     {
         if (!IsServer) return;
 
@@ -284,9 +305,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 preExistingCount++;
         }
 
+        GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
+
         int spawnCount = Random.Range(_minSpawnCount, _maxSpawnCount + 1);
         for (int i = 0; i < spawnCount; i++)
-            SpawnSingleItem();
+            SpawnSingleItem(prefabPool);
 
         // Total = actually spawned (may be less than spawnCount on error) + pre-existing.
         _totalCount.Value = _spawnedItems.Count + preExistingCount;
@@ -302,8 +325,47 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
-        Debug.Log($"[TakeOutTrashTask] Task triggered — spawned {_spawnedItems.Count}, " +
-                  $"pre-existing {preExistingCount}, total {_totalCount.Value}.");
+        Debug.Log($"[TakeOutTrashTask] Task triggered ({(useGorePrefabs ? "gore" : "trash")} pool) — " +
+                  $"spawned {_spawnedItems.Count}, pre-existing {preExistingCount}, total {_totalCount.Value}.");
+    }
+
+    /// <summary>
+    /// Tutorial-only helper: turns on the persistent outline highlight for every currently
+    /// active <see cref="JunkItem"/> (freshly spawned or pre-existing, e.g. the soldier body)
+    /// on every client. Intended to be called once, right after <see cref="TriggerTask"/>,
+    /// for the Day 1 trash task tutorial so the player can immediately spot every piece of
+    /// trash. Does not affect later/other triggers of this same shared task instance —
+    /// callers must invoke this explicitly. Server-only.
+    /// </summary>
+    public void HighlightAllItemsForTutorial()
+    {
+        if (!IsServer) return;
+
+        var junkItems = FindObjectsByType<JunkItem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        var refs = new List<NetworkObjectReference>(junkItems.Length);
+        foreach (JunkItem junk in junkItems)
+        {
+            NetworkObject netObj = junk.NetworkObject;
+            if (netObj != null && netObj.IsSpawned)
+                refs.Add(netObj);
+        }
+
+        if (refs.Count == 0) return;
+
+        HighlightItemsClientRpc(refs.ToArray());
+    }
+
+    [ClientRpc]
+    private void HighlightItemsClientRpc(NetworkObjectReference[] itemRefs)
+    {
+        foreach (NetworkObjectReference itemRef in itemRefs)
+        {
+            if (itemRef.TryGet(out NetworkObject netObj))
+            {
+                JunkItem junk = netObj.GetComponent<JunkItem>();
+                junk?.Highlight(true);
+            }
+        }
     }
 
     /// <summary>
@@ -387,15 +449,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         Debug.Log($"[TakeOutTrashTask] Item collected into bag — remaining spawned items: {_spawnedItems.Count}");
     }
 
-    private void SpawnSingleItem()
+    private void SpawnSingleItem(GameObject[] prefabPool)
     {
-        if (_trashPrefabs == null || _trashPrefabs.Length == 0)
+        if (prefabPool == null || prefabPool.Length == 0)
         {
-            Debug.LogError("[TakeOutTrashTask] _trashPrefabs is empty or not assigned.");
+            Debug.LogError("[TakeOutTrashTask] Prefab pool is empty or not assigned.");
             return;
         }
 
-        GameObject prefab = _trashPrefabs[Random.Range(0, _trashPrefabs.Length)];
+        GameObject prefab = prefabPool[Random.Range(0, prefabPool.Length)];
         if (prefab == null) return;
 
         Vector3    spawnPos = GetRandomSpawnPosition();

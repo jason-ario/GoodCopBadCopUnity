@@ -58,6 +58,15 @@ public class TutorialTaskSync : NetworkBehaviour
     /// </summary>
     public static event Action<NetworkObjectReference> OnFolderHandedToVladAllClients;
 
+    /// <summary>
+    /// Fired on ALL clients once the server is ready to show the end-of-shift trash task.
+    /// <see cref="TakeOutTrashTask"/>'s progress itself is already networked via
+    /// NetworkVariable, but the initial <c>TutorialObjectiveList.AddObjective</c> call that
+    /// shows the task needs to run on every client — not just wherever the scripted
+    /// cutscene callback happens to execute (the server).
+    /// </summary>
+    public static event Action OnTrashTaskReadyAllClients;
+
     // ── Server-side counters / guards ─────────────────────────────────────────
 
     private int  _vladDocsPickedUpCount;
@@ -256,5 +265,24 @@ public class TutorialTaskSync : NetworkBehaviour
     private void BroadcastFolderHandedToVladClientRpc(NetworkObjectReference folderRef)
     {
         OnFolderHandedToVladAllClients?.Invoke(folderRef);
+    }
+
+    // ── Trash task ready ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Called once the post-Alexei megaphone dialogue completes and the
+    /// end-of-shift trash task should be shown. Broadcasts to all clients so every
+    /// player's <see cref="TutorialObjectiveList"/> gets the objective, not just the host.
+    /// </summary>
+    public void BroadcastTrashTaskReadyServer()
+    {
+        if (!IsServer) return;
+        BroadcastTrashTaskReadyClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastTrashTaskReadyClientRpc()
+    {
+        OnTrashTaskReadyAllClients?.Invoke();
     }
 }

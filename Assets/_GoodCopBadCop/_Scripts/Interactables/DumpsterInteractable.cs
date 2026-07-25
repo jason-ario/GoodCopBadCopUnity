@@ -6,16 +6,19 @@ using UnityEngine;
 /// <summary>
 /// Dumpster for the Trash Build-up systemic threat.
 ///
-/// The ONLY way to deposit a TrashBag is to throw it with real physics (ThrowController's
-/// F-key charge-and-release throw) directly into the dumpster's opening — a child
-/// DumpsterPhysicsDepositZone trigger volume detects the in-flight bag and calls
-/// <see cref="TryDepositThrownBag"/>, which validates and deposits it. There is no
-/// left-click / interact-based deposit flow; the dumpster does not accept items via
-/// InteractWithItem.
+/// A TrashBag can be deposited in two ways:
+///   1. Thrown with real physics (ThrowController's F-key charge-and-release throw) directly
+///      into the dumpster's opening — a child DumpsterPhysicsDepositZone trigger volume
+///      detects the in-flight bag and calls <see cref="TryDepositThrownBag"/>.
+///   2. Interacted with directly while holding a TrashBag (left-click / E, routed by
+///      <see cref="PlayerInteractionController"/> via <see cref="InteractWithItem"/> because
+///      the Trash Bag PickableItemData is listed in <c>itemsThatCanInteractWith</c>) — this
+///      triggers the same deposit sequence without requiring a physics throw.
 ///
 /// Each TrashBag instance can only be deposited once — <see cref="TrashBag.IsDeposited"/>
-/// is checked and set atomically in <see cref="TryDepositThrownBag"/> so a bag can never be
-/// registered twice (e.g. from overlapping trigger events in the same physics step).
+/// is checked and set atomically before any further processing so a bag can never be
+/// registered twice (e.g. from overlapping trigger events in the same physics step, or a
+/// throw landing at the same moment as a manual interact).
 ///
 /// A world-space label hovers above the dumpster and is visible only while the player looks
 /// at it. It shows the current deposited count.
@@ -24,6 +27,7 @@ using UnityEngine;
 ///   - NetworkObject + HighlightEffect + Collider (Interactable layer)
 ///   - A child GameObject with a trigger Collider + DumpsterPhysicsDepositZone, positioned
 ///     inside the opening, to catch bags thrown in with physics
+///   - Trash Bag PickableItemData added to itemsThatCanInteractWith for the manual deposit flow
 /// </summary>
 public class DumpsterInteractable : CollectableContainer
 {
@@ -101,12 +105,49 @@ public class DumpsterInteractable : CollectableContainer
             OnTrashBagDeposited?.Invoke(junkCount);
     }
 
+    // ── Interact-based deposit (holding a TrashBag) ──────────────────────────
+
+    /// <summary>
+    /// Called by <see cref="PlayerInteractionController"/> on the local client when the player
+    /// interacts with the dumpster while holding a <see cref="TrashBag"/> (the Trash Bag
+    /// PickableItemData must be listed in <c>itemsThatCanInteractWith</c> on the prefab).
+    /// Releases the bag from the player's hand and requests a server-side deposit.
+    /// </summary>
+    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    {
+        if (item is not TrashBag bag || bag.IsDeposited) return;
+
+        base.InteractWithItem(playerInteractionController, item);
+
+        // Release the bag from the player's hand (skips DropServerRpc so the bag is not
+        // re-enabled as an interactable before it is despawned).
+        playerInteractionController.pickupController.ReleaseHeldObjectForThrow();
+
+        DepositHeldBagServerRpc(bag.NetworkObject);
+    }
+
+    /// <summary>
+    /// Server-side deposit route for a bag released directly into the dumpster via
+    /// <see cref="InteractWithItem"/>. Resolves the bag by NetworkObjectReference and, if it
+    /// is still valid and not already deposited, deposits it the same way a physics-thrown bag
+    /// is deposited.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void DepositHeldBagServerRpc(NetworkObjectReference bagRef)
+    {
+        if (!bagRef.TryGet(out NetworkObject bagNetworkObject)) return;
+
+        TrashBag bag = bagNetworkObject.GetComponent<TrashBag>();
+        if (bag == null || !bag.IsSpawned || bag.IsDeposited) return;
+
+        DepositBag(bag);
+    }
+
     // ── Physics throw deposit ────────────────────────────────────────────────
 
     /// <summary>
     /// Called by a <see cref="DumpsterPhysicsDepositZone"/> when a TrashBag thrown with real
-    /// physics flies into the dumpster's opening. This is the only way a TrashBag is ever
-    /// deposited — the dumpster has no interact-based deposit flow.
+    /// physics flies into the dumpster's opening.
     ///
     /// Only a bag that is actually in free physics flight (Rigidbody non-kinematic, as set by
     /// <see cref="PickableObject.ThrowServerRpc"/>) is accepted, so bags merely resting nearby
@@ -125,9 +166,19 @@ public class DumpsterInteractable : CollectableContainer
         Rigidbody rb = bag.GetComponent<Rigidbody>();
         if (rb == null || rb.isKinematic) return false;
 
-        // Mark deposited immediately, before any further processing, so this exact bag
-        // instance can never be registered again even if another trigger fires for it
-        // in the same frame.
+        DepositBag(bag);
+        return true;
+    }
+
+    /// <summary>
+    /// Shared server-only deposit routine used by both the physics-throw path
+    /// (<see cref="TryDepositThrownBag"/>) and the interact-while-holding path
+    /// (<see cref="DepositHeldBagServerRpc"/>). Marks the bag deposited immediately, before any
+    /// further processing, so this exact bag instance can never be registered again even if
+    /// another trigger or interact fires for it in the same frame.
+    /// </summary>
+    private void DepositBag(TrashBag bag)
+    {
         bag.MarkDeposited();
 
         int     junkCount    = bag.JunkCount;
@@ -136,8 +187,6 @@ public class DumpsterInteractable : CollectableContainer
         PlayLandSoundServerRpc(landPosition);
         bag.DespawnServerRpc();
         DepositBagServerRpc(junkCount);
-
-        return true;
     }
 
     // ── NetworkVariable callbacks ─────────────────────────────────────────────

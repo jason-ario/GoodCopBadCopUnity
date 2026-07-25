@@ -45,6 +45,14 @@ public class DialogueManager : NetworkBehaviour
 
     private Subtitles _waitingSubtitle;
 
+    /// <summary>
+    /// The persistent "player choice echo" line spawned by <see cref="ShowChoiceEcho"/>.
+    /// Unlike normal subtitles, this instance survives <see cref="DestroyPreviousSubtitles"/>
+    /// so it can remain visible above the NPC's response subtitle until explicitly hidden
+    /// via <see cref="HideChoiceEcho"/>.
+    /// </summary>
+    private GameObject _activeChoiceEcho;
+
     private void Awake()
     {
         Instance = this;
@@ -278,6 +286,38 @@ public class DialogueManager : NetworkBehaviour
         dialogueChoiceSystem.StartDialogueChoices(lookTarget,choices);
     }
 
+    /// <summary>
+    /// Spawns a persistent caption showing the resolved player dialogue choice. Unlike a
+    /// normal subtitle, this line is not cleared by <see cref="DestroyPreviousSubtitles"/>,
+    /// so it stays on screen — stacked above via the subtitles container's vertical layout —
+    /// while the NPC's response subtitle is subsequently spawned below it. Call
+    /// <see cref="HideChoiceEcho"/> once the response has been dismissed to remove it.
+    /// </summary>
+    public void ShowChoiceEcho(string text, string playerName, Color color)
+    {
+        HideChoiceEcho();
+
+        DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Player, playerName, text);
+
+        Subtitles echo = Instantiate(playerSubtitlesPrefab, subtitlesContainer);
+        echo.SetText(text, playerName, color);
+        echo.transform.SetAsFirstSibling();
+
+        _activeChoiceEcho = echo.gameObject;
+    }
+
+    /// <summary>
+    /// Removes the choice echo spawned by <see cref="ShowChoiceEcho"/>, if any is active.
+    /// </summary>
+    public void HideChoiceEcho()
+    {
+        if (_activeChoiceEcho != null)
+        {
+            Destroy(_activeChoiceEcho);
+            _activeChoiceEcho = null;
+        }
+    }
+
     public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,
         bool isPlayer = false, bool clearHistory = false, bool waitForInput = false)
     {
@@ -423,6 +463,9 @@ public class DialogueManager : NetworkBehaviour
         CancelSubtitleDestroy();
         foreach (Transform child in subtitlesContainer)
         {
+            // The choice echo has its own explicit lifecycle (see ShowChoiceEcho/HideChoiceEcho)
+            // and must survive the NPC response subtitle being spawned right after it.
+            if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho) continue;
             Destroy(child.gameObject);
         }
     }
