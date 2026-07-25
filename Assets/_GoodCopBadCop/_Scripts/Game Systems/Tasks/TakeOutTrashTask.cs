@@ -22,6 +22,9 @@ using Random = UnityEngine.Random;
 ///   - Assign _trashPrefabs (all registered in NetworkManager's prefab list).
 ///   - Assign _goreJunkPrefabs (gore/body-part variants, also registered as Network Prefabs)
 ///     for days that dress the yard with gore instead of standard junk.
+///   - Assign _bloodDecalPrefabs (flat ground-decal prefabs, also registered as Network
+///     Prefabs) to have a blood splatter spawned under each gore item when useGorePrefabs
+///     is true. Optional — leave empty to disable.
 ///   - Assign _spawnZones with centre Transforms and half-extents.
 ///   - Set _groundLayer to match your environment layer.
 ///   - Register this component in TaskRegistry via AlexeiController.
@@ -53,6 +56,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Pool of gore/body-part prefabs to pick from when TriggerTask is called with useGorePrefabs: true. " +
              "All must be registered as Network Prefabs in the NetworkManager.")]
     [SerializeField] private GameObject[] _goreJunkPrefabs;
+
+    [Tooltip("Pool of blood decal prefabs spawned on the ground under each gore/body-part item " +
+             "(only used when useGorePrefabs is true). Flat quad/plane prefabs expected — oriented " +
+             "with their forward axis facing down into the ground. All must be registered as " +
+             "Network Prefabs in the NetworkManager. Leave empty to disable blood decals.")]
+    [SerializeField] private GameObject[] _bloodDecalPrefabs;
 
     [Tooltip("One or more zones in which items are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
@@ -98,6 +107,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Local state (server-only) ─────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedItems = new();
+    private readonly List<NetworkObject> _spawnedDecals = new();
     private bool _taskActive;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
@@ -309,7 +319,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         int spawnCount = Random.Range(_minSpawnCount, _maxSpawnCount + 1);
         for (int i = 0; i < spawnCount; i++)
-            SpawnSingleItem(prefabPool);
+            SpawnSingleItem(prefabPool, spawnBloodDecal: useGorePrefabs);
 
         // Total = actually spawned (may be less than spawnCount on error) + pre-existing.
         _totalCount.Value = _spawnedItems.Count + preExistingCount;
@@ -449,7 +459,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         Debug.Log($"[TakeOutTrashTask] Item collected into bag — remaining spawned items: {_spawnedItems.Count}");
     }
 
-    private void SpawnSingleItem(GameObject[] prefabPool)
+    private void SpawnSingleItem(GameObject[] prefabPool, bool spawnBloodDecal)
     {
         if (prefabPool == null || prefabPool.Length == 0)
         {
@@ -460,7 +470,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         GameObject prefab = prefabPool[Random.Range(0, prefabPool.Length)];
         if (prefab == null) return;
 
-        Vector3    spawnPos = GetRandomSpawnPosition();
+        Vector3    spawnPos = GetRandomSpawnPosition(out Vector3 groundNormal);
         Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
         GameObject    itemGo = Instantiate(prefab, spawnPos, spawnRot);
@@ -475,6 +485,37 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedItems.Add(netObj);
+
+        if (spawnBloodDecal)
+            SpawnBloodDecal(spawnPos, groundNormal);
+    }
+
+    /// <summary>
+    /// Spawns a random blood decal from <see cref="_bloodDecalPrefabs"/> at <paramref name="position"/>,
+    /// oriented so its forward axis faces down into the ground surface described by
+    /// <paramref name="groundNormal"/>. No-op when no decal prefabs are assigned. Server-only.
+    /// </summary>
+    private void SpawnBloodDecal(Vector3 position, Vector3 groundNormal)
+    {
+        if (_bloodDecalPrefabs == null || _bloodDecalPrefabs.Length == 0)
+            return;
+
+        GameObject prefab = _bloodDecalPrefabs[Random.Range(0, _bloodDecalPrefabs.Length)];
+        if (prefab == null) return;
+
+        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(groundNormal);
+        GameObject   decalGo = Instantiate(prefab, position, rotation);
+        NetworkObject netObj = decalGo.GetComponent<NetworkObject>();
+
+        if (netObj == null)
+        {
+            Debug.LogError("[TakeOutTrashTask] Blood decal prefab is missing a NetworkObject component.");
+            Destroy(decalGo);
+            return;
+        }
+
+        netObj.Spawn(destroyWithScene: true);
+        _spawnedDecals.Add(netObj);
     }
 
     private void PruneCollectedItems()
@@ -498,11 +539,23 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
         }
         _spawnedItems.Clear();
+
+        foreach (NetworkObject netObj in _spawnedDecals)
+        {
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn(destroy: true);
+        }
+        _spawnedDecals.Clear();
+
         _networkThreatLevel.Value = 0f;
     }
 
-    private Vector3 GetRandomSpawnPosition()
+    private Vector3 GetRandomSpawnPosition() => GetRandomSpawnPosition(out _);
+
+    private Vector3 GetRandomSpawnPosition(out Vector3 groundNormal)
     {
+        groundNormal = Vector3.up;
+
         if (_spawnZones == null || _spawnZones.Length == 0)
         {
             Debug.LogWarning("[TakeOutTrashTask] No spawn zones assigned — spawning at origin.");
@@ -520,7 +573,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         Vector3 castOrigin = zone.GetRandomPosition() + Vector3.up * 5f;
 
         if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, _groundLayer, QueryTriggerInteraction.Ignore))
+        {
+            groundNormal = hit.normal;
             return hit.point + Vector3.up * _spawnHeightOffset;
+        }
 
         return new Vector3(castOrigin.x, zone.transform.position.y + _spawnHeightOffset, castOrigin.z);
     }

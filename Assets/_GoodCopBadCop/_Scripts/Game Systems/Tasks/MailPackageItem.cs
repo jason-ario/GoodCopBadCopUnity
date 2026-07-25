@@ -38,6 +38,12 @@ public class MailPackageItem : PickableObject
     [Tooltip("World-space label showing the goods category. Optional.")]
     [SerializeField] private TextMeshPro _goodsLabelText;
 
+    [Header("Delivery Sound")]
+    [Tooltip("One-shot sound played when this package is correctly delivered to its addressee's mailbox cubby.")]
+    [SerializeField] private AudioClip _deliverySfxClip;
+    [Tooltip("Volume for _deliverySfxClip.")]
+    [SerializeField] private float _deliverySfxVolume = 1f;
+
     // ── Networked data, set once by the server at spawn time via ServerInitialize ──────────────
 
     private readonly NetworkVariable<FixedString64Bytes> _residentName = new(
@@ -93,6 +99,31 @@ public class MailPackageItem : PickableObject
 
     /// <summary>Server-only. Marks this package as resolved so it cannot be counted twice.</summary>
     public void MarkResolved() => IsResolved = true;
+
+    /// <summary>
+    /// Server-only. Marks this package as resolved, permanently locks it so it can no longer be
+    /// picked up (via <see cref="LockInteractableNetworked"/>), and plays the delivery sound
+    /// effect on every client. Called by <see cref="SortMailTask.EvaluateSort"/> when this
+    /// package is dropped into its addressee's mailbox cubby — unlike Confiscate/Quarantine
+    /// correct sorts, delivered packages are not despawned immediately; they stay sitting in the
+    /// mailbox until <see cref="SortMailTask.DespawnDeliveredPackages"/> clears them at the start
+    /// of the next day.
+    /// </summary>
+    public void MarkDelivered()
+    {
+        if (!IsServer) return;
+
+        MarkResolved();
+        LockInteractableNetworked();
+        PlayDeliverySfxClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayDeliverySfxClientRpc()
+    {
+        if (_deliverySfxClip != null)
+            AudioSource.PlayClipAtPoint(_deliverySfxClip, transform.position, _deliverySfxVolume);
+    }
 
     /// <summary>
     /// Called by <see cref="MailSortBin"/> or <see cref="MailCubbySlot"/> (any client) when this

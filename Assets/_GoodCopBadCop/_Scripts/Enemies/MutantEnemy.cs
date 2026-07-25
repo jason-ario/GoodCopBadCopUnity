@@ -97,6 +97,16 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0f)]
     [SerializeField] private float goreLifetime = 10f;
 
+    [Tooltip("Blood decal prefabs spawned on the ground where a cosmetic gore piece lands. Leave empty to disable landing decals.")]
+    [SerializeField] private GameObject[] bloodDecalPrefabs;
+
+    [Tooltip("Layer(s) considered 'ground' for the purpose of spawning a landing blood decal under a gore piece.")]
+    [SerializeField] private LayerMask goreGroundLayer;
+
+    [Tooltip("Seconds before a landing blood decal is automatically destroyed. 0 = never.")]
+    [Min(0f)]
+    [SerializeField] private float bloodDecalLifetime = 20f;
+
     [Header("Aggro Target")]
     [Tooltip("If false, this mutant will never head for the booth on its own, regardless of the aggro chance roll.")]
     [SerializeField] private bool canAggro = true;
@@ -1085,6 +1095,8 @@ public class MutantEnemy : NetworkBehaviour
         rb.linearVelocity = velocity;
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
+        AttachGoreLandingDecalSpawner(piece);
+
         junk.enabled = true;
         netObj.Spawn(destroyWithScene: true);
 
@@ -1169,7 +1181,23 @@ public class MutantEnemy : NetworkBehaviour
         rb.linearVelocity = velocity;
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
+        AttachGoreLandingDecalSpawner(piece);
+
         Destroy(piece, goreLifetime);
+    }
+
+    /// <summary>
+    /// Adds a <see cref="GoreLandingDecalSpawner"/> to a physics-driven gore piece so a blood
+    /// decal appears on the ground at the point where it first lands. No-op when
+    /// <see cref="bloodDecalPrefabs"/> is empty.
+    /// </summary>
+    private void AttachGoreLandingDecalSpawner(GameObject piece)
+    {
+        if (bloodDecalPrefabs == null || bloodDecalPrefabs.Length == 0)
+            return;
+
+        GoreLandingDecalSpawner spawner = piece.AddComponent<GoreLandingDecalSpawner>();
+        spawner.Initialize(bloodDecalPrefabs, goreGroundLayer, bloodDecalLifetime);
     }
 
     [ClientRpc]

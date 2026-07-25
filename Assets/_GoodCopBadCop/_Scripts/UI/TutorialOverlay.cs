@@ -28,6 +28,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject accuracyPayoutTutorialScreen;
     [SerializeField] private GameObject trashTutorialScreen;
     [SerializeField] private GameObject graffitiTutorialScreen;
+    [SerializeField] private GameObject sortingMailTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -94,6 +95,9 @@ public class TutorialOverlay : MonoBehaviour
 
     /// <summary>Shows the end-of-shift graffiti task tutorial overlay.</summary>
     public void ShowGraffitiTutorial(Action onComplete = null) => ShowScreen(graffitiTutorialScreen, onComplete);
+
+    /// <summary>Shows the sorting-mail tutorial overlay (Day 2, right after Vlad unlocks the tool locker).</summary>
+    public void ShowSortingMailTutorial(Action onComplete = null) => ShowScreen(sortingMailTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

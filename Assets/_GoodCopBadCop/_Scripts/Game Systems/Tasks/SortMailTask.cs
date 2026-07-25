@@ -115,6 +115,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Local state (server-only) ─────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedPackages = new();
+
+    /// <summary>Packages correctly delivered to a mailbox cubby that are left sitting there
+    /// (locked, no longer despawned immediately — see <see cref="MailPackageItem.MarkDelivered"/>)
+    /// until <see cref="DespawnDeliveredPackages"/> clears them at the start of the next day.</summary>
+    private readonly List<NetworkObject> _deliveredPackages = new();
     private readonly List<string> _todaysAllowedGoods = new();
     private readonly List<string> _todaysProhibitedGoods = new();
     private bool _taskActive;
@@ -124,6 +129,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// separately from <see cref="_lastTriggeredDay"/> since the goods roll happens every day
     /// (including Day 1), while the delivery itself only triggers after Day 1.</summary>
     private int _lastGoodsRollDay = -1;
+
+    /// <summary>
+    /// When set to a day number, <see cref="OnDayChanged"/> skips its normal automatic delivery
+    /// trigger for that specific day — it just marks the day as handled and returns, leaving the
+    /// caller responsible for invoking <see cref="TriggerDeferredDelivery"/> once ready. Used by
+    /// Day 2, where the mail delivery must not appear until Vlad's tool locker dialogue finishes.
+    /// Reset to -1 automatically once consumed. Must be set before the day actually changes
+    /// (e.g. in a day script's DayActivated, which CampaignManager calls before OnDayChanged).
+    /// </summary>
+    public static int DeferAutoTriggerForDay = -1;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
@@ -251,6 +266,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
 
+        // Clear out any packages left sitting in mailboxes from the previous day's delivery.
+        DespawnDeliveredPackages();
+
         if (day != _lastGoodsRollDay)
         {
             _lastGoodsRollDay = day;
@@ -262,10 +280,52 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _lastTriggeredDay = day;
 
+        if (day == DeferAutoTriggerForDay)
+        {
+            DeferAutoTriggerForDay = -1;
+            Debug.Log($"[SortMailTask] Day {day} delivery deferred — waiting for a manual TriggerDeferredDelivery() call.");
+            return;
+        }
+
         if (_deliveryTruck != null)
             _deliveryTruck.BeginDeliverySequence();
         else
             TriggerTask();
+    }
+
+    /// <summary>
+    /// Manually fires a delivery that was deferred via <see cref="DeferAutoTriggerForDay"/>. Uses
+    /// the same dispatch as the automatic day-change trigger (truck cutscene if assigned, else an
+    /// immediate spawn). Server-only.
+    /// </summary>
+    public void TriggerDeferredDelivery()
+    {
+        if (!IsServer) return;
+
+        if (_deliveryTruck != null)
+            _deliveryTruck.BeginDeliverySequence();
+        else
+            TriggerTask();
+    }
+
+    /// <summary>
+    /// Server-only. Despawns every package that was correctly delivered to a mailbox cubby and
+    /// left sitting there (see <see cref="MailPackageItem.MarkDelivered"/>). Called at the start
+    /// of every day change so mailboxes don't accumulate packages indefinitely.
+    /// </summary>
+    public void DespawnDeliveredPackages()
+    {
+        if (!IsServer) return;
+        if (_deliveredPackages.Count == 0) return;
+
+        foreach (NetworkObject packageObj in _deliveredPackages)
+        {
+            if (packageObj != null && packageObj.IsSpawned)
+                packageObj.Despawn(destroy: true);
+        }
+
+        Debug.Log($"[SortMailTask] Despawned {_deliveredPackages.Count} delivered package(s) left in mailboxes.");
+        _deliveredPackages.Clear();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -330,9 +390,20 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (isCorrect)
         {
-            package.MarkResolved();
-            _spawnedPackages.Remove(package.NetworkObject);
-            package.NetworkObject.Despawn(destroy: true);
+            if (binType == MailSortBinType.Delivery)
+            {
+                // Delivered packages stay sitting in the mailbox (locked, no longer interactable)
+                // instead of despawning immediately — cleared at the start of the next day.
+                package.MarkDelivered();
+                _spawnedPackages.Remove(package.NetworkObject);
+                _deliveredPackages.Add(package.NetworkObject);
+            }
+            else
+            {
+                package.MarkResolved();
+                _spawnedPackages.Remove(package.NetworkObject);
+                package.NetworkObject.Despawn(destroy: true);
+            }
 
             _sortedCount.Value = Mathf.Min(_sortedCount.Value + 1, _totalCount.Value);
             Debug.Log($"[SortMailTask] Correctly sorted '{package.ResidentName}' ({package.GoodsLabel}) into {binType}. " +
@@ -474,10 +545,23 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (ATM.Instance != null)
             ATM.Instance.SpawnCoupons(_couponReward);
 
-        OnAllPackagesSorted?.Invoke();
         OnDailyTaskCompleted?.Invoke();
 
+        // EvaluateSort (and therefore CompleteTask) only ever runs on the server, so
+        // OnAllPackagesSorted must be broadcast via ClientRpc rather than invoked directly —
+        // otherwise remote clients would never fire it and their tutorial objective row would
+        // never get marked complete / hidden, even though the sorted/total counts (driven by the
+        // replicated NetworkVariables) display correctly for them.
+        NotifyAllPackagesSortedClientRpc();
+
         _isActive.Value = false;
+    }
+
+    /// <summary>Runs on every client (including the host) so <see cref="OnAllPackagesSorted"/> fires identically everywhere.</summary>
+    [ClientRpc]
+    private void NotifyAllPackagesSortedClientRpc()
+    {
+        OnAllPackagesSorted?.Invoke();
     }
 
     private void UpdateThreatLevel()

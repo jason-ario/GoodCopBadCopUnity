@@ -83,6 +83,10 @@ public class DeliveryTruckController : NetworkBehaviour
     [SerializeField] private AudioClip driveClip;
     [Tooltip("Delay after the drive clip starts before the truck actually begins moving, so the engine can rev first.")]
     [SerializeField] private float driveRevDelay = 1.5f;
+    [Tooltip("One-shot sound played when the crate lands after tumbling off the truck's roof.")]
+    [SerializeField] private AudioClip crateDropSfxClip;
+    [Tooltip("Volume for crateDropSfxClip.")]
+    [SerializeField] private float crateDropSfxVolume = 1f;
 
     [Header("Timing")]
     [Tooltip("How long the truck idles at pointC after dropping the crate before driving back — packages are spawned as soon as the crate settles.")]
@@ -396,6 +400,9 @@ public class DeliveryTruckController : NetworkBehaviour
         }
 
         deliveryCrate.SetPositionAndRotation(_crateRestPosition, _crateRestRotation);
+
+        if (crateDropSfxClip != null)
+            AudioSource.PlayClipAtPoint(crateDropSfxClip, _crateRestPosition, crateDropSfxVolume);
     }
 
     // -------------------------------------------------------------------------

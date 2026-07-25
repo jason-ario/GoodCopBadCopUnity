@@ -22,7 +22,11 @@ using UnityEngine;
 ///   he opens the booth door, performs an unlock gesture at the tool locker (unlocking
 ///   the padlock), then faces his final position and waits. When a player approaches him
 ///   there a second dialogue explains the tool locker. Vlad then makes an ominous remark
-///   and walks off.
+///   and walks off. Immediately after that dialogue finishes, the Day 2 mail delivery is
+///   triggered (see StartMailSortingSequence) — it is deliberately deferred from the normal
+///   automatic day-change trigger (SortMailTask.DeferAutoTriggerForDay) so mail never appears
+///   before Vlad has unlocked the tool locker. The sorting-mail tutorial overlay shows on all
+///   clients; once closed, the tutorial objective list shows the "Sort the mail" task.
 /// </summary>
 public class Day_02 : DayBase
 {
@@ -133,6 +137,15 @@ public class Day_02 : DayBase
     // Active tutorial objective item for the graffiti task — kept as a field so
     // OnGraffitiProgress can update its text from outside the coroutine.
     private TutorialObjectiveItem _graffitiObjectiveItem;
+
+    [Header("Day 2 — Mail Sorting Tutorial")]
+    [Tooltip("Base objective text shown in the tutorial list. The sorted/total count is appended automatically, " +
+             "e.g. 'Sort the mail 0/18'.")]
+    [SerializeField] private string _taskSortMailText = "Sort the mail";
+
+    // Active tutorial objective item for the mail sorting task — kept as a field so
+    // OnSortMailProgressChanged can update its text from outside the coroutine.
+    private TutorialObjectiveItem _taskSortMail;
 
     // -------------------------------------------------------------------------
     // Day 2 Post-Shift Vlad Sequence (Out Back)
@@ -297,6 +310,10 @@ public class Day_02 : DayBase
         _debugSkipOpening            = false;
         _spawnedVlad                 = null;
 
+        // Defer the automatic Day 2 mail delivery — it must not appear until Vlad's tool locker
+        // dialogue finishes (see StartMailSortingSequence), not immediately on day change.
+        SortMailTask.DeferAutoTriggerForDay = 2;
+
         if (_vladCharacter == null)
             Debug.LogWarning("[Day_02] _vladCharacter prefab not assigned — opening sequence will be skipped.", this);
 
@@ -324,6 +341,11 @@ public class Day_02 : DayBase
         // Clean up graffiti tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
         _graffitiObjectiveItem = null;
+
+        // Clean up mail sorting tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
+        SortMailTask.OnProgressChanged   -= OnSortMailProgressChanged;
+        SortMailTask.OnAllPackagesSorted -= OnSortMailTaskComplete;
+        _taskSortMail = null;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -408,7 +430,17 @@ public class Day_02 : DayBase
         // Unlock the tool locker so it isn't still padlocked when the player is in-world.
         _toolLockerLock?.ForceUnlock();
 
-        Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked.");
+        // Vlad's sequence — which would normally trigger the mail delivery right after the tool
+        // locker dialogue — is being skipped entirely. If OnDayChanged hasn't deferred day 2's
+        // delivery yet, clear the flag so it fires via the normal automatic trigger; otherwise
+        // it's already been deferred and waiting for a manual call that will never come, so fire
+        // it directly.
+        if (SortMailTask.DeferAutoTriggerForDay == 2)
+            SortMailTask.DeferAutoTriggerForDay = -1;
+        else
+            SortMailTask.Instance?.TriggerDeferredDelivery();
+
+        Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked.");
     }
 
     // -------------------------------------------------------------------------
@@ -552,6 +584,11 @@ public class Day_02 : DayBase
         // Show the graffiti tutorial objective and track progress independently of Vlad's exit.
         // The graffiti lines are the last two nodes of _vladToolLockerDialogue — already spoken above.
         StartCoroutine(GraffitiObjectiveSequence());
+
+        // Now that Vlad has unlocked the tool locker, trigger the Day 2 mail delivery (deferred
+        // from the automatic day-change trigger) and show the sorting-mail tutorial overlay on
+        // all clients. See StartMailSortingSequence.
+        StartMailSortingSequence();
 
         // ── Phase 5: Vlad returns to the yard and settles in ───────────────────
         yield return new WaitForSeconds(_vladExitDelay);
@@ -756,6 +793,73 @@ public class Day_02 : DayBase
 
     private string BuildGraffitiObjectiveText(int scrubbed, int total) =>
         $"{_taskCleanGraffitiText} {scrubbed}/{total}";
+
+    // -------------------------------------------------------------------------
+    // Mail Sorting Tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. Triggers the Day 2 mail delivery — deferred from the automatic day-change
+    /// trigger via <see cref="SortMailTask.DeferAutoTriggerForDay"/> so it never appears before
+    /// Vlad has unlocked the tool locker — and broadcasts to all clients that the sorting-mail
+    /// tutorial overlay should show. Called right after the tool locker dialogue finishes.
+    /// </summary>
+    private void StartMailSortingSequence()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        SortMailTask.Instance?.TriggerDeferredDelivery();
+        Day02NetworkSync.Instance?.ShowMailSortingTutorial();
+    }
+
+    /// <summary>
+    /// Runs on every client via <see cref="Day02NetworkSync.ShowMailSortingTutorialClientRpc"/>.
+    /// Shows the sorting-mail tutorial overlay; once the player closes it, shows the tutorial
+    /// objective list with the "Sort the mail" task and tracks live progress until every package
+    /// has been correctly sorted.
+    /// </summary>
+    public void ShowMailSortingTutorialLocal()
+    {
+        TutorialOverlay.Instance?.ShowSortingMailTutorial(OnMailSortingTutorialClosed);
+    }
+
+    /// <summary>
+    /// Called once the player closes the sorting-mail tutorial overlay. Adds the "Sort the mail"
+    /// objective to the tutorial objective list (which slides the list in automatically) and
+    /// subscribes to live progress until every package is sorted.
+    /// </summary>
+    private void OnMailSortingTutorialClosed()
+    {
+        _taskSortMail = TutorialObjectiveList.Instance?.AddObjective(GetSortMailTaskText());
+
+        SortMailTask.OnProgressChanged   += OnSortMailProgressChanged;
+        SortMailTask.OnAllPackagesSorted += OnSortMailTaskComplete;
+    }
+
+    /// <summary>
+    /// Called whenever <see cref="SortMailTask.OnProgressChanged"/> fires (driven by replicated
+    /// NetworkVariable changes, so this runs identically on every client). Updates the live
+    /// count label on the tutorial objective row.
+    /// </summary>
+    private void OnSortMailProgressChanged()
+    {
+        _taskSortMail?.SetText(GetSortMailTaskText());
+    }
+
+    private void OnSortMailTaskComplete()
+    {
+        SortMailTask.OnProgressChanged   -= OnSortMailProgressChanged;
+        SortMailTask.OnAllPackagesSorted -= OnSortMailTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskSortMail);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        _taskSortMail = null;
+    }
+
+    private string GetSortMailTaskText() =>
+        SortMailTask.Instance != null && SortMailTask.Instance.TotalCount > 0
+            ? $"{_taskSortMailText} {SortMailTask.Instance.SortedCount}/{SortMailTask.Instance.TotalCount}"
+            : _taskSortMailText;
 
     // -------------------------------------------------------------------------
     // Suspect arrival — fire tutorial once on the first suspect with a mutation anomaly

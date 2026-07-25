@@ -48,4 +48,23 @@ public class Day02NetworkSync : NetworkBehaviour
     {
         Day_02.Instance?.ActivateDeadAnimalLocal();
     }
+
+    // ── Mail Sorting Tutorial ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Notifies all clients that Vlad's tool locker sequence has finished and the sorting-mail
+    /// tutorial overlay should show. Server-only. Called by <see cref="Day_02"/> right after the
+    /// tool locker dialogue completes.
+    /// </summary>
+    public void ShowMailSortingTutorial()
+    {
+        if (!IsServer) return;
+        ShowMailSortingTutorialClientRpc();
+    }
+
+    [ClientRpc]
+    private void ShowMailSortingTutorialClientRpc()
+    {
+        Day_02.Instance?.ShowMailSortingTutorialLocal();
+    }
 }
