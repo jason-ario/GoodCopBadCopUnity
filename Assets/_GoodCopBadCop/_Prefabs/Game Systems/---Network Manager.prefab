@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 7721090385761821857}
   - component: {fileID: 6512953315529076578}
   - component: {fileID: 6322275724560792444}
-  - component: {fileID: 460626101277801702}
   m_Layer: 0
   m_Name: ---Network Manager
   m_TagString: Untagged
@@ -49,7 +48,7 @@ MonoBehaviour:
   NetworkManagerExpanded: 0
   NetworkConfig:
     ProtocolVersion: 0
-    NetworkTransport: {fileID: 460626101277801702}
+    NetworkTransport: {fileID: 0}
     PlayerPrefab: {fileID: 0}
     Prefabs:
       NetworkPrefabsLists:
@@ -100,23 +99,10 @@ MonoBehaviour:
   ConnectionData:
     Address: 0.0.0.0
     Port: 7777
+    WebSocketPath: /
     ServerListenAddress: 0.0.0.0
+    ClientBindPort: 0
   DebugSimulator:
     PacketDelayMS: 0
     PacketJitterMS: 0
     PacketDropRate: 0
---- !u!114 &460626101277801702
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4570007536955076168}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5ff6ce59565044e8d8b036c5484e2e72, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Facepunch Transport for Netcode for GameObjects::Netcode.Transports.Facepunch.FacepunchTransport
-  steamAppId: 3262820
-  targetSteamId: 3262820
-  userSteamId: 0
