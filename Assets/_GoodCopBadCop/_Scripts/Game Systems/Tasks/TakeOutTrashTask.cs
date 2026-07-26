@@ -448,11 +448,23 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Debug.Log("[TakeOutTrashTask] All items deposited — task complete.");
         ATM.Instance?.SpawnCoupons(_couponReward);
-        OnAllItemsDeposited?.Invoke();
-        OnDailyTaskCompleted?.Invoke();
 
         // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
         _isActive.Value = false;
+
+        // Broadcast completion to every client, not just wherever this ServerRpc-triggered
+        // code happens to run (the server/host process). Day_01 subscribes to these events
+        // per-client to gate the shared TutorialObjectiveList; previously OnAllItemsDeposited/
+        // OnDailyTaskCompleted only ever fired locally on the server, so remote (non-host)
+        // clients never received them.
+        NotifyTaskCompletedClientRpc();
+    }
+
+    [ClientRpc]
+    private void NotifyTaskCompletedClientRpc()
+    {
+        OnAllItemsDeposited?.Invoke();
+        OnDailyTaskCompleted?.Invoke();
     }
 
     private void OnJunkItemCollected()

@@ -27,7 +27,15 @@ public class HandOffPoint : PlacementBoard
 
         FolderController folderController = pickableObject.GetComponent<FolderController>();
         if (folderController == null) return;
-        if (SuspectController.Instance.CurrentSuspect == null) return;
+
+        // Do NOT gate on SuspectController.Instance.CurrentSuspect here. CurrentSuspect is set
+        // synchronously on the server but only arrives on non-host clients asynchronously via
+        // AssignReferencesClientRpc → WaitForSpawnAndAssign. If a non-host player places the
+        // folder before that RPC has resolved on their machine, this local check would silently
+        // return and DeliverVerdict would never even be called — the handoff would appear to do
+        // nothing for that player while working fine for the host. The server always has an
+        // up-to-date suspectCharacter reference, so the "is there a suspect at the window" guard
+        // is enforced authoritatively in SuspectController.ExecuteVerdict instead.
 
         if (!folderController.IsStamped) return;
 

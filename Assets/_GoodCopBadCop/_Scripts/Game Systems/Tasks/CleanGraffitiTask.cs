@@ -208,7 +208,6 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isComplete = true;
 
         ATM.Instance?.SpawnCoupons(_couponReward);
-        OnDailyTaskCompleted?.Invoke();
 
         MarkCompleteClientRpc();
 
@@ -226,6 +225,13 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         TutorialObjectiveList.Instance?.CompleteObjective(_tutorialObjectiveItem);
         _tutorialObjectiveItem = null;
+
+        // Fired here (rather than inline in OnGraffitiScrubbed) so every client — not just
+        // the server/host process — receives the completion notification. Day_01/Day_02
+        // subscribe to this per-client to gate the shared TutorialObjectiveList; previously
+        // this only ever invoked locally wherever OnGraffitiScrubbed's IsServer-gated code
+        // ran, so remote (non-host) clients never saw it.
+        OnDailyTaskCompleted?.Invoke();
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────

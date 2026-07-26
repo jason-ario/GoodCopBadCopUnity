@@ -1131,6 +1131,24 @@ public class ShiftManager : NetworkBehaviour
 
     private void RunInitiateIntroCutscene()
     {
+        StartCoroutine(RunInitiateIntroCutsceneSequence());
+    }
+
+    /// <summary>
+    /// Waits for <see cref="PlayerInstance.Instance"/> to be available before touching it.
+    /// This runs via <see cref="InitiateIntroCutsceneClientRpc"/> on every client, including
+    /// clients whose local player may not have finished spawning/assigning
+    /// <see cref="PlayerInstance.Instance"/> yet. Without this guard, a null reference here
+    /// throws and silently aborts before <see cref="PlayIntroCutscene"/> ever starts — which
+    /// means that client's own CinemachineCamera never gets disabled via
+    /// <see cref="PlayerInstance.SetOwnCameraActive"/>, producing an erratic camera once the
+    /// cutscene vcam takes over. Mirrors the existing wait pattern in
+    /// <see cref="SkipToBoothReadySequence"/>.
+    /// </summary>
+    private IEnumerator RunInitiateIntroCutsceneSequence()
+    {
+        yield return new WaitUntil(() => PlayerInstance.Instance != null);
+
         UIController.Instance.ClosePlayerUI();
         PlayerInstance.Instance.SetCanInteract(false);
         PlayerInstance.Instance.SetCanMove(false);

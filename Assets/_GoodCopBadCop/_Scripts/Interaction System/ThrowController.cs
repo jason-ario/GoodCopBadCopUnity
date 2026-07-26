@@ -50,12 +50,17 @@ public class ThrowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Begins accumulating throw charge. No-op when no item is held.
+    /// Begins accumulating throw charge. No-op when no item is held, or when the
+    /// held item's <see cref="PickableItemData.canBeThrown"/> flag is false (e.g. stamps).
     /// Called by <see cref="PlayerInteractionController"/> on F key down.
     /// </summary>
     public void StartCharge()
     {
         if (!_pickupController.IsHoldingObject) return;
+
+        PickableItemData heldItemData = _pickupController.HeldObject.ItemData;
+        if (heldItemData != null && !heldItemData.canBeThrown) return;
+
         _chargeTime = 0f;
         _isCharging = true;
         if (throwArcLine != null) throwArcLine.gameObject.SetActive(true);

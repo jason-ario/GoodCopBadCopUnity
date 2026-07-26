@@ -14,6 +14,9 @@ using UnityEngine;
 /// </summary>
 public class TaskPage : MonoBehaviour
 {
+    /// <summary>Scene-local instance, used by CampaignManager to reset the page on day change.</summary>
+    public static TaskPage Instance { get; private set; }
+
     [Header("Row Spawning")]
     [Tooltip("Prefab with a TaskPageRow component. Instantiated once per tracked task.")]
     [SerializeField] private GameObject _taskRowPrefab;
@@ -31,6 +34,11 @@ public class TaskPage : MonoBehaviour
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
+    private void Awake()
+    {
+        Instance = this;
+    }
+
     private void OnEnable()
     {
         TaskRegistry.OnTaskListChanged  += OnTaskListChanged;
@@ -42,6 +50,24 @@ public class TaskPage : MonoBehaviour
     {
         TaskRegistry.OnTaskListChanged  -= OnTaskListChanged;
         TaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Clears every task the page has ever tracked (active and completed/struck-through)
+    /// and rebuilds the (now empty) row list. Call this when a day ends so the page
+    /// doesn't keep accumulating stale entries from previous days.
+    /// </summary>
+    public void ResetTasks()
+    {
+        _knownTasks.Clear();
+        RebuildRows();
     }
 
     // ── TaskRegistry event handlers ───────────────────────────────────────────

@@ -67,6 +67,13 @@ public class Day_01 : DayBase
              "to the spawn point, then he walks in like a normal suspect.")]
     [SerializeField] private SuspectCharacter _soldierCharacter;
 
+    /// <summary>
+    /// Exposes the scene-placed Soldier so <see cref="CampaignManager"/> can despawn him
+    /// once any day other than Day 1 becomes active — he's only ever needed for this one
+    /// scripted moment. See <see cref="CampaignManager.ApplyDay"/>.
+    /// </summary>
+    public SuspectCharacter SoldierCharacter => _soldierCharacter;
+
     [Tooltip("Scripted dialogue sequence to play once the Soldier sequence begins.")]
     [SerializeField] private ScriptedDialogue _soldierDialogue;
 
@@ -2039,6 +2046,12 @@ public class Day_01 : DayBase
             TutorialMarkerManager.Instance.Unmark(_markerBunkBed);
 
         _bunkBedInteractable?.Highlight(false);
+
+        // Safety net: the objective list should already be hidden by OnBunkerDoorOpened, but
+        // if any upstream tutorial step failed to clear it (e.g. a completion notification
+        // that didn't reach this client), force it closed now so it never carries over into
+        // the night phase or the next day. Safe to call when already hidden.
+        TutorialObjectiveList.Instance?.HideAndClear();
     }
 
     // -------------------------------------------------------------------------

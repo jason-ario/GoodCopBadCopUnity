@@ -784,10 +784,28 @@ public class SuspectCharacter : Interactable
         if (_mutantSuspectBehaviour == null)
             _mutantSuspectBehaviour = GetComponent<MutantSuspectBehaviour>();
 
+        // MutantEnemy must stay fully dormant until BeginMutantBehavior() fires after the booth
+        // cutscene. Disabling the component's 'enabled' flag alone is NOT enough — Netcode calls
+        // OnNetworkSpawn() on every NetworkBehaviour regardless of its enabled state, so without
+        // DisableAutoInit() here, MutantEnemy.InitialiseServer() would still fire the instant this
+        // NetworkObject spawns (immediately for scene-placed suspects, since in-scene NetworkObjects
+        // auto-spawn on scene load) and throw trying to drive a NavMeshAgent that Awake disables
+        // below. Both calls must happen before NetworkObject.Spawn(), which Awake guarantees.
+        if (_mutantEnemy != null)
+        {
+            _mutantEnemy.DisableAutoInit();
+            _mutantEnemy.enabled = false;
+        }
+
+        if (_mutantSuspectBehaviour != null)
+            _mutantSuspectBehaviour.enabled = false;
+
         // Cache and disable NavMeshAgent by default; server enables it via InitNavigation().
         _navAgent = GetComponent<NavMeshAgent>();
         if (_navAgent != null)
             _navAgent.enabled = false;
+
+        _bodyCollider = GetComponent<CapsuleCollider>();
 
         // Scene-placed characters that must stay active for NGO registration (e.g. the Soldier)
         // hide their renderers/collider until RevealVisuals() is called. This runs identically on
@@ -1225,21 +1243,33 @@ public class SuspectCharacter : Interactable
     }
 
     [Header("Scene-Placed Visibility")]
-    [Tooltip("When true, this character's renderers and interaction collider start disabled even " +
-             "though the GameObject itself stays active. Used for scripted, scene-placed characters " +
-             "(e.g. the Soldier on Day 1) that must remain active at scene load so NGO registers their " +
-             "in-scene NetworkObject for every client, but shouldn't be visible or interactable until " +
-             "their sequence begins. Call RevealVisuals() on the server to show the character " +
+    [Tooltip("When true, this character's renderers, interaction collider, physical body collider, " +
+             "Animator, and NavMeshAgent all start disabled even though the GameObject itself stays " +
+             "active. Used for scripted, scene-placed characters (e.g. the Soldier on Day 1) that " +
+             "must remain active at scene load so NGO registers their in-scene NetworkObject for " +
+             "every client, but shouldn't be visible, interactable, animating, colliding, or moving " +
+             "until their sequence begins. Call RevealVisuals() on the server to show the character " +
              "(e.g. from SuspectController.IntroduceSceneSuspect).")]
     [SerializeField] private bool _hiddenUntilRevealed = false;
 
     private Renderer[] _cachedRenderers;
     private bool _visualsHidden;
+    private CapsuleCollider _bodyCollider;
 
     /// <summary>
-    /// Enables or disables all renderers and the interaction collider on this character.
-    /// Runs identically on every client since it is called from deterministic startup state
-    /// (Awake) or from a replicated RPC — it never needs to touch networked state itself.
+    /// Enables or disables everything a hidden-until-revealed character shouldn't be doing while
+    /// dormant: renderers, the interaction collider, the physical body collider, the Animator, and
+    /// the NavMeshAgent. Runs identically on every client since it is called from deterministic
+    /// startup state (Awake) or from a replicated RPC — it never needs to touch networked state
+    /// itself.
+    /// The GameObject and its NetworkObject/NetworkBehaviours are deliberately left active/enabled
+    /// throughout — deactivating the whole GameObject at runtime is unsafe for an already-spawned
+    /// NetworkObject (it stops receiving RPCs and NetworkVariable updates), and would also prevent
+    /// NGO from ever registering this in-scene NetworkObject for clients in the first place.
+    /// MutantEnemy/MutantSuspectBehaviour are intentionally NOT touched here — they're kept
+    /// permanently disabled from Awake() and only turned on later by BeginMutantBehavior(), and
+    /// NavMeshAgent is intentionally left disabled on reveal — InitNavigation() turns it on when
+    /// the walk-in sequence actually begins.
     /// </summary>
     private void SetVisualsHidden(bool hidden)
     {
@@ -1252,6 +1282,15 @@ public class SuspectCharacter : Interactable
             if (r != null) r.enabled = !hidden;
 
         SetCanInteract(!hidden);
+
+        if (_bodyCollider != null) _bodyCollider.enabled = !hidden;
+        if (animator != null) animator.enabled = !hidden;
+
+        if (hidden)
+        {
+            if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+            if (_navAgent != null) _navAgent.enabled = false;
+        }
     }
 
     /// <summary>

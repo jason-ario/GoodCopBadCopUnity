@@ -7,6 +7,9 @@ public class PickableItemData : ScriptableObject
     public GameObject PickUpPrefab => pickUpPrefab;
     public bool canBeHung = false;
 
+    [Tooltip("When false, this item cannot be charged/thrown via ThrowController (e.g. stamps). Held/placed normally as usual.")]
+    public bool canBeThrown = true;
+
     public enum Hand
     {
         Left,

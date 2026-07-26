@@ -316,6 +316,11 @@ public class CampaignManager : NetworkBehaviour
         dayBase.gameObject.SetActive(true);
         ActiveDay = dayBase;
 
+        // Reset the between-shift task manager and task page so tasks from the
+        // previous day don't persist and keep piling up on the paper.
+        BetweenShiftTaskManager.Instance?.ResetForNewDay();
+        TaskPage.Instance?.ResetTasks();
+
         // Push day number to ShiftManager.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.SetCurrentDay(day);
@@ -335,7 +340,34 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer)
             ResetAllPlayersHealth();
 
+        // The Day 1 scripted Soldier only exists for his one Day 1 cutscene moment.
+        // Once any other day is active — whether reached via normal progression or a
+        // debug day-jump that skips Day 1 entirely — permanently remove him.
+        if (IsServer && day != 1)
+            DespawnDay1Soldier();
+
         Debug.Log($"[CampaignManager] Day {day} applied.");
+    }
+
+    /// <summary>
+    /// Server-only. Despawns and destroys Day 1's scene-placed Soldier
+    /// (<see cref="Day_01.SoldierCharacter"/>) if he is still spawned. No-op if Day 1 was
+    /// never instantiated, the soldier reference wasn't assigned, or he's already gone.
+    /// Uses <see cref="NetworkObject.Despawn"/> rather than deactivating the GameObject —
+    /// Netcode does not deliver RPCs or NetworkVariable updates to an inactive spawned
+    /// NetworkObject, so despawning is the only safe way to remove him from the scene.
+    /// </summary>
+    private void DespawnDay1Soldier()
+    {
+        SuspectCharacter soldier = Day_01.Instance != null ? Day_01.Instance.SoldierCharacter : null;
+        if (soldier == null) return;
+
+        NetworkObject netObj = soldier.GetComponent<NetworkObject>();
+        if (netObj != null && netObj.IsSpawned)
+        {
+            netObj.Despawn(true);
+            Debug.Log("[CampaignManager] Day 1 Soldier despawned — no longer Day 1.");
+        }
     }
 
     private bool TryEnsurePopulationInitialized()

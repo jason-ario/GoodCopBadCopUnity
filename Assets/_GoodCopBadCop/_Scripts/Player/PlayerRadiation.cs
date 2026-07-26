@@ -20,6 +20,20 @@ public class PlayerRadiation : NetworkBehaviour
     [Tooltip("Maximum health damage per second dealt at 100% radiation.")]
     [SerializeField] private float maxRadiationDamagePerSecond = 5f;
 
+    [Header("Radiation Tick Feedback")]
+    [Tooltip("Radiation gain rate (units/sec) above which the distinct radiation-tick feedback " +
+             "(vignette pulse / camera kick / tick sound) plays on damage. Below this rate, damage " +
+             "still applies but uses the default damage feedback instead of the tick.")]
+    [SerializeField] private float tickFeedbackRateThreshold = 0.5f;
+    [Tooltip("EMA time constant (seconds) used to smooth the measured radiation gain rate.")]
+    [SerializeField] private float rateSmoothingWindow = 0.4f;
+
+    private float _previousRadiationForRate;
+    private float _smoothedRadiationRate;
+
+    /// <summary>Smoothed radiation gain rate, in units/sec. Reflects current velocity, not accrued total.</summary>
+    public float RadiationRate => _smoothedRadiationRate;
+
     [Header("Death")]
     [SerializeField] private bool dieAtMaxRadiation = true;
 
@@ -86,13 +100,32 @@ public class PlayerRadiation : NetworkBehaviour
                 isTakingPill = false;
         }
 
+        UpdateRadiationRate();
         ApplyRadiationDamage();
         CheckRadiationState();
     }
 
     /// <summary>
+    /// Tracks how fast radiation is currently being gained (units/sec), independent of the
+    /// accrued total. Pill drain (a decrease) is clamped to zero so it never registers as a gain.
+    /// </summary>
+    private void UpdateRadiationRate()
+    {
+        float instantRate = (currentRadiation - _previousRadiationForRate) / Time.deltaTime;
+        _previousRadiationForRate = currentRadiation;
+
+        instantRate = Mathf.Max(0f, instantRate);
+
+        float alpha = Mathf.Clamp01(Time.deltaTime / Mathf.Max(rateSmoothingWindow, 0.001f));
+        _smoothedRadiationRate = Mathf.Lerp(_smoothedRadiationRate, instantRate, alpha);
+    }
+
+    /// <summary>
     /// Deals damage to the player scaled linearly between the threshold and max radiation.
-    /// No damage is applied below the threshold.
+    /// No damage is applied below the threshold. The distinct radiation-tick feedback (vignette
+    /// pulse / camera kick / tick sound) only plays while radiation is actively climbing fast
+    /// (<see cref="RadiationRate"/> above <see cref="tickFeedbackRateThreshold"/>) — not merely
+    /// because the accrued total is above the damage threshold.
     /// </summary>
     private void ApplyRadiationDamage()
     {
@@ -102,7 +135,12 @@ public class PlayerRadiation : NetworkBehaviour
         // Remap normalized radiation from [threshold, 1] to [0, 1].
         float damageScale = (Normalized - radiationDamageThreshold) / (1f - radiationDamageThreshold);
         float damage = maxRadiationDamagePerSecond * damageScale * Time.deltaTime;
-        playerHealth.TakeDamage(damage, EffectKeys.RadiationTickDamage);
+
+        string effectKey = _smoothedRadiationRate >= tickFeedbackRateThreshold
+            ? EffectKeys.RadiationTickDamage
+            : EffectKeys.DefaultPlayerDamage;
+
+        playerHealth.TakeDamage(damage, effectKey);
     }
 
     public void AddRadiation(float amount)

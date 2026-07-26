@@ -553,6 +553,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: e80f149ad6a63a44f859f976d74bb291, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7649986326165887056}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: e80f149ad6a63a44f859f976d74bb291, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8962585819241929909}
   m_SourcePrefab: {fileID: 100100000, guid: e80f149ad6a63a44f859f976d74bb291, type: 3}
 --- !u!1 &8093225277174320017 stripped
 GameObject:
@@ -602,8 +605,10 @@ MonoBehaviour:
   interactText: Thermometer
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 59ad8970a01f44f448b5b74b3878a49b, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   thermometerText: {fileID: 6197059357419278471}
-  maxDistance: 1
+  maxDistance: 3
   screenRenderer: {fileID: 7867845385414485236}
   highColor: {r: 1, g: 0, b: 0, a: 1}
   normalColor: {r: 0, g: 1, b: 0, a: 1}
@@ -1028,6 +1033,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 0
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &8962585819241929909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8093225277174320017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!4 &8870746761296105771 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: e80f149ad6a63a44f859f976d74bb291, type: 3}

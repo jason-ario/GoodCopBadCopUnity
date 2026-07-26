@@ -1802,6 +1802,12 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        if (suspectCharacter == null)
+        {
+            Debug.LogWarning("[SuspectController] ExecuteVerdict: no current suspect on the server — ignoring verdict.");
+            return;
+        }
+
         suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();
 
         spawnedFolder = folder;

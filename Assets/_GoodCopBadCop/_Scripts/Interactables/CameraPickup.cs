@@ -11,7 +11,8 @@ using UnityEngine;
 ///   2. LMB while holding → enter camera mode: enables the viewfinder Unity Camera,
 ///      sets the "usingTool" animator bool, disables world interaction.
 ///   3. LMB inside camera mode → take a photo: captures the viewfinder render texture,
-///      spawns a polaroid <see cref="NetworkObject"/> at <see cref="_photoSpawnPoint"/>,
+///      JPG-encodes it, spawns a polaroid <see cref="NetworkObject"/> at <see cref="_photoSpawnPoint"/>,
+///      broadcasts the encoded photo bytes to every client so all players see the same image,
 ///      DOTweens it to <see cref="_photoFinalPoint"/>, then locks it to the camera via
 ///      <see cref="PickableObject.SetSocketFollowWithLocalOffset"/>.
 ///   4. Q inside camera mode → exit camera mode.
@@ -78,12 +79,14 @@ public class CameraPickup : PickableObject
     /// </summary>
     private const float CameraModeCooldown = 0.3f;
 
+    /// <summary>JPG encode quality used when broadcasting the captured photo to all clients.</summary>
+    private const int PhotoJpegQuality = 85;
+
     // ── Runtime state ─────────────────────────────────────────────────────────
 
     private bool _inCameraMode;
     private float _cameraModeEnterTime;
     private bool _isAnimatingPhoto;
-    private Texture2D _capturedPhoto;
     private PlayerInteractionController _interactionController;
 
     /// <summary>
@@ -256,7 +259,7 @@ public class CameraPickup : PickableObject
         // The render camera has been running alongside the viewfinder since EnterCameraMode,
         // so its RT holds the previous frame's fully-composed scene — exactly what the player
         // last saw through the viewfinder. Capture it now, before ExitCameraMode shuts the camera down.
-        CaptureRenderTexture();
+        byte[] photoData = CaptureAndEncodePhoto();
 
         ExitCameraMode();
 
@@ -269,28 +272,34 @@ public class CameraPickup : PickableObject
         Vector3    localFinalPos = _photoFinalPoint.localPosition;
         Quaternion localFinalRot = _photoFinalPoint.localRotation;
 
-        SpawnPhotoServerRpc(localSpawnPos, localSpawnRot, localFinalPos, localFinalRot);
+        SpawnPhotoServerRpc(localSpawnPos, localSpawnRot, localFinalPos, localFinalRot, photoData);
     }
 
     /// <summary>
-    /// Reads the current contents of <see cref="_renderCamera"/>'s target RenderTexture into
-    /// <see cref="_capturedPhoto"/>.
+    /// Reads the current contents of <see cref="_renderCamera"/>'s target RenderTexture and
+    /// JPG-encodes it into a byte array suitable for broadcasting over the network.
     ///
-    /// The Texture2D is created with <c>linear = true</c> because URP writes linear-space
-    /// values into the <c>R8G8B8A8_UNorm</c> render texture (no automatic gamma encoding).
-    /// Marking the Texture2D as linear prevents the material shader from applying a second
-    /// round of sRGB→linear conversion, which would otherwise cause the photo to appear dark.
+    /// The intermediate Texture2D is created with <c>linear = true</c> because URP writes
+    /// linear-space values into the <c>R8G8B8A8_UNorm</c> render texture (no automatic gamma
+    /// encoding). JPG encoding operates on the raw pixel bytes regardless of that flag, so it
+    /// does not affect the resulting file — the flag matters again on the receiving end, where
+    /// the decoded texture must also be marked linear to avoid a double sRGB conversion in the
+    /// polaroid material shader.
     /// </summary>
-    private void CaptureRenderTexture()
+    private byte[] CaptureAndEncodePhoto()
     {
         RenderTexture rt   = _renderCamera.targetTexture;
         RenderTexture prev = RenderTexture.active;
 
-        _capturedPhoto = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false, true);
+        var texture = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false, true);
         RenderTexture.active = rt;
-        _capturedPhoto.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-        _capturedPhoto.Apply();
+        texture.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        texture.Apply();
         RenderTexture.active = prev;
+
+        byte[] data = ImageConversion.EncodeToJPG(texture, PhotoJpegQuality);
+        Destroy(texture);
+        return data;
     }
 
     // ── Photo Spawn RPC ───────────────────────────────────────────────────────
@@ -303,6 +312,7 @@ public class CameraPickup : PickableObject
     private void SpawnPhotoServerRpc(
         Vector3 localSpawnPos, Quaternion localSpawnRot,
         Vector3 localFinalPos, Quaternion localFinalRot,
+        byte[] photoData,
         ServerRpcParams rpcParams = default)
     {
         if (_polaroidPrefab == null) return;
@@ -326,20 +336,23 @@ public class CameraPickup : PickableObject
             new NetworkObjectReference(no),
             localSpawnPos, localSpawnRot,
             localFinalPos, localFinalRot,
-            photographerId);
+            photographerId,
+            photoData);
     }
 
     /// <summary>
     /// Received on all clients. Moves <see cref="_photoFollowPoint"/> to the spawn position,
-    /// attaches the polaroid to it with zero local offset, then DOTweens the follow point
-    /// to the final position in local space on the photographing client (all others snap).
+    /// attaches the polaroid to it with zero local offset, decodes and displays the JPG photo
+    /// data on every client, then DOTweens the follow point to the final position in local
+    /// space on the photographing client (all others snap).
     /// </summary>
     [ClientRpc]
     private void AttachPolaroidClientRpc(
         NetworkObjectReference polaroidRef,
         Vector3 localSpawnPos, Quaternion localSpawnRot,
         Vector3 localFinalPos, Quaternion localFinalRot,
-        ulong photographerClientId)
+        ulong photographerClientId,
+        byte[] photoData)
     {
         if (!polaroidRef.TryGet(out NetworkObject polaroidNO))
         {
@@ -372,25 +385,27 @@ public class CameraPickup : PickableObject
         // follow point animates or the camera moves, the polaroid moves with it.
         polaroid.SetSocketFollowWithLocalOffset(_photoFollowPoint, Vector3.zero, Quaternion.identity);
 
+        // Decode and paint the photo on every client — the JPG bytes travelled through the
+        // server RPC round-trip so all clients (not just the photographer) see the same image.
+        if (photoData != null && photoData.Length > 0)
+        {
+            Polaroid polaroidDisplay = polaroidNO.GetComponent<Polaroid>();
+            if (polaroidDisplay != null)
+            {
+                var photo = new Texture2D(2, 2, TextureFormat.RGB24, false, true);
+                photo.LoadImage(photoData);
+                polaroidDisplay.SetPhoto(photo, takeOwnership: true);
+            }
+            else
+            {
+                Debug.LogWarning("[CameraPickup] Spawned polaroid prefab has no Polaroid component.", this);
+            }
+        }
+
         bool isPhotographer = NetworkManager.Singleton.LocalClientId == photographerClientId;
 
         if (isPhotographer)
         {
-            // Paint the local snapshot onto the polaroid surface.
-            if (_capturedPhoto != null)
-            {
-                Polaroid polaroidDisplay = polaroidNO.GetComponent<Polaroid>();
-                if (polaroidDisplay != null)
-                {
-                    polaroidDisplay.SetPhoto(_capturedPhoto, takeOwnership: true);
-                    _capturedPhoto = null;
-                }
-                else
-                {
-                    Debug.LogWarning("[CameraPickup] Spawned polaroid prefab has no Polaroid component.", this);
-                }
-            }
-
             if (_ejectSound != null)
                 SFXController.Instance.PlayAtPosition(_ejectSound, transform.position);
 
@@ -496,13 +511,5 @@ public class CameraPickup : PickableObject
     private void OnNetPolaroidIdChanged(ulong previous, ulong current)
     {
         interactText = current != 0UL ? InteractTextHasPhoto : InteractTextDefault;
-
-        // _capturedPhoto ownership is transferred to the Polaroid component on capture,
-        // so _capturedPhoto is typically already null here. Guard defensively regardless.
-        if (current == 0UL && _capturedPhoto != null)
-        {
-            Destroy(_capturedPhoto);
-            _capturedPhoto = null;
-        }
     }
 }

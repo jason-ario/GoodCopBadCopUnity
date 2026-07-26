@@ -181,6 +181,24 @@ public class BetweenShiftTaskManager : MonoBehaviour
         HandleNightPhaseReady();
     }
 
+    /// <summary>
+    /// Clears out any leftover task state from the previous day. Called by
+    /// CampaignManager when a new day is applied so stale threats/tasks from
+    /// the prior day don't persist into the next one.
+    /// </summary>
+    public void ResetForNewDay()
+    {
+        _nightPhaseActive = false;
+
+        if (_nightTimerCoroutine != null)
+        {
+            StopCoroutine(_nightTimerCoroutine);
+            _nightTimerCoroutine = null;
+        }
+
+        TaskRegistry.Instance?.ClearThreats();
+    }
+
     // ── Backward-compatibility stubs ─────────────────────────────────────────
 
     /// <summary>Obsolete. No-op — the night phase no longer uses discrete task completion.</summary>

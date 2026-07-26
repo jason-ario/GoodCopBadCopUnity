@@ -51,6 +51,8 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     [Header("Continue")]
     [SerializeField] private GameObject continueButton;
+    [Tooltip("Shown instead of the continue button on clients while waiting for the host to advance the shift.")]
+    [SerializeField] private GameObject waitingForHostText;
 
     [Header("Layout")]
     [Tooltip("The Container child of BG that holds all report content. Deactivated on Continue so the BG remains as an overlay while the screen fades.")]
@@ -154,6 +156,9 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         if (continueButton != null)
             continueButton.SetActive(false);
+
+        if (waitingForHostText != null)
+            waitingForHostText.SetActive(false);
     }
 
     private IEnumerator RevealReportRoutine(
@@ -221,8 +226,15 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         yield return new WaitForSeconds(finalDelayBeforeContinue);
 
+        // Only the host advances the shift, to avoid both players triggering
+        // the transition at once. Clients see a "waiting for host" message instead.
+        bool isHost = GlobalHostVariables.Instance == null || GlobalHostVariables.Instance.IsServer;
+
         if (continueButton != null)
-            continueButton.SetActive(true);
+            continueButton.SetActive(isHost);
+
+        if (waitingForHostText != null)
+            waitingForHostText.SetActive(!isHost);
 
         revealRoutine = null;
     }

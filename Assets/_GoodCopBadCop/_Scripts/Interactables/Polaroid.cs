@@ -9,8 +9,9 @@ using UnityEngine;
 /// <see cref="SetPhoto"/> applies the captured texture to the <c>_BaseMap</c> slot of the
 /// photo mesh's material — matching the Toony Colors Pro shader used by <c>foto.mat</c>.
 ///
-/// Texture display is local-only: only the client that took the photo sees the image.
-/// All other clients see the default placeholder texture on the material.
+/// Texture display is synced: the photographer's client JPG-encodes the captured photo and
+/// broadcasts it through <see cref="CameraPickup"/>'s spawn RPC, so every client decodes and
+/// displays the same image.
 ///
 /// Prefab requirements
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -41,9 +42,10 @@ public class Polaroid : PickableObject
     /// Applies <paramref name="photo"/> to the photo mesh's <c>_BaseMap</c> material slot.
     /// Creates a per-instance material copy on first call so each polaroid has independent texture state.
     ///
-    /// Should only be called on the client that captured the image — texture data is not synced.
+    /// Called on every client with an independently decoded texture, since <see cref="CameraPickup"/>
+    /// broadcasts the JPG-encoded photo bytes rather than syncing the raw Texture2D directly.
     /// </summary>
-    /// <param name="photo">Texture2D read from the camera viewfinder RenderTexture.</param>
+    /// <param name="photo">Texture2D decoded from the JPG bytes broadcast by <see cref="CameraPickup"/>.</param>
     /// <param name="takeOwnership">
     /// When true (default) this component destroys the texture in <see cref="OnPolaroidDestroyed"/>.
     /// Pass false when the caller manages the texture's lifetime externally.

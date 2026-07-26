@@ -158,59 +158,53 @@ public class Thermometer : PickableObject
                 ShutOff();
                 yield break;
             }
-            
-            Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-            if (Physics.Raycast(ray, out RaycastHit hit, maxDistance))
+
+            SuspectCharacter suspect = FindSuspectAlongLookRay(out bool hitSomething);
+            if (suspect != null)
             {
-                SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
-                if (suspect != null)
+                // Resolve temperature target from the anomaly component if present and active.
+                HighTemperatureAnomaly tempAnomaly = suspect.GetComponentInChildren<HighTemperatureAnomaly>();
+                bool hasAnomaly = tempAnomaly != null && tempAnomaly.IsActive;
+                float targetTemp  = (hasAnomaly ? tempAnomaly.ElevatedTemperature : NormalBaseTemp) + GetRoomTemperatureOffset();
+                float jitterRange = hasAnomaly ? tempAnomaly.JitterRange : NormalJitterRange;
+
+                // Initial Ramp up
+                float startTemp = 0f;
+                float elapsed = 0f;
+                float duration = 1.0f;
+
+                while (elapsed < duration)
                 {
-                    // Resolve temperature target from the anomaly component if present and active.
-                    HighTemperatureAnomaly tempAnomaly = suspect.GetComponentInChildren<HighTemperatureAnomaly>();
-                    bool hasAnomaly = tempAnomaly != null && tempAnomaly.IsActive;
-                    float targetTemp  = (hasAnomaly ? tempAnomaly.ElevatedTemperature : NormalBaseTemp) + GetRoomTemperatureOffset();
-                    float jitterRange = hasAnomaly ? tempAnomaly.JitterRange : NormalJitterRange;
+                    elapsed += Time.deltaTime;
+                    currentReading = Mathf.Lerp(startTemp, targetTemp, elapsed / duration);
+                    thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
+                    yield return null;
+                }
 
-                    // Initial Ramp up
-                    float startTemp = 0f;
-                    float elapsed = 0f;
-                    float duration = 1.0f;
-
-                    while (elapsed < duration)
+                // Continuous jittery updates while still aimed at the suspect
+                while (isUsing)
+                {
+                    // Check if we are still aimed at a suspect (walls/glass/other geometry in between are ignored).
+                    if (FindSuspectAlongLookRay(out _) != null)
                     {
-                        elapsed += Time.deltaTime;
-                        currentReading = Mathf.Lerp(startTemp, targetTemp, elapsed / duration);
+                        float jitter = UnityEngine.Random.Range(-jitterRange, jitterRange);
+                        currentReading = targetTemp + jitter;
                         thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
-                        yield return null;
+                        SetColorFromTemp(currentReading);
                     }
-
-                    // Continuous jittery updates while still hitting the suspect
-                    while (isUsing)
+                    else
                     {
-                        // Check if we are still hitting a suspect
-                        Ray continuousRay = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-                        if (Physics.Raycast(continuousRay, out RaycastHit continuousHit, maxDistance) && 
-                            continuousHit.collider.GetComponentInParent<SuspectCharacter>() != null)
-                        {
-                            float jitter = UnityEngine.Random.Range(-jitterRange, jitterRange);
-                            currentReading = targetTemp + jitter;
-                            thermometerText.text = Mathf.RoundToInt(currentReading).ToString() + "°";
-                            SetColorFromTemp(currentReading);
-                        }
-                        else
-                        {
-                            thermometerText.text = "ERR";
-                            UpdateScreenColor(highColor);
-                            break; 
-                        }
-                        yield return new WaitForSeconds(1.0f);
+                        thermometerText.text = "ERR";
+                        UpdateScreenColor(highColor);
+                        break; 
                     }
+                    yield return new WaitForSeconds(1.0f);
                 }
-                else
-                {
-                    thermometerText.text = "---";
-                    UpdateScreenColor(idleColor);
-                }
+            }
+            else if (hitSomething)
+            {
+                thermometerText.text = "---";
+                UpdateScreenColor(idleColor);
             }
             else
             {
@@ -220,6 +214,35 @@ public class Thermometer : PickableObject
             }
             yield return new WaitForSeconds(0.1f);
         }
+    }
+
+    /// <summary>
+    /// Casts through everything within <see cref="maxDistance"/> along the camera's forward look ray and
+    /// returns the closest <see cref="SuspectCharacter"/> found, ignoring any non-suspect geometry
+    /// (walls, glass, furniture, etc.) that the ray also passes through.
+    /// </summary>
+    /// <param name="hitSomething">True if the ray hit at least one collider within range, regardless of whether it was a suspect.</param>
+    private SuspectCharacter FindSuspectAlongLookRay(out bool hitSomething)
+    {
+        Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+        RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance);
+        hitSomething = hits.Length > 0;
+        if (!hitSomething)
+        {
+            return null;
+        }
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit hit in hits)
+        {
+            SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
+            if (suspect != null)
+            {
+                return suspect;
+            }
+        }
+
+        return null;
     }
 
     private float GetRoomTemperatureOffset()
