@@ -42,6 +42,18 @@ public class GateStartShiftController : Interactable
         base.Awake();
     }
 
+    private void Update()
+    {
+        // While the gate is actively swinging open/closed, the Animator keeps moving the
+        // BoxCollider's ancestor Transform every frame. Physics.autoSyncTransforms is
+        // disabled project-wide, so PhysX's cached collider pose would otherwise lag behind
+        // for the whole transition, making the gate briefly (or, if interrupted, permanently)
+        // un-raycastable. Force a sync for the duration of the transition only, to avoid
+        // paying this cost every frame while the gate is idle.
+        if (gateAnimator != null && gateAnimator.IsInTransition(0))
+            Physics.SyncTransforms();
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -165,6 +177,15 @@ public class GateStartShiftController : Interactable
     {
         gateAnimator.SetBool("OpenedIn", isOpen && openedIn);
         gateAnimator.SetBool("OpenedOut", isOpen && !openedIn);
+
+        // The interactable BoxCollider (on a child of this Animator's hierarchy) is
+        // physically moved by the gate-open/close animation. Physics.autoSyncTransforms
+        // is disabled project-wide (see ProjectSettings/DynamicsManager.asset), so PhysX's
+        // cached collider pose does not update on its own when the Animator moves the
+        // Transform. Without this call, the collider silently goes stale as soon as the
+        // gate is toggled once, and Physics.Raycast in PlayerInteractionController stops
+        // registering hits against it even though it still looks correct visually.
+        Physics.SyncTransforms();
     }
 
     /// <summary>Opens the gate on all clients. Must be called on the server.</summary>
