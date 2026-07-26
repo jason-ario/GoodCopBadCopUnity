@@ -16,8 +16,10 @@ public class TMPTextReveal : MonoBehaviour
     [SerializeField] bool revealOnEnable = false;
     [SerializeField] float revealOnEnableDelay = 0.5f;
     [SerializeField] AudioClip[] revealSounds;
+    [SerializeField] private float minSoundInterval = 0.1f;
 
     private string _fullText;
+    private float _lastSoundPlayTime = float.NegativeInfinity;
 
     private void Awake()
     {
@@ -80,6 +82,8 @@ public class TMPTextReveal : MonoBehaviour
 
     private IEnumerator RevealRoutine(string fullText)
     {
+        _lastSoundPlayTime = float.NegativeInfinity;
+
         // Set full text with all characters hidden to populate textInfo without a visual flash.
         tmp.maxVisibleCharacters = 0;
         tmp.text = fullText;
@@ -101,8 +105,11 @@ public class TMPTextReveal : MonoBehaviour
         {
             tmp.text = fullText.Substring(0, charStringIndices[i] + 1);
 
-            if (revealSounds.Length != 0)
+            if (revealSounds.Length != 0 && Time.time - _lastSoundPlayTime >= minSoundInterval)
+            {
+                _lastSoundPlayTime = Time.time;
                 SFXController.Instance.Play(revealSounds[UnityEngine.Random.Range(0, revealSounds.Length)]);
+            }
 
             yield return new WaitForSeconds(characterDelay);
         }

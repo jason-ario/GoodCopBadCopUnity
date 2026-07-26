@@ -32,6 +32,11 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private PlayableDirector playableDirector;
     [SerializeField] private float cutsceneMusicFadeOutDuration = 2f;
 
+    [Header("Main Menu Music")]
+    [Tooltip("Holds the main menu music clip. Playback is routed through MusicManager, so this " +
+             "AudioSource itself is never played directly and can be disabled.")]
+    [SerializeField] private AudioSource mainMenuMusicSource;
+
     [Header("Button Group")]
     [SerializeField] private Animator buttonGroupAnimator;
     [SerializeField] private RuntimeAnimatorController buttonGroupFastController;
@@ -112,6 +117,7 @@ public class MainMenuController : MonoBehaviour
         SwitchToScreen(homeScreen);
         playableDirector.gameObject.SetActive(true);
         RefreshContinueButton();
+        PlayMainMenuMusic();
     }
 
     private void Update()
@@ -416,6 +422,9 @@ public class MainMenuController : MonoBehaviour
     /// Stops the main menu cutscene's visual playback immediately (used once the screen has
     /// faded to black) but leaves its background music playing — see
     /// <see cref="FadeOutCutsceneMusic"/> for when the music itself should stop.
+    /// The main menu's own background music is left playing too — see
+    /// <see cref="StopMainMenuMusic"/>, which callers should invoke once the intro cutscene
+    /// (if any) has finished, so the music carries through it instead of cutting off abruptly.
     /// </summary>
     public void TransitionToGameplay()
     {
@@ -453,6 +462,40 @@ public class MainMenuController : MonoBehaviour
             cutsceneAudio.Stop();
             playableDirector.gameObject.SetActive(false);
         });
+    }
+
+    // ---------------------------------------------------------------------------
+    // Main Menu Music
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Starts the main menu's background music through <see cref="MusicManager"/> so it fades
+    /// in and shares the same cross-fade/stop behaviour as the rest of the game's music.
+    /// Called on <see cref="Start"/> once the home screen is showing.
+    /// </summary>
+    private void PlayMainMenuMusic()
+    {
+        if (mainMenuMusicSource == null || mainMenuMusicSource.clip == null)
+            return;
+
+        if (MusicManager.Instance == null)
+        {
+            Debug.LogWarning("[PlayMainMenuMusic] No MusicManager instance found.");
+            return;
+        }
+
+        MusicManager.Instance.Play(mainMenuMusicSource.clip);
+    }
+
+    /// <summary>
+    /// Fades out and stops the main menu's background music. Call this once the player has
+    /// fully committed to entering the game — after the intro cutscene (if any) has finished,
+    /// so the menu music carries through it instead of cutting off abruptly. See
+    /// <see cref="GameManager.LobbyTransitionSequence"/> for the primary call site.
+    /// </summary>
+    public void StopMainMenuMusic()
+    {
+        MusicManager.Instance?.FadeOut();
     }
 
     // ---------------------------------------------------------------------------

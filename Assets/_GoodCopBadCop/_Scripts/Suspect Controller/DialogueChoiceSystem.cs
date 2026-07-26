@@ -617,7 +617,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void SpawnPlayerSubtitleClientRpc(string choiceText, string playerName, ulong senderClientId)
     {
         if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
-        DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.darkCyan, true);
+        DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.white, true);
     }
 
     private IEnumerator NPCRespondToDialogueChoice(int choiceIndex)

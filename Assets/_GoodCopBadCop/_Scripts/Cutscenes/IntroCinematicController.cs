@@ -42,7 +42,7 @@ public class IntroCinematicController : MonoBehaviour
     };
 
     /// <summary>True once the intro cinematic has played for this application session.</summary>
-    private static bool _hasPlayed;
+    private bool _hasPlayed;
 
     private bool _awaitingInput;
     private bool _advanceRequested;

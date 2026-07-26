@@ -120,6 +120,10 @@ public class GameManager : NetworkBehaviour
         if (IntroCinematicController.Instance != null)
             yield return StartCoroutine(IntroCinematicController.Instance.PlayIfNeeded());
 
+        // The main menu's background music has been playing underneath the black screen and
+        // the intro cutscene above — stop it now that the intro cutscene has finished.
+        MainMenuController.Instance.StopMainMenuMusic();
+
         if (IsServer)
         {
             SpawnAllPlayersAtLobby();
@@ -254,6 +258,7 @@ public class GameManager : NetworkBehaviour
         Debug.Log("[GameManager] LobbyJoinClientSequence: transitioning to gameplay");
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();
+        MainMenuController.Instance.StopMainMenuMusic();
         UIController.Instance.ShowPlayerUI();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
@@ -273,6 +278,7 @@ public class GameManager : NetworkBehaviour
         UIController.Instance.ShowPlayerUI();
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();
+        MainMenuController.Instance.StopMainMenuMusic();
         // Bootstrap the current day on this client — it joined after StartGameClientRpc was
         // already sent, so DayActivated() was never called and no tutorial state was set up.
         CampaignManager.Instance.StartCampaign();
@@ -342,6 +348,7 @@ public class GameManager : NetworkBehaviour
         {
             MainMenuController.Instance.TransitionToGameplay();
             MainMenuController.Instance.FadeOutCutsceneMusic();
+            MainMenuController.Instance.StopMainMenuMusic();
 
             if (IsServer)
             {
@@ -361,6 +368,7 @@ public class GameManager : NetworkBehaviour
 
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();
+        MainMenuController.Instance.StopMainMenuMusic();
         AudioManager.Instance.StartAmbientAudio();
 
         if (IsServer)

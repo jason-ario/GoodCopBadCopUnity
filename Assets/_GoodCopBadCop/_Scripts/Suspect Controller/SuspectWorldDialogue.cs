@@ -1,15 +1,16 @@
-using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// Adds a simple, direct-interaction conversation to a <see cref="SuspectCharacter"/> that is
 /// placed and interactable directly in the world (e.g. the Day 1 Suspect_Soldier), as opposed
 /// to the interrogation booth flow which is driven exclusively by <see cref="ScriptedDialogueRunner"/>.
 ///
-/// The player walks up, interacts (LMB / E) and is shown up to 3 dialogue options sourced from
-/// <see cref="SuspectData.questionResponses"/> (using the Day 1 / early-days answer). Picking an
-/// option plays the NPC's unique response and re-shows the options so the player can ask another
-/// question, or leave the conversation at any time via the Back button.
+/// The player walks up, interacts (LMB / E) and is shown up to 3 dialogue options for the
+/// current day (see <see cref="DaySet"/>). Picking an option hides the choices, plays the NPC's
+/// unique response as a click-through subtitle (typewriter reveal, skip-to-complete, then
+/// advance), and returns to the choice menu — mirroring <see cref="ScriptedDialogueRunner"/>'s
+/// line-advance UX. The player can leave the conversation at any time via the Back button.
 /// </summary>
 public class SuspectWorldDialogue : MonoBehaviour
 {
@@ -63,12 +64,18 @@ public class SuspectWorldDialogue : MonoBehaviour
              "Requires the assigned Animator's controller to have a 'Sitting' bool parameter.")]
     [SerializeField] private bool startSitting = false;
 
-    /// <summary>Seconds to wait before re-showing choices, matching DialogueChoiceSystem's own pacing.</summary>
-    private const float ReshowDelaySeconds = 1f;
+    private enum ConversationState
+    {
+        Idle,
+        ShowingGreeting,
+        ShowingOptions,
+        ShowingResponse
+    }
 
     private DialogueOption[] _options;
     private string _greetingLineForCurrentConversation;
     private bool _inConversation;
+    private ConversationState _state = ConversationState.Idle;
 
     public bool InConversation => _inConversation;
 
@@ -147,9 +154,10 @@ public class SuspectWorldDialogue : MonoBehaviour
     }
 
     /// <summary>
-    /// Opens the conversation: locks player movement/camera, greets the player, and shows the
-    /// dialogue options. Safe to call repeatedly — ignored while already in conversation or while
-    /// the NPC is mid-line.
+    /// Opens the conversation: locks player movement/camera and either plays the day's greeting
+    /// line (click-through) before showing options, or shows options immediately if there's no
+    /// greeting. Safe to call repeatedly — ignored while already in conversation or while the
+    /// NPC is mid-line.
     /// </summary>
     public void BeginConversation()
     {
@@ -164,16 +172,23 @@ public class SuspectWorldDialogue : MonoBehaviour
         Transform lookTarget = speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform;
         DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget);
 
-        if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation) && speaking != null)
-            speaking.Say(_greetingLineForCurrentConversation);
-
-        ShowOptions();
-
         UIController.Instance.ShowBackButton(EndConversation);
+
+        if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation) && speaking != null)
+        {
+            _state = ConversationState.ShowingGreeting;
+            speaking.Say(_greetingLineForCurrentConversation, waitForInput: true);
+        }
+        else
+        {
+            ShowOptions();
+        }
     }
 
     private void ShowOptions()
     {
+        _state = ConversationState.ShowingOptions;
+
         string[] texts = new string[_options.Length];
         for (int i = 0; i < _options.Length; i++)
             texts[i] = _options[i].playerLine;
@@ -186,47 +201,68 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (!_inConversation) return;
         if (index < 0 || index >= _options.Length) return;
 
+        // The scripted-choice callback path does not hide the panel on its own — do it here so
+        // the choices disappear the moment a pick is made, before the response plays.
+        DialogueChoiceSystem.Instance.HideChoicePanel();
+
         DialogueOption chosen = _options[index];
 
         if (animator != null && !string.IsNullOrEmpty(chosen.animationTrigger))
             animator.SetTrigger(chosen.animationTrigger);
 
         if (speaking != null)
-            speaking.Say(chosen.npcResponse);
-
-        StartCoroutine(ReshowOptionsAfterResponse());
+        {
+            _state = ConversationState.ShowingResponse;
+            speaking.Say(chosen.npcResponse, waitForInput: true);
+        }
+        else
+        {
+            ShowOptions();
+        }
     }
 
-    /// <summary>
-    /// Waits for the NPC's response subtitle to appear and fully clear before re-showing the
-    /// options, mirroring <see cref="DialogueChoiceSystem"/>'s own reshow pacing so the player is
-    /// never looking at both the subtitle and the choice panel simultaneously.
-    /// </summary>
-    private IEnumerator ReshowOptionsAfterResponse()
+    private void Update()
     {
-        yield return new WaitForSeconds(ReshowDelaySeconds);
+        if (!_inConversation) return;
+        if (_state != ConversationState.ShowingGreeting && _state != ConversationState.ShowingResponse) return;
+        if (DialogueManager.Instance == null) return;
 
-        if (DialogueManager.Instance != null)
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        bool pressedAdvance = Input.GetKeyDown(KeyCode.E) || (Input.GetMouseButtonDown(0) && !overUI);
+        if (!pressedAdvance) return;
+
+        if (DialogueManager.Instance.IsAnySubtitleRevealing())
         {
-            yield return new WaitUntil(() => DialogueManager.Instance.HasActiveSubtitles);
-            yield return new WaitUntil(() => !DialogueManager.Instance.HasActiveSubtitles);
+            // First input: complete the typewriter locally without advancing the line.
+            DialogueManager.Instance.CompleteCurrentReveal();
+            return;
         }
 
-        if (_inConversation)
+        // Second input (or first when the typewriter already finished): advance past the line.
+        ConversationState finishedState = _state;
+        _state = ConversationState.Idle;
+        DialogueManager.Instance.AdvanceDialogueServerRpc();
+
+        if (!_inConversation) return;
+
+        if (finishedState == ConversationState.ShowingGreeting || finishedState == ConversationState.ShowingResponse)
             ShowOptions();
     }
 
     /// <summary>
-    /// Leaves the conversation at any point: hides the choice panel and back button and restores
-    /// normal player control. Wired to the Back button shown in <see cref="BeginConversation"/>.
+    /// Leaves the conversation at any point: hides the choice panel and back button, clears any
+    /// active subtitle, and restores normal player control. Wired to the Back button shown in
+    /// <see cref="BeginConversation"/>.
     /// </summary>
     public void EndConversation()
     {
         if (!_inConversation) return;
         _inConversation = false;
+        _state = ConversationState.Idle;
 
         UIController.Instance.HideBackButton();
         DialogueChoiceSystem.Instance.HideChoicePanel();
+        DialogueManager.Instance?.ClearHistory();
         DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
     }
 }

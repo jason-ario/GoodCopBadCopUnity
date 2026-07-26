@@ -1437,7 +1437,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
-        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.cyan);
+        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white);
     }
 
     /// <summary>
