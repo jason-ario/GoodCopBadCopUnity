@@ -153,10 +153,16 @@ PrefabInstance:
       addedObject: {fileID: 3248501529027894736}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 8985796584860906982}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 6401988701027712831}
     - targetCorrespondingSourceObject: {fileID: -5737641381485329298, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1294924337227544730}
+    - targetCorrespondingSourceObject: {fileID: -5737641381485329298, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7550564597609799211}
   m_SourcePrefab: {fileID: 100100000, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
 --- !u!4 &415906712139754843 stripped
 Transform:
@@ -439,6 +445,31 @@ MonoBehaviour:
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
+--- !u!114 &8985796584860906982
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1048855339949766625}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1046609539
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &6401988701027712831
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -459,7 +490,7 @@ MonoBehaviour:
   standingPos: {fileID: 5380030724991725382}
   sitDuration: 0.5
   canMoveWhileSeated: 0
-  canRotateWhileSeated: 0
+  canRotateWhileSeated: 1
 --- !u!1 &3607642915478392542 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -5737641381485329298, guid: 5470c9e154e21db40ab004f6bb338de8, type: 3}
@@ -486,3 +517,17 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.30219603, y: 0.09409, z: 0.103478}
   m_Center: {x: 0.006362118, y: -0.047036, z: 0.0029479992}
+--- !u!114 &7550564597609799211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3607642915478392542}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 6401988701027712831}
+  ShopItem: {fileID: 0}

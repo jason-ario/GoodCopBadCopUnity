@@ -1,3 +1,4 @@
+using FIMSpace.FLook;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -58,6 +59,12 @@ public class SuspectWorldDialogue : MonoBehaviour
     [SerializeField] private SpeakingInteraction speaking;
     [SerializeField] private Animator animator;
 
+    [Header("Look At")]
+    [Tooltip("The suspect's FLookAnimator. When assigned, the player camera looks at its head " +
+             "bone (LeadBone) on entering conversation, and the suspect looks back at the " +
+             "player's camera for the duration of the conversation.")]
+    [SerializeField] private FLookAnimator lookAnimator;
+
     [Header("Idle State")]
     [Tooltip("When true, sets the Animator's 'Sitting' bool parameter to true on Awake, so this " +
              "NPC starts (and remains, outside of conversation lines) in its sitting idle pose. " +
@@ -76,6 +83,8 @@ public class SuspectWorldDialogue : MonoBehaviour
     private string _greetingLineForCurrentConversation;
     private bool _inConversation;
     private ConversationState _state = ConversationState.Idle;
+    private Transform _previousObjectToFollow;
+    private bool _restoreObjectToFollow;
 
     public bool InConversation => _inConversation;
 
@@ -92,12 +101,13 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// authoring <see cref="daySets"/> in the Inspector for scene-placed suspects; use this only
     /// for prefab instances spawned purely at runtime.
     /// </summary>
-    public void Configure(SpeakingInteraction speakingRef, Animator animatorRef, DaySet[] sets, bool startSittingNow = true)
+    public void Configure(SpeakingInteraction speakingRef, Animator animatorRef, DaySet[] sets, bool startSittingNow = true, FLookAnimator lookAnimatorRef = null)
     {
         speaking = speakingRef;
         animator = animatorRef;
         daySets = sets;
         startSitting = startSittingNow;
+        lookAnimator = lookAnimatorRef;
     }
 
     /// <summary>
@@ -169,8 +179,22 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         _inConversation = true;
 
-        Transform lookTarget = speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform;
+        UIController.Instance.ClosePlayerUI();
+
+        Transform headBone = lookAnimator != null && lookAnimator.LeadBone != null ? lookAnimator.LeadBone : null;
+        Transform lookTarget = headBone != null ? headBone
+            : (speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform);
         DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget);
+
+        if (lookAnimator != null)
+        {
+            _previousObjectToFollow = lookAnimator.ObjectToFollow;
+            _restoreObjectToFollow = true;
+
+            Transform playerCamera = PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null;
+            if (playerCamera != null)
+                lookAnimator.ObjectToFollow = playerCamera;
+        }
 
         UIController.Instance.ShowBackButton(EndConversation);
 
@@ -264,5 +288,12 @@ public class SuspectWorldDialogue : MonoBehaviour
         DialogueChoiceSystem.Instance.HideChoicePanel();
         DialogueManager.Instance?.ClearHistory();
         DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
+        UIController.Instance.ShowPlayerUI();
+
+        if (_restoreObjectToFollow && lookAnimator != null)
+        {
+            lookAnimator.ObjectToFollow = _previousObjectToFollow;
+            _restoreObjectToFollow = false;
+        }
     }
 }
