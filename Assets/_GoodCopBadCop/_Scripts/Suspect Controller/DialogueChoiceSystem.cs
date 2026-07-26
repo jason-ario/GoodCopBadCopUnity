@@ -105,7 +105,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
         UIController.Instance.ShowCursor();
 
         HidePlayerBody();
-        player.SetPlayerLightActive(false);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
@@ -201,7 +200,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
             player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
         HidePlayerBody();
-        player.SetPlayerLightActive(false);
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(true);
@@ -252,9 +250,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
             player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
 
         HidePlayerBody();
-        player.SetPlayerLightActive(false);
 
-        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueModeOutside — movement locked, interaction disabled, light off.");
+        Debug.Log("[DialogueChoiceSystem] EnterScriptedDialogueModeOutside — movement locked, interaction disabled.");
     }
 
     /// <summary>

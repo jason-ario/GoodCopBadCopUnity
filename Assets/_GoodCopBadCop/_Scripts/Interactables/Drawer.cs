@@ -11,6 +11,16 @@ public class Drawer : Interactable, IHeldItemPassthrough
     [SerializeField] private AudioClip drawerOpenSound;
     [SerializeField] private AudioClip drawerCloseSound;
 
+    [Header("Movement Audio")]
+    [Tooltip("Dedicated AudioSource used for the looping slide sound. Kept separate from 'audioSource' so it can loop independently of the open/close one-shots.")]
+    [SerializeField] private AudioSource _movementAudioSource;
+
+    [Tooltip("Looping clip played while the drawer is actively sliding.")]
+    [SerializeField] private AudioClip _drawerMoveLoopClip;
+
+    [Tooltip("Minimum drawer speed (normalized travel per second, 0=closed to 1=open) required to keep the movement loop playing. Below this, the loop stops.")]
+    [SerializeField] private float _moveVelocityThreshold = 0.05f;
+
     [Header("Drawer Mesh")]
     [Tooltip("The child Transform that physically represents the drawer body (driven by localPosition).")]
     [SerializeField] private Transform _drawerMesh;
@@ -72,6 +82,20 @@ public class Drawer : Interactable, IHeldItemPassthrough
     private PlayerInteractionController _currentPlayer;
     private Coroutine _exitCoroutine;
 
+    /// <summary>Normalised drawer position sampled on the previous frame, used to derive travel speed for movement audio. Negative = uninitialised.</summary>
+    private float _previousMeshDragT = -1f;
+
+    /// <summary>Edge-trigger guards so the open/close sound plays once per arrival at an end, not every frame it's held there.</summary>
+    private bool _hasPlayedOpenEndSound = false;
+    private bool _hasPlayedClosedEndSound = false;
+
+    /// <summary>True while a non-local client is actively receiving live drag updates from the network (i.e. someone else is dragging it right now).</summary>
+    private float _lastRemoteDragSyncTime = -1f;
+    private const float RemoteDragSyncActiveWindow = 0.15f; // Slightly wider than DragSyncInterval so brief gaps between syncs don't cut the loop.
+
+    /// <summary>True while the commit snap-tween (DOTween) is actively moving the mesh to its final open/closed position.</summary>
+    private bool _isSnapping = false;
+
     /// <summary>
     /// Fired locally whenever this drawer transitions to open.
     /// </summary>
@@ -120,6 +144,9 @@ public class Drawer : Interactable, IHeldItemPassthrough
         isOpen.OnValueChanged      -= OnDrawerStateChanged;
         _isLocked.OnValueChanged   -= OnLockedChanged;
         _networkDragT.OnValueChanged -= OnNetworkDragTChanged;
+
+        if (_movementAudioSource != null)
+            _movementAudioSource.Stop();
     }
 
     private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
@@ -129,6 +156,14 @@ public class Drawer : Interactable, IHeldItemPassthrough
 
     private void Update()
     {
+        // Only evaluate movement audio while the drawer is actually being manipulated —
+        // local drag, a remote player's live drag sync, or the post-commit snap tween.
+        // This avoids false triggers from one-off repositioning (e.g. initial network spawn sync).
+        if (_inControl || _isSnapping || IsRemoteDragActive())
+            UpdateMovementAudio();
+        else
+            StopMovementLoop();
+
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
@@ -270,7 +305,6 @@ public class Drawer : Interactable, IHeldItemPassthrough
 
         if (newIsOpen != isOpen.Value)
         {
-            audioSource.PlayOneShot(newIsOpen ? drawerOpenSound : drawerCloseSound);
             if (newIsOpen) OnOpened?.Invoke();
             SetDrawerServerRpc(newIsOpen, NetworkManager.Singleton.LocalClientId);
         }
@@ -343,9 +377,107 @@ public class Drawer : Interactable, IHeldItemPassthrough
         if (_drawerMesh == null) return;
         Vector3 target = open ? _openPos : _closedPos;
         if (duration <= 0f)
+        {
+            // Instant reposition (e.g. initial network spawn / late-join catch-up) — not player-driven, no movement audio.
             _drawerMesh.localPosition = target;
+        }
         else
-            _drawerMesh.DOLocalMove(target, duration).SetEase(Ease.OutCubic);
+        {
+            _isSnapping = true;
+            _drawerMesh.DOLocalMove(target, duration)
+                .SetEase(Ease.OutCubic)
+                .OnComplete(() => _isSnapping = false);
+        }
+    }
+
+    // ── Movement audio ────────────────────────────────────────────────────────
+
+    /// <summary>Whether a remote drag sync was received recently enough to be considered "live" right now.</summary>
+    private bool IsRemoteDragActive()
+    {
+        return _lastRemoteDragSyncTime >= 0f
+            && (Time.unscaledTime - _lastRemoteDragSyncTime) < RemoteDragSyncActiveWindow;
+    }
+
+    /// <summary>
+    /// Drives the looping slide sound and the end-of-track open/close stingers from the
+    /// drawer mesh's actual position each frame. Only called while the drawer is confirmed
+    /// to be under active player control (see the guard in Update()).
+    /// </summary>
+    private void UpdateMovementAudio()
+    {
+        if (_drawerMesh == null) return;
+
+        float currentDragT = Mathf.InverseLerp(_closedPos.z, _openPos.z, _drawerMesh.localPosition.z);
+        float deltaTime = Time.deltaTime;
+
+        // First frame after enabling — just seed the reference position, don't evaluate speed yet.
+        if (_previousMeshDragT < 0f)
+        {
+            _previousMeshDragT = currentDragT;
+            return;
+        }
+
+        if (deltaTime > 0f)
+        {
+            float speed = Mathf.Abs(currentDragT - _previousMeshDragT) / deltaTime;
+
+            if (speed >= _moveVelocityThreshold)
+                PlayMovementLoop();
+            else
+                StopMovementLoop();
+        }
+
+        const float endOfTrackEpsilon = 0.001f;
+        if (currentDragT >= 1f - endOfTrackEpsilon)
+        {
+            if (!_hasPlayedOpenEndSound)
+            {
+                _hasPlayedOpenEndSound = true;
+                _hasPlayedClosedEndSound = false;
+                PlayEndOfTrackSound(open: true);
+            }
+        }
+        else if (currentDragT <= endOfTrackEpsilon)
+        {
+            if (!_hasPlayedClosedEndSound)
+            {
+                _hasPlayedClosedEndSound = true;
+                _hasPlayedOpenEndSound = false;
+                PlayEndOfTrackSound(open: false);
+            }
+        }
+        else
+        {
+            // Left both ends — re-arm so the stinger can fire again next time either end is reached.
+            _hasPlayedOpenEndSound = false;
+            _hasPlayedClosedEndSound = false;
+        }
+
+        _previousMeshDragT = currentDragT;
+    }
+
+    private void PlayMovementLoop()
+    {
+        if (_movementAudioSource == null || _drawerMoveLoopClip == null) return;
+        if (_movementAudioSource.isPlaying && _movementAudioSource.clip == _drawerMoveLoopClip) return;
+
+        _movementAudioSource.clip = _drawerMoveLoopClip;
+        _movementAudioSource.loop = true;
+        _movementAudioSource.Play();
+    }
+
+    private void StopMovementLoop()
+    {
+        if (_movementAudioSource == null) return;
+        if (_movementAudioSource.isPlaying) _movementAudioSource.Stop();
+    }
+
+    private void PlayEndOfTrackSound(bool open)
+    {
+        if (audioSource == null) return;
+        AudioClip clip = open ? drawerOpenSound : drawerCloseSound;
+        if (clip != null) audioSource.PlayOneShot(clip);
     }
 
     // ── Networking ────────────────────────────────────────────────────────────
@@ -379,7 +511,6 @@ public class Drawer : Interactable, IHeldItemPassthrough
     {
         if (NetworkManager.Singleton.LocalClientId == excludeClientId) return;
         SnapDrawerMeshToState(open, _snapDuration);
-        audioSource.PlayOneShot(open ? drawerOpenSound : drawerCloseSound);
         if (open) OnOpened?.Invoke();
     }
 
@@ -396,6 +527,7 @@ public class Drawer : Interactable, IHeldItemPassthrough
     private void OnNetworkDragTChanged(float oldVal, float newVal)
     {
         if (_inControl) return; // local player is driving — don't fight the input
+        _lastRemoteDragSyncTime = Time.unscaledTime;
         if (_drawerMesh == null) return;
         _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, newVal);
     }

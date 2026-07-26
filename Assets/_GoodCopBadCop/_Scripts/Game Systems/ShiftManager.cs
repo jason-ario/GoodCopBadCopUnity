@@ -261,6 +261,13 @@ public class ShiftManager : NetworkBehaviour
         if (IsServer)
             _networkCurrentDay.Value = day;
         Debug.Log($"[ShiftManager] Day set to {_currentDay} ({_startDate.AddDays(_currentDay - 1):dd MMMM yyyy})");
+
+        // Lock the booth door immediately if the new day requires it, instead of waiting for
+        // OpenWindowSequence (which only runs once the player presses the "open window" button
+        // inside the booth). Without this, the door stays unlocked from the moment the player
+        // spawns until they press that button — too late to actually keep them inside.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)
+            OnDoorLock?.Invoke();
     }
     #endregion
 
@@ -342,6 +349,23 @@ public class ShiftManager : NetworkBehaviour
 
         NextSuspectReadyForBell = true;
         OnNextSuspectReadyForBell?.Invoke();
+    }
+
+    /// <summary>
+    /// Marks every suspect for the day as processed and attempts to enable clock-out.
+    /// Used by scripted day sequences (e.g. Day 1's Alexei encounter) whose final "suspect"
+    /// bypasses the normal <see cref="SetNextSuspectReady"/> flow entirely. Clock-out — and the
+    /// timecard machine's fanfare — still stays blocked until every daily task registered via
+    /// <see cref="RegisterPendingDailyTask"/> has completed, including tasks triggered by that
+    /// same scripted sequence after this call (as long as they were registered first).
+    /// Server-only.
+    /// </summary>
+    public void MarkSuspectsComplete()
+    {
+        if (!IsServer) return;
+
+        _suspectsComplete = true;
+        TryEnableClockOut();
     }
 
     /// <summary>

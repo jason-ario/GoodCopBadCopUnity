@@ -134,10 +134,6 @@ public class AlexeiController : NetworkBehaviour
     {
         base.OnNetworkDespawn();
         _cutsceneActive.OnValueChanged -= OnCutsceneActiveChanged;
-        TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
-        if (_subscribedGraffitiTask != null)
-            _subscribedGraffitiTask.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
-        _subscribedGraffitiTask = null;
     }
 
     // ── Attack behaviour gate ──────────────────────────────────────────────────
@@ -327,30 +323,12 @@ public class AlexeiController : NetworkBehaviour
     // ── End-of-shift setup ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Tracks whether the end-of-shift TakeOutTrashTask has been fully completed.
-    /// Clock-out is only enabled once this AND <see cref="_graffitiTaskComplete"/> are true.
-    /// </summary>
-    private bool _trashTaskComplete;
-
-    /// <summary>
-    /// Tracks whether the end-of-shift CleanGraffitiTask has been fully completed.
-    /// Clock-out is only enabled once this AND <see cref="_trashTaskComplete"/> are true.
-    /// </summary>
-    private bool _graffitiTaskComplete;
-
-    /// <summary>
-    /// Cached reference to the CleanGraffitiTask instance whose OnDailyTaskCompleted event
-    /// this controller subscribed to, so it can be unsubscribed reliably on despawn even if
-    /// CleanGraffitiTask.Instance has already changed or been cleared.
-    /// </summary>
-    private CleanGraffitiTask _subscribedGraffitiTask;
-
-    /// <summary>
     /// Called on the server once the post-Alexei megaphone dialogue completes.
-    /// Enables the soldier body as a collectible JunkItem, registers the TakeOutTrashTask and
-    /// CleanGraffitiTask in the HUD task list, and begins tracking their progress. Clock-out is
-    /// only enabled via <see cref="ShiftManager.DebugEnableClockOut"/> once both tasks are
-    /// fully complete. Server-only.
+    /// Enables the soldier body as a collectible JunkItem, and triggers the TakeOutTrashTask
+    /// and CleanGraffitiTask so they appear in the HUD and register themselves as pending
+    /// daily tasks with <see cref="ShiftManager"/>. Clock-out (and the timecard machine's
+    /// fanfare) only becomes available once <see cref="ShiftManager"/> confirms every pending
+    /// daily task — including these two — has actually been completed. Server-only.
     /// </summary>
     public void TriggerEndOfShiftSetup()
     {
@@ -362,9 +340,6 @@ public class AlexeiController : NetworkBehaviour
     private void EndOfShiftSetupSequence()
     {
         Debug.Log("[AlexeiController] EndOfShiftSetupSequence — beginning end-of-shift setup.");
-
-        _trashTaskComplete    = false;
-        _graffitiTaskComplete = false;
 
         // Enable the soldier body as collectible junk on all clients.
         if (_soldierBodySuspect != null)
@@ -381,12 +356,12 @@ public class AlexeiController : NetworkBehaviour
         else
             Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: _boothDoor is not assigned.");
 
-        // Trigger TakeOutTrashTask to spawn all task items immediately.
-        // TriggerTask also broadcasts RegisterInTaskRegistryClientRpc to all clients.
+        // Trigger TakeOutTrashTask to spawn all task items immediately. TriggerTask registers
+        // itself with ShiftManager as a pending daily task (see TakeOutTrashTask.RegisterPendingDailyTask
+        // usage), so the timecard machine stays un-primed until every item is turned in.
         if (TakeOutTrashTask.Instance != null)
         {
             Debug.Log($"[AlexeiController] Calling TakeOutTrashTask.TriggerTask(). IsServer={IsServer}");
-            TakeOutTrashTask.OnAllItemsDeposited += OnTrashTaskComplete;
             TakeOutTrashTask.Instance.TriggerTask();
 
             // Day 1 tutorial only: highlight every piece of trash so it's easy to find.
@@ -397,60 +372,25 @@ public class AlexeiController : NetworkBehaviour
         else
         {
             Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: TakeOutTrashTask.Instance is null.");
-            // No trash task to wait on — don't block clock-out on a task that doesn't exist.
-            _trashTaskComplete = true;
         }
 
         // Also trigger CleanGraffitiTask alongside the trash task so graffiti appears
-        // for the player to scrub during the same end-of-shift/night phase. Clock-out waits
-        // on both tasks — see OnTrashTaskComplete / OnGraffitiTaskComplete.
+        // for the player to scrub during the same end-of-shift/night phase. It likewise
+        // registers itself as a pending daily task with ShiftManager.
         if (CleanGraffitiTask.Instance != null)
         {
             Debug.Log($"[AlexeiController] Calling CleanGraffitiTask.TriggerDailyTask(). IsServer={IsServer}");
-            _subscribedGraffitiTask = CleanGraffitiTask.Instance;
-            _subscribedGraffitiTask.OnDailyTaskCompleted += OnGraffitiTaskComplete;
-            _subscribedGraffitiTask.TriggerDailyTask();
+            CleanGraffitiTask.Instance.TriggerDailyTask();
         }
         else
         {
             Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: CleanGraffitiTask.Instance is null.");
-            // No graffiti task to wait on — don't block clock-out on a task that doesn't exist.
-            _graffitiTaskComplete = true;
         }
 
-        TryEnableClockOut();
-    }
-
-    private void OnTrashTaskComplete()
-    {
-        TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
-        _trashTaskComplete = true;
-        Debug.Log("[AlexeiController] Trash task complete.");
-        TryEnableClockOut();
-    }
-
-    private void OnGraffitiTaskComplete()
-    {
-        if (_subscribedGraffitiTask != null)
-            _subscribedGraffitiTask.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
-        _subscribedGraffitiTask = null;
-        _graffitiTaskComplete = true;
-        Debug.Log("[AlexeiController] Graffiti task complete.");
-        TryEnableClockOut();
-    }
-
-    /// <summary>
-    /// Enables clock-out only once every end-of-shift task (trash and graffiti) has been
-    /// completed for the day.
-    /// </summary>
-    private void TryEnableClockOut()
-    {
-        if (!_trashTaskComplete || !_graffitiTaskComplete) return;
-
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.DebugEnableClockOut();
-        else
-            Debug.LogWarning("[AlexeiController] TryEnableClockOut: ShiftManager.Instance is null.");
+        // The tasks above have already registered themselves as pending (if they exist), so
+        // marking suspects complete now cannot prime the timecard machine early — ShiftManager
+        // waits for both this flag and an empty pending-task set before enabling clock-out.
+        ShiftManager.Instance?.MarkSuspectsComplete();
     }
 
     // ── Mutant Entrance ────────────────────────────────────────────────────────

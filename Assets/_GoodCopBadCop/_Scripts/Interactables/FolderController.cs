@@ -1169,6 +1169,11 @@ public class FolderController : PickableObject
     /// Returns the set of category type names (e.g. "PhysicalAnomaly") for every checked
     /// checkbox across all exam pages in this folder. Used by the verdict scoring system
     /// to determine which categories the player identified.
+    /// Checklist items reference specific anomaly leaf classes (e.g. "NameWrongAnomaly"),
+    /// so each checked item's full type hierarchy is walked up to and including its category
+    /// base class — mirroring the matching done by <see cref="ExamContainsAnomaly"/> and
+    /// <see cref="AnomalyController.HasActiveAnomalyOfCategory"/> — so a checked leaf-level
+    /// item is correctly recognized as identifying its parent category.
     /// </summary>
     public HashSet<string> GetCheckedCategoryNames()
     {
@@ -1179,8 +1184,19 @@ public class FolderController : PickableObject
             if (examPage == null) continue;
             foreach (ChecklistItem item in examPage.ChecklistItems)
             {
-                if (item != null && item.IsChecked && !string.IsNullOrEmpty(item.AnomalyTypeName))
-                    result.Add(item.AnomalyTypeName);
+                if (item == null || !item.IsChecked || string.IsNullOrEmpty(item.AnomalyTypeName))
+                    continue;
+
+                result.Add(item.AnomalyTypeName);
+
+                // Walk up the type hierarchy so a leaf anomaly name (e.g. "NameWrongAnomaly")
+                // also registers its category ancestors (e.g. "DocumentationAnomaly").
+                System.Type t = System.Type.GetType(item.AnomalyTypeName);
+                while (t != null && t != typeof(Anomaly))
+                {
+                    result.Add(t.Name);
+                    t = t.BaseType;
+                }
             }
         }
 

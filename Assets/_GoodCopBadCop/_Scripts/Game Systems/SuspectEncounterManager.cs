@@ -13,8 +13,9 @@ using UnityEngine;
 /// immediately before the normal entry-bark path. When <see cref="TryInterceptForIntroDialogue"/>
 /// returns <c>true</c> the caller must skip both the generic bark and the paperwork hand-off;
 /// this manager drives the scripted intro, then — if the suspect gives paperwork — calls
-/// <see cref="SuspectController.SpawnPaperwork"/> after the dialogue completes and fires
-/// <see cref="OnFirstEncounterDialogueComplete"/>.
+/// <see cref="SuspectCharacter.GivePaperwork"/> after the dialogue completes (so the
+/// suspect's "Give" animation plays before the documents appear, matching the normal
+/// entry-bark path) and fires <see cref="OnFirstEncounterDialogueComplete"/>.
 /// </summary>
 public class SuspectEncounterManager : MonoBehaviour
 {
@@ -132,7 +133,7 @@ public class SuspectEncounterManager : MonoBehaviour
         if (ScriptedDialogueRunner.Instance == null)
         {
             Debug.LogWarning("[SuspectEncounterManager] ScriptedDialogueRunner not found — skipping intro dialogue.");
-            if (givesPaperwork) SuspectController.Instance?.SpawnPaperwork();
+            if (givesPaperwork) suspect.GivePaperwork();
             OnFirstEncounterDialogueComplete?.Invoke(data);
             yield break;
         }
@@ -141,9 +142,11 @@ public class SuspectEncounterManager : MonoBehaviour
         ScriptedDialogueRunner.Instance.PlayDialogue(suspect, data.introDialogue, () => done = true);
         yield return new WaitUntil(() => done);
 
-        // Spawn paperwork now that the intro has finished, then notify any listeners.
+        // Hand off paperwork now that the intro has finished (plays the "Give" animation
+        // before the documents spawn, matching the normal SuspectController.SayEntryDialogue
+        // path), then notify any listeners.
         if (givesPaperwork)
-            SuspectController.Instance?.SpawnPaperwork();
+            suspect.GivePaperwork();
 
         OnFirstEncounterDialogueComplete?.Invoke(data);
         Debug.Log($"[SuspectEncounterManager] First-encounter intro complete for '{data.name}'.");
