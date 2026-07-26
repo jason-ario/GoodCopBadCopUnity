@@ -632,6 +632,25 @@ public class DebugConsole : MonoBehaviour
         Debug.Log("[DebugConsole] Skipped to end of Day 1 — booth door opened, trash and graffiti tutorial tasks triggered.");
     }
     /// <summary>
+    /// Skips straight to the start of Day 2 with the player positioned inside the bunker,
+    /// matching the natural end-of-InBetweenShiftSequence spawn before the player walks out
+    /// to begin their shift. JumpToDay is called first so the day NetworkVariable propagates
+    /// to all clients before PlayShiftStartFanfare fires (mirrors the SkipToStartOfDay3 /
+    /// SkipToOutsideBunker pattern).
+    /// </summary>
+    public void SkipToStartOfDay2()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToStartOfDay2: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        CampaignManager.Instance.JumpToDay(2);
+        ShiftManager.Instance.SkipToInsideBunker();
+    }
+
+    /// <summary>
     /// Skips to Day 2 in the booth with the opening Vlad sequence suppressed and the shift
     /// immediately ended, dropping the player straight into the post-shift Vlad out-back cutscene.
     /// </summary>

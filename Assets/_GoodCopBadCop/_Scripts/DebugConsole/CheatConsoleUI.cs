@@ -83,6 +83,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Skip to Day 2 — Start (Inside Bunker)", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToStartOfDay2());
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Skip to Day 2 — Vlad Out Back Cutscene", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay2());

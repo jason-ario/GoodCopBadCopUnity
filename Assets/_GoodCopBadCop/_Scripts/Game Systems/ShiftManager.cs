@@ -644,6 +644,31 @@ public class ShiftManager : NetworkBehaviour
     public void StartInBetweenShiftSequence()
     {
         Debug.Log($"[ShiftManager] StartInBetweenShiftSequence called.\n{System.Environment.StackTrace}");
+
+        if (IsServer)
+            StartInBetweenShiftSequenceClientRpc();
+        else
+            StartInBetweenShiftSequenceServerRpc();
+    }
+
+    /// <summary>
+    /// Routes the request through the server so the resulting ClientRpc reaches every
+    /// connected client, even though only the host is expected to call this (the
+    /// Next Shift button is hidden on non-host clients).
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void StartInBetweenShiftSequenceServerRpc()
+    {
+        StartInBetweenShiftSequenceClientRpc();
+    }
+
+    /// <summary>
+    /// Runs the in-between-shift transition locally on every client (including the host),
+    /// so the end-of-shift report closes and the next day starts for everyone at once.
+    /// </summary>
+    [ClientRpc]
+    private void StartInBetweenShiftSequenceClientRpc()
+    {
         StartCoroutine(InBetweenShiftSequence());
     }
 
@@ -1232,6 +1257,70 @@ public class ShiftManager : NetworkBehaviour
             SkipToOutsideBunkerClientRpc();
         else
             StartCoroutine(SkipToOutsideBunkerSequence());
+    }
+
+    /// <summary>
+    /// Debug shortcut. Runs the full environment-reset setup and places the player at the
+    /// inside-bunker spawn point with the bunker door forced closed — mirroring the natural
+    /// start-of-day position reached at the end of <see cref="InBetweenShiftSequence"/>.
+    /// Call <see cref="CampaignManager.JumpToDay"/> before this so the NetworkVariable
+    /// propagates to all clients before <see cref="PlayShiftStartFanfare"/> fires (mirrors the
+    /// <see cref="SkipToOutsideBunker"/> / <see cref="DebugConsole.SkipToDay"/> pattern).
+    /// </summary>
+    public void SkipToInsideBunker()
+    {
+        if (IsServer)
+            SkipToInsideBunkerClientRpc();
+        else
+            StartCoroutine(SkipToInsideBunkerSequence());
+    }
+
+    [ClientRpc]
+    private void SkipToInsideBunkerClientRpc()
+    {
+        StartCoroutine(SkipToInsideBunkerSequence());
+    }
+
+    private IEnumerator SkipToInsideBunkerSequence()
+    {
+        MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
+        AudioManager.Instance.StartAmbientAudio();
+
+        yield return new WaitForEndOfFrame();
+
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
+
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        ResetEnvironment();
+        SuspectController.Instance.ResetSuspects();
+
+        // Wait for a valid PlayerInstance — same guard as SkipToBoothReadySequence.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        PlayerInstance.Instance.SetPosition(bunkerSpawn);
+        PlayerInstance.Instance.SetIsOutside(false);
+
+        // Force the bunker door closed so the new day always starts locked inside,
+        // matching InBetweenShiftSequence's natural day-transition behaviour.
+        _bunkerDoorController?.Reset();
+
+        UIController.Instance.ShowPlayerUI();
+        EnablePlayerControl();
+        GameManager.Instance.OnGameStart?.Invoke();
+        OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
+        PlayShiftStartFanfare();
     }
 
     [ClientRpc]
