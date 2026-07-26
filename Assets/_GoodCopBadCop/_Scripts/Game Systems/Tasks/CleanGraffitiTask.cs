@@ -121,9 +121,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         DespawnExistingGraffiti();
 
         int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
-        _totalCount.Value = count;
 
-        SpawnGraffiti(count);
+        int spawnedCount = SpawnGraffiti(count);
+        _totalCount.Value = spawnedCount;
 
         // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
@@ -131,7 +131,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
-        Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {count} graffiti piece(s).");
+        Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {spawnedCount} graffiti piece(s).");
     }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -251,23 +251,43 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     // ── Spawning (server only) ────────────────────────────────────────────────
 
-    private void SpawnGraffiti(int count)
+    private int SpawnGraffiti(int count)
     {
         if (_graffitiPrefabs == null || _graffitiPrefabs.Length == 0)
         {
             Debug.LogError("[CleanGraffitiTask] _graffitiPrefabs is empty — assign at least one prefab.");
-            return;
+            return 0;
         }
 
         if (_spawnPoints == null || _spawnPoints.Length == 0)
         {
             Debug.LogError("[CleanGraffitiTask] _spawnPoints is empty — assign at least one spawn point.");
-            return;
+            return 0;
         }
 
-        for (int i = 0; i < count; i++)
+        // Pick spawn points without replacement so no two pieces land on the same spot
+        // in a single spawn cycle. Clamp to the number of available points since we
+        // can't place more unique pieces than there are spots.
+        int usableCount = Mathf.Min(count, _spawnPoints.Length);
+        if (usableCount < count)
         {
-            Transform  point  = _spawnPoints[Random.Range(0, _spawnPoints.Length)];
+            Debug.LogWarning($"[CleanGraffitiTask] Requested {count} graffiti pieces but only " +
+                              $"{_spawnPoints.Length} spawn point(s) are assigned — spawning {usableCount}.");
+        }
+
+        List<int> availableIndices = new(_spawnPoints.Length);
+        for (int i = 0; i < _spawnPoints.Length; i++)
+            availableIndices.Add(i);
+
+        int spawnedCount = 0;
+
+        for (int i = 0; i < usableCount; i++)
+        {
+            int listIndex  = Random.Range(0, availableIndices.Count);
+            int pointIndex = availableIndices[listIndex];
+            availableIndices.RemoveAt(listIndex);
+
+            Transform  point  = _spawnPoints[pointIndex];
             GameObject prefab = _graffitiPrefabs[Random.Range(0, _graffitiPrefabs.Length)];
 
             GameObject go = Instantiate(prefab, point.position, point.rotation);
@@ -280,9 +300,19 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 continue;
             }
 
+            // Route the scrub-completion callback to this task instead of the default
+            // GraffitiThreat fallback so clearing graffiti during this task actually
+            // registers progress (see GraffitiInteractable.ProgressRoutine).
+            GraffitiInteractable interactable = go.GetComponent<GraffitiInteractable>();
+            if (interactable != null)
+                interactable.OnScrubCompleted = OnGraffitiScrubbed;
+
             netObj.Spawn(destroyWithScene: true);
             _spawnedGraffiti.Add(netObj);
+            spawnedCount++;
         }
+
+        return spawnedCount;
     }
 
     private void DespawnExistingGraffiti()

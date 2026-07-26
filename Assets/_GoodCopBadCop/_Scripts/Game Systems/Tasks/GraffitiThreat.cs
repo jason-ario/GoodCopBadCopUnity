@@ -70,6 +70,14 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
     // ── Local state ──────────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedGraffiti = new();
+
+    /// <summary>Maps each currently-spawned graffiti's NetworkObject to the spawn point
+    /// index it occupies, so a spot is freed up again once that piece is scrubbed.</summary>
+    private readonly Dictionary<NetworkObject, int> _occupiedPointsByGraffiti = new();
+
+    /// <summary>Spawn point indices currently occupied by active graffiti.</summary>
+    private readonly HashSet<int> _occupiedPointIndices = new();
+
     private int _activeGraffitiCount;
     private Coroutine _spawnCoroutine;
 
@@ -148,6 +156,9 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
     /// <summary>
     /// Called by GraffitiInteractable on the server when a piece is fully scrubbed.
     /// Decrements the active count and updates the networked threat level.
+    /// Kept for pieces spawned without a tracked point index (should not normally
+    /// happen via <see cref="SpawnSingleGraffiti"/>, which always assigns
+    /// <see cref="GraffitiInteractable.OnScrubCompleted"/>).
     /// </summary>
     public void OnGraffitiScrubbed()
     {
@@ -157,6 +168,22 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
         _networkThreatLevel.Value = _maxTrackedGraffiti > 0
             ? (float)_activeGraffitiCount / _maxTrackedGraffiti
             : 0f;
+    }
+
+    /// <summary>
+    /// Called when a specific tracked graffiti piece is fully scrubbed. Frees its spawn
+    /// point so a future spawn can reuse that spot, in addition to the bookkeeping done
+    /// by <see cref="OnGraffitiScrubbed"/>.
+    /// </summary>
+    private void OnGraffitiScrubbedAt(NetworkObject netObj, int pointIndex)
+    {
+        if (!IsServer) return;
+
+        _occupiedPointIndices.Remove(pointIndex);
+        _occupiedPointsByGraffiti.Remove(netObj);
+        _spawnedGraffiti.Remove(netObj);
+
+        OnGraffitiScrubbed();
     }
 
     // ── Day start ─────────────────────────────────────────────────────────────
@@ -202,7 +229,20 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
             return;
         }
 
-        Transform  point  = _spawnPoints[Random.Range(0, _spawnPoints.Length)];
+        // Only consider spawn points not already occupied by active graffiti.
+        List<int> availableIndices = new(_spawnPoints.Length);
+        for (int i = 0; i < _spawnPoints.Length; i++)
+            if (!_occupiedPointIndices.Contains(i))
+                availableIndices.Add(i);
+
+        if (availableIndices.Count == 0)
+        {
+            // Every spot is currently covered — nothing to do until one is scrubbed.
+            return;
+        }
+
+        int pointIndex = availableIndices[Random.Range(0, availableIndices.Count)];
+        Transform  point  = _spawnPoints[pointIndex];
         GameObject prefab = _graffitiPrefabs[Random.Range(0, _graffitiPrefabs.Length)];
 
         GameObject    go     = Instantiate(prefab, point.position, point.rotation);
@@ -215,8 +255,14 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
             return;
         }
 
+        GraffitiInteractable interactable = go.GetComponent<GraffitiInteractable>();
+        if (interactable != null)
+            interactable.OnScrubCompleted = () => OnGraffitiScrubbedAt(netObj, pointIndex);
+
         netObj.Spawn(destroyWithScene: true);
         _spawnedGraffiti.Add(netObj);
+        _occupiedPointIndices.Add(pointIndex);
+        _occupiedPointsByGraffiti[netObj] = pointIndex;
         _activeGraffitiCount++;
 
         _networkThreatLevel.Value = _maxTrackedGraffiti > 0
@@ -249,6 +295,8 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
                 netObj.Despawn(destroy: true);
         }
         _spawnedGraffiti.Clear();
+        _occupiedPointIndices.Clear();
+        _occupiedPointsByGraffiti.Clear();
     }
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────

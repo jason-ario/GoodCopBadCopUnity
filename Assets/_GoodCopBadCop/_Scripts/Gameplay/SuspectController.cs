@@ -896,12 +896,24 @@ public class SuspectController : NetworkBehaviour
     public void SpawnPaperwork()
     {
         if (!IsServer) return;
-        if (suspectCharacter == null) return;
-        if (!suspectCharacter.Data.GivesPaperwork) return;
+        if (suspectCharacter == null)
+        {
+            Debug.LogWarning("[SuspectController] SpawnPaperwork: aborting — suspectCharacter is null.");
+            return;
+        }
+        if (!suspectCharacter.Data.GivesPaperwork)
+        {
+            Debug.LogWarning($"[SuspectController] SpawnPaperwork: aborting — '{suspectCharacter.Data.name}' Data.GivesPaperwork is false.");
+            return;
+        }
 
         SuspectPaperworkState paperworkState = BuildPaperworkState();
         if (!paperworkState.DocumentsVisible)
+        {
+            Debug.LogWarning($"[SuspectController] SpawnPaperwork: aborting — BuildPaperworkState() returned DocumentsVisible=false for '{suspectCharacter.Data.name}' (likely MissingDocumentAnomaly active).");
             return;
+        }
+
         
         Vector3 randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0f, 1f));
         randomPos.y = documentSpawnEndPos.position.y;

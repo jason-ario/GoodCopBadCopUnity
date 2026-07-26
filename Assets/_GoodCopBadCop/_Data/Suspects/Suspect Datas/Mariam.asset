@@ -1,0 +1,217 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc4902ccea98cf44865aecb61fc1ff4, type: 3}
+  m_Name: Mariam
+  m_EditorClassIdentifier: Assembly-CSharp::SuspectData
+  FirstName: Miriam
+  LastName: Beridze
+  Nickname: Miri
+  Occupation: Student
+  CharacterDescription: "A typical teen girl with a harsh attitude. Studies hard
+    to become a doctor. Has a mom, dad, and a sister; Sharena is her mom. She tries
+    hard to gain her teacher and mom's love \u2014 an overachiever raised under a
+    harsh mother. Has a special interest in human anatomy."
+  CharacterArc: "When mutated, Miriam becomes fully nonverbal \u2014 creepy and deeply
+    unsettling. She screams with an extremely disturbing voice if asked too many
+    questions. She can manipulate the environment, moving, shattering, spotting,
+    and opening things with startling speed. Physical mutations include a broken
+    neck, black goop dripping from her face, and large tumorous hands."
+  DateOfBirth: 03/09/1972
+  Sex: Female
+  EntryPermitExpiryDate: 18 MAY
+  IsResident: 1
+  GivesPaperwork: 1
+  handwritingFont: {fileID: 0}
+  startingInfectionScore: 0
+  dailyInfectionProgression: {x: 3, y: 8}
+  alterEgoName: The Anatomist
+  basePersonalityDescriptors:
+  - Meticulous and high-strung; treats every checkpoint interaction like an exam
+    she cannot fail.
+  - Redirects personal questions toward schoolwork or her mother's expectations.
+  - Speaks with clinical precision whenever the topic turns to anatomy or medicine.
+  - Visibly tenses at any implication that she has fallen short.
+  normalBehaviorNotes: Presents as a driven, slightly brittle student who over-explains
+    herself. Answers quickly and precisely, often citing grades or her mother's
+    standards as justification. Becomes noticeably rigid when questioned about home
+    life; softens only when allowed to talk about her studies, particularly anatomy.
+  fullMutantDialogue: {fileID: 11400000, guid: be9c05fa596d1a14ba5b58d5d887bae3, type: 2}
+  replacementIDPhoto: {fileID: 0}
+  IDPhoto: {fileID: 2800000, guid: 11f445b9376d6d64b9ad9d0ac1ee5a48, type: 3}
+  CharacterPrefab: {fileID: 947284972480981435, guid: 44cfb9d2070b2ab45ac3e84ef713a834, type: 3}
+  entryReasons:
+    earlyDaysReasons:
+    - Returning home from anatomy tutoring at the clinic. My mother expects me by
+      six.
+    - Coming back from school. I stayed late to redo an exam I did not do well enough
+      on.
+    - Picking up study materials from the district library before it closes.
+    midDaysReasons:
+    - Returning from the clinic. The volunteer program still runs, even now.
+    - Coming home from studying with a classmate. My mother does not like me being
+      late.
+    - Collecting textbooks the school released before they suspended lessons.
+    finalDaysReasons:
+    - Returning to residence. There is nowhere else worth going now.
+    - I was at the old clinic building. It's mostly empty, but I still study there.
+    - Coming home. My mother will ask what I learned today. I want an answer ready.
+  invalidEntryReasons:
+    earlyDaysReasons:
+    - Going to see the anatomy specimens kept past the northern perimeter.
+    - Meeting a boy near the restricted block. My mother does not know.
+    - Taking a shortcut through the quarantine annex to save time.
+    midDaysReasons:
+    - Visiting the clinic wing that was sealed off last week.
+    - Going to check on a patient in the contaminated ward. I wanted to see it myself.
+    - Cutting through the evacuation zone. It's faster than the main road.
+    finalDaysReasons:
+    - Going to find my sister. She did not come home last night.
+    - I need to reach the old hospital. There's something there I have to see.
+    - Checking on my teacher. No one else seems to be doing it.
+  entryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - Here. I organized everything by date, in case that helps you.
+    - I know the correct forms. I checked them twice before I left.
+    - My mother says punctuality reflects character. I am not going to be late because
+      of paperwork.
+    dialoguesMidDays:
+    - The line was longer yesterday. I timed it. This is already faster.
+    - I brought everything you'll need. I don't like being asked twice.
+    - I have a test tomorrow. I would like to be efficient, if that's possible.
+    dialoguesFinalDays:
+    - My sister is waiting for me. Please, I've done everything correctly.
+    - I don't understand why this takes longer every day. I follow every instruction.
+    - I want to go home. I have already answered these questions the way they should
+      be answered.
+  uncannyEntryDialogues:
+    lastVerdict: 0
+    dialoguesEarlyDays:
+    - I checked everything. I think I checked everything. I don't remember checking
+      it.
+    - Something felt wrong on the way here. I couldn't say what.
+    - I'm not usually like this. I don't know why my hands won't stay still.
+    dialoguesMidDays:
+    - I studied the wrong chapter, I think. I keep forgetting which one was assigned.
+    - My mother would be disappointed if she saw me right now. I don't want her to
+      see me right now.
+    - I can hear my own heartbeat. That's not normal, is it. Is that normal.
+    dialoguesFinalDays:
+    - I don't feel like myself. I don't know what that means, exactly.
+    - Something under my skin doesn't feel like mine anymore. I should probably not
+      have said that.
+    - Please, just tell me if I did something wrong. I need to know if I did something
+      wrong.
+  exitDialoguesPassed:
+    lastVerdict: 1
+    dialoguesEarlyDays:
+    - Thank you. I'll tell my mother it went well.
+    dialoguesMidDays:
+    - See, I told you I had everything in order.
+    dialoguesFinalDays:
+    - I can still make it home before dark. Thank you.
+  exitDialoguesQuarantined:
+    lastVerdict: 2
+    dialoguesEarlyDays:
+    - Please tell my mother I'll be late. She worries when I don't come straight
+      home.
+    dialoguesMidDays:
+    - I don't understand. I did everything right. Please, just tell them I did everything
+      right.
+    dialoguesFinalDays:
+    - My sister needs me. Please, someone has to tell her where I am.
+  exitDialoguesKilled:
+    lastVerdict: 3
+    dialoguesEarlyDays:
+    - "I didn't even get to\u2026 tell her I tried\u2026"
+    dialoguesMidDays:
+    - I had a test tomorrow. I was going to pass it.
+    dialoguesFinalDays:
+    - "Tell my sister\u2026 I'm sorry I wasn't\u2026 better\u2026"
+  quarantineExitLines:
+  - I keep a study schedule in my bag. I would like to keep it with me.
+  - This isn't fair. I have never failed an inspection before.
+  - Someone needs to tell my mother where I am. She will not handle this well.
+  killExitLines:
+  - I was going to become a doctor. I was going to be good at it.
+  - My mother will say I brought this on myself. She says that about everything.
+  - I never even got to finish studying today's chapter.
+  voiceAudioClips:
+  - {fileID: 8300000, guid: b6737e317f2bc4144bc9356831d02f4e, type: 3}
+  - {fileID: 8300000, guid: 4a5e0e57193b2464baa07e479f67e96d, type: 3}
+  - {fileID: 8300000, guid: 37e71ec15cbca174daac7dac7ec9bfa4, type: 3}
+  - {fileID: 8300000, guid: c05c77641e0d23a49bc6d2d085e28b53, type: 3}
+  - {fileID: 8300000, guid: 45be5ed74dd9a554188f19530e63750d, type: 3}
+  - {fileID: 8300000, guid: a6a934d6761eda14daee6bed68e4efe6, type: 3}
+  - {fileID: 8300000, guid: a2a2d789fc7daf0429fe98b2ac270d78, type: 3}
+  - {fileID: 8300000, guid: 436a72b3d3e624343b1362eb0fe6db16, type: 3}
+  - {fileID: 8300000, guid: ee9e3c6a782ef9843b78d5683854f6c1, type: 3}
+  - {fileID: 8300000, guid: a2a1216baa0b9394fa8f4e04f0d9ff5b, type: 3}
+  introDialogue: {fileID: 11400000, guid: ada4737c1145afd48aa7b3b5855249f5, type: 2}
+  questionResponses:
+  - question: Where are you coming from?
+    earlyDaysAnswer: The clinic. I volunteer there most afternoons — it counts toward
+      my application.
+    midDaysAnswer: The clinic, what's left of it. I still go. It's good practice.
+    finalDaysAnswer: The old hospital wing. I walked the back route. The main road
+      isn't safe anymore.
+    mismatchEarlyDaysAnswer: Home. I was studying all day. I didn't go anywhere.
+    mismatchMidDaysAnswer: A friend's house. We were studying together. Nothing
+      unusual.
+    mismatchFinalDaysAnswer: Nowhere in particular. I just needed some air.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Have you been experiencing any strange symptoms lately?
+    earlyDaysAnswer: No. I sleep less than I should, but that's from studying, not
+      illness.
+    midDaysAnswer: Some headaches. I assumed it was from reading too much by candlelight.
+    finalDaysAnswer: I don't sleep much anymore. I tell myself it's the exams.
+    mismatchEarlyDaysAnswer: No, nothing. I feel completely normal.
+    mismatchMidDaysAnswer: Nothing at all. I've actually been sleeping quite well.
+    mismatchFinalDaysAnswer: No symptoms. I feel fine, honestly.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  - question: Who do you live with?
+    earlyDaysAnswer: My mother, my father, and my younger sister. My mother mostly.
+    midDaysAnswer: My family. My mother keeps us close these days.
+    finalDaysAnswer: My mother and my sister. My father is not always home anymore.
+    mismatchEarlyDaysAnswer: Alone. I live alone, actually. It's better for studying.
+    mismatchMidDaysAnswer: No one. I've been staying by myself since the evacuation
+      started.
+    mismatchFinalDaysAnswer: No one. I haven't seen my family in some time.
+    uncannyEarlyDaysAnswer: 
+    uncannyMidDaysAnswer: 
+    uncannyFinalDaysAnswer: 
+  idleBarks:
+    earlyDays:
+    - My mother expects me home by a certain hour. I would rather not test her patience.
+    - I've read that the human body can survive remarkably specific traumas. It's
+      fascinating, honestly.
+    - I don't usually get nervous. I don't know why I'm nervous.
+    midDays:
+    - Do you think medical school takes checkpoint delays into account? I doubt
+      it.
+    - I've started noticing things about the body that I didn't used to notice.
+      It's probably just my studies.
+    - My teacher says I overthink everything. I think that's an unfair thing to
+      say to a student who studies this hard.
+    finalDays:
+    - I used to think I wanted to understand the body completely. Now I'm not sure
+      I do.
+    - My sister asked me if I was scared. I told her fear wasn't useful information.
+    - I keep counting things. I don't know when I started doing that.
+    uncannyEarlyDays: []
+    uncannyMidDays: []
+    uncannyFinalDays: []
+  IDNumber: 5127493

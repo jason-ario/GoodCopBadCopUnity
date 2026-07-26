@@ -15,10 +15,11 @@ using UnityEngine;
 ///     FP fill light.
 ///   - Disables player movement and the interaction reticle.
 ///   - Shows the Back UI button (Q to exit).
+///   - Disables the player's point light (<see cref="PlayerInstance.SetPlayerLightActive"/>).
 ///
 /// On close:
 ///   - Calls <see cref="PlayerThirdPersonView.Exit"/> to revert all visuals.
-///   - Re-enables everything in reverse order.
+///   - Re-enables everything in reverse order, including the player's point light.
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
@@ -116,6 +117,9 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
             PlayerHatController hatController = player.GetComponent<PlayerHatController>();
             _menuUI.Open(hatController);
         }
+
+        // Hide the player's point light so it does not bleed into the cosmetics view.
+        player.GetComponent<PlayerInstance>()?.SetPlayerLightActive(false);
     }
 
     private void CloseView()
@@ -145,6 +149,10 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
         {
             _interactingPlayer.SetSuspectCamMode(false);
             _interactingPlayer.playerMovementController.SetCanControl(true);
+
+            // Restore the player's point light now that the cosmetics view is closed.
+            _interactingPlayer.GetComponent<PlayerInstance>()?.SetPlayerLightActive(true);
+
             _interactingPlayer = null;
         }
     }

@@ -22,8 +22,8 @@ public class TutorialTaskSync : NetworkBehaviour
     /// <summary>Fired on all clients once the server confirms both Vlad docs were picked up.</summary>
     public static event Action OnVladDocsBothPickedUpAllClients;
 
-    /// <summary>Fired on all clients when the Ivan documentation tutorial begins.</summary>
-    public static event Action OnIvanDocumentTutorialStartedAllClients;
+    /// <summary>Fired on all clients when the quarantine tutorial suspect's documentation tutorial begins.</summary>
+    public static event Action OnQuarantineDocumentTutorialStartedAllClients;
 
     /// <summary>Fired on all clients when any player picks up an exam notebook during the tutorial.</summary>
     public static event Action OnExamNotebookPickedUpAllClients;
@@ -32,16 +32,10 @@ public class TutorialTaskSync : NetworkBehaviour
     public static event Action OnExamPageFiledAllClients;
 
     /// <summary>
-    /// Fired on all clients after the post-clock-in megaphone dialogue completes,
+    /// Fired on ALL clients once the post-coupon megaphone dialogue completes,
     /// signalling that it is time to show the "Press the button" task and arm the switch.
     /// </summary>
     public static event Action OnPressButtonReadyAllClients;
-
-    /// <summary>
-    /// Fired on ALL clients once the clock-in nag dialogue finishes and the time card machine
-    /// is enabled. Signals that it is time to show the clock-in task and marker.
-    /// </summary>
-    public static event Action OnClockInReadyAllClients;
 
     /// <summary>
     /// Fired on all clients once the server confirms the tutorial folder was placed on the
@@ -70,7 +64,7 @@ public class TutorialTaskSync : NetworkBehaviour
     // ── Server-side counters / guards ─────────────────────────────────────────
 
     private int  _vladDocsPickedUpCount;
-    private bool _ivanTutorialBroadcast;
+    private bool _quarantineTutorialBroadcast;
     private bool _examPickedUpBroadcast;
     private bool _deskFolderPlacedBroadcast;
     private bool _windowHandOffBroadcast;
@@ -99,7 +93,7 @@ public class TutorialTaskSync : NetworkBehaviour
     {
         if (!IsServer) return;
         _vladDocsPickedUpCount = 0;
-        _ivanTutorialBroadcast = false;
+        _quarantineTutorialBroadcast = false;
         _examPickedUpBroadcast = false;
         _deskFolderPlacedBroadcast = false;
         _windowHandOffBroadcast = false;
@@ -126,24 +120,25 @@ public class TutorialTaskSync : NetworkBehaviour
         OnVladDocsBothPickedUpAllClients?.Invoke();
     }
 
-    // ── Ivan documentation tutorial ───────────────────────────────────────────
+    // ── Quarantine tutorial suspect documentation tutorial ────────────────────
 
     /// <summary>
-    /// Called by any client when the Ivan documentation tutorial is triggered.
-    /// The server ensures the broadcast fires exactly once even if multiple clients report it.
+    /// Called by any client when the quarantine tutorial suspect's documentation tutorial
+    /// is triggered. The server ensures the broadcast fires exactly once even if multiple
+    /// clients report it.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void ReportIvanTutorialTriggerServerRpc()
+    public void ReportQuarantineTutorialTriggerServerRpc()
     {
-        if (_ivanTutorialBroadcast) return;
-        _ivanTutorialBroadcast = true;
-        BroadcastIvanTutorialStartedClientRpc();
+        if (_quarantineTutorialBroadcast) return;
+        _quarantineTutorialBroadcast = true;
+        BroadcastQuarantineTutorialStartedClientRpc();
     }
 
     [ClientRpc]
-    private void BroadcastIvanTutorialStartedClientRpc()
+    private void BroadcastQuarantineTutorialStartedClientRpc()
     {
-        OnIvanDocumentTutorialStartedAllClients?.Invoke();
+        OnQuarantineDocumentTutorialStartedAllClients?.Invoke();
     }
 
     // ── Exam notebook pickup ──────────────────────────────────────────────────
@@ -163,7 +158,7 @@ public class TutorialTaskSync : NetworkBehaviour
     [ClientRpc]
     private void BroadcastExamPickedUpClientRpc()
     {
-        // Set the static flag so the server-side WaitUntil in IvanDocumentationBarkRoutine
+        // Set the static flag so the server-side WaitUntil in QuarantineDocumentationBarkRoutine
         // unblocks regardless of which client picked up the notebook.
         ExamNotebook.AnyExamNotebookPickedUp = true;
         OnExamNotebookPickedUpAllClients?.Invoke();
@@ -190,7 +185,7 @@ public class TutorialTaskSync : NetworkBehaviour
     // ── Press-button ready ────────────────────────────────────────────────────
 
     /// <summary>
-    /// Server-only. Called after the post-clock-in megaphone dialogue finishes.
+    /// Server-only. Called after the post-coupon megaphone dialogue finishes.
     /// Broadcasts to all clients that it is time to show the "Press the button" task
     /// and arm the switch button.
     /// </summary>
@@ -204,25 +199,6 @@ public class TutorialTaskSync : NetworkBehaviour
     private void BroadcastPressButtonReadyClientRpc()
     {
         OnPressButtonReadyAllClients?.Invoke();
-    }
-
-    // ── Clock-in ready ────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Server-only. Called after the clock-in nag dialogue finishes and the time card
-    /// machine has been enabled. Broadcasts to all clients that the clock-in task
-    /// and marker should now be shown.
-    /// </summary>
-    public void BroadcastClockInReadyServer()
-    {
-        if (!IsServer) return;
-        BroadcastClockInReadyClientRpc();
-    }
-
-    [ClientRpc]
-    private void BroadcastClockInReadyClientRpc()
-    {
-        OnClockInReadyAllClients?.Invoke();
     }
 
     // ── Folder placed on desk ─────────────────────────────────────────────────

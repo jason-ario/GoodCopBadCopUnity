@@ -10,6 +10,11 @@ using UnityEngine;
 /// out over <see cref="_fadeOutDuration"/> seconds before extinguishing.
 /// The pit can be re-lit after it goes out, or while already burning (resets the timer).
 ///
+/// If <see cref="_burnIndefinitely"/> is enabled, the timer is skipped entirely and the
+/// fire stays lit until <see cref="Extinguish"/> is called explicitly — used for narrative
+/// fires (e.g. the fire barrel) that must keep burning through an entire shift and only go
+/// out as part of a scripted day transition, after the End of Shift Report has been shown.
+///
 /// Prefab requirements:
 ///   - NetworkObject
 ///   - HighlightEffect       (required by Interactable)
@@ -32,10 +37,16 @@ public class FirePit : Interactable, IIgnitable
     [SerializeField] private Light _fireLight;
 
     [Header("Fire Pit — Duration")]
-    [Tooltip("Total burn time in seconds before the fire naturally extinguishes (~3 minutes default).")]
+    [Tooltip("If true, the fire ignores _burnDuration and stays lit indefinitely once ignited. " +
+             "It will only go out when Extinguish() is called explicitly (e.g. a scripted day " +
+             "transition after the End of Shift Report has been shown). Use this for narrative " +
+             "fires that must burn through an entire shift regardless of real-world duration.")]
+    [SerializeField] private bool _burnIndefinitely = false;
+
+    [Tooltip("Total burn time in seconds before the fire naturally extinguishes (~3 minutes default). Ignored if _burnIndefinitely is true.")]
     [SerializeField] private float _burnDuration = 180f;
 
-    [Tooltip("Seconds at the end of the burn during which the flame fades out.")]
+    [Tooltip("Seconds at the end of the burn during which the flame fades out. Ignored if _burnIndefinitely is true.")]
     [SerializeField] private float _fadeOutDuration = 10f;
 
     [Header("Fire Pit — Audio")]
@@ -99,8 +110,16 @@ public class FirePit : Interactable, IIgnitable
         _isLit.Value = true;
 
         if (_burnCoroutine != null)
+        {
             StopCoroutine(_burnCoroutine);
-        _burnCoroutine = StartCoroutine(BurnCoroutine());
+            _burnCoroutine = null;
+        }
+
+        // Indefinite fires (e.g. the narrative fire barrel) skip the timer entirely and
+        // rely solely on an explicit Extinguish() call — typically fired from a scripted
+        // day transition once the End of Shift Report has finished playing.
+        if (!_burnIndefinitely)
+            _burnCoroutine = StartCoroutine(BurnCoroutine());
     }
 
     /// <summary>

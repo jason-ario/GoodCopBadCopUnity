@@ -236,22 +236,32 @@ public class AnomalyController : MonoBehaviour
 
     /// <summary>
     /// Activates exactly <paramref name="count"/> anomalies from the documentation pool only.
-    /// Used for tutorial suspects (e.g. Ivan on Day 1) that must exhibit paperwork
+    /// Used for tutorial suspects (e.g. the Day 1 quarantine tutorial suspect) that must exhibit paperwork
     /// discrepancies. Other categories stay unavailable through the normal unlock rules.
     /// Only unlocked documentation anomalies are eligible for selection.
+    /// <para>
+    /// <see cref="MissingDocumentAnomaly"/> is always excluded from selection here: when active,
+    /// <see cref="SuspectPaperworkService.BuildForSuspect"/> reports <c>DocumentsVisible = false</c>,
+    /// which makes <see cref="SuspectController.SpawnPaperwork"/> abort entirely and spawn no
+    /// documents at all — self-defeating for a tutorial suspect who must have physical documents
+    /// on the desk for the player to inspect.
+    /// </para>
     /// </summary>
     public void InitializeWithDocumentationAnomalies(int count)
     {
         ClearInitializationState(deactivateActive: true);
 
-        // Filter to unlocked documentation anomalies, then shuffle and activate.
-        var docPool = FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList());
+        // Filter to unlocked documentation anomalies, excluding MissingDocumentAnomaly (see summary),
+        // then shuffle and activate.
+        var docPool = FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList())
+            .Where(a => a is not MissingDocumentAnomaly)
+            .ToList();
         ShuffleList(docPool);
         int toActivate = Mathf.Min(count, docPool.Count);
         for (int i = 0; i < toActivate; i++) ActivateAnomaly(docPool[i]);
         for (int i = toActivate; i < docPool.Count; i++) InitializeDisabled(docPool[i]);
 
-        Debug.Log($"[AnomalyController] Documentation-only init: {toActivate}/{docPool.Count} unlocked anomaly/ies active.");
+        Debug.Log($"[AnomalyController] Documentation-only init: {toActivate}/{docPool.Count} unlocked anomaly/ies active (MissingDocumentAnomaly excluded).");
     }
 
     /// <summary>

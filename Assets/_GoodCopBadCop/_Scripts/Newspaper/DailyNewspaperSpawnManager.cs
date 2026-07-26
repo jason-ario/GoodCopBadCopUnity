@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -27,6 +28,10 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
+    // Tracks whether OnDayStart has been subscribed, so OnNetworkDespawn only unsubscribes
+    // once the retry coroutine has actually attached the handler.
+    private bool _subscribedToDayStart;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -34,18 +39,32 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
         if (!IsServer)
             return;
 
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart += OnDayStart;
-        else
-            Debug.LogError("[DailyNewspaperSpawnManager] ShiftManager.Instance is null on spawn.", this);
+        StartCoroutine(SubscribeToDayStartWhenReady());
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
 
-        if (IsServer && ShiftManager.Instance != null)
+        if (IsServer && _subscribedToDayStart && ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
+
+        _subscribedToDayStart = false;
+    }
+
+    /// <summary>
+    /// Waits for <see cref="ShiftManager.Instance"/> to become available before subscribing.
+    /// Scene-placed NetworkObjects spawn in a non-deterministic order, so ShiftManager's
+    /// singleton may not be assigned yet at the exact moment this object's OnNetworkSpawn runs.
+    /// A one-shot null check here would silently and permanently miss the subscription —
+    /// this retries every frame until the instance exists.
+    /// </summary>
+    private IEnumerator SubscribeToDayStartWhenReady()
+    {
+        yield return new WaitUntil(() => ShiftManager.Instance != null);
+
+        ShiftManager.Instance.OnDayStart += OnDayStart;
+        _subscribedToDayStart = true;
     }
 
     // ── Day Start ────────────────────────────────────────────────────────────

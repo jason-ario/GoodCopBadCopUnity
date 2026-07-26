@@ -7,8 +7,10 @@ using UnityEngine;
 /// Before the intro cutscene completes, interacting opens the start-shift screen.
 /// Once the intro cutscene is done (<see cref="ShiftManager.OnShiftReady"/> fires),
 /// the gate behaves like a standard gate — toggling open and closed, synced across the network.
+/// Implements <see cref="IHeldItemPassthrough"/> so the gate can still be opened/closed
+/// (or the start-shift screen opened) while the player is holding an item.
 /// </summary>
-public class GateStartShiftController : Interactable
+public class GateStartShiftController : Interactable, IHeldItemPassthrough
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
         false,

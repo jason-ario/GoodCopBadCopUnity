@@ -1,6 +1,7 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Day 1 scripted opening sequence.
@@ -103,8 +104,9 @@ public class Day_01 : DayBase
     [Tooltip("The Documentation Exam shop item — locked until the documentation tutorial begins.")]
     [SerializeField] private ShopItem _documentationExamShopItem;
 
-    [Tooltip("Number of documentation anomalies to force-activate on Ivan for the Day 1 tutorial.")]
-    [SerializeField] private int _ivanDocumentationAnomalyCount = 2;
+    [Tooltip("Number of documentation anomalies to force-activate on the random quarantine tutorial suspect (index 2) for the Day 1 tutorial.")]
+    [FormerlySerializedAs("_ivanDocumentationAnomalyCount")]
+    [SerializeField] private int _quarantineDocumentationAnomalyCount = 5;
 
     [Tooltip("Task text shown while the player needs to get a documentation checklist.")]
     [SerializeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
@@ -112,11 +114,13 @@ public class Day_01 : DayBase
     [Tooltip("Task text shown while the player needs to check documentation anomalies and file the page.")]
     [SerializeField] private string _taskCheckDocumentationText = "Check documentation anomalies and add the page to the folder";
 
-    [Tooltip("First megaphone scripted dialogue — plays when the player first picks up one of Ivan's documents.")]
-    [SerializeField] private ScriptedDialogue _ivanMegaphonePart1;
+    [Tooltip("First megaphone scripted dialogue — plays when the player first picks up one of the quarantine tutorial suspect's documents.")]
+    [FormerlySerializedAs("_ivanMegaphonePart1")]
+    [SerializeField] private ScriptedDialogue _quarantineMegaphonePart1;
 
     [Tooltip("Second megaphone scripted dialogue — plays after the player picks up the documentation checklist.")]
-    [SerializeField] private ScriptedDialogue _ivanMegaphonePart2;
+    [FormerlySerializedAs("_ivanMegaphonePart2")]
+    [SerializeField] private ScriptedDialogue _quarantineMegaphonePart2;
 
     [Tooltip("Seconds after OnDayStart fires before the shutter opens and Vlad is triggered.")]
     [SerializeField] private float _shutterOpenDelay = 7f;
@@ -202,26 +206,9 @@ public class Day_01 : DayBase
     [Tooltip("HUD task text shown while the player needs to collect the payout coupons from the ATM.")]
     [SerializeField] private string _taskCollectCouponsText = "Collect coupons at ATM";
 
-    [Tooltip("HUD task text shown after all coupons are collected, prompting the player to clock in.")]
-    [SerializeField] private string _taskClockInText = "Clock in with the time card machine";
-
-    [Tooltip("HUD task text shown after clocking in, prompting the player to press the " +
+    [Tooltip("HUD task text shown after all coupons are collected, prompting the player to press the " +
              "switch button to call the first real subject.")]
     [SerializeField] private string _taskPressButtonText = "Press button to call next subject";
-
-    [Header("Day 1 — Clock-In Tutorial")]
-    [Tooltip("The Time Card Machine in the scene — used to enable clock-in and detect when the player punches in.")]
-    [SerializeField] private TimecardMachine _timecardMachine;
-
-    [Tooltip("Megaphone scripted dialogue played immediately after all coupons are collected. " +
-             "Two lines: 'Hey, are you taking cash already? You need to clock in first!' " +
-             "and 'Clock in with that Time card machine over there'.")]
-    [SerializeField] private ScriptedDialogue _clockInNagDialogue;
-
-    [Tooltip("Megaphone scripted dialogue played after the player clocks in. " +
-             "Two lines: 'Good, now you can call the first subject.' " +
-             "and 'Press that button over there to alert the next in line. Hurry up, you're on the clock!'")]
-    [SerializeField] private ScriptedDialogue _clockInCompleteDialogue;
 
     [Header("Day 1 — Tutorial Markers")]
     [Tooltip("World-space point above Vlad's document drop zone — marker shown during 'pick up docs' task.")]
@@ -241,9 +228,6 @@ public class Day_01 : DayBase
 
     [Tooltip("World-space point above the ATM — marker shown during 'collect coupons' task.")]
     [SerializeField] private Transform _markerATM;
-
-    [Tooltip("World-space point above the time card machine — marker shown during 'clock in' task.")]
-    [SerializeField] private Transform _markerTimecardMachine;
 
     [Tooltip("World-space point above the switch button — marker shown during 'press button to call next subject' task.")]
     [SerializeField] private Transform _markerSwitchButton;
@@ -295,13 +279,19 @@ public class Day_01 : DayBase
     private PickableObject _vladAppForm;
     private int _docsPickedUp;
 
-    // Tracks which of Ivan's two documents have been spawned — used to wire pickup triggers.
-    private PickableObject _ivanDoc1;
-    private PickableObject _ivanDoc2;
-
-    // Active Ivan documentation tutorial tasks.
+    // Active quarantine documentation tutorial tasks.
     private TutorialObjectiveItem _taskGetChecklist;
     private TutorialObjectiveItem _taskCheckDocumentation;
+
+    // The suspect captured when index 2 arrives — used to verify that a later
+    // OnPaperworkSpawned event actually belongs to this suspect before wiring the
+    // documentation tutorial's pickup triggers. See OnQuarantineSuspectPaperworkSpawned.
+    private SuspectCharacter _quarantineTargetSuspect;
+
+    // Tracks which of the quarantine tutorial suspect's two documents have been spawned —
+    // used to wire pickup triggers.
+    private PickableObject _quarantineDoc1;
+    private PickableObject _quarantineDoc2;
 
     // Tracks how many of Vlad's documents have been filed into a folder.
     private int _docsFiledCount;
@@ -320,13 +310,19 @@ public class Day_01 : DayBase
 
     // Post-Vlad ATM / button tasks shown after his closing dialogue.
     private TutorialObjectiveItem _taskCollectCoupons;
-    private TutorialObjectiveItem _taskClockIn;
     private TutorialObjectiveItem _taskPressButton;
 
     // End-of-shift trash task shown after the Alexei sequence.
     private TutorialObjectiveItem _taskThrowTrash;
     private TutorialObjectiveItem _taskOpenBunker;
     private TutorialObjectiveItem _taskGoToBed;
+
+    // Both the trash and graffiti objectives are added to the same shared
+    // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
+    // These flags gate HideAndClear so the whole list isn't cleared out from
+    // under a still-in-progress task when the other one finishes first.
+    private bool _trashTaskDone;
+    private bool _graffitiTaskDone;
 
     // "Process N subjects" counter task — shown after Vlad's tutorial sequence ends.
     private const int SubjectsToProcess = 5;
@@ -376,26 +372,22 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived += OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived += OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived += OnDocAnomalySuspectArrivedAtWindow;
-        SuspectController.OnSuspectArrived += OnIvanArrivedAtWindow;
-        SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned; // advances through random → doc anomaly → Ivan
+        SuspectController.OnSuspectArrived += OnStampsRestoredAtWindow;
+        SuspectController.OnPaperworkSpawned += OnVladPaperworkSpawned;
         FolderController.OnDocumentAdded += OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
         FolderController.OnFolderHandedOff += OnVladFolderHandedOff_OneShot; // fires once after Vlad's deferred verdict
         SuspectEncounterManager.OnFirstEncounterDialogueComplete += OnSuspectFirstEncounterComplete;
 
         // Subscribe to TutorialTaskSync events so all task transitions broadcast to every client.
-        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        += OnVladDocsBothPickedUpSync;
-        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients += OnIvanTutorialStartedSync;
-        TutorialTaskSync.OnExamNotebookPickedUpAllClients        += OnExamPickedUpSync;
-        TutorialTaskSync.OnExamPageFiledAllClients               += OnExamPageFiledSync;
-        TutorialTaskSync.OnPressButtonReadyAllClients            += OnPressButtonReadySync;
-        TutorialTaskSync.OnClockInReadyAllClients                += OnClockInReadySync;
-        TutorialTaskSync.OnFolderPlacedOnDeskAllClients          += OnFolderPlacedOnDeskSync;
-        TutorialTaskSync.OnFolderHandedToVladAllClients          += OnFolderHandedToVladSync;
-        TutorialTaskSync.OnTrashTaskReadyAllClients              += OnTrashTaskReadySync;
-
-        // Subscribe to the clock-in event so the task can be completed on all clients.
-        TimecardMachine.OnClockInAllClients += OnTimecardClockInSync;
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients            += OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnQuarantineDocumentTutorialStartedAllClients += OnQuarantineTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients             += OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients                    += OnExamPageFiledSync;
+        TutorialTaskSync.OnPressButtonReadyAllClients                 += OnPressButtonReadySync;
+        TutorialTaskSync.OnFolderPlacedOnDeskAllClients               += OnFolderPlacedOnDeskSync;
+        TutorialTaskSync.OnFolderHandedToVladAllClients               += OnFolderHandedToVladSync;
+        TutorialTaskSync.OnTrashTaskReadyAllClients                   += OnTrashTaskReadySync;
 
         // Reset server-side tutorial counters when the day starts.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
@@ -448,35 +440,31 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
 
-        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnQuarantineSuspectPaperworkSpawned;
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
-        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
+        FolderController.OnFolderEquipped -= OnQuarantinePickupTrigger;
         FolderController.OnFolderHandedOff -= OnVladFolderHandedOff_OneShot;
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
-        ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
+        ExamNotebook.OnAnyNotebookPageFiled    -= OnQuarantinePageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
 
-        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        -= OnVladDocsBothPickedUpSync;
-        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
-        TutorialTaskSync.OnExamNotebookPickedUpAllClients        -= OnExamPickedUpSync;
-        TutorialTaskSync.OnExamPageFiledAllClients               -= OnExamPageFiledSync;
-        TutorialTaskSync.OnPressButtonReadyAllClients            -= OnPressButtonReadySync;
-        TutorialTaskSync.OnClockInReadyAllClients                -= OnClockInReadySync;
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients              -= OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnQuarantineDocumentTutorialStartedAllClients -= OnQuarantineTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients              -= OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients                     -= OnExamPageFiledSync;
+        TutorialTaskSync.OnPressButtonReadyAllClients                  -= OnPressButtonReadySync;
 
         // Post-Vlad ATM / button sequence cleanup.
         ShiftManager.OnNextSuspectReadyForBell -= OnVladVerdictReadyIntercept;
         CouponPickup.OnAnyPickedUp             -= OnCouponPickedUp;
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
-        TimecardMachine.OnClockInAllClients    -= OnTimecardClockInSync;
         TutorialMarkerManager.Instance?.UnmarkAll();
 
         if (_deskPlacementBoard != null)
@@ -489,10 +477,15 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
         TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
 
+        TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+        if (CleanGraffitiTask.Instance != null)
+            CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
+
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
-        UnsubscribeIvanDocumentPickupEvents();
+        UnsubscribeQuarantineDocumentPickupEvents();
 
         StopAllCoroutines();
 
@@ -519,39 +512,37 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
 
-        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
         SuspectController.OnSuspectArrived -= OnSoldierArrivedAtWindow;
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnQuarantineSuspectPaperworkSpawned;
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
-        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
+        FolderController.OnFolderEquipped -= OnQuarantinePickupTrigger;
         FolderController.OnFolderHandedOff -= OnVladFolderHandedOff_OneShot;
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
-        ExamNotebook.OnAnyNotebookPageFiled    -= OnIvanPageFiledLocal;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
+        ExamNotebook.OnAnyNotebookPageFiled    -= OnQuarantinePageFiledLocal;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete -= OnSuspectFirstEncounterComplete;
 
-        TutorialTaskSync.OnVladDocsBothPickedUpAllClients        -= OnVladDocsBothPickedUpSync;
-        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
-        TutorialTaskSync.OnExamNotebookPickedUpAllClients        -= OnExamPickedUpSync;
-        TutorialTaskSync.OnExamPageFiledAllClients               -= OnExamPageFiledSync;
-        TutorialTaskSync.OnPressButtonReadyAllClients            -= OnPressButtonReadySync;
-        TutorialTaskSync.OnClockInReadyAllClients                -= OnClockInReadySync;
+        TutorialTaskSync.OnVladDocsBothPickedUpAllClients              -= OnVladDocsBothPickedUpSync;
+        TutorialTaskSync.OnQuarantineDocumentTutorialStartedAllClients -= OnQuarantineTutorialStartedSync;
+        TutorialTaskSync.OnExamNotebookPickedUpAllClients              -= OnExamPickedUpSync;
+        TutorialTaskSync.OnExamPageFiledAllClients                     -= OnExamPageFiledSync;
+        TutorialTaskSync.OnPressButtonReadyAllClients                  -= OnPressButtonReadySync;
 
         // Post-Vlad ATM / button sequence cleanup.
         ShiftManager.OnNextSuspectReadyForBell -= OnVladVerdictReadyIntercept;
         CouponPickup.OnAnyPickedUp             -= OnCouponPickedUp;
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
-        TimecardMachine.OnClockInAllClients    -= OnTimecardClockInSync;
 
-        // Trash task tutorial cleanup (safe to call even if task never started).
+        // Trash/graffiti task tutorial cleanup (safe to call even if tasks never started).
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+        if (CleanGraffitiTask.Instance != null)
+            CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
         BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
 
@@ -568,7 +559,7 @@ public class Day_01 : DayBase
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
-        UnsubscribeIvanDocumentPickupEvents();
+        UnsubscribeQuarantineDocumentPickupEvents();
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -593,7 +584,7 @@ public class Day_01 : DayBase
         _yellowStampSlot?.SetSlotInteractable(false);
         _redStampSlot?.SetSlotInteractable(false);
 
-        // When a debug skip is active, the opening sequence (Vlad / civilians / Ivan) is
+        // When a debug skip is active, the opening sequence (Vlad / civilians / quarantine suspect) is
         // intentionally bypassed — DebugSkipToSoldierSlot handles the shift start itself.
         if (_debugSkipActive)
         {
@@ -736,19 +727,16 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients when Vlad's paperwork spawns. Hooks OnPickedUpEvent on both
-    /// documents so we can track when the local player picks them up.
-    /// Immediately swaps the subscription so the random suspect's paperwork (spawned after
-    /// Vlad leaves) is handled by <see cref="OnRandomSuspectPaperworkSpawned"/>, which in
-    /// turn swaps to <see cref="OnIvanPaperworkSpawned"/> so only Ivan (suspect index 2)
-    /// triggers the documentation tutorial.
+    /// documents so we can track when the local player picks them up. Self-unsubscribes —
+    /// no further suspects are tracked through this event; the quarantine tutorial suspect's
+    /// own paperwork is instead wired directly in <see cref="OnDocAnomalySuspectArrivedAtWindow"/>
+    /// via <see cref="OnQuarantineSuspectPaperworkSpawned"/>.
     /// </summary>
     private void OnVladPaperworkSpawned(IDCard card, PickableObject appForm)
     {
         Debug.Log($"[Day_01] OnVladPaperworkSpawned — card={card}, appForm={appForm}  IsServer={NetworkManager.Singleton?.IsServer ?? false}");
 
-        // Advance the chain: random suspect's paperwork goes to the next handler, not Ivan's.
         SuspectController.OnPaperworkSpawned -= OnVladPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned += OnRandomSuspectPaperworkSpawned;
         _vladIDCard = card;
         _vladAppForm = appForm;
 
@@ -779,17 +767,6 @@ public class Day_01 : DayBase
     {
         if (TutorialMarkerManager.Instance != null && _markerPickUpDocs != null)
             TutorialMarkerManager.Instance.Mark(_markerPickUpDocs);
-    }
-
-    /// <summary>
-    /// Fires on all clients when the random (second) suspect's paperwork spawns.
-    /// Advances the handler chain so the third suspect's (doc-anomaly) paperwork
-    /// triggers the documentation tutorial.
-    /// </summary>
-    private void OnRandomSuspectPaperworkSpawned(IDCard card, PickableObject appForm)
-    {
-        SuspectController.OnPaperworkSpawned -= OnRandomSuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned += OnDocAnomalySuspectPaperworkSpawned;
     }
 
     private void OnVladDocumentPickedUp()
@@ -826,81 +803,84 @@ public class Day_01 : DayBase
         }
     }
 
-    private void UnsubscribeIvanDocumentPickupEvents()
-    {
-        if (_ivanDoc1 != null) { _ivanDoc1.OnPickedUpEvent -= OnIvanPickupTrigger; _ivanDoc1 = null; }
-        if (_ivanDoc2 != null) { _ivanDoc2.OnPickedUpEvent -= OnIvanPickupTrigger; _ivanDoc2 = null; }
-        FolderController.OnFolderEquipped -= OnIvanPickupTrigger;
-    }
-
     // -------------------------------------------------------------------------
-    // Documentation Anomaly Suspect Paperwork & Tutorial (index 2)
+    // Quarantine Tutorial Suspect Paperwork & Tutorial (index 2)
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Fires on all clients when the documentation-anomaly suspect's paperwork spawns
-    /// (suspect index 2). Hooks pickup triggers on both documents and any folder equip so
-    /// that the first pickup starts the megaphone tutorial sequence.
-    /// Advances the chain to <see cref="OnIvanPaperworkSpawned"/> for Ivan's turn.
+    /// Fires on all clients whenever ANY suspect's paperwork spawns while we're waiting for
+    /// the quarantine tutorial suspect (index 2). Verifies the event actually belongs to
+    /// <see cref="_quarantineTargetSuspect"/> — the suspect captured in
+    /// <see cref="OnDocAnomalySuspectArrivedAtWindow"/> — before wiring pickup triggers.
+    /// This guards against ever attaching the documentation tutorial to the wrong suspect:
+    /// if this suspect's own paperwork never spawns (e.g. their first-encounter intro dialogue
+    /// stalls) and a LATER suspect's paperwork event arrives instead, we drop the subscription
+    /// entirely rather than hijacking the tutorial onto that later suspect.
+    /// IMPORTANT: the tutorial trigger must wait for the player to actually pick up this
+    /// suspect's documents/folder (see <see cref="OnQuarantinePickupTrigger()"/>) — starting the
+    /// megaphone dialogue any earlier collides with and interrupts this suspect's own
+    /// first-encounter intro monologue (played via <see cref="SuspectEncounterManager"/>),
+    /// which stops that monologue from ever finishing and stops it from ever reaching
+    /// <see cref="SuspectCharacter.GivePaperwork"/> — i.e. the suspect never hands over
+    /// their documents at all.
     /// </summary>
-    private void OnDocAnomalySuspectPaperworkSpawned(IDCard card, PickableObject appForm)
+    private void OnQuarantineSuspectPaperworkSpawned(IDCard card, PickableObject appForm)
     {
-        SuspectController.OnPaperworkSpawned -= OnDocAnomalySuspectPaperworkSpawned;
-        SuspectController.OnPaperworkSpawned += OnIvanPaperworkSpawned;
+        SuspectController.OnPaperworkSpawned -= OnQuarantineSuspectPaperworkSpawned;
 
-        // Wire documentation tutorial triggers for any index-2 suspect, whether they come
-        // from a specific prefab or are a random civilian. The megaphone plays after the
-        // player picks up their paperwork, which always follows their intro conversation.
-        _ivanDoc1 = card;
-        _ivanDoc2 = appForm;
+        if (SuspectController.Instance?.CurrentSuspect != _quarantineTargetSuspect)
+        {
+            Debug.LogWarning("[Day_01] OnQuarantineSuspectPaperworkSpawned: paperwork belongs to a " +
+                              "different suspect than the index-2 quarantine target — the target's own " +
+                              "paperwork never spawned. Skipping the documentation tutorial for this day.");
+            _quarantineTargetSuspect = null;
+            return;
+        }
 
-        if (card != null)    card.OnPickedUpEvent    += OnIvanPickupTrigger;
-        if (appForm != null) appForm.OnPickedUpEvent  += OnIvanPickupTrigger;
-        FolderController.OnFolderEquipped += OnIvanPickupTrigger;
-    }
+        _quarantineTargetSuspect = null;
+        _quarantineDoc1 = card;
+        _quarantineDoc2 = appForm;
 
-    // -------------------------------------------------------------------------
-    // Ivan Paperwork (index 3)
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fires on all clients when Ivan's paperwork spawns (suspect index 3).
-    /// The documentation tutorial was already completed on suspect index 2 — no pickup
-    /// triggers are needed here. Simply cleans up the subscription.
-    /// </summary>
-    private void OnIvanPaperworkSpawned(IDCard card, PickableObject appForm)
-    {
-        SuspectController.OnPaperworkSpawned -= OnIvanPaperworkSpawned;
+        if (card != null)    card.OnPickedUpEvent    += OnQuarantinePickupTrigger;
+        if (appForm != null) appForm.OnPickedUpEvent  += OnQuarantinePickupTrigger;
+        FolderController.OnFolderEquipped += OnQuarantinePickupTrigger;
     }
 
     /// <summary>
-    /// Fires when the player picks up one of Ivan's documents or any folder.
-    /// Kicks off the documentation tutorial — subscribes for single-fire then shows the
-    /// first tutorial task and starts the megaphone bark sequence on the server.
+    /// Fires when the player picks up one of the quarantine tutorial suspect's documents or
+    /// any folder. Kicks off the documentation tutorial — subscribes for single-fire then shows
+    /// the first tutorial task and starts the megaphone bark sequence on the server.
     /// Signature matches both <see cref="PickableObject.OnPickedUpEvent"/> (Action)
     /// and <see cref="FolderController.OnFolderEquipped"/> (Action&lt;FolderController&gt;)
     /// via separate adapter overloads below.
     /// </summary>
-    private void StartIvanDocumentationTutorial()
+    private void StartQuarantineDocumentationTutorial()
     {
         // Single-fire — remove all triggers immediately on this client.
-        UnsubscribeIvanDocumentPickupEvents();
+        UnsubscribeQuarantineDocumentPickupEvents();
 
         // Notify the server; it will broadcast the task start to all clients exactly once.
-        TutorialTaskSync.Instance?.ReportIvanTutorialTriggerServerRpc();
+        TutorialTaskSync.Instance?.ReportQuarantineTutorialTriggerServerRpc();
     }
 
     // Parameterless adapter — used by PickableObject.OnPickedUpEvent.
-    private void OnIvanPickupTrigger() => StartIvanDocumentationTutorial();
+    private void OnQuarantinePickupTrigger() => StartQuarantineDocumentationTutorial();
 
     // FolderController.OnFolderEquipped passes the instance — we ignore it.
-    private void OnIvanPickupTrigger(FolderController _) => StartIvanDocumentationTutorial();
+    private void OnQuarantinePickupTrigger(FolderController _) => StartQuarantineDocumentationTutorial();
+
+    private void UnsubscribeQuarantineDocumentPickupEvents()
+    {
+        if (_quarantineDoc1 != null) { _quarantineDoc1.OnPickedUpEvent -= OnQuarantinePickupTrigger; _quarantineDoc1 = null; }
+        if (_quarantineDoc2 != null) { _quarantineDoc2.OnPickedUpEvent -= OnQuarantinePickupTrigger; _quarantineDoc2 = null; }
+        FolderController.OnFolderEquipped -= OnQuarantinePickupTrigger;
+    }
 
     /// <summary>
     /// Fires on the local client when they pick up an exam notebook during the tutorial.
     /// Reports to the server; <see cref="TutorialTaskSync"/> broadcasts the task swap to all clients.
     /// </summary>
-    private void OnIvanExamPickedUpLocal()
+    private void OnQuarantineExamPickedUpLocal()
     {
         TutorialTaskSync.Instance?.ReportExamPickedUpServerRpc();
     }
@@ -909,7 +889,7 @@ public class Day_01 : DayBase
     /// Fires on the local client when an exam notebook page is filed during the tutorial.
     /// Reports to the server; <see cref="TutorialTaskSync"/> broadcasts the task removal to all clients.
     /// </summary>
-    private void OnIvanPageFiledLocal()
+    private void OnQuarantinePageFiledLocal()
     {
         TutorialTaskSync.Instance?.ReportExamPageFiledServerRpc();
     }
@@ -922,22 +902,22 @@ public class Day_01 : DayBase
     /// Both parts are played through <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/>
     /// so the player clicks to advance each line exactly as with character dialogue.
     /// </summary>
-    private IEnumerator IvanDocumentationBarkRoutine()
+    private IEnumerator QuarantineDocumentationBarkRoutine()
     {
         var runner = ScriptedDialogueRunner.Instance;
         var mgr = MegaphoneDialogueManager.Instance;
         if (runner == null) yield break;
 
         // ── Part 1: 2 intro lines ─────────────────────────────────────────────
-        if (_ivanMegaphonePart1 != null)
+        if (_quarantineMegaphonePart1 != null)
         {
             bool part1Done = false;
-            runner.PlayMegaphoneDialogue(_ivanMegaphonePart1, () => part1Done = true);
+            runner.PlayMegaphoneDialogue(_quarantineMegaphonePart1, () => part1Done = true);
             yield return new WaitUntil(() => part1Done);
         }
         else
         {
-            Debug.LogWarning("[Day_01] _ivanMegaphonePart1 is not assigned — skipping first megaphone sequence.");
+            Debug.LogWarning("[Day_01] _quarantineMegaphonePart1 is not assigned — skipping first megaphone sequence.");
         }
 
         // Make the documentation exam free for this pass only.
@@ -954,15 +934,15 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(0.5f);
 
         // ── Part 2: 4 follow-up lines ─────────────────────────────────────────
-        if (_ivanMegaphonePart2 != null)
+        if (_quarantineMegaphonePart2 != null)
         {
             bool part2Done = false;
-            runner.PlayMegaphoneDialogue(_ivanMegaphonePart2, () => part2Done = true);
+            runner.PlayMegaphoneDialogue(_quarantineMegaphonePart2, () => part2Done = true);
             yield return new WaitUntil(() => part2Done);
         }
         else
         {
-            Debug.LogWarning("[Day_01] _ivanMegaphonePart2 is not assigned — skipping second megaphone sequence.");
+            Debug.LogWarning("[Day_01] _quarantineMegaphonePart2 is not assigned — skipping second megaphone sequence.");
         }
     }
 
@@ -996,16 +976,16 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Fires on all clients when the Ivan documentation tutorial begins.
+    /// Fires on all clients when the quarantine tutorial suspect's documentation tutorial begins.
     /// Adds the checklist task, wires exam pickup/filed events locally, and starts
     /// the megaphone bark routine on the server.
     /// </summary>
-    private void OnIvanTutorialStartedSync()
+    private void OnQuarantineTutorialStartedSync()
     {
-        TutorialTaskSync.OnIvanDocumentTutorialStartedAllClients -= OnIvanTutorialStartedSync;
+        TutorialTaskSync.OnQuarantineDocumentTutorialStartedAllClients -= OnQuarantineTutorialStartedSync;
 
-        // Clean up any remaining Ivan document pickup subscriptions on all clients.
-        UnsubscribeIvanDocumentPickupEvents();
+        // Clean up any remaining quarantine document pickup subscriptions on all clients.
+        UnsubscribeQuarantineDocumentPickupEvents();
 
         // Unlock the documentation exam shop item now that the player is guided to use it.
         _documentationExamShopItem?.SetAvailable(true);
@@ -1017,12 +997,12 @@ public class Day_01 : DayBase
         // Reset flags and subscribe completion handlers on every client so whoever
         // interacts next reports back via TutorialTaskSync RPCs.
         ExamNotebook.AnyExamNotebookPickedUp = false;
-        ExamNotebook.OnAnyExamNotebookPickedUp += OnIvanExamPickedUpLocal;
+        ExamNotebook.OnAnyExamNotebookPickedUp += OnQuarantineExamPickedUpLocal;
         ExamNotebook.AnyPageFiled = false;
-        ExamNotebook.OnAnyNotebookPageFiled += OnIvanPageFiledLocal;
+        ExamNotebook.OnAnyNotebookPageFiled += OnQuarantinePageFiledLocal;
 
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            StartCoroutine(IvanDocumentationBarkRoutine());
+            StartCoroutine(QuarantineDocumentationBarkRoutine());
     }
 
     /// <summary>
@@ -1032,7 +1012,7 @@ public class Day_01 : DayBase
     private void OnExamPickedUpSync()
     {
         TutorialTaskSync.OnExamNotebookPickedUpAllClients -= OnExamPickedUpSync;
-        ExamNotebook.OnAnyExamNotebookPickedUp -= OnIvanExamPickedUpLocal;
+        ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
 
         if (_taskGetChecklist != null)
         {
@@ -1056,7 +1036,7 @@ public class Day_01 : DayBase
     private void OnExamPageFiledSync()
     {
         TutorialTaskSync.OnExamPageFiledAllClients -= OnExamPageFiledSync;
-        ExamNotebook.OnAnyNotebookPageFiled -= OnIvanPageFiledLocal;
+        ExamNotebook.OnAnyNotebookPageFiled -= OnQuarantinePageFiledLocal;
 
         if (_taskCheckDocumentation != null)
         {
@@ -1456,109 +1436,17 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskCollectCoupons);
         _taskCollectCoupons = null;
 
-        // Server-only: play the nag dialogue, then enable the machine and broadcast the
-        // clock-in task. Task and marker are shown in OnClockInReadySync on all clients
-        // so the player sees the instruction only after being told what to do.
+        // Server-only: immediately allow the player to call the next suspect — no further
+        // dialogue or clock-in gating in between.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            StartCoroutine(ClockInNagSequence());
+            TutorialTaskSync.Instance?.BroadcastPressButtonReadyServer();
 
-        Debug.Log("[Day_01] All coupons collected — starting clock-in nag dialogue.");
-    }
-
-    /// <summary>
-    /// Server-only coroutine. Plays the two-line megaphone dialogue that tells the player
-    /// they must clock in before the shift can begin: "Hey, are you taking cash already?
-    /// You need to clock in first!" followed by "Clock in with that Time card machine over there."
-    /// After the dialogue finishes, enables the machine and broadcasts the clock-in task to all clients.
-    /// </summary>
-    private IEnumerator ClockInNagSequence()
-    {
-        yield return new WaitForSeconds(3f);
-
-        if (_clockInNagDialogue != null)
-        {
-            bool done = false;
-            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_clockInNagDialogue, () => done = true);
-            yield return new WaitUntil(() => done);
-        }
-        else
-        {
-            Debug.LogWarning("[Day_01] _clockInNagDialogue not assigned — skipping clock-in nag sequence.");
-        }
-
-        // Enable the machine and tell all clients to show the task now that the
-        // nag dialogue has explained what to do.
-        _timecardMachine?.EnableClockIn();
-        TutorialTaskSync.Instance?.BroadcastClockInReadyServer();
-    }
-
-    /// <summary>
-    /// Fires on ALL clients once the clock-in nag dialogue has finished and the machine is enabled.
-    /// Shows the clock-in task and marker so the player is prompted at the right moment.
-    /// </summary>
-    private void OnClockInReadySync()
-    {
-        TutorialTaskSync.OnClockInReadyAllClients -= OnClockInReadySync;
-
-        _taskClockIn = TutorialObjectiveList.Instance?.AddObjective(_taskClockInText);
-
-        if (TutorialMarkerManager.Instance != null && _markerTimecardMachine != null)
-            TutorialMarkerManager.Instance.Mark(_markerTimecardMachine);
-
-        Debug.Log("[Day_01] Clock-in nag complete — task shown, time card machine ready.");
-    }
-
-    /// <summary>
-    /// Fires on ALL clients (via <see cref="TimecardMachine.OnClockInAllClients"/>) when
-    /// the player punches the time card machine. Completes the clock-in task and — server-only
-    /// — starts the post-clock-in megaphone dialogue before arming the switch button.
-    /// </summary>
-    private void OnTimecardClockInSync()
-    {
-        TimecardMachine.OnClockInAllClients -= OnTimecardClockInSync;
-
-        if (_taskClockIn != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskClockIn);
-            _taskClockIn = null;
-        }
-
-        if (TutorialMarkerManager.Instance != null && _markerTimecardMachine != null)
-            TutorialMarkerManager.Instance.Unmark(_markerTimecardMachine);
-
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            StartCoroutine(PostClockInSequence());
-
-        Debug.Log("[Day_01] Player clocked in — completing clock-in task.");
-    }
-
-    /// <summary>
-    /// Server-only coroutine. Plays the two-line post-clock-in megaphone dialogue:
-    /// "Good, now you can call the first subject." and "Press that button over there to alert
-    /// the next in line. Hurry up, you're on the clock!" Then broadcasts to all clients that
-    /// the press-button task is ready.
-    /// </summary>
-    private IEnumerator PostClockInSequence()
-    {
-        yield return new WaitForSeconds(2f);
-
-        if (_clockInCompleteDialogue != null)
-        {
-            bool done = false;
-            ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(_clockInCompleteDialogue, () => done = true);
-            yield return new WaitUntil(() => done);
-        }
-        else
-        {
-            Debug.LogWarning("[Day_01] _clockInCompleteDialogue not assigned — skipping post-clock-in dialogue.");
-        }
-
-        TutorialTaskSync.Instance?.BroadcastPressButtonReadyServer();
+        Debug.Log("[Day_01] All coupons collected — press-button task armed immediately.");
     }
 
     /// <summary>
     /// Fires on ALL clients via <see cref="TutorialTaskSync.OnPressButtonReadyAllClients"/>
-    /// once the post-clock-in megaphone dialogue finishes. Shows the "Press button" task,
+    /// once all ATM coupons have been collected. Shows the "Press button" task,
     /// arms the switch button marker, and re-arms the switch on the server.
     /// </summary>
     private void OnPressButtonReadySync()
@@ -1578,7 +1466,7 @@ public class Day_01 : DayBase
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             ShiftManager.Instance?.SetNextSuspectReady();
 
-        Debug.Log("[Day_01] Post-clock-in dialogue done — 'Press button' task shown, switch button armed.");
+        Debug.Log("[Day_01] Coupons collected — 'Press button' task shown, switch button armed.");
     }
 
     /// <summary>
@@ -1713,6 +1601,13 @@ public class Day_01 : DayBase
     /// that carries documentation anomalies). Server-side:
     ///   — Forces documentation anomalies onto the current suspect so the player has something
     ///     to find with the exam notebook checklist.
+    /// Captures the arriving <see cref="SuspectCharacter"/> and subscribes
+    /// <see cref="OnQuarantineSuspectPaperworkSpawned"/> so the documentation tutorial wires up
+    /// to this exact suspect's own paperwork/pickup — never any other suspect's — once it
+    /// spawns. The tutorial itself only starts once the player picks up a document (see
+    /// <see cref="OnQuarantinePickupTrigger()"/>): starting it any earlier would collide with
+    /// this suspect's own first-encounter intro monologue and prevent them from ever handing
+    /// over their documents.
     /// Unsubscribes itself so it only fires once per day.
     /// </summary>
     private void OnDocAnomalySuspectArrivedAtWindow(int index)
@@ -1726,10 +1621,14 @@ public class Day_01 : DayBase
         _greenStampSlot?.SetSlotInteractable(false);
         _yellowStampSlot?.SetSlotInteractable(true);
 
+        // Capture the target suspect and wait for their own paperwork to spawn.
+        _quarantineTargetSuspect = SuspectController.Instance?.CurrentSuspect;
+        SuspectController.OnPaperworkSpawned += OnQuarantineSuspectPaperworkSpawned;
+
         if (NetworkManager.Singleton.IsServer)
         {
             SuspectController.Instance.CurrentSuspect?
-                .InitializeWithDocumentationAnomalies(_ivanDocumentationAnomalyCount);
+                .InitializeWithDocumentationAnomalies(_quarantineDocumentationAnomalyCount);
         }
     }
 
@@ -1742,11 +1641,11 @@ public class Day_01 : DayBase
     /// Unlocks the green stamp (re-enabling it after the quarantine tutorial locked it for
     /// index 2) and arms the Soldier sequence for after this suspect is processed.
     /// </summary>
-    private void OnIvanArrivedAtWindow(int index)
+    private void OnStampsRestoredAtWindow(int index)
     {
         if (index != 3) return;
 
-        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
 
         // Quarantine tutorial (index 2) locked the green stamp. Unlock it now so the
         // player can use both green and yellow stamps when processing index 3.
@@ -1761,15 +1660,15 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on the server when any suspect's first-encounter intro dialogue completes.
-    /// On Day 1 this is used to react to Ivan's intro finishing (the general system
-    /// handles his dialogue and paperwork; Day_01 only needs to know when he is done
+    /// On Day 1 this is used to react to the current suspect's intro finishing (the general
+    /// system handles their dialogue and paperwork; Day_01 only needs to know when it's done
     /// for any follow-up logic beyond what the encounter manager provides).
     /// </summary>
     private void OnSuspectFirstEncounterComplete(SuspectData data)
     {
         if (data == null) return;
 
-        // Currently no additional Day 1 logic is needed after Ivan's intro beyond what
+        // Currently no additional Day 1 logic is needed after a suspect's intro beyond what
         // SuspectEncounterManager already handles (paperwork spawn + soldier arming).
         // This hook exists as an extension point for future use.
         Debug.Log($"[Day_01] First-encounter dialogue complete for '{data.name}'.");
@@ -1792,7 +1691,7 @@ public class Day_01 : DayBase
     }
 
     // -------------------------------------------------------------------------
-    // Soldier Scene Sequence (triggered after Ivan leaves)
+    // Soldier Scene Sequence (triggered after the post-quarantine suspect leaves)
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -1800,7 +1699,7 @@ public class Day_01 : DayBase
     /// <see cref="SuspectController.OnSuspectArrived"/> for his arrival, then calls
     /// <see cref="SuspectController.IntroduceSceneSuspect"/> to teleport him to the
     /// spawn point and kick off the standard DOTween walk-in. Dialogue starts once
-    /// <see cref="OnSoldierArrivedAtWindow"/> fires (index 4), matching the Vlad/Ivan
+    /// <see cref="OnSoldierArrivedAtWindow"/> fires (index 4), matching the Vlad
     /// pattern exactly.
     /// </summary>
     private IEnumerator ActivateAndStartSoldierDialogue()
@@ -1844,8 +1743,8 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnSoldierArrivedAtWindow(int index)
     {
-        // In normal play the soldier is always suspect index 4 (right after Ivan at
-        // index 3). When _debugSkipActive is true he is the only suspect spawned
+        // In normal play the soldier is always suspect index 4 (right after the
+        // post-quarantine suspect at index 3). When _debugSkipActive is true he is the only suspect spawned
         // (index 0), so accept any index on the debug-skip path to avoid the guard
         // blocking his dialogue.
         if (!_debugSkipActive && index != 4) return;
@@ -2013,12 +1912,24 @@ public class Day_01 : DayBase
 
         if (TakeOutTrashTask.Instance == null) return;
 
+        _trashTaskDone    = false;
+        _graffitiTaskDone = false;
+
         _taskThrowTrash = TutorialObjectiveList.Instance?.AddObjective(
             GetTrashTaskText(TakeOutTrashTask.Instance.DepositedCount,
                              TakeOutTrashTask.Instance.TotalCount));
 
         TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
+
+        // The graffiti objective row itself is added/completed internally by
+        // CleanGraffitiTask (see OnIsActiveChanged / MarkCompleteClientRpc) —
+        // here we only need to know when it finishes so we don't clear the
+        // shared list while it's still in progress.
+        if (CleanGraffitiTask.Instance != null)
+            CleanGraffitiTask.Instance.OnDailyTaskCompleted += OnGraffitiTaskComplete;
+        else
+            _graffitiTaskDone = true;
 
         TutorialOverlay.Instance?.ShowTrashTutorial(
             () => TutorialOverlay.Instance?.ShowGraffitiTutorial());
@@ -2038,8 +1949,32 @@ public class Day_01 : DayBase
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
 
         TutorialObjectiveList.Instance?.CompleteObjective(_taskThrowTrash);
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
         _taskThrowTrash = null;
+
+        _trashTaskDone = true;
+        TryFinishTrashAndGraffitiTutorials();
+    }
+
+    private void OnGraffitiTaskComplete()
+    {
+        if (CleanGraffitiTask.Instance != null)
+            CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
+
+        _graffitiTaskDone = true;
+        TryFinishTrashAndGraffitiTutorials();
+    }
+
+    /// <summary>
+    /// Only clears the shared objective list and advances to the "open bunker" step
+    /// once BOTH the trash and graffiti end-of-shift tasks have been completed —
+    /// whichever finishes second triggers this. Prevents the list (and the still
+    /// in-progress task's row) from being wiped out early.
+    /// </summary>
+    private void TryFinishTrashAndGraffitiTutorials()
+    {
+        if (!_trashTaskDone || !_graffitiTaskDone) return;
+
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
     }
 
     private string GetTrashTaskText(int deposited, int total) =>
@@ -2119,8 +2054,8 @@ public class Day_01 : DayBase
     /// <summary>
     /// Debug-only server method. Aborts the normal Day 1 opening sequence and jumps
     /// directly to the Soldier's slot, bypassing Vlad, the random civilian, the
-    /// documentation-anomaly suspect, and Ivan entirely. Intended to be called by
-    /// <see cref="DebugConsole"/> so the Soldier sequence can be tested in isolation.
+    /// documentation-anomaly suspect, and the post-quarantine suspect entirely. Intended to
+    /// be called by <see cref="DebugConsole"/> so the Soldier sequence can be tested in isolation.
     ///
     /// Side effects:
     ///   — Stops all running coroutines on this component (cancels the 7 s shutter delay).
@@ -2135,7 +2070,7 @@ public class Day_01 : DayBase
         if (!NetworkManager.Singleton.IsServer) return;
 
         // Prevent OnDayStarted from launching Day1OpeningSequence when TryStartShift
-        // fires OnDayStart — the entire opening sequence (Vlad, civilians, Ivan) is skipped.
+        // fires OnDayStart — the entire opening sequence (Vlad, civilians, quarantine suspect) is skipped.
         _debugSkipActive = true;
 
         // Cancel any pending Day 1 coroutines so the 7s delay can't re-arm Vlad's intercept.
@@ -2147,7 +2082,7 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
-        SuspectController.OnSuspectArrived -= OnIvanArrivedAtWindow;
+        SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
 
         // Open and lock the shutter so the Soldier can walk up to the window.
         ShutterController.Instance?.OpenShutter();
@@ -2178,7 +2113,7 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Sets up Day 1 for free play: bypasses the entire opening sequence (Vlad, civilians,
-    /// Ivan), clears the Alexei intercept so normal suspects arrive, and unlocks all
+    /// quarantine suspect), clears the Alexei intercept so normal suspects arrive, and unlocks all
     /// tutorial-gated items (stamps, folder stack, doc exam shop item).
     /// Call <c>ShiftManager.Instance.TryStartShift()</c> after this to begin the shift.
     /// </summary>

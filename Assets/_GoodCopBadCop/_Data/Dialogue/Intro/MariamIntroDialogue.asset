@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: MariamIntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  nodes:
+  - type: 0
+    npcLine: My documents. I organized them by date before I left, in case that
+      speeds things up.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 0
+    npcLine: Miriam Beridze. Student. I'm training to become a doctor, when all
+      this is finished.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 1
+    npcLine: My mother sent me alone today. She said I should get used to responsibility.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices:
+    - playerChoiceText: Isn't that a lot to put on you?
+      npcResponse: She doesn't think so. She thinks it's the minimum. I try not
+        to disagree with her math on that.
+      animationTrigger: TalkLookAway
+    - playerChoiceText: That's a lot of trust in you.
+      npcResponse: It isn't trust. It's a test. I don't fail tests.
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: I study anatomy in whatever time is left after schoolwork. Most people
+      find it unpleasant. I find it honest.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 1
+    npcLine: I have a younger sister at home. She doesn't understand why I take
+      all of this so seriously.
+    animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices:
+    - playerChoiceText: Why do you take it so seriously?
+      npcResponse: Because someone in my family should be excellent at something.
+        It might as well be me.
+      animationTrigger: TalkLookDown
+    - playerChoiceText: Maybe she understands more than you think.
+      npcResponse: Maybe. I don't have time to find out today.
+      animationTrigger: TalkIdle
+  - type: 0
+    npcLine: Here. Everything should be correct. I don't like giving anyone a reason
+      to look twice.
+    animationTrigger: TalkPoint
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []

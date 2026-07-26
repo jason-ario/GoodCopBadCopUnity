@@ -355,6 +355,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         var refs = new List<NetworkObjectReference>(junkItems.Length);
         foreach (JunkItem junk in junkItems)
         {
+            // JunkItem components on living SuspectCharacters are kept disabled until death
+            // (see class doc comment) — FindObjectsInactive.Exclude only filters by GameObject
+            // active state, not component-enabled state, so skip disabled components here to
+            // avoid highlighting living suspects instead of actual junk.
+            if (!junk.enabled) continue;
+
             NetworkObject netObj = junk.NetworkObject;
             if (netObj != null && netObj.IsSpawned)
                 refs.Add(netObj);
@@ -373,7 +379,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             if (itemRef.TryGet(out NetworkObject netObj))
             {
                 JunkItem junk = netObj.GetComponent<JunkItem>();
-                junk?.Highlight(true);
+                junk?.SetForceHighlight(true);
             }
         }
     }

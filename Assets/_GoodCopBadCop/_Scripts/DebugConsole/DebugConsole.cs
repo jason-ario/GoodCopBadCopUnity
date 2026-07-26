@@ -573,9 +573,11 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Skips to Day 1 in the booth with the shift already started and the timecard machine
-    /// primed for clock-out, as if all suspects had been processed. No suspects will arrive.
-    /// The player must walk to the timecard machine to clock out, then to the bed to begin Day 2.
+    /// Skips to Day 1 in the booth with the shift already started, the booth door unlocked and
+    /// opened, and the end-of-shift trash and graffiti tutorial tasks triggered — mirroring
+    /// <see cref="AlexeiController.TriggerEndOfShiftSetup"/>, the same production code path used
+    /// after the real Alexei sequence. No suspects will arrive. The timecard machine only primes
+    /// for clock-out once the player actually finishes both tutorial tasks.
     /// </summary>
     public void SkipToEndOfDay1()
     {
@@ -603,7 +605,7 @@ public class DebugConsole : MonoBehaviour
         // Ensure the gate is in post-intro state so interactions toggle it correctly.
         _startShiftGate?.ForceIntroComplete();
 
-        // Suppress Day1OpeningSequence (Vlad / civilians / Ivan) and open the shutter and lever.
+        // Suppress Day1OpeningSequence (Vlad / civilians / quarantine suspect) and open the shutter and lever.
         // This sets _debugSkipActive on Day_01 so OnDayStarted skips the opening coroutine.
         Day_01.Instance.DebugSkipToSoldierSlot();
 
@@ -619,10 +621,15 @@ public class DebugConsole : MonoBehaviour
         yield return null;
         yield return null;
 
-        // Prime the timecard machine as if all suspects have been processed.
-        ShiftManager.Instance?.DebugEnableClockOut();
+        // Run the real end-of-shift setup: unlocks/opens the booth door, triggers the trash and
+        // graffiti tutorial tasks (highlighting trash items), and marks suspects complete so the
+        // timecard machine primes once both tasks are actually finished.
+        if (AlexeiController.Instance != null)
+            AlexeiController.Instance.TriggerEndOfShiftSetup();
+        else
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay1: AlexeiController.Instance not found — door and tutorial tasks not triggered.");
 
-        Debug.Log("[DebugConsole] Skipped to end of Day 1 — timecard machine primed for clock-out (F12).");
+        Debug.Log("[DebugConsole] Skipped to end of Day 1 — booth door opened, trash and graffiti tutorial tasks triggered.");
     }
     /// <summary>
     /// Skips to Day 2 in the booth with the opening Vlad sequence suppressed and the shift

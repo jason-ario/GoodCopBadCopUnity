@@ -46,6 +46,16 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     [Tooltip("Only highlight children whose names contain this string. Leave empty to disable highlighting entirely.")]
     [SerializeField] private string highlightNameFilter;
 
+    /// <summary>
+    /// When true, the highlight is held on regardless of hover state — normal
+    /// hover-driven <see cref="Highlight"/>(false) calls from
+    /// <see cref="PlayerInteractionController"/> are ignored while this is set.
+    /// Used for tutorial call-outs (e.g. <see cref="TakeOutTrashTask.HighlightAllItemsForTutorial"/>)
+    /// where an object must stay highlighted until a specific task event clears it,
+    /// not just until the player's reticle looks away.
+    /// </summary>
+    private bool _forceHighlighted;
+
     public virtual void Interact(PlayerInteractionController player)
     {
         OnInteract?.Invoke();
@@ -82,12 +92,39 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     public virtual void Highlight(bool highlight)
     {
+        // While force-highlighted (tutorial call-out), ignore hover-driven attempts to
+        // turn the highlight off — it should only clear via SetForceHighlight(false).
+        if (_forceHighlighted && !highlight) return;
+
         // Drive visibility through 'highlighted', not 'enabled'.
         // Toggling 'enabled' was the cause of the broken-first-hover bug: each
         // enable/disable cycle re-ran OnEnable before Start, leaving rms uninitialised.
         highlightEffect.highlighted = highlight;
 
         if (highlight)
+        {
+            OnHighlight();
+        }
+        else
+        {
+            OnStopHighlight();
+        }
+    }
+
+    /// <summary>
+    /// Turns on (or off) a persistent highlight that is not cleared by the normal
+    /// hover-driven <see cref="Highlight"/>(false) calls made every frame by
+    /// <see cref="PlayerInteractionController"/> when the reticle looks away.
+    /// Intended for tutorial call-outs where the object should stay highlighted until a
+    /// specific game event (e.g. the item being collected/despawned) clears it, rather
+    /// than just until the player stops looking at it.
+    /// </summary>
+    public void SetForceHighlight(bool force)
+    {
+        _forceHighlighted = force;
+        highlightEffect.highlighted = force;
+
+        if (force)
         {
             OnHighlight();
         }

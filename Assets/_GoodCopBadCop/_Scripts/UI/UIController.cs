@@ -205,6 +205,16 @@ public class UIController : MonoBehaviour
     
     public void ShowPlayerUI()
     {
+        // Guard: never reveal the HUD while a scripted cutscene or dialogue session is still
+        // active. Mirrors the guard in PlayerMovementController.CanControl — delayed coroutines
+        // (interaction close, panel dismissal, etc.) can call ShowPlayerUI() after scripted mode
+        // has already locked the player, which would otherwise pop the HUD back up mid-cutscene
+        // (e.g. during the Alexei cutscene) well before movement is actually restored.
+        // The scripted/dialogue exit paths always clear these flags before calling ShowPlayerUI(),
+        // so this never blocks the legitimate restore.
+        if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
+            return;
+
         playerUI.SetActive(true);
     }
     

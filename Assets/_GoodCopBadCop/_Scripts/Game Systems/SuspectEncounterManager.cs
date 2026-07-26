@@ -130,6 +130,12 @@ public class SuspectEncounterManager : MonoBehaviour
         // Natural settle beat — suspect finishes their rotation and faces the player.
         yield return new WaitForSeconds(1.0f);
 
+        if (suspect == null)
+        {
+            Debug.LogWarning($"[SuspectEncounterManager] PlayIntroDialogue: '{data.name}' was destroyed during the settle beat — aborting before dialogue starts.");
+            yield break;
+        }
+
         if (ScriptedDialogueRunner.Instance == null)
         {
             Debug.LogWarning("[SuspectEncounterManager] ScriptedDialogueRunner not found — skipping intro dialogue.");
@@ -141,6 +147,13 @@ public class SuspectEncounterManager : MonoBehaviour
         bool done = false;
         ScriptedDialogueRunner.Instance.PlayDialogue(suspect, data.introDialogue, () => done = true);
         yield return new WaitUntil(() => done);
+
+        if (suspect == null)
+        {
+            Debug.LogWarning($"[SuspectEncounterManager] PlayIntroDialogue: '{data.name}' was destroyed before GivePaperwork could be called.");
+            OnFirstEncounterDialogueComplete?.Invoke(data);
+            yield break;
+        }
 
         // Hand off paperwork now that the intro has finished (plays the "Give" animation
         // before the documents spawn, matching the normal SuspectController.SayEntryDialogue

@@ -172,13 +172,11 @@ public class LockController : Interactable
     /// </summary>
     private void CheckSavedUnlockState()
     {
-        if (string.IsNullOrEmpty(_lockId) || SaveDataManager.Instance == null)
-        {
-            ApplyLockedState(_isLocked.Value);
-            return;
-        }
+        bool alreadyUnlocked = !string.IsNullOrEmpty(_lockId)
+            && SaveDataManager.Instance != null
+            && SaveDataManager.Instance.IsLockUnlocked(_lockId);
 
-        if (SaveDataManager.Instance.IsLockUnlocked(_lockId))
+        if (alreadyUnlocked)
         {
             _isLocked.Value = false;
             _lockable?.Unlock();
@@ -186,8 +184,10 @@ public class LockController : Interactable
         }
         else
         {
-            // Lock has not been unlocked — ensure the ILockable reflects the locked state.
-            // This is important for lockables like GateController that default to unlocked.
+            // Lock has not been unlocked (or has no persisted save state) — ensure the
+            // ILockable reflects the locked state. This is important for lockables like
+            // GateController that default to unlocked, and must run even when this padlock
+            // has no _lockId or there's no SaveDataManager available.
             _lockable?.Lock();
             ApplyLockedState(_isLocked.Value);
         }

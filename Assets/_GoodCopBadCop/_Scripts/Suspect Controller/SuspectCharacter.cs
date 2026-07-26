@@ -869,7 +869,7 @@ public class SuspectCharacter : Interactable
     /// <summary>
     /// Initializes this suspect with documentation-only anomalies.
     /// All other anomaly categories are disabled. Used for scripted tutorial suspects
-    /// (e.g. Ivan on Day 1) that must exhibit paperwork discrepancies and nothing else.
+    /// (e.g. the Day 1 quarantine tutorial suspect) that must exhibit paperwork discrepancies and nothing else.
     /// Syncs disabled anomaly states to all clients.
     /// </summary>
     public void InitializeWithDocumentationAnomalies(int count)
@@ -1540,7 +1540,9 @@ public class SuspectCharacter : Interactable
 
     IEnumerator GivePaperworkCoroutine()
     {
-        animator.SetTrigger(_folderGivingAnimationData.animationTriggerName);
+        string triggerName = _folderGivingAnimationData.animationTriggerName;
+        if (!string.IsNullOrEmpty(triggerName))
+            animator.SetTrigger(triggerName);
         yield return new WaitForSeconds(1f);
         SuspectController.Instance.SpawnPaperwork();
     }
