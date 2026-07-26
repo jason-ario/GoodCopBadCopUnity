@@ -96,8 +96,6 @@ public class Day_01 : DayBase
     [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
     [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
 
-    [Tooltip("Objective label shown after the bunker is open, prompting the player to sleep in the bunk bed.")]
-    [SerializeField] private string _taskGoToBedText = "Go to bed";
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
 
@@ -244,13 +242,13 @@ public class Day_01 : DayBase
     [Tooltip("World-space point above the bunker door — marker shown during 'Open the bunker' end-of-shift task.")]
     [SerializeField] private Transform _markerBunkerDoor;
 
-    [Tooltip("World-space point above the bunk bed — marker shown during 'Go to bed' end-of-shift task.")]
+    [Tooltip("World-space point above the bunk bed — marker shown after the bunker door opens, pointing the player to bed.")]
     [SerializeField] private Transform _markerBunkBed;
 
     [Tooltip("The bunker door's Interactable — highlighted while the 'Open the bunker' tutorial task is active.")]
     [SerializeField] private BunkerDoorInteractable _bunkerDoorInteractable;
 
-    [Tooltip("The bunk bed's Interactable — highlighted while the 'Go to bed' tutorial task is active.")]
+    [Tooltip("The bunk bed's Interactable — highlighted after the bunker door opens, guiding the player to sleep.")]
     [SerializeField] private BunkBedInteractable _bunkBedInteractable;
 
     [Header("Day 1 — Quarantine Tutorial")]
@@ -315,7 +313,6 @@ public class Day_01 : DayBase
     // End-of-shift trash task shown after the Alexei sequence.
     private TutorialObjectiveItem _taskThrowTrash;
     private TutorialObjectiveItem _taskOpenBunker;
-    private TutorialObjectiveItem _taskGoToBed;
 
     // Both the trash and graffiti objectives are added to the same shared
     // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
@@ -2012,19 +2009,20 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskOpenBunker);
         _taskOpenBunker = null;
 
-        ShowGoToBedTask();
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+
+        ShowGoToBedMarker();
     }
 
     // ── Go to Bed ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Adds the "Go to bed" objective and a world-space arrow above the bunk bed.
-    /// Called immediately after the bunker door opens.
+    /// Shows a world-space arrow above the bunk bed and highlights it, pointing the player
+    /// toward the bed without adding a checklist objective. Called immediately after the
+    /// bunker door opens.
     /// </summary>
-    private void ShowGoToBedTask()
+    private void ShowGoToBedMarker()
     {
-        _taskGoToBed = TutorialObjectiveList.Instance?.AddObjective(_taskGoToBedText);
-
         if (TutorialMarkerManager.Instance != null && _markerBunkBed != null)
             TutorialMarkerManager.Instance.Mark(_markerBunkBed);
 
@@ -2041,10 +2039,6 @@ public class Day_01 : DayBase
             TutorialMarkerManager.Instance.Unmark(_markerBunkBed);
 
         _bunkBedInteractable?.Highlight(false);
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskGoToBed);
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
-        _taskGoToBed = null;
     }
 
     // -------------------------------------------------------------------------

@@ -26,7 +26,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
     /// <summary>
     /// Fired locally when the player confirms ending the day at the bunk bed.
-    /// Subscribe server-side (e.g. Day_01) to dismiss the "Go to bed" tutorial task.
+    /// Subscribe server-side (e.g. Day_01) to dismiss the "go to bed" marker/highlight.
     /// </summary>
     public static event Action OnSleepConfirmed;
 
