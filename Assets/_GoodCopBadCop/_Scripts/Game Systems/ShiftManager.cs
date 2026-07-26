@@ -1213,6 +1213,7 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator SkipToOutsideBunkerSequence()
     {
         MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
         AudioManager.Instance.StartAmbientAudio();
 
         yield return new WaitForEndOfFrame();
@@ -1250,6 +1251,7 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator SkipToBoothReadySequence(int targetDay = -1)
     {
         MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
         AudioManager.Instance.StartAmbientAudio();
 
         yield return new WaitForEndOfFrame();

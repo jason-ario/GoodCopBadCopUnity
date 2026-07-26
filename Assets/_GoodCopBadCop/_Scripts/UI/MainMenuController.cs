@@ -30,6 +30,7 @@ public class MainMenuController : MonoBehaviour
 
     [Header("Cutscenes")]
     [SerializeField] private PlayableDirector playableDirector;
+    [SerializeField] private float cutsceneMusicFadeOutDuration = 2f;
 
     [Header("Button Group")]
     [SerializeField] private Animator buttonGroupAnimator;
@@ -411,6 +412,11 @@ public class MainMenuController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Stops the main menu cutscene's visual playback immediately (used once the screen has
+    /// faded to black) but leaves its background music playing — see
+    /// <see cref="FadeOutCutsceneMusic"/> for when the music itself should stop.
+    /// </summary>
     public void TransitionToGameplay()
     {
         mainMenu.SetActive(false);
@@ -418,10 +424,35 @@ public class MainMenuController : MonoBehaviour
         if (playableDirector != null)
         {
             playableDirector.Stop();
-            playableDirector.gameObject.SetActive(false);
         }
 
         HideAllMenus();
+    }
+
+    /// <summary>
+    /// Fades out and stops the main menu cutscene's background music, then deactivates the
+    /// cutscene object. Call this once gameplay has been revealed (after the fade-out to
+    /// gameplay completes) so the music plays through the black-screen transition and intro
+    /// cinematic instead of cutting off abruptly.
+    /// </summary>
+    public void FadeOutCutsceneMusic(float duration = -1f)
+    {
+        if (playableDirector == null)
+            return;
+
+        AudioSource cutsceneAudio = playableDirector.GetComponent<AudioSource>();
+        if (cutsceneAudio == null || !cutsceneAudio.isPlaying)
+        {
+            playableDirector.gameObject.SetActive(false);
+            return;
+        }
+
+        float fadeDuration = duration < 0f ? cutsceneMusicFadeOutDuration : duration;
+        cutsceneAudio.DOFade(0f, fadeDuration).OnComplete(() =>
+        {
+            cutsceneAudio.Stop();
+            playableDirector.gameObject.SetActive(false);
+        });
     }
 
     // ---------------------------------------------------------------------------

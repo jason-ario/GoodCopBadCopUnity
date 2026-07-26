@@ -109,6 +109,17 @@ public class GameManager : NetworkBehaviour
         // Wait until the screen is fully dark before spawning or moving anything.
         yield return StartCoroutine(UIController.Instance.FadeInAndWait());
 
+        // Stop the main menu cutscene's visual playback now that the screen is black, before the
+        // intro story cinematic starts — its background music keeps playing (see
+        // MainMenuController.FadeOutCutsceneMusic below) so it doesn't cut off abruptly.
+        MainMenuController.Instance.TransitionToGameplay();
+
+        // Plays the intro story cinematic while the screen is still black. Local/client-side
+        // only (no network sync needed) and a no-op after the first time it has played this
+        // application session — see IntroCinematicController.PlayIfNeeded.
+        if (IntroCinematicController.Instance != null)
+            yield return StartCoroutine(IntroCinematicController.Instance.PlayIfNeeded());
+
         if (IsServer)
         {
             SpawnAllPlayersAtLobby();
@@ -124,9 +135,14 @@ public class GameManager : NetworkBehaviour
         yield return new WaitUntil(() => _lobbyRevealReady);
         _lobbyRevealReady = false;
 
-        MainMenuController.Instance.TransitionToGameplay();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
+
+        // The main menu cutscene's visual playback already stopped when the screen went black
+        // (see MainMenuController.TransitionToGameplay above); its background music keeps
+        // playing until now, then fades out alongside the reveal so it doesn't cut off
+        // abruptly behind the black screen.
+        MainMenuController.Instance.FadeOutCutsceneMusic();
 
         // Wait for the fade-out animation to finish before revealing the HUD.
         const float FadeOutDuration = 0.8f;
@@ -237,6 +253,7 @@ public class GameManager : NetworkBehaviour
 
         Debug.Log("[GameManager] LobbyJoinClientSequence: transitioning to gameplay");
         MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
         UIController.Instance.ShowPlayerUI();
         AudioManager.Instance.StartAmbientAudio();
         UIController.Instance.FadeOut();
@@ -255,6 +272,7 @@ public class GameManager : NetworkBehaviour
         ShiftManager.Instance.StopIntroCutscene();
         UIController.Instance.ShowPlayerUI();
         MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
         // Bootstrap the current day on this client — it joined after StartGameClientRpc was
         // already sent, so DayActivated() was never called and no tutorial state was set up.
         CampaignManager.Instance.StartCampaign();
@@ -323,6 +341,7 @@ public class GameManager : NetworkBehaviour
         if (skipTransition)
         {
             MainMenuController.Instance.TransitionToGameplay();
+            MainMenuController.Instance.FadeOutCutsceneMusic();
 
             if (IsServer)
             {
@@ -341,6 +360,7 @@ public class GameManager : NetworkBehaviour
         yield return new WaitForSeconds(1);
 
         MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
         AudioManager.Instance.StartAmbientAudio();
 
         if (IsServer)

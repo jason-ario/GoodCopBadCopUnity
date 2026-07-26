@@ -13,6 +13,7 @@ using UnityEngine;
 public class BusCutsceneController : NetworkBehaviour
 {
     [Header("References")]
+    [SerializeField] private GameObject busVisual;
     [SerializeField] private AudioSource busAudioSource;
     [SerializeField] private MachineShake machineShake;
 
@@ -37,16 +38,13 @@ public class BusCutsceneController : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // Idle audio runs from the moment the bus appears in the scene.
-        if (busAudioSource != null)
-        {
-            busAudioSource.loop   = true;
-            busAudioSource.volume = 1f;
-            if (!busAudioSource.isPlaying)
-                busAudioSource.Play();
-        }
+        // Keep the bus hidden and silent until the first lobby player has actually
+        // spawned in, so it doesn't idle on screen before anyone arrives.
+        if (busVisual != null)
+            busVisual.SetActive(false);
 
-        // Server waits for the first lobby player spawn before starting the sequence.
+        // Server waits for the first lobby player spawn before revealing the bus
+        // and starting the sequence.
         if (IsServer)
             PlayerSpawner.OnPlayerSpawnedAtLobby += OnFirstPlayerSpawnedAtLobby;
     }
@@ -60,7 +58,25 @@ public class BusCutsceneController : NetworkBehaviour
     {
         // Unsubscribe immediately so the sequence only starts once.
         PlayerSpawner.OnPlayerSpawnedAtLobby -= OnFirstPlayerSpawnedAtLobby;
+
+        RevealBusClientRpc();
         StartCoroutine(ServerSequence());
+    }
+
+    /// <summary>Broadcasts to every client (including the host) to show the bus and start idle audio.</summary>
+    [ClientRpc]
+    private void RevealBusClientRpc()
+    {
+        if (busVisual != null)
+            busVisual.SetActive(true);
+
+        if (busAudioSource != null)
+        {
+            busAudioSource.loop   = true;
+            busAudioSource.volume = 1f;
+            if (!busAudioSource.isPlaying)
+                busAudioSource.Play();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -152,6 +168,7 @@ public class BusCutsceneController : NetworkBehaviour
         var bus = transform.Find("Bus");
         if (bus == null) return;
 
+        busVisual      = bus.gameObject;
         busAudioSource = bus.GetComponent<AudioSource>();
         machineShake   = bus.GetComponent<MachineShake>();
     }

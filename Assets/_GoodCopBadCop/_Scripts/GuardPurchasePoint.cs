@@ -23,6 +23,9 @@ public class GuardPurchasePoint : Interactable
     [SerializeField] private GameObject _suspectSoldier;
     [Tooltip("Child GameObject representing the purchase post — deactivated when the guard arrives.")]
     [SerializeField] private GameObject _guardPurchasePost;
+    [Tooltip("Child GameObject with the sign mesh and its interaction collider. Hidden and " +
+             "non-interactable while locked, alongside the post and soldier.")]
+    [SerializeField] private GameObject _guardSign;
 
     private readonly NetworkVariable<bool> _guardPurchased = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -122,11 +125,11 @@ public class GuardPurchasePoint : Interactable
     private void OnUnlockedChanged(bool previousValue, bool newValue) => RefreshVisualState();
 
     /// <summary>
-    /// Applies the correct visibility for the post/soldier children based on the current
+    /// Applies the correct visibility for the sign/post/soldier children based on the current
     /// locked/purchased/arrived state:
-    ///   - Locked: both post and soldier hidden.
-    ///   - Unlocked, not yet arrived: post visible, soldier hidden.
-    ///   - Unlocked, guard arrived: soldier visible, post hidden.
+    ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.
+    ///   - Unlocked, not yet arrived: sign and post visible, soldier hidden.
+    ///   - Unlocked, guard arrived: sign and soldier visible, post hidden.
     /// </summary>
     private void RefreshVisualState()
     {
@@ -138,5 +141,8 @@ public class GuardPurchasePoint : Interactable
 
         if (_guardPurchasePost != null)
             _guardPurchasePost.SetActive(showPost);
+
+        if (_guardSign != null)
+            _guardSign.SetActive(_unlocked.Value);
     }
 }
