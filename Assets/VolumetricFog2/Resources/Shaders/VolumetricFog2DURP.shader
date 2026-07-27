@@ -81,8 +81,8 @@ Shader "VolumetricFog2/VolumetricFog2DURP"
 				#pragma shader_feature_local_fragment VF2_VOIDS
 				#pragma shader_feature_local_fragment VF2_FOW
 				#pragma shader_feature_local_fragment VF2_SURFACE
-				#pragma shader_feature_local_fragment VF2_DEPTH_GRADIENT
-				#pragma shader_feature_local_fragment VF2_HEIGHT_GRADIENT
+				#define VF2_DEPTH_GRADIENT 1
+				#define VF2_HEIGHT_GRADIENT 1
 				#pragma shader_feature_local_fragment VF2_LIGHT_COOKIE
 				#pragma shader_feature_local_fragment _ VF2_DIFFUSION_SMOOTH VF2_DIFFUSION_STRONG
 				#define UNITY_FOVEATED_RENDERING_INCLUDED

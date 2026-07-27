@@ -17,8 +17,11 @@ using UnityEngine.Serialization;
 ///   2. Drives from _pointA to _pointB (drive audio, with a rev delay before it starts moving) —
 ///      the crate rides along on the roof for the whole trip. _pointB sits in front of the
 ///      checkpoint gate.
-///   3. On arrival at _pointB, the truck stops and the checkpoint gate is opened. The truck waits
-///      _gateOpenWaitDuration (e.g. ~3s) for the gate to finish opening before continuing.
+///   3. On arrival at _pointB, the truck stops and waits — a "shipment is waiting at the gate"
+///      alert is shown (see <see cref="SortMailTask.NotifyShipmentWaitingAtGate"/>) and the truck
+///      idles until a player opens the gate via <see cref="CheckpointGateController"/> (e.g. by
+///      pressing the gate button). Once open, it waits _gateOpenWaitDuration more for the open
+///      animation to finish before continuing.
 ///   4. Drives from _pointB through the (now open) gate to _pointC — the crate still rides along.
 ///   5. On arrival at _pointC, the roof constraint is released and the crate tumbles down to its
 ///      resting spot on the ground. Once it settles, the server spawns the mail delivery via
@@ -51,8 +54,8 @@ public class DeliveryTruckController : NetworkBehaviour
     [SerializeField] private GameObject truckVisual;
     [SerializeField] private AudioSource truckAudioSource;
     [SerializeField] private MachineShake machineShake;
-    [Tooltip("The checkpoint gate's Animator (drives its 'IsOpen' bool parameter). Opened when the truck stops at pointB and closed shortly after it passes back through on the return leg.")]
-    [SerializeField] private Animator checkpointGateAnimator;
+    [Tooltip("The checkpoint gate. The truck waits at pointB until a player opens it (see CheckpointGateController), then closes it shortly after passing back through on the return leg.")]
+    [SerializeField] private CheckpointGateController checkpointGate;
 
     [Header("Waypoints")]
     [Tooltip("Parked / starting position the truck drives from and returns to.")]
@@ -92,7 +95,7 @@ public class DeliveryTruckController : NetworkBehaviour
     [Tooltip("How long the truck idles at pointC after dropping the crate before driving back — packages are spawned as soon as the crate settles.")]
     [FormerlySerializedAs("idleDurationAtDestination")]
     [SerializeField] private float idleDurationAtDestination = 8f;
-    [Tooltip("How long the truck waits at pointB for the checkpoint gate to finish opening before continuing to pointC.")]
+    [Tooltip("How long the truck waits at pointB after the gate opens for the open animation to finish before continuing to pointC.")]
     [SerializeField] private float gateOpenWaitDuration = 3f;
     [Tooltip("How long after the truck passes back through the checkpoint gate (on the pointC-to-pointA return leg) before the gate closes.")]
     [SerializeField] private float gateCloseDelayAfterPassing = 1f;
@@ -110,14 +113,6 @@ public class DeliveryTruckController : NetworkBehaviour
     [Tooltip("Peak MachineShake.positionStrength reached while driving at full speed.")]
     [SerializeField] private float peakShakeStrength = 0.05f;
 
-    private static readonly int CheckpointGateIsOpenParam = Animator.StringToHash("IsOpen");
-
-    private readonly NetworkVariable<bool> _checkpointGateOpen = new NetworkVariable<bool>(
-        false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
-
     private bool _sequenceRunning;
     private Vector3 _crateRestPosition;
     private Quaternion _crateRestRotation;
@@ -126,9 +121,6 @@ public class DeliveryTruckController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-
-        _checkpointGateOpen.OnValueChanged += OnCheckpointGateOpenChanged;
-        ApplyCheckpointGateVisual(_checkpointGateOpen.Value);
 
         // Start parked and hidden — the truck only appears once a delivery begins.
         if (pointA != null)
@@ -153,15 +145,6 @@ public class DeliveryTruckController : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _checkpointGateOpen.OnValueChanged -= OnCheckpointGateOpenChanged;
-    }
-
-    private void OnCheckpointGateOpenChanged(bool oldValue, bool newValue) => ApplyCheckpointGateVisual(newValue);
-
-    private void ApplyCheckpointGateVisual(bool isOpen)
-    {
-        if (checkpointGateAnimator != null)
-            checkpointGateAnimator.SetBool(CheckpointGateIsOpenParam, isOpen);
     }
 
     // -------------------------------------------------------------------------
@@ -186,9 +169,9 @@ public class DeliveryTruckController : NetworkBehaviour
             Debug.LogError("[DeliveryTruckController] pointA/pointB/pointC not assigned — cannot run delivery sequence.");
             return;
         }
-        if (checkpointGateAnimator == null)
+        if (checkpointGate == null)
         {
-            Debug.LogWarning("[DeliveryTruckController] checkpointGateAnimator not assigned — the truck will skip the gate wait/close steps.");
+            Debug.LogWarning("[DeliveryTruckController] checkpointGate not assigned — the truck will skip the gate wait/close steps.");
         }
 
         StartCoroutine(ServerSequence());
@@ -202,11 +185,16 @@ public class DeliveryTruckController : NetworkBehaviour
         BeginDriveClientRpc(DriveLeg.ToPointB);
         yield return new WaitForSeconds(driveRevDelay + driveToPointBDuration);
 
-        // Truck has stopped at pointB, right in front of the checkpoint gate — open it and wait
-        // for it to finish before driving through.
-        if (checkpointGateAnimator != null)
+        // Truck has stopped at pointB, right in front of the checkpoint gate — alert players
+        // that a shipment is waiting, then wait for a player to actually open the gate (e.g. by
+        // pressing the gate button) before driving through.
+        if (checkpointGate != null)
         {
-            _checkpointGateOpen.Value = true;
+            SortMailTask.Instance?.NotifyShipmentWaitingAtGate();
+
+            if (!checkpointGate.IsOpen)
+                yield return StartCoroutine(WaitForGateOpen());
+
             yield return new WaitForSeconds(gateOpenWaitDuration);
         }
 
@@ -223,7 +211,7 @@ public class DeliveryTruckController : NetworkBehaviour
         yield return new WaitForSeconds(idleDurationAtDestination);
 
         BeginDriveClientRpc(DriveLeg.Back);
-        if (checkpointGateAnimator != null)
+        if (checkpointGate != null)
             StartCoroutine(CloseGateAfterPassing());
 
         yield return new WaitForSeconds(driveRevDelay + driveBackDuration);
@@ -234,6 +222,15 @@ public class DeliveryTruckController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server-only. Waits until a player opens <see cref="checkpointGate"/>.
+    /// </summary>
+    private IEnumerator WaitForGateOpen()
+    {
+        while (checkpointGate != null && !checkpointGate.IsOpen)
+            yield return null;
+    }
+
+    /// <summary>
     /// Server-only. Waits until the truck has driven far enough along the pointC -> pointA leg to
     /// have passed the checkpoint gate, then waits <see cref="gateCloseDelayAfterPassing"/> more
     /// before closing it. Timing is derived from <see cref="speedCurve"/> so it lines up with the
@@ -241,16 +238,16 @@ public class DeliveryTruckController : NetworkBehaviour
     /// </summary>
     private IEnumerator CloseGateAfterPassing()
     {
-        if (pointA == null || pointC == null || checkpointGateAnimator == null) yield break;
+        if (pointA == null || pointC == null || checkpointGate == null) yield break;
 
-        float fraction = GetFractionAlongLine(pointC.position, pointA.position, checkpointGateAnimator.transform.position);
+        float fraction = GetFractionAlongLine(pointC.position, pointA.position, checkpointGate.transform.position);
         float normalizedTimeAtGate = InverseEvaluateCurve(speedCurve, fraction);
         float timeUntilPass = driveRevDelay + normalizedTimeAtGate * driveBackDuration;
 
         yield return new WaitForSeconds(timeUntilPass);
         yield return new WaitForSeconds(gateCloseDelayAfterPassing);
 
-        _checkpointGateOpen.Value = false;
+        checkpointGate.RequestClose();
     }
 
     // -------------------------------------------------------------------------

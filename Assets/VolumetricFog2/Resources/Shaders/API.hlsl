@@ -1,4 +1,4 @@
-﻿#ifndef VOLUMETRIC_FOG_2_API
+#ifndef VOLUMETRIC_FOG_2_API
 #define VOLUMETRIC_FOG_2_API
 
 //#pragma multi_compile _ VF2_DEPTH_PREPASS VF2_DEPTH_PEELING
@@ -8,8 +8,8 @@
 #pragma shader_feature_local_fragment VF2_VOIDS
 #pragma shader_feature_local_fragment VF2_FOW
 #pragma shader_feature_local_fragment VF2_SURFACE
-#pragma shader_feature_local_fragment VF2_DEPTH_GRADIENT
-#pragma shader_feature_local_fragment VF2_HEIGHT_GRADIENT
+#define VF2_DEPTH_GRADIENT 1
+#define VF2_HEIGHT_GRADIENT 1
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 

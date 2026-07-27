@@ -78,6 +78,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private const float GiveUpPauseDuration = 0.1f;
     private const string ClimbingAnimBool = "climbing";
     private const string BangOnShuttersAnimBool = "BangOnShutters";
+    private const string GroundedAnimBool = "Grounded";
 
     /// <summary>
     /// Returns true when there is a physical barrier for the mutant to bang against.
@@ -134,6 +135,14 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         // Suspend the chase loop before it gets a chance to run (it defers one frame),
         // so MutantSuspectBehaviour has exclusive control during the lineup sequence.
         _mutantEnemy?.SuspendForLineup();
+
+        // MutantEnemy.Update() is the only thing that syncs the networked "Grounded" animator
+        // state (from NavMeshAgent.isOnNavMesh), and SuspendForLineup() just disabled that
+        // component. Its NetworkVariable defaults to false, and nothing will ever flip it back
+        // to true while MutantEnemy stays disabled — so without this the mutant plays a
+        // floating/falling pose for the entire walk-in instead of walking. Force it true here
+        // since the mutant is standing on solid ground for the whole lineup sequence, not falling.
+        SetAnimBool(GroundedAnimBool, true);
 
         StartCoroutine(LineupSequence());
     }
@@ -505,6 +514,11 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _controller = controller;
 
         _mutantEnemy?.SuspendForLineup();
+
+        // See BeginLineup for why this is required — SuspendForLineup() disables MutantEnemy,
+        // which is the only thing that keeps the networked "Grounded" bool in sync, so it would
+        // otherwise be stuck at its default false for this entire scripted-entrance sequence too.
+        SetAnimBool(GroundedAnimBool, true);
 
         StartCoroutine(AtStandPosSequence());
     }

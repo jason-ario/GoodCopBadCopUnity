@@ -69,7 +69,7 @@ public class CableGenerator : MonoBehaviour
         );
 
         // Clean up memory in edit mode
-        if (_mf.sharedMesh != null && !UnityEditor.AssetDatabase.Contains(_mf.sharedMesh))
+        if (_mf.sharedMesh != null)
         {
             if (Application.isPlaying) Destroy(_mf.sharedMesh);
             else DestroyImmediate(_mf.sharedMesh);

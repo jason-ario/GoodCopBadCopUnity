@@ -9,10 +9,12 @@ using UnityEngine.Serialization;
 /// Flow:
 ///   1. Day activates — all stamps, drawer, and notebooks are immediately unlocked.
 ///      Mutation and biological notebooks are hidden until Day 2/3 introduce them.
-///   2. Intro cutscene ends → <see cref="ShiftManager.OnDayStart"/> fires →
-///      <see cref="OnDayStarted"/> runs server-side.
-///   3. After a 7-second hold, the rolling shutter opens automatically and is
-///      locked open via <see cref="ShutterController.ShutterLockedOpen"/>.
+///   2. Intro cutscene ends and the Day number pop-up plays → <see cref="ShiftManager.OnDayStart"/>
+///      fires → <see cref="OnDayStarted"/> runs. A tutorial arrow points the player to the
+///      Time Card Machine and clock-in is enabled server-side via <see cref="TimecardMachine.EnableClockIn"/>.
+///   3. Once the player clocks in (<see cref="TimecardMachine.OnClockInServer"/>), the tutorial
+///      arrow is dismissed and, after a short hold, the rolling shutter opens automatically and
+///      is locked open via <see cref="ShutterController.ShutterLockedOpen"/>.
 ///   4. The shift starts automatically (no switch press required on Day 1).
 ///      <see cref="SuspectController.InterceptNextSuspectSpawn"/> is armed so the
 ///      first suspect slot calls <see cref="SuspectController.SpawnScriptedSuspect"/>
@@ -58,6 +60,14 @@ public class Day_01 : DayBase
     [Tooltip("Vlad's SuspectCharacter prefab — spawned as the first visitor on Day 1 via SuspectController.")]
     [SerializeField] private SuspectCharacter _vladPrefab;
 
+    [Header("Day 1 — Clock In Tutorial")]
+    [Tooltip("The Time Card Machine the player must clock in on before the shutter opens and Vlad is summoned.")]
+    [SerializeField] private TimecardMachine _timeCardMachine;
+
+    [Tooltip("World-space tutorial arrow pointing at the Time Card Machine. Shown immediately after the " +
+             "Day number pop-up plays and hidden the moment the player clocks in.")]
+    [SerializeField] private GameObject _clockInTutorialArrow;
+
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
              "IMPORTANT: Must stay ACTIVE in the scene at load time so NGO registers his in-scene " +
@@ -90,6 +100,12 @@ public class Day_01 : DayBase
     [Tooltip("The booth lever — animated to the open position when the shutter opens and locked " +
              "non-interactable until the megaphone instructs the player to use it.")]
     [SerializeField] private Lever _lever;
+
+    [Tooltip("World-space tutorial arrow pointing at the booth lever. Shown once the lever megaphone " +
+             "dialogue finishes and hidden the moment the player pulls the lever. Pre-placed in the " +
+             "scene (like _clockInTutorialArrow) rather than spawned from the pooled TutorialMarker system, " +
+             "since the pooled marker's hover offset was landing in the wrong spot for this object.")]
+    [SerializeField] private Transform _leverTutorialArrow;
 
     [Tooltip("Custom stand position for the Soldier at the booth window. " +
              "Overrides SuspectController's default standPos for the soldier's walk-in.")]
@@ -127,7 +143,7 @@ public class Day_01 : DayBase
     [FormerlySerializedAs("_ivanMegaphonePart2")]
     [SerializeField] private ScriptedDialogue _quarantineMegaphonePart2;
 
-    [Tooltip("Seconds after OnDayStart fires before the shutter opens and Vlad is triggered.")]
+    [Tooltip("Seconds after the player clocks in before the shutter opens and Vlad is triggered.")]
     [SerializeField] private float _shutterOpenDelay = 7f;
 
     [Header("Day 1 — Vlad Dialogue")]
@@ -350,6 +366,10 @@ public class Day_01 : DayBase
         _dayStartedFired = false;
         _debugSkipActive = false;
 
+        // Reset the clock-in tutorial arrow to hidden — OnDayStarted shows it once the
+        // Day number pop-up plays.
+        ShowClockInArrow(false);
+
         // Drawer is unlocked so the player can grab a folder during the tutorial.
         _drawer?.SetLocked(false);
 
@@ -382,6 +402,9 @@ public class Day_01 : DayBase
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
         FolderController.OnFolderHandedOff += OnVladFolderHandedOff_OneShot; // fires once after Vlad's deferred verdict
         SuspectEncounterManager.OnFirstEncounterDialogueComplete += OnSuspectFirstEncounterComplete;
+
+        // Clock-in tutorial: hide the arrow on every client the instant the punch lands.
+        TimecardMachine.OnClockInAllClients += OnClockInAllClientsLocal;
 
         // Subscribe to TutorialTaskSync events so all task transitions broadcast to every client.
         TutorialTaskSync.OnVladDocsBothPickedUpAllClients            += OnVladDocsBothPickedUpSync;
@@ -438,6 +461,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+
+        TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
+        TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
+
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
@@ -510,6 +537,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+
+        TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
+        TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
+
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
@@ -577,9 +608,15 @@ public class Day_01 : DayBase
     private void OnDayStarted()
     {
         if (this == null) return;
-        if (!NetworkManager.Singleton.IsServer) return;
         if (_dayStartedFired) return;
         _dayStartedFired = true;
+
+        // Guide the player to the Time Card Machine immediately after the Day number
+        // pop-up plays. Runs on every client — the arrow carries no NetworkObject, so it's
+        // shown/hidden locally in response to events that are already broadcast to all clients.
+        ShowClockInArrow(true);
+
+        if (!NetworkManager.Singleton.IsServer) return;
 
         // DayActivated runs before NGO spawns scene NetworkObjects on the debug-skip path,
         // so stamp calls there are silently ignored. Re-apply the correct locked state here
@@ -593,14 +630,48 @@ public class Day_01 : DayBase
         if (_debugSkipActive)
         {
             Debug.Log("[Day_01] OnDayStarted: debug skip active — skipping Day1OpeningSequence.");
+            ShowClockInArrow(false);
             return;
         }
+
+        // Arm the server-side reaction to the player's clock-in punch, then enable the
+        // interaction on the Time Card Machine. Day1OpeningSequence now fires once the
+        // player actually clocks in, rather than after a fixed delay from day start.
+        TimecardMachine.OnClockInServer += OnPlayerClockedIn;
+        _timeCardMachine?.EnableClockIn();
+    }
+
+    /// <summary>
+    /// Fired on the server by <see cref="TimecardMachine.OnClockInServer"/> the instant the
+    /// player punches in. Self-unsubscribes, then kicks off <see cref="Day1OpeningSequence"/>.
+    /// </summary>
+    private void OnPlayerClockedIn()
+    {
+        TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
+
+        if (this == null) return;
+        if (!NetworkManager.Singleton.IsServer) return;
+        if (_debugSkipActive) return;
 
         StartCoroutine(Day1OpeningSequence());
     }
 
     /// <summary>
-    /// Server-side coroutine. Waits <see cref="_shutterOpenDelay"/> seconds, then:
+    /// Fired on ALL clients by <see cref="TimecardMachine.OnClockInAllClients"/> the instant the
+    /// clock-in punch lands. Purely visual — dismisses the tutorial arrow locally.
+    /// </summary>
+    private void OnClockInAllClientsLocal() => ShowClockInArrow(false);
+
+    /// <summary>Shows or hides the world-space arrow pointing at the Time Card Machine.</summary>
+    private void ShowClockInArrow(bool show)
+    {
+        if (_clockInTutorialArrow != null)
+            _clockInTutorialArrow.SetActive(show);
+    }
+
+    /// <summary>
+    /// Server-side coroutine, started once the player clocks in. Waits <see cref="_shutterOpenDelay"/>
+    /// seconds, then:
     ///   - Opens and locks the rolling shutter.
     ///   - Arms the Vlad intercept on the first suspect spawn slot (no paperwork, no entry line).
     ///   - Auto-starts the shift (bypassing the switch button for this scripted day).
@@ -1881,11 +1952,8 @@ public class Day_01 : DayBase
 
     private void ShowLeverMarker(bool show)
     {
-        if (_lever == null) return;
-        NetworkObject netObj = _lever.GetComponent<NetworkObject>();
-        if (netObj == null) return;
-        if (show) MegaphoneDialogueManager.Instance?.ShowMarkerSynced(netObj);
-        else      MegaphoneDialogueManager.Instance?.HideMarkerSynced(netObj);
+        if (_leverTutorialArrow == null) return;
+        MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_leverTutorialArrow, show);
     }
 
     private IEnumerator HideLeverMarkerOnUse()
@@ -2082,6 +2150,11 @@ public class Day_01 : DayBase
 
         // Cancel any pending Day 1 coroutines so the 7s delay can't re-arm Vlad's intercept.
         StopAllCoroutines();
+
+        // The clock-in tutorial is bypassed too — dismiss the arrow and cancel the pending
+        // server-side clock-in reaction so a late punch can't re-trigger Day1OpeningSequence.
+        ShowClockInArrow(false);
+        TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
 
         // Unsubscribe all early-day arrival handlers so none of them fire when the soldier
         // arrives. Without this, OnVladArrivedAtWindow fires for index 0 and plays

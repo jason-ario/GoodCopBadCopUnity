@@ -181,6 +181,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public int SortedCount => _sortedCount.Value;
     public int TotalCount  => _totalCount.Value;
 
+    /// <summary>Client-local handle to this delivery's row in the tutorial objective list overlay
+    /// (see <see cref="TutorialObjectiveList"/>). Created when the delivery alert fires, kept
+    /// up to date as packages are sorted, and completed/hidden once every package is sorted.</summary>
+    private TutorialObjectiveItem _mailObjective;
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -235,6 +240,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
+        _mailObjective?.SetText(GetMailObjectiveText());
     }
 
     private void OnIsActiveChanged(bool previous, bool current)
@@ -562,6 +568,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void NotifyAllPackagesSortedClientRpc()
     {
         OnAllPackagesSorted?.Invoke();
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_mailObjective);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        _mailObjective = null;
     }
 
     private void UpdateThreatLevel()
@@ -599,11 +609,33 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
+    /// Shows a lightweight, non-blocking alert on every client telling players a shipment is
+    /// waiting at the checkpoint gate. Called by <see cref="DeliveryTruckController"/> when the
+    /// truck arrives at the gate and stops, waiting for a player to open it (e.g. via the gate
+    /// button) before continuing on to the drop-off point.
+    /// </summary>
+    public void NotifyShipmentWaitingAtGate()
+    {
+        if (!IsServer) return;
+        NotifyShipmentWaitingAtGateClientRpc();
+    }
+
+    [ClientRpc]
+    private void NotifyShipmentWaitingAtGateClientRpc()
+    {
+        UIController.Instance?.ShowMailDeliveryNotification("A shipment is waiting at the gate.");
+    }
+
+    /// <summary>
     /// Shows a lightweight, non-blocking alert on every client — the mail-sorting equivalent of
     /// the "Someone is waiting at the booth" prompt — announcing today's delivery and which
     /// goods categories are prohibited. Uses the same reveal-and-fade notification style as the
     /// booth waiting alert (see <see cref="UIController.ShowMailDeliveryNotification"/>), but on
     /// its own notification instance so it never gets dismissed by booth-arrival logic.
+    ///
+    /// Also pops up the tutorial objective list overlay (see <see cref="TutorialObjectiveList"/>)
+    /// showing how much mail is left to put away. The row stays up — updated live as packages
+    /// are sorted — until <see cref="NotifyAllPackagesSortedClientRpc"/> completes and hides it.
     /// </summary>
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
@@ -613,5 +645,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         string prohibited = _todaysProhibitedGoods.Count > 0 ? string.Join(", ", _todaysProhibitedGoods) : "none";
         string message = $"A mail delivery has arrived — sort it at the mail bins.\nToday's prohibited goods: {prohibited}";
         UIController.Instance.ShowMailDeliveryNotification(message);
+
+        _mailObjective = TutorialObjectiveList.Instance?.AddObjective(GetMailObjectiveText());
     }
+
+    /// <summary>Display text for <see cref="_mailObjective"/>, e.g. "Put away the mail (3/22)".</summary>
+    private string GetMailObjectiveText() =>
+        $"Put away the mail ({Mathf.Min(SortedCount, TotalCount)}/{TotalCount})";
 }

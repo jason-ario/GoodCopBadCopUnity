@@ -9,14 +9,19 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Spray_1
   m_Shader: {fileID: 4800000, guid: 57584c2ee2b1b8747be2d9f8d805926f, type: 3}
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _RECEIVE_SHADOWS_OFF
+  m_InvalidKeywords:
+  - _RECEIVESHADOWS_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -120,6 +125,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _InvFade: 1
     - _MaxDisplacement: 0
     - _MaxScale: 0
     - _Metallic: 0.75
@@ -130,7 +136,7 @@ Material:
     - _Parallax: 0.02
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _ReceiveShadows: 1
+    - _ReceiveShadows: 0
     - _Rows: 1
     - _Scale: 0
     - _SmoothTexture: 0.02
@@ -154,7 +160,10 @@ Material:
     - _AlphaRemapColorBlend: {r: 0, g: 1, b: 0, a: 1}
     - _Color: {r: 0.2156862, g: 0, b: 0, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
+    - _Metalic: {r: 0, g: 0, b: 0, a: 0}
     - _SpecularColor: {r: 0, g: 0, b: 0, a: 1}
     - _Tint: {r: 0.22745098, g: 0, b: 0, a: 1}
     - _Tint2: {r: 0, g: 0, b: 0, a: 0}
+    - _TintColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

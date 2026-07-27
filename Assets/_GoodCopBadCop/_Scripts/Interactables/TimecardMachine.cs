@@ -31,6 +31,14 @@ public class TimecardMachine : Interactable
     public static event Action OnClockInAllClients;
 
     /// <summary>
+    /// Fired on the server the moment a clock-in punch is accepted — before the punch
+    /// is broadcast to clients. Subscribe to drive server-authoritative day sequencing
+    /// (e.g. Day 1 opening the shutter and summoning Vlad) that must run reliably even
+    /// on a dedicated server with no local client.
+    /// </summary>
+    public static event Action OnClockInServer;
+
+    /// <summary>
     /// Fired on ALL clients the moment a clock-out punch is accepted.
     /// Subscribe to drive client-side reactions such as UI notifications.
     /// </summary>
@@ -113,6 +121,7 @@ public class TimecardMachine : Interactable
     {
         if (!_clockInReady) return;
         _clockInReady = false;
+        OnClockInServer?.Invoke();
         PunchClockInClientRpc();
     }
 
