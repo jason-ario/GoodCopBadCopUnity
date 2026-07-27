@@ -119,6 +119,10 @@ public class Day_01 : DayBase
     [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
     [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
 
+    [Tooltip("Objective label shown after the trash and graffiti tasks are done, prompting the player " +
+             "to clock out on the Time Card Machine before heading to the bunker.")]
+    [SerializeField] private string _taskClockOutText = "Clock out for the day";
+
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
 
@@ -335,7 +339,13 @@ public class Day_01 : DayBase
 
     // End-of-shift trash task shown after the Alexei sequence.
     private TutorialObjectiveItem _taskThrowTrash;
+    private TutorialObjectiveItem _taskClockOut;
     private TutorialObjectiveItem _taskOpenBunker;
+
+    // End-of-shift graffiti task, shown alongside the trash task (see OnTrashTaskReadySync).
+    // Owned here (rather than inside CleanGraffitiTask) so this day script controls exactly
+    // when the row appears/disappears in the shared TutorialObjectiveList.
+    private TutorialObjectiveItem _taskCleanGraffiti;
 
     // Both the trash and graffiti objectives are added to the same shared
     // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
@@ -461,11 +471,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
         TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
-
-            ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
@@ -512,6 +521,10 @@ public class Day_01 : DayBase
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
         if (CleanGraffitiTask.Instance != null)
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
+        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
+
+        TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
+        BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -537,11 +550,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
         TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
-
-            ShiftManager.Instance.OnDayStart -= OnDayStarted;
 
         SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnRandomSuspectArrivedAtWindow;
@@ -578,6 +590,7 @@ public class Day_01 : DayBase
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
         if (CleanGraffitiTask.Instance != null)
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
+        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
         BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
 
@@ -1994,17 +2007,30 @@ public class Day_01 : DayBase
         TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
 
-        // The graffiti objective row itself is added/completed internally by
-        // CleanGraffitiTask (see OnIsActiveChanged / MarkCompleteClientRpc) —
-        // here we only need to know when it finishes so we don't clear the
-        // shared list while it's still in progress.
+        // The graffiti objective row is owned here (not by CleanGraffitiTask itself) so we
+        // control exactly when it appears — right alongside the trash task, matching the
+        // moment CleanGraffitiTask.TriggerDailyTask() was called in AlexeiController's
+        // end-of-shift setup sequence.
         if (CleanGraffitiTask.Instance != null)
+        {
+            _taskCleanGraffiti = TutorialObjectiveList.Instance?.AddObjective(
+                CleanGraffitiTask.Instance.GetTutorialObjectiveText());
+            CleanGraffitiTask.OnProgressChanged            += OnGraffitiProgressChanged;
             CleanGraffitiTask.Instance.OnDailyTaskCompleted += OnGraffitiTaskComplete;
+        }
         else
+        {
             _graffitiTaskDone = true;
+        }
 
         TutorialOverlay.Instance?.ShowTrashTutorial(
             () => TutorialOverlay.Instance?.ShowGraffitiTutorial());
+    }
+
+    private void OnGraffitiProgressChanged()
+    {
+        if (CleanGraffitiTask.Instance == null) return;
+        _taskCleanGraffiti?.SetText(CleanGraffitiTask.Instance.GetTutorialObjectiveText());
     }
 
     private void OnTrashProgressChanged()
@@ -2031,22 +2057,26 @@ public class Day_01 : DayBase
     {
         if (CleanGraffitiTask.Instance != null)
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
+        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskCleanGraffiti);
+        _taskCleanGraffiti = null;
 
         _graffitiTaskDone = true;
         TryFinishTrashAndGraffitiTutorials();
     }
 
     /// <summary>
-    /// Only clears the shared objective list and advances to the "open bunker" step
-    /// once BOTH the trash and graffiti end-of-shift tasks have been completed —
-    /// whichever finishes second triggers this. Prevents the list (and the still
-    /// in-progress task's row) from being wiped out early.
+    /// Only clears the shared objective list and advances to the clock-out step once BOTH
+    /// the trash and graffiti end-of-shift tasks have been completed — whichever finishes
+    /// second triggers this. Prevents the list (and the still in-progress task's row) from
+    /// being wiped out early.
     /// </summary>
     private void TryFinishTrashAndGraffitiTutorials()
     {
         if (!_trashTaskDone || !_graffitiTaskDone) return;
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowClockOutTask);
     }
 
     private string GetTrashTaskText(int deposited, int total) =>
@@ -2054,11 +2084,48 @@ public class Day_01 : DayBase
             ? $"{_taskThrowTrashText} {deposited}/{total}"
             : _taskThrowTrashText;
 
+    // ── Clock Out ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows the "Clock out" objective and points the tutorial arrow at, and highlights, the
+    /// Time Card Machine. Called as the onComplete of HideAndClear once the trash and graffiti
+    /// tasks both finish. The bunker sequence is deliberately withheld until the player clocks
+    /// out — see <see cref="OnClockedOutForBunker"/>.
+    /// </summary>
+    private void ShowClockOutTask()
+    {
+        _taskClockOut = TutorialObjectiveList.Instance?.AddObjective(_taskClockOutText);
+
+        // Reuse the same arrow/machine from the morning clock-in tutorial.
+        ShowClockInArrow(true);
+        _timeCardMachine?.Highlight(true);
+
+        TimecardMachine.OnClockOutAllClients += OnClockedOutForBunker;
+    }
+
+    /// <summary>
+    /// Fires on all clients via <see cref="TimecardMachine.OnClockOutAllClients"/> the instant
+    /// the player punches out. Dismisses the clock-out tutorial, then advances to the
+    /// "open the bunker" step.
+    /// </summary>
+    private void OnClockedOutForBunker()
+    {
+        TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
+
+        ShowClockInArrow(false);
+        _timeCardMachine?.Highlight(false);
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskClockOut);
+        _taskClockOut = null;
+
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
+    }
+
     // ── Open Bunker ───────────────────────────────────────────────────────────
 
     /// <summary>
     /// Shows the "Open the bunker" objective and a world-space arrow above the bunker door.
-    /// Called as the onComplete of HideAndClear once the trash task finishes.
+    /// Called as the onComplete of HideAndClear once the player clocks out.
     /// </summary>
     private void ShowOpenBunkerTask()
     {

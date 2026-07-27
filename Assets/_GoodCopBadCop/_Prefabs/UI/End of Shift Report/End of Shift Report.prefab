@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5877473880884031418}
   - component: {fileID: 392874218602886406}
   - component: {fileID: 4699108291686896988}
+  - component: {fileID: 2859136050839847808}
   m_Layer: 5
   m_Name: Civilians Killed
   m_TagString: Untagged
@@ -38,7 +39,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: -0.000003993511, y: -149}
-  m_SizeDelta: {x: 595.7587, y: 97.2133}
+  m_SizeDelta: {x: 149, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &2116768888142939097
 CanvasRenderer:
@@ -192,6 +193,19 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &2859136050839847808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 96690725736452578}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 748569c94a701904489c63d021af456e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
+  horizontalPadding: 74.5
 --- !u!1 &3006319240726623522
 GameObject:
   m_ObjectHideFlags: 0
@@ -438,6 +452,7 @@ GameObject:
   - component: {fileID: 3635177565951746750}
   - component: {fileID: 5500083547778988415}
   - component: {fileID: 3708417525499033301}
+  - component: {fileID: 7949459898221092918}
   m_Layer: 5
   m_Name: Current Population
   m_TagString: Untagged
@@ -462,7 +477,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: -0.519108, y: 52}
-  m_SizeDelta: {x: 595.7587, y: 120.3895}
+  m_SizeDelta: {x: 82.04, y: 120.3895}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &5154544101841317161
 CanvasRenderer:
@@ -616,6 +631,19 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &7949459898221092918
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3876259116149682975}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 748569c94a701904489c63d021af456e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
+  horizontalPadding: 41.02
 --- !u!1 &4119082692839138615
 GameObject:
   m_ObjectHideFlags: 0
@@ -628,6 +656,7 @@ GameObject:
   - component: {fileID: 784765587021323026}
   - component: {fileID: 3675510793639786837}
   - component: {fileID: 1309307434097594726}
+  - component: {fileID: 1826444582030800848}
   m_Layer: 5
   m_Name: Net Earnings
   m_TagString: Untagged
@@ -653,8 +682,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: -0.000003993511, y: 21.4}
-  m_SizeDelta: {x: 595.7587, y: 97.2133}
+  m_AnchoredPosition: {x: -0.000003993511, y: 38}
+  m_SizeDelta: {x: 0, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &784765587021323026
 CanvasRenderer:
@@ -704,12 +733,26 @@ MonoBehaviour:
   m_ChildAlignment: 4
   m_Spacing: 12.61
   m_ChildForceExpandWidth: 0
-  m_ChildForceExpandHeight: 1
+  m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 1
   m_ChildControlHeight: 0
   m_ChildScaleWidth: 1
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &1826444582030800848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4119082692839138615}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
+  m_HorizontalFit: 2
+  m_VerticalFit: 0
 --- !u!1 &4379677683047637689
 GameObject:
   m_ObjectHideFlags: 0
@@ -747,7 +790,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 352.2, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8260104120792476520
 CanvasRenderer:
@@ -884,7 +927,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 748569c94a701904489c63d021af456e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
-  horizontalPadding: 0
+  horizontalPadding: 176.1
 --- !u!1 &4727575292025939158
 GameObject:
   m_ObjectHideFlags: 0
@@ -1185,6 +1228,7 @@ GameObject:
   - component: {fileID: 5140073134643393930}
   - component: {fileID: 8497091751893371278}
   - component: {fileID: 2958894931395392782}
+  - component: {fileID: 2641669846452997585}
   m_Layer: 5
   m_Name: Residents Who Fully Mutated
   m_TagString: Untagged
@@ -1209,7 +1253,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: -0, y: -97.999985}
-  m_SizeDelta: {x: 595.7587, y: 97.2133}
+  m_SizeDelta: {x: 154.8, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &1225443861691747725
 CanvasRenderer:
@@ -1363,6 +1407,19 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &2641669846452997585
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7287339879383706658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 748569c94a701904489c63d021af456e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
+  horizontalPadding: 77.4
 --- !u!1 &8313120206903623415
 GameObject:
   m_ObjectHideFlags: 0
@@ -1586,6 +1643,7 @@ GameObject:
   - component: {fileID: 5129455966507606957}
   - component: {fileID: 5868235210807842627}
   - component: {fileID: 1121568732852595860}
+  - component: {fileID: 558821961864120422}
   m_Layer: 0
   m_Name: Waiting For Host Text
   m_TagString: Untagged
@@ -1649,7 +1707,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 3003121663
   m_fontColor: {r: 1, g: 1, b: 1, a: 0.7}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -1662,7 +1720,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -1712,6 +1770,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &558821961864120422
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8844669244534275885}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c27507d999965240b21ed05ea2189d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
+  profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
+  playOnEnable: 1
 --- !u!1001 &1633641428109013454
 PrefabInstance:
   m_ObjectHideFlags: 0

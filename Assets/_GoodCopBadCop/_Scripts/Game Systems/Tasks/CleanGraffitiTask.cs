@@ -63,15 +63,6 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedGraffiti = new();
     private bool _isComplete;
 
-    /// <summary>
-    /// This client's tutorial-overlay objective row for this task run, e.g.
-    /// "Clean graffiti 1/10". Kept per-instance (not networked) since each client
-    /// drives its own local <see cref="TutorialObjectiveList"/> in response to the
-    /// networked <see cref="_scrubbed"/>/<see cref="_totalCount"/>/<see cref="_isActive"/>
-    /// values, which are already synced to everyone.
-    /// </summary>
-    private TutorialObjectiveItem _tutorialObjectiveItem;
-
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _taskName;
@@ -155,11 +146,12 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isActive.OnValueChanged   += OnIsActiveChanged;
 
         // Handle the initial value for late-joining clients.
+        // Note: this only registers the HUD threat entry — showing/managing a
+        // TutorialObjectiveList row for this task is the caller's responsibility
+        // (see Day_01/Day_02), since each day script controls exactly when the
+        // graffiti objective should first become visible to the player.
         if (_isActive.Value)
-        {
             TaskRegistry.Instance?.AddThreat(this);
-            _tutorialObjectiveItem = TutorialObjectiveList.Instance?.AddObjective(GetTutorialObjectiveText());
-        }
 
         // Re-register whenever SetThreats clears the registry (e.g. at night-phase start),
         // ensuring graffiti stays visible in the HUD throughout the night phase.
@@ -223,14 +215,12 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isComplete = true;
         TaskRegistry.Instance?.NotifyTaskStateChanged();
 
-        TutorialObjectiveList.Instance?.CompleteObjective(_tutorialObjectiveItem);
-        _tutorialObjectiveItem = null;
-
         // Fired here (rather than inline in OnGraffitiScrubbed) so every client — not just
         // the server/host process — receives the completion notification. Day_01/Day_02
-        // subscribe to this per-client to gate the shared TutorialObjectiveList; previously
-        // this only ever invoked locally wherever OnGraffitiScrubbed's IsServer-gated code
-        // ran, so remote (non-host) clients never saw it.
+        // subscribe to this per-client to complete/clear whichever TutorialObjectiveList
+        // row they created for this task run; previously this only ever invoked locally
+        // wherever OnGraffitiScrubbed's IsServer-gated code ran, so remote (non-host)
+        // clients never saw it.
         OnDailyTaskCompleted?.Invoke();
     }
 
@@ -248,11 +238,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (_spawnedGraffiti.Count > 0)
         {
-            // Deactivate first so OnIsActiveChanged clears/completes any lingering
-            // _tutorialObjectiveItem (e.g. graffiti left unscrubbed from the previous
-            // day) before the counts below are reset. Otherwise OnScrubbedChanged/
-            // OnTotalCountChanged would still see the stale item and overwrite its
-            // label to "Clean graffiti 0/0" right before it gets cleared.
+            // Deactivate first so OnIsActiveChanged removes the stale HUD threat entry
+            // (e.g. graffiti left unscrubbed from the previous day) before the counts
+            // below are reset.
             _isActive.Value = false;
 
             _scrubbed.Value   = 0;
@@ -342,23 +330,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void OnIsActiveChanged(bool previous, bool current)
     {
         if (current)
-        {
             TaskRegistry.Instance?.AddThreat(this);
-            _tutorialObjectiveItem = TutorialObjectiveList.Instance?.AddObjective(GetTutorialObjectiveText());
-        }
         else
-        {
             TaskRegistry.Instance?.RemoveThreat(this);
-
-            // If the task was deactivated without ever completing (e.g. OnDayStart reset
-            // it for a new day), MarkCompleteClientRpc never ran to clear the reference —
-            // clear it here so a stale item isn't left dangling for the next run.
-            if (_tutorialObjectiveItem != null)
-            {
-                TutorialObjectiveList.Instance?.CompleteObjective(_tutorialObjectiveItem);
-                _tutorialObjectiveItem = null;
-            }
-        }
     }
 
     /// <summary>
@@ -395,20 +369,20 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
-        _tutorialObjectiveItem?.SetText(GetTutorialObjectiveText());
     }
 
     private void OnTotalCountChanged(int previous, int current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
-        _tutorialObjectiveItem?.SetText(GetTutorialObjectiveText());
     }
 
     /// <summary>
     /// Builds the tutorial-overlay objective label, e.g. "Clean graffiti 1/10".
+    /// Public so day scripts (which now own their own <see cref="TutorialObjectiveItem"/>
+    /// for this task — see <see cref="OnDailyTaskCompleted"/>) can reuse the same format.
     /// </summary>
-    private string GetTutorialObjectiveText() =>
+    public string GetTutorialObjectiveText() =>
         $"Clean graffiti {Mathf.Min(_scrubbed.Value, _totalCount.Value)}/{_totalCount.Value}";
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────

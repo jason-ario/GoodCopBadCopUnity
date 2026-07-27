@@ -19,16 +19,26 @@ public class EndOfShiftReportRow : MonoBehaviour
     [SerializeField] private TMPTextReveal valueReveal;
     [SerializeField] private TMPWobbleText valueWobble;
 
+    [Header("Coupon Icon")]
+    [Tooltip("Icon that activates once the value text has finished revealing.")]
+    [SerializeField] private GameObject couponIcon;
+
     public void Hide()
     {
         if (root != null)
             root.SetActive(false);
+
+        if (couponIcon != null)
+            couponIcon.SetActive(false);
     }
 
     public void Clear()
     {
         labelText.text = " ";
         valueText.text = " ";
+
+        if (couponIcon != null)
+            couponIcon.SetActive(false);
     }
 
     public void Show()
@@ -55,7 +65,7 @@ public class EndOfShiftReportRow : MonoBehaviour
 
     public IEnumerator RevealValue(string text, Color color, TMPWobbleProfile wobbleProfile)
     {
-        text = text + " <sprite=0>";
+        text = "Rewards " + text;
         
         if (valueText != null)
             valueText.color = color;
@@ -70,5 +80,8 @@ public class EndOfShiftReportRow : MonoBehaviour
             yield return valueReveal.RevealText(text);
         else if (valueText != null)
             valueText.text = text;
+
+        if (couponIcon != null)
+            couponIcon.SetActive(true);
     }
 }

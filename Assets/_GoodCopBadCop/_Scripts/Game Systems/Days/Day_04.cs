@@ -2,6 +2,10 @@ using UnityEngine;
 
 public class Day_04 : DayBase
 {
+    /// <summary>Day 4 hosts the fuse-box puzzle, so an intentional fuse-required outage
+    /// should not be force-cleared by <see cref="DayBase.SupportsFuseBoxRestore"/>.</summary>
+    protected override bool SupportsFuseBoxRestore => true;
+
     [Header("Day 4 — Power")]
     [Tooltip("Restores power at the start of Day 4, which was cut at the end of Day 3. " +
              "The ElectricityController NetworkVariable persists across the day boundary, " +

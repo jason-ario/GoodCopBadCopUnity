@@ -129,21 +129,38 @@ public abstract class DayBase : MonoBehaviour
     }
 
     /// <summary>
+    /// Override to true on the day(s) that actually host a fuse-box puzzle (e.g. Day 4).
+    /// <see cref="RestorePowerIfNoOutageIntended"/> uses this to tell an intentional
+    /// fuse-required outage (left alone so the puzzle can resolve it) apart from a stray
+    /// one left over from a debug cheat or another day that has no fuse box to clear it.
+    /// </summary>
+    protected virtual bool SupportsFuseBoxRestore => false;
+
+    /// <summary>
     /// Safety net so a scripted or debug-triggered blackout from a previous day never leaks
     /// into a later day's start. <see cref="ElectricityController"/>'s <c>_isPowerOn</c>
     /// NetworkVariable persists on its scene object across day transitions and debug day-skips,
     /// so without this, power left off by e.g. Day 3's scripted outage or a debug cheat would
     /// stay off going into Day 2/4/etc. Only restores power when the automatic random-outage
-    /// feature is disabled and no fuse-box-required outage is currently in effect — days that
-    /// intentionally need power off at start (e.g. a future fuse-required day) are left alone,
-    /// and days that intentionally cut power themselves do so after this point in their own
-    /// override (e.g. Day 3's end-of-shift blackout).
+    /// feature is disabled. A fuse-box-required outage is left alone only on a day that
+    /// declares <see cref="SupportsFuseBoxRestore"/> — on any other day it is treated as stray
+    /// leftover state (e.g. from the SkipToDay4FusePowerOutage debug cheat) and force-cleared,
+    /// since that day has no fuse box to resolve it and the standard CircuitBox refuses to
+    /// restore power while the flag is set.
     /// </summary>
     private void RestorePowerIfNoOutageIntended()
     {
         ElectricityController ec = ElectricityController.Instance;
         if (ec == null) return;
         if (ec.EnablePowerOutage) return;
+
+        if (ec.RequiresFuseBoxRestore && !SupportsFuseBoxRestore)
+        {
+            Debug.Log($"[Day {DayNumber}] Clearing a stray fuse-required power outage left over from another day — this day has no fuse box to resolve it.");
+            ec.PowerOn();
+            return;
+        }
+
         if (ec.RequiresFuseBoxRestore) return;
         if (ec.IsPowerOn) return;
 
