@@ -160,6 +160,7 @@ public class CheatConsoleUI : MonoBehaviour
         _cheats.Add(("Trigger Mail Delivery Task", () =>
         {
             SortMailTask.Instance?.TriggerDailyTask();
+            Day_02.Instance?.EnsureSortMailObjective();
             SetVisible(false);
         }));
     }

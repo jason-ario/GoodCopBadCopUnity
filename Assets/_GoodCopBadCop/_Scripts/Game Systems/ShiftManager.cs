@@ -646,9 +646,19 @@ public class ShiftManager : NetworkBehaviour
         Debug.Log($"[ShiftManager] StartInBetweenShiftSequence called.\n{System.Environment.StackTrace}");
 
         if (IsServer)
-            StartInBetweenShiftSequenceClientRpc();
+            StartInBetweenShiftSequenceOnServer();
         else
             StartInBetweenShiftSequenceServerRpc();
+    }
+
+    /// <summary>
+    /// Starts the transition locally on the host, then notifies all other clients so the
+    /// end-of-shift report closes and the next day starts for everyone at the same time.
+    /// </summary>
+    private void StartInBetweenShiftSequenceOnServer()
+    {
+        StartCoroutine(InBetweenShiftSequence());
+        StartInBetweenShiftSequenceClientRpc();
     }
 
     /// <summary>
@@ -659,16 +669,17 @@ public class ShiftManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void StartInBetweenShiftSequenceServerRpc()
     {
-        StartInBetweenShiftSequenceClientRpc();
+        StartInBetweenShiftSequenceOnServer();
     }
 
     /// <summary>
-    /// Runs the in-between-shift transition locally on every client (including the host),
-    /// so the end-of-shift report closes and the next day starts for everyone at once.
+    /// Runs the in-between-shift transition on non-host clients. The host already started
+    /// its own copy in <see cref="StartInBetweenShiftSequenceOnServer"/>.
     /// </summary>
     [ClientRpc]
     private void StartInBetweenShiftSequenceClientRpc()
     {
+        if (IsServer) return; // Host already ran the sequence locally above.
         StartCoroutine(InBetweenShiftSequence());
     }
 

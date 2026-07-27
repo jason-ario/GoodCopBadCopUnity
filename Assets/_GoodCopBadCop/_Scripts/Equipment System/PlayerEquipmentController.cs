@@ -88,8 +88,14 @@ public class PlayerEquipmentController : NetworkBehaviour
         if (IsOwner && MaskOverlayController.Instance != null)
             MaskOverlayController.Instance.SetVisible(equipped);
 
-        // Radiation runs server-side only — set the multiplier only on the server.
-        if (IsServer && _radiationController != null)
+        // RadiationMultiplier is a plain (non-networked) field read locally by every machine's
+        // own PlayerRadiation instance — e.g. RadiationHotspot/OffTrailRadiation run unguarded on
+        // every client and read whichever local copy they find. _isMaskEquipped is already
+        // network-synced (NetworkVariable), so every machine — server and every client — should
+        // mirror it into its own local RadiationMultiplier to keep local feedback (UI, tick audio)
+        // consistent with the authoritative mask state. Restricting this to IsServer left non-host
+        // clients always computing with an un-masked (1x) multiplier locally.
+        if (_radiationController != null)
             _radiationController.RadiationMultiplier = equipped ? maskRadiationMultiplier : 1f;
     }
 

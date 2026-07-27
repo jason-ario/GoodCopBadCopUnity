@@ -45,6 +45,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
+    [SerializeField] private BoothWaitingNotification mailDeliveryNotification;
     [SerializeField] private DeathScreenUI deathScreenUI;
     [SerializeField] private GameObject _endDayPopup;
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
@@ -519,6 +520,24 @@ public class UIController : MonoBehaviour
     {
         if (boothWaitingNotification != null)
             boothWaitingNotification.Hide();
+    }
+
+    /// <summary>
+    /// Shows the same bottom-centre reveal-and-fade notification style as the booth waiting
+    /// alert, but with a caller-supplied message. Used by tasks (e.g. Sort Mail) that need an
+    /// unobtrusive popup that can appear at any time, independent of the booth-waiting alert.
+    /// </summary>
+    public void ShowMailDeliveryNotification(string message)
+    {
+        if (mailDeliveryNotification != null)
+            mailDeliveryNotification.Show(message);
+    }
+
+    /// <summary>Hides the mail delivery notification.</summary>
+    public void HideMailDeliveryNotification()
+    {
+        if (mailDeliveryNotification != null)
+            mailDeliveryNotification.Hide();
     }
 
     /// <summary>Shows the death screen after the given delay in seconds.</summary>

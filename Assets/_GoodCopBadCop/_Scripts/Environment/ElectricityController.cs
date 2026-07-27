@@ -29,8 +29,19 @@ public class ElectricityController : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>Scene singleton — set in <see cref="Awake"/>, cleared in <see cref="OnDestroy"/>.</summary>
+    public static ElectricityController Instance { get; private set; }
+
     /// <summary>Returns the current power state, readable by all clients.</summary>
     public bool IsPowerOn => _isPowerOn.Value;
+
+    /// <summary>True when the automatic random outage countdown is enabled for this session.</summary>
+    public bool EnablePowerOutage => enablePowerOutage;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     /// <summary>
     /// True when the current outage can only be cleared via the fuse-box puzzle.
@@ -69,6 +80,8 @@ public class ElectricityController : NetworkBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this) Instance = null;
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftStart -= StartCountdown;
 

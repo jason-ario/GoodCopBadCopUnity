@@ -329,8 +329,8 @@ public class DebugConsole : MonoBehaviour
     /// Skips booth-ready setup and immediately jumps CampaignManager to the given day.
     /// Runs SkipToBoothReady first if the game is not yet in the shift, then applies
     /// the target day on top. Server-only.
-    /// For any day other than Day 1, ink stamps are unlocked after one frame so that
-    /// Day 1's tutorial locks do not carry over into later-day debug skips.
+    /// For any day other than Day 1, ink stamps and the folder stack are unlocked after
+    /// one frame so that Day 1's tutorial locks do not carry over into later-day debug skips.
     /// </summary>
     public void SkipToDay(int targetDay)
     {
@@ -345,22 +345,25 @@ public class DebugConsole : MonoBehaviour
         CampaignManager.Instance.JumpToDay(targetDay);
 
         if (targetDay != 1)
-            StartCoroutine(UnlockInkStampsAfterDelay());
+            StartCoroutine(UnlockTutorialGatedItemsAfterDelay());
     }
 
     /// <summary>
     /// Waits one frame (to allow the day's DayActivated to complete), then forces all
-    /// InkStamp slots interactable. Prevents Day 1's tutorial locks from persisting
-    /// when skipping to a later day.
+    /// InkStamp slots and StackOfFolders instances interactable. Prevents Day 1's
+    /// tutorial locks from persisting when skipping to a later day.
     /// </summary>
-    private IEnumerator UnlockInkStampsAfterDelay()
+    private IEnumerator UnlockTutorialGatedItemsAfterDelay()
     {
         yield return null;
 
         foreach (var stamp in FindObjectsByType<InkStamp>(FindObjectsSortMode.None))
             stamp.SetSlotInteractable(true);
 
-        Debug.Log("[DebugConsole] Ink stamps unlocked for non-Day-1 skip.");
+        foreach (var stack in FindObjectsByType<StackOfFolders>(FindObjectsSortMode.None))
+            stack.SetInteractable(true);
+
+        Debug.Log("[DebugConsole] Ink stamps and folder stack unlocked for non-Day-1 skip.");
     }
 
     /// <summary>
@@ -409,7 +412,7 @@ public class DebugConsole : MonoBehaviour
     private IEnumerator StartFreePlayDay5AfterDayLoad()
     {
         // Let CampaignManager activate Day 5 and apply its normal setup.
-        // UnlockInkStampsAfterDelay (launched by SkipToDay) also runs this frame.
+        // UnlockTutorialGatedItemsAfterDelay (launched by SkipToDay) also runs this frame.
         yield return null;
 
         FindFirstObjectByType<ToolsLocker>()?.DebugForceUnlock();

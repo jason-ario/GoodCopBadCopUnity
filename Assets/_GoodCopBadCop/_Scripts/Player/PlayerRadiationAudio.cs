@@ -9,9 +9,14 @@ using UnityEngine;
 ///   Medium : hotspot is actively irradiating the player at a moderate pace.
 ///   High   : player is in a strong radiation source or radiation is stacking fast.
 ///
-/// NOTE: Radiation is server-authoritative and not replicated via a NetworkVariable,
-/// so audio currently only plays on the host. When <see cref="PlayerRadiation"/> exposes
-/// a networked radiation value, gate on <c>IsOwner</c> instead of <c>IsServer</c>.
+/// NOTE: Radiation is server-authoritative and not replicated via a NetworkVariable, so
+/// <see cref="PlayerRadiation.CurrentRadiation"/> is only kept up to date on the machine
+/// that owns the underlying <see cref="PlayerRadiation.Update"/> call (the host). As a
+/// result this component only ever produces correct audio on the host, and only for the
+/// host's own locally-owned player — gating on <c>IsOwner</c> (rather than <c>IsServer</c>)
+/// is what keeps the host from also hearing every other player's radiation ticker. When
+/// <see cref="PlayerRadiation"/> exposes a networked radiation value, remote clients will
+/// start hearing their own ticker too without any further changes here.
 /// </summary>
 [RequireComponent(typeof(PlayerRadiation))]
 public class PlayerRadiationAudio : NetworkBehaviour
@@ -59,8 +64,11 @@ public class PlayerRadiationAudio : NetworkBehaviour
 
     private void Update()
     {
-        // Radiation state is only authoritative on the server — match that gate.
-        if (!IsServer) return;
+        // Only the locally-owned player's radiation ticker should play on this machine.
+        // Gating on IsServer here (instead of IsOwner) was the bug: on the host, IsServer
+        // is true for every player's NetworkObject, so the host ended up computing and
+        // playing every player's radiation audio simultaneously, not just its own.
+        if (!IsOwner) return;
 
         float current = _playerRadiation.CurrentRadiation;
 

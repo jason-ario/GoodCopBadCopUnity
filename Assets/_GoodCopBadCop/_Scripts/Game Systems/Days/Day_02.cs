@@ -61,19 +61,21 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
 
     [Header("Day 2 — Vlad Opening Sequence")]
-    [Tooltip("Vlad's SuspectCharacter prefab. Instantiated at day start and destroyed after the opening sequence.")]
+    [Tooltip("Vlad's SuspectCharacter — the persistent instance already placed in the scene " +
+             "(the same character used for his day/night idle chatter). Reused directly for the " +
+             "opening sequence instead of spawning a runtime copy: he's moved to _vladSpawnPos, " +
+             "walked through the tool locker walkthrough, then settled back in the yard.")]
     [SerializeField] private SuspectCharacter _vladCharacter;
 
-    // Runtime instance spawned from the prefab. Null when not in-world.
+    // Vlad instance currently being driven through a scripted sequence. Points at _vladCharacter
+    // while a sequence is active; null when Vlad isn't mid-sequence. Never destroyed — he's a
+    // persistent scene character, not a runtime-spawned instance.
     private SuspectCharacter _spawnedVlad;
 
     [Tooltip("Where Vlad stands at the start of Day 2. He waits here until a player approaches.")]
     [SerializeField] private Transform _vladSpawnPos;
 
-    [Tooltip("Delivery controller that spawns the supply box. On Day 2 the box is redirected to a unique position.")]
-    [SerializeField] private SupplyBoxDeliveryController _supplyBoxDelivery;
-
-    [Tooltip("The position and rotation at which the Day 2 supply box is spawned (overrides the controller's default spawn point).")]
+    [Tooltip("The position and rotation at which the Day 2 supply box is spawned (overrides the delivery controller's default spawn point via GetSupplyBoxSpawnPointOverride).")]
     [SerializeField] private Transform _day2SupplyBoxSpawnPoint;
 
     [Header("Day 2 — Scripted Dialogues")]
@@ -157,10 +159,9 @@ public class Day_02 : DayBase
              "Vlad, the dead animal, or the trail event.")]
     [SerializeField] private bool _enablePostShiftVladSequence = true;
 
-    [Tooltip("Vlad's SuspectCharacter prefab for the out-back sequence. Instantiated when the shift ends and destroyed after the sequence.")]
-    [SerializeField] private SuspectCharacter _vladOutBackCharacter;
-
-    // Runtime instance spawned from the prefab. Null when not in-world.
+    // Runtime instance driving the post-shift out-back sequence. Points at _vladCharacter (the
+    // same persistent scene character) once the opening sequence hands him off, or reuses him
+    // directly as a fallback if the opening sequence never ran (e.g. debug-skipped).
     private SuspectCharacter _spawnedVladOutBack;
 
     [Tooltip("Where Vlad stands when waiting out back. He teleports here when the shift ends.")]
@@ -315,17 +316,19 @@ public class Day_02 : DayBase
         SortMailTask.DeferAutoTriggerForDay = 2;
 
         if (_vladCharacter == null)
-            Debug.LogWarning("[Day_02] _vladCharacter prefab not assigned — opening sequence will be skipped.", this);
-
-        // Redirect the supply box delivery to the Day 2 unique position.
-        // SupplyBoxDeliveryController will consume the override when OnDayStart fires.
-        if (NetworkManager.Singleton.IsServer && _supplyBoxDelivery != null && _day2SupplyBoxSpawnPoint != null)
-            _supplyBoxDelivery.SpawnPointOverride = _day2SupplyBoxSpawnPoint;
+            Debug.LogWarning("[Day_02] _vladCharacter (scene instance) not assigned — opening sequence will be skipped.", this);
 
         // Subscribe to ShiftManager so the opening sequence starts when the day officially begins.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDay2Started;
     }
+
+    /// <summary>
+    /// Redirects the supply box delivery to <see cref="_day2SupplyBoxSpawnPoint"/> while Day 2 is
+    /// active. Resolved fresh by <see cref="SupplyBoxDeliveryController"/> every time it spawns a
+    /// box, so it's never missed regardless of how many times the day-start event fires.
+    /// </summary>
+    public override Transform GetSupplyBoxSpawnPointOverride() => _day2SupplyBoxSpawnPoint;
 
     public override void DayDeactivated()
     {
@@ -350,10 +353,6 @@ public class Day_02 : DayBase
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
 
-        // Clear any unused spawn override so it doesn't bleed into the next day.
-        if (_supplyBoxDelivery != null)
-            _supplyBoxDelivery.SpawnPointOverride = null;
-
         // Clear the trail destination override so other days use default behaviour.
         if (FollowTrailThreat.Instance != null)
             FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = null;
@@ -374,9 +373,11 @@ public class Day_02 : DayBase
         MeetVladOutBackTask.CompleteAndRemove();
         KillMutantTask.CompleteAndRemove();
 
-        // Destroy any Vlad instances that are still in-world (e.g. day skipped mid-sequence).
-        DespawnVladInstance(ref _spawnedVlad);
-        DespawnVladInstance(ref _spawnedVladOutBack);
+        // Clear the shared Vlad references — he's the persistent scene character, not a runtime
+        // instance, so he's left in-world (wherever the sequence left him) rather than despawned
+        // or destroyed. This also covers the case where the day was skipped mid-sequence.
+        _spawnedVlad = null;
+        _spawnedVladOutBack = null;
 
         // Despawn Ocho if still present (e.g. player never approached him).
         DespawnOcho();
@@ -440,6 +441,10 @@ public class Day_02 : DayBase
         else
             SortMailTask.Instance?.TriggerDeferredDelivery();
 
+        // The tutorial overlay is being skipped entirely, so add the objective directly —
+        // OnMailSortingTutorialClosed will never fire on this path.
+        EnsureSortMailObjective();
+
         Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked.");
     }
 
@@ -464,25 +469,20 @@ public class Day_02 : DayBase
     {
         if (_vladCharacter == null)
         {
-            Debug.LogWarning("[Day_02] _vladCharacter prefab not assigned — skipping opening sequence.");
+            Debug.LogWarning("[Day_02] _vladCharacter (scene instance) not assigned — skipping opening sequence.");
             yield break;
         }
 
-        // Instantiate Vlad from the prefab and network-spawn him at the opening position.
-        Vector3    spawnPos = _vladSpawnPos != null ? _vladSpawnPos.position : Vector3.zero;
-        Quaternion spawnRot = _vladSpawnPos != null ? _vladSpawnPos.rotation : Quaternion.identity;
-        _spawnedVlad = Instantiate(_vladCharacter, spawnPos, spawnRot);
+        // Reuse the persistent Vlad already placed in the scene instead of spawning a runtime
+        // copy of the prefab. Stand him up out of any yard sitting pose and strip his idle
+        // world-dialogue so he isn't interactable as generic yard chatter while the scripted
+        // sequence plays, then move him straight to his Day 2 opening position.
+        _spawnedVlad = _vladCharacter;
+        yield return StartCoroutine(StandUpAndLeaveYard(_spawnedVlad));
 
-        NetworkObject vladNetObj = _spawnedVlad.GetComponent<NetworkObject>();
-        if (vladNetObj == null)
-        {
-            Debug.LogError("[Day_02] Vlad prefab is missing a NetworkObject — opening sequence aborted.", this);
-            Destroy(_spawnedVlad.gameObject);
-            _spawnedVlad = null;
-            yield break;
-        }
-
-        vladNetObj.Spawn(destroyWithScene: true);
+        Vector3    spawnPos = _vladSpawnPos != null ? _vladSpawnPos.position : _spawnedVlad.transform.position;
+        Quaternion spawnRot = _vladSpawnPos != null ? _vladSpawnPos.rotation : _spawnedVlad.transform.rotation;
+        _spawnedVlad.transform.SetPositionAndRotation(spawnPos, spawnRot);
         _spawnedVlad.InitNavigation();
 
         // ── Phase 1: wait for a player to walk up to Vlad ──────────────────────
@@ -701,23 +701,6 @@ public class Day_02 : DayBase
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Despawns a runtime Vlad prefab instance (destroyGameObject: true) and clears the ref.
-    /// Safe to call when the instance is null or already despawned.
-    /// </summary>
-    private static void DespawnVladInstance(ref SuspectCharacter instance)
-    {
-        if (instance == null) return;
-
-        NetworkObject netObj = instance.GetComponent<NetworkObject>();
-        if (netObj != null && netObj.IsSpawned)
-            netObj.Despawn(true);
-        else if (instance.gameObject != null)
-            UnityEngine.Object.Destroy(instance.gameObject);
-
-        instance = null;
-    }
-
-    /// <summary>
     /// Polls every 0.5 s until any connected player's object is within <paramref name="radius"/>
     /// world units of <paramref name="target"/>. Server-side.
     /// </summary>
@@ -825,11 +808,25 @@ public class Day_02 : DayBase
 
     /// <summary>
     /// Called once the player closes the sorting-mail tutorial overlay. Adds the "Sort the mail"
-    /// objective to the tutorial objective list (which slides the list in automatically) and
-    /// subscribes to live progress until every package is sorted.
+    /// objective to the tutorial objective list.
     /// </summary>
     private void OnMailSortingTutorialClosed()
     {
+        EnsureSortMailObjective();
+    }
+
+    /// <summary>
+    /// Adds the "Sort the mail" objective to the tutorial objective list (which slides the list
+    /// in automatically) and subscribes to live progress until every package is sorted.
+    /// Safe to call multiple times — no-ops if the objective is already tracked, so both the
+    /// normal tutorial-overlay flow and any debug path that triggers the mail delivery directly
+    /// (e.g. <see cref="DebugSkipOpening"/>, the F12 "Trigger Mail Delivery Task" cheat) always
+    /// end up showing the objective.
+    /// </summary>
+    public void EnsureSortMailObjective()
+    {
+        if (_taskSortMail != null) return;
+
         _taskSortMail = TutorialObjectiveList.Instance?.AddObjective(GetSortMailTaskText());
 
         SortMailTask.OnProgressChanged   += OnSortMailProgressChanged;
@@ -1014,27 +1011,20 @@ public class Day_02 : DayBase
         else
         {
             // Fallback — the opening sequence never produced a Vlad instance (e.g. day skipped
-            // mid-sequence via debug tools), so spawn a fresh one as before.
-            if (_vladOutBackCharacter == null)
+            // mid-sequence via debug tools). Reuse the same persistent scene Vlad instead of
+            // spawning a duplicate instance.
+            if (_vladCharacter == null)
             {
-                Debug.LogError("[Day_02] _vladOutBackCharacter prefab not assigned — post-shift sequence aborted.", this);
+                Debug.LogError("[Day_02] _vladCharacter (scene instance) not assigned — post-shift sequence aborted.", this);
                 yield break;
             }
 
-            Vector3    spawnPos = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.position : Vector3.zero;
-            Quaternion spawnRot = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.rotation : Quaternion.identity;
-            _spawnedVladOutBack = Instantiate(_vladOutBackCharacter, spawnPos, spawnRot);
+            _spawnedVladOutBack = _vladCharacter;
+            yield return StartCoroutine(StandUpAndLeaveYard(_spawnedVladOutBack));
 
-            NetworkObject vladNetObj = _spawnedVladOutBack.GetComponent<NetworkObject>();
-            if (vladNetObj == null)
-            {
-                Debug.LogError("[Day_02] _vladOutBackCharacter prefab is missing a NetworkObject — post-shift sequence aborted.", this);
-                Destroy(_spawnedVladOutBack.gameObject);
-                _spawnedVladOutBack = null;
-                yield break;
-            }
-
-            vladNetObj.Spawn(destroyWithScene: true);
+            Vector3    spawnPos = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.position : _spawnedVladOutBack.transform.position;
+            Quaternion spawnRot = _vladOutBackSpawnPos != null ? _vladOutBackSpawnPos.rotation : _spawnedVladOutBack.transform.rotation;
+            _spawnedVladOutBack.transform.SetPositionAndRotation(spawnPos, spawnRot);
             _spawnedVladOutBack.InitNavigation();
         }
 

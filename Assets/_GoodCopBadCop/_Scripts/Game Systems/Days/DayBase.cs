@@ -44,6 +44,16 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("Item prefabs to spawn inside the supply box. Each prefab must have a NetworkObject component and be registered in the NetworkManager prefab list.")]
     public List<GameObject> SupplyBoxItemPrefabs = new List<GameObject>();
 
+    /// <summary>
+    /// Optional per-day override for where the supply box spawns, resolved fresh by
+    /// <see cref="SupplyBoxDeliveryController"/> every time it spawns a box (rather than a
+    /// one-shot mutable property set ahead of time, which could be silently missed if
+    /// <see cref="ShiftManager.OnDayStart"/> ends up firing more than once or in an unexpected
+    /// order). Return null to use the delivery controller's default spawn point. Override in a
+    /// day subclass (e.g. Day_02) that needs a unique delivery position.
+    /// </summary>
+    public virtual Transform GetSupplyBoxSpawnPointOverride() => null;
+
     [Header("Events")]
     [Tooltip("When true, the 'Follow the Trail' event can trigger on this day.")]
     public bool CanFollowTrailEvent;
@@ -113,7 +123,32 @@ public abstract class DayBase : MonoBehaviour
             }
         }
 
+        RestorePowerIfNoOutageIntended();
+
         OnDayStart?.Invoke();
+    }
+
+    /// <summary>
+    /// Safety net so a scripted or debug-triggered blackout from a previous day never leaks
+    /// into a later day's start. <see cref="ElectricityController"/>'s <c>_isPowerOn</c>
+    /// NetworkVariable persists on its scene object across day transitions and debug day-skips,
+    /// so without this, power left off by e.g. Day 3's scripted outage or a debug cheat would
+    /// stay off going into Day 2/4/etc. Only restores power when the automatic random-outage
+    /// feature is disabled and no fuse-box-required outage is currently in effect — days that
+    /// intentionally need power off at start (e.g. a future fuse-required day) are left alone,
+    /// and days that intentionally cut power themselves do so after this point in their own
+    /// override (e.g. Day 3's end-of-shift blackout).
+    /// </summary>
+    private void RestorePowerIfNoOutageIntended()
+    {
+        ElectricityController ec = ElectricityController.Instance;
+        if (ec == null) return;
+        if (ec.EnablePowerOutage) return;
+        if (ec.RequiresFuseBoxRestore) return;
+        if (ec.IsPowerOn) return;
+
+        Debug.Log($"[Day {DayNumber}] Power was left off from a previous day — restoring since automatic outages are disabled.");
+        ec.PowerOn();
     }
 
     /// <summary>

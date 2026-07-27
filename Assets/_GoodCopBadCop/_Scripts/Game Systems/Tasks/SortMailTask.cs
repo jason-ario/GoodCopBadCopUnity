@@ -600,16 +600,18 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Shows a lightweight, non-blocking alert on every client — the mail-sorting equivalent of
-    /// the "Go to the booth to start your shift" prompt — announcing today's delivery and which
-    /// goods categories are prohibited.
+    /// the "Someone is waiting at the booth" prompt — announcing today's delivery and which
+    /// goods categories are prohibited. Uses the same reveal-and-fade notification style as the
+    /// booth waiting alert (see <see cref="UIController.ShowMailDeliveryNotification"/>), but on
+    /// its own notification instance so it never gets dismissed by booth-arrival logic.
     /// </summary>
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
     {
-        if (PlayerTutorialUI.Instance == null) return;
+        if (UIController.Instance == null) return;
 
         string prohibited = _todaysProhibitedGoods.Count > 0 ? string.Join(", ", _todaysProhibitedGoods) : "none";
         string message = $"A mail delivery has arrived — sort it at the mail bins.\nToday's prohibited goods: {prohibited}";
-        PlayerTutorialUI.Instance.ShowTextOnly(message, 5f);
+        UIController.Instance.ShowMailDeliveryNotification(message);
     }
 }

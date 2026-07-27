@@ -8,7 +8,9 @@ using UnityEngine;
 ///
 /// When the day starts it:
 ///   1. Despawns any box and items left over from the previous day.
-///   2. Spawns a fresh <see cref="SupplyBox"/> instance at <see cref="_spawnPoint"/>.
+///   2. Spawns a fresh <see cref="SupplyBox"/> instance at the active day's
+///      <see cref="DayBase.GetSupplyBoxSpawnPointOverride"/> (falling back to
+///      <see cref="_spawnPoint"/> when the day doesn't provide one).
 ///   3. Spawns the day's configured item prefabs as NetworkObject children of the box contents.
 ///   4. Immediately unlocks the box and its contents for pickup.
 /// </summary>
@@ -31,13 +33,6 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     private NetworkObject _activeBoxNetObj;
     private SupplyBox _activeBox;
     private readonly List<NetworkObject> _spawnedItems = new List<NetworkObject>();
-
-    /// <summary>
-    /// Optional one-time spawn point override. When set before <see cref="OnDayStart"/> fires,
-    /// the next delivery places the box at this transform instead of <see cref="_spawnPoint"/>.
-    /// Consumed and reset to null automatically after use.
-    /// </summary>
-    public Transform SpawnPointOverride { get; set; }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -108,9 +103,11 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             return;
         }
 
-        // Use the one-time override if set, otherwise fall back to the default spawn point.
-        Transform spawnTransform = SpawnPointOverride != null ? SpawnPointOverride : _spawnPoint;
-        SpawnPointOverride = null;
+        // Ask the currently active day for a delivery position override — resolved fresh every
+        // time so it can never be silently missed regardless of event-firing order, unlike a
+        // one-shot mutable property that has to be set ahead of time and gets consumed once.
+        Transform overrideTransform = CampaignManager.Instance?.ActiveDay?.GetSupplyBoxSpawnPointOverride();
+        Transform spawnTransform = overrideTransform != null ? overrideTransform : _spawnPoint;
 
         if (spawnTransform == null)
         {

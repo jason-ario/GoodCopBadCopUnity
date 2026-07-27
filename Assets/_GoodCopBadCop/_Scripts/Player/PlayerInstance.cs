@@ -393,10 +393,33 @@ public class PlayerInstance : NetworkBehaviour
         Debug.Log($"[PlayerInstance] Components deactivated for corpse of player {OwnerClientId}.");
     }
 
+    /// <summary>
+    /// Moves this player to <paramref name="position"/>. This player's <c>NetworkTransform</c>
+    /// is server-authoritative, so a direct <c>transform</c> write here only "sticks" when
+    /// called on the server (e.g. the host moving its own player). When called on a client —
+    /// including the owning client moving its own player, such as at the end of the intro
+    /// cutscene — the write is not authoritative and gets silently overwritten by the next
+    /// NetworkTransform sync from the server, which produces an apparent teleport to a stale
+    /// position. Route the write through the server in that case.
+    /// </summary>
     public void SetPosition(Transform position)
     {
-        transform.position = position.position;
-        transform.rotation = position.rotation;
+        if (IsServer)
+        {
+            transform.position = position.position;
+            transform.rotation = position.rotation;
+        }
+        else
+        {
+            SetPositionServerRpc(position.position, position.rotation);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetPositionServerRpc(Vector3 position, Quaternion rotation)
+    {
+        transform.position = position;
+        transform.rotation = rotation;
     }
 
     public void DisableReticle()

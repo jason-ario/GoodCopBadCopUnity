@@ -248,10 +248,16 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (_spawnedGraffiti.Count > 0)
         {
+            // Deactivate first so OnIsActiveChanged clears/completes any lingering
+            // _tutorialObjectiveItem (e.g. graffiti left unscrubbed from the previous
+            // day) before the counts below are reset. Otherwise OnScrubbedChanged/
+            // OnTotalCountChanged would still see the stale item and overwrite its
+            // label to "Clean graffiti 0/0" right before it gets cleared.
+            _isActive.Value = false;
+
             _scrubbed.Value   = 0;
             _totalCount.Value = 0;
             DespawnExistingGraffiti();
-            _isActive.Value = false;
         }
     }
 
