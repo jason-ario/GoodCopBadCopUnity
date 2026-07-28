@@ -27,6 +27,12 @@ public class GraffitiInteractable : NetworkBehaviour
     [Tooltip("Seconds required to fully scrub this graffiti when a single mop is active.")]
     [SerializeField] private float _scrubDuration = 3f;
 
+    [Tooltip("Scrub progress [0, 1] at which the graffiti is considered fully cleaned and despawns. " +
+             "Lower than 1 so completion reads clearly instead of requiring a slow final sliver of progress. " +
+             "The visual fade is remapped so it reaches fully-clean exactly at this threshold.")]
+    [Range(0.1f, 1f)]
+    [SerializeField] private float _completionThreshold = 0.8f;
+
     [Header("Visual")]
     [Tooltip("Renderer whose material alpha is faded as scrub progress increases. " +
              "Assign a material using a URP Lit or Unlit shader with Transparent surface type.")]
@@ -113,7 +119,7 @@ public class GraffitiInteractable : NetworkBehaviour
 
     private IEnumerator ProgressRoutine()
     {
-        while (_scrubProgress.Value < 1f)
+        while (_scrubProgress.Value < _completionThreshold)
         {
             // Progress rate scales with the number of active mops.
             float rate = _activeScrubbers / _scrubDuration;
@@ -149,10 +155,16 @@ public class GraffitiInteractable : NetworkBehaviour
     {
         if (_graffitiRenderer == null) return;
 
+        // Remap so the visual fade reaches fully-clean (1) exactly when completion
+        // fires at _completionThreshold, instead of requiring raw progress to hit 1.
+        float visualProgress = _completionThreshold > 0f
+            ? Mathf.Clamp01(progress / _completionThreshold)
+            : 1f;
+
         // MaterialPropertyBlock avoids creating a new material instance per renderer.
         MaterialPropertyBlock block = new MaterialPropertyBlock();
         _graffitiRenderer.GetPropertyBlock(block);
-        block.SetFloat(ScrubProgressProperty, progress);
+        block.SetFloat(ScrubProgressProperty, visualProgress);
         _graffitiRenderer.SetPropertyBlock(block);
     }
 

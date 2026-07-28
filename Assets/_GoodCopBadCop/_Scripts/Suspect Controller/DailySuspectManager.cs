@@ -121,7 +121,7 @@ public class DailySuspectManager : MonoBehaviour
             return;
         }
 
-        int suspectAmount = (int)UnityEngine.Random.Range(suspectsPerShift.x, suspectsPerShift.y);
+        int suspectAmount = GetSuspectAmountForToday();
 
         List<SuspectData> randomSuspects = GetRandomSuspects(suspectAmount);
         foreach (SuspectData suspectData in randomSuspects)
@@ -142,6 +142,21 @@ public class DailySuspectManager : MonoBehaviour
         InjectMutantSlots();
         InjectDoppelgangerSlots();
         InjectFullMutantSlots();
+    }
+
+    /// <summary>
+    /// Returns how many suspects to draw for today's lineup. Uses the active day's
+    /// <see cref="DayBase.SuspectsToProcess"/> when configured (>0, the normal case — default 5).
+    /// Falls back to the legacy random <see cref="suspectsPerShift"/> range only when the active
+    /// day explicitly sets its suspect quota to 0.
+    /// </summary>
+    private int GetSuspectAmountForToday()
+    {
+        DayBase activeDay = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        if (activeDay != null && activeDay.SuspectsToProcess > 0)
+            return activeDay.SuspectsToProcess;
+
+        return (int)UnityEngine.Random.Range(suspectsPerShift.x, suspectsPerShift.y);
     }
 
     /// <summary>

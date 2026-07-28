@@ -52,6 +52,15 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Bool parameter set to true whenever the agent is moving. Derived from the synced Speed value — no extra NetworkVariable required.")]
     [SerializeField] private string runningBoolName = "Running";
 
+    [Header("Look At (FLook Animator)")]
+    [Tooltip("FIMSpace.FLook.FLookAnimator used to turn the head/spine toward the chased player. " +
+             "If left empty, auto-assigned from a FLookAnimator found on this GameObject or its children.")]
+    [SerializeField] private FIMSpace.FLook.FLookAnimator lookAnimator;
+
+    [Tooltip("Maximum distance at which the mutant will aim the look animator at the player it is chasing. " +
+             "Independent from attackRange/detectionRadius so head-tracking can be tuned separately.")]
+    [SerializeField] private float lookAtRange = 12f;
+
     [Header("Attack Hitbox")]
     [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
     [SerializeField] private MutantAttackHitbox attackHitbox;
@@ -216,6 +225,15 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    // Synced NetworkObjectId of the player the look animator should aim at (0 = none).
+    // Resolved locally on every client into a Transform so FLookAnimator can be driven
+    // without requiring the target reference itself to be replicated.
+    private readonly NetworkVariable<ulong> _networkLookTargetId = new NetworkVariable<ulong>(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -224,6 +242,9 @@ public class MutantEnemy : NetworkBehaviour
 
         if (goreCollider == null)
             goreCollider = GetComponent<CapsuleCollider>() as Collider ?? GetComponent<Collider>();
+
+        if (lookAnimator == null)
+            lookAnimator = GetComponentInChildren<FIMSpace.FLook.FLookAnimator>(true);
     }
 
     public override void OnNetworkSpawn()
@@ -241,6 +262,10 @@ public class MutantEnemy : NetworkBehaviour
 
         _networkGrounded.OnValueChanged += OnNetworkGroundedChanged;
         ApplyAnimatorGrounded(_networkGrounded.Value);
+
+        // All clients resolve the synced look target id into a local Transform for FLookAnimator.
+        _networkLookTargetId.OnValueChanged += OnNetworkLookTargetChanged;
+        ApplyLookTarget(_networkLookTargetId.Value);
     }
 
     public override void OnNetworkDespawn()
@@ -248,6 +273,7 @@ public class MutantEnemy : NetworkBehaviour
         base.OnNetworkDespawn();
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
         _networkGrounded.OnValueChanged -= OnNetworkGroundedChanged;
+        _networkLookTargetId.OnValueChanged -= OnNetworkLookTargetChanged;
     }
 
     /// <summary>
@@ -635,6 +661,9 @@ public class MutantEnemy : NetworkBehaviour
                     transform.rotation, targetRot, data.angularSpeed * Time.deltaTime);
             }
         }
+
+        // ── Look At (FLook Animator) ────────────────────────────────────────────
+        UpdateLookAtTarget();
 
         // ── Aggro / Fence Logic ────────────────────────────────────────────────
         if (_isAggroed && aggroTarget != null)
@@ -1406,5 +1435,60 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (animator != null && !string.IsNullOrEmpty(groundedParameterName))
             animator.SetBool(groundedParameterName, grounded);
+    }
+
+    // ── Look At Sync ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Re-evaluates whether the mutant should aim its <see cref="lookAnimator"/> at the
+    /// player it is currently chasing, and syncs the result to clients via <see cref="_networkLookTargetId"/>.
+    /// Called every frame from <see cref="Update"/>, which already early-returns on non-server instances.
+    /// </summary>
+    private void UpdateLookAtTarget()
+    {
+        if (lookAnimator == null) return;
+
+        ulong newLookTargetId = 0;
+
+        if (_currentTarget != null
+            && Vector3.Distance(transform.position, _currentTarget.position) <= lookAtRange)
+        {
+            NetworkObject targetNetObj = _currentTarget.GetComponent<NetworkObject>();
+            if (targetNetObj != null)
+                newLookTargetId = targetNetObj.NetworkObjectId;
+        }
+
+        if (_networkLookTargetId.Value != newLookTargetId)
+            _networkLookTargetId.Value = newLookTargetId;
+    }
+
+    private void OnNetworkLookTargetChanged(ulong oldValue, ulong newValue)
+    {
+        ApplyLookTarget(newValue);
+    }
+
+    /// <summary>
+    /// Resolves a synced NetworkObjectId into a local Transform and assigns/clears it on the
+    /// look animator. Runs on every client (including the server) so head-tracking is visible
+    /// consistently regardless of who is watching.
+    /// </summary>
+    private void ApplyLookTarget(ulong targetId)
+    {
+        if (lookAnimator == null) return;
+
+        if (targetId == 0)
+        {
+            if (lookAnimator.ObjectToFollow != null)
+                lookAnimator.SetLookTarget(null);
+            return;
+        }
+
+        if (NetworkManager.Singleton != null
+            && NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetId, out NetworkObject targetObj)
+            && targetObj != null)
+        {
+            if (lookAnimator.ObjectToFollow != targetObj.transform)
+                lookAnimator.SetLookTarget(targetObj.transform);
+        }
     }
 }

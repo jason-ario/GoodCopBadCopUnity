@@ -182,7 +182,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 265443080
+  GlobalObjectIdHash: 3107953825
   InScenePlacedSourceGlobalObjectIdHash: 3107953825
   DeferredDespawnTick: 0
   Ownership: 1
@@ -237,6 +237,8 @@ MonoBehaviour:
   attackBoolName: Attack
   deathBoolName: Death
   runningBoolName: Running
+  lookAnimator: {fileID: 0}
+  lookAtRange: 12
   attackHitbox: {fileID: 291297765939751491}
   attackHitDelay: 0.4
   doorDetectionRadius: 3
@@ -253,6 +255,11 @@ MonoBehaviour:
   deathGoreBurstCountRange: {x: 2, y: 4}
   deathGoreBurstSpeedRange: {x: 3, y: 7}
   goreLifetime: 10
+  bloodDecalPrefabs: []
+  goreGroundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  bloodDecalLifetime: 20
   canAggro: 1
   aggroTarget: {fileID: 0}
   deathBehaviour: 0

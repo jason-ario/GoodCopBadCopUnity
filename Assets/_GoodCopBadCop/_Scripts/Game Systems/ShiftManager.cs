@@ -212,8 +212,21 @@ public class ShiftManager : NetworkBehaviour
             _timecardMachine.EnableClockOut();
 
         NotifyClockOutReadyClientRpc();
+
+        // End of the day's schedule — suspects processed AND every post-shift task complete.
+        // MutantBreachManager listens here to roll this day's breach event, if it has one.
+        OnPostShiftTasksComplete?.Invoke();
+
         Debug.Log("[ShiftManager] TryEnableClockOut: all tasks complete — timecard machine primed for clock-out.");
     }
+
+    /// <summary>
+    /// Fired on the server once every suspect has been processed AND every post-shift daily
+    /// task registered via <see cref="RegisterPendingDailyTask"/> has completed — i.e. the day's
+    /// full task schedule is done and the timecard machine has just been primed for clock-out.
+    /// Subscribe here for end-of-day events (e.g. <c>MutantBreachManager</c>'s breach roll).
+    /// </summary>
+    public static event Action OnPostShiftTasksComplete;
 
     #region Events & Date Helpers
     public Action OnShiftStart { get; set; }
@@ -227,6 +240,14 @@ public class ShiftManager : NetworkBehaviour
     /// that should occur right after the final visitor walks away.
     /// </summary>
     public static event Action OnLastSuspectProcessed;
+
+    /// <summary>
+    /// Fired on ALL clients — via <see cref="NotifyDuskBeginClientRpc"/> — the instant the last
+    /// suspect for the day is processed. This is "Dusk": the work shift's suspect processing is
+    /// done and the day's post-shift tasks (<see cref="DayBase.PostShiftTasks"/>) are triggered.
+    /// Subscribe here for the Dusk banner/notification UI.
+    /// </summary>
+    public static event Action OnDuskBegin;
     /// <summary>
     /// Fired once per workday when the player enters the booth and the day officially starts
     /// (after the intro cutscene or between-shift transition). Use this for day-start effects
@@ -333,10 +354,7 @@ public class ShiftManager : NetworkBehaviour
         if (!interceptPending &&
             SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
         {
-            OnLastSuspectProcessed?.Invoke();
-
-            _suspectsComplete = true;
-            TryEnableClockOut();
+            HandleAllSuspectsProcessed();
             return;
         }
 
@@ -364,8 +382,33 @@ public class ShiftManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        HandleAllSuspectsProcessed();
+    }
+
+    /// <summary>
+    /// Server-only. Common "all suspects for the day are processed" handler shared by
+    /// <see cref="SetNextSuspectReady"/> (normal lineup exhaustion) and
+    /// <see cref="MarkSuspectsComplete"/> (scripted bypass). This is "Dusk": fires
+    /// <see cref="OnLastSuspectProcessed"/> and <see cref="OnDuskBegin"/> (on all clients),
+    /// triggers the active day's <see cref="DayBase.PostShiftTasks"/>, and re-evaluates
+    /// clock-out readiness (which stays blocked until every post-shift task completes).
+    /// </summary>
+    private void HandleAllSuspectsProcessed()
+    {
+        OnLastSuspectProcessed?.Invoke();
+
         _suspectsComplete = true;
+
+        NotifyDuskBeginClientRpc();
+        CampaignManager.Instance?.ActiveDay?.TriggerPostShiftTasks();
+
         TryEnableClockOut();
+    }
+
+    [ClientRpc]
+    private void NotifyDuskBeginClientRpc()
+    {
+        OnDuskBegin?.Invoke();
     }
 
     /// <summary>

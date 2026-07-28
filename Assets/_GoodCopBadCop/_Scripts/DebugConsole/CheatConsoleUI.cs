@@ -163,6 +163,12 @@ public class CheatConsoleUI : MonoBehaviour
             Day_02.Instance?.EnsureSortMailObjective();
             SetVisible(false);
         }));
+
+        _cheats.Add(("Trigger Mutant Breach", () =>
+        {
+            DebugConsole.Instance.DebugForceMutantBreach();
+            SetVisible(false);
+        }));
     }
 
     private void SetVisible(bool visible)

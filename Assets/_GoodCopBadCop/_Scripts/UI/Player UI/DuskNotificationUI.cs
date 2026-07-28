@@ -2,7 +2,9 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Displays the "Dusk" notification banner at the top of the screen when the player clocks out.
+/// Displays the "Dusk" notification banner the instant the last suspect for the day has been
+/// processed (see <see cref="ShiftManager.OnDuskBegin"/>) — i.e. when the work shift's suspect
+/// processing is done and the day's post-shift tasks begin, not when the player clocks out.
 /// Fades in over <see cref="_fadeInDuration"/> seconds, holds for <see cref="_holdDuration"/> seconds,
 /// then fades out over <see cref="_fadeOutDuration"/> seconds. Plays a bell chime on show.
 ///
@@ -40,8 +42,8 @@ public class DuskNotificationUI : MonoBehaviour
         }
     }
 
-    private void OnEnable()  => TimecardMachine.OnClockOutAllClients += ShowDusk;
-    private void OnDisable() => TimecardMachine.OnClockOutAllClients -= ShowDusk;
+    private void OnEnable()  => ShiftManager.OnDuskBegin += ShowDusk;
+    private void OnDisable() => ShiftManager.OnDuskBegin -= ShowDusk;
 
     private void ShowDusk()
     {

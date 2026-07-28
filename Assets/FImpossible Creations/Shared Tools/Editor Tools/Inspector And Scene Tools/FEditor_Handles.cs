@@ -166,7 +166,7 @@ public static class FEditor_TransformHandles
         {
             Handles.color = Handles.centerColor;
             Vector3 prePos = position;
-            var fmh_169_57_639144620110267330 = Quaternion.identity; position = Handles.FreeMoveHandle(position, handleSize * 0.15f, Vector3.one * 0.001f, Handles.RectangleHandleCap);
+            var fmh_169_57_639174749506045091 = Quaternion.identity; position = Handles.FreeMoveHandle(position, handleSize * 0.15f, Vector3.one * 0.001f, Handles.RectangleHandleCap);
             if (yHandles == false) position.y = prePos.y;
         }
 

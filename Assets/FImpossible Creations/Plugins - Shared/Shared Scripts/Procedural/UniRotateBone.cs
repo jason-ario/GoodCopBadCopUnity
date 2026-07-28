@@ -72,8 +72,8 @@ namespace FIMSpace.FTools
         #region Complex look target rotation
 
 
-        public Vector3 forwardReference { get; private set; }
-        public Vector3 upReference { get; private set; }
+        public Vector3 forwardReference { get; private set; } = Vector3.forward;
+        public Vector3 upReference { get; private set; } = Vector3.up;
         public Vector3 rightCrossReference { get; private set; }
         private Vector3 dynamicUpReference = Vector3.up;
 

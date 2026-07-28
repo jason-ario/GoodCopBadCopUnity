@@ -796,6 +796,23 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Immediately force-triggers a mutant breach via <see cref="MutantBreachManager"/>,
+    /// bypassing day gating, the once-per-day limit, and the random scheduling delay.
+    /// Used by the F12 cheat console's "Trigger Mutant Breach" button.
+    /// </summary>
+    public void DebugForceMutantBreach()
+    {
+        if (MutantBreachManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] MutantBreachManager.Instance not found — is the manager in the scene and has the game started?");
+            return;
+        }
+
+        MutantBreachManager.Instance.DebugForceTriggerBreach();
+        Debug.Log("[DebugConsole] Mutant breach force-triggered via cheat console.");
+    }
+
+    /// <summary>
     /// Immediately shows the Thanks For Playing screen as if Day 7 just ended.
     /// Marks the campaign as complete so the shift sequence cannot resume afterward.
     /// </summary>

@@ -33,6 +33,41 @@ public abstract class DayBase : MonoBehaviour
              "Only use for fully scripted days (e.g. Day 1) that require a hand-authored lineup.")]
     public SuspectSet SuspectSet;
 
+    [Tooltip("Number of suspects the player must process this shift. Read by DailySuspectManager " +
+             "when it randomly populates the day's lineup (ignored when SuspectSet above is assigned, " +
+             "since that fully authors its own lineup). Default 5.")]
+    [Min(0)]
+    public int SuspectsToProcess = 5;
+
+    // -------------------------------------------------------------------------
+    // Day Schedule — Tasks
+    // -------------------------------------------------------------------------
+    //
+    // Every entry in the three lists below must be a MonoBehaviour that implements
+    // IDailyTask (e.g. CleanGraffitiTask, TakeOutTrashTask, SortMailTask). Assigning a
+    // task here does not change how the task itself works — it only controls WHEN
+    // TriggerDailyTask() is called for this day. This is the single place to read a
+    // day's full task schedule at a glance.
+
+    [Header("Schedule — Pre-Shift Tasks (Dawn)")]
+    [Tooltip("Daily tasks triggered automatically at Dawn, the moment this day is activated — " +
+             "before the player clocks in (e.g. mail sorting, morning prep). " +
+             "Each entry must implement IDailyTask.")]
+    public MonoBehaviour[] PreShiftTasks;
+
+    [Header("Schedule — Mid-Shift Tasks (Work Shift)")]
+    [Tooltip("Daily tasks that MAY be triggered during the work shift. These are not fired " +
+             "automatically — call TriggerMidShiftTasks() from wherever in your day script the " +
+             "trigger should happen (e.g. after a specific suspect is processed). " +
+             "Each entry must implement IDailyTask.")]
+    public MonoBehaviour[] MidShiftTasks;
+
+    [Header("Schedule — Post-Shift Tasks (Dusk)")]
+    [Tooltip("Daily tasks triggered automatically at Dusk — the instant the last suspect for the " +
+             "day is processed (e.g. clean graffiti, take out the trash). Clock-out stays locked " +
+             "until every triggered task reports complete. Each entry must implement IDailyTask.")]
+    public MonoBehaviour[] PostShiftTasks;
+
     [Header("Door")]
     [Tooltip("Lock the exit door for the entire shift on this day. Use for tutorial days.")]
     public bool LockDoorDuringShift;
@@ -57,6 +92,18 @@ public abstract class DayBase : MonoBehaviour
     [Header("Events")]
     [Tooltip("When true, the 'Follow the Trail' event can trigger on this day.")]
     public bool CanFollowTrailEvent;
+
+    [Header("Breach Event")]
+    [Tooltip("Whether this day has a mutant breach event or not. When true, MutantBreachManager " +
+             "triggers one random breach at the end of the day, once every suspect has been " +
+             "processed AND every post-shift task above has been completed (never before Day 2, " +
+             "regardless of this flag). Leave false on days that should never have a breach.")]
+    public bool HasMutantBreach;
+
+    [Tooltip("Which breach data this day uses. Pool of breach presets this day can roll from when " +
+             "the breach triggers — one is chosen at random. Required (non-empty) when " +
+             "HasMutantBreach is true.")]
+    public MutantBreachData[] PossibleBreaches;
 
     [Header("Default Guards")]
     [Tooltip("Plain standing guard/soldier NPCs present in the scene by default (not tied to a " +
@@ -123,9 +170,70 @@ public abstract class DayBase : MonoBehaviour
             }
         }
 
+        // Best-effort immediate attempt — works on the normal (non-debug-skip) day-advance path.
         RestorePowerIfNoOutageIntended();
 
+        // DayActivated runs before NGO (re)spawns scene NetworkObjects on the debug-skip path
+        // (see Day_01.OnDayStarted for the same issue with ink-stamp locks), so the immediate
+        // PowerOn() call above can be silently dropped. Re-apply once ShiftManager.OnDayStart
+        // fires, by which point every NetworkBehaviour is guaranteed to be spawned.
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart += RestorePowerIfNoOutageIntendedOnDayStart;
+
+        // Dawn — trigger this day's pre-shift tasks before the player clocks in.
+        TriggerPreShiftTasks();
+
         OnDayStart?.Invoke();
+    }
+
+    // -------------------------------------------------------------------------
+    // Day Schedule — Task Triggers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Triggers every task in <see cref="PreShiftTasks"/>. Called automatically by
+    /// <see cref="DayActivated"/> at Dawn, before the player clocks in.
+    /// </summary>
+    public void TriggerPreShiftTasks() => TriggerTaskList(PreShiftTasks, "pre-shift");
+
+    /// <summary>
+    /// Triggers every task in <see cref="MidShiftTasks"/>. Not called automatically — call this
+    /// from a day subclass (or an event it subscribes to) at whatever moment during the work
+    /// shift the trigger should happen, e.g. after a specific suspect is processed.
+    /// </summary>
+    public void TriggerMidShiftTasks() => TriggerTaskList(MidShiftTasks, "mid-shift");
+
+    /// <summary>
+    /// Triggers every task in <see cref="PostShiftTasks"/>. Called automatically by
+    /// <see cref="ShiftManager"/> at Dusk, the instant the last suspect for the day is processed.
+    /// </summary>
+    public void TriggerPostShiftTasks() => TriggerTaskList(PostShiftTasks, "post-shift");
+
+    private void TriggerTaskList(MonoBehaviour[] tasks, string scheduleLabel)
+    {
+        if (tasks == null) return;
+
+        foreach (MonoBehaviour behaviour in tasks)
+        {
+            if (behaviour == null) continue;
+
+            if (behaviour is IDailyTask task)
+            {
+                task.TriggerDailyTask();
+            }
+            else
+            {
+                Debug.LogWarning($"[Day {DayNumber}] {scheduleLabel} task '{behaviour.name}' does not implement IDailyTask — skipping.");
+            }
+        }
+    }
+
+    private void RestorePowerIfNoOutageIntendedOnDayStart()
+    {
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= RestorePowerIfNoOutageIntendedOnDayStart;
+
+        RestorePowerIfNoOutageIntended();
     }
 
     /// <summary>
@@ -203,5 +311,8 @@ public abstract class DayBase : MonoBehaviour
     public virtual void DayDeactivated()
     {
         Debug.Log($"[Day {DayNumber}] Day deactivated.");
+
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= RestorePowerIfNoOutageIntendedOnDayStart;
     }
 }
