@@ -67,6 +67,8 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
 
         ShiftManager.Instance.OnDayStart += OnDayStart;
         _subscribedToDayStart = true;
+
+        Debug.Log("[DailyNewspaperSpawnManager] Subscribed to ShiftManager.OnDayStart.", this);
     }
 
     // ── Day Start ────────────────────────────────────────────────────────────
@@ -77,6 +79,7 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     /// </summary>
     private void OnDayStart()
     {
+        Debug.Log("[DailyNewspaperSpawnManager] OnDayStart received — despawning previous newspaper and spawning today's.", this);
         DespawnPreviousNewspaper();
         SpawnDailyNewspaper();
     }
@@ -118,6 +121,16 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
         }
 
         netObj.Spawn(true);
+
+        // Netcode's NetworkRigidbody does not auto-manage kinematic state for this prefab
+        // (AutoUpdateKinematicState is off), so the freshly spawned instance can end up
+        // non-kinematic and fall through the floor under gravity. Force it kinematic here,
+        // matching the defensive re-assertion PickableObject does at every other spawn/place
+        // site (e.g. SetSocketFollow, ApplySaveData).
+        Rigidbody rb = instance.GetComponent<Rigidbody>();
+        if (rb != null)
+            rb.isKinematic = true;
+
         _activeNewspaper = netObj;
 
         Debug.Log("[DailyNewspaperSpawnManager] Spawned today's newspaper.");
