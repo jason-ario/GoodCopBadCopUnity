@@ -23,4 +23,14 @@ public class TutorialObjectiveItem : MonoBehaviour
         if (label != null)
             label.text = $"<s>{label.text}</s>";
     }
+
+    /// <summary>
+    /// Replaces the display text in place (e.g. to refresh a progress count like "0/3").
+    /// Does not affect completion state — call before <see cref="MarkComplete"/>.
+    /// </summary>
+    public void UpdateText(string text)
+    {
+        if (label != null)
+            label.text = text;
+    }
 }

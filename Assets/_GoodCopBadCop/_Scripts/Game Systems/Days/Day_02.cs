@@ -227,6 +227,10 @@ public class Day_02 : DayBase
     [SerializeField] private int _day2TrailLocationIndex = 0;
 
     [Header("Day 2 — Post-Shift Scripted Dialogues")]
+    [Tooltip("Short megaphone line played the instant the shift ends, before the 'Meet Vlad out back' " +
+             "HUD task appears. E.g. 'Meet me out back. I need your help with something.'")]
+    [SerializeField] private ScriptedDialogue _vladMeetOutBackDialogue;
+
     [Tooltip("Brief intro dialogue played when the player first approaches Vlad outside.")]
     [SerializeField] private ScriptedDialogue _vladOutBackIntroDialogue;
 
@@ -989,11 +993,12 @@ public class Day_02 : DayBase
     /// </summary>
     private IEnumerator PostShiftSetupSequence()
     {
-        // Register the HUD task and bark simultaneously.
-        // SetMeetVladActive sets a NetworkVariable on FollowTrailThreat → fires on all clients.
-        FollowTrailThreat.Instance?.SetMeetVladActive(true);
+        // Play the short megaphone line first, then immediately register the "Meet Vlad out
+        // back" HUD task the instant it finishes — SetMeetVladActive sets a NetworkVariable on
+        // FollowTrailThreat, which fires the task on all clients.
+        yield return StartCoroutine(PlayMeetOutBackMegaphoneLine());
 
-        yield return ShowAndWait("Good work today. Meet me out back by the bunker. I have a special task for you.");
+        FollowTrailThreat.Instance?.SetMeetVladActive(true);
 
         if (_spawnedVlad != null)
         {
@@ -1032,6 +1037,27 @@ public class Day_02 : DayBase
         _outBackAnimalDialogueTriggered = false;
 
         StartCoroutine(PostShiftVladSequence());
+    }
+
+    /// <summary>
+    /// Plays Vlad's short "meet me out back" line through <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/>.
+    /// Falls back to a plain megaphone bark if <see cref="_vladMeetOutBackDialogue"/> isn't assigned
+    /// or the runner isn't available yet. Server-side only.
+    /// </summary>
+    private IEnumerator PlayMeetOutBackMegaphoneLine()
+    {
+        if (_vladMeetOutBackDialogue == null || ScriptedDialogueRunner.Instance == null)
+        {
+            yield return ShowAndWait("Meet me out back. I need your help with something.");
+            yield break;
+        }
+
+        bool dialogueDone = false;
+        ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
+            _vladMeetOutBackDialogue,
+            onComplete: () => dialogueDone = true,
+            unlocked: true);
+        yield return new WaitUntil(() => dialogueDone);
     }
 
     /// <summary>

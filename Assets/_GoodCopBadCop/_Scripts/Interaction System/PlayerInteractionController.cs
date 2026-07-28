@@ -51,6 +51,8 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool RmbUp   => Input.GetMouseButtonUp(1)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
     private bool MmbDown => Input.GetMouseButtonDown(2) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
     private bool MmbUp   => Input.GetMouseButtonUp(2)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
+    // E key — world interact / alternate interact. buttonWest maps to Xbox X / PlayStation Square.
+    private bool EKeyDown => Input.GetKeyDown(KeyCode.E) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
     public bool ReticleActive => reticleActive;
@@ -134,11 +136,11 @@ public class PlayerInteractionController : NetworkBehaviour
         // When holding an item, both keys route to TryItemUse regardless.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
         // ClickDetector — skip TryItemUse so it doesn't double-fire and call OnStartUse again.
-        if (LmbDown || Input.GetKeyDown(KeyCode.E))
+        if (LmbDown || EKeyDown)
         {
             if (_playerPickupController.HeldObject == null)
-                TryWorldInteract(alternate: Input.GetKeyDown(KeyCode.E));
-            else if (!Cursor.visible || Input.GetKeyDown(KeyCode.E))
+                TryWorldInteract(alternate: EKeyDown);
+            else if (!Cursor.visible || EKeyDown)
                 TryItemUse();
         }
 

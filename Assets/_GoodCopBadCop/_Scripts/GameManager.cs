@@ -29,6 +29,14 @@ public class GameManager : NetworkBehaviour
     /// </summary>
     private static bool _isRestartingDay;
 
+    /// <summary>
+    /// Captured by <see cref="RestartDay"/> right before the reload — the day phase the player
+    /// was in when they died. Read by <see cref="RestartDaySequence"/> after reload to decide
+    /// whether to resume normally (PreShift/Shift) or fast-forward straight to Dusk (PostShift).
+    /// Static so it survives the scene reload within the same AppDomain.
+    /// </summary>
+    private static ShiftManager.DayPhase _restartDayPhase = ShiftManager.DayPhase.PreShift;
+
     public bool HasGameStarted { get; private set; }
 
     /// <summary>
@@ -412,14 +420,16 @@ public class GameManager : NetworkBehaviour
     /// <summary>
     /// Reloads the active scene for all connected clients via NGO's network scene manager,
     /// preserving the network session and active save slot. After reload,
-    /// <see cref="OnNetworkSpawn"/> automatically restarts the day from the host's save file.
-    /// SERVER ONLY.
+    /// <see cref="OnNetworkSpawn"/> automatically restarts the day from the host's save file —
+    /// resuming at Dusk instead of repeating the whole day if the player died during
+    /// <see cref="ShiftManager.DayPhase.PostShift"/>. SERVER ONLY.
     /// </summary>
     public void RestartDay()
     {
         if (!IsServer) return;
 
         _isRestartingDay = true;
+        _restartDayPhase = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentPhase : ShiftManager.DayPhase.PreShift;
         string sceneName = SceneManager.GetActiveScene().name;
 
         if (NetworkManager.Singleton.SceneManager != null)
@@ -435,5 +445,20 @@ public class GameManager : NetworkBehaviour
         BeginLobbyTransition();
         TransitionToLobby();
         TryStartGame();
+
+        if (_restartDayPhase != ShiftManager.DayPhase.PostShift)
+            yield break;
+
+        // The player died at Dusk — wait for the reloaded day's normal Dawn setup to finish
+        // spawning in, then fast-forward past suspect processing straight back to Dusk instead
+        // of making them redo the whole shift.
+        yield return new WaitUntil(() =>
+            ShiftManager.Instance != null &&
+            CampaignManager.Instance != null &&
+            CampaignManager.Instance.ActiveDay != null);
+
+        yield return new WaitForSeconds(1f);
+
+        ShiftManager.Instance.RestartIntoPostShiftPhase();
     }
 }

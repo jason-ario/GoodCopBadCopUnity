@@ -38,6 +38,42 @@ public class SaveDataManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Cash total as of the active slot's last Dusk checkpoint (see
+    /// <see cref="SaveDuskCheckpoint"/>). Setting this persists immediately.
+    /// </summary>
+    public int CurrentCash
+    {
+        get => ActiveSlot?.TotalCashEarned ?? 0;
+        set
+        {
+            if (ActiveSlot == null) return;
+            ActiveSlot.TotalCashEarned = value;
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// Persists the Dusk checkpoint used by a death-retry that fast-forwards back into the
+    /// post-shift phase: current coupon total and every live pickable's transform. Call once,
+    /// the instant all suspects finish processing (see <see cref="ShiftManager.HandleAllSuspectsProcessed"/>),
+    /// rather than setting <see cref="CurrentCash"/> and pickable state separately.
+    /// </summary>
+    public void SaveDuskCheckpoint(int cash, PickableObjectSaveData[] pickables)
+    {
+        if (ActiveSlot == null)
+        {
+            Debug.LogWarning("[SaveDataManager] SaveDuskCheckpoint called with no active slot.");
+            return;
+        }
+
+        ActiveSlot.TotalCashEarned = cash;
+        ActiveSlot.PickableObjects = pickables ?? new PickableObjectSaveData[0];
+        Save();
+
+        Debug.Log($"[SaveDataManager] Dusk checkpoint saved — cash: {cash}, pickables: {ActiveSlot.PickableObjects.Length}.");
+    }
+
     // -------------------------------------------------------------------------
     // Daily Task Unlocks
     // -------------------------------------------------------------------------
@@ -596,6 +632,15 @@ public class SaveSlot
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;
+
+    /// <summary>
+    /// Snapshot of every pickable's position/rotation, captured at the Dusk checkpoint (see
+    /// <see cref="ShiftManager.HandleAllSuspectsProcessed"/>). Restored on a death-retry that
+    /// fast-forwards back into the post-shift phase (see <see cref="ShiftManager.RestartIntoPostShiftPhase"/>)
+    /// so world clutter resets to where it was when Dusk began, instead of wherever it ended up
+    /// during the failed attempt.
+    /// </summary>
+    public PickableObjectSaveData[] PickableObjects = new PickableObjectSaveData[0];
 
     [NonSerialized]
     private DateTime _lastSaved;

@@ -129,6 +129,8 @@ public class PickableObject : Interactable
 
         // Apply tutorial override first; fall back to holder-based logic if unset.
         ApplyNetworkInteractableState();
+
+        PickableObjectRegistry.Instance.Register(this);
     }
 
     public override void OnNetworkDespawn()
@@ -136,6 +138,90 @@ public class PickableObject : Interactable
         base.OnNetworkDespawn();
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
+
+        PickableObjectRegistry.Instance.Unregister(this);
+    }
+
+    /// <summary>
+    /// Stable identifier used to match this instance to its saved checkpoint data across a
+    /// scene reload. Scene-placed objects keep the same GameObject/parent names across a
+    /// reload, so the full hierarchy path is a reliable deterministic key (NetworkObject's
+    /// GlobalObjectIdHash is internal and, for runtime-spawned prefab instances, shared across
+    /// every copy — unsuitable for telling multiple placed pickables of the same prefab apart).
+    /// </summary>
+    public string SaveId
+    {
+        get
+        {
+            var path = name;
+            for (Transform t = transform.parent; t != null; t = t.parent)
+                path = t.name + "/" + path;
+            return path;
+        }
+    }
+
+    /// <summary>Captures this object's current position/rotation for checkpoint saving.</summary>
+    public PickableObjectSaveData CaptureSaveData()
+    {
+        return new PickableObjectSaveData
+        {
+            Id = SaveId,
+            Position = transform.position,
+            EulerRotation = transform.eulerAngles
+        };
+    }
+
+    /// <summary>
+    /// Server-only: forces this object back to a saved position/rotation, releasing any
+    /// holder and clearing physics velocity, then broadcasts the new transform to all clients.
+    /// Used when retrying into the Dusk/post-shift phase so pickables reset to their
+    /// last-checkpoint placement instead of wherever they were left during the failed attempt.
+    /// </summary>
+    public void ApplySaveData(PickableObjectSaveData data)
+    {
+        if (data == null) return;
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] ApplySaveData called on non-server for {name}; ignoring.");
+            return;
+        }
+
+        RemoveParent();
+
+        _holdingClientId.Value = ulong.MaxValue;
+        NetworkObject.RemoveOwnership();
+
+        transform.position = data.Position;
+        transform.rotation = Quaternion.Euler(data.EulerRotation);
+
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic = true;
+        }
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        ApplySaveDataBroadcastClientRpc(data.Position, data.EulerRotation);
+    }
+
+    /// <summary>Received on all clients after a checkpoint restore; mirrors the server's authoritative transform.</summary>
+    [ClientRpc]
+    private void ApplySaveDataBroadcastClientRpc(Vector3 position, Vector3 eulerRotation)
+    {
+        RemoveParent();
+        ClearSocketFollow();
+        transform.position = position;
+        transform.rotation = Quaternion.Euler(eulerRotation);
+
+        NetworkObject.AutoObjectParentSync = true;
+
+        if (_rb != null) _rb.isKinematic = true;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
     }
 
     private void OnHoldingClientChanged(ulong previous, ulong current)

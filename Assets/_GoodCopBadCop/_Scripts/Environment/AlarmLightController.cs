@@ -67,7 +67,7 @@ public class AlarmLightController : MonoBehaviour
         for (int i = 0; i < alarmLights.Length; i++)
         {
             if (alarmLights[i] != null)
-                alarmLights[i].enabled = isEnabled;
+                alarmLights[i].gameObject.SetActive(isEnabled);
         }
     }
 

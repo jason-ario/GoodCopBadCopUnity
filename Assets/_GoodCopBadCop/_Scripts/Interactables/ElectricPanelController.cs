@@ -137,8 +137,13 @@ public class ElectricPanelController : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void RestorePowerServerRpc()
     {
-        // ElectricityController.PowerOn() already guards against non-server calls.
-        _electricityController?.PowerOn();
+        if (_electricityController == null) return;
+
+        // Blocked while a fuse-box-required outage (e.g. Day 3/4) is active — the player
+        // must travel to the power station, find the fuses, and use the PowerSwitch there.
+        if (_electricityController.RequiresFuseBoxRestore) return;
+
+        _electricityController.PowerOn();
     }
 
     // ─── NetworkVariable callback ─────────────────────────────────────────────

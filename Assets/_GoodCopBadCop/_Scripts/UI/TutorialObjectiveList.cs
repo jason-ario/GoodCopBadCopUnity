@@ -108,6 +108,15 @@ public class TutorialObjectiveList : MonoBehaviour
     }
 
     /// <summary>
+    /// Updates the display text of an in-progress objective (e.g. a live "0/3" counter).
+    /// Safe to call with a null reference.
+    /// </summary>
+    public void UpdateObjective(TutorialObjectiveItem item, string text)
+    {
+        item?.UpdateText(text);
+    }
+
+    /// <summary>
     /// Hides the objective list with its slide-out animation, then destroys all items.
     /// Safe to call when the list is not showing.
     /// </summary>

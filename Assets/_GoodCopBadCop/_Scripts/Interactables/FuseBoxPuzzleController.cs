@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Linq;
 using Unity.Netcode;
@@ -10,6 +11,10 @@ using UnityEngine;
 /// inserted. When ready, the status light turns green. The <see cref="PowerSwitch"/>
 /// reads <see cref="IsReady"/> server-side before calling
 /// <see cref="ElectricityController.PowerOn"/>.
+///
+/// Also exposes <see cref="OnBoxInteracted"/> and <see cref="OnFuseCountChanged"/>,
+/// broadcast on all clients, so callers (e.g. <c>Day_03</c>) can drive a step-by-step
+/// tutorial objective list without polling.
 ///
 /// Setup notes:
 ///   - Assign the three child <see cref="FuseSlot"/> components to <see cref="_fuseSlots"/>.
@@ -58,6 +63,26 @@ public class FuseBoxPuzzleController : Interactable
     public bool IsReady => _fuseSlots != null && _fuseSlots.Length > 0
                            && _fuseSlots.All(s => s != null && s.IsFilled);
 
+    /// <summary>Total number of assigned fuse slots.</summary>
+    public int FuseSlotCount => _fuseSlots?.Length ?? 0;
+
+    /// <summary>Number of assigned fuse slots that currently hold a fuse.</summary>
+    public int FilledSlotCount => _fuseSlots == null ? 0 : _fuseSlots.Count(s => s != null && s.IsFilled);
+
+    /// <summary>
+    /// Fired on all clients whenever the box door is toggled (opened or closed) via
+    /// <see cref="Interact"/>. Used to drive the "find the fuse box" objective —
+    /// listeners should unsubscribe after the first invocation if they only care about
+    /// the initial discovery.
+    /// </summary>
+    public event Action OnBoxInteracted;
+
+    /// <summary>
+    /// Fired on all clients whenever a fuse is inserted into or extracted from any slot.
+    /// Passes the current filled-slot count and the total slot count.
+    /// </summary>
+    public event Action<int, int> OnFuseCountChanged;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -100,7 +125,11 @@ public class FuseBoxPuzzleController : Interactable
         }
     }
 
-    private void OnSlotStateChanged() => UpdateStatusLight();
+    private void OnSlotStateChanged()
+    {
+        UpdateStatusLight();
+        OnFuseCountChanged?.Invoke(FilledSlotCount, FuseSlotCount);
+    }
 
     private void UpdateStatusLight()
     {
@@ -128,6 +157,7 @@ public class FuseBoxPuzzleController : Interactable
     [ClientRpc]
     private void BroadcastDoorStateClientRpc(bool isOpen)
     {
+        OnBoxInteracted?.Invoke();
         PlayDoorSound(isOpen);
         StartCoroutine(AnimateDoor(isOpen));
     }

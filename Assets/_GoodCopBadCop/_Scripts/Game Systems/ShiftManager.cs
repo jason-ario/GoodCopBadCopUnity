@@ -11,6 +11,24 @@ public class ShiftManager : NetworkBehaviour
 {
     public static ShiftManager Instance;
 
+    /// <summary>
+    /// Coarse phase of the current day. Used by <see cref="GameManager.RestartDay"/> to decide
+    /// whether dying and retrying should fully restart the day (PreShift/Shift) or resume
+    /// directly at Dusk (PostShift) instead of repeating suspect processing.
+    /// </summary>
+    public enum DayPhase
+    {
+        /// <summary>Dawn — day has started but the player has not clocked in yet.</summary>
+        PreShift,
+        /// <summary>Work Shift — clocked in and processing suspects.</summary>
+        Shift,
+        /// <summary>Dusk — every suspect has been processed; post-shift tasks are underway.</summary>
+        PostShift
+    }
+
+    /// <summary>The current day's coarse phase. See <see cref="DayPhase"/>.</summary>
+    public DayPhase CurrentPhase { get; private set; } = DayPhase.PreShift;
+
     /// <summary>Fired on the server whenever a suspect is killed.</summary>
     public static event System.Action OnSuspectKilled;
 
@@ -283,6 +301,8 @@ public class ShiftManager : NetworkBehaviour
             _networkCurrentDay.Value = day;
         Debug.Log($"[ShiftManager] Day set to {_currentDay} ({_startDate.AddDays(_currentDay - 1):dd MMMM yyyy})");
 
+        CurrentPhase = DayPhase.PreShift;
+
         // Lock the booth door immediately if the new day requires it, instead of waiting for
         // OpenWindowSequence (which only runs once the player presses the "open window" button
         // inside the booth). Without this, the door stays unlocked from the moment the player
@@ -390,6 +410,8 @@ public class ShiftManager : NetworkBehaviour
     /// <see cref="SetNextSuspectReady"/> (normal lineup exhaustion) and
     /// <see cref="MarkSuspectsComplete"/> (scripted bypass). This is "Dusk": fires
     /// <see cref="OnLastSuspectProcessed"/> and <see cref="OnDuskBegin"/> (on all clients),
+    /// snapshots the current coupon total and every pickable's transform to the active save
+    /// slot as a checkpoint for death-retries (see <see cref="RestartIntoPostShiftPhase"/>),
     /// triggers the active day's <see cref="DayBase.PostShiftTasks"/>, and re-evaluates
     /// clock-out readiness (which stays blocked until every post-shift task completes).
     /// </summary>
@@ -398,6 +420,11 @@ public class ShiftManager : NetworkBehaviour
         OnLastSuspectProcessed?.Invoke();
 
         _suspectsComplete = true;
+        CurrentPhase = DayPhase.PostShift;
+
+        SaveDataManager.Instance?.SaveDuskCheckpoint(
+            GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
+            PickableObjectRegistry.Instance.CaptureAll());
 
         NotifyDuskBeginClientRpc();
         CampaignManager.Instance?.ActiveDay?.TriggerPostShiftTasks();
@@ -409,6 +436,61 @@ public class ShiftManager : NetworkBehaviour
     private void NotifyDuskBeginClientRpc()
     {
         OnDuskBegin?.Invoke();
+    }
+
+    /// <summary>
+    /// Server-only. Fast-forwards a freshly-reloaded day straight to Dusk — as if the player
+    /// had just finished processing every suspect — instead of repeating the whole shift.
+    /// Restores coupons and pickable object transforms to their last Dusk checkpoint (see
+    /// <see cref="SaveDataManager.SaveDuskCheckpoint"/>) before re-resolving the shift as
+    /// complete, so any coupons collected or pickables moved during the failed post-shift
+    /// attempt are reverted. Called by <see cref="GameManager.RestartDaySequence"/> after the
+    /// normal Dawn setup for the reloaded day has finished, when the player died and clicked
+    /// Retry while already in <see cref="DayPhase.PostShift"/>.
+    /// </summary>
+    public void RestartIntoPostShiftPhase()
+    {
+        if (!IsServer || shiftStarted.Value) return;
+
+        shiftStarted.Value = true;
+
+        RestoreDuskCheckpoint();
+
+        // Populate (without spawning) the day's suspect lineup so downstream systems that read
+        // it (e.g. the end-of-shift report, ProcessResidentsTask) behave sensibly, then resolve
+        // it as fully processed immediately below.
+        OnShiftStart?.Invoke();
+        CurrentPhase = DayPhase.Shift;
+
+        StartCoroutine(PositionPlayerForPostShiftRetry());
+
+        HandleAllSuspectsProcessed();
+
+        Debug.Log("[ShiftManager] RestartIntoPostShiftPhase — resumed directly at Dusk after a death retry.");
+    }
+
+    /// <summary>
+    /// Server-only. Restores the shared coupon total and every registered pickable's
+    /// transform from the active save slot's Dusk checkpoint. No-op if no checkpoint exists.
+    /// </summary>
+    private void RestoreDuskCheckpoint()
+    {
+        SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
+        if (slot == null) return;
+
+        GlobalHostVariables.Instance?.SetMoney(slot.TotalCashEarned);
+        PickableObjectRegistry.Instance.RestoreAll(slot.PickableObjects);
+    }
+
+    private IEnumerator PositionPlayerForPostShiftRetry()
+    {
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        Transform spawn = PlayerSpawner.Instance.GetOutsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        PlayerInstance.Instance.SetPosition(spawn);
+        PlayerInstance.Instance.SetIsOutside(true);
+
+        OnDoorUnlock?.Invoke();
     }
 
     /// <summary>
@@ -529,6 +611,7 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(3f);
 
         OnShiftStart?.Invoke();
+        CurrentPhase = DayPhase.Shift;
 
         // Lock the booth door for the duration of the shift if the active day requires it.
         if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)

@@ -130,12 +130,6 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
-        _cheats.Add(("Day 4 — Fuse Power Outage + Power Station", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay4FusePowerOutage());
-            SetVisible(false);
-        }));
-
         _cheats.Add(("Unlock All Anomalies + Guidebook Pages", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() =>

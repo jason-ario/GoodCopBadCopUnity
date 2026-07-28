@@ -65,6 +65,14 @@ public class ElectricityController : NetworkBehaviour
     /// </summary>
     public event System.Action OnFuseOutageResolved;
 
+    /// <summary>
+    /// Fired on ALL clients (via the <c>_isPowerOn</c> NetworkVariable's OnValueChanged
+    /// callback, which runs locally on every client) whenever power transitions from off to
+    /// on, regardless of which interactable restored it. Day-specific controllers can
+    /// subscribe to complete their local objective/threat state without needing a ClientRpc.
+    /// </summary>
+    public event System.Action OnPowerRestoredAllClients;
+
     public override void OnNetworkSpawn()
     {
         _isPowerOn.OnValueChanged += OnPowerStateChanged;
@@ -237,6 +245,11 @@ public class ElectricityController : NetworkBehaviour
             {
                 electricObject.OnElectricityTurnOn?.Invoke();
             }
+
+            // Fires locally on every client (this callback runs wherever the NetworkVariable
+            // is readable, i.e. everyone) — safe hook for day-specific controllers (e.g. Day_03)
+            // to complete their local "fix the power outage" objective/threat.
+            OnPowerRestoredAllClients?.Invoke();
         }
         else
         {

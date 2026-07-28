@@ -56,4 +56,20 @@ public class GlobalHostVariables : NetworkBehaviour
     {
         SubtractMoney(amount);
     }
+
+    /// <summary>
+    /// Server-only. Forces the shared money pool to an exact value, clamped to non-negative.
+    /// Used to restore the coupon total to its last Dusk checkpoint when a death-retry
+    /// fast-forwards back into the post-shift phase (see <see cref="ShiftManager.RestartIntoPostShiftPhase"/>).
+    /// </summary>
+    public void SetMoney(int amount)
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning("[GlobalHostVariables] SetMoney called on non-server; ignoring.");
+            return;
+        }
+
+        money.Value = Mathf.Max(0, amount);
+    }
 }
