@@ -32,6 +32,12 @@ public class WorldShopItemInteractable : Interactable
              "Assign this when the item lives inside a drawer that should not be moved during purchase.")]
     [SerializeField] private Drawer _drawerToLock;
 
+    [Header("Anomaly Unlock Gate")]
+    [Tooltip("Optional. A sibling object (e.g. a drawer 'Tape' label) that should only be visible while " +
+             "this item's ShopItem.IsUnlockRequirementMet() is true — i.e. it shows and hides in lockstep " +
+             "with this pile as its anomaly category unlocks.")]
+    [SerializeField] private GameObject _unlockLabel;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     private ShopItem _shopItem;
@@ -61,12 +67,17 @@ public class WorldShopItemInteractable : Interactable
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDayStart;
+
+        AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
+        ApplyUnlockGate();
     }
 
     public override void OnNetworkDespawn()
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
+
+        AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
     }
 
     // ─── Interactable override ────────────────────────────────────────────────
@@ -197,12 +208,33 @@ public class WorldShopItemInteractable : Interactable
         RestockClientRpc();
     }
 
-    /// <summary>Re-shows the item for all clients at the start of each new day.</summary>
+    /// <summary>Re-shows the item for all clients at the start of each new day, unless it is still
+    /// gated behind an anomaly-category unlock (see <see cref="ApplyUnlockGate"/>).</summary>
     [ClientRpc]
     private void RestockClientRpc()
     {
-        _shopItem.SetAvailable(true);
-        _shopItem.gameObject.SetActive(true);
+        ApplyUnlockGate();
+    }
+
+    // ─── Anomaly unlock gating ────────────────────────────────────────────────
+
+    private void OnAnomalyUnlocked(string typeName) => ApplyUnlockGate();
+
+    /// <summary>
+    /// Shows or hides this pile (and its optional <see cref="_unlockLabel"/>) to match
+    /// <see cref="ShopItem.IsUnlockRequirementMet"/>. Items with no required anomaly type always
+    /// resolve to available/true here, so this is a no-op for ordinary shop items.
+    /// </summary>
+    private void ApplyUnlockGate()
+    {
+        if (_shopItem == null) return;
+
+        bool unlocked = _shopItem.IsUnlockRequirementMet();
+        _shopItem.SetAvailable(unlocked);
+        gameObject.SetActive(unlocked);
+
+        if (_unlockLabel != null)
+            _unlockLabel.SetActive(unlocked);
     }
 
     // ─── Camera framing ───────────────────────────────────────────────────────

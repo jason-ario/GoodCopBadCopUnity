@@ -36,6 +36,8 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        Debug.Log($"[DailyNewspaperSpawnManager] OnNetworkSpawn. IsServer={IsServer}, IsHost={IsHost}, IsClient={IsClient}.", this);
+
         if (!IsServer)
             return;
 

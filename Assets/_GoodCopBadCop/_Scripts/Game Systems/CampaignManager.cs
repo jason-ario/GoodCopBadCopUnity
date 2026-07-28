@@ -257,18 +257,22 @@ public class CampaignManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Debug only — immediately marks the campaign as complete on this client and
-    /// broadcasts the flag to all clients via <see cref="NotifyCampaignCompleteClientRpc"/>.
-    /// Use this from <see cref="DebugConsole"/> to show the thanks-for-playing screen
-    /// without running through the full shift-end sequence.
+    /// Immediately marks the campaign as complete on this client and broadcasts the flag to
+    /// all clients via <see cref="NotifyCampaignCompleteClientRpc"/>. Used by scripted finale
+    /// events that end the demo without going through the normal AdvanceDay → no-more-days
+    /// path (e.g. the Day 5 Ocho breach mutant fleeing instead of dying), as well as by
+    /// <see cref="DebugConsole"/>'s "skip to end of demo" command.
     /// </summary>
-    public void DebugForceCampaignComplete()
+    public void ForceCampaignComplete()
     {
         IsCampaignComplete = true;
         if (IsServer)
             NotifyCampaignCompleteClientRpc();
-        Debug.Log("[CampaignManager] DEBUG — campaign forcibly marked complete.");
+        Debug.Log("[CampaignManager] Campaign forcibly marked complete.");
     }
+
+    /// <summary>Debug-console alias for <see cref="ForceCampaignComplete"/>.</summary>
+    public void DebugForceCampaignComplete() => ForceCampaignComplete();
 
     // -------------------------------------------------------------------------
     // Event Handlers

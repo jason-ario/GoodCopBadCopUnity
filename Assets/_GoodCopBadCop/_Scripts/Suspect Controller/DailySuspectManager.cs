@@ -117,6 +117,7 @@ public class DailySuspectManager : MonoBehaviour
             Debug.Log($"[DailySuspectManager] Shift populated via override — {shiftSuspects.Count} suspect(s).");
             InjectMutantSlots();
             InjectDoppelgangerSlots();
+            InjectForcedFullMutantSlots();
             InjectFullMutantSlots();
             return;
         }
@@ -141,6 +142,7 @@ public class DailySuspectManager : MonoBehaviour
 
         InjectMutantSlots();
         InjectDoppelgangerSlots();
+        InjectForcedFullMutantSlots();
         InjectFullMutantSlots();
     }
 
@@ -411,6 +413,76 @@ public class DailySuspectManager : MonoBehaviour
     /// Must run after all other injections so indices are stable.
     /// Doppelganger, mutant-intruder, and replacement slots are never double-flagged.
     /// </summary>
+    /// <summary>
+    /// Demo-only override, driven by <see cref="DayBase.ForceEarlyFullMutants"/> /
+    /// <see cref="DayBase.ForcedFullMutantCount"/> on the active day. Picks 1–2 random suspects
+    /// the player has already seen in a previous shift (<see cref="SuspectRecord.daysShown"/> &gt; 0)
+    /// and who were never sent to quarantine (<see cref="SuspectRecord.quarantinedOnDay"/> &lt; 0),
+    /// forces their infection score to the fully-mutated threshold via
+    /// <see cref="SuspectRunRecords.ForceFullMutation"/>, and inserts each into today's lineup at a
+    /// random slot — mirroring <see cref="InjectDoppelgangerSlots"/>. Must run after mutant-intruder
+    /// and doppelganger injection (so slot indices are stable) and before
+    /// <see cref="InjectFullMutantSlots"/>, whose normal scan then flags these slots automatically
+    /// now that each candidate reads as fully mutated.
+    /// </summary>
+    private void InjectForcedFullMutantSlots()
+    {
+        DayBase activeDay = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        if (activeDay == null || !activeDay.ForceEarlyFullMutants) return;
+
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+        if (runRecords == null)
+        {
+            Debug.LogWarning("[DailySuspectManager] ForceEarlyFullMutants is enabled but SuspectRunRecords is not available — skipping.");
+            return;
+        }
+
+        List<SuspectRecord> candidates = new List<SuspectRecord>();
+        foreach (SuspectRecord record in runRecords.Records)
+        {
+            if (record == null || record.SuspectData == null) continue;
+            if (record.isKilled || record.isReplacement) continue;
+            if (record.daysShown <= 0) continue;                              // must have been seen previously
+            if (record.quarantinedOnDay >= 0) continue;                       // must never have been quarantined
+            if (record.IsFullyMutated || record.isLegacyMutant) continue;     // already eligible on its own
+            if (record.SuspectData.fullMutantDialogue == null) continue;
+            if (record.SuspectData.CharacterPrefab == null) continue;
+            if (runRecords.IsFullMutantInstanceActive(record.SuspectData)) continue;
+            if (shiftSuspects.Contains(record.SuspectData)) continue;         // avoid a duplicate same-day appearance
+
+            candidates.Add(record);
+        }
+
+        if (candidates.Count == 0)
+        {
+            Debug.Log("[DailySuspectManager] ForceEarlyFullMutants enabled but no eligible previously-seen, never-quarantined suspects were found.");
+            return;
+        }
+
+        int desiredCount = Mathf.Clamp(activeDay.ForcedFullMutantCount, 1, 2);
+        int injected = 0;
+
+        while (injected < desiredCount && candidates.Count > 0)
+        {
+            int pick = UnityEngine.Random.Range(0, candidates.Count);
+            SuspectRecord chosen = candidates[pick];
+            candidates.RemoveAt(pick);
+
+            runRecords.ForceFullMutation(chosen.SuspectData);
+
+            int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
+            shiftSuspects.Insert(insertIndex, chosen.SuspectData);
+
+            ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
+            ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+            ShiftReplacementSlotsAfterInsert(insertIndex);
+            ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
+
+            injected++;
+            Debug.Log($"[DailySuspectManager] Demo override — forced '{chosen.SuspectData.name}' into today's lineup as an early full mutant (slot {insertIndex}).");
+        }
+    }
+
     private void InjectFullMutantSlots()
     {
         SuspectRunRecords runRecords = SuspectRunRecords.Instance;

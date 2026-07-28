@@ -14,14 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Hello. ...You are new.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleText: 0
-    choices: []
-  - type: 0
-    npcLine: I keep track of faces. The last officer had different eyes. Yours are
-      better. ...That is not a threat.
+    npcLine: Hello. ...You are new. I keep track of faces. The last officer had different
+      eyes. Yours are better. ...That is not a threat.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
@@ -42,28 +36,18 @@ MonoBehaviour:
         ...I have stopped asking.
       animationTrigger: TalkLookAway
   - type: 0
-    npcLine: The bees were quiet today. That is... a good day.
+    npcLine: The bees were quiet today — that is a good day. I have been listening
+      to them for two years; I am starting to understand what they are saying. I
+      rent rooms with a work crew, louder than I prefer, but they do not ask questions.
+      ...Fair.
     animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleText: 0
-    choices: []
-  - type: 0
-    npcLine: I have been listening to them for two years. I am starting to understand
-      what they are saying.
-    animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleText: 0
-    choices: []
-  - type: 0
-    npcLine: I rent rooms with a work crew. Louder than I prefer. But they do not
-      ask questions. ...Fair.
-    animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
     npcLine: My chest has been tight lately. From the dust at the site, the foreman
-      says.
+      says. My papers — the master reminded me this morning. He says careful people
+      last. ...More than bees.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
@@ -73,13 +57,6 @@ MonoBehaviour:
         says I am useful. The foreman says I am quiet.
       animationTrigger: TalkIdle
     - playerChoiceText: You should see a doctor.
-      npcResponse: ...Yes. Probably. The lines are very long. The master says urgency
-        is what gets people stung. I think he means more than bees.
+      npcResponse: "...Yes. Probably. The lines are very long. The master says urgency
+        is what gets people stung. I think he means more than bees."
       animationTrigger: TalkLookDown
-  - type: 0
-    npcLine: My papers. The master reminded me this morning. He says careful people
-      last. ...More than bees.
-    animationTrigger: TalkPoint
-    cameraTrigger: 
-    wobbleText: 0
-    choices: []

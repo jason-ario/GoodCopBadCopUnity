@@ -22,6 +22,15 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public event Action OnRemovedFromPlay;
 
+    /// <summary>
+    /// Fired on the server the instant a <see cref="fleeInsteadOfDie"/> mutant begins its
+    /// flee-and-despawn sequence — i.e. as soon as it starts running, unlike
+    /// <see cref="OnRemovedFromPlay"/> which only fires once <see cref="fleeDespawnTimeout"/>
+    /// has elapsed and the mutant is actually gone. Subscribe here to react immediately to the
+    /// flee itself (e.g. a scripted finale mutant fleeing should end the encounter right away).
+    /// </summary>
+    public event Action OnFleeStarted;
+
     // ── Static events ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1314,6 +1323,11 @@ public class MutantEnemy : NetworkBehaviour
         SetAttackAnimClientRpc(false);
         SetFleeingClientRpc(true);
         StopChaseMusicClientRpc();
+
+        // Fire immediately — before the despawn timeout — so listeners can react to the flee
+        // itself (e.g. ending a scripted finale encounter) without waiting for the mutant to
+        // actually leave the scene.
+        OnFleeStarted?.Invoke();
 
         float elapsed = 0f;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -13,7 +14,9 @@ using UnityEngine;
 ///   2. Interacted with directly while holding a TrashBag (left-click / E, routed by
 ///      <see cref="PlayerInteractionController"/> via <see cref="InteractWithItem"/> because
 ///      the Trash Bag PickableItemData is listed in <c>itemsThatCanInteractWith</c>) — this
-///      triggers the same deposit sequence without requiring a physics throw.
+///      plays the player's throw animation and tosses the bag along a scripted parabolic arc
+///      (<see cref="ThrowBagArcServerRpc"/>/<see cref="ThrowBagArcClientRpc"/>) into the
+///      dumpster's opening before it despawns and is registered as deposited.
 ///
 /// Each TrashBag instance can only be deposited once — <see cref="TrashBag.IsDeposited"/>
 /// is checked and set atomically before any further processing so a bag can never be
@@ -47,6 +50,21 @@ public class DumpsterInteractable : CollectableContainer
     [SerializeField] private AudioClip _depositSound;
     [SerializeField] private float _depositSoundVolume = 1f;
 
+    [Header("Throw Arc")]
+    [Tooltip("Point inside the dumpster's opening the bag arcs toward before despawning. " +
+             "Auto-resolved from a child DumpsterPhysicsDepositZone if left empty, falling " +
+             "back to this dumpster's own position.")]
+    [SerializeField] private Transform _depositTarget;
+
+    [Tooltip("Duration in seconds of the toss arc from the player's hand into the dumpster.")]
+    [SerializeField] private float _throwArcDuration = 0.5f;
+
+    [Tooltip("Extra height added at the arc's midpoint, on top of the straight line between start and end.")]
+    [SerializeField] private float _throwArcHeight = 1.5f;
+
+    [Tooltip("Animator trigger played on the player (body + arms) when tossing a bag into the dumpster.")]
+    [SerializeField] private string _throwAnimTrigger = "ThrowTrashBag";
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -54,6 +72,13 @@ public class DumpsterInteractable : CollectableContainer
         base.Awake();
         if (_labelRoot != null)
             _labelRoot.SetActive(false);
+
+        if (_depositTarget == null)
+        {
+            DumpsterPhysicsDepositZone zone = GetComponentInChildren<DumpsterPhysicsDepositZone>();
+            if (zone != null)
+                _depositTarget = zone.transform;
+        }
     }
 
     public override void OnNetworkSpawn()
@@ -111,7 +136,9 @@ public class DumpsterInteractable : CollectableContainer
     /// Called by <see cref="PlayerInteractionController"/> on the local client when the player
     /// interacts with the dumpster while holding a <see cref="TrashBag"/> (the Trash Bag
     /// PickableItemData must be listed in <c>itemsThatCanInteractWith</c> on the prefab).
-    /// Releases the bag from the player's hand and requests a server-side deposit.
+    /// Plays the player's throw animation, releases the bag from their hand, and kicks off a
+    /// networked toss arc into the dumpster's opening. The bag despawns and is registered as
+    /// deposited only once the arc completes (see <see cref="ThrowBagArcServerRpc"/>).
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
@@ -119,28 +146,92 @@ public class DumpsterInteractable : CollectableContainer
 
         base.InteractWithItem(playerInteractionController, item);
 
+        PlayerAnimationController animController = playerInteractionController.pickupController.PlayerAnimationController;
+        if (animController != null)
+            animController.SetAnimTrigger(_throwAnimTrigger);
+
+        Vector3 startPosition = bag.transform.position;
+
         // Release the bag from the player's hand (skips DropServerRpc so the bag is not
-        // re-enabled as an interactable before it is despawned).
+        // re-enabled as an interactable/NetworkTransform before the arc tween takes over).
         playerInteractionController.pickupController.ReleaseHeldObjectForThrow();
 
-        DepositHeldBagServerRpc(bag.NetworkObject);
+        Vector3 endPosition = _depositTarget != null ? _depositTarget.position : transform.position;
+
+        ThrowBagArcServerRpc(bag.NetworkObject, startPosition, endPosition);
     }
 
     /// <summary>
-    /// Server-side deposit route for a bag released directly into the dumpster via
-    /// <see cref="InteractWithItem"/>. Resolves the bag by NetworkObjectReference and, if it
-    /// is still valid and not already deposited, deposits it the same way a physics-thrown bag
-    /// is deposited.
+    /// Server-side entry point for a bag tossed into the dumpster via <see cref="InteractWithItem"/>.
+    /// Resolves the bag by NetworkObjectReference and, if it is still valid and not already
+    /// deposited, marks it deposited immediately (so it can never be registered twice), then
+    /// broadcasts the visual arc to every client and schedules the actual despawn/registration
+    /// for when the arc finishes.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void DepositHeldBagServerRpc(NetworkObjectReference bagRef)
+    private void ThrowBagArcServerRpc(NetworkObjectReference bagRef, Vector3 startPosition, Vector3 endPosition)
     {
         if (!bagRef.TryGet(out NetworkObject bagNetworkObject)) return;
 
         TrashBag bag = bagNetworkObject.GetComponent<TrashBag>();
         if (bag == null || !bag.IsSpawned || bag.IsDeposited) return;
 
-        DepositBag(bag);
+        bag.MarkDeposited();
+
+        ThrowBagArcClientRpc(bagRef, startPosition, endPosition);
+        StartCoroutine(FinishArcDeposit(bag, endPosition));
+    }
+
+    /// <summary>
+    /// Received on all clients (including the server). Plays the visual toss arc on the bag's
+    /// transform. NetworkTransform is already disabled on this bag (left disabled by
+    /// <see cref="PlayerPickupController.ReleaseHeldObjectForThrow"/>), so it is safe for every
+    /// client to drive the bag's position locally and in lockstep.
+    /// </summary>
+    [ClientRpc]
+    private void ThrowBagArcClientRpc(NetworkObjectReference bagRef, Vector3 startPosition, Vector3 endPosition)
+    {
+        if (!bagRef.TryGet(out NetworkObject bagNetworkObject)) return;
+
+        StartCoroutine(AnimateThrowArc(bagNetworkObject.transform, startPosition, endPosition));
+    }
+
+    /// <summary>Moves <paramref name="bagTransform"/> along a simple parabolic arc.</summary>
+    private IEnumerator AnimateThrowArc(Transform bagTransform, Vector3 startPosition, Vector3 endPosition)
+    {
+        float elapsed = 0f;
+        while (elapsed < _throwArcDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / _throwArcDuration);
+
+            Vector3 point = Vector3.Lerp(startPosition, endPosition, t);
+            point.y += _throwArcHeight * Mathf.Sin(t * Mathf.PI);
+
+            if (bagTransform == null) yield break;
+            bagTransform.position = point;
+
+            yield return null;
+        }
+
+        if (bagTransform != null)
+            bagTransform.position = endPosition;
+    }
+
+    /// <summary>
+    /// Server-only: waits for the arc duration to elapse, then finalizes the deposit — plays
+    /// the land sound, despawns the bag, and increments the fill counter — the same way a
+    /// physics-thrown bag is finalized.
+    /// </summary>
+    private IEnumerator FinishArcDeposit(TrashBag bag, Vector3 landPosition)
+    {
+        yield return new WaitForSeconds(_throwArcDuration);
+
+        int junkCount = bag.JunkCount;
+
+        PlayLandSoundServerRpc(landPosition);
+        bag.DespawnServerRpc();
+        DepositBagServerRpc(junkCount);
     }
 
     // ── Physics throw deposit ────────────────────────────────────────────────
@@ -171,11 +262,10 @@ public class DumpsterInteractable : CollectableContainer
     }
 
     /// <summary>
-    /// Shared server-only deposit routine used by both the physics-throw path
-    /// (<see cref="TryDepositThrownBag"/>) and the interact-while-holding path
-    /// (<see cref="DepositHeldBagServerRpc"/>). Marks the bag deposited immediately, before any
+    /// Shared server-only deposit routine used by the physics-throw path
+    /// (<see cref="TryDepositThrownBag"/>). Marks the bag deposited immediately, before any
     /// further processing, so this exact bag instance can never be registered again even if
-    /// another trigger or interact fires for it in the same frame.
+    /// another trigger fires for it in the same frame.
     /// </summary>
     private void DepositBag(TrashBag bag)
     {

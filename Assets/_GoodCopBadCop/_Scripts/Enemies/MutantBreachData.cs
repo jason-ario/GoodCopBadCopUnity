@@ -46,4 +46,11 @@ public class MutantBreachData : ScriptableObject
     [Tooltip("When true, every mutant spawned by this breach is forced into aggro mode toward " +
              "MutantBreachManager's configured aggro target, regardless of MutantEnemyData.aggroChance.")]
     public bool forceAggro = true;
+
+    [Header("Campaign Finale")]
+    [Tooltip("When true, the moment any mutant spawned by this breach begins fleeing instead of " +
+             "dying (see MutantEnemy.fleeInsteadOfDie), the campaign is marked complete and the " +
+             "Thanks For Playing screen is shown on all clients. Use only on the demo's final " +
+             "scripted breach (e.g. the Day 5 Ocho breach) — leave false on every other breach.")]
+    public bool showThanksForPlayingOnFlee = false;
 }

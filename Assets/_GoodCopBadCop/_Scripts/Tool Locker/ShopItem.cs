@@ -39,6 +39,11 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
     [Tooltip("When false, this item is hidden behind '???' in the shop until explicitly unlocked via gameplay progression.")]
     [SerializeField] private bool _unlockedByDefault = true;
 
+    [Tooltip("Optional. When set, this item additionally requires this anomaly C# type name to be " +
+             "unlocked (via AnomalyUnlockManager, typically driven by AnomalyUnlockProgressionSO) before " +
+             "it is considered available. Leave empty for items that don't gate on anomaly-category unlocks.")]
+    [SerializeField] private string _requiredAnomalyTypeName;
+
     /// <summary>
     /// Runtime availability override. Null means fall back to <see cref="_unlockedByDefault"/>.
     /// Stored as nullable so the field works correctly on prefab assets where Awake never runs.
@@ -47,9 +52,22 @@ public class ShopItem : MonoBehaviour, IHoverable, IClickable
 
     /// <summary>
     /// True if this item is visible and purchasable in the shop.
-    /// Determined by <see cref="_unlockedByDefault"/> unless overridden at runtime via <see cref="SetAvailable"/>.
+    /// Determined by <see cref="_unlockedByDefault"/> and <see cref="IsUnlockRequirementMet"/> unless
+    /// overridden at runtime via <see cref="SetAvailable"/>.
     /// </summary>
-    public bool IsAvailable => _availabilityOverride ?? _unlockedByDefault;
+    public bool IsAvailable => _availabilityOverride ?? (_unlockedByDefault && IsUnlockRequirementMet());
+
+    /// <summary>
+    /// True when this item has no <see cref="_requiredAnomalyTypeName"/> configured, or when that anomaly
+    /// type is currently unlocked according to <see cref="AnomalyUnlockManager"/>.
+    /// </summary>
+    public bool IsUnlockRequirementMet()
+    {
+        if (string.IsNullOrEmpty(_requiredAnomalyTypeName))
+            return true;
+
+        return AnomalyUnlockManager.Instance != null && AnomalyUnlockManager.Instance.IsAnomalyUnlocked(_requiredAnomalyTypeName);
+    }
 
     /// <summary>
     /// Sets the runtime availability of this item. Use <see cref="MegaphoneDialogueManager.SetShopItemAvailableSynced"/>

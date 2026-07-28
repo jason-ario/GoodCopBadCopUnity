@@ -39,6 +39,16 @@ public class MutantBreachManager : NetworkBehaviour
     [Tooltip("Looping alarm siren AudioSource. Assign a clip (e.g. Alarm v1) and leave it stopped by default.")]
     [SerializeField] private AudioSource alarmAudioSource;
 
+    [Header("Breach Music")]
+    [Tooltip("Looping music track played through MusicManager while a breach is active. Leave null to skip breach music entirely.")]
+    [SerializeField] private AudioClip breachMusic;
+
+    [Tooltip("Seconds to fade the breach music in over when the breach starts. Pass -1 to use MusicManager's default.")]
+    [SerializeField] private float breachMusicFadeInDuration = -1f;
+
+    [Tooltip("Seconds to fade the breach music out over when the breach ends. Pass -1 to use MusicManager's default.")]
+    [SerializeField] private float breachMusicFadeOutDuration = -1f;
+
     [Header("Scheduling")]
     [Tooltip("Minimum seconds after the day's tasks are all complete before a breach can trigger.")]
     [SerializeField] private float minDelayAfterShiftStart = 10f;
@@ -252,6 +262,9 @@ public class MutantBreachManager : NetworkBehaviour
             if (data.forceAggro)
                 enemy?.SetForceAggro(true);
 
+            if (data.showThanksForPlayingOnFlee && enemy != null)
+                enemy.OnFleeStarted += HandleFinaleMutantFleeStarted;
+
             netObj.Spawn(true);
             _activeBreachMutants.Add(netObj);
 
@@ -278,6 +291,27 @@ public class MutantBreachManager : NetworkBehaviour
         return _activeBreachMutants.Count == 0;
     }
 
+    // ── Campaign Finale ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called on the server the instant a <see cref="MutantBreachData.showThanksForPlayingOnFlee"/>
+    /// breach mutant begins fleeing instead of dying. Ends the demo immediately: marks the
+    /// campaign complete and shows the Thanks For Playing screen on every client, without
+    /// waiting for the mutant to fully leave the scene or for the normal end-of-shift sequence.
+    /// </summary>
+    private void HandleFinaleMutantFleeStarted()
+    {
+        Debug.Log("[MutantBreachManager] Finale breach mutant began fleeing — ending the demo.");
+        CampaignManager.Instance?.ForceCampaignComplete();
+        ShowThanksForPlayingScreenClientRpc();
+    }
+
+    [ClientRpc]
+    private void ShowThanksForPlayingScreenClientRpc()
+    {
+        UIController.Instance?.ShowThanksForPlayingScreen();
+    }
+
     // ── Client FX ────────────────────────────────────────────────────────────
 
     [ClientRpc]
@@ -291,6 +325,9 @@ public class MutantBreachManager : NetworkBehaviour
             alarmAudioSource.loop = true;
             alarmAudioSource.Play();
         }
+
+        if (breachMusic != null && MusicManager.Instance != null)
+            MusicManager.Instance.Play(breachMusic, true, breachMusicFadeInDuration);
 
         if (PlayerTutorialUI.Instance != null)
             PlayerTutorialUI.Instance.Show(message, holdDuration);
@@ -306,5 +343,8 @@ public class MutantBreachManager : NetworkBehaviour
 
         if (alarmAudioSource != null)
             alarmAudioSource.Stop();
+
+        if (breachMusic != null && MusicManager.Instance != null)
+            MusicManager.Instance.FadeOut(breachMusicFadeOutDuration);
     }
 }

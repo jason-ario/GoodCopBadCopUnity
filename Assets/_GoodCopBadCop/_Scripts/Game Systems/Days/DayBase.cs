@@ -93,6 +93,20 @@ public abstract class DayBase : MonoBehaviour
     [Tooltip("When true, the 'Follow the Trail' event can trigger on this day.")]
     public bool CanFollowTrailEvent;
 
+    [Header("Demo — Force Early Full Mutants")]
+    [Tooltip("Demo-only override. When true, DailySuspectManager forces 1–2 suspects the player has " +
+             "already seen in a previous shift — and never sent to quarantine — to appear in today's " +
+             "lineup as full mutants, bypassing the normal day-by-day infection pacing. Selected " +
+             "suspects still need a fullMutantDialogue assigned on their SuspectData. Leave false for " +
+             "normal campaign days; use only to showcase full mutants earlier for a demo/build.")]
+    public bool ForceEarlyFullMutants;
+
+    [Tooltip("How many previously-seen, never-quarantined suspects to force into full-mutant form " +
+             "this day (1 or 2). Ignored when ForceEarlyFullMutants is false, or if fewer eligible " +
+             "candidates exist.")]
+    [Range(1, 2)]
+    public int ForcedFullMutantCount = 1;
+
     [Header("Breach Event")]
     [Tooltip("Whether this day has a mutant breach event or not. When true, MutantBreachManager " +
              "triggers one random breach at the end of the day, once every suspect has been " +

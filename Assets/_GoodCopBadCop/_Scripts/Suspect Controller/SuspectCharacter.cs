@@ -1232,8 +1232,17 @@ public class SuspectCharacter : Interactable
             return;
         }
 
-        // Direct interaction no longer opens the dialogue view.
-        // Dialogue is initiated exclusively through scripted cutscenes (ScriptedDialogueRunner).
+        // Booth suspects: direct interaction opens the free-form question dialogue (sourced
+        // from SuspectData.questionResponses) so the player can ask questions independent of
+        // the linear scripted intro/cutscene sequence — including checking for story mismatches
+        // via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly. Suppressed while a
+        // scripted sequence or another dialogue session is already controlling the player.
+        if (speaking != null &&
+            !ScriptedDialogueRunner.IsScriptedModeActive &&
+            !DialogueChoiceSystem.IsInDialogueMode)
+        {
+            speaking.InitiateChoices();
+        }
     }
 
     public void SetCanInteract(bool canInteract)
