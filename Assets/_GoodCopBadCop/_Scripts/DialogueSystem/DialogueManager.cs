@@ -5,6 +5,8 @@ using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 public class DialogueManager : NetworkBehaviour
 {
@@ -436,14 +438,23 @@ public class DialogueManager : NetworkBehaviour
 
         while (!_dialogueInputReceived)
         {
-            if (Input.GetKeyDown(KeyCode.E) && _waitingSubtitle != null && _waitingSubtitle.IsPromptActive)
+            if (_waitingSubtitle != null && IsAdvanceInputPressed())
             {
-                // During scripted dialogue, route through the multi-player advance gate so
-                // both players must confirm (or the timeout fires) before the sequence continues.
-                if (ScriptedDialogueRunner.IsScriptedModeActive)
-                    ScriptedDialogueRunner.Instance.AdvanceScriptedLineServerRpc();
+                if (!_waitingSubtitle.IsPromptActive)
+                {
+                    // First input just completes the typewriter reveal for this line — does not advance yet,
+                    // mirroring the skip/advance convention used in IntroCinematicController.
+                    CompleteCurrentReveal();
+                }
                 else
-                    AdvanceDialogueServerRpc();
+                {
+                    // During scripted dialogue, route through the multi-player advance gate so
+                    // both players must confirm (or the timeout fires) before the sequence continues.
+                    if (ScriptedDialogueRunner.IsScriptedModeActive)
+                        ScriptedDialogueRunner.Instance.AdvanceScriptedLineServerRpc();
+                    else
+                        AdvanceDialogueServerRpc();
+                }
             }
             yield return null;
         }
@@ -451,6 +462,21 @@ public class DialogueManager : NetworkBehaviour
         ClearHistory();
         _waitingSubtitle = null;
         onComplete?.Invoke();
+    }
+
+    /// <summary>
+    /// Returns true if any of the accepted dialogue-advance inputs were pressed this frame —
+    /// keyboard E, left mouse click (when not over UI), or a gamepad face/start button. Matches
+    /// the input set used by <see cref="IntroCinematicController"/> for consistency.
+    /// </summary>
+    private bool IsAdvanceInputPressed()
+    {
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
+        return Input.GetKeyDown(KeyCode.E)
+               || (Input.GetMouseButtonDown(0) && !overUI)
+               || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false)
+               || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
     }
 
     public void ClearHistory()

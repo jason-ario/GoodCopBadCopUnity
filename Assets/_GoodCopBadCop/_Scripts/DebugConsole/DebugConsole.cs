@@ -702,6 +702,48 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Skips to Day 2 with the opening Vlad sequence suppressed, arms Ocho's booth encounter
+    /// (fake ID, antagonizing dialogue, verdict rejection, blackout) as the very next suspect,
+    /// and auto-summons him a couple of seconds after the shift starts — bypassing the mutation
+    /// and kill tutorials and the switch button entirely.
+    /// </summary>
+    public void SkipToOchoBoothEncounter()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToOchoBoothEncounter: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(2);
+        StartCoroutine(SkipToOchoBoothEncounterAfterDelay());
+    }
+
+    private IEnumerator SkipToOchoBoothEncounterAfterDelay()
+    {
+        // Wait one frame for Day_02 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_02.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToOchoBoothEncounter: Day_02.Instance not found after SkipToDay(2).");
+            yield break;
+        }
+
+        _startShiftGate?.ForceIntroComplete();
+
+        // Suppress the opening Vlad sequence (tool locker unlock etc.) and arm/auto-summon Ocho.
+        Day_02.Instance.DebugSkipOpening();
+        Day_02.Instance.DebugSkipToOchoBoothEncounter();
+
+        const float OchoArrivalDelay = 2f;
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(OchoArrivalDelay, OchoArrivalDelay);
+        ShiftManager.Instance?.TryStartShift();
+
+        Debug.Log("[DebugConsole] Skipped to Ocho booth encounter — he will arrive in ~2 s.");
+    }
+
+    /// <summary>
     /// Skips to the start of Day 3 with the player positioned in front of the bunker,
     /// matching the natural wake-up spawn before the player walks in to begin their shift.
     /// JumpToDay is called first so the day NetworkVariable propagates to all clients

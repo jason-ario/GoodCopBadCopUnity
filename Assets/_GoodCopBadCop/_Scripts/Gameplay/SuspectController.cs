@@ -27,6 +27,14 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public static event System.Action<int, int> OnSuspectProgressChanged;
 
+    /// <summary>
+    /// Fired on the server immediately after the application form document is spawned and its
+    /// paperwork state applied, carrying the spawned <see cref="ApplicationLetter"/> instance.
+    /// Used by one-off scripted encounters (e.g. <see cref="OchoBoothEncounter"/>) that need to
+    /// override the freshly-spawned form — e.g. swapping the entry-reason text for a drawing.
+    /// </summary>
+    public static event System.Action<ApplicationLetter> OnApplicationFormSpawned;
+
     [VContainer.Inject] private ILegacyGameObjectInjector legacyGameObjectInjector;
     [VContainer.Inject] private IPopulationService populationService;
     [VContainer.Inject] private ISuspectPaperworkService suspectPaperworkService;
@@ -932,8 +940,10 @@ public class SuspectController : NetworkBehaviour
         newApplicationForm.transform.position = randomPos;
         Rigidbody appFormRb = newApplicationForm.GetComponent<Rigidbody>();
         if (appFormRb != null) appFormRb.isKinematic = true;
-        newApplicationForm.GetComponent<ApplicationLetter>().SetPaperworkState(paperworkState, suspectCharacter.Data);
+        ApplicationLetter applicationLetter = newApplicationForm.GetComponent<ApplicationLetter>();
+        applicationLetter.SetPaperworkState(paperworkState, suspectCharacter.Data);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
+        OnApplicationFormSpawned?.Invoke(applicationLetter);
 
         NotifyPaperworkSpawnedClientRpc(
             new NetworkObjectReference(newIDCard),
@@ -1539,6 +1549,20 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.animator.SetBool("Restrained", true);
     }
 
+    /// <summary>
+    /// Cleans up the currently spawned folder (documents + folder object) without processing a
+    /// verdict. Used by scripted encounters (e.g. <see cref="OchoBoothEncounter"/>) that reject
+    /// the verdict visually instead of executing the normal Pass/Quarantine/Kill switch.
+    /// </summary>
+    public void CleanupSpawnedFolderForRejectedVerdict() => CleanupSpawnedFolder();
+
+    /// <summary>
+    /// Despawns the given suspect and clears it as the current suspect if it is still current,
+    /// without running kill/quarantine payout logic. Used by scripted encounters that end a
+    /// suspect's booth visit without a real verdict (e.g. <see cref="OchoBoothEncounter"/>).
+    /// </summary>
+    public void DespawnSuspectWithoutVerdict(SuspectCharacter suspectToDespawn) => DespawnSuspect(suspectToDespawn);
+
     private void CleanupSpawnedFolder()
     {
         if (spawnedFolder == null) return;
@@ -1805,6 +1829,16 @@ public class SuspectController : NetworkBehaviour
         if (suspectCharacter == null)
         {
             Debug.LogWarning("[SuspectController] ExecuteVerdict: no current suspect on the server — ignoring verdict.");
+            return;
+        }
+
+        // Scripted encounters (e.g. Ocho's booth confrontation) can reject verdicts entirely —
+        // neither the kill machine nor quarantine actually process the suspect. Fully hand off
+        // to the encounter's own scripted sequence instead of the normal payout/switch below.
+        OchoBoothEncounter ochoEncounter = suspectCharacter.GetComponent<OchoBoothEncounter>();
+        if (ochoEncounter != null)
+        {
+            ochoEncounter.HandleVerdictAttempt(folder);
             return;
         }
 

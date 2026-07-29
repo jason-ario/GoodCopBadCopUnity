@@ -375,6 +375,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 6058667383269575648}
     - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: 40edee8b695db704a903f5038575567c, type: 2}
+    - target: {fileID: 6270557809546838554, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: _baseVersion
       value: 
       objectReference: {fileID: 0}
@@ -410,6 +414,14 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 2.32
       objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: laughClips.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: 'laughClips.Array.data[0]'
+      value: 
+      objectReference: {fileID: 8300000, guid: 72cf83aae5f3f45c5b9dd8df50f2c1fa, type: 3}
     - target: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalPosition.x
       value: -75.76812
@@ -463,6 +475,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4331289234258202243, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3175726451092423348}
+    - targetCorrespondingSourceObject: {fileID: 4331289234258202243, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7621640106841151181}
   m_SourcePrefab: {fileID: 100100000, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
 --- !u!1 &447494977244835932 stripped
 GameObject:
@@ -938,7 +953,7 @@ MonoBehaviour:
   AnimationFloorLevel: 0.001
   _Editor_Foldout_Setup_LegsList: 1
   _Editor_EnsureCount: 0
-  _Editor_OnValidateTrigger: 0
+  _Editor_OnValidateTrigger: 1
   _EditorAllowAutoUpdateFeetParams: 1
   _EditorCategory: 0
   _EditorSetupCategory: 0
@@ -990,6 +1005,45 @@ MonoBehaviour:
   LegsAnimatorBlend: 1
   _Editor_DefaultModuleOnStart: {fileID: 11400000, guid: 7d9bd86d54a7a594cb1793f9533e2e00, type: 2}
   _Editor_LegHelperModule: {fileID: 11400000, guid: 0645fbea8059aec47aa6ae9d2c93c1d4, type: 2}
+--- !u!114 &7621640106841151181
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 447494977244835932}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f81adae1312bec4b9d942e3c47937d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OchoBoothEncounter
+  ShowTopMostFoldoutHeaderGroup: 1
+  _useDrawingForEntryReason: 1
+  _passRejectedLine: Passed? Ha! You really think paperwork like that gets to just
+    walk through?
+  _quarantineRejectedLine: Quarantine? Adorable. Like a cage was ever going to hold
+    me.
+  _killRejectedLine: Ahh, interesting choice! I bet you would love to kill again
+    wouldn't you?
+  _takeFolderDelay: 0.6
+  _postLineDelay: 2.5
+  _reappearPoint: {fileID: 0}
+  _vanishToReappearDelay: 1.5
+  _reappearToLineDelay: 1
+  _danceAnimationTrigger: Dance
+  _danceDuration: 3
+  _audioSource: {fileID: 2485501968895569445}
+  _demonicLaughClip: {fileID: 8300000, guid: 72cf83aae5f3f45c5b9dd8df50f2c1fa, type: 3}
+  _electricalPanelMarker: {fileID: 0}
+  _powerRestoredBark1: Did you guys lose power?
+  _powerRestoredBark2: Don't worry, it's Georgia, happens all the time.
+  _barkGap: 2.5
+  _finalDelayBeforeNextSuspect: 1.5
+--- !u!82 &2485501968895569445 stripped
+AudioSource:
+  m_CorrespondingSourceObject: {fileID: 1751970679333441786, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+  m_PrefabInstance: {fileID: 4192295810028551903}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4980353453559112566 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9165884929875893673, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}

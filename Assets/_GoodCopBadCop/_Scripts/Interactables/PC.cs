@@ -191,6 +191,7 @@ public class PC : Interactable
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Confined;
         ShowPCBackButton();
+        UIController.Instance?.ClosePlayerUI();
 
         if (lookAtTarget != null)
             player.playerMovementController.LookAtTarget(lookAtTarget.transform);
@@ -237,6 +238,7 @@ public class PC : Interactable
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Confined;
         ShowPCBackButton();
+        UIController.Instance?.ClosePlayerUI();
 
         if (!_navState.Value.IsActive)
             Navigate(NavAction.EnterTerminal);
@@ -844,6 +846,7 @@ public class PC : Interactable
         Cursor.lockState = CursorLockMode.Locked;
         if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
         Navigate(NavAction.ExitTerminal);
+        UIController.Instance?.ShowPlayerUI();
         if (_player == null) return;
         _player.SetCanInteract(true, "");
         _player.playerMovementController.ResetCameraPos(false, 0.5f, () => _player.playerMovementController.SetCanControl(true));

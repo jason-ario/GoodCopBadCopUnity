@@ -98,24 +98,30 @@ public class ATM : NetworkBehaviour
 
     /// <summary>
     /// Plays the ATM dispense sound and spawns coupon pickup objects one after another
-    /// at the spawn point. The number of coupons spawned is <paramref name="amount"/>
-    /// divided by the individual coupon's value (rounded down, minimum 1). SERVER ONLY.
+    /// at the spawn point. <paramref name="amount"/> is first scaled by the current
+    /// Checkpoint Integrity Score (see <see cref="CheckpointIntegrityService"/>) — a dirty,
+    /// trashed, or fence-damaged booth pays out less on every ATM transaction. The resulting
+    /// amount is divided by the individual coupon's value (rounded down, minimum 1). SERVER ONLY.
     /// </summary>
     public void SpawnCoupons(int amount)
     {
         if (!IsServer) return;
         if (amount <= 0) return;
 
+        int adjustedAmount = CheckpointIntegrityService.Instance != null
+            ? CheckpointIntegrityService.Instance.ApplyMultiplier(amount)
+            : amount;
+
         int couponValue = _couponPickupPrefab != null
             ? (_couponPickupPrefab.GetComponent<CouponPickup>()?.CouponValue ?? 1)
             : 1;
 
-        int count = Mathf.Max(1, amount / couponValue);
+        int count = Mathf.Max(1, adjustedAmount / couponValue);
 
         PlayDispenseSound();
 
         StartCoroutine(SpawnCouponsRoutine(count));
-        StartCoroutine(ShowPaymentDelayedRoutine(amount));
+        StartCoroutine(ShowPaymentDelayedRoutine(adjustedAmount));
     }
 
     // ── Private ──────────────────────────────────────────────────────────────

@@ -1,55 +1,80 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /// <summary>
-/// Between-shift task: repair a randomly selected set of broken perimeter fence segments.
+/// One-shot task: repair a randomly selected set of broken perimeter fence segments.
 ///
-/// At the start of each night phase the server:
+/// Unlike <see cref="FenceThreat"/> (a continuous night-phase systemic threat active from
+/// Day <c>_firstActiveDay</c> onward), this task is manually triggered — e.g. once at the start
+/// of Day 2 as a scripted tutorial beat (see <see cref="Day_02"/>) — and breaks a batch of
+/// fences immediately rather than damaging them one at a time on a timer.
+///
+/// When triggered on the server:
 ///   1. Heals all fences back to their healthy state.
 ///   2. Picks a random count (within BrokenFenceCount range) of fences to break.
 ///   3. Assigns each a random damage level (within DamageRange).
 ///   4. Subscribes to OnFullyRepaired on every broken fence.
 ///
-/// Players repair fences by hitting them with HammerPickable. When all broken fences
-/// are repaired, the task is marked complete and the coupon reward is granted.
+/// Players repair fences by hitting them with HammerPickable. When all broken fences are
+/// repaired, the task is marked complete, the coupon reward is granted, and
+/// <see cref="OnAllFencesRepaired"/> fires so subscribers (e.g. Day_02's tutorial objective
+/// list entry) can react.
 ///
 /// Scene setup:
 ///   - Add a NetworkObject component to this GameObject.
 ///   - Assign all PerimiterFence instances present in the scene to _allFences.
-///   - Register this MonoBehaviour on BetweenShiftTaskManager via the Inspector.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
+public class FenceRepairTask : NetworkBehaviour
 {
     public static FenceRepairTask Instance { get; private set; }
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName = "Fix the Perimeter Fence";
+    [SerializeField] private string _taskName = "Fix Perimeter Fences";
     [SerializeField] private int _couponReward = 15;
 
     [Header("Fence Configuration")]
-    [Tooltip("Every PerimiterFence in the scene. A random subset is broken each night.")]
+    [Tooltip("Every PerimiterFence in the scene. A random subset is broken each time TriggerTask() is called.")]
     [SerializeField] private PerimiterFence[] _allFences;
 
-    [Tooltip("Inclusive range for how many fence segments are broken per night phase.")]
+    [Tooltip("Inclusive range for how many fence segments are broken per trigger.")]
     [SerializeField] private Vector2Int _brokenFenceCount = new Vector2Int(2, 4);
 
     [Tooltip("Inclusive range for the starting damage level assigned to each broken fence. " +
              "Min 1 (slightly damaged) — must not exceed the fence's MaxDamageLevel.")]
     [SerializeField] private Vector2Int _damageRange = new Vector2Int(1, 3);
 
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
+    // ── Public API ───────────────────────────────────────────────────────────
 
-    public string TaskName     => _taskName;
-    public int    CouponReward => _couponReward;
-    public bool   IsComplete   => _isComplete;
+    /// <summary>Display name for this task.</summary>
+    public string TaskName => _taskName;
+
+    /// <summary>Money awarded upon completion.</summary>
+    public int CouponReward => _couponReward;
+
+    /// <summary>True once every broken fence from the most recent trigger has been repaired.</summary>
+    public bool IsComplete => _isComplete;
+
+    /// <summary>Number of fences repaired so far this round.</summary>
+    public int RepairedCount => _fencesRepaired.Value;
+
+    /// <summary>Number of fences broken this round (the round's target).</summary>
+    public int TotalCount => _targetFenceCount.Value;
 
     /// <summary>Dynamic description updated as fences are repaired.</summary>
     public string TaskDescription =>
         _isComplete
             ? "All fence segments repaired!"
-            : $"Repair broken fence segments: {_fencesRepaired.Value}/{_targetFenceCount.Value}";
+            : $"{_taskName} {RepairedCount}/{TotalCount}";
+
+    /// <summary>Fired on every client whenever the repaired/total counts change.</summary>
+    public static event Action OnProgressChanged;
+
+    /// <summary>Fired on every client once every broken fence has been repaired.</summary>
+    public static event Action OnAllFencesRepaired;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -66,7 +91,7 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
     // Local flag propagated to all clients via MarkCompleteClientRpc.
     private bool _isComplete;
 
-    // Server-only: which fences were broken this round (for cleanup on the next reset).
+    // Server-only: which fences were broken this round (for cleanup on the next trigger).
     private readonly List<PerimiterFence> _brokenFences = new();
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -85,35 +110,36 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _targetFenceCount.OnValueChanged += OnProgressChanged;
-        _fencesRepaired.OnValueChanged   += OnProgressChanged;
+        _targetFenceCount.OnValueChanged += OnProgressChangedInternal;
+        _fencesRepaired.OnValueChanged   += OnProgressChangedInternal;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _targetFenceCount.OnValueChanged -= OnProgressChanged;
-        _fencesRepaired.OnValueChanged   -= OnProgressChanged;
+        _targetFenceCount.OnValueChanged -= OnProgressChangedInternal;
+        _fencesRepaired.OnValueChanged   -= OnProgressChangedInternal;
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        OnProgressChanged     = null;
+        OnAllFencesRepaired   = null;
     }
 
-    // ── IBetweenShiftTask ────────────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Resets all fences to healthy, then randomly breaks a subset at varied damage levels.
-    /// Non-server clients call this too (per BetweenShiftTaskManager.BeginNightPhase()),
-    /// but only the server performs the authoritative break logic.
+    /// Server-only — safe to call from any client, but only the server performs the
+    /// authoritative break logic (replicated to clients via the NetworkVariables above).
     /// </summary>
-    public void ResetTask()
+    public void TriggerTask()
     {
-        _isComplete = false;
-
         if (!IsServer) return;
 
+        _isComplete = false;
         _fencesRepaired.Value = 0;
 
         UnsubscribeFromAllBrokenFences();
@@ -141,7 +167,7 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
             _brokenFences.Add(fence);
         }
 
-        Debug.Log($"[FenceRepairTask] Night phase begun: {count} fence segment(s) broken.");
+        Debug.Log($"[FenceRepairTask] Task triggered: {count} fence segment(s) broken.");
     }
 
     // ── Repair flow ──────────────────────────────────────────────────────────
@@ -163,12 +189,7 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
         if (_fencesRepaired.Value < _targetFenceCount.Value) return;
 
         // All broken fences have been repaired — complete the task.
-        _isComplete = true;
-
         ATM.Instance?.SpawnCoupons(_couponReward);
-
-        if (BetweenShiftTaskManager.Instance != null)
-            BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);
 
         MarkCompleteClientRpc();
     }
@@ -178,6 +199,7 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
     {
         _isComplete = true;
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnAllFencesRepaired?.Invoke();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -232,9 +254,10 @@ public class FenceRepairTask : NetworkBehaviour, IBetweenShiftTask
         return copy;
     }
 
-    /// <summary>Notifies the task registry to refresh task row text whenever progress changes.</summary>
-    private void OnProgressChanged(int previous, int current)
+    /// <summary>Notifies the task registry and static subscribers whenever progress changes.</summary>
+    private void OnProgressChangedInternal(int previous, int current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnProgressChanged?.Invoke();
     }
 }

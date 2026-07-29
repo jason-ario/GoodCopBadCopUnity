@@ -59,6 +59,15 @@ public class DumpsterInteractable : CollectableContainer
     [Tooltip("Duration in seconds of the toss arc from the player's hand into the dumpster.")]
     [SerializeField] private float _throwArcDuration = 0.5f;
 
+    /// <summary>
+    /// Trigger collider on the auto-resolved DumpsterPhysicsDepositZone, if any. The zone's
+    /// own transform sits at the dumpster's pivot — the actual opening is offset from that
+    /// pivot via the collider's local <c>center</c>. <see cref="GetDepositWorldPosition"/>
+    /// uses <c>Collider.bounds.center</c> (which already bakes in that offset, plus the
+    /// zone's rotation/scale) so the toss arc lands on the real opening instead of the pivot.
+    /// </summary>
+    private Collider _depositZoneCollider;
+
     [Tooltip("Extra height added at the arc's midpoint, on top of the straight line between start and end.")]
     [SerializeField] private float _throwArcHeight = 1.5f;
 
@@ -73,12 +82,28 @@ public class DumpsterInteractable : CollectableContainer
         if (_labelRoot != null)
             _labelRoot.SetActive(false);
 
-        if (_depositTarget == null)
+        DumpsterPhysicsDepositZone zone = GetComponentInChildren<DumpsterPhysicsDepositZone>();
+        if (zone != null)
         {
-            DumpsterPhysicsDepositZone zone = GetComponentInChildren<DumpsterPhysicsDepositZone>();
-            if (zone != null)
+            if (_depositTarget == null)
                 _depositTarget = zone.transform;
+            _depositZoneCollider = zone.GetComponent<Collider>();
         }
+    }
+
+    /// <summary>
+    /// Resolves the true world-space point the toss arc should land on. Prefers the
+    /// deposit zone's trigger collider bounds (which correctly bake in any local
+    /// <c>center</c> offset baked into the collider, plus the zone's rotation/scale),
+    /// falling back to <see cref="_depositTarget"/>'s raw transform position, and finally
+    /// this dumpster's own position if neither is available.
+    /// </summary>
+    private Vector3 GetDepositWorldPosition()
+    {
+        if (_depositZoneCollider != null)
+            return _depositZoneCollider.bounds.center;
+
+        return _depositTarget != null ? _depositTarget.position : transform.position;
     }
 
     public override void OnNetworkSpawn()
@@ -156,7 +181,7 @@ public class DumpsterInteractable : CollectableContainer
         // re-enabled as an interactable/NetworkTransform before the arc tween takes over).
         playerInteractionController.pickupController.ReleaseHeldObjectForThrow();
 
-        Vector3 endPosition = _depositTarget != null ? _depositTarget.position : transform.position;
+        Vector3 endPosition = GetDepositWorldPosition();
 
         ThrowBagArcServerRpc(bag.NetworkObject, startPosition, endPosition);
     }

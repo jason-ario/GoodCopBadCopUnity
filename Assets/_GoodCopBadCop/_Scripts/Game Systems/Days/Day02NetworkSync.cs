@@ -67,4 +67,23 @@ public class Day02NetworkSync : NetworkBehaviour
     {
         Day_02.Instance?.ShowMailSortingTutorialLocal();
     }
+
+    // ── Fence Repair Tutorial ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Notifies all clients that Vlad's tool locker sequence has finished and the "Fix Perimeter
+    /// Fences" objective should be added to the tutorial objective list. Server-only. Called by
+    /// <see cref="Day_02"/> right after the tool locker dialogue completes.
+    /// </summary>
+    public void ShowFixFencesObjective()
+    {
+        if (!IsServer) return;
+        ShowFixFencesObjectiveClientRpc();
+    }
+
+    [ClientRpc]
+    private void ShowFixFencesObjectiveClientRpc()
+    {
+        Day_02.Instance?.EnsureFixFencesObjective();
+    }
 }

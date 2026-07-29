@@ -453,6 +453,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, node.animationTrigger);
             _lastAnimTrigger = node.animationTrigger ?? string.Empty;
 
+            if (node.playLaughSfx)
+                PlayLaughSfxClientRpc(speakerNetId);
+
             yield return StartCoroutine(SayAndWait(speaker, node.npcLine));
 
             if (node.type == ScriptedDialogueNodeType.Choice)
@@ -972,6 +975,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
         _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
+
+        if (chosen.playLaughSfx)
+            PlayLaughSfxClientRpc(speakerNetId);
+
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse));
 
         // The response has now been advanced past on every client — remove the echo of the
@@ -1507,6 +1514,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
+    }
+
+    /// <summary>
+    /// Plays a random laugh clip on the speaker's <see cref="SpeakingInteraction"/> AudioSource.
+    /// No-ops if the speaker has no <see cref="SpeakingInteraction"/> or no laugh clips assigned.
+    /// </summary>
+    [ClientRpc]
+    private void PlayLaughSfxClientRpc(ulong speakerNetId)
+    {
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            return;
+
+        netObj.GetComponent<SuspectCharacter>()?.Speaking?.PlayLaugh();
     }
 
     private string GetLocalPlayerName()

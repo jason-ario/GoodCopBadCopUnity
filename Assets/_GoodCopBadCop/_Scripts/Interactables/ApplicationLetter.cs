@@ -13,6 +13,11 @@ public class ApplicationLetter : FolderItem
     [SerializeField] private TextMeshPro idNumberText;
     [SerializeField] private TextMeshPro expirationDateText;
 
+    [Tooltip("Optional child object holding a hand-drawn entry reason (e.g. a scribbled doodle) " +
+             "shown instead of reasonForEntryText. Toggled via SetEntryReasonDrawing — used by " +
+             "one-off scripted encounters. Leave unassigned for normal suspects.")]
+    [SerializeField] private GameObject entryReasonDrawing;
+
     private readonly NetworkVariable<FixedString512Bytes> syncedFullName = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedSex = new(new FixedString512Bytes(string.Empty));
@@ -20,6 +25,7 @@ public class ApplicationLetter : FolderItem
     private readonly NetworkVariable<FixedString512Bytes> syncedExpirationDate = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<FixedString512Bytes> syncedEntryReason = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<bool> syncedVisible = new(true);
+    private readonly NetworkVariable<bool> syncedShowDrawing = new(false);
 
     public override void OnNetworkSpawn()
     {
@@ -32,6 +38,7 @@ public class ApplicationLetter : FolderItem
         syncedExpirationDate.OnValueChanged += OnExpirationDateChanged;
         syncedEntryReason.OnValueChanged += OnEntryReasonChanged;
         syncedVisible.OnValueChanged += OnVisibleChanged;
+        syncedShowDrawing.OnValueChanged += OnShowDrawingChanged;
 
         ApplySyncedState();
     }
@@ -45,6 +52,7 @@ public class ApplicationLetter : FolderItem
         syncedExpirationDate.OnValueChanged -= OnExpirationDateChanged;
         syncedEntryReason.OnValueChanged -= OnEntryReasonChanged;
         syncedVisible.OnValueChanged -= OnVisibleChanged;
+        syncedShowDrawing.OnValueChanged -= OnShowDrawingChanged;
 
         base.OnNetworkDespawn();
     }
@@ -96,6 +104,18 @@ public class ApplicationLetter : FolderItem
         ApplyFonts(suspectData);
     }
 
+    /// <summary>
+    /// Server-only. Toggles whether a hand-drawn <see cref="entryReasonDrawing"/> child is shown
+    /// instead of <see cref="reasonForEntryText"/>. Used by one-off scripted encounters (e.g.
+    /// Ocho's fake application) where the entry reason should be a visual doodle rather than text.
+    /// </summary>
+    public void SetEntryReasonDrawing(bool showDrawing)
+    {
+        if (!IsServer) return;
+        syncedShowDrawing.Value = showDrawing;
+        ApplyEntryReasonVisual(showDrawing);
+    }
+
     private void ApplySyncedState()
     {
         ApplyState(new SuspectPaperworkState(
@@ -126,6 +146,16 @@ public class ApplicationLetter : FolderItem
         SetText(expirationDateText, state.ApplicationExpirationDate);
         reasonForEntryText.text = state.EntryReason;
         SetDocumentVisible(state.ApplicationVisible);
+        ApplyEntryReasonVisual(syncedShowDrawing.Value);
+    }
+
+    private void ApplyEntryReasonVisual(bool showDrawing)
+    {
+        if (entryReasonDrawing != null)
+            entryReasonDrawing.SetActive(showDrawing);
+
+        if (reasonForEntryText != null)
+            reasonForEntryText.gameObject.SetActive(!showDrawing);
     }
 
     private void ApplyFonts(SuspectData suspectData)
@@ -147,6 +177,7 @@ public class ApplicationLetter : FolderItem
     private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNumberText.text = current.ToString();
     private void OnExpirationDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => SetText(expirationDateText, current.ToString());
     private void OnEntryReasonChanged(FixedString512Bytes previous, FixedString512Bytes current) => reasonForEntryText.text = current.ToString();
+    private void OnShowDrawingChanged(bool previous, bool current) => ApplyEntryReasonVisual(current);
     private void OnVisibleChanged(bool previous, bool current)
     {
         SetDocumentVisible(current);

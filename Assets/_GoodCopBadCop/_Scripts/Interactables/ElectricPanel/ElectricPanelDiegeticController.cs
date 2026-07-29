@@ -90,7 +90,19 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         }
         else
         {
-            hit.collider.GetComponentInParent<CircuitSwitch>()?.OnClick();
+            CircuitSwitch switchHit = hit.collider.GetComponentInParent<CircuitSwitch>();
+            if (switchHit == null) return;
+
+            switchHit.OnClick();
+
+            // Touching a breaker switch while power is already on trips the breaker and cuts
+            // power entirely, same as a real panel.
+            if (_panelController != null && _panelController.IsPowerOn)
+            {
+                _panelController.TripPower();
+                return;
+            }
+
             CheckPuzzleSolved();
         }
     }
@@ -128,14 +140,38 @@ public class ElectricPanelDiegeticController : DiegeticViewController
     {
         if (_nob == null || !_nob.IsAtOnPosition) return;
 
+        bool allSwitchesOn = true;
         if (_switches != null)
         {
             foreach (CircuitSwitch sw in _switches)
-                if (sw != null && !sw.IsOn) return;
+            {
+                if (sw != null && !sw.IsOn)
+                {
+                    allSwitchesOn = false;
+                    break;
+                }
+            }
+        }
+
+        if (!allSwitchesOn)
+        {
+            // The knob reached On but not every switch is On — fail the attempt and reset
+            // the whole panel back to Off.
+            ResetPanel();
+            return;
         }
 
         // All switches are On and the knob has reached its On position — restore power!
         _panelController?.RestorePower();
+    }
+
+    private void ResetPanel()
+    {
+        _nob?.ForceSpringBack();
+
+        if (_switches != null)
+            foreach (CircuitSwitch sw in _switches)
+                sw?.SetSwitchOff();
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

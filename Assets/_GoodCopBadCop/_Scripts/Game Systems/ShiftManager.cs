@@ -979,12 +979,14 @@ public class ShiftManager : NetworkBehaviour
         // Close the bunker door immediately so it is never seen open during the transition.
         _bunkerDoorController?.Reset();
 
-        UIController.Instance.FadeIn();
-
-        // Wait for the screen to reach full black (fade duration = 0.64s).
+        // Fade the tentacle blackout all the way to fully opaque before touching the report.
         // The end-of-shift report BG stays visible as an overlay during this window
-        // so the world never flashes through before the fade completes.
-        yield return new WaitForSeconds(0.64f);
+        // so the world never flashes through before the fade completes. Waiting on the
+        // actual fade (rather than a hardcoded duration that could drift out of sync with
+        // the configured fade-in duration) guarantees the screen is truly fully black —
+        // otherwise the report can be torn down while the blackout is still translucent,
+        // briefly exposing the player's camera before the blackout finishes fading in.
+        yield return UIController.Instance.FadeInAndWait();
 
         // Screen is now fully black — safe to tear down the report overlay.
         UIController.Instance.HideEndOfShiftReport();

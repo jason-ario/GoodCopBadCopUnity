@@ -41,6 +41,25 @@ public class SpeakingInteraction : NetworkBehaviour
 
     public AudioSource AudioSource => audioSource;
 
+    [Header("Laugh SFX")]
+    [Tooltip("Optional laugh sound effect(s). One is chosen at random and played on this " +
+             "speaker's AudioSource when a ScriptedDialogueNode/Choice has playLaughSfx enabled.")]
+    [SerializeField] private AudioClip[] laughClips;
+
+    /// <summary>
+    /// Plays a random laugh clip on this speaker's AudioSource. Safe to call on any client —
+    /// invoked locally by <see cref="ScriptedDialogueRunner"/>'s laugh ClientRpc. No-ops if no
+    /// laugh clips or AudioSource are assigned.
+    /// </summary>
+    public void PlayLaugh()
+    {
+        if (audioSource == null || laughClips == null || laughClips.Length == 0) return;
+
+        AudioClip clip = laughClips[Random.Range(0, laughClips.Length)];
+        if (clip != null)
+            audioSource.PlayOneShot(clip);
+    }
+
     [Header("Dialogue Choices")]
     [Tooltip("Populated from SuspectData at runtime when assigned. Used as a fallback for non-suspect speakers (e.g. Guard).")]
     [SerializeField] private string[] dialogueChoices;

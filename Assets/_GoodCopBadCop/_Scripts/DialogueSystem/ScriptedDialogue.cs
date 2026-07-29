@@ -36,6 +36,10 @@ public class ScriptedDialogueChoice
     [Tooltip("Optional Animator trigger fired on the NPC at the start of the response line. " +
              "Leave empty for no animation.")]
     public string animationTrigger;
+
+    [Tooltip("If true, plays a random clip from the speaker's SpeakingInteraction laugh clips " +
+             "when this response starts. Requires laugh clips to be assigned on the speaker.")]
+    public bool playLaughSfx;
 }
 
 /// <summary>
@@ -65,6 +69,10 @@ public class ScriptedDialogueNode
              "set on ScriptedDialogueRunner. Every scripted line wobbles by default — only assign this " +
              "if you want a different effect on this specific line.")]
     public TMPWobbleProfile wobbleProfileOverride;
+
+    [Tooltip("If true, plays a random clip from the speaker's SpeakingInteraction laugh clips " +
+             "when this line starts. Requires laugh clips to be assigned on the speaker.")]
+    public bool playLaughSfx;
 
     [Tooltip("Player choices. Required when Type is Choice. Exactly two entries expected.")]
     public ScriptedDialogueChoice[] choices;

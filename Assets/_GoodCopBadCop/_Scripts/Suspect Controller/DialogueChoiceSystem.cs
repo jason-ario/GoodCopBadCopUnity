@@ -26,7 +26,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
     [SerializeField] private GameObject dialogueChoiceContainer;
     [SerializeField] private Subtitles subtitlesPrefab;
     [SerializeField] private RectTransform subtitlesContainer;
-    [SerializeField] private GameObject backButton;
 
     // Callback set by ShowScriptedChoices — routes the player's pick to ScriptedDialogueRunner.
     private Action<int> _scriptedChoiceCallback;
@@ -103,6 +102,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(true);
 
         UIController.Instance.ShowCursor();
+        UIController.Instance.ShowBackButton(CloseDialogueChoices);
 
         HidePlayerBody();
 
@@ -122,7 +122,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
 
         dialogueChoiceContainer.SetActive(false);
-        backButton.SetActive(false);
+        UIController.Instance.HideBackButton();
 
         // If scripted dialogue is still active (e.g. old-style dialogue closed while a scripted
         // sequence was running), do not restore normal gameplay state — the scripted mode exit
@@ -135,7 +135,6 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
 
         UIController.Instance.HideCursor();
-        UIController.Instance.HideBackButton();
 
         var player = PlayerInstance.Instance;
         // Restore look before restoring control so the CanControl setter can re-lock the cursor.
@@ -172,6 +171,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
             // Force-show the cursor and tear down the lingering choice UI so it cannot
             // later call ExitDialogueMode and hide the cursor mid-sequence.
             UIController.Instance.ShowCursor();
+            UIController.Instance.HideBackButton();
             if (_reshowCoroutine != null) { StopCoroutine(_reshowCoroutine); _reshowCoroutine = null; }
             dialogueChoiceContainer.SetActive(false);
             return;
@@ -224,6 +224,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
             // Same guard as EnterScriptedDialogueMode: scripted mode takes over, show cursor
             // and clear old choice UI so it cannot hide the cursor via ExitDialogueMode later.
             UIController.Instance.ShowCursor();
+            UIController.Instance.HideBackButton();
             if (_reshowCoroutine != null) { StopCoroutine(_reshowCoroutine); _reshowCoroutine = null; }
             dialogueChoiceContainer.SetActive(false);
             return;
@@ -429,10 +430,13 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // ── Skip NPC line while waiting to reshow choices (non-scripted mode) ─
         if (_reshowCoroutine == null) return;
 
+        bool skipKey     = Input.GetKeyDown(KeyCode.E);
         bool skipMouse   = Input.GetMouseButtonDown(0);
-        bool skipGamepad = Gamepad.current != null && AnyGamepadButtonThisFrame();
+        // Exclude buttonEast — it is reserved for the exit/back action (see UIController's
+        // centralized Back-button handling) and must not also skip the NPC line.
+        bool skipGamepad = Gamepad.current != null && !Gamepad.current.buttonEast.wasPressedThisFrame && AnyGamepadButtonThisFrame();
 
-        if (!skipMouse && !skipGamepad) return;
+        if (!skipKey && !skipMouse && !skipGamepad) return;
 
         // Ignore clicks that land on a UI element (e.g. the Back button).
         if (UnityEngine.EventSystems.EventSystem.current != null &&

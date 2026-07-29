@@ -6,7 +6,7 @@ using UnityEngine;
 /// Toggles a set of <see cref="ElectricObject"/> components — invoking their
 /// <see cref="ElectricObject.OnElectricityTurnOn"/> / <see cref="ElectricObject.OnElectricityTurnOff"/>
 /// UnityEvents — only when <see cref="ElectricityController"/> reports power is available.
-/// Starts ON by default on Day 1; resets to OFF at the start of every subsequent day.
+/// Starts ON by default every day, including Day 1.
 ///
 /// Electricity responsiveness:
 ///   Add an <see cref="ElectricObject"/> to this GameObject and register it with the booth's
@@ -93,9 +93,9 @@ public class BoothLightSwitch : Interactable, IHeldItemPassthrough
         if (!IsServer) return;
         if (ShiftManager.Instance.CurrentDay <= 1) return;
 
-        // Reset to OFF for Day 2 and beyond.
-        _isOn.Value = false;
-        ResetSwitchClientRpc();
+        // Reset to ON at the start of every day — the booth should always start lit.
+        _isOn.Value = true;
+        ResetSwitchClientRpc(true);
     }
 
     // -----------------------------------------------------------------------
@@ -124,10 +124,10 @@ public class BoothLightSwitch : Interactable, IHeldItemPassthrough
     }
 
     [ClientRpc]
-    private void ResetSwitchClientRpc()
+    private void ResetSwitchClientRpc(bool isOn)
     {
-        ApplySwitchVisual(false);
-        FireElectricEvents(false);
+        ApplySwitchVisual(isOn);
+        RefreshObjects(isOn);
     }
 
     // -----------------------------------------------------------------------

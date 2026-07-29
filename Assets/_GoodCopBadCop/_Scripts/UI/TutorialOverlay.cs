@@ -30,6 +30,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject graffitiTutorialScreen;
     [SerializeField] private GameObject sortingMailTutorialScreen;
     [SerializeField] private GameObject killCriteriaTutorialScreen;
+    [SerializeField] private GameObject fixPowerTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -105,6 +106,13 @@ public class TutorialOverlay : MonoBehaviour
     /// quarantine/kill symptom-count thresholds right after the kill scripted dialogue.
     /// </summary>
     public void ShowKillCriteriaTutorial(Action onComplete = null) => ShowScreen(killCriteriaTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "go fix the power outage at the electrical panel" tutorial overlay.
+    /// Used when a booth power outage forces the player to solve the panel puzzle before the
+    /// switch button will let them summon the next suspect (e.g. Day 2's Ocho encounter).
+    /// </summary>
+    public void ShowElectricalPanelTutorial(Action onComplete = null) => ShowScreen(fixPowerTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

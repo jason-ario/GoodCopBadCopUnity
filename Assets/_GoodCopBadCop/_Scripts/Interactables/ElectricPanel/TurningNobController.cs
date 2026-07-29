@@ -31,6 +31,16 @@ public class TurningNobController : MonoBehaviour
     [Tooltip("Progress fraction that counts as 'at the On position'.")]
     [SerializeField, Range(0.85f, 1f)] private float _onThreshold = 0.95f;
 
+    [Header("Audio")]
+    [Tooltip("AudioSource used to play the knob sounds. Falls back to a component on this GameObject if left empty.")]
+    [SerializeField] private AudioSource _audioSource;
+
+    [Tooltip("Looping sound played while the knob is being turned.")]
+    [SerializeField] private AudioClip _rotatingSound;
+
+    [Tooltip("One-shot sound played the moment the knob reaches its On position.")]
+    [SerializeField] private AudioClip _fullyRotatedSound;
+
     // ─── State ────────────────────────────────────────────────────────────────
 
     private float _progress; // 0 = Off, 1 = On
@@ -39,12 +49,19 @@ public class TurningNobController : MonoBehaviour
     /// <summary>True when the knob has been turned far enough to trigger power restore.</summary>
     public bool IsAtOnPosition => _progress >= _onThreshold;
 
+    private void Awake()
+    {
+        if (_audioSource == null)
+            _audioSource = GetComponent<AudioSource>();
+    }
+
     // ─── Public API ──────────────────────────────────────────────────────────
 
     /// <summary>Immediately snaps the knob to the Off position. Called on power outage.</summary>
     public void SnapToOff()
     {
         CancelSpring();
+        StopRotatingSound();
         _progress = 0f;
         ApplyRotation();
     }
@@ -57,15 +74,35 @@ public class TurningNobController : MonoBehaviour
     public void AddDragDelta(float screenAngleDelta)
     {
         CancelSpring();
+
+        bool wasAtOnPosition = IsAtOnPosition;
+
         // Negative screenAngleDelta = CW = advancing toward On.
         _progress = Mathf.Clamp01(_progress - screenAngleDelta / _degreesForFullTravel);
         ApplyRotation();
+
+        if (!wasAtOnPosition && IsAtOnPosition)
+            PlayFullyRotatedSound();
+        else if (!IsAtOnPosition)
+            PlayRotatingSound();
     }
 
     /// <summary>Called when the player releases the drag. Springs back if not yet at On.</summary>
     public void OnRelease()
     {
+        StopRotatingSound();
         if (IsAtOnPosition) return;
+        _springCoroutine = StartCoroutine(SpringBackRoutine());
+    }
+
+    /// <summary>
+    /// Forces the knob to spring back to Off regardless of its current position. Used when the
+    /// puzzle resets because the knob reached On while not all circuit switches were On.
+    /// </summary>
+    public void ForceSpringBack()
+    {
+        StopRotatingSound();
+        CancelSpring();
         _springCoroutine = StartCoroutine(SpringBackRoutine());
     }
 
@@ -103,5 +140,29 @@ public class TurningNobController : MonoBehaviour
         if (_springCoroutine == null) return;
         StopCoroutine(_springCoroutine);
         _springCoroutine = null;
+    }
+
+    private void PlayRotatingSound()
+    {
+        if (_audioSource == null || _rotatingSound == null) return;
+        if (_audioSource.isPlaying && _audioSource.clip == _rotatingSound) return;
+
+        _audioSource.clip = _rotatingSound;
+        _audioSource.loop = true;
+        _audioSource.Play();
+    }
+
+    private void StopRotatingSound()
+    {
+        if (_audioSource == null) return;
+        if (_audioSource.isPlaying && _audioSource.clip == _rotatingSound)
+            _audioSource.Stop();
+    }
+
+    private void PlayFullyRotatedSound()
+    {
+        StopRotatingSound();
+        if (_audioSource != null && _fullyRotatedSound != null)
+            _audioSource.PlayOneShot(_fullyRotatedSound);
     }
 }

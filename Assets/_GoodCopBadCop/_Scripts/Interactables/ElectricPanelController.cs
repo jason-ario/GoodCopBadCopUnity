@@ -14,9 +14,14 @@ using UnityEngine;
 ///
 /// Power-outage reset:
 ///   Add an <see cref="ElectricObject"/> component on this same GameObject and wire its
-///   <c>OnElectricityTurnOff</c> UnityEvent to <see cref="OnPowerOff"/> in the Inspector.
+///   <c>OnElectricityTurnOff</c> UnityEvent to <see cref="OnPowerOff"/> and its
+///   <c>OnElectricityTurnOn</c> UnityEvent to <see cref="OnPowerOn"/> in the Inspector.
 ///   This also registers the panel as an electric object so the <see cref="ElectricityController"/>
-///   calls it automatically on every outage.
+///   calls it automatically on every outage and restore.
+///
+/// Tripping the breaker:
+///   While the power is already on, touching any circuit switch trips the breaker and cuts
+///   power entirely (see <see cref="TripPower"/>), same as a real panel.
 /// </summary>
 public class ElectricPanelController : Interactable
 {
@@ -67,6 +72,9 @@ public class ElectricPanelController : Interactable
 
         // Snap the door to its correct visual state for late-joining clients.
         SnapDoor(_isDoorOpen.Value);
+
+        // Snap the switches to match the current power state for late-joining clients.
+        SyncSwitchesToPowerState();
     }
 
     public override void OnNetworkDespawn()
@@ -93,6 +101,9 @@ public class ElectricPanelController : Interactable
 
     // ─── Public API ──────────────────────────────────────────────────────────
 
+    /// <summary>True when the panel's electricity controller currently has power on.</summary>
+    public bool IsPowerOn => _electricityController != null && _electricityController.IsPowerOn;
+
     /// <summary>
     /// Resets all circuit switches to Off and snaps the knob to its Off position.
     /// Wire this to <see cref="ElectricObject.OnElectricityTurnOff"/> in the Inspector.
@@ -109,6 +120,20 @@ public class ElectricPanelController : Interactable
         if (DiegeticViewController.Current == _diegeticController)
             _diegeticController?.Close();
     }
+
+    /// <summary>
+    /// Snaps all circuit switches to On to match the current power state. Wire this to
+    /// <see cref="ElectricObject.OnElectricityTurnOn"/> in the Inspector so the switches always
+    /// visually reflect that power is flowing (e.g. right after the puzzle is solved, or for
+    /// late-joining clients when power is already on).
+    /// </summary>
+    public void OnPowerOn() => SyncSwitchesToPowerState();
+
+    /// <summary>
+    /// Called by <see cref="ElectricPanelDiegeticController"/> when the player messes with a
+    /// circuit switch while the power is already on. Trips the breaker and cuts power entirely.
+    /// </summary>
+    public void TripPower() => TripPowerServerRpc();
 
     /// <summary>
     /// Called by <see cref="ElectricPanelDiegeticController"/> when the puzzle is solved.
@@ -144,6 +169,15 @@ public class ElectricPanelController : Interactable
         if (_electricityController.RequiresFuseBoxRestore) return;
 
         _electricityController.PowerOn();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TripPowerServerRpc()
+    {
+        if (_electricityController == null) return;
+        if (!_electricityController.IsPowerOn) return;
+
+        _electricityController.PowerOff();
     }
 
     // ─── NetworkVariable callback ─────────────────────────────────────────────
@@ -197,5 +231,18 @@ public class ElectricPanelController : Interactable
         Transform target = open ? _doorOpenRef : _doorClosedRef;
         if (target != null)
             _door.localRotation = target.localRotation;
+    }
+
+    private void SyncSwitchesToPowerState()
+    {
+        if (_switches == null) return;
+
+        bool isOn = IsPowerOn;
+        foreach (CircuitSwitch sw in _switches)
+        {
+            if (sw == null) continue;
+            if (isOn) sw.SetSwitchOn();
+            else sw.SetSwitchOff();
+        }
     }
 }

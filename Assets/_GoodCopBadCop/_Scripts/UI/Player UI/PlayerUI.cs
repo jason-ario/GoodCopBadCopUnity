@@ -16,6 +16,9 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private InventoryHUDController _inventoryHUD;
     public InventoryHUDController InventoryHUD => _inventoryHUD;
 
+    [SerializeField] private CheckpointIntegrityBar _checkpointIntegrityBar;
+    public CheckpointIntegrityBar CheckpointIntegrityBar => _checkpointIntegrityBar;
+
     private void Awake()
     {
         Instance = this;

@@ -152,9 +152,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 return;
             }
 
-            // Track the closest surface point of the first non-self, non-weapon collider
-            // so environment hits have a meaningful spawn position.
-            if (!anyNonSelfHit)
+            // Track the closest surface point of the first non-self, non-weapon, non-trigger
+            // collider so environment hits have a meaningful spawn position. Trigger colliders
+            // are excluded here because this project uses them extensively for non-physical logic
+            // volumes (interaction zones, click detectors, task areas, etc.) — those aren't real
+            // geometry and shouldn't register as a "clang" when the swing merely passes near one.
+            // Colliders that ARE meaningful hits despite being triggers (glass, enemies, suspects)
+            // are still handled explicitly below regardless of this skip.
+            if (!anyNonSelfHit && !col.isTrigger)
             {
                 anyNonSelfHit = true;
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);

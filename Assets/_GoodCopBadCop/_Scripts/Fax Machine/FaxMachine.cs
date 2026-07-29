@@ -16,6 +16,10 @@ public class FaxMachine : NetworkBehaviour
     [SerializeField] private Newspaper _faxPaper;
     [SerializeField] private Transform _faxPaperSpawnPoint;
 
+    [Header("Tutorial")]
+    [Tooltip("World-space arrow that points at the fax machine while a delivered fax is waiting to be picked up.")]
+    [SerializeField] private GameObject _tutorialArrow;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -84,6 +88,8 @@ public class FaxMachine : NetworkBehaviour
         _machineShake.enabled = false;
 
         pickable.UnlockInteractableNetworked();
+
+        ShowTutorialArrowUntilPickedUp(pickable);
     }
 
     /// <summary>
@@ -137,5 +143,26 @@ public class FaxMachine : NetworkBehaviour
         _machineShake.enabled = false;
 
         pickable.UnlockInteractableNetworked();
+
+        ShowTutorialArrowUntilPickedUp(pickable);
+    }
+
+    /// <summary>
+    /// Shows the fax machine tutorial arrow and automatically hides it the moment
+    /// <paramref name="pickable"/> is grabbed. Safe to call even if no arrow is assigned.
+    /// </summary>
+    private void ShowTutorialArrowUntilPickedUp(PickableObject pickable)
+    {
+        if (_tutorialArrow == null || pickable == null) return;
+
+        _tutorialArrow.SetActive(true);
+
+        void OnPickedUp()
+        {
+            _tutorialArrow.SetActive(false);
+            pickable.OnPickedUpEvent -= OnPickedUp;
+        }
+
+        pickable.OnPickedUpEvent += OnPickedUp;
     }
 }

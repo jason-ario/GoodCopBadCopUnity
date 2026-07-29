@@ -96,6 +96,20 @@ public class Day_02 : DayBase, IDailyTask
     [Tooltip("World-space point above the red stamp slot — marker shown during the 'grab the red stamp' task.")]
     [SerializeField] private Transform _markerRedStamp;
 
+    [Header("Day 2 — Ocho Booth Encounter (Third Suspect)")]
+    [Tooltip("Ocho's booth-encounter SuspectCharacter prefab (the clown-faced 'Nunya Business' " +
+             "suspect with OchoBoothEncounter attached). Spawned as the next suspect right after " +
+             "the kill tutorial folder is handed off — see OnKillFolderHandedOff.")]
+    [SerializeField] private SuspectCharacter _ochoBoothEncounterPrefab;
+
+    [Tooltip("Scene point behind the player's usual position in the booth. Injected into the " +
+             "spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
+    [SerializeField] private Transform _ochoReappearPoint;
+
+    [Tooltip("Scene point the tutorial arrow points at during Ocho's power outage (the Electrical Panel). " +
+             "Injected into the spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
+    [SerializeField] private Transform _ochoElectricalPanelMarker;
+
     [Tooltip("Task text shown while the player needs to file the Documentation and Mutation exam pages into the folder.")]
     [SerializeField] private string _taskAddExamPagesText = "Add the Documentation and Mutation exam pages to the folder";
 
@@ -190,15 +204,6 @@ public class Day_02 : DayBase, IDailyTask
     // Set by DebugSkipOpening to bypass Day2OpeningSequence entirely.
     private bool _debugSkipOpening;
 
-    [Header("Day 2 — Graffiti Tutorial")]
-    [Tooltip("Base objective text shown in the tutorial list. The scrubbed/total count is appended automatically, " +
-             "e.g. 'Clean graffiti using mop 0/4'.")]
-    [SerializeField] private string _taskCleanGraffitiText = "Clean graffiti using mop";
-
-    // Active tutorial objective item for the graffiti task — kept as a field so
-    // OnGraffitiProgress can update its text from outside the coroutine.
-    private TutorialObjectiveItem _graffitiObjectiveItem;
-
     [Header("Day 2 — Mail Sorting Tutorial")]
     [Tooltip("Base objective text shown in the tutorial list. The sorted/total count is appended automatically, " +
              "e.g. 'Sort the mail 0/18'.")]
@@ -207,6 +212,15 @@ public class Day_02 : DayBase, IDailyTask
     // Active tutorial objective item for the mail sorting task — kept as a field so
     // OnSortMailProgressChanged can update its text from outside the coroutine.
     private TutorialObjectiveItem _taskSortMail;
+
+    [Header("Day 2 — Fix Perimeter Fences Tutorial")]
+    [Tooltip("Base objective text shown in the tutorial list. The repaired/total count is appended automatically, " +
+             "e.g. 'Fix Perimeter Fences 1/3'.")]
+    [SerializeField] private string _taskFixFencesText = "Fix Perimeter Fences";
+
+    // Active tutorial objective item for the fence repair task — kept as a field so
+    // OnFixFencesProgressChanged can update its text from outside the coroutine.
+    private TutorialObjectiveItem _taskFixFences;
 
     // -------------------------------------------------------------------------
     // Day 2 Post-Shift Vlad Sequence (Out Back)
@@ -367,11 +381,6 @@ public class Day_02 : DayBase, IDailyTask
         if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
 
-        // Spawn graffiti at the very start of Day 2 for the night-phase cleaning tutorial.
-        // Graffiti is visible throughout the shift and cleaned during the night phase.
-        if (NetworkManager.Singleton.IsServer)
-            CleanGraffitiTask.Instance?.TriggerDailyTask();
-
         // ── Opening Sequence Setup ──────────────────────────────────────────────
 
         _introDialogueTriggered      = false;
@@ -454,14 +463,15 @@ public class Day_02 : DayBase, IDailyTask
         _taskKillHandOff    = null;
         _killTargetSuspect  = null;
 
-        // Clean up graffiti tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
-        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
-        _graffitiObjectiveItem = null;
-
         // Clean up mail sorting tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
         SortMailTask.OnProgressChanged   -= OnSortMailProgressChanged;
         SortMailTask.OnAllPackagesSorted -= OnSortMailTaskComplete;
         _taskSortMail = null;
+
+        // Clean up fence repair tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
+        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
+        _taskFixFences = null;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -559,9 +569,10 @@ public class Day_02 : DayBase, IDailyTask
         else
             SortMailTask.Instance?.TriggerDeferredDelivery();
 
-        // The tutorial overlay is being skipped entirely, so add the objective directly —
+        // The tutorial overlay is being skipped entirely, so add the objectives directly —
         // OnMailSortingTutorialClosed will never fire on this path.
         EnsureSortMailObjective();
+        EnsureFixFencesObjective();
 
         Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked.");
     }
@@ -574,6 +585,12 @@ public class Day_02 : DayBase, IDailyTask
     {
         if (!NetworkManager.Singleton.IsServer) return;
         ShiftManager.Instance.OnDayStart -= OnDay2Started;
+
+        // Break a random batch of perimeter fences the instant Day 2 begins — independent of
+        // the scripted Vlad opening sequence below, which only decides when the "Fix Perimeter
+        // Fences" objective is surfaced on the tutorial overlay (see StartMailSortingSequence).
+        FenceRepairTask.Instance?.TriggerTask();
+
         if (_debugSkipOpening) return;
         StartCoroutine(Day2OpeningSequence());
     }
@@ -699,14 +716,12 @@ public class Day_02 : DayBase, IDailyTask
             yield return new WaitUntil(() => lockerDone);
         }
 
-        // Show the graffiti tutorial objective and track progress independently of Vlad's exit.
-        // The graffiti lines are the last two nodes of _vladToolLockerDialogue — already spoken above.
-        StartCoroutine(GraffitiObjectiveSequence());
-
         // Now that Vlad has unlocked the tool locker, trigger the Day 2 mail delivery (deferred
         // from the automatic day-change trigger) and show the sorting-mail tutorial overlay on
-        // all clients. See StartMailSortingSequence.
+        // all clients. See StartMailSortingSequence. Also surface the "Fix Perimeter Fences"
+        // objective (broken at Day 2 start — see OnDay2Started) on the tutorial objective list.
         StartMailSortingSequence();
+        Day02NetworkSync.Instance?.ShowFixFencesObjective();
 
         // ── Phase 5: Vlad returns to the yard and settles in ───────────────────
         yield return new WaitForSeconds(_vladExitDelay);
@@ -841,61 +856,6 @@ public class Day_02 : DayBase, IDailyTask
     }
 
     // -------------------------------------------------------------------------
-    // Graffiti Tutorial Objective
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Shows the graffiti tutorial objective and keeps its count label live until
-    /// all graffiti pieces are scrubbed. Runs independently so Vlad can exit
-    /// while the task is still in progress. Server-side only (CleanGraffitiTask
-    /// state is replicated so the text on clients stays in sync via OnProgressChanged).
-    /// </summary>
-    private IEnumerator GraffitiObjectiveSequence()
-    {
-        if (TutorialObjectiveList.Instance == null || CleanGraffitiTask.Instance == null)
-            yield break;
-
-        int total = CleanGraffitiTask.Instance.TotalGraffitiCount;
-        _graffitiObjectiveItem = TutorialObjectiveList.Instance.AddObjective(
-            BuildGraffitiObjectiveText(CleanGraffitiTask.Instance.ScrubbedCount, total));
-
-        CleanGraffitiTask.OnProgressChanged += OnGraffitiProgress;
-
-        bool taskDone = false;
-        void OnTaskCompleted() => taskDone = true;
-        CleanGraffitiTask.Instance.OnDailyTaskCompleted += OnTaskCompleted;
-
-        yield return new WaitUntil(() => taskDone || CleanGraffitiTask.Instance == null);
-
-        CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
-        if (CleanGraffitiTask.Instance != null)
-            CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnTaskCompleted;
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_graffitiObjectiveItem);
-        yield return new WaitForSeconds(2f);
-        TutorialObjectiveList.Instance?.HideAndClear();
-        _graffitiObjectiveItem = null;
-
-        Debug.Log("[Day_02] Graffiti tutorial objective complete.");
-    }
-
-    /// <summary>
-    /// Called whenever <see cref="CleanGraffitiTask.OnProgressChanged"/> fires.
-    /// Updates the live count label on the tutorial objective row.
-    /// </summary>
-    private void OnGraffitiProgress()
-    {
-        if (_graffitiObjectiveItem == null || CleanGraffitiTask.Instance == null) return;
-        _graffitiObjectiveItem.SetText(
-            BuildGraffitiObjectiveText(
-                CleanGraffitiTask.Instance.ScrubbedCount,
-                CleanGraffitiTask.Instance.TotalGraffitiCount));
-    }
-
-    private string BuildGraffitiObjectiveText(int scrubbed, int total) =>
-        $"{_taskCleanGraffitiText} {scrubbed}/{total}";
-
-    // -------------------------------------------------------------------------
     // Mail Sorting Tutorial
     // -------------------------------------------------------------------------
 
@@ -977,6 +937,53 @@ public class Day_02 : DayBase, IDailyTask
             : _taskSortMailText;
 
     // -------------------------------------------------------------------------
+    // Fix Perimeter Fences Tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the "Fix Perimeter Fences" objective to the tutorial objective list (which slides
+    /// the list in automatically) and subscribes to live progress until every broken fence is
+    /// repaired. Safe to call multiple times — no-ops if the objective is already tracked, so
+    /// both the normal tool-locker-dialogue flow and <see cref="DebugSkipOpening"/> always end
+    /// up showing the objective. Runs locally on every client (invoked via
+    /// <see cref="Day02NetworkSync.ShowFixFencesObjective"/>).
+    /// </summary>
+    public void EnsureFixFencesObjective()
+    {
+        if (_taskFixFences != null) return;
+
+        _taskFixFences = TutorialObjectiveList.Instance?.AddObjective(GetFixFencesTaskText());
+
+        FenceRepairTask.OnProgressChanged   += OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired += OnFixFencesTaskComplete;
+    }
+
+    /// <summary>
+    /// Called whenever <see cref="FenceRepairTask.OnProgressChanged"/> fires (driven by
+    /// replicated NetworkVariable changes, so this runs identically on every client). Updates
+    /// the live count label on the tutorial objective row.
+    /// </summary>
+    private void OnFixFencesProgressChanged()
+    {
+        _taskFixFences?.SetText(GetFixFencesTaskText());
+    }
+
+    private void OnFixFencesTaskComplete()
+    {
+        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskFixFences);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        _taskFixFences = null;
+    }
+
+    private string GetFixFencesTaskText() =>
+        FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
+            ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
+            : _taskFixFencesText;
+
+    // -------------------------------------------------------------------------
     // Suspect arrival — fire tutorial once on the first suspect with a mutation anomaly
     // -------------------------------------------------------------------------
 
@@ -997,8 +1004,6 @@ public class Day_02 : DayBase, IDailyTask
     {
         yield return new WaitForSeconds(4f);
 
-        yield return ShowAndWait("A new type of anomaly has appeared in the field — physical mutations.");
-        yield return new WaitForSeconds(1f);
         yield return ShowAndWait("Mutations are catalogued separately. Use the Mutation Exam notebook to record them.");
         yield return new WaitForSeconds(1f);
         yield return ShowAndWait("Pick up the Mutation Exam notebook and mark every mutation you find on this subject.");
@@ -1273,7 +1278,60 @@ public class Day_02 : DayBase, IDailyTask
         TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
 
         Debug.Log("[Day_02] Kill tutorial complete — folder handed off with the red stamp.");
+
+        ArmOchoBoothEncounter();
     }
+
+    // -------------------------------------------------------------------------
+    // Ocho Booth Encounter — arms as the next suspect right after the kill tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Arms <see cref="SuspectController.InterceptNextSuspectSpawn"/> so Ocho's booth-encounter
+    /// prefab (fake name, fake ID, antagonizing dialogue, and a verdict that never actually
+    /// processes) spawns as the very next suspect. Server-only. Safe to call directly from the
+    /// F12 debug cheat to skip straight to the encounter.
+    /// </summary>
+    public void ArmOchoBoothEncounter()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (_ochoBoothEncounterPrefab == null)
+        {
+            Debug.LogWarning("[Day_02] ArmOchoBoothEncounter: _ochoBoothEncounterPrefab is not assigned — skipping.");
+            return;
+        }
+
+        SuspectController.InterceptNextSuspectSpawn = () =>
+        {
+            SuspectController.Instance.SpawnScriptedSuspect(_ochoBoothEncounterPrefab);
+            SuspectController.Instance.CurrentSuspect?.GetComponent<OchoBoothEncounter>()?
+                .ConfigureSceneReferences(_ochoReappearPoint, _ochoElectricalPanelMarker);
+        };
+
+        Debug.Log("[Day_02] Ocho booth encounter armed — he will be the next suspect summoned.");
+    }
+
+    /// <summary>
+    /// Debug-only: arms the Ocho booth encounter and auto-summons him the instant the shift is
+    /// ready, bypassing the mutation/kill tutorials and the switch button entirely. Called by
+    /// <see cref="DebugConsole"/>'s F12 cheat menu.
+    /// </summary>
+    public void DebugSkipToOchoBoothEncounter()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        ArmOchoBoothEncounter();
+        ShiftManager.OnNextSuspectReadyForBell += AutoSummonOcho;
+    }
+
+    private void AutoSummonOcho()
+    {
+        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonOcho;
+        SuspectController.Instance?.NextSuspect();
+    }
+
+
 
     // -------------------------------------------------------------------------
     // Networked Marker helpers
