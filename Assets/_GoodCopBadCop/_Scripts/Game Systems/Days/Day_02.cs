@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using DG.Tweening;
 using Unity.Netcode;
@@ -28,11 +29,34 @@ using UnityEngine;
 ///   before Vlad has unlocked the tool locker. The sorting-mail tutorial overlay shows on all
 ///   clients; once closed, the tutorial objective list shows the "Sort the mail" task.
 /// </summary>
-public class Day_02 : DayBase
+public class Day_02 : DayBase, IDailyTask
 {
     public static Day_02 Instance { get; private set; }
 
     private void Awake() => Instance = this;
+
+    // -------------------------------------------------------------------------
+    // IDailyTask — registers the post-shift Vlad Out-Back sequence as a clock-out
+    // blocker the instant the last suspect for the day is processed (Dusk), rather
+    // than waiting for the player to clock out at the timecard machine first.
+    // See OnAllSuspectsProcessed_Day2 for the trigger point.
+    // -------------------------------------------------------------------------
+
+    string IDailyTask.DailyTaskId => "Day2VladFollowTrail";
+
+    /// <inheritdoc/>
+    public event Action OnDailyTaskCompleted;
+
+    /// <summary>
+    /// Entry point wired to <see cref="ShiftManager.RegisterPendingDailyTask"/>. Not called
+    /// directly by the scheduler — invoked from <see cref="OnAllSuspectsProcessed_Day2"/> once
+    /// per shift. Starts the Vlad out-back sequence. Server-only.
+    /// </summary>
+    void IDailyTask.TriggerDailyTask()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+        StartCoroutine(PostShiftSetupSequence());
+    }
 
     // -------------------------------------------------------------------------
     // Day 2 Tutorial (existing)
@@ -55,6 +79,41 @@ public class Day_02 : DayBase
 
     // Persistent flags for early-action guards (mirrors Day_01 pattern).
     private bool _notebookPageFiled;
+
+    [Header("Day 2 — Kill Tutorial (Second Suspect)")]
+    [Tooltip("The green (pass) ink stamp station — locked during the kill tutorial's stamp step so the player can only use the red stamp.")]
+    [SerializeField] private InkStamp _greenStampSlot;
+
+    [Tooltip("The yellow (quarantine) ink stamp station — locked during the kill tutorial's stamp step.")]
+    [SerializeField] private InkStamp _yellowStampSlot;
+
+    [Tooltip("The red (kill) ink stamp station.")]
+    [SerializeField] private InkStamp _redStampSlot;
+
+    [Tooltip("Number of documentation + physical (mutation) anomalies to force-activate on the second Day 2 suspect (index 1), so they always clear the '>10 active anomalies = kill' threshold.")]
+    [SerializeField] private int _killTutorialAnomalyCount = 10;
+
+    [Tooltip("World-space point above the red stamp slot — marker shown during the 'grab the red stamp' task.")]
+    [SerializeField] private Transform _markerRedStamp;
+
+    [Tooltip("Task text shown while the player needs to file the Documentation and Mutation exam pages into the folder.")]
+    [SerializeField] private string _taskAddExamPagesText = "Add the Documentation and Mutation exam pages to the folder";
+
+    [Tooltip("Task text shown while the player needs to grab the red ink stamp.")]
+    [SerializeField] private string _taskGrabRedStampText = "Grab the red ink stamp";
+
+    [Tooltip("Task text shown while the player needs to place the stamped folder at the window.")]
+    [SerializeField] private string _taskKillHandOffText = "Place the folder at the window";
+
+    // Guards / runtime state for the kill tutorial (second suspect, index 1).
+    private bool _killTutorialFired;
+    private SuspectCharacter _killTargetSuspect;
+    private PickableObject _killDoc1;
+    private PickableObject _killDoc2;
+    private int _killExamPagesFiledCount;
+    private TutorialObjectiveItem _taskAddExamPages;
+    private TutorialObjectiveItem _taskGrabRedStamp;
+    private TutorialObjectiveItem _taskKillHandOff;
 
     // -------------------------------------------------------------------------
     // Day 2 Opening Sequence
@@ -299,6 +358,11 @@ public class Day_02 : DayBase
         // Listen for each suspect's paperwork so we can detect the first with a mutation anomaly.
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
+        // Kill tutorial (second suspect, index 1) — force >10 documentation+physical anomalies.
+        _killTutorialFired = false;
+        _killExamPagesFiledCount = 0;
+        SuspectController.OnSuspectArrived += OnKillTutorialSuspectArrived;
+
         // Ensure the first booth suspect has at least one mutation anomaly for the tutorial.
         if (NetworkManager.Singleton.IsServer)
             SuspectController.ForceNextSuspectAnomalyCount = 1;
@@ -325,6 +389,38 @@ public class Day_02 : DayBase
         // Subscribe to ShiftManager so the opening sequence starts when the day officially begins.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDay2Started;
+
+        // Override the default "all suspects processed -> timecard machine activates
+        // immediately" behaviour for Day 2: the instant the last suspect is processed
+        // (Dusk), trigger the Vlad follow-the-trail sequence instead of letting the
+        // timecard machine prime for clock-out right away.
+        ShiftManager.OnLastSuspectProcessed += OnAllSuspectsProcessed_Day2;
+    }
+
+    /// <summary>
+    /// Fired by <see cref="ShiftManager.OnLastSuspectProcessed"/> the instant the last suspect
+    /// for the day is processed — before the timecard machine is ever primed for clock-out.
+    /// Registers this day's Vlad out-back sequence as a pending daily task so
+    /// <see cref="ShiftManager"/> keeps the timecard machine disabled until the sequence
+    /// resolves, then kicks the sequence off directly instead of waiting for
+    /// <see cref="ShiftEnded"/> (which only fires after the player clocks out). One-shot per
+    /// shift — unsubscribes itself immediately. Server-only.
+    /// </summary>
+    private void OnAllSuspectsProcessed_Day2()
+    {
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day2;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (!_enablePostShiftVladSequence)
+        {
+            Debug.Log("[Day_02] Post-shift Vlad sequence is disabled — advancing night phase directly.");
+            BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+            return;
+        }
+
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        ((IDailyTask)this).TriggerDailyTask();
     }
 
     /// <summary>
@@ -345,6 +441,19 @@ public class Day_02 : DayBase
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
 
+        // Kill tutorial cleanup — unsubscribe everything regardless of which step was active.
+        SuspectController.OnSuspectArrived   -= OnKillTutorialSuspectArrived;
+        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
+        UnsubscribeKillTutorialDocumentPickupEvents();
+        ExamNotebook.OnAnyNotebookPageFiled  -= OnKillExamPageFiledLocal;
+        FolderController.OnAnyFolderStamped  -= OnKillFolderStamped;
+        FolderController.OnFolderHandedOff   -= OnKillFolderHandedOff;
+        if (_markerRedStamp != null) TutorialMarkerManager.Instance?.Unmark(_markerRedStamp);
+        _taskAddExamPages   = null;
+        _taskGrabRedStamp   = null;
+        _taskKillHandOff    = null;
+        _killTargetSuspect  = null;
+
         // Clean up graffiti tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgress;
         _graffitiObjectiveItem = null;
@@ -356,6 +465,8 @@ public class Day_02 : DayBase
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
+
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day2;
 
         // Clear the trail destination override so other days use default behaviour.
         if (FollowTrailThreat.Instance != null)
@@ -395,23 +506,26 @@ public class Day_02 : DayBase
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
 
+        SuspectController.OnSuspectArrived   -= OnKillTutorialSuspectArrived;
+        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
+        UnsubscribeKillTutorialDocumentPickupEvents();
+        ExamNotebook.OnAnyNotebookPageFiled  -= OnKillExamPageFiledLocal;
+        FolderController.OnAnyFolderStamped  -= OnKillFolderStamped;
+        FolderController.OnFolderHandedOff   -= OnKillFolderHandedOff;
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
+
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day2;
     }
 
     public override void ShiftEnded()
     {
         base.ShiftEnded();
-        if (!NetworkManager.Singleton.IsServer) return;
 
-        if (!_enablePostShiftVladSequence)
-        {
-            Debug.Log("[Day_02] Post-shift Vlad sequence is disabled — advancing night phase directly.");
-            BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
-            return;
-        }
-
-        StartCoroutine(PostShiftSetupSequence());
+        // The Vlad out-back / follow-the-trail sequence now starts at Dusk — the instant the
+        // last suspect is processed — via OnAllSuspectsProcessed_Day2, instead of waiting for
+        // the player to clock out here. Nothing further to do on Day 2's clock-out.
     }
 
     public override void NightPhaseStarted() => base.NightPhaseStarted();
@@ -958,6 +1072,210 @@ public class Day_02 : DayBase
     }
 
     // -------------------------------------------------------------------------
+    // Kill Tutorial — Second Suspect (index 1)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on all clients when any suspect arrives. Reacts to index 1 (the second suspect
+    /// to reach the booth window on Day 2). Forces exactly <see cref="_killTutorialAnomalyCount"/>
+    /// anomalies drawn only from the documentation and physical (mutation) pools onto this
+    /// suspect via <see cref="SuspectCharacter.InitializeWithDocumentationAndPhysicalAnomalies"/>,
+    /// so they always clear the "more than 10 active anomalies = kill" threshold. Captures the
+    /// arriving suspect and waits for their own paperwork to spawn (see
+    /// <see cref="OnKillTutorialPaperworkSpawned"/>) before wiring the pickup trigger that starts
+    /// the scripted kill dialogue. Mirrors Day_01's index-2 quarantine tutorial suspect pattern.
+    /// Unsubscribes itself so it only fires once per day.
+    /// </summary>
+    private void OnKillTutorialSuspectArrived(int index)
+    {
+        if (index != 1) return;
+        SuspectController.OnSuspectArrived -= OnKillTutorialSuspectArrived;
+
+        _killTargetSuspect = SuspectController.Instance?.CurrentSuspect;
+        SuspectController.OnPaperworkSpawned += OnKillTutorialPaperworkSpawned;
+
+        if (NetworkManager.Singleton.IsServer)
+        {
+            SuspectController.Instance.CurrentSuspect?
+                .InitializeWithDocumentationAndPhysicalAnomalies(_killTutorialAnomalyCount);
+        }
+    }
+
+    /// <summary>
+    /// Fires on all clients whenever ANY suspect's paperwork spawns while we're waiting for the
+    /// kill tutorial suspect (index 1). Verifies the event actually belongs to
+    /// <see cref="_killTargetSuspect"/> before wiring pickup triggers — guards against ever
+    /// attaching the kill tutorial to the wrong suspect, exactly like Day_01's quarantine
+    /// tutorial guard.
+    /// </summary>
+    private void OnKillTutorialPaperworkSpawned(IDCard card, PickableObject appForm)
+    {
+        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
+
+        if (SuspectController.Instance?.CurrentSuspect != _killTargetSuspect)
+        {
+            Debug.LogWarning("[Day_02] OnKillTutorialPaperworkSpawned: paperwork belongs to a " +
+                              "different suspect than the index-1 kill-tutorial target — the target's own " +
+                              "paperwork never spawned. Skipping the kill tutorial for this day.");
+            _killTargetSuspect = null;
+            return;
+        }
+
+        _killTargetSuspect = null;
+        _killDoc1 = card;
+        _killDoc2 = appForm;
+
+        if (card != null)    card.OnPickedUpEvent    += OnKillPickupTrigger;
+        if (appForm != null) appForm.OnPickedUpEvent  += OnKillPickupTrigger;
+        FolderController.OnFolderEquipped += OnKillPickupTrigger;
+    }
+
+    // Parameterless adapter — used by PickableObject.OnPickedUpEvent.
+    private void OnKillPickupTrigger() => StartKillTutorial();
+
+    // FolderController.OnFolderEquipped passes the instance — we ignore it.
+    private void OnKillPickupTrigger(FolderController _) => StartKillTutorial();
+
+    private void UnsubscribeKillTutorialDocumentPickupEvents()
+    {
+        if (_killDoc1 != null) { _killDoc1.OnPickedUpEvent -= OnKillPickupTrigger; _killDoc1 = null; }
+        if (_killDoc2 != null) { _killDoc2.OnPickedUpEvent -= OnKillPickupTrigger; _killDoc2 = null; }
+        FolderController.OnFolderEquipped -= OnKillPickupTrigger;
+    }
+
+    /// <summary>
+    /// Fires when the player picks up one of the kill-tutorial suspect's documents or any
+    /// folder. Single-fire — removes all triggers and starts the scripted kill dialogue on
+    /// the server.
+    /// </summary>
+    private void StartKillTutorial()
+    {
+        if (_killTutorialFired) return;
+        _killTutorialFired = true;
+
+        UnsubscribeKillTutorialDocumentPickupEvents();
+
+        if (NetworkManager.Singleton.IsServer)
+            StartCoroutine(KillTutorialDialogueSequence());
+    }
+
+    /// <summary>
+    /// Server-only coroutine. Plays a quick scripted megaphone bark explaining that this
+    /// subject must be killed with the red stamp, then shows the kill-criteria tutorial
+    /// overlay (">5 symptoms = Quarantine. >10 = Kill. Don't hesitate!"). Once the overlay is
+    /// dismissed, <see cref="OnKillCriteriaOverlayClosed"/> begins the exam-page filing step.
+    /// </summary>
+    private IEnumerator KillTutorialDialogueSequence()
+    {
+        yield return ShowAndWait("This one's too far gone — more than ten active symptoms. That's not a quarantine, that's a kill.");
+        yield return new WaitForSeconds(0.5f);
+        yield return ShowAndWait("File the Documentation and Mutation exam pages, then use the red stamp. Don't hesitate.");
+
+        TutorialOverlay.Instance?.ShowKillCriteriaTutorial(OnKillCriteriaOverlayClosed);
+    }
+
+    /// <summary>
+    /// Fires when the player closes the kill-criteria tutorial overlay. Begins the "add exam
+    /// pages" task — completes once two exam pages (Documentation + Mutation) are filed into
+    /// the folder.
+    /// </summary>
+    private void OnKillCriteriaOverlayClosed()
+    {
+        _killExamPagesFiledCount = 0;
+        _taskAddExamPages = TutorialObjectiveList.Instance?.AddObjective(_taskAddExamPagesText);
+
+        ExamNotebook.AnyPageFiled = false;
+        ExamNotebook.OnAnyNotebookPageFiled += OnKillExamPageFiledLocal;
+    }
+
+    /// <summary>
+    /// Fires on all clients each time any exam notebook page is filed while the kill tutorial's
+    /// "add exam pages" step is active. Advances to the stamp step once two pages have been
+    /// filed — the Documentation page and the Mutation page.
+    /// </summary>
+    private void OnKillExamPageFiledLocal()
+    {
+        _killExamPagesFiledCount++;
+        if (_killExamPagesFiledCount < 2) return;
+
+        ExamNotebook.OnAnyNotebookPageFiled -= OnKillExamPageFiledLocal;
+        StartKillStampStep();
+    }
+
+    /// <summary>
+    /// Begins the red-stamp phase of the kill tutorial. Completes the "add exam pages" task,
+    /// locks the green and yellow stamps so only the red stamp is usable, shows the "grab the
+    /// red ink stamp" task with its marker, and waits for the folder to be stamped.
+    /// </summary>
+    private void StartKillStampStep()
+    {
+        if (_taskAddExamPages != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteObjective(_taskAddExamPages);
+            _taskAddExamPages = null;
+        }
+
+        _greenStampSlot?.SetSlotInteractable(false);
+        _yellowStampSlot?.SetSlotInteractable(false);
+        _redStampSlot?.SetSlotInteractable(true);
+
+        _taskGrabRedStamp = TutorialObjectiveList.Instance?.AddObjective(_taskGrabRedStampText);
+
+        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
+            TutorialMarkerManager.Instance.Mark(_markerRedStamp);
+
+        FolderController.OnAnyFolderStamped += OnKillFolderStamped;
+    }
+
+    /// <summary>
+    /// Fires on all clients when any folder is stamped after the kill tutorial's stamp step
+    /// began. Completes the stamp task, removes the arrow, restores the green/yellow stamps,
+    /// and shows the "place folder at window" task — mirrors Day_01's quarantine hand-off step,
+    /// but for the kill verdict.
+    /// </summary>
+    private void OnKillFolderStamped()
+    {
+        FolderController.OnAnyFolderStamped -= OnKillFolderStamped;
+
+        if (_taskGrabRedStamp != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteObjective(_taskGrabRedStamp);
+            _taskGrabRedStamp = null;
+        }
+
+        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
+            TutorialMarkerManager.Instance.Unmark(_markerRedStamp);
+
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+
+        _taskKillHandOff = TutorialObjectiveList.Instance?.AddObjective(_taskKillHandOffText);
+
+        FolderController.OnFolderHandedOff += OnKillFolderHandedOff;
+    }
+
+    /// <summary>
+    /// Fires on all clients when the stamped folder is handed off at the window. The kill
+    /// verdict itself (despawning the suspect, payout, etc.) is resolved automatically by
+    /// <see cref="SuspectController.DeliverVerdict"/> based on the folder's Kill stamp type —
+    /// this only finishes the kill tutorial's task list.
+    /// </summary>
+    private void OnKillFolderHandedOff()
+    {
+        FolderController.OnFolderHandedOff -= OnKillFolderHandedOff;
+
+        if (_taskKillHandOff != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteObjective(_taskKillHandOff);
+            _taskKillHandOff = null;
+        }
+
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+
+        Debug.Log("[Day_02] Kill tutorial complete — folder handed off with the red stamp.");
+    }
+
+    // -------------------------------------------------------------------------
     // Networked Marker helpers
     // -------------------------------------------------------------------------
 
@@ -1279,6 +1597,10 @@ public class Day_02 : DayBase
 
         // Advance the night phase — lights up the "start next shift" button.
         BetweenShiftTaskManager.Instance?.HandleNightPhaseReady();
+
+        // The Day 2 out-back sequence is fully resolved — release the clock-out block that was
+        // registered via ShiftManager.RegisterPendingDailyTask in OnAllSuspectsProcessed_Day2.
+        OnDailyTaskCompleted?.Invoke();
 
         Debug.Log("[Day_02] Mutant killed — night phase ready.");
     }

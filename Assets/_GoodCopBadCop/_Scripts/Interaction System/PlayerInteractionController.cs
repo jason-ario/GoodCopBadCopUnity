@@ -437,20 +437,32 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
-        // Slope check — hanging boards are exempt (they're intentionally vertical/angled).
-        // For all other surfaces, block placement when the surface is steeper than MaxPlacementSlopeAngle.
+        // A PlacementSlot forces the object into an exact fixed pose (e.g. a mail bin's opening
+        // or a mail cubby slot) instead of following the raycast hit point / surface normal —
+        // this stops the ghost from appearing to stick to the side of the receptacle when the
+        // player's aim lands slightly off-center.
+        PlacementSlot placementSlot = placementBoard as PlacementSlot;
+
+        // Slope check — hanging boards and exact placement slots are exempt (a slot's own pose
+        // is authoritative regardless of what surface normal the raycast happened to hit).
         bool isHangingBoard = placementBoard != null && placementBoard.IsHanging;
-        if (!isHangingBoard)
+        if (!isHangingBoard && placementSlot == null)
         {
             float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
             if (slopeAngle > MaxPlacementSlopeAngle)
                 inRange = false;
         }
 
-        // Determine placement rotation: board rotation when available, otherwise align to surface normal
-        Quaternion targetRotation = placementBoard != null
-            ? placementBoard.transform.rotation
-            : Quaternion.FromToRotation(Vector3.up, hit.normal);
+        // Determine placement pose: an exact PlacementSlot pose takes priority, then a generic
+        // board's rotation (still following the hit point for position), otherwise align to the
+        // surface normal at the raycast hit point for freeform placement.
+        Quaternion targetRotation = placementSlot != null
+            ? placementSlot.SnapPoint.rotation
+            : placementBoard != null
+                ? placementBoard.transform.rotation
+                : Quaternion.FromToRotation(Vector3.up, hit.normal);
+
+        Vector3 targetPosition = placementSlot != null ? placementSlot.SnapPoint.position : hit.point;
 
         reticle.SetInteractState(false);
 
@@ -459,11 +471,11 @@ public class PlayerInteractionController : NetworkBehaviour
             ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject.ItemData);
             ObjectPlacer.Instance.ActivatePlacer(placementBoard);
             ObjectPlacer.Instance.transform.rotation = targetRotation;
-            ObjectPlacer.Instance.transform.position = hit.point;
+            ObjectPlacer.Instance.transform.position = targetPosition;
         }
 
         ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, targetRotation, Time.deltaTime * objectPlacerLerpSpeed);
-        ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, hit.point, Time.deltaTime * objectPlacerLerpSpeed);
+        ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, targetPosition, Time.deltaTime * objectPlacerLerpSpeed);
         ObjectPlacer.Instance.SetInRange(inRange);
     }
     

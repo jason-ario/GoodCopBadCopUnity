@@ -9,6 +9,12 @@ using UnityEngine;
 /// The box is centred on this GameObject's position.
 /// Spawn intervals are randomised between <see cref="spawnIntervalMin"/> and <see cref="spawnIntervalMax"/>.
 /// Each interval triggers a burst: a rapid sequence of spawns with a short delay between each one.
+///
+/// Ambient mutants spawned this way (including legacy-mutant reintroductions) never start
+/// aggroed — they always spawn with no aggro target, ignoring <see cref="MutantEnemyData.aggroChance"/>
+/// entirely. The only mutants that spawn already aggroed are those created by a
+/// <see cref="MutantBreachManager"/> breach (when <see cref="MutantBreachData.forceAggro"/> is set),
+/// or via the debug-only <see cref="ForceSpawnAggroed"/> cheat.
 /// </summary>
 public class MutantSpawner : NetworkBehaviour
 {
@@ -281,6 +287,12 @@ public class MutantSpawner : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Spawns one mutant. Ambient spawns (the normal burst loop) never start aggroed —
+    /// only <see cref="MutantBreachManager"/>-spawned mutants, or an explicit
+    /// <paramref name="forceAggro"/> override (used solely by the debug console's
+    /// "Aggroed Mutant" cheat via <see cref="ForceSpawnAggroed"/>), can start hostile.
+    /// </summary>
     private void SpawnSingleEnemy(bool forceAggro = false)
     {
         Vector3 localOffset = new Vector3(
@@ -316,12 +328,16 @@ public class MutantSpawner : NetworkBehaviour
 
         if (legacyCharacter == null)
         {
-            // Normal path — assign the aggro target before Spawn() so InitialiseServer can read it.
+            // Ambient path — only assign an aggro target (and thus allow InitialiseServer's
+            // aggroChance roll / forced aggro to matter) when explicitly forced. Otherwise the
+            // mutant spawns with no aggro target at all, guaranteeing it starts non-aggroed.
             MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
-            if (aggroTarget != null)
-                enemy?.SetAggroTarget(aggroTarget);
             if (forceAggro)
+            {
+                if (aggroTarget != null)
+                    enemy?.SetAggroTarget(aggroTarget);
                 enemy?.SetForceAggro(true);
+            }
         }
 
         netObj.Spawn(true);
@@ -330,8 +346,10 @@ public class MutantSpawner : NetworkBehaviour
         if (legacyCharacter != null)
         {
             // Legacy path — skip the booth cutscene/window-breach entirely and drop straight
-            // into active MutantEnemy behaviour, forced hostile toward the aggro target.
-            legacyCharacter.ActivateAsLegacyMutant(aggroTarget);
+            // into active MutantEnemy behaviour. Only force hostility when explicitly requested;
+            // ambient reintroductions of a legacy mutant now start non-aggroed like any other
+            // ambient spawn.
+            legacyCharacter.ActivateAsLegacyMutant(forceAggro ? aggroTarget : null);
             Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
         }
     }
@@ -462,8 +480,11 @@ public class MutantSpawner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Spawns a single enemy that is guaranteed to be in aggro mode, heading straight
-    /// for the assigned <see cref="aggroTarget"/> regardless of <see cref="MutantEnemyData.aggroChance"/>.
+    /// Debug-only entry point (used by the F-key cheat console) that spawns a single enemy
+    /// guaranteed to be in aggro mode, heading straight for the assigned <see cref="aggroTarget"/>
+    /// regardless of <see cref="MutantEnemyData.aggroChance"/>. This is the only way an ambient
+    /// <see cref="MutantSpawner"/> mutant can start aggroed — normal bursts (<see cref="SpawnBurst"/>)
+    /// never aggro on spawn; only a <see cref="MutantBreachManager"/> breach does that organically.
     /// Respects the active-enemy cap (day-scaled when enabled). SERVER ONLY.
     /// </summary>
     public void ForceSpawnAggroed()

@@ -13,13 +13,16 @@ using Random = UnityEngine.Random;
 ///
 /// The player must physically carry each package and drop it into the correct bin:
 ///   - Confiscate bin  — goods category is on the prohibited list.
-///   - Quarantine bin  — the addressee is currently serving quarantine.
-///   - Addressee's cubby (Mail Cubbies) — the addressee is alive, not quarantined, and the goods
-///     are allowed. There is no generic "Delivery" bin: the package must land in the specific
+///   - Addressee's cubby (Mail Cubbies) — the goods are allowed (addressee is alive — dead
+///     residents are never used as addressees, see <see cref="BuildAddressablePool"/>). There is
+///     no generic "Delivery" bin: the package must land in the specific
 ///     <see cref="MailCubbySlot"/> assigned to that resident, or it is bounced back out even
 ///     though it is a deliverable package.
 ///
-/// Sorting is detected by <see cref="MailSortBin"/> (Confiscate/Quarantine) and
+/// Quarantine sorting has been removed from this task — packages are only ever Confiscate or
+/// Delivery, regardless of the addressee's quarantine status.
+///
+/// Sorting is detected by <see cref="MailSortBin"/> (Confiscate) and
 /// <see cref="MailCubbySlot"/> (Delivery) trigger volumes, which call
 /// <see cref="EvaluateSort"/> via <see cref="MailPackageItem.RequestSortServerRpc"/>.
 ///
@@ -357,8 +360,27 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         int packageCount = Random.Range(_minPackageCount, _maxPackageCount + 1);
+
+        // Draw addressees from a shuffled pass over every eligible resident so each one gets at
+        // most one package before anyone gets a second — only reshuffling and starting a fresh
+        // pass once every resident has already received one. This prevents the same resident
+        // from being picked for multiple pieces of mail in a single delivery whenever there are
+        // at least as many residents as packages.
+        List<SuspectRecord> residentDrawOrder = new List<SuspectRecord>(addressPool);
+        Shuffle(residentDrawOrder);
+        int residentCursor = 0;
+
         for (int i = 0; i < packageCount; i++)
-            SpawnSinglePackage(addressPool);
+        {
+            if (residentCursor >= residentDrawOrder.Count)
+            {
+                Shuffle(residentDrawOrder);
+                residentCursor = 0;
+            }
+
+            SpawnSinglePackage(residentDrawOrder[residentCursor]);
+            residentCursor++;
+        }
 
         _totalCount.Value = _spawnedPackages.Count;
         UpdateThreatLevel();
@@ -383,8 +405,14 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <see cref="MailCubbySlot"/> the package was dropped into) matches the package's addressee —
     /// dropping a deliverable package into the wrong resident's cubby is treated as incorrect,
     /// even though the bin type matches.
+    ///
+    /// <paramref name="hasSnapPose"/>/<paramref name="snapPosition"/>/<paramref name="snapRotation"/>
+    /// carry the cubby's fixed placement pose (see <see cref="MailCubbySlot"/>'s
+    /// <see cref="PlacementSlot"/>) so a correctly delivered package can be snapped exactly into
+    /// place and have its throw momentum cleared — see <see cref="MailPackageItem.MarkDelivered"/>.
     /// </summary>
-    public void EvaluateSort(MailPackageItem package, MailSortBinType binType, string slotResidentName = "")
+    public void EvaluateSort(MailPackageItem package, MailSortBinType binType, string slotResidentName = "",
+        bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
@@ -400,13 +428,14 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             {
                 // Delivered packages stay sitting in the mailbox (locked, no longer interactable)
                 // instead of despawning immediately — cleared at the start of the next day.
-                package.MarkDelivered();
+                package.MarkDelivered(hasSnapPose, snapPosition, snapRotation);
                 _spawnedPackages.Remove(package.NetworkObject);
                 _deliveredPackages.Add(package.NetworkObject);
             }
             else
             {
                 package.MarkResolved();
+                package.PlaySortSuccessSfx();
                 _spawnedPackages.Remove(package.NetworkObject);
                 package.NetworkObject.Despawn(destroy: true);
             }
@@ -433,6 +462,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     // ── Private ────────────────────────────────────────────────────────────────
 
+    /// <summary>Fisher-Yates shuffle used to randomize resident draw order per delivery (see <see cref="TriggerTask"/>).</summary>
+    private static void Shuffle<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
     /// <summary>
     /// Builds the pool of residents packages can be addressed to. Excludes killed suspects —
     /// dead residents are not one of the three sortable outcomes (contraband / deliverable /
@@ -453,7 +492,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         return pool;
     }
 
-    private void SpawnSinglePackage(List<SuspectRecord> addressPool)
+    private void SpawnSinglePackage(SuspectRecord resident)
     {
         if (_packagePrefab == null)
         {
@@ -461,7 +500,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return;
         }
 
-        SuspectRecord resident = addressPool[Random.Range(0, addressPool.Count)];
         string residentName = $"{resident.SuspectData.FirstName} {resident.SuspectData.LastName}".Trim();
 
         bool isProhibited = Random.Range(0, _todaysAllowedGoods.Count + _todaysProhibitedGoods.Count) >= _todaysAllowedGoods.Count;
@@ -469,15 +507,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             ? _todaysProhibitedGoods[Random.Range(0, _todaysProhibitedGoods.Count)]
             : _todaysAllowedGoods[Random.Range(0, _todaysAllowedGoods.Count)];
 
-        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
-        bool isQuarantined = SuspectRunRecords.Instance != null &&
-                              SuspectRunRecords.Instance.GetRemainingQuarantineDays(resident, currentDay) > 0;
-
+        // Quarantine sorting has been removed from this task — mail is only ever Confiscate
+        // (prohibited goods) or Delivery (everything else), regardless of the addressee's
+        // quarantine status.
         MailSortBinType correctBin = isProhibited
             ? MailSortBinType.Confiscate
-            : isQuarantined
-                ? MailSortBinType.Quarantine
-                : MailSortBinType.Delivery;
+            : MailSortBinType.Delivery;
 
         Vector3    spawnPos = GetRandomSpawnPosition();
         Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);

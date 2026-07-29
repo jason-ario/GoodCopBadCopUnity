@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -189,10 +190,26 @@ public abstract class DayBase : MonoBehaviour
 
         // DayActivated runs before NGO (re)spawns scene NetworkObjects on the debug-skip path
         // (see Day_01.OnDayStarted for the same issue with ink-stamp locks), so the immediate
-        // PowerOn() call above can be silently dropped. Re-apply once ShiftManager.OnDayStart
-        // fires, by which point every NetworkBehaviour is guaranteed to be spawned.
+        // PowerOn() call above can be silently dropped. Re-apply on every ShiftManager.OnDayStart
+        // firing while this day is active — deliberately NOT a one-shot subscription, since
+        // OnDayStart is invoked from several different transition paths (normal shift-end,
+        // debug booth-skips, intro-cutscene-skip, etc.) and some of those fire it before this
+        // method has had a chance to subscribe, which would otherwise permanently miss the one
+        // firing it needed. Re-running the check on every firing is safe — it's a no-op once
+        // power is already in the correct state — so there's no need to track "did we already
+        // catch it" and unsubscribe early.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += RestorePowerIfNoOutageIntendedOnDayStart;
+
+        // Final safety net independent of ShiftManager.OnDayStart entirely: some transition
+        // paths can end up never firing OnDayStart while this day's subscription window is
+        // open (e.g. a debug cheat that jumps straight into a shift already in progress).
+        // Re-check a couple of times shortly after activation once every relevant
+        // NetworkBehaviour (ElectricityController, FuseBoxPuzzleController, etc.) is
+        // guaranteed to have finished spawning.
+        if (_powerRestoreRetryCoroutine != null)
+            StopCoroutine(_powerRestoreRetryCoroutine);
+        _powerRestoreRetryCoroutine = StartCoroutine(RetryRestorePowerShortlyAfterActivation());
 
         // Dawn — trigger this day's pre-shift tasks before the player clocks in.
         TriggerPreShiftTasks();
@@ -242,12 +259,27 @@ public abstract class DayBase : MonoBehaviour
         }
     }
 
+    private Coroutine _powerRestoreRetryCoroutine;
+
     private void RestorePowerIfNoOutageIntendedOnDayStart()
     {
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= RestorePowerIfNoOutageIntendedOnDayStart;
-
         RestorePowerIfNoOutageIntended();
+    }
+
+    /// <summary>
+    /// Re-checks power state a couple of times shortly after <see cref="DayActivated"/>,
+    /// independently of <see cref="ShiftManager.OnDayStart"/>. Covers transition paths that
+    /// never fire OnDayStart at all while this day is the active one.
+    /// </summary>
+    private IEnumerator RetryRestorePowerShortlyAfterActivation()
+    {
+        yield return null;
+        RestorePowerIfNoOutageIntended();
+
+        yield return new WaitForSeconds(0.5f);
+        RestorePowerIfNoOutageIntended();
+
+        _powerRestoreRetryCoroutine = null;
     }
 
     /// <summary>
@@ -328,5 +360,11 @@ public abstract class DayBase : MonoBehaviour
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= RestorePowerIfNoOutageIntendedOnDayStart;
+
+        if (_powerRestoreRetryCoroutine != null)
+        {
+            StopCoroutine(_powerRestoreRetryCoroutine);
+            _powerRestoreRetryCoroutine = null;
+        }
     }
 }

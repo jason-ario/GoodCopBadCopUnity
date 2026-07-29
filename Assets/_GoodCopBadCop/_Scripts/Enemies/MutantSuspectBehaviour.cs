@@ -1,5 +1,6 @@
 using System.Collections;
 using DG.Tweening;
+using FIMSpace.FProceduralAnimation;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -206,6 +207,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         SetClimbingClientRpc(true);
         PlayClimbThroughSoundClientRpc();
 
+        // Disable procedural leg IK for the duration of the climb — the tweened climb-through
+        // motion isn't grounded locomotion, so LegsAnimator would otherwise fight the pose.
+        SetLegsAnimatorsEnabledClientRpc(false);
+
         // Disable agent so DOTween can move freely across the counter (off-mesh).
         _agent.enabled = false;
 
@@ -224,6 +229,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         PlayClimbLandSoundClientRpc();
         if (_playChaseMusic)
             StartChaseMusicClientRpc();
+
+        // Climb-through is complete — re-enable leg IK before the mutant resumes normal
+        // grounded locomotion under MutantEnemy's control.
+        SetLegsAnimatorsEnabledClientRpc(true);
 
         if (_isDone) yield break;
 
@@ -582,6 +591,20 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (_animator != null)
             _animator.SetBool(ClimbingAnimBool, climbing);
+    }
+
+    /// <summary>
+    /// Enables or disables every <see cref="LegsAnimator"/> on this mutant (and its children)
+    /// on all clients. Used to suspend procedural leg IK during the tweened window climb-through,
+    /// then restore it once the mutant lands and resumes grounded locomotion.
+    /// </summary>
+    [ClientRpc]
+    private void SetLegsAnimatorsEnabledClientRpc(bool enabled)
+    {
+        foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
+        {
+            legsAnimator.enabled = enabled;
+        }
     }
 
     /// <summary>Sets the BangOnShutters animator bool on all clients. Used to drive the shutter-attack animation.</summary>

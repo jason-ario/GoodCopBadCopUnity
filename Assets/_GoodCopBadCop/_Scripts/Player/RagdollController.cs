@@ -1,3 +1,4 @@
+using FIMSpace.FProceduralAnimation;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -118,6 +119,20 @@ public class RagdollController : MonoBehaviour
 
         if (firstPersonArms != null)
             firstPersonArms.SetActive(false);
+
+        DisableLegsAnimators();
+    }
+
+    /// <summary>
+    /// Disables every <see cref="LegsAnimator"/> on this player (and its children) so
+    /// procedural leg IK stops fighting the ragdoll once the player has died.
+    /// </summary>
+    private void DisableLegsAnimators()
+    {
+        foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
+        {
+            legsAnimator.enabled = false;
+        }
     }
 
     [ContextMenu("Activate")]

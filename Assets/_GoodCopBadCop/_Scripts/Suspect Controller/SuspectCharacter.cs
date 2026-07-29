@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using FIMSpace.FLook;
+using FIMSpace.FProceduralAnimation;
 using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -400,8 +401,10 @@ public class SuspectCharacter : Interactable
     /// </summary>
     /// <param name="initialAggroTarget">
     /// Optional target (e.g. the player or booth) the mutant heads toward on spawn, mirroring
-    /// <see cref="MutantSpawner"/>'s aggroTarget. Forces aggro so the legacy mutant is
-    /// immediately hostile rather than rolling the normal aggroChance.
+    /// <see cref="MutantSpawner"/>'s aggroTarget. When non-null, forces aggro so the legacy
+    /// mutant is immediately hostile. When null (the normal ambient-reintroduction case), the
+    /// mutant spawns with no aggro target at all and starts non-aggroed, ignoring
+    /// <see cref="MutantEnemyData.aggroChance"/> entirely.
     /// </param>
     public void ActivateAsLegacyMutant(Transform initialAggroTarget)
     {
@@ -427,8 +430,10 @@ public class SuspectCharacter : Interactable
         SuspectRunRecords.Instance?.RegisterActiveFullMutant(suspectData);
 
         if (initialAggroTarget != null)
+        {
             _mutantEnemy.SetAggroTarget(initialAggroTarget);
-        _mutantEnemy.SetForceAggro(true);
+            _mutantEnemy.SetForceAggro(true);
+        }
         _mutantEnemy.enabled = true;
         _mutantEnemy.InitialiseServer();
         EnableMutantEnemyClientRpc();
@@ -903,6 +908,27 @@ public class SuspectCharacter : Interactable
 
         SyncAnomalySnapshot();
 
+    }
+
+    /// <summary>
+    /// Initializes this suspect with anomalies drawn only from the documentation and mutation
+    /// (physical) pools. All other anomaly categories are disabled. Used for scripted tutorial
+    /// suspects (e.g. the Day 2 kill tutorial suspect) that must exhibit exactly a specific number
+    /// of paperwork and physical symptoms, and nothing from any other category.
+    /// Syncs disabled anomaly states to all clients.
+    /// </summary>
+    public void InitializeWithDocumentationAndPhysicalAnomalies(int count)
+    {
+        anomalyController.InitializeWithDocumentationAndPhysicalAnomalies(count);
+
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
+        if (record != null)
+        {
+            MarkSuspectShown(record);
+            suspectRecordViewer.SetRecord(record);
+        }
+
+        SyncAnomalySnapshot();
     }
 
     /// <summary>
@@ -1532,6 +1558,20 @@ public class SuspectCharacter : Interactable
             bloodExplosion.SetActive(true);
 
         animator.SetTrigger("Die");
+
+        DisableLegsAnimators();
+    }
+
+    /// <summary>
+    /// Disables every <see cref="LegsAnimator"/> on this suspect (and its children) so
+    /// procedural leg IK stops driving the rig once the death animation takes over.
+    /// </summary>
+    private void DisableLegsAnimators()
+    {
+        foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
+        {
+            legsAnimator.enabled = false;
+        }
     }
 
     public void AimAtPlayer()

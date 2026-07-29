@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using FIMSpace.FProceduralAnimation;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -1192,6 +1193,24 @@ public class MutantEnemy : NetworkBehaviour
         DisableColliders();
     }
 
+    /// <summary>
+    /// Disables every <see cref="LegsAnimator"/> on this mutant (and its children) so procedural
+    /// leg IK stops driving the rig once the corpse should go limp/play its death animation.
+    /// </summary>
+    private void DisableLegsAnimators()
+    {
+        foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
+        {
+            legsAnimator.enabled = false;
+        }
+    }
+
+    [ClientRpc]
+    private void DisableLegsAnimatorsClientRpc()
+    {
+        DisableLegsAnimators();
+    }
+
     [ClientRpc]
     private void SpawnGoreBurstClientRpc(Vector3[] positions, int[] prefabIndices, Vector3[] velocities)
     {
@@ -1291,6 +1310,11 @@ public class MutantEnemy : NetworkBehaviour
         // navigation, or weapon hits. Applied locally (server) and broadcast to all clients.
         DisableColliders();
         DisableCollidersClientRpc();
+
+        // Disable this mutant's leg animator(s) on death so procedural leg IK stops fighting
+        // the death pose/ragdoll. Applied locally (server) and broadcast to all clients.
+        DisableLegsAnimators();
+        DisableLegsAnimatorsClientRpc();
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {

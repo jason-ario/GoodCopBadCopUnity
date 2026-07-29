@@ -265,6 +265,38 @@ public class AnomalyController : MonoBehaviour
     }
 
     /// <summary>
+    /// Activates exactly <paramref name="count"/> anomalies chosen at random from the combined
+    /// documentation and mutation (physical) pools only. Every other category stays unavailable,
+    /// exactly like <see cref="InitializeWithDocumentationAnomalies"/>. Used for scripted tutorial
+    /// suspects that must exhibit both a paperwork discrepancy and a visible physical mutation —
+    /// e.g. the Day 2 kill-tutorial suspect who must clear the "more than 10 active anomalies"
+    /// kill threshold using only paperwork and physical symptoms.
+    /// <para>
+    /// <see cref="MissingDocumentAnomaly"/> is always excluded from selection here for the same
+    /// reason as <see cref="InitializeWithDocumentationAnomalies"/>: it would make
+    /// <see cref="SuspectController.SpawnPaperwork"/> abort and spawn no documents at all.
+    /// </para>
+    /// </summary>
+    public void InitializeWithDocumentationAndPhysicalAnomalies(int count)
+    {
+        ClearInitializationState(deactivateActive: true);
+
+        var pool = FilterToUnlocked(
+                _documentationAnomalies.Cast<Anomaly>()
+                    .Concat(_mutationAnomalies.Cast<Anomaly>())
+                    .ToList())
+            .Where(a => a is not MissingDocumentAnomaly)
+            .ToList();
+
+        ShuffleList(pool);
+        int toActivate = Mathf.Min(count, pool.Count);
+        for (int i = 0; i < toActivate; i++) ActivateAnomaly(pool[i]);
+        for (int i = toActivate; i < pool.Count; i++) InitializeDisabled(pool[i]);
+
+        Debug.Log($"[AnomalyController] Documentation+Physical init: {toActivate}/{pool.Count} unlocked anomaly/ies active (MissingDocumentAnomaly excluded).");
+    }
+
+    /// <summary>
     /// Forces on exactly the anomaly types named in <paramref name="typeNames"/> (matched against
     /// each anomaly component's C# type name, e.g. "RandomTumorAnomaly"), bypassing
     /// <see cref="AnomalyUnlockManager"/> entirely. Every other anomaly on the prefab is disabled.

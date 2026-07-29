@@ -29,6 +29,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject trashTutorialScreen;
     [SerializeField] private GameObject graffitiTutorialScreen;
     [SerializeField] private GameObject sortingMailTutorialScreen;
+    [SerializeField] private GameObject killCriteriaTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -98,6 +99,12 @@ public class TutorialOverlay : MonoBehaviour
 
     /// <summary>Shows the sorting-mail tutorial overlay (Day 2, right after Vlad unlocks the tool locker).</summary>
     public void ShowSortingMailTutorial(Action onComplete = null) => ShowScreen(sortingMailTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the kill-criteria tutorial overlay (Day 2 kill tutorial) — explains the
+    /// quarantine/kill symptom-count thresholds right after the kill scripted dialogue.
+    /// </summary>
+    public void ShowKillCriteriaTutorial(Action onComplete = null) => ShowScreen(killCriteriaTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

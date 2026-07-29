@@ -38,11 +38,11 @@ public class MailPackageItem : PickableObject
     [Tooltip("World-space label showing the goods category. Optional.")]
     [SerializeField] private TextMeshPro _goodsLabelText;
 
-    [Header("Delivery Sound")]
-    [Tooltip("One-shot sound played when this package is correctly delivered to its addressee's mailbox cubby.")]
-    [SerializeField] private AudioClip _deliverySfxClip;
-    [Tooltip("Volume for _deliverySfxClip.")]
-    [SerializeField] private float _deliverySfxVolume = 1f;
+    [Header("Sort Feedback")]
+    [Tooltip("One-shot sound played on all clients whenever this package is correctly sorted (into Confiscate or into its addressee's mailbox cubby).")]
+    [SerializeField] private AudioClip _sortSuccessSfxClip;
+    [Tooltip("Volume for _sortSuccessSfxClip.")]
+    [SerializeField] private float _sortSuccessSfxVolume = 1f;
 
     // ── Networked data, set once by the server at spawn time via ServerInitialize ──────────────
 
@@ -97,32 +97,83 @@ public class MailPackageItem : PickableObject
         RefreshLabel();
     }
 
-    /// <summary>Server-only. Marks this package as resolved so it cannot be counted twice.</summary>
-    public void MarkResolved() => IsResolved = true;
-
     /// <summary>
     /// Server-only. Marks this package as resolved, permanently locks it so it can no longer be
     /// picked up (via <see cref="LockInteractableNetworked"/>), and plays the delivery sound
     /// effect on every client. Called by <see cref="SortMailTask.EvaluateSort"/> when this
-    /// package is dropped into its addressee's mailbox cubby — unlike Confiscate/Quarantine
-    /// correct sorts, delivered packages are not despawned immediately; they stay sitting in the
-    /// mailbox until <see cref="SortMailTask.DespawnDeliveredPackages"/> clears them at the start
-    /// of the next day.
+    /// package is dropped into its addressee's mailbox cubby — unlike a Confiscate correct sort,
+    /// delivered packages are not despawned immediately; they stay sitting in the mailbox until
+    /// <see cref="SortMailTask.DespawnDeliveredPackages"/> clears them at the start of the next
+    /// day.
+    ///
+    /// If <paramref name="hasSnapPose"/> is true, the package is first snapped to
+    /// <paramref name="snapPosition"/>/<paramref name="snapRotation"/> (the cubby's
+    /// <see cref="PlacementSlot"/> pose) and its Rigidbody is zeroed out and made kinematic
+    /// before colliders are disabled — otherwise a package that was thrown into the slot keeps
+    /// its throw velocity after its collider is locked out, and with no collider left to stop it
+    /// it flies straight through the floor and is lost.
     /// </summary>
-    public void MarkDelivered()
+    public void MarkDelivered(bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
         if (!IsServer) return;
 
+        if (hasSnapPose)
+            SnapAndFreeze(snapPosition, snapRotation);
+
         MarkResolved();
         LockInteractableNetworked();
-        PlayDeliverySfxClientRpc();
+        PlaySortSuccessSfx();
+    }
+
+    /// <summary>
+    /// Server-only. Immediately zeroes this package's Rigidbody velocity, makes it kinematic,
+    /// and snaps its transform to the given world pose on every client — used so a package that
+    /// is still physically flying (thrown) when it correctly lands in a slot comes to rest
+    /// exactly in place instead of continuing to travel with its throw momentum after its
+    /// collider is disabled.
+    /// </summary>
+    private void SnapAndFreeze(Vector3 position, Quaternion rotation)
+    {
+        ApplySnapAndFreeze(position, rotation);
+        SnapAndFreezeClientRpc(position, rotation);
     }
 
     [ClientRpc]
-    private void PlayDeliverySfxClientRpc()
+    private void SnapAndFreezeClientRpc(Vector3 position, Quaternion rotation) => ApplySnapAndFreeze(position, rotation);
+
+    private void ApplySnapAndFreeze(Vector3 position, Quaternion rotation)
     {
-        if (_deliverySfxClip != null)
-            AudioSource.PlayClipAtPoint(_deliverySfxClip, transform.position, _deliverySfxVolume);
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic = true;
+        }
+
+        transform.position = position;
+        transform.rotation = rotation;
+    }
+
+    /// <summary>Server-only. Marks this package as resolved so it cannot be counted twice.</summary>
+    public void MarkResolved() => IsResolved = true;
+
+    /// <summary>
+    /// Server-only. Plays <see cref="_sortSuccessSfxClip"/> on every client. Called by
+    /// <see cref="MarkDelivered"/> for a correct cubby delivery, and directly by
+    /// <see cref="SortMailTask.EvaluateSort"/> for a correct Confiscate sort (which despawns the
+    /// package immediately rather than going through MarkDelivered).
+    /// </summary>
+    public void PlaySortSuccessSfx()
+    {
+        if (!IsServer) return;
+        PlaySortSuccessSfxClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlaySortSuccessSfxClientRpc()
+    {
+        if (_sortSuccessSfxClip != null)
+            SFXController.Instance?.PlayAtPosition(_sortSuccessSfxClip, transform.position, _sortSuccessSfxVolume);
     }
 
     /// <summary>
@@ -134,13 +185,19 @@ public class MailPackageItem : PickableObject
     /// <param name="slotResidentName">
     /// When <paramref name="binType"/> is <see cref="MailSortBinType.Delivery"/>, the resident
     /// name assigned to the specific cubby slot the package was dropped into (see
-    /// <see cref="MailCubbySlot"/>). Ignored for Quarantine/Confiscate. Empty if dropped into a
-    /// generic bin rather than a labelled cubby.
+    /// <see cref="MailCubbySlot"/>). Ignored for Confiscate. Empty if dropped into a generic bin
+    /// rather than a labelled cubby.
+    /// </param>
+    /// <param name="hasSnapPose">
+    /// True if the caller (a <see cref="MailCubbySlot"/>) supplied a fixed placement pose this
+    /// package should snap to if the sort turns out to be correct — see
+    /// <see cref="MarkDelivered"/>. Always false for a generic <see cref="MailSortBin"/>, since a
+    /// correctly-sorted Confiscate package is despawned immediately rather than snapped in place.
     /// </param>
     [ServerRpc(RequireOwnership = false)]
-    public void RequestSortServerRpc(int binType, string slotResidentName = "")
+    public void RequestSortServerRpc(int binType, string slotResidentName = "", bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
-        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType, slotResidentName);
+        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType, slotResidentName, hasSnapPose, snapPosition, snapRotation);
     }
 
     /// <summary>

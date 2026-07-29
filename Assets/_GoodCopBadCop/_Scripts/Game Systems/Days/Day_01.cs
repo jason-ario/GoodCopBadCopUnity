@@ -1155,6 +1155,12 @@ public class Day_01 : DayBase
         if (TutorialMarkerManager.Instance != null && _markerYellowStamp != null)
             TutorialMarkerManager.Instance.Mark(_markerYellowStamp);
 
+        // Only unlock the quarantine stamp now that the Documentation Exam Page has been
+        // filed into the folder (this method runs from OnExamPageFiledSync). Stamping — and
+        // therefore delivering a verdict, since HandOffPoint requires FolderController.IsStamped —
+        // is impossible before this point because the stamp itself cannot be picked up.
+        _yellowStampSlot?.SetSlotInteractable(true);
+
         FolderController.OnAnyFolderStamped += OnQuarantineFolderStamped;
     }
 
@@ -1706,8 +1712,12 @@ public class Day_01 : DayBase
         // Always apply documentation anomalies to the index-2 suspect so the player
         // learns the exam-notebook workflow on every run.
         // Swap stamps on all clients: this suspect requires quarantine, not a pass.
+        // The yellow (quarantine) stamp stays locked until the player has actually filed
+        // the Documentation Exam Page in the folder — see StartQuarantineTutorialStep,
+        // which unlocks it only after OnExamPageFiledSync fires. This prevents the player
+        // from stamping (and therefore delivering a verdict, which requires IsStamped) before
+        // completing the documentation checklist.
         _greenStampSlot?.SetSlotInteractable(false);
-        _yellowStampSlot?.SetSlotInteractable(true);
 
         // Capture the target suspect and wait for their own paperwork to spawn.
         _quarantineTargetSuspect = SuspectController.Instance?.CurrentSuspect;

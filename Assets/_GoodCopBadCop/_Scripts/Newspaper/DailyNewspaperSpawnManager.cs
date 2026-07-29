@@ -23,8 +23,17 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     [Tooltip("World location where the daily newspaper is spawned.")]
     [SerializeField] private Transform _spawnPoint;
 
+    [Header("Tutorial Arrow")]
+    [Tooltip("World-space tutorial arrow that hovers over the PostBox/Mailbox while today's " +
+             "newspaper is waiting to be picked up. Shown right after spawn, hidden as soon as " +
+             "a player picks the newspaper up. Assign the scene's 'Tutorial Arrow - Mailbox'.")]
+    [SerializeField] private Transform _pickupTutorialArrow;
+
     // The newspaper spawned for the current day, if any, so it can be despawned next day.
     private NetworkObject _activeNewspaper;
+
+    // The Newspaper component on the active newspaper, so its pickup event can be unsubscribed.
+    private Newspaper _activeNewspaperComponent;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -52,6 +61,8 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
             ShiftManager.Instance.OnDayStart -= OnDayStart;
 
         _subscribedToDayStart = false;
+
+        UnsubscribeFromActiveNewspaper();
     }
 
     /// <summary>
@@ -88,6 +99,11 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
 
     private void DespawnPreviousNewspaper()
     {
+        // The previous day's newspaper may still be sitting unpicked — clear its arrow and
+        // unsubscribe before the instance is despawned.
+        UnsubscribeFromActiveNewspaper();
+        HidePickupArrow();
+
         if (_activeNewspaper != null && _activeNewspaper.IsSpawned)
             _activeNewspaper.Despawn();
 
@@ -133,6 +149,45 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
 
         _activeNewspaper = netObj;
 
+        // Point players at the PostBox with a hovering arrow until this newspaper is picked up.
+        _activeNewspaperComponent = instance.GetComponent<Newspaper>();
+        if (_activeNewspaperComponent != null)
+            _activeNewspaperComponent.OnPickedUpNetworked += OnActiveNewspaperPickedUp;
+
+        ShowPickupArrow();
+
         Debug.Log("[DailyNewspaperSpawnManager] Spawned today's newspaper.");
+    }
+
+    // ── Tutorial Arrow ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired on every instance (server and clients) the moment the tracked newspaper is picked
+    /// up for the first time. Hides the arrow for all clients and stops tracking the pickup.
+    /// </summary>
+    private void OnActiveNewspaperPickedUp()
+    {
+        UnsubscribeFromActiveNewspaper();
+        HidePickupArrow();
+    }
+
+    private void UnsubscribeFromActiveNewspaper()
+    {
+        if (_activeNewspaperComponent != null)
+            _activeNewspaperComponent.OnPickedUpNetworked -= OnActiveNewspaperPickedUp;
+
+        _activeNewspaperComponent = null;
+    }
+
+    private void ShowPickupArrow()
+    {
+        if (_pickupTutorialArrow == null) return;
+        MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_pickupTutorialArrow, true);
+    }
+
+    private void HidePickupArrow()
+    {
+        if (_pickupTutorialArrow == null) return;
+        MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_pickupTutorialArrow, false);
     }
 }
