@@ -35,6 +35,12 @@ public class WorldPurchaseActionInteractable : Interactable
     [Tooltip("Fired on all clients after a successful purchase.")]
     [SerializeField] private UnityEvent _onPurchaseConfirmed;
 
+    [Header("Persistence")]
+    [Tooltip("Optional. When set, this purchase is remembered permanently across play sessions via " +
+             "SaveDataManager. Use a stable, unique ID per interactable (e.g. 'BoothPC', 'BoothRadio', " +
+             "'BoothTV'). Leave empty for purchases that should only last for the current session.")]
+    [SerializeField] private string _persistentUnlockId;
+
     // ─── Runtime state ─────────────────────────────────────────────────────────
 
     private ShopItem _shopItem;
@@ -56,6 +62,33 @@ public class WorldPurchaseActionInteractable : Interactable
 
         if (_shopItem != null && string.IsNullOrEmpty(interactText))
             interactText = _shopItem.Name;
+
+        ApplySavedUnlockState();
+    }
+
+    // ─── Persistence ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// If <see cref="_persistentUnlockId"/> was already purchased in a previous session, replays the
+    /// purchase effect immediately (without charging) and hides this interactable. Runs locally on
+    /// every peer from each client's own save data, mirroring how <see cref="SetAvailable"/> and
+    /// <see cref="_onPurchaseConfirmed"/> are otherwise applied as direct, non-RPC local calls.
+    /// </summary>
+    private void ApplySavedUnlockState()
+    {
+        if (string.IsNullOrEmpty(_persistentUnlockId)) return;
+        if (SaveDataManager.Instance == null || !SaveDataManager.Instance.IsWorldObjectUnlocked(_persistentUnlockId))
+            return;
+
+        _onPurchaseConfirmed?.Invoke();
+        SetAvailable(false);
+    }
+
+    /// <summary>Persists <see cref="_persistentUnlockId"/> to save data, if one is configured. No-op otherwise.</summary>
+    private void PersistUnlock()
+    {
+        if (string.IsNullOrEmpty(_persistentUnlockId) || SaveDataManager.Instance == null) return;
+        SaveDataManager.Instance.UnlockWorldObject(_persistentUnlockId);
     }
 
     // ─── Interactable override ─────────────────────────────────────────────────
@@ -138,6 +171,7 @@ public class WorldPurchaseActionInteractable : Interactable
         {
             _onPurchaseConfirmed?.Invoke();
             SetAvailable(false);
+            PersistUnlock();
         }
 
         ClosePurchaseView();
@@ -157,7 +191,12 @@ public class WorldPurchaseActionInteractable : Interactable
     // ─── Networking ─────────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
-    private void ExecutePurchaseServerRpc() => ExecutePurchaseClientRpc();
+    private void ExecutePurchaseServerRpc()
+    {
+        // Runs only on the server — the correct, authoritative place to persist the unlock.
+        PersistUnlock();
+        ExecutePurchaseClientRpc();
+    }
 
     /// <summary>
     /// Fires the purchase event and deactivates this interactable on all clients.

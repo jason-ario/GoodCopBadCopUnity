@@ -178,6 +178,36 @@ public class SaveDataManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // World Object Unlocks (generic — used by WorldPurchaseActionInteractable
+    // for one-off scene purchases such as the booth PC, Radio, TV, etc.)
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns true if the world object with the given ID has been permanently unlocked for the active slot.</summary>
+    public bool IsWorldObjectUnlocked(string objectId)
+    {
+        string[] unlocked = ActiveSlot?.UnlockedWorldObjectIds;
+        if (unlocked == null) return false;
+        return Array.IndexOf(unlocked, objectId) >= 0;
+    }
+
+    /// <summary>
+    /// Marks the named world object as permanently unlocked in the active slot and persists to disk.
+    /// Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void UnlockWorldObject(string objectId)
+    {
+        if (ActiveSlot == null) return;
+        if (IsWorldObjectUnlocked(objectId)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.UnlockedWorldObjectIds ?? new string[0]);
+        list.Add(objectId);
+        ActiveSlot.UnlockedWorldObjectIds = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] World object unlocked and saved: '{objectId}'.");
+    }
+
+    // -------------------------------------------------------------------------
     // Lock State
     // -------------------------------------------------------------------------
 
@@ -608,6 +638,13 @@ public class SaveSlot
     /// and its target <see cref="ILockable"/> is immediately unlocked.
     /// </summary>
     public string[] UnlockedLockIds = new string[0];
+
+    /// <summary>
+    /// IDs of world objects (e.g. the booth PC, Radio, TV) that have been permanently purchased/unlocked
+    /// via <see cref="WorldPurchaseActionInteractable"/>. On load, any interactable whose persistent
+    /// unlock ID appears here immediately replays its purchase effect (without charging) and hides itself.
+    /// </summary>
+    public string[] UnlockedWorldObjectIds = new string[0];
 
     /// <summary>
     /// Stable task IDs (matching <see cref="IDailyTask.DailyTaskId"/>) that have been unlocked

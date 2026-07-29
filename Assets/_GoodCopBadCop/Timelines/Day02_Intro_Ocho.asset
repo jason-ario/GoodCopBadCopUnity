@@ -15,26 +15,116 @@ MonoBehaviour:
   nodes:
   - type: 0
     npcLine: So. You're the one who decides who lives.
-    animationTrigger: 
-    cameraTrigger: 
+    animationTrigger: TalkCocky
+    cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: "I heard you pulled the trigger last week. Tell me \u2014 how did it
-      feel? Be honest."
-    animationTrigger: 
+    npcLine: Relax, relax. I'm not applying for a job. Just admiring the view from
+      this side of the glass, for once.
+    animationTrigger: TalkBigLaugh
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 1
     choices: []
+  - type: 1
+    npcLine: I heard you pulled the trigger last week. Tell me, how did it feel?
+      Go on, humor me.
+    animationTrigger: TalkPoint
+    cameraTrigger: SuspectFaceCam
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: It felt like doing my job.
+      npcResponse: Ha! Your job. Sure. Keep telling yourself that, officer.
+      animationTrigger: TalkBigLaugh
+      playLaughSfx: 1
+    - playerChoiceText: It felt terrible.
+      npcResponse: Terrible? Then why'd your hand stop shaking by the second stamp?
+      animationTrigger: TalkSarcasticNod
+      playLaughSfx: 1
   - type: 0
     npcLine: Everyone says no the first time. Funny how nobody says no the second.
-    animationTrigger: 
+    animationTrigger: TalkDismissing
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 1
+    choices: []
+  - type: 1
+    npcLine: Here's a fun one. If I sat down right now and told you I was infected,
+      would you even check? Or would you just... stamp?
+    animationTrigger: TalkShrug
+    cameraTrigger: SuspectFaceCam
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: I'd check every time.
+      npcResponse: Adorable. Absolutely adorable. You almost believe that.
+      animationTrigger: TalkBigCocky
+      playLaughSfx: 1
+    - playerChoiceText: Depends on my mood.
+      npcResponse: NOW we're being honest! See, I like you already.
+      animationTrigger: TalkBigLaugh
+      playLaughSfx: 1
+  - type: 0
+    npcLine: Relax. I'm messing with you. Mostly.
+    animationTrigger: ShortLaugh
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 1
     choices: []
   - type: 0
-    npcLine: Anyway. Papers are all in order. Take a good look.
-    animationTrigger: 
+    npcLine: Let's talk business. I've got a few questions for YOU, for once.
+    animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 1
+    npcLine: First one, does it get easier? The killing, I mean. Or does it just
+      get quieter?
+    animationTrigger: TalkLookAway
+    cameraTrigger: SuspectFaceCam
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: It gets quieter.
+      npcResponse: Quieter. I like that. Very poetic for a guy in a booth.
+      animationTrigger: TalkSarcasticNod
+      playLaughSfx: 1
+    - playerChoiceText: I don't think about it.
+      npcResponse: Not thinking about it IS the getting easier part, sweetheart.
+      animationTrigger: TalkBigCocky
+      playLaughSfx: 1
+  - type: 0
+    npcLine: Alright, alright, enough therapy. Let's get to the paperwork before
+      I start crying.
+    animationTrigger: ShortLaugh
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 1
+    choices: []
+  - type: 1
+    npcLine: One last question, answer fast: pass, quarantine, or kill. Gut feeling,
+      right now, before you've even seen my face properly.
+    animationTrigger: TalkBigCocky
+    cameraTrigger: SuspectFaceCam
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Pass.
+      npcResponse: Ha! Bold. I respect a man who commits to a bad decision.
+      animationTrigger: TalkBigLaugh
+      playLaughSfx: 1
+    - playerChoiceText: Kill.
+      npcResponse: Ohhh, straight for the throat. I LIKE this one.
+      animationTrigger: TalkBigLaugh
+      playLaughSfx: 1
+  - type: 0
+    npcLine: Anyway. Papers are all in order. Take a good look.
+    animationTrigger: TalkDismissing
+    cameraTrigger: SuspectFaceCam
+    wobbleProfileOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []

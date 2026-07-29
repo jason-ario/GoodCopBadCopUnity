@@ -355,6 +355,15 @@ public class Day_02 : DayBase, IDailyTask
         if (NetworkManager.Singleton.IsServer)
             _fireBarrel?.Extinguish();
 
+        // Break a random batch of perimeter fences the instant Day 2 activates. DayActivated()
+        // is called directly by CampaignManager when the day changes, so — unlike
+        // ShiftManager.OnDayStart (which is tied to shift begin/end cycles and can be skipped
+        // entirely by debug/day-jump paths) — it's guaranteed to fire exactly once per day.
+        // Surfacing the "Fix Perimeter Fences" objective on the tutorial overlay is a separate
+        // concern handled later, after Vlad's tool locker dialogue (see StartMailSortingSequence).
+        if (NetworkManager.Singleton.IsServer)
+            FenceRepairTask.Instance?.TriggerTask();
+
         // Unlock the mutation exam refill in the tool locker shop for all clients.
         if (NetworkManager.Singleton.IsServer && MegaphoneDialogueManager.Instance != null)
             MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced("Mutation Exams (5)");
@@ -585,11 +594,6 @@ public class Day_02 : DayBase, IDailyTask
     {
         if (!NetworkManager.Singleton.IsServer) return;
         ShiftManager.Instance.OnDayStart -= OnDay2Started;
-
-        // Break a random batch of perimeter fences the instant Day 2 begins — independent of
-        // the scripted Vlad opening sequence below, which only decides when the "Fix Perimeter
-        // Fences" objective is surfaced on the tutorial overlay (see StartMailSortingSequence).
-        FenceRepairTask.Instance?.TriggerTask();
 
         if (_debugSkipOpening) return;
         StartCoroutine(Day2OpeningSequence());

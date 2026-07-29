@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using TMPro;
 
@@ -99,27 +100,50 @@ public class MailPackageItem : PickableObject
 
     /// <summary>
     /// Server-only. Marks this package as resolved, permanently locks it so it can no longer be
-    /// picked up (via <see cref="LockInteractableNetworked"/>), and plays the delivery sound
+    /// picked up (via <see cref="LockInteractableNetworked"/>), and plays the sort success sound
     /// effect on every client. Called by <see cref="SortMailTask.EvaluateSort"/> when this
-    /// package is dropped into its addressee's mailbox cubby — unlike a Confiscate correct sort,
-    /// delivered packages are not despawned immediately; they stay sitting in the mailbox until
-    /// <see cref="SortMailTask.DespawnDeliveredPackages"/> clears them at the start of the next
-    /// day.
-    ///
-    /// If <paramref name="hasSnapPose"/> is true, the package is first snapped to
-    /// <paramref name="snapPosition"/>/<paramref name="snapRotation"/> (the cubby's
-    /// <see cref="PlacementSlot"/> pose) and its Rigidbody is zeroed out and made kinematic
-    /// before colliders are disabled — otherwise a package that was thrown into the slot keeps
-    /// its throw velocity after its collider is locked out, and with no collider left to stop it
-    /// it flies straight through the floor and is lost.
+    /// package is dropped into its addressee's mailbox cubby — delivered packages are not
+    /// despawned immediately; they stay sitting in the mailbox until
+    /// <see cref="SortMailTask.DespawnResolvedPackages"/> clears them at the start of the next
+    /// day. See <see cref="ResolveAndSettle"/> for how throw momentum is cleared before locking.
     /// </summary>
     public void MarkDelivered(bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
         if (!IsServer) return;
+        ResolveAndSettle(hasSnapPose, snapPosition, snapRotation);
+    }
 
-        if (hasSnapPose)
-            SnapAndFreeze(snapPosition, snapRotation);
+    /// <summary>
+    /// Server-only. Marks this package as resolved, permanently locks it so it can no longer be
+    /// picked up, and plays the sort success sound effect on every client. Called by
+    /// <see cref="SortMailTask.EvaluateSort"/> when this package is correctly sorted into a
+    /// Confiscate bin — like a correct delivery, the package is not despawned immediately; it
+    /// stays sitting in the bin until <see cref="SortMailTask.DespawnResolvedPackages"/> clears it
+    /// at the start of the next day. See <see cref="ResolveAndSettle"/> for how throw momentum is
+    /// cleared before locking.
+    /// </summary>
+    public void MarkConfiscated(bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
+    {
+        if (!IsServer) return;
+        ResolveAndSettle(hasSnapPose, snapPosition, snapRotation);
+    }
 
+    /// <summary>
+    /// Server-only. Shared finalization for a correct sort (Confiscate or Delivery): always
+    /// zeroes this package's Rigidbody velocity and makes it kinematic in place before disabling
+    /// its colliders — otherwise a package that still has throw momentum when its collider is
+    /// locked out (via <see cref="LockInteractableNetworked"/>) keeps travelling with nothing left
+    /// to stop it and flies straight through the floor. If <paramref name="hasSnapPose"/> is true,
+    /// the package is snapped to <paramref name="snapPosition"/>/<paramref name="snapRotation"/>
+    /// (e.g. a cubby's <see cref="PlacementSlot"/> pose) rather than just freezing wherever it
+    /// currently sits.
+    /// </summary>
+    private void ResolveAndSettle(bool hasSnapPose, Vector3 snapPosition, Quaternion snapRotation)
+    {
+        Vector3    position = hasSnapPose ? snapPosition : transform.position;
+        Quaternion rotation = hasSnapPose ? snapRotation : transform.rotation;
+
+        SnapAndFreeze(position, rotation);
         MarkResolved();
         LockInteractableNetworked();
         PlaySortSuccessSfx();
@@ -158,10 +182,53 @@ public class MailPackageItem : PickableObject
     public void MarkResolved() => IsResolved = true;
 
     /// <summary>
+    /// Server-only. Restores normal server-authoritative physics after this package has been
+    /// driven along a scripted arc (see <see cref="MailSortBin.InteractWithItem"/>'s toss-in
+    /// mechanic) — re-enables NetworkTransform, makes the Rigidbody non-kinematic again with zero
+    /// velocity, and positions it at the arc's landing point on every client. Mirrors
+    /// <see cref="ThrowServerRpc"/>/its ClientRpc, minus an actual throw velocity. Must be called
+    /// right before <see cref="SortMailTask.EvaluateSort"/> so that a package rejected from the
+    /// wrong bin can bounce out with a real physics impulse (<see cref="RejectFromBin"/>) instead
+    /// of staying kinematic/frozen from the scripted toss — a correct sort simply re-freezes it
+    /// again immediately afterward via <see cref="ResolveAndSettle"/>.
+    /// </summary>
+    public void ResumePhysicsAfterScriptedThrow(Vector3 landPosition)
+    {
+        if (!IsServer) return;
+
+        transform.position = landPosition;
+        NetworkObject.RemoveOwnership();
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        if (_rb != null)
+        {
+            _rb.isKinematic = false;
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+        }
+
+        ResumePhysicsAfterScriptedThrowClientRpc(landPosition);
+    }
+
+    [ClientRpc]
+    private void ResumePhysicsAfterScriptedThrowClientRpc(Vector3 landPosition)
+    {
+        transform.position = landPosition;
+        NetworkObject.AutoObjectParentSync = true;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        if (IsServer) return;
+        if (_rb != null) _rb.isKinematic = true;
+    }
+
+    /// <summary>
     /// Server-only. Plays <see cref="_sortSuccessSfxClip"/> on every client. Called by
-    /// <see cref="MarkDelivered"/> for a correct cubby delivery, and directly by
-    /// <see cref="SortMailTask.EvaluateSort"/> for a correct Confiscate sort (which despawns the
-    /// package immediately rather than going through MarkDelivered).
+    /// <see cref="ResolveAndSettle"/> for both a correct cubby delivery (<see cref="MarkDelivered"/>)
+    /// and a correct Confiscate sort (<see cref="MarkConfiscated"/>).
     /// </summary>
     public void PlaySortSuccessSfx()
     {
@@ -191,8 +258,8 @@ public class MailPackageItem : PickableObject
     /// <param name="hasSnapPose">
     /// True if the caller (a <see cref="MailCubbySlot"/>) supplied a fixed placement pose this
     /// package should snap to if the sort turns out to be correct — see
-    /// <see cref="MarkDelivered"/>. Always false for a generic <see cref="MailSortBin"/>, since a
-    /// correctly-sorted Confiscate package is despawned immediately rather than snapped in place.
+    /// <see cref="MarkDelivered"/>/<see cref="MarkConfiscated"/>. Always false for a generic
+    /// <see cref="MailSortBin"/> trigger drop, which just freezes the package wherever it landed.
     /// </param>
     [ServerRpc(RequireOwnership = false)]
     public void RequestSortServerRpc(int binType, string slotResidentName = "", bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)

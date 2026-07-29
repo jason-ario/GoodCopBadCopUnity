@@ -11,13 +11,20 @@ using Random = UnityEngine.Random;
 /// <see cref="SuspectRunRecords"/> and labelled with a goods category drawn from that day's
 /// allowed or prohibited pool (see below).
 ///
-/// The player must physically carry each package and drop it into the correct bin:
+/// The player must physically carry each package and drop it into the correct bin — either by
+/// throwing it directly with real physics, or by walking up and interacting with the bin/cubby
+/// while holding the package (a scripted toss arc, mirroring <see cref="DumpsterInteractable"/>):
 ///   - Confiscate bin  — goods category is on the prohibited list.
 ///   - Addressee's cubby (Mail Cubbies) — the goods are allowed (addressee is alive — dead
 ///     residents are never used as addressees, see <see cref="BuildAddressablePool"/>). There is
 ///     no generic "Delivery" bin: the package must land in the specific
 ///     <see cref="MailCubbySlot"/> assigned to that resident, or it is bounced back out even
 ///     though it is a deliverable package.
+///
+/// A correctly sorted package (Confiscate or Delivery) is never despawned immediately — it is
+/// locked in place where it landed (see <see cref="MailPackageItem.MarkConfiscated"/>/
+/// <see cref="MailPackageItem.MarkDelivered"/>) and only cleared at the start of the next day by
+/// <see cref="DespawnResolvedPackages"/>.
 ///
 /// Quarantine sorting has been removed from this task — packages are only ever Confiscate or
 /// Delivery, regardless of the addressee's quarantine status.
@@ -119,10 +126,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private readonly List<NetworkObject> _spawnedPackages = new();
 
-    /// <summary>Packages correctly delivered to a mailbox cubby that are left sitting there
-    /// (locked, no longer despawned immediately — see <see cref="MailPackageItem.MarkDelivered"/>)
-    /// until <see cref="DespawnDeliveredPackages"/> clears them at the start of the next day.</summary>
-    private readonly List<NetworkObject> _deliveredPackages = new();
+    /// <summary>Packages correctly sorted (delivered to a mailbox cubby or confiscated into a
+    /// Confiscate bin) that are left sitting there (locked, no longer despawned immediately —
+    /// see <see cref="MailPackageItem.MarkDelivered"/>/<see cref="MailPackageItem.MarkConfiscated"/>)
+    /// until <see cref="DespawnResolvedPackages"/> clears them at the start of the next day.</summary>
+    private readonly List<NetworkObject> _resolvedPackages = new();
     private readonly List<string> _todaysAllowedGoods = new();
     private readonly List<string> _todaysProhibitedGoods = new();
     private bool _taskActive;
@@ -275,8 +283,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
 
-        // Clear out any packages left sitting in mailboxes from the previous day's delivery.
-        DespawnDeliveredPackages();
+        // Clear out any packages left sitting in mailboxes/bins from the previous day's delivery.
+        DespawnResolvedPackages();
 
         if (day != _lastGoodsRollDay)
         {
@@ -318,23 +326,25 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Server-only. Despawns every package that was correctly delivered to a mailbox cubby and
-    /// left sitting there (see <see cref="MailPackageItem.MarkDelivered"/>). Called at the start
-    /// of every day change so mailboxes don't accumulate packages indefinitely.
+    /// Server-only. Despawns every package that was correctly sorted — delivered to a mailbox
+    /// cubby or confiscated into a Confiscate bin — and left sitting there (see
+    /// <see cref="MailPackageItem.MarkDelivered"/>/<see cref="MailPackageItem.MarkConfiscated"/>).
+    /// Called at the start of every day change so mailboxes/bins don't accumulate packages
+    /// indefinitely.
     /// </summary>
-    public void DespawnDeliveredPackages()
+    public void DespawnResolvedPackages()
     {
         if (!IsServer) return;
-        if (_deliveredPackages.Count == 0) return;
+        if (_resolvedPackages.Count == 0) return;
 
-        foreach (NetworkObject packageObj in _deliveredPackages)
+        foreach (NetworkObject packageObj in _resolvedPackages)
         {
             if (packageObj != null && packageObj.IsSpawned)
                 packageObj.Despawn(destroy: true);
         }
 
-        Debug.Log($"[SortMailTask] Despawned {_deliveredPackages.Count} delivered package(s) left in mailboxes.");
-        _deliveredPackages.Clear();
+        Debug.Log($"[SortMailTask] Despawned {_resolvedPackages.Count} resolved package(s) left in mailboxes/bins.");
+        _resolvedPackages.Clear();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -397,8 +407,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Called by <see cref="MailPackageItem.RequestSortServerRpc"/> when a package is dropped
-    /// into a bin or cubby slot. Server-only; validates the placement and either despawns the
-    /// package (correct) or bounces it back out (incorrect).
+    /// into a bin or cubby slot. Server-only; validates the placement and either resolves the
+    /// package in place — locked and left sitting there (correct) — or bounces it back out
+    /// (incorrect).
     ///
     /// For <see cref="MailSortBinType.Delivery"/>, correctness additionally requires that
     /// <paramref name="slotResidentName"/> (the resident assigned to the specific
@@ -407,9 +418,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// even though the bin type matches.
     ///
     /// <paramref name="hasSnapPose"/>/<paramref name="snapPosition"/>/<paramref name="snapRotation"/>
-    /// carry the cubby's fixed placement pose (see <see cref="MailCubbySlot"/>'s
-    /// <see cref="PlacementSlot"/>) so a correctly delivered package can be snapped exactly into
-    /// place and have its throw momentum cleared — see <see cref="MailPackageItem.MarkDelivered"/>.
+    /// optionally carry a fixed placement pose (e.g. a cubby's <see cref="PlacementSlot"/>) so a
+    /// correctly sorted package can be snapped exactly into place and have its throw momentum
+    /// cleared — see <see cref="MailPackageItem.MarkDelivered"/>/<see cref="MailPackageItem.MarkConfiscated"/>.
     /// </summary>
     public void EvaluateSort(MailPackageItem package, MailSortBinType binType, string slotResidentName = "",
         bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
@@ -429,16 +440,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 // Delivered packages stay sitting in the mailbox (locked, no longer interactable)
                 // instead of despawning immediately — cleared at the start of the next day.
                 package.MarkDelivered(hasSnapPose, snapPosition, snapRotation);
-                _spawnedPackages.Remove(package.NetworkObject);
-                _deliveredPackages.Add(package.NetworkObject);
             }
             else
             {
-                package.MarkResolved();
-                package.PlaySortSuccessSfx();
-                _spawnedPackages.Remove(package.NetworkObject);
-                package.NetworkObject.Despawn(destroy: true);
+                // Confiscated packages likewise stay sitting in the bin instead of despawning
+                // immediately — cleared at the start of the next day.
+                package.MarkConfiscated(hasSnapPose, snapPosition, snapRotation);
             }
+
+            _spawnedPackages.Remove(package.NetworkObject);
+            _resolvedPackages.Add(package.NetworkObject);
 
             _sortedCount.Value = Mathf.Min(_sortedCount.Value + 1, _totalCount.Value);
             Debug.Log($"[SortMailTask] Correctly sorted '{package.ResidentName}' ({package.GoodsLabel}) into {binType}. " +

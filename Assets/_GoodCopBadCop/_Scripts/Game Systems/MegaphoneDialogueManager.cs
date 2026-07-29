@@ -1,5 +1,4 @@
 using System.Collections;
-using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -22,20 +21,19 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     public static MegaphoneDialogueManager Instance;
 
     [Header("Bark Canvas")]
-    [SerializeField] private GameObject _barkCanvas;
-    [SerializeField] private TextMeshProUGUI _barkText;
     [SerializeField] private Animator _speakerAnimator;
+
+    [Header("Subtitle Identity")]
+    [Tooltip("Speaker name shown on the standard dialogue subtitle when a bark plays.")]
+    [SerializeField] private string _speakerName = "Megaphone";
+    [Tooltip("Speaker name color shown on the standard dialogue subtitle when a bark plays.")]
+    [SerializeField] private Color _speakerColor = new Color(1f, 0.65f, 0f);
 
     [Header("Megaphone Camera")]
     [Tooltip("The camera that frames the megaphone speaker during tutorial cutscenes. " +
              "Assign the child 'Megaphone Camera' of this manager. " +
              "Use SetMegaphoneCameraActive to show/hide it from server-side tutorial coroutines.")]
     [SerializeField] private Transform _megaphoneCameraTransform;
-
-    [Header("Dialogue Positioning")]
-    [SerializeField] private RectTransform _megaphoneDialogueRect;
-    [SerializeField] private RectTransform _dialogueTopPos;
-    [SerializeField] private RectTransform _dialogueBottomPos;
 
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
@@ -46,11 +44,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     public bool disabled = true;
 
     private static readonly int SpeakingParam = Animator.StringToHash("Speaking");
-    private const float PostSpeakHideDuration = 3f;
 
     private bool _isSpeaking;
-    private Coroutine _hideCoroutine;
-    private Coroutine _positionTrackCoroutine;
 
     /// <summary>
     /// Authoritative speaking state replicated to all clients so server-side tutorial
@@ -88,8 +83,6 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     private void Start()
     {
-        _barkCanvas.SetActive(false);
-
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
 
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
@@ -492,7 +485,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Displays a voiced bark on the megaphone canvas. Ignored if already speaking.
+    /// Displays a voiced bark using the standard dialogue subtitle system (same visual style
+    /// as character dialogue). Ignored if already speaking.
     /// Audio is routed through DialogueManager for lip-sync and playback management.
     /// </summary>
     public void ShowDialogue(string text)
@@ -503,37 +497,23 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Displays plain text on the bark canvas without audio. Useful for lightweight prompts.
-    /// Ignored if already speaking.
+    /// Displays plain text as a standard dialogue subtitle without audio. Useful for
+    /// lightweight prompts. Ignored if already speaking. Not skippable — it disappears on
+    /// its own once the standard subtitle's display timer elapses.
     /// </summary>
     public void ShowTextOnly(string text)
     {
         if (disabled || _isSpeaking) return;
 
-        if (_hideCoroutine != null)
-            StopCoroutine(_hideCoroutine);
-
-        PositionDialogue();
-        StartPositionTracking();
-
-        _barkText.text = text;
-        _barkCanvas.SetActive(true);
-
-        // Dismiss any in-progress character dialogue subtitles so they don't overlap.
-        DialogueManager.Instance?.ClearHistory();
-
-        _hideCoroutine = StartCoroutine(WaitAndHide());
+        DialogueManager.Instance.SpawnSubtitles(text, _speakerName, _speakerColor,
+            isPlayer: false, clearHistory: true, waitForInput: false);
     }
 
-    /// <summary>Immediately hides the bark canvas.</summary>
+    /// <summary>Immediately hides the currently displayed bark subtitle, if any.</summary>
     public void HideDialogue()
     {
-        if (_hideCoroutine != null)
-            StopCoroutine(_hideCoroutine);
+        DialogueManager.Instance?.ClearHistory();
 
-        StopPositionTracking();
-
-        _barkCanvas.SetActive(false);
         _isSpeaking = false;
 
         if (IsServer)
@@ -557,76 +537,20 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // Internal Coroutines
     // ---------------------------------------------------------------------------
 
-    /// <summary>
-    /// Snaps the megaphone dialogue panel to the top position when regular character
-    /// dialogue subtitles are active, or to the bottom position otherwise.
-    /// </summary>
-    private void PositionDialogue()
-    {
-        if (_megaphoneDialogueRect == null) return;
-
-        bool subtitlesActive = DialogueManager.Instance != null && DialogueManager.Instance.HasActiveSubtitles;
-        RectTransform target = subtitlesActive ? _dialogueTopPos : _dialogueBottomPos;
-
-        if (target != null)
-        {
-            _megaphoneDialogueRect.anchorMin = target.anchorMin;
-            _megaphoneDialogueRect.anchorMax = target.anchorMax;
-            _megaphoneDialogueRect.pivot = target.pivot;
-            _megaphoneDialogueRect.anchoredPosition = target.anchoredPosition;
-            _megaphoneDialogueRect.sizeDelta = target.sizeDelta;
-        }
-    }
-
-    /// <summary>
-    /// Starts a frame-by-frame coroutine that repositions the megaphone panel
-    /// while the bark is visible.
-    /// </summary>
-    private void StartPositionTracking()
-    {
-        StopPositionTracking();
-        _positionTrackCoroutine = StartCoroutine(TrackSubtitlePosition());
-    }
-
-    private void StopPositionTracking()
-    {
-        if (_positionTrackCoroutine != null)
-        {
-            StopCoroutine(_positionTrackCoroutine);
-            _positionTrackCoroutine = null;
-        }
-    }
-
-    private IEnumerator TrackSubtitlePosition()
-    {
-        while (true)
-        {
-            PositionDialogue();
-            yield return null;
-        }
-    }
-
     private IEnumerator ShowBarkSequence(string text)
     {
-        if (_hideCoroutine != null)
-            StopCoroutine(_hideCoroutine);
-
         _isSpeaking = true;
-        _barkCanvas.SetActive(false);
-
-        PositionDialogue();
-        StartPositionTracking();
 
         yield return new WaitForSeconds(0.4f);
 
         if (_speakerAnimator != null)
             _speakerAnimator.SetBool(SpeakingParam, true);
 
-        _barkText.text = text;
-        _barkCanvas.SetActive(true);
-
-        // Dismiss any in-progress character dialogue subtitles so they don't overlap.
-        DialogueManager.Instance?.ClearHistory();
+        // Standard dialogue subtitle: same visual style as character dialogue, but shown with
+        // waitForInput: false so it cannot be advanced/skipped by player input and instead
+        // disappears on its own once the subtitle's display timer elapses.
+        DialogueManager.Instance.SpawnSubtitles(text, _speakerName, _speakerColor,
+            isPlayer: false, clearHistory: true, waitForInput: false);
 
         // Use the dedicated megaphone slot so that SayDialogueClientRpc (which calls
         // StopDialogueAudio on all clients) cannot cancel this bark mid-speech and
@@ -644,14 +568,5 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         // Clear the authoritative flag so remote clients know the bark is done.
         if (IsServer)
             _isSpeakingNetwork.Value = false;
-
-        _hideCoroutine = StartCoroutine(WaitAndHide());
-    }
-
-    private IEnumerator WaitAndHide()
-    {
-        yield return new WaitForSeconds(PostSpeakHideDuration);
-        StopPositionTracking();
-        _barkCanvas.SetActive(false);
     }
 }

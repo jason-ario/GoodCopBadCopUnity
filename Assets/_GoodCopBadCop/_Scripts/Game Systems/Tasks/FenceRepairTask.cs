@@ -40,8 +40,9 @@ public class FenceRepairTask : NetworkBehaviour
     [Tooltip("Every PerimiterFence in the scene. A random subset is broken each time TriggerTask() is called.")]
     [SerializeField] private PerimiterFence[] _allFences;
 
-    [Tooltip("Inclusive range for how many fence segments are broken per trigger.")]
-    [SerializeField] private Vector2Int _brokenFenceCount = new Vector2Int(2, 4);
+    [Tooltip("Inclusive range (0–1) for the fraction of _allFences broken per trigger. " +
+             "E.g. 0.4–0.6 breaks roughly 40–60% of all fences.")]
+    [SerializeField] private Vector2 _brokenFencePercentage = new Vector2(0.4f, 0.6f);
 
     [Tooltip("Inclusive range for the starting damage level assigned to each broken fence. " +
              "Min 1 (slightly damaged) — must not exceed the fence's MaxDamageLevel.")]
@@ -227,7 +228,8 @@ public class FenceRepairTask : NetworkBehaviour
     }
 
     /// <summary>
-    /// Returns a random count of fences to break, clamped to the available fence pool size.
+    /// Returns a random count of fences to break, derived from _brokenFencePercentage
+    /// applied to the total fence pool size (always at least 1 if any fences exist).
     /// </summary>
     private int PickBrokenFenceCount()
     {
@@ -237,9 +239,12 @@ public class FenceRepairTask : NetworkBehaviour
             return 0;
         }
 
-        int max = Mathf.Min(_brokenFenceCount.y, _allFences.Length);
-        int min = Mathf.Min(_brokenFenceCount.x, max);
-        return Random.Range(min, max + 1);
+        float minPct = Mathf.Clamp01(Mathf.Min(_brokenFencePercentage.x, _brokenFencePercentage.y));
+        float maxPct = Mathf.Clamp01(Mathf.Max(_brokenFencePercentage.x, _brokenFencePercentage.y));
+        float pct = Random.Range(minPct, maxPct);
+
+        int count = Mathf.RoundToInt(_allFences.Length * pct);
+        return Mathf.Clamp(count, 1, _allFences.Length);
     }
 
     /// <summary>Returns a Fisher-Yates shuffled copy of the source array.</summary>

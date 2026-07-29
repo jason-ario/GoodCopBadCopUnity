@@ -9,21 +9,25 @@ using UnityEngine;
 /// Ocho antagonizes the player about a previous kill (via <see cref="SuspectData.introDialogue"/>
 /// on his own <see cref="SuspectData"/> asset), hands over paperwork with an obviously fake name
 /// and ID (and, if <c>_useDrawingForEntryReason</c> is on, a hand-drawn doodle in place of a
-/// written entry reason — see <see cref="ApplicationLetter.SetEntryReasonDrawing"/>), and rejects
-/// every verdict outright:
-///   - Any verdict: he takes the folder, vanishes, and reappears behind the player inside the
-///     booth (always — regardless of stamp), then delivers a stamp-specific mocking reaction line.
-///     The verdict never actually processes (no payout switch runs — see
-///     <see cref="SuspectController.ExecuteVerdict"/>).
-///   - Red stamp (Kill) specifically: after the reaction line he also does a mocking little dance,
-///     cuts the booth's power, and cackles — leaving the player to go fix the breaker at
+/// written entry reason, see <see cref="ApplicationLetter.SetEntryReasonDrawing"/>), and rejects
+/// every verdict outright. The rejection plays out in a fixed sequence, regardless of stamp:
+///   1. He takes the folder and immediately delivers a stamp-specific mocking reaction line
+///      while still standing at the booth. The verdict never actually processes (no payout
+///      switch runs, see <see cref="SuspectController.ExecuteVerdict"/>).
+///   2. He vanishes and reappears standing behind the player inside the booth.
+///   3. The encounter waits for a player to actually turn around and spot him there (or times
+///      out); the moment he's spotted a stinger plays and he vanishes again.
+///   - Red stamp (Kill) specifically: once he vanishes after the stinger, the booth's power
+///     cuts out and he cackles from the dark, leaving the player to go fix the breaker at
 ///     <see cref="ElectricPanelController"/> before the switch button will let them summon the
 ///     next suspect (already gated by <see cref="SwitchButton"/>'s powerOn check). Once power is
 ///     restored the megaphone plays a couple of dismissive barks and the next suspect can be
-///     called. Pass/Quarantine skip the dance/blackout entirely — Ocho just leaves.
+///     called. Pass/Quarantine skip the blackout entirely, Ocho just leaves.
 ///
-/// All timing/sequencing runs server-only; physical vanish/reappear/dance/laugh beats are
-/// broadcast to all clients via ClientRpc so both co-op players see them.
+/// All timing/sequencing runs server-only; physical vanish/reappear/stinger/laugh beats are
+/// broadcast to all clients via ClientRpc so both co-op players see them. The turn-around spot
+/// check runs locally on each client against that client's own local player camera and reports
+/// back to the server via ServerRpc the moment it succeeds.
 /// </summary>
 public class OchoBoothEncounter : NetworkBehaviour
 {
@@ -60,18 +64,27 @@ public class OchoBoothEncounter : NetworkBehaviour
     [Tooltip("Seconds Ocho waits after reappearing, standing still, before delivering his reaction line.")]
     [SerializeField] private float _reappearToLineDelay = 1f;
 
-    [Header("Ocho Booth Encounter — Dance & Power Outage (Red Stamp / Kill only)")]
-    [Tooltip("Animator trigger played for the mocking dance. Must exist on Ocho's Animator Controller — " +
-             "safe to leave unassigned/mismatched, it simply won't animate.")]
-    [SerializeField] private string _danceAnimationTrigger = "Dance";
+    [Header("Ocho Booth Encounter — Turn-Around Reveal")]
+    [Tooltip("Stinger clip played the instant a player turns and actually spots Ocho standing behind them.")]
+    [SerializeField] private AudioClip _stingerClip;
 
-    [Tooltip("Seconds the dance plays before the power cuts and Ocho vanishes into the dark.")]
-    [SerializeField] private float _danceDuration = 3f;
+    [Tooltip("Dot product between the local player's camera forward and the direction to Ocho required to " +
+             "count as 'looking at him'. Higher = a narrower cone directly in front of the camera.")]
+    [SerializeField] private float _spotDotThreshold = 0.7f;
 
+    [Tooltip("Seconds between visibility checks on each client while waiting for a player to turn around.")]
+    [SerializeField] private float _spotCheckInterval = 0.15f;
+
+    [Tooltip("Maximum seconds to wait for a player to spot Ocho before giving up and having him vanish anyway.")]
+    [SerializeField] private float _spotTimeoutSeconds = 12f;
+
+    [Tooltip("Seconds between the stinger playing and the sequence continuing (power outage / despawn).")]
+    [SerializeField] private float _stingerToVanishDelay = 0.4f;
+
+    [Header("Ocho Booth Encounter — Power Outage (Red Stamp / Kill only)")]
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _demonicLaughClip;
 
-    [Header("Ocho Booth Encounter — Power Outage")]
     [Tooltip("Transform the tutorial arrow points at while the power is out (usually the Electrical Panel).")]
     [SerializeField] private Transform _electricalPanelMarker;
 
@@ -83,6 +96,8 @@ public class OchoBoothEncounter : NetworkBehaviour
 
     private SuspectCharacter _self;
     private bool _handled;
+    private bool _spotted;
+    private Coroutine _monitorCoroutine;
     private ApplicationLetter _spawnedApplicationLetter;
 
     private void Awake()
@@ -152,8 +167,15 @@ public class OchoBoothEncounter : NetworkBehaviour
         controller.CleanupSpawnedFolderForRejectedVerdict();
         controller.SetCanInteract(false);
 
-        // Ocho always vanishes and reappears behind the player, regardless of the verdict —
-        // only his reaction line (and, for Kill, the dance/blackout that follows) changes.
+        // Ocho reacts to the verdict first, while still standing at the booth, before any of
+        // the vanish/reappear theatrics kick in.
+        string reactionLine = GetReactionLine(attemptedStamp);
+        if (DialogueManager.Instance != null && !string.IsNullOrEmpty(reactionLine))
+            DialogueManager.Instance.SayDialogue(_self, reactionLine);
+
+        yield return new WaitForSeconds(_postLineDelay);
+
+        // Now he vanishes and reappears behind the player, regardless of the verdict.
         VanishClientRpc();
         yield return new WaitForSeconds(_vanishToReappearDelay);
 
@@ -166,24 +188,22 @@ public class OchoBoothEncounter : NetworkBehaviour
         ReappearClientRpc();
         yield return new WaitForSeconds(_reappearToLineDelay);
 
-        string reactionLine = GetReactionLine(attemptedStamp);
-        if (DialogueManager.Instance != null && !string.IsNullOrEmpty(reactionLine))
-            DialogueManager.Instance.SayDialogue(_self, reactionLine);
+        // Wait until a player actually turns around and spots him standing behind them
+        // (or the timeout elapses), then he startles them with a stinger and vanishes.
+        yield return WaitForPlayerToSpotOcho();
 
-        yield return new WaitForSeconds(_postLineDelay);
+        PlayStingerAndVanishClientRpc();
+        yield return new WaitForSeconds(_stingerToVanishDelay);
 
         if (attemptedStamp != StampContainer.StampType.Kill)
         {
-            // Quarantine and Pass also fail to process Ocho — he vanishes behind the player one
-            // last time and saunters off, with no dance or blackout theatrics.
-            VanishClientRpc();
-            yield return new WaitForSeconds(0.5f);
+            // Quarantine and Pass also fail to process Ocho, but there's no blackout theatrics.
             controller.DespawnSuspectWithoutVerdict(_self);
             ShiftManager.Instance.SetNextSuspectReady();
             yield break;
         }
 
-        yield return RedStampSequence(controller);
+        RedStampSequence(controller);
     }
 
     private string GetReactionLine(StampContainer.StampType stamp)
@@ -196,22 +216,42 @@ public class OchoBoothEncounter : NetworkBehaviour
         }
     }
 
-    private IEnumerator RedStampSequence(SuspectController controller)
+    /// <summary>
+    /// Server-only wait: blocks until any client reports (via <see cref="ReportSpottedServerRpc"/>)
+    /// that its local player turned and spotted Ocho, or until <see cref="_spotTimeoutSeconds"/>
+    /// elapses, whichever comes first.
+    /// </summary>
+    private IEnumerator WaitForPlayerToSpotOcho()
     {
-        DanceAndLaughClientRpc();
-        yield return new WaitForSeconds(_danceDuration);
+        _spotted = false;
+        float elapsed = 0f;
+        while (!_spotted && elapsed < _spotTimeoutSeconds)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+    }
 
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportSpottedServerRpc()
+    {
+        _spotted = true;
+    }
+
+    private void RedStampSequence(SuspectController controller)
+    {
         // Cut the power — the switch button (SwitchButton.PowerOff, already wired to this
         // ElectricObject in the scene) can't be readied again until the panel puzzle is solved.
         ElectricityController.Instance?.PowerOff();
+        PlayDemonicLaughInDarkClientRpc();
 
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerRestored;
 
         ShowElectricalPanelTutorialClientRpc();
-        VanishClientRpc();
 
-        // Ocho disappears into the dark for good — the encounter's visual beat is complete.
+        // Ocho is already gone (vanished after the stinger) — the encounter's visual beat is
+        // complete, he just disappears into the dark for good.
         controller.DespawnSuspectWithoutVerdict(_self);
     }
 
@@ -251,6 +291,7 @@ public class OchoBoothEncounter : NetworkBehaviour
     [ClientRpc]
     private void VanishClientRpc()
     {
+        StopMonitoring();
         SetVisible(false);
     }
 
@@ -258,14 +299,24 @@ public class OchoBoothEncounter : NetworkBehaviour
     private void ReappearClientRpc()
     {
         SetVisible(true);
+        StopMonitoring();
+        _monitorCoroutine = StartCoroutine(MonitorForLocalPlayerSpot());
     }
 
     [ClientRpc]
-    private void DanceAndLaughClientRpc()
+    private void PlayStingerAndVanishClientRpc()
     {
-        if (!string.IsNullOrEmpty(_danceAnimationTrigger))
-            _self.animator?.SetTrigger(_danceAnimationTrigger);
+        StopMonitoring();
 
+        if (_audioSource != null && _stingerClip != null)
+            _audioSource.PlayOneShot(_stingerClip);
+
+        SetVisible(false);
+    }
+
+    [ClientRpc]
+    private void PlayDemonicLaughInDarkClientRpc()
+    {
         if (_audioSource != null && _demonicLaughClip != null)
             _audioSource.PlayOneShot(_demonicLaughClip);
     }
@@ -283,5 +334,49 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
             r.enabled = visible;
+    }
+
+    private void StopMonitoring()
+    {
+        if (_monitorCoroutine == null) return;
+        StopCoroutine(_monitorCoroutine);
+        _monitorCoroutine = null;
+    }
+
+    /// <summary>
+    /// Runs locally on every client while Ocho is visible behind the player. Checks this
+    /// client's own local player camera (<see cref="PlayerInstance.Instance"/>) against Ocho's
+    /// position — a narrow forward cone plus an unobstructed raycast counts as "spotted". The
+    /// first client to detect this reports it to the server via <see cref="ReportSpottedServerRpc"/>.
+    /// Stopped externally by <see cref="StopMonitoring"/> once the server moves on (either because
+    /// a client reported a spot, or the wait timed out).
+    /// </summary>
+    private IEnumerator MonitorForLocalPlayerSpot()
+    {
+        while (true)
+        {
+            Camera cam = Camera.main;
+            if (PlayerInstance.Instance != null && cam != null)
+            {
+                Vector3 toOcho = transform.position - cam.transform.position;
+                float dist = toOcho.magnitude;
+
+                if (dist > 0.05f)
+                {
+                    Vector3 dir = toOcho / dist;
+                    float dot = Vector3.Dot(cam.transform.forward, dir);
+
+                    if (dot >= _spotDotThreshold &&
+                        (!Physics.Raycast(cam.transform.position, dir, out RaycastHit hit, dist) ||
+                         hit.transform.IsChildOf(transform)))
+                    {
+                        ReportSpottedServerRpc();
+                        yield break;
+                    }
+                }
+            }
+
+            yield return new WaitForSeconds(_spotCheckInterval);
+        }
     }
 }
