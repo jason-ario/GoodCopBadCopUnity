@@ -4,13 +4,35 @@ using UnityEngine;
 
 public class ExamPage : FolderItem
 {
-    [SerializeField] private ChecklistItem[] _checklistItems;
+    // Built dynamically at runtime by BuildChecklistFromCategory — no longer wired in the
+    // Inspector. Kept as a plain (non-serialized) field so all existing index-based logic
+    // (sorting, bitmask, lock states) works unchanged against whatever was just spawned.
+    private ChecklistItem[] _checklistItems;
     private ExamNotebook notebook;
     private int pageIndex;
     public Animator pageAnimator;
     public bool IsChecking => notebook.IsChecking;
     public bool isRippedOut;
     [SerializeField] private GameObject container;
+
+    [Header("Dynamic Checklist Item Spawning")]
+    /// <summary>The base "Checklist Item" prefab instantiated per anomaly at runtime.</summary>
+    [SerializeField] private ChecklistItem checklistItemPrefab;
+
+    /// <summary>Parent transform new checklist items are instantiated under (the page's "Exam Notebook Contents" child).</summary>
+    [SerializeField] private Transform checklistItemsParent;
+
+    /// <summary>Local position of the first (bottom-most) checklist item slot.</summary>
+    [SerializeField] private Vector3 checklistItemStartLocalPosition = new Vector3(-0.016f, -0.478f, 0.019f);
+
+    /// <summary>Vertical distance in local space between consecutive checklist item slots.</summary>
+    [SerializeField] private float checklistItemSpacingY = 0.1397143f;
+
+    /// <summary>Local rotation (Euler, degrees) applied to every spawned checklist item.</summary>
+    [SerializeField] private Vector3 checklistItemLocalRotationEuler = new Vector3(0f, 0f, 90f);
+
+    /// <summary>Local scale applied to every spawned checklist item.</summary>
+    [SerializeField] private Vector3 checklistItemLocalScale = new Vector3(0.08675341f, 0.930651f, 0.09206503f);
 
     // ── RenderTexture overlay system ─────────────────────────────────────────
     /// <summary>
@@ -63,8 +85,6 @@ public class ExamPage : FolderItem
     protected override void Awake()
     {
         base.Awake();
-        CacheVisualItems();
-        CacheOriginalItemPositions();
         SetupRenderTexture();
     }
 
@@ -158,47 +178,79 @@ public class ExamPage : FolderItem
     /// client that just activated the page (e.g. picked up from a supply box).
     /// </summary>
     /// <summary>
-    /// Auto-populates this page's checklist item slots from AnomalyUnlockManager's progression
-    /// asset instead of relying on hand-authored per-item values baked into the prefab. Called
-    /// by ExamNotebook right before <see cref="InitializeChecklistIndices"/> whenever a notebook
-    /// spawns its pages, so every page always reflects the current category's anomaly list.
+    /// Auto-populates this page's checklist by instantiating a fresh "Checklist Item" for every
+    /// anomaly in <paramref name="categoryName"/>'s progression list, instead of relying on
+    /// hand-authored, pre-placed slots baked into the prefab (which drifted out of sync and could
+    /// leave stray/duplicate items behind). Called by ExamNotebook right before
+    /// <see cref="InitializeChecklistIndices"/> whenever a notebook spawns its pages, so every
+    /// page always reflects the current category's anomaly list with exactly the items it needs —
+    /// no more, no less.
     ///
-    /// Assigns each entry in <paramref name="categoryName"/>'s anomaly list to the checklist item
-    /// slots in array order (which matches the progression asset's authored checklist order —
-    /// top to bottom). Slots beyond the category's anomaly count are deactivated. Locked/unlocked
+    /// Any previously spawned items (e.g. from a prior call) are destroyed first so repeated
+    /// calls never produce duplicates. Items are laid out top-to-bottom in the progression
+    /// asset's authored order using the page's configured start position/spacing. Locked/unlocked
     /// visibility and sorting is applied afterwards by InitializeChecklistIndices → RefreshLockStates,
     /// which already reads unlocked state from AnomalyUnlockManager.
     /// </summary>
-    public void PopulateChecklistFromCategory(string categoryName)
+    public void BuildChecklistFromCategory(string categoryName)
     {
-        if (_checklistItems == null || _checklistItems.Length == 0) return;
+        ClearChecklistItems();
+
+        if (checklistItemPrefab == null)
+        {
+            Debug.LogWarning($"[ExamPage] BuildChecklistFromCategory: '{name}' has no checklistItemPrefab assigned — no checklist items were spawned.");
+            return;
+        }
 
         if (string.IsNullOrEmpty(categoryName))
         {
-            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: '{name}' has no categoryName assigned on its ExamNotebook — checklist items were left unchanged.");
+            Debug.LogWarning($"[ExamPage] BuildChecklistFromCategory: '{name}' has no categoryName assigned on its ExamNotebook — no checklist items were spawned.");
             return;
         }
 
         if (AnomalyUnlockManager.Instance == null)
         {
-            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: no AnomalyUnlockManager.Instance in the scene — checklist items were left unchanged on '{name}'.");
+            Debug.LogWarning($"[ExamPage] BuildChecklistFromCategory: no AnomalyUnlockManager.Instance in the scene — no checklist items were spawned on '{name}'.");
             return;
         }
 
         string[] anomalyNames = AnomalyUnlockManager.Instance.GetAnomalyTypeNamesForCategory(categoryName);
+        Transform parent = checklistItemsParent != null ? checklistItemsParent : transform;
 
-        if (anomalyNames.Length > _checklistItems.Length)
-            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: category '{categoryName}' has {anomalyNames.Length} anomalies but '{name}' only has {_checklistItems.Length} checklist item slots — extra anomalies will not be shown.");
-
-        for (int i = 0; i < _checklistItems.Length; i++)
+        _checklistItems = new ChecklistItem[anomalyNames.Length];
+        for (int i = 0; i < anomalyNames.Length; i++)
         {
-            if (_checklistItems[i] == null) continue;
+            ChecklistItem item = Instantiate(checklistItemPrefab, parent);
+            item.name = $"Checklist Item {i}";
+            item.gameObject.layer = parent.gameObject.layer;
 
-            bool hasAnomaly = i < anomalyNames.Length;
-            _checklistItems[i].gameObject.SetActive(hasAnomaly);
-            if (hasAnomaly)
-                _checklistItems[i].SetAnomalyTypeName(anomalyNames[i]);
+            Transform t = item.transform;
+            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, i * checklistItemSpacingY, 0f);
+            t.localRotation = Quaternion.Euler(checklistItemLocalRotationEuler);
+            t.localScale = checklistItemLocalScale;
+
+            item.SetExamPage(this);
+            item.SetAnomalyTypeName(anomalyNames[i]);
+
+            _checklistItems[i] = item;
         }
+
+        CacheVisualItems();
+        CacheOriginalItemPositions();
+    }
+
+    /// <summary>Destroys any checklist items previously spawned by BuildChecklistFromCategory.</summary>
+    private void ClearChecklistItems()
+    {
+        if (_checklistItems == null) return;
+
+        foreach (ChecklistItem item in _checklistItems)
+        {
+            if (item != null)
+                Destroy(item.gameObject);
+        }
+
+        _checklistItems = null;
     }
 
     public void SnapshotChecklist()
@@ -412,8 +464,13 @@ public class ExamPage : FolderItem
     public void SetChecklistInteractable(bool b)
     {
         _checklistInteractable = b;
+        if (_checklistItems == null) return;
+
         foreach (ChecklistItem item in _checklistItems)
+        {
+            if (item == null) continue;
             item.SetInteractable(b);
+        }
     }
 
     /// <summary>

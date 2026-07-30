@@ -145,7 +145,7 @@ public class AnomalyUnlockManager : MonoBehaviour
     /// <summary>
     /// Returns the anomaly C# type names configured for the given category (matched against
     /// <see cref="AnomalyUnlockProgressionSO.AnomalyCategoryData.CategoryName"/>, case-insensitive),
-    /// in checklist order (top → bottom). Used by <see cref="ExamPage.PopulateChecklistFromCategory"/>
+    /// in checklist order (top → bottom). Used by <see cref="ExamPage.BuildChecklistFromCategory"/>
     /// to auto-populate a notebook page's checklist items at runtime.
     /// Returns an empty array if no progression asset is assigned or no category matches.
     /// </summary>

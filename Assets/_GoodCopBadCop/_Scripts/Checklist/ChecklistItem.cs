@@ -110,9 +110,16 @@ public class ChecklistItem : MonoBehaviour
     public void SetIndex(int i) => index = i;
 
     /// <summary>
+    /// Wires this item back to the page that owns it. Required when the item is instantiated
+    /// dynamically at runtime (see <see cref="ExamPage.BuildChecklistFromCategory"/>), since the
+    /// base "Checklist Item" prefab has no page to reference until it's spawned into one.
+    /// </summary>
+    public void SetExamPage(ExamPage page) => examPage = page;
+
+    /// <summary>
     /// Overrides this item's anomaly type name at runtime and refreshes its label to match,
     /// using a humanized version of the type name (e.g. "IDNumberWrongAnomaly" → "ID Number Wrong").
-    /// Used by <see cref="ExamPage.PopulateChecklistFromCategory"/> to auto-populate checklist
+    /// Used by <see cref="ExamPage.BuildChecklistFromCategory"/> to auto-populate checklist
     /// items from AnomalyUnlockManager's progression asset instead of relying on hand-authored
     /// per-item values in the prefab.
     /// </summary>

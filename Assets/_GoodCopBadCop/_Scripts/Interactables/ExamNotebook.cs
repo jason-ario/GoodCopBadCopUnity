@@ -45,7 +45,7 @@ public class ExamNotebook : PickableObject
     /// <see cref="AnomalyUnlockProgressionSO.AnomalyCategoryData.CategoryName"/> entry in
     /// AnomalyUnlockManager's progression asset (e.g. "Documentation", "Physical", "Vitals",
     /// "Behavior", "Supernatural"). Drives automatic checklist population on every page
-    /// when the notebook spawns — see <see cref="ExamPage.PopulateChecklistFromCategory"/>.
+    /// when the notebook spawns — see <see cref="ExamPage.BuildChecklistFromCategory"/>.
     /// </summary>
     [SerializeField] private string categoryName;
     public string CategoryName => categoryName;
@@ -412,7 +412,7 @@ public class ExamNotebook : PickableObject
         {
             int capturedPage = p;
             pages[p].SetPageIndex(p);
-            pages[p].PopulateChecklistFromCategory(categoryName);
+            pages[p].BuildChecklistFromCategory(categoryName);
             pages[p].InitializeChecklistIndices();
 
             pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value);
