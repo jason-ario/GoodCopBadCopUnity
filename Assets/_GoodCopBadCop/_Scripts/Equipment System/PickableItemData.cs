@@ -34,4 +34,9 @@ public class PickableItemData : ScriptableObject
     [Tooltip("Icon displayed in the inventory HUD slot when this item is carried.")]
     [SerializeField] private Sprite icon;
     public Sprite Icon => icon;
+
+    [Tooltip("Optional flavor/description text shown in the shop purchase popup when this item is for sale. Leave empty to hide the description in the popup.")]
+    [TextArea]
+    [SerializeField] private string description;
+    public string Description => description;
 }

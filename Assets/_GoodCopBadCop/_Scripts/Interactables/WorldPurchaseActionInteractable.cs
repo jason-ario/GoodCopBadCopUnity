@@ -51,7 +51,6 @@ public class WorldPurchaseActionInteractable : Interactable
 
     private const string PurchaseSuccessMessage = "Done!";
     private const string NotEnoughMoneyMessage  = "Not enough coupons!";
-    private const float  ZoomPaddingMultiplier  = 1.5f;
 
     // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -112,6 +111,7 @@ public class WorldPurchaseActionInteractable : Interactable
         _currentPlayer.SetSuspectCamMode(true);
 
         UIController.Instance.ShowCursor();
+        UIController.Instance.ClosePlayerUI();
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(ClosePurchaseView);
         UIController.OnPauseMenuOpened += ClosePurchaseView;
@@ -136,6 +136,7 @@ public class WorldPurchaseActionInteractable : Interactable
         UIController.Instance.CloseShopItemPurchasePopup();
         UIController.Instance.HideBackButton();
         UIController.Instance.HideCursor();
+        UIController.Instance.ShowPlayerUI();
         _drawerToLock?.SetLocked(false);
 
         if (_currentPlayer != null)
@@ -231,27 +232,16 @@ public class WorldPurchaseActionInteractable : Interactable
 
     // ─── Camera framing ─────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Activates <see cref="_itemZoomCamera"/> using the transform already authored on it in the
+    /// prefab. Unlike <see cref="WorldShopItemInteractable"/>'s equivalent method — which
+    /// auto-frames a physical pickup item using renderer bounds — a purchase stand's camera is a
+    /// fixed, designer-placed shot of the stand/kiosk itself, so it must always win outright and
+    /// never be recomputed or skipped based on renderer/ray-camera lookups.
+    /// </summary>
     private void ActivateZoomCamera()
     {
         if (_itemZoomCamera == null) return;
-
-        Renderer[] renderers = GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return;
-
-        Bounds bounds = renderers[0].bounds;
-        foreach (Renderer r in renderers)
-            bounds.Encapsulate(r.bounds);
-
-        Camera rayCam = PlayerInstance.Instance?.GetCamera();
-        if (rayCam == null) return;
-
-        Vector3 dir      = (bounds.center - rayCam.transform.position).normalized;
-        float   fovRad   = _itemZoomCamera.Lens.FieldOfView * Mathf.Deg2Rad;
-        float   radius   = bounds.extents.magnitude * ZoomPaddingMultiplier;
-        float   distance = radius / Mathf.Sin(fovRad * 0.5f);
-
-        _itemZoomCamera.transform.position = bounds.center - dir * distance;
-        _itemZoomCamera.transform.LookAt(bounds.center);
         _itemZoomCamera.gameObject.SetActive(true);
     }
 }

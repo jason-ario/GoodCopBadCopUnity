@@ -102,6 +102,7 @@ public class WorldShopItemInteractable : Interactable
         _currentPlayer.SetSuspectCamMode(true);
 
         UIController.Instance.ShowCursor();
+        UIController.Instance.ClosePlayerUI();
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(ClosePurchaseView);
         UIController.OnPauseMenuOpened += ClosePurchaseView;
@@ -125,6 +126,7 @@ public class WorldShopItemInteractable : Interactable
         UIController.Instance.CloseShopItemPurchasePopup();
         UIController.Instance.HideBackButton();
         UIController.Instance.HideCursor();
+        UIController.Instance.ShowPlayerUI();
         _drawerToLock?.SetLocked(false);
 
         if (_currentPlayer != null)
@@ -243,23 +245,27 @@ public class WorldShopItemInteractable : Interactable
     {
         if (_itemZoomCamera == null) return;
 
+        // Auto-frame the camera on the item's renderer bounds when possible. This is a
+        // best-effort enhancement, not a prerequisite — if renderers or the local player's
+        // camera can't be resolved, fall through and activate using the transform already
+        // authored on the camera in the prefab instead of leaving it inactive.
         Renderer[] renderers = _shopItem.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return;
-
-        Bounds bounds = renderers[0].bounds;
-        foreach (Renderer r in renderers)
-            bounds.Encapsulate(r.bounds);
-
         Camera rayCam = PlayerInstance.Instance?.GetCamera();
-        if (rayCam == null) return;
+        if (renderers.Length > 0 && rayCam != null)
+        {
+            Bounds bounds = renderers[0].bounds;
+            foreach (Renderer r in renderers)
+                bounds.Encapsulate(r.bounds);
 
-        Vector3 dir      = (bounds.center - rayCam.transform.position).normalized;
-        float   fovRad   = _itemZoomCamera.Lens.FieldOfView * Mathf.Deg2Rad;
-        float   radius   = bounds.extents.magnitude * ZoomPaddingMultiplier;
-        float   distance = radius / Mathf.Sin(fovRad * 0.5f);
+            Vector3 dir      = (bounds.center - rayCam.transform.position).normalized;
+            float   fovRad   = _itemZoomCamera.Lens.FieldOfView * Mathf.Deg2Rad;
+            float   radius   = bounds.extents.magnitude * ZoomPaddingMultiplier;
+            float   distance = radius / Mathf.Sin(fovRad * 0.5f);
 
-        _itemZoomCamera.transform.position = bounds.center - dir * distance;
-        _itemZoomCamera.transform.LookAt(bounds.center);
+            _itemZoomCamera.transform.position = bounds.center - dir * distance;
+            _itemZoomCamera.transform.LookAt(bounds.center);
+        }
+
         _itemZoomCamera.gameObject.SetActive(true);
     }
 
