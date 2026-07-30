@@ -157,6 +157,50 @@ public class ExamPage : FolderItem
     /// Called by ExamNotebook after SetPagesActive(true) so the RT is populated on every
     /// client that just activated the page (e.g. picked up from a supply box).
     /// </summary>
+    /// <summary>
+    /// Auto-populates this page's checklist item slots from AnomalyUnlockManager's progression
+    /// asset instead of relying on hand-authored per-item values baked into the prefab. Called
+    /// by ExamNotebook right before <see cref="InitializeChecklistIndices"/> whenever a notebook
+    /// spawns its pages, so every page always reflects the current category's anomaly list.
+    ///
+    /// Assigns each entry in <paramref name="categoryName"/>'s anomaly list to the checklist item
+    /// slots in array order (which matches the progression asset's authored checklist order —
+    /// top to bottom). Slots beyond the category's anomaly count are deactivated. Locked/unlocked
+    /// visibility and sorting is applied afterwards by InitializeChecklistIndices → RefreshLockStates,
+    /// which already reads unlocked state from AnomalyUnlockManager.
+    /// </summary>
+    public void PopulateChecklistFromCategory(string categoryName)
+    {
+        if (_checklistItems == null || _checklistItems.Length == 0) return;
+
+        if (string.IsNullOrEmpty(categoryName))
+        {
+            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: '{name}' has no categoryName assigned on its ExamNotebook — checklist items were left unchanged.");
+            return;
+        }
+
+        if (AnomalyUnlockManager.Instance == null)
+        {
+            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: no AnomalyUnlockManager.Instance in the scene — checklist items were left unchanged on '{name}'.");
+            return;
+        }
+
+        string[] anomalyNames = AnomalyUnlockManager.Instance.GetAnomalyTypeNamesForCategory(categoryName);
+
+        if (anomalyNames.Length > _checklistItems.Length)
+            Debug.LogWarning($"[ExamPage] PopulateChecklistFromCategory: category '{categoryName}' has {anomalyNames.Length} anomalies but '{name}' only has {_checklistItems.Length} checklist item slots — extra anomalies will not be shown.");
+
+        for (int i = 0; i < _checklistItems.Length; i++)
+        {
+            if (_checklistItems[i] == null) continue;
+
+            bool hasAnomaly = i < anomalyNames.Length;
+            _checklistItems[i].gameObject.SetActive(hasAnomaly);
+            if (hasAnomaly)
+                _checklistItems[i].SetAnomalyTypeName(anomalyNames[i]);
+        }
+    }
+
     public void SnapshotChecklist()
     {
         if (_checklistCamera == null) return;

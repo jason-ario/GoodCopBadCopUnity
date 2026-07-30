@@ -143,6 +143,29 @@ public class AnomalyUnlockManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns the anomaly C# type names configured for the given category (matched against
+    /// <see cref="AnomalyUnlockProgressionSO.AnomalyCategoryData.CategoryName"/>, case-insensitive),
+    /// in checklist order (top → bottom). Used by <see cref="ExamPage.PopulateChecklistFromCategory"/>
+    /// to auto-populate a notebook page's checklist items at runtime.
+    /// Returns an empty array if no progression asset is assigned or no category matches.
+    /// </summary>
+    public string[] GetAnomalyTypeNamesForCategory(string categoryName)
+    {
+        if (_progression == null || string.IsNullOrEmpty(categoryName))
+            return Array.Empty<string>();
+
+        foreach (AnomalyUnlockProgressionSO.AnomalyCategoryData category in _progression.AllCategories)
+        {
+            if (category == null) continue;
+            if (string.Equals(category.CategoryName, categoryName, StringComparison.OrdinalIgnoreCase))
+                return category.AnomalyTypeNames ?? Array.Empty<string>();
+        }
+
+        Debug.LogWarning($"[AnomalyUnlockManager] GetAnomalyTypeNamesForCategory: no category named '{categoryName}' found in the progression asset.");
+        return Array.Empty<string>();
+    }
+
+    /// <summary>
     /// Cheat / debug helper: unlocks every anomaly defined in the progression asset,
     /// across every category regardless of UnlockDay.
     /// Guidebook pages update automatically via <see cref="OnAnomalyUnlocked"/>.
