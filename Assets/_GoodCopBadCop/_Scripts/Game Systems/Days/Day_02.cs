@@ -110,6 +110,11 @@ public class Day_02 : DayBase, IDailyTask
              "Injected into the spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
     [SerializeField] private Transform _ochoElectricalPanelMarker;
 
+    [Tooltip("The Electrical Panel's own Interactable (ElectricPanelController) — force-highlighted while " +
+             "Ocho's power outage tutorial is showing, cleared once power is restored. Injected into the " +
+             "spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
+    [SerializeField] private Interactable _ochoElectricalPanelInteractable;
+
     [Tooltip("Task text shown while the player needs to file the Documentation and Mutation exam pages into the folder.")]
     [SerializeField] private string _taskAddExamPagesText = "Add the Documentation and Mutation exam pages to the folder";
 
@@ -1310,7 +1315,7 @@ public class Day_02 : DayBase, IDailyTask
         {
             SuspectController.Instance.SpawnScriptedSuspect(_ochoBoothEncounterPrefab);
             SuspectController.Instance.CurrentSuspect?.GetComponent<OchoBoothEncounter>()?
-                .ConfigureSceneReferences(_ochoReappearPoint, _ochoElectricalPanelMarker);
+                .ConfigureSceneReferences(_ochoReappearPoint, _ochoElectricalPanelMarker, _ochoElectricalPanelInteractable);
         };
 
         Debug.Log("[Day_02] Ocho booth encounter armed — he will be the next suspect summoned.");

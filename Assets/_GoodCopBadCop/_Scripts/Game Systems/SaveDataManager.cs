@@ -208,6 +208,57 @@ public class SaveDataManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // Suspect First-Encounter Tracking
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns true if the named suspect's intro dialogue has already played for the active slot.</summary>
+    public bool HasEncounteredSuspect(string suspectName)
+    {
+        if (string.IsNullOrEmpty(suspectName)) return false;
+        string[] encountered = ActiveSlot?.EncounteredSuspectNames;
+        if (encountered == null) return false;
+        return Array.IndexOf(encountered, suspectName) >= 0;
+    }
+
+    /// <summary>
+    /// Marks the named suspect as encountered (their intro dialogue has played) in the active
+    /// slot and persists to disk. Safe to call multiple times — duplicate entries are ignored.
+    /// </summary>
+    public void MarkSuspectEncountered(string suspectName)
+    {
+        if (ActiveSlot == null || string.IsNullOrEmpty(suspectName)) return;
+        if (HasEncounteredSuspect(suspectName)) return;
+
+        var list = new System.Collections.Generic.List<string>(
+            ActiveSlot.EncounteredSuspectNames ?? new string[0]);
+        list.Add(suspectName);
+        ActiveSlot.EncounteredSuspectNames = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Suspect encountered: '{suspectName}'.");
+    }
+
+    /// <summary>Clears the encounter record for one specific suspect name in the active slot. Debug use only.</summary>
+    public void ResetEncounteredSuspect(string suspectName)
+    {
+        if (ActiveSlot == null || string.IsNullOrEmpty(suspectName)) return;
+
+        var list = new System.Collections.Generic.List<string>(ActiveSlot.EncounteredSuspectNames ?? new string[0]);
+        if (list.Remove(suspectName))
+        {
+            ActiveSlot.EncounteredSuspectNames = list.ToArray();
+            Save();
+        }
+    }
+
+    /// <summary>Clears every suspect encounter record in the active slot. Debug use only.</summary>
+    public void ResetAllEncounteredSuspects()
+    {
+        if (ActiveSlot == null) return;
+        ActiveSlot.EncounteredSuspectNames = new string[0];
+        Save();
+    }
+
+    // -------------------------------------------------------------------------
     // Lock State
     // -------------------------------------------------------------------------
 
@@ -651,6 +702,13 @@ public class SaveSlot
     /// through gameplay progression and are eligible for selection by <see cref="DailyTaskScheduler"/>.
     /// </summary>
     public string[] UnlockedDailyTaskIds = new string[0];
+
+    /// <summary>
+    /// Unity asset names of suspects whose first-encounter intro dialogue
+    /// (<see cref="SuspectData.introDialogue"/>) has already played for this save slot.
+    /// Populated and consumed by <see cref="SuspectEncounterManager"/>.
+    /// </summary>
+    public string[] EncounteredSuspectNames = new string[0];
 
     /// <summary>
     /// Per-suspect persistent state (kill flags, quarantine cooldowns, infection scores).

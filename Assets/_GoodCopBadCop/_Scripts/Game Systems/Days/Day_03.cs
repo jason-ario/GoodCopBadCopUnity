@@ -54,6 +54,20 @@ public class Day_03 : DayBase
     protected override bool SupportsFuseBoxRestore => true;
 
     // -------------------------------------------------------------------------
+    // Inspector — Bunker Exit Stinger
+    // -------------------------------------------------------------------------
+
+    [Header("Day 3 — Bunker Exit Stinger")]
+    [Tooltip("One-shot stinger played the first time a player opens the bunker door and " +
+             "exits for Day 3. Played locally on every client via SFXController, matching " +
+             "the pattern used by UIController's transition stinger.")]
+    [SerializeField] private AudioClip _bunkerExitStinger;
+
+    [SerializeField] private float _bunkerExitStingerVolume = 1f;
+
+    private bool _bunkerExitStingerPlayed;
+
+    // -------------------------------------------------------------------------
     // Inspector — Power Outage Sequence
     // -------------------------------------------------------------------------
 
@@ -125,6 +139,11 @@ public class Day_03 : DayBase
         // bunker for Day 3 — see OchoEatingVladCutscene for the full sequence.
         OchoEatingVladCutscene.Instance?.TriggerTask();
 
+        // Plays a one-shot stinger the first time a player opens the bunker door and steps
+        // outside for Day 3. Reset per-day so a re-activation (e.g. debug skip) can replay it.
+        _bunkerExitStingerPlayed = false;
+        BunkerDoorController.OnDoorOpened += OnBunkerDoorOpenedFirstTime;
+
         // Subscribe on ALL clients — these drive local UI (TutorialObjectiveList) and
         // task-registry state, so every client must react independently.
         Telephone.OnScriptedCallAnsweredAllClients += OnScriptedCallAnsweredAllClients;
@@ -159,6 +178,7 @@ public class Day_03 : DayBase
 
     private void UnsubscribeAll()
     {
+        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
         ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
         Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
         Telephone.OnRingStarted -= OnPhoneRingStartedAllClients;
@@ -250,6 +270,33 @@ public class Day_03 : DayBase
             unlocked: true);
 
         Debug.Log("[Day_03] Power outage scripted dialogue started.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Bunker exit stinger — all clients
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fired on every client (via <see cref="BunkerDoorController.OnDoorOpened"/>) the moment
+    /// the bunker door swings open. Since the door is force-closed at the start of every day
+    /// (see <see cref="ShiftManager.InBetweenShiftSequence"/> / <see cref="BunkerDoorController.OnDayChanged"/>),
+    /// the first invocation each Day 3 always corresponds to the player's first exit of the day.
+    /// Unsubscribes immediately so later door-opens that day (e.g. going back in and out) stay silent.
+    /// </summary>
+    private void OnBunkerDoorOpenedFirstTime()
+    {
+        if (_bunkerExitStingerPlayed) return;
+        _bunkerExitStingerPlayed = true;
+
+        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
+
+        if (_bunkerExitStinger == null)
+        {
+            Debug.LogWarning("[Day_03] _bunkerExitStinger is not assigned — skipping stinger playback.");
+            return;
+        }
+
+        SFXController.Instance?.Play(_bunkerExitStinger, _bunkerExitStingerVolume);
     }
 
     // -------------------------------------------------------------------------

@@ -42,6 +42,10 @@ public class ElectricPanelController : Interactable
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip   _doorOpenSound;
 
+    [Tooltip("One-shot cue played whenever every circuit switch resets to Off in one go " +
+             "(power outage, or a failed puzzle attempt when the knob reaches On early).")]
+    [SerializeField] private AudioClip   _allSwitchesResetSound;
+
     [Header("Puzzle")]
     [SerializeField] private ElectricPanelDiegeticController _diegeticController;
     [SerializeField] private ElectricityController           _electricityController;
@@ -115,6 +119,7 @@ public class ElectricPanelController : Interactable
                 sw?.SetSwitchOff();
 
         _nob?.SnapToOff();
+        PlayAllSwitchesResetSound();
 
         // If the local player is currently inside this view, close it.
         if (DiegeticViewController.Current == _diegeticController)
@@ -149,6 +154,17 @@ public class ElectricPanelController : Interactable
     {
         CloseDoorServerRpc();
         _occupancy?.Release();
+    }
+
+    /// <summary>
+    /// Plays <see cref="_allSwitchesResetSound"/> once. Called whenever every circuit switch
+    /// resets to Off in one go — on a power outage (<see cref="OnPowerOff"/>) or when
+    /// <see cref="ElectricPanelDiegeticController"/> resets the panel after a failed attempt.
+    /// </summary>
+    public void PlayAllSwitchesResetSound()
+    {
+        if (_audioSource != null && _allSwitchesResetSound != null)
+            _audioSource.PlayOneShot(_allSwitchesResetSound);
     }
 
     // ─── ServerRpcs ──────────────────────────────────────────────────────────

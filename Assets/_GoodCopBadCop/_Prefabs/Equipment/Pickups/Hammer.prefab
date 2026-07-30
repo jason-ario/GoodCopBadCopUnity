@@ -139,13 +139,13 @@ PrefabInstance:
       addedObject: {fileID: 5232604761152191521}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6613276751134763203}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 7576498006100713669}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4170243926111273233}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6521086885668226916}
   m_SourcePrefab: {fileID: 100100000, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}
 --- !u!1 &8610616473533010578 stripped
 GameObject:
@@ -458,7 +458,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1229338863
+  GlobalObjectIdHash: 1431654506
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -488,6 +488,8 @@ MonoBehaviour:
   interactText: Hammer
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 51857c337f439214db5db13f67a38eb1, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   _hitbox: {fileID: 2950890886079734997}
   _damagePerHit: 25
   _hitDelay: 0.3
@@ -568,25 +570,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2.0081532, y: 21.18948, z: 8.819784}
   m_Center: {x: -0.004276201, y: -2.9700675, z: -0.4820134}
---- !u!114 &6613276751134763203
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8610616473533010578}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49e64c2e5076be549aebc84739dd1dc9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponDurability
-  ShowTopMostFoldoutHeaderGroup: 1
-  weaponData: {fileID: 11400000, guid: 7f11f13807441774e914b4d5d684f019, type: 2}
-  breakSound: {fileID: 8300000, guid: 5941a53f3dd529143b1346937c127440, type: 3}
-  _meshRenderer: {fileID: 0}
-  _damageStages: []
-  _breakPiecesPrefab: {fileID: 0}
-  _breakForce: 5
 --- !u!54 &7576498006100713669
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -631,6 +614,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 0
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &6521086885668226916
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8610616473533010578}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!4 &8950023152507783208 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 52c3a904b5b39b548a4b2ac5eb7563d1, type: 3}

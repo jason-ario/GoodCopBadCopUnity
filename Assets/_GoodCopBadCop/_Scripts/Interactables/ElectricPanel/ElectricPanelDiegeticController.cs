@@ -45,6 +45,9 @@ public class ElectricPanelDiegeticController : DiegeticViewController
     protected override void OnOpened()
     {
         if (_panelCollider != null) _panelCollider.enabled = false;
+
+        // Hide the player HUD while the player is focused on the diegetic panel view.
+        UIController.Instance?.ClosePlayerUI();
     }
 
     protected override void OnClosed()
@@ -57,6 +60,9 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         }
 
         if (_panelCollider != null) _panelCollider.enabled = true;
+
+        // Restore the player HUD now that the panel view is closing.
+        UIController.Instance?.ShowPlayerUI();
 
         // Notify the panel controller so it can close the door.
         _panelController?.OnViewClosed();
@@ -172,6 +178,10 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         if (_switches != null)
             foreach (CircuitSwitch sw in _switches)
                 sw?.SetSwitchOff();
+
+        // Extra one-shot cue on top of the individual switch-flip sounds, signalling that
+        // the whole panel just failed and reset.
+        _panelController?.PlayAllSwitchesResetSound();
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

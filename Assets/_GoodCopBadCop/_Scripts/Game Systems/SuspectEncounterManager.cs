@@ -6,8 +6,10 @@ using UnityEngine;
 /// Tracks first encounters with named suspects and automatically triggers their
 /// <see cref="SuspectData.introDialogue"/> the first time they arrive at the booth window.
 ///
-/// Encounter state is persisted across sessions via <see cref="PlayerPrefs"/>, keyed by
-/// each suspect's Unity asset name (e.g. <c>"Encountered_Ivan"</c>).
+/// Encounter state is persisted per campaign save slot via <see cref="SaveDataManager"/>
+/// (see <see cref="SaveSlot.EncounteredSuspectNames"/>), keyed by each suspect's Unity asset
+/// name (e.g. <c>"Ivan"</c>). This means starting a new save slot correctly replays every
+/// suspect's intro dialogue again, rather than the record leaking across separate campaigns.
 ///
 /// This manager is called server-side from <see cref="SuspectController.SayEntryDialogue"/>
 /// immediately before the normal entry-bark path. When <see cref="TryInterceptForIntroDialogue"/>
@@ -20,8 +22,6 @@ using UnityEngine;
 public class SuspectEncounterManager : MonoBehaviour
 {
     public static SuspectEncounterManager Instance { get; private set; }
-
-    private const string PrefPrefix = "Encountered_";
 
     /// <summary>
     /// Fired on the server immediately after a first-encounter intro dialogue finishes.
@@ -48,18 +48,27 @@ public class SuspectEncounterManager : MonoBehaviour
     // Encounter Tracking
     // -------------------------------------------------------------------------
 
-    /// <summary>Returns <c>true</c> if the player has already encountered this suspect before.</summary>
+    /// <summary>
+    /// Returns <c>true</c> if the player has already encountered this suspect before, for the
+    /// currently active save slot. Falls back to <c>false</c> (never encountered) if there is
+    /// no active slot, e.g. outside of a loaded campaign.
+    /// </summary>
     public static bool HasEncountered(SuspectData data)
     {
         if (data == null || string.IsNullOrEmpty(data.name)) return false;
-        return PlayerPrefs.GetInt(PrefPrefix + data.name, 0) != 0;
+        if (SaveDataManager.Instance == null) return false;
+        return SaveDataManager.Instance.HasEncounteredSuspect(data.name);
     }
 
     private static void MarkEncountered(SuspectData data)
     {
         if (data == null || string.IsNullOrEmpty(data.name)) return;
-        PlayerPrefs.SetInt(PrefPrefix + data.name, 1);
-        PlayerPrefs.Save();
+        if (SaveDataManager.Instance == null)
+        {
+            Debug.LogWarning($"[SuspectEncounterManager] No SaveDataManager instance — '{data.name}' encounter could not be persisted.");
+            return;
+        }
+        SaveDataManager.Instance.MarkSuspectEncountered(data.name);
     }
 
     /// <summary>
@@ -70,27 +79,21 @@ public class SuspectEncounterManager : MonoBehaviour
     /// </summary>
     public static void MarkEncounteredWithoutIntro(SuspectData data) => MarkEncountered(data);
 
-    /// <summary>Clears the encounter record for one specific suspect. Debug use only.</summary>
+    /// <summary>Clears the encounter record for one specific suspect, in the active save slot. Debug use only.</summary>
     public static void ResetEncounter(SuspectData data)
     {
-        if (data == null) return;
-        PlayerPrefs.DeleteKey(PrefPrefix + data.name);
-        PlayerPrefs.Save();
+        if (data == null || SaveDataManager.Instance == null) return;
+        SaveDataManager.Instance.ResetEncounteredSuspect(data.name);
     }
 
     /// <summary>
-    /// Clears all encounter records for the given suspects. Debug use only.
+    /// Clears all encounter records, in the active save slot, for the given suspects. Debug use only.
     /// Pass the full <see cref="SuspectDatabase"/> contents to ensure every key is cleared.
     /// </summary>
     public static void ResetEncounters(SuspectData[] suspects)
     {
-        if (suspects == null) return;
-        foreach (var s in suspects)
-        {
-            if (s != null && !string.IsNullOrEmpty(s.name))
-                PlayerPrefs.DeleteKey(PrefPrefix + s.name);
-        }
-        PlayerPrefs.Save();
+        if (suspects == null || SaveDataManager.Instance == null) return;
+        SaveDataManager.Instance.ResetAllEncounteredSuspects();
         Debug.Log("[SuspectEncounterManager] All encounter records reset.");
     }
 

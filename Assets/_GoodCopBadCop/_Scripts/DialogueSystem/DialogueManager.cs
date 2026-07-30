@@ -62,7 +62,7 @@ public class DialogueManager : NetworkBehaviour
     
 
     public void SayDialogue(SpeakingInteraction speaking, string dialogue, bool clearHistory = false,
-        bool waitForInput = false, Action onComplete = null)
+        bool waitForInput = false, Action onComplete = null, bool playLaughSfx = false)
     {
         ulong networkObjectId = ulong.MaxValue;
         if (speaking != null)
@@ -73,11 +73,11 @@ public class DialogueManager : NetworkBehaviour
 
         if (IsServer)
         {
-            SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput);
+            SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput, playLaughSfx);
         }
         else
         {
-            SayDialogueServerRpc(dialogue, networkObjectId, clearHistory, waitForInput);
+            SayDialogueServerRpc(dialogue, networkObjectId, clearHistory, waitForInput, playLaughSfx);
         }
 
         if (waitForInput)
@@ -91,19 +91,21 @@ public class DialogueManager : NetworkBehaviour
     /// Kept for backwards compatibility with SuspectController and DialogueSequence.
     /// </summary>
     public void SayDialogue(SuspectCharacter character, string dialogue, bool clearHistory = false,
-        bool waitForInput = false, Action onComplete = null)
+        bool waitForInput = false, Action onComplete = null, bool playLaughSfx = false)
     {
-        SayDialogue(character != null ? character.Speaking : null, dialogue, clearHistory, waitForInput, onComplete);
+        SayDialogue(character != null ? character.Speaking : null, dialogue, clearHistory, waitForInput, onComplete, playLaughSfx);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false, bool waitForInput = false)
+    private void SayDialogueServerRpc(string dialogue, ulong networkObjectId, bool clearHistory = false,
+        bool waitForInput = false, bool playLaughSfx = false)
     {
-        SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput);
+        SayDialogueClientRpc(dialogue, networkObjectId, clearHistory, waitForInput, playLaughSfx);
     }
 
     [ClientRpc]
-    private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false, bool waitForInput = false)
+    private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false,
+        bool waitForInput = false, bool playLaughSfx = false)
     {
         StopDialogueAudio();
 
@@ -124,7 +126,18 @@ public class DialogueManager : NetworkBehaviour
         }
 
         SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, waitForInput);
-        PlayDialogueAudio(dialogue, speaking.VoiceAudioClips, speaking.AudioSource, isMutant: speaking.IsMutantVoiceActive);
+
+        // Lines flagged to play a laugh instead of normal speech (e.g. ScriptedDialogueNode/
+        // Choice.playLaughSfx) show their subtitle immediately but skip the voice-clip cycling
+        // entirely, playing the speaker's laugh SFX in its place instead.
+        if (playLaughSfx)
+        {
+            speaking.PlayLaugh();
+        }
+        else if (!speaking.IsLaughing)
+        {
+            PlayDialogueAudio(dialogue, speaking.VoiceAudioClips, speaking.AudioSource, isMutant: speaking.IsMutantVoiceActive);
+        }
     }
 
     public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null, bool isMutant = false)
@@ -181,7 +194,10 @@ public class DialogueManager : NetworkBehaviour
         else
             _activeDialogueSource = audioSource;
 
-        float duration = dialogue.Length * secondsPerCharacter * 0.5f;
+        // Halved again (0.25f) on top of the existing 0.5f scale-down so voice clip
+        // playback covers roughly a quarter of the raw text-length estimate — dialogue
+        // audio was running noticeably longer than the actual spoken lines warranted.
+        float duration = dialogue.Length * secondsPerCharacter * 0.25f;
         float timer = 0;
         int lastClipIndex = -1;
 

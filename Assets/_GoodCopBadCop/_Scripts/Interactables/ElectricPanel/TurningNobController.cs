@@ -41,6 +41,9 @@ public class TurningNobController : MonoBehaviour
     [Tooltip("One-shot sound played the moment the knob reaches its On position.")]
     [SerializeField] private AudioClip _fullyRotatedSound;
 
+    [Tooltip("Additional one-shot sound played alongside _fullyRotatedSound when the knob reaches its On position.")]
+    [SerializeField] private AudioClip _fullyRotatedSoundSecondary;
+
     // ─── State ────────────────────────────────────────────────────────────────
 
     private float _progress; // 0 = Off, 1 = On
@@ -162,7 +165,11 @@ public class TurningNobController : MonoBehaviour
     private void PlayFullyRotatedSound()
     {
         StopRotatingSound();
-        if (_audioSource != null && _fullyRotatedSound != null)
+        if (_audioSource == null) return;
+
+        if (_fullyRotatedSound != null)
             _audioSource.PlayOneShot(_fullyRotatedSound);
+        if (_fullyRotatedSoundSecondary != null)
+            _audioSource.PlayOneShot(_fullyRotatedSoundSecondary);
     }
 }

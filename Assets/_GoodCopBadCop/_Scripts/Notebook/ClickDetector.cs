@@ -23,6 +23,18 @@ public class ClickDetector : MonoBehaviour
             return;
         }
 
+        // Diegetic views (tool locker, electric panel, etc.) already raycast against the
+        // same render camera and dispatch their own IClickable/IHoverable calls while open.
+        // Without this guard, this detector's rect covers the full screen regardless of
+        // whether the underlying RawImage is actually active, so it would fire a second,
+        // redundant OnClick() alongside the diegetic view's own click handling — e.g.
+        // double-toggling a CircuitSwitch back to its original state on every click.
+        if (DiegeticViewController.IsAnyViewActive)
+        {
+            ClearHover();
+            return;
+        }
+
         Vector3? cameraScreenPoint = GetCameraScreenPoint();
         if (cameraScreenPoint == null)
         {

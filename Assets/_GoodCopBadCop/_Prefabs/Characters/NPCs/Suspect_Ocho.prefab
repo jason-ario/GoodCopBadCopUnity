@@ -415,6 +415,10 @@ PrefabInstance:
       value: 2.32
       objectReference: {fileID: 0}
     - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: suspectData
+      value: 
+      objectReference: {fileID: 11400000, guid: 40edee8b695db704a903f5038575567c, type: 2}
+    - target: {fileID: 7888620099599006139, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: laughClips.Array.size
       value: 1
       objectReference: {fileID: 0}
@@ -1030,8 +1034,21 @@ MonoBehaviour:
   _reappearPoint: {fileID: 0}
   _vanishToReappearDelay: 1.5
   _reappearToLineDelay: 1
-  _danceAnimationTrigger: Dance
-  _danceDuration: 3
+  _stingerClip: {fileID: 8300000, guid: d4219561f6440854780b29447d7bd3be, type: 3}
+  _spotDotThreshold: 0.7
+  _spotMaxDistance: 15
+  _logSpotChecks: 1
+  _spotCheckInterval: 0.15
+  _spotTimeoutSeconds: 12
+  _stingerToVanishDelay: 0.4
+  _jumpscareZoomDuration: 0.18
+  _jumpscareTargetHeightOffset: -0.76
+  _jumpscareCloseDistance: 0.75
+  _jumpscareScaleMultiplier: 1.15
+  _twitchAnimatorParam: RandomTwitch
+  _twitchVariantCount: 5
+  _twitchMinInterval: 0.15
+  _twitchMaxInterval: 0.4
   _audioSource: {fileID: 2485501968895569445}
   _demonicLaughClip: {fileID: 8300000, guid: 116bfb4c4d324174da8e03cb3c6065a2, type: 3}
   _electricalPanelMarker: {fileID: 0}

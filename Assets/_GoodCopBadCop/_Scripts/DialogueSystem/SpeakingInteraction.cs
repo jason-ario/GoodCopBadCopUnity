@@ -29,6 +29,24 @@ public class SpeakingInteraction : NetworkBehaviour
     /// </summary>
     public bool IsMutantVoiceActive => _isMutantVoiceActive;
 
+    private bool _isLaughing;
+
+    /// <summary>
+    /// True while this speaker's <see cref="LaughingAnomaly"/> is active. While laughing,
+    /// normal dialogue voice clips are suppressed — the character is busy laughing instead
+    /// of delivering their line. Driven by <see cref="LaughingAnomaly"/> Activate/Deactivate.
+    /// </summary>
+    public bool IsLaughing => _isLaughing;
+
+    /// <summary>
+    /// Sets whether this speaker is currently in the middle of a laughing fit.
+    /// Called by <see cref="LaughingAnomaly"/> when it activates/deactivates.
+    /// </summary>
+    public void SetLaughing(bool isLaughing)
+    {
+        _isLaughing = isLaughing;
+    }
+
     /// <summary>
     /// Returns the voice clips for this speaker. When a <see cref="SuspectData"/> asset is
     /// assigned and it contains clips, those take priority over the local serialized array —
@@ -98,7 +116,7 @@ public class SpeakingInteraction : NetworkBehaviour
         DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory, waitForInput);
 
         AudioClip[] clips = VoiceAudioClips;
-        if (clips != null && clips.Length > 0 && audioSource != null)
+        if (!_isLaughing && clips != null && clips.Length > 0 && audioSource != null)
         {
             DialogueManager.Instance.PlayDialogueAudio(dialogue, clips, audioSource, isMutant: _isMutantVoiceActive);
         }

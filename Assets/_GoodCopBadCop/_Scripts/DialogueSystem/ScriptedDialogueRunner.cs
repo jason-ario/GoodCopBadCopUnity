@@ -453,10 +453,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, node.animationTrigger);
             _lastAnimTrigger = node.animationTrigger ?? string.Empty;
 
-            if (node.playLaughSfx)
-                PlayLaughSfxClientRpc(speakerNetId);
-
-            yield return StartCoroutine(SayAndWait(speaker, node.npcLine));
+            yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx));
 
             if (node.type == ScriptedDialogueNodeType.Choice)
                 yield return StartCoroutine(PlayChoiceNode(speaker, node, speakerNetId));
@@ -484,7 +481,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>Says a line and waits for all connected players to advance (or the timeout to expire).</summary>
-    private IEnumerator SayAndWait(SuspectCharacter speaker, string text)
+    private IEnumerator SayAndWait(SuspectCharacter speaker, string text, bool playLaughSfx = false)
     {
         _awaitingScriptedInput = true;
         // Target the "input open" signal only to participants — non-participants must not
@@ -500,7 +497,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ShowInWorldSubtitleClientRpc(speakerNetId, text, speaker.Speaking != null ? speaker.Speaking.SpeakerName : speaker.name, false);
         }
 
-        DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true);
+        DialogueManager.Instance.SayDialogue(speaker, text, waitForInput: true, playLaughSfx: playLaughSfx);
         yield return StartCoroutine(WaitForScriptedAdvance());
         // Broadcast the "input closed" signal so any late-joiner who had _clientIsWaitingForInput
         // set (via LateJoinClientRpc) also has it cleared correctly.
@@ -976,10 +973,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
         _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
 
-        if (chosen.playLaughSfx)
-            PlayLaughSfxClientRpc(speakerNetId);
-
-        yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse));
+        yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
 
         // The response has now been advanced past on every client — remove the echo of the
         // player's choice along with it.
@@ -1514,19 +1508,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
-    }
-
-    /// <summary>
-    /// Plays a random laugh clip on the speaker's <see cref="SpeakingInteraction"/> AudioSource.
-    /// No-ops if the speaker has no <see cref="SpeakingInteraction"/> or no laugh clips assigned.
-    /// </summary>
-    [ClientRpc]
-    private void PlayLaughSfxClientRpc(ulong speakerNetId)
-    {
-        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
-            return;
-
-        netObj.GetComponent<SuspectCharacter>()?.Speaking?.PlayLaugh();
     }
 
     private string GetLocalPlayerName()

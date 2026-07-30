@@ -437,6 +437,7 @@ MonoBehaviour:
   _audioSource: {fileID: 0}
   _rotatingSound: {fileID: 0}
   _fullyRotatedSound: {fileID: 0}
+  _fullyRotatedSoundSecondary: {fileID: 0}
 --- !u!1 &1407905521772622538
 GameObject:
   m_ObjectHideFlags: 0
@@ -805,7 +806,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3050579595
+  GlobalObjectIdHash: 367920235
   InScenePlacedSourceGlobalObjectIdHash: 2697777458
   DeferredDespawnTick: 0
   Ownership: 1
@@ -840,6 +841,7 @@ MonoBehaviour:
   _doorRotateSpeed: 200
   _audioSource: {fileID: 1815886758458922068}
   _doorOpenSound: {fileID: 8300000, guid: f9e3aab5f2668b44895f898efbdc9672, type: 3}
+  _allSwitchesResetSound: {fileID: 8300000, guid: 68b670bc325665f4298a6945aad627f2, type: 3}
   _diegeticController: {fileID: 1846375494466276468}
   _electricityController: {fileID: 0}
   _switches:
@@ -3097,10 +3099,6 @@ PrefabInstance:
       propertyPath: _audioSource
       value: 
       objectReference: {fileID: 1815886758458922068}
-    - target: {fileID: 237942142654282490, guid: cd8e9e21c72c0a746804fddf41dda806, type: 3}
-      propertyPath: _switchSound
-      value: 
-      objectReference: {fileID: 8300000, guid: b199dd899dc9f08488f3efa08a6e55e7, type: 3}
     - target: {fileID: 375869022729923197, guid: cd8e9e21c72c0a746804fddf41dda806, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.3817391

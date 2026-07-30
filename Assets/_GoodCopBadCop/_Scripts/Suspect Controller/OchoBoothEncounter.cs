@@ -17,12 +17,12 @@ using UnityEngine;
 ///   2. He vanishes and reappears standing behind the player inside the booth.
 ///   3. The encounter waits for a player to actually turn around and spot him there (or times
 ///      out); the moment he's spotted a stinger plays and he vanishes again.
-///   - Red stamp (Kill) specifically: once he vanishes after the stinger, the booth's power
-///     cuts out and he cackles from the dark, leaving the player to go fix the breaker at
+///   - Every verdict: once he vanishes after the stinger, the booth's power cuts out and he
+///     cackles from the dark, leaving the player to go fix the breaker at
 ///     <see cref="ElectricPanelController"/> before the switch button will let them summon the
 ///     next suspect (already gated by <see cref="SwitchButton"/>'s powerOn check). Once power is
 ///     restored the megaphone plays a couple of dismissive barks and the next suspect can be
-///     called. Pass/Quarantine skip the blackout entirely, Ocho just leaves.
+///     called.
 ///
 /// All timing/sequencing runs server-only; physical vanish/reappear/stinger/laugh beats are
 /// broadcast to all clients via ClientRpc so both co-op players see them. The turn-around spot
@@ -70,7 +70,15 @@ public class OchoBoothEncounter : NetworkBehaviour
 
     [Tooltip("Dot product between the local player's camera forward and the direction to Ocho required to " +
              "count as 'looking at him'. Higher = a narrower cone directly in front of the camera.")]
-    [SerializeField] private float _spotDotThreshold = 0.7f;
+    [SerializeField] private float _spotDotThreshold = 0.5f;
+
+    [Tooltip("Maximum distance (world units) from the local player's camera at which Ocho can still be spotted. " +
+             "Should comfortably cover the booth interior around the reappear point.")]
+    [SerializeField] private float _spotMaxDistance = 15f;
+
+    [Tooltip("Logs the local spot-check state (camera found, distance, dot) to the console every check " +
+             "while waiting for the player to turn around. Turn off once the reveal is confirmed working.")]
+    [SerializeField] private bool _logSpotChecks = true;
 
     [Tooltip("Seconds between visibility checks on each client while waiting for a player to turn around.")]
     [SerializeField] private float _spotCheckInterval = 0.15f;
@@ -79,14 +87,50 @@ public class OchoBoothEncounter : NetworkBehaviour
     [SerializeField] private float _spotTimeoutSeconds = 12f;
 
     [Tooltip("Seconds between the stinger playing and the sequence continuing (power outage / despawn).")]
-    [SerializeField] private float _stingerToVanishDelay = 0.4f;
+    [SerializeField] private float _stingerToVanishDelay = 0.5f;
 
-    [Header("Ocho Booth Encounter — Power Outage (Red Stamp / Kill only)")]
+    [Header("Ocho Booth Encounter — Jumpscare Zoom")]
+    [Tooltip("Seconds the zoom-in takes, from wherever Ocho is standing to right next to the player, " +
+             "before he vanishes and the stinger plays.")]
+    [SerializeField] private float _jumpscareZoomDuration = 0.18f;
+
+    [Tooltip("Vertical offset (world units, negative = below) from the local player's own root position that " +
+             "Ocho zooms toward. E.g. -0.3 zooms him to a point 0.3 units below the player's root.")]
+    [SerializeField] private float _jumpscareTargetHeightOffset = -0.3f;
+
+    [Tooltip("Fallback distance in front of the camera Ocho zooms to if no local PlayerInstance can be found " +
+             "to compute the player-root-relative target (should not normally happen in play).")]
+    [SerializeField] private float _jumpscareCloseDistance = 0.75f;
+
+    [Tooltip("Scale multiplier applied to Ocho's root at the peak of the jumpscare for extra punch (1 = no change).")]
+    [SerializeField] private float _jumpscareScaleMultiplier = 1.15f;
+
+    [Header("Ocho Booth Encounter — Reappear Twitching")]
+    [Tooltip("Name of the Animator Int parameter that selects a twitch animation variant (1 to " +
+             "_twitchVariantCount, 0 = none). Matches the shared NPC controller's 'RandomTwitch' parameter.")]
+    [SerializeField] private string _twitchAnimatorParam = "RandomTwitch";
+
+    [Tooltip("Number of twitch animation variants available on the Animator (a random value from 1 to this " +
+             "count is picked on each trigger).")]
+    [SerializeField] private int _twitchVariantCount = 5;
+
+    [Tooltip("Minimum seconds between rapid twitch triggers while Ocho stands behind the player waiting to be spotted.")]
+    [SerializeField] private float _twitchMinInterval = 0.15f;
+
+    [Tooltip("Maximum seconds between rapid twitch triggers while Ocho stands behind the player waiting to be spotted.")]
+    [SerializeField] private float _twitchMaxInterval = 0.4f;
+
+    [Header("Ocho Booth Encounter — Power Outage")]
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _demonicLaughClip;
 
     [Tooltip("Transform the tutorial arrow points at while the power is out (usually the Electrical Panel).")]
     [SerializeField] private Transform _electricalPanelMarker;
+
+    [Tooltip("The Electrical Panel's own Interactable (e.g. ElectricPanelController), force-highlighted " +
+             "while the power outage tutorial is showing so the panel visually stands out, not just the " +
+             "arrow above it. Cleared the moment power is restored.")]
+    [SerializeField] private Interactable _electricalPanelInteractable;
 
     [Header("Ocho Booth Encounter — Megaphone Barks (after power restored)")]
     [SerializeField] private string _powerRestoredBark1 = "Did you guys lose power?";
@@ -95,14 +139,17 @@ public class OchoBoothEncounter : NetworkBehaviour
     [SerializeField] private float _finalDelayBeforeNextSuspect = 1.5f;
 
     private SuspectCharacter _self;
+    private Collider _ochoCollider;
     private bool _handled;
     private bool _spotted;
     private Coroutine _monitorCoroutine;
+    private Coroutine _twitchCoroutine;
     private ApplicationLetter _spawnedApplicationLetter;
 
     private void Awake()
     {
         _self = GetComponent<SuspectCharacter>();
+        _ochoCollider = GetComponent<Collider>();
     }
 
     public override void OnNetworkSpawn()
@@ -137,10 +184,11 @@ public class OchoBoothEncounter : NetworkBehaviour
     /// panel marker — must be supplied by the spawner). Call immediately after spawning, e.g.
     /// from <c>Day_02.ArmOchoBoothEncounter</c>'s intercept.
     /// </summary>
-    public void ConfigureSceneReferences(Transform reappearPoint, Transform electricalPanelMarker)
+    public void ConfigureSceneReferences(Transform reappearPoint, Transform electricalPanelMarker, Interactable electricalPanelInteractable = null)
     {
         if (reappearPoint != null) _reappearPoint = reappearPoint;
         if (electricalPanelMarker != null) _electricalPanelMarker = electricalPanelMarker;
+        if (electricalPanelInteractable != null) _electricalPanelInteractable = electricalPanelInteractable;
     }
 
     /// <summary>
@@ -186,23 +234,18 @@ public class OchoBoothEncounter : NetworkBehaviour
         }
 
         ReappearClientRpc();
+        _twitchCoroutine = StartCoroutine(RapidTwitchLoop());
         yield return new WaitForSeconds(_reappearToLineDelay);
 
         // Wait until a player actually turns around and spots him standing behind them
         // (or the timeout elapses), then he startles them with a stinger and vanishes.
         yield return WaitForPlayerToSpotOcho();
 
+        StopTwitching();
         PlayStingerAndVanishClientRpc();
         yield return new WaitForSeconds(_stingerToVanishDelay);
 
-        if (attemptedStamp != StampContainer.StampType.Kill)
-        {
-            // Quarantine and Pass also fail to process Ocho, but there's no blackout theatrics.
-            controller.DespawnSuspectWithoutVerdict(_self);
-            ShiftManager.Instance.SetNextSuspectReady();
-            yield break;
-        }
-
+        Debug.Log($"[OchoBoothEncounter] Verdict was {attemptedStamp} — running the power outage sequence.");
         RedStampSequence(controller);
     }
 
@@ -217,29 +260,70 @@ public class OchoBoothEncounter : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server-only: rapidly fires random twitch animations (via the Animator's Int parameter,
+    /// replicated to clients through NetworkAnimator) while Ocho stands behind the player waiting
+    /// to be spotted, for an extra creepy "something's wrong with him" effect. Stopped by
+    /// <see cref="StopTwitching"/> the moment he's spotted (or the wait times out).
+    /// </summary>
+    private IEnumerator RapidTwitchLoop()
+    {
+        while (true)
+        {
+            int index = Random.Range(1, _twitchVariantCount + 1);
+            _self.animator?.SetInteger(_twitchAnimatorParam, index);
+
+            yield return new WaitForSeconds(Random.Range(_twitchMinInterval, _twitchMaxInterval));
+        }
+    }
+
+    private void StopTwitching()
+    {
+        if (_twitchCoroutine != null)
+        {
+            StopCoroutine(_twitchCoroutine);
+            _twitchCoroutine = null;
+        }
+
+        _self.animator?.SetInteger(_twitchAnimatorParam, 0);
+    }
+
+    /// <summary>
     /// Server-only wait: blocks until any client reports (via <see cref="ReportSpottedServerRpc"/>)
     /// that its local player turned and spotted Ocho, or until <see cref="_spotTimeoutSeconds"/>
-    /// elapses, whichever comes first.
+    /// elapses, whichever comes first. <see cref="_spotted"/> is deliberately NOT reset here — a
+    /// client can (and often does) report a spot before this method even starts running, e.g. when
+    /// the player was already looking straight at the reappear point the instant Ocho becomes
+    /// visible; resetting the flag here would silently discard that already-received report and
+    /// leave the server waiting forever for a second report that will never come, since the
+    /// client's monitor coroutine already exited after its first successful report.
     /// </summary>
     private IEnumerator WaitForPlayerToSpotOcho()
     {
-        _spotted = false;
+        Debug.Log($"[OchoBoothEncounter] Server: WaitForPlayerToSpotOcho started (spotted so far: {_spotted}), waiting for spot report or timeout.");
+
         float elapsed = 0f;
         while (!_spotted && elapsed < _spotTimeoutSeconds)
         {
             elapsed += Time.deltaTime;
             yield return null;
         }
+
+        Debug.Log(_spotted
+            ? $"[OchoBoothEncounter] Server: player reported spotting Ocho (elapsed={elapsed:F1}s)."
+            : $"[OchoBoothEncounter] Server: spot wait timed out after {elapsed:F1}s — continuing anyway.");
     }
 
     [ServerRpc(RequireOwnership = false)]
     private void ReportSpottedServerRpc()
     {
+        Debug.Log($"[OchoBoothEncounter] ReportSpottedServerRpc received on server (IsServer={IsServer}). Setting _spotted=true.");
         _spotted = true;
     }
 
     private void RedStampSequence(SuspectController controller)
     {
+        Debug.Log($"[OchoBoothEncounter] RedStampSequence: ElectricityController.Instance={(ElectricityController.Instance != null ? "found" : "NULL")}.");
+
         // Cut the power — the switch button (SwitchButton.PowerOff, already wired to this
         // ElectricObject in the scene) can't be readied again until the panel puzzle is solved.
         ElectricityController.Instance?.PowerOff();
@@ -267,6 +351,8 @@ public class OchoBoothEncounter : NetworkBehaviour
 
         if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
             TutorialMarkerManager.Instance.Unmark(_electricalPanelMarker);
+
+        _electricalPanelInteractable?.SetForceHighlight(false);
 
         TutorialOverlay.Instance?.Close();
 
@@ -298,6 +384,7 @@ public class OchoBoothEncounter : NetworkBehaviour
     [ClientRpc]
     private void ReappearClientRpc()
     {
+        Debug.Log("[OchoBoothEncounter] ReappearClientRpc received on this client — starting spot monitor.");
         SetVisible(true);
         StopMonitoring();
         _monitorCoroutine = StartCoroutine(MonitorForLocalPlayerSpot());
@@ -306,12 +393,94 @@ public class OchoBoothEncounter : NetworkBehaviour
     [ClientRpc]
     private void PlayStingerAndVanishClientRpc()
     {
-        StopMonitoring();
+        Debug.Log($"[OchoBoothEncounter] PlayStingerAndVanishClientRpc received — " +
+                  $"audioSource={(_audioSource != null ? _audioSource.name : "NULL")}, " +
+                  $"clip={(_stingerClip != null ? _stingerClip.name : "NULL")}.");
 
-        if (_audioSource != null && _stingerClip != null)
-            _audioSource.PlayOneShot(_stingerClip);
+        StopMonitoring();
+        StartCoroutine(JumpscareZoomAndVanish());
+    }
+
+    /// <summary>
+    /// Client-local only: rapidly drives Ocho's actual root transform (not just his visual mesh)
+    /// from wherever he's standing to right next to the player for a cheap jumpscare punch, then
+    /// plays the stinger and hides him. Moving the root — rather than a child mesh/rig transform —
+    /// avoids fighting the Animator's own root motion on the rig (which was fighting a child-only
+    /// move and causing the legs to appear stuck/sliding). The root's <see cref="NetworkTransform"/>
+    /// is temporarily disabled on this client only for the duration of the animation so its
+    /// authoritative sync doesn't snap Ocho back to his last-replicated position mid-zoom — this is
+    /// a purely client-visual gag, the server's own copy of his transform never actually changes.
+    /// His own <see cref="Collider"/> is also disabled for the same duration so he doesn't physically
+    /// shove/collide with the player while zooming through their position. The stinger plays through
+    /// <see cref="SFXController"/> rather than Ocho's own <see cref="AudioSource"/> (so it keeps
+    /// playing even after he vanishes and is despawned moments later), and fires immediately as the
+    /// zoom starts — the instant the player is confirmed to have spotted him — rather than waiting
+    /// for the punch-in to finish.
+    /// Falls back to a plain stinger + hide if no camera is found (e.g. dedicated server).
+    /// </summary>
+    private IEnumerator JumpscareZoomAndVanish()
+    {
+        Camera cam = Camera.main;
+
+        if (cam == null)
+        {
+            SFXController.Instance?.Play(_stingerClip);
+            SetVisible(false);
+            yield break;
+        }
+
+        Unity.Netcode.Components.NetworkTransform netTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+
+        Vector3 originalPos = transform.position;
+        Quaternion originalRot = transform.rotation;
+        Vector3 originalScale = transform.localScale;
+
+        // Zoom toward a point just below the local player's own root position (their feet/pivot),
+        // rather than a fixed distance in front of the camera — this way the jumpscare always
+        // lands "on" the player regardless of where they're standing or how they're oriented.
+        Vector3 targetPos = PlayerInstance.Instance != null
+            ? PlayerInstance.Instance.transform.position + new Vector3(0f, _jumpscareTargetHeightOffset, 0f)
+            : cam.transform.position + cam.transform.forward * _jumpscareCloseDistance;
+
+        Vector3 lookDir = cam.transform.position - targetPos;
+        lookDir.y = 0f;
+        Quaternion targetRot = lookDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(lookDir.normalized, Vector3.up)
+            : originalRot;
+        Vector3 targetScale = originalScale * _jumpscareScaleMultiplier;
+
+        if (netTransform != null) netTransform.enabled = false;
+        if (_ochoCollider != null) _ochoCollider.enabled = false;
+
+        // Fire the stinger the instant the player spots him — right as the zoom starts — rather
+        // than after he's already zipped over. The jumpscare "hit" needs to land the moment he's
+        // seen, not half a beat later once the punch-in animation has finished playing out.
+        SFXController.Instance?.Play(_stingerClip);
+
+        float t = 0f;
+        while (t < _jumpscareZoomDuration)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / _jumpscareZoomDuration);
+            float eased = 1f - Mathf.Pow(1f - p, 3f); // fast punch-in
+
+            transform.position = Vector3.Lerp(originalPos, targetPos, eased);
+            transform.rotation = Quaternion.Slerp(originalRot, targetRot, eased);
+            transform.localScale = Vector3.Lerp(originalScale, targetScale, eased);
+
+            yield return null;
+        }
 
         SetVisible(false);
+
+        // Restore his real transform so nothing is left offset once he's despawned (or in case
+        // despawn is delayed for any reason).
+        transform.position = originalPos;
+        transform.rotation = originalRot;
+        transform.localScale = originalScale;
+
+        if (netTransform != null) netTransform.enabled = true;
+        if (_ochoCollider != null) _ochoCollider.enabled = true;
     }
 
     [ClientRpc]
@@ -326,6 +495,8 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
             TutorialMarkerManager.Instance.Mark(_electricalPanelMarker);
+
+        _electricalPanelInteractable?.SetForceHighlight(true);
 
         TutorialOverlay.Instance?.ShowElectricalPanelTutorial();
     }
@@ -346,30 +517,52 @@ public class OchoBoothEncounter : NetworkBehaviour
     /// <summary>
     /// Runs locally on every client while Ocho is visible behind the player. Checks this
     /// client's own local player camera (<see cref="PlayerInstance.Instance"/>) against Ocho's
-    /// position — a narrow forward cone plus an unobstructed raycast counts as "spotted". The
-    /// first client to detect this reports it to the server via <see cref="ReportSpottedServerRpc"/>.
-    /// Stopped externally by <see cref="StopMonitoring"/> once the server moves on (either because
-    /// a client reported a spot, or the wait timed out).
+    /// position, a narrow forward cone counts as "spotted" (deliberately no line-of-sight
+    /// raycast: the booth interior is cluttered with interaction/trigger colliders that would
+    /// otherwise block the check almost every time even when the player is looking straight at
+    /// him). The first client to detect this reports it to the server via
+    /// <see cref="ReportSpottedServerRpc"/>. Stopped externally by <see cref="StopMonitoring"/>
+    /// once the server moves on (either because a client reported a spot, or the wait timed out).
     /// </summary>
     private IEnumerator MonitorForLocalPlayerSpot()
     {
+        Debug.Log("[OchoBoothEncounter] Spot monitor started on this client.");
+
         while (true)
         {
             Camera cam = Camera.main;
-            if (PlayerInstance.Instance != null && cam != null)
+
+            if (PlayerInstance.Instance == null)
+            {
+                if (_logSpotChecks) Debug.Log("[OchoBoothEncounter] Spot check: no local PlayerInstance yet.");
+            }
+            else if (cam == null)
+            {
+                if (_logSpotChecks) Debug.Log("[OchoBoothEncounter] Spot check: Camera.main is null.");
+            }
+            else
             {
                 Vector3 toOcho = transform.position - cam.transform.position;
                 float dist = toOcho.magnitude;
 
-                if (dist > 0.05f)
+                if (dist <= 0.05f)
+                {
+                    if (_logSpotChecks) Debug.Log($"[OchoBoothEncounter] Spot check: distance too small ({dist:F2}).");
+                }
+                else if (dist > _spotMaxDistance)
+                {
+                    if (_logSpotChecks) Debug.Log($"[OchoBoothEncounter] Spot check: out of range (dist={dist:F1}, max={_spotMaxDistance}).");
+                }
+                else
                 {
                     Vector3 dir = toOcho / dist;
                     float dot = Vector3.Dot(cam.transform.forward, dir);
 
-                    if (dot >= _spotDotThreshold &&
-                        (!Physics.Raycast(cam.transform.position, dir, out RaycastHit hit, dist) ||
-                         hit.transform.IsChildOf(transform)))
+                    if (_logSpotChecks) Debug.Log($"[OchoBoothEncounter] Spot check: dist={dist:F1}, dot={dot:F2} (need >= {_spotDotThreshold}).");
+
+                    if (dot >= _spotDotThreshold)
                     {
+                        Debug.Log("[OchoBoothEncounter] Player spotted Ocho — reporting to server.");
                         ReportSpottedServerRpc();
                         yield break;
                     }

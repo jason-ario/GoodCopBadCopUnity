@@ -1835,9 +1835,12 @@ public class SuspectController : NetworkBehaviour
         // Scripted encounters (e.g. Ocho's booth confrontation) can reject verdicts entirely —
         // neither the kill machine nor quarantine actually process the suspect. Fully hand off
         // to the encounter's own scripted sequence instead of the normal payout/switch below.
+        // spawnedFolder must still be tracked here so CleanupSpawnedFolderForRejectedVerdict()
+        // (called by the encounter once it takes the folder) actually has something to despawn.
         OchoBoothEncounter ochoEncounter = suspectCharacter.GetComponent<OchoBoothEncounter>();
         if (ochoEncounter != null)
         {
+            spawnedFolder = folder;
             ochoEncounter.HandleVerdictAttempt(folder);
             return;
         }
