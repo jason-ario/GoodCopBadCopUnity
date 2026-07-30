@@ -10,8 +10,17 @@ public class Checkbox : MonoBehaviour, IClickable
     [SerializeField] private Transform ikTargetTransform;
     [SerializeField] private AudioClip drawSound;
 
+    /// <summary>
+    /// Visual indicator (the "Selected Box" child) shown while this checkbox is the
+    /// currently highlighted item during controller navigation. Hidden by default.
+    /// </summary>
+    [SerializeField] private GameObject selectedBox;
+
     private bool _isInteractable = false;
     public bool IsChecked { get; private set; }
+
+    /// <summary>True while this checkbox can be clicked/toggled (exam is active and unlocked).</summary>
+    public bool IsInteractable => _isInteractable;
 
     private void OnEnable()
     {
@@ -65,5 +74,15 @@ public class Checkbox : MonoBehaviour, IClickable
     public void SetInteractable(bool value)
     {
         _isInteractable = value;
+    }
+
+    /// <summary>
+    /// Shows or hides the "Selected Box" highlight used to indicate which checkbox is
+    /// currently focused during controller (gamepad) navigation.
+    /// </summary>
+    public void SetSelected(bool value)
+    {
+        if (selectedBox != null)
+            selectedBox.SetActive(value);
     }
 }

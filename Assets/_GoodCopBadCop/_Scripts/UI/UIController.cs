@@ -91,16 +91,15 @@ public class UIController : MonoBehaviour
 
     private void Update()
     {
-        if (playerUI.activeSelf == false)
-        {
-            return;
-        }
-        
-        if(PlayerInstance.Instance == null)
+        if (PlayerInstance.Instance == null)
         {
             return;
         }
 
+        // The back button (and its gamepad B/East equivalent) must work even while the
+        // player's main HUD is hidden — e.g. SuspectWorldDialogue closes playerUI for the
+        // duration of a world conversation — so this check runs before the playerUI-gated
+        // logic below, not after it.
         // While a diegetic view is open, Q is its exit key — suppress the global
         // "Back" shortcut so it doesn't double-fire through the back button as well.
         if (backButtonUI.activeSelf == true && !DiegeticViewController.IsAnyViewActive)
@@ -111,6 +110,11 @@ public class UIController : MonoBehaviour
             {
                 backButton.onClick.Invoke();
             }
+        }
+
+        if (playerUI.activeSelf == false)
+        {
+            return;
         }
 
         bool pauseInput = Input.GetButtonDown("Pause")

@@ -1,8 +1,10 @@
 using System.Collections;
+using System.Linq;
 using HighlightPlus;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 // LateUpdate must run after PlayerAnimationController (default order 0) and
 // PlayerPickupController (order 1) so pages snap to the notebook's final
@@ -127,6 +129,19 @@ public class ExamNotebook : PickableObject
 
     private NetworkVariable<int>[] _pageBitmasks;
     [SerializeField] private AudioClip ripOutSound;
+
+    // ── Controller checklist navigation ─────────────────────────────────────────
+    /// <summary>True while the "draw mode" checklist view is open (see OnStartUse/ExitDrawMode).</summary>
+    private bool _isInDrawMode;
+
+    /// <summary>The checklist item currently highlighted by controller navigation, if any.</summary>
+    private ChecklistItem _controllerSelectedItem;
+
+    /// <summary>Earliest time the left-stick navigation can fire again (debounce).</summary>
+    private float _stickNavTime;
+
+    private const float ChecklistStickNavCooldown = 0.25f;
+    // ─────────────────────────────────────────────────────────────────────────────
 
     protected override void Awake()
     {
@@ -645,7 +660,24 @@ public class ExamNotebook : PickableObject
         playerPickupController.CanPickUpAndPlace = false;
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(false);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(false);
-        UIController.Instance.ShowCursor();
+
+        _isInDrawMode = true;
+        _controllerSelectedItem = null;
+
+        // Default to controller navigation (cursor hidden) if a gamepad is connected;
+        // otherwise show the free mouse cursor for point-and-click checkbox interaction.
+        if (Gamepad.current != null)
+        {
+            UIController.Instance.HideCursor();
+            ChecklistItem[] items = GetNavigableChecklistItems();
+            if (items.Length > 0)
+                SetChecklistControllerSelection(items[0]);
+        }
+        else
+        {
+            UIController.Instance.ShowCursor();
+        }
+
         UIController.Instance.ShowBackButton(ExitDrawMode);
     }
 
@@ -655,8 +687,114 @@ public class ExamNotebook : PickableObject
         playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(true);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(true);
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+
+        _isInDrawMode = false;
+        ClearChecklistControllerSelection();
+
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
+    }
+
+    private void Update()
+    {
+        if (!_isInDrawMode) return;
+        UpdateChecklistControllerNavigation();
+    }
+
+    /// <summary>
+    /// Returns the checklist items on the currently active page that can be navigated to
+    /// with a controller — unlocked and currently visible — ordered top-to-bottom to match
+    /// their on-page layout.
+    /// </summary>
+    private ChecklistItem[] GetNavigableChecklistItems()
+    {
+        if (pages == null || currentPage < 0 || currentPage >= pages.Length) return System.Array.Empty<ChecklistItem>();
+
+        ExamPage page = pages[currentPage];
+        if (page == null || page.ChecklistItems == null) return System.Array.Empty<ChecklistItem>();
+
+        return page.ChecklistItems
+            .Where(item => item != null && !item.IsLocked && item.gameObject.activeInHierarchy)
+            .OrderByDescending(item => item.transform.position.y)
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Drives controller (gamepad) checklist navigation while draw mode is open:
+    /// left stick / d-pad vertical input moves the highlighted checkbox, the south button
+    /// toggles it, and any mouse/keyboard activity clears the highlight and restores the
+    /// free mouse cursor.
+    /// </summary>
+    private void UpdateChecklistControllerNavigation()
+    {
+        // ── Mouse/keyboard activity always wins: clear controller highlight, show cursor ──
+        bool mkActivity = (Mouse.current != null &&
+                            (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f ||
+                             Mouse.current.leftButton.wasPressedThisFrame ||
+                             Mouse.current.rightButton.wasPressedThisFrame))
+                           || (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame);
+
+        if (mkActivity)
+        {
+            if (_controllerSelectedItem != null)
+                ClearChecklistControllerSelection();
+            UIController.Instance.ShowCursor();
+            return;
+        }
+
+        Gamepad gp = Gamepad.current;
+        if (gp == null) return;
+
+        ChecklistItem[] items = GetNavigableChecklistItems();
+        if (items.Length == 0) return;
+
+        Vector2 leftStick = gp.leftStick.ReadValue();
+        bool navUp = gp.dpad.up.wasPressedThisFrame;
+        bool navDown = gp.dpad.down.wasPressedThisFrame;
+
+        if (leftStick.y > 0.5f && Time.time >= _stickNavTime) { navUp = true; _stickNavTime = Time.time + ChecklistStickNavCooldown; }
+        if (leftStick.y < -0.5f && Time.time >= _stickNavTime) { navDown = true; _stickNavTime = Time.time + ChecklistStickNavCooldown; }
+
+        bool confirmPressed = gp.buttonSouth.wasPressedThisFrame;
+
+        if (!navUp && !navDown && !confirmPressed) return;
+
+        // Any controller input takes over navigation — hide the free mouse cursor by default.
+        UIController.Instance.HideCursor();
+
+        int currentIndex = _controllerSelectedItem != null ? System.Array.IndexOf(items, _controllerSelectedItem) : -1;
+
+        if (currentIndex < 0)
+        {
+            SetChecklistControllerSelection(items[0]);
+        }
+        else if (navUp || navDown)
+        {
+            int dir = navDown ? 1 : -1;
+            int newIndex = Mathf.Clamp(currentIndex + dir, 0, items.Length - 1);
+            SetChecklistControllerSelection(items[newIndex]);
+        }
+        else if (confirmPressed)
+        {
+            items[currentIndex].ActivateViaController();
+        }
+    }
+
+    /// <summary>Moves the controller highlight to <paramref name="item"/>, clearing the previous one.</summary>
+    private void SetChecklistControllerSelection(ChecklistItem item)
+    {
+        if (_controllerSelectedItem == item) return;
+
+        _controllerSelectedItem?.SetControllerSelected(false);
+        _controllerSelectedItem = item;
+        _controllerSelectedItem?.SetControllerSelected(true);
+    }
+
+    /// <summary>Clears the controller highlight, if any.</summary>
+    private void ClearChecklistControllerSelection()
+    {
+        _controllerSelectedItem?.SetControllerSelected(false);
+        _controllerSelectedItem = null;
     }
 
     public void AddToFolder(FolderController folder)

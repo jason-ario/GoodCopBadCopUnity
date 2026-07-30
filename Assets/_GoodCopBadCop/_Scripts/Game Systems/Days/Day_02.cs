@@ -814,11 +814,15 @@ public class Day_02 : DayBase, IDailyTask
     /// <summary>
     /// Walks any <see cref="SuspectCharacter"/> to <paramref name="target"/> using the NavMeshAgent,
     /// then settles facing to the waypoint's forward direction. Server-side.
+    /// Vlad is made non-interactable for the duration of the walk (on every client) so players
+    /// can't start a conversation with him mid-transit between waypoints, then restored once
+    /// he's arrived and settled.
     /// </summary>
     private IEnumerator WalkVladTo(SuspectCharacter character, Transform target)
     {
         if (character == null || target == null) yield break;
 
+        character.SetCanInteractNetworked(false);
         character.SetAnimatorBool("Walking", true);
 
         bool arrived = false;
@@ -836,6 +840,8 @@ public class Day_02 : DayBase, IDailyTask
                 .OnComplete(() => rotDone = true);
             yield return new WaitUntil(() => rotDone);
         }
+
+        character.SetCanInteractNetworked(true);
     }
 
     // -------------------------------------------------------------------------

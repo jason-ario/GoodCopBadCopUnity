@@ -1277,6 +1277,23 @@ public class SuspectCharacter : Interactable
             interactionCollider.enabled = canInteract;
     }
 
+    /// <summary>
+    /// Networked wrapper for <see cref="SetCanInteract"/> — broadcasts to every client so a
+    /// suspect that shouldn't currently be interactable (e.g. Vlad walking between waypoints
+    /// in Day 2's opening/out-back sequences) reads as non-interactable in everyone's game, not
+    /// just the server's. Call from server-side code only.
+    /// </summary>
+    public void SetCanInteractNetworked(bool canInteract)
+    {
+        SetCanInteractClientRpc(canInteract);
+    }
+
+    [ClientRpc]
+    private void SetCanInteractClientRpc(bool canInteract)
+    {
+        SetCanInteract(canInteract);
+    }
+
     [Header("Scene-Placed Visibility")]
     [Tooltip("When true, this character's renderers, interaction collider, physical body collider, " +
              "Animator, and NavMeshAgent all start disabled even though the GameObject itself stays " +

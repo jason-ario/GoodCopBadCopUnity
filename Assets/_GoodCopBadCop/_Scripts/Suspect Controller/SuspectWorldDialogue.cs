@@ -1,6 +1,7 @@
 using FIMSpace.FLook;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Adds a simple, direct-interaction conversation to a <see cref="SuspectCharacter"/> that is
@@ -252,7 +253,9 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (DialogueManager.Instance == null) return;
 
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-        bool pressedAdvance = Input.GetKeyDown(KeyCode.E) || (Input.GetMouseButtonDown(0) && !overUI);
+        bool pressedAdvance = Input.GetKeyDown(KeyCode.E)
+                               || (Input.GetMouseButtonDown(0) && !overUI)
+                               || AnyGamepadAdvanceButtonThisFrame();
         if (!pressedAdvance) return;
 
         if (DialogueManager.Instance.IsAnySubtitleRevealing())
@@ -271,6 +274,32 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         if (finishedState == ConversationState.ShowingGreeting || finishedState == ConversationState.ShowingResponse)
             ShowOptions();
+    }
+
+    /// <summary>
+    /// Returns true if any gamepad button other than East (B) was pressed this frame. Used to
+    /// advance/skip the NPC's greeting or response line with a controller, mirroring the E-key /
+    /// LMB advance. East is excluded — it's reserved for exiting the conversation via the Back
+    /// button (see UIController's centralized Back-button handling) and must not also advance
+    /// the line on the same press.
+    /// </summary>
+    private static bool AnyGamepadAdvanceButtonThisFrame()
+    {
+        Gamepad gp = Gamepad.current;
+        if (gp == null) return false;
+        return gp.buttonSouth.wasPressedThisFrame
+            || gp.buttonNorth.wasPressedThisFrame
+            || gp.buttonWest.wasPressedThisFrame
+            || gp.leftShoulder.wasPressedThisFrame
+            || gp.rightShoulder.wasPressedThisFrame
+            || gp.leftTrigger.wasPressedThisFrame
+            || gp.rightTrigger.wasPressedThisFrame
+            || gp.leftStickButton.wasPressedThisFrame
+            || gp.rightStickButton.wasPressedThisFrame
+            || gp.dpad.up.wasPressedThisFrame
+            || gp.dpad.down.wasPressedThisFrame
+            || gp.dpad.left.wasPressedThisFrame
+            || gp.dpad.right.wasPressedThisFrame;
     }
 
     /// <summary>

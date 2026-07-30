@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6132614166041349952}
   - component: {fileID: 2328127280511628588}
+  - component: {fileID: 2266675862256175636}
   m_Layer: 0
   m_Name: Start Campaign Screen
   m_TagString: Untagged
@@ -64,6 +65,22 @@ MonoBehaviour:
   waitForHostText: {fileID: 8838545453537708398}
   readyButton: {fileID: 7697651089164873126}
   readyButtonLabel: {fileID: 5392015677463571877}
+--- !u!114 &2266675862256175636
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 417967829149027496}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b00294b436c48646ac9ff1fcb0d7c12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GamepadMenuNavigator
+  _buttons:
+  - {fileID: 5056886014396601992}
+  - {fileID: 7697651089164873126}
+  - {fileID: 8506686734615832463}
 --- !u!1 &842730749134218496
 GameObject:
   m_ObjectHideFlags: 0
@@ -1842,6 +1859,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 2001134237151362241, guid: 26da29ed55e39d542818406e54ad9643, type: 3}
   m_PrefabInstance: {fileID: 715941216598165324}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8506686734615832463 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9215027007994781891, guid: 26da29ed55e39d542818406e54ad9643, type: 3}
+  m_PrefabInstance: {fileID: 715941216598165324}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1001 &2001990118450488227
 PrefabInstance:
   m_ObjectHideFlags: 0

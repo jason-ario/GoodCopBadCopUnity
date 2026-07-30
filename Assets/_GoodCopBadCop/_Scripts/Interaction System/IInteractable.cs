@@ -96,6 +96,15 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // turn the highlight off — it should only clear via SetForceHighlight(false).
         if (_forceHighlighted && !highlight) return;
 
+        // Some subclasses (e.g. WorldPurchaseActionInteractable / WorldShopItemInteractable)
+        // share this HighlightEffect with a ShopItem component, which drives its own
+        // hover-highlight system by toggling 'enabled' directly (SetHighlightBlocked).
+        // If that leaves 'enabled' false (e.g. after the purchase popup closes), our
+        // 'highlighted'-driven visibility below would silently never render. Reassert
+        // 'enabled' every call so this class's invariant — always enabled, visibility
+        // solely via 'highlighted' — holds no matter what else touched the component.
+        highlightEffect.enabled = true;
+
         // Drive visibility through 'highlighted', not 'enabled'.
         // Toggling 'enabled' was the cause of the broken-first-hover bug: each
         // enable/disable cycle re-ran OnEnable before Start, leaving rms uninitialised.
@@ -122,6 +131,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public void SetForceHighlight(bool force)
     {
         _forceHighlighted = force;
+        highlightEffect.enabled = true;
         highlightEffect.highlighted = force;
 
         if (force)

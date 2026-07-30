@@ -103,6 +103,12 @@ public abstract class DiegeticViewController : MonoBehaviour
         if (ShowBackButton)
             UIController.Instance.ShowBackButton(Close);
 
+        // Hide the main HUD while any diegetic view (tool locker, mini fridge, task
+        // checklist, etc.) is open — it has no reason to be visible over these close-up,
+        // cursor-driven views, and it would otherwise overlap the view's own UI.
+        // The back button above is tracked independently of playerUI, so it still works.
+        UIController.Instance.ClosePlayerUI();
+
         // Hide first-person arms so they don't occlude the view.
         _playerArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
         if (_playerArms != null)
@@ -159,6 +165,11 @@ public abstract class DiegeticViewController : MonoBehaviour
         UIController.Instance.HideCursor();
         if (ShowBackButton)
             UIController.Instance.HideBackButton();
+
+        // Restore the main HUD. ShowPlayerUI() itself guards against popping the HUD
+        // back up mid-cutscene/dialogue, so this is safe even if a scripted sequence
+        // started while the view was open.
+        UIController.Instance.ShowPlayerUI();
 
         // Restore the point light to whatever the real outdoor/indoor state dictates —
         // do not leave it force-enabled beyond the lifetime of this view.

@@ -51,6 +51,15 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private const float StickNavCooldown = 0.25f;
 
     /// <summary>
+    /// Time.frameCount of the frame the choice panel was last shown/populated. Guards against
+    /// a single South-button press being consumed twice in one frame — e.g. the same press that
+    /// advances a greeting/response line in <see cref="SuspectWorldDialogue"/> and reveals the
+    /// choice panel would otherwise also be read this frame as an immediate confirm of the
+    /// pre-selected first choice, instantly picking it before the player ever sees the menu.
+    /// </summary>
+    private int _choicePanelShownFrame = -1;
+
+    /// <summary>
     /// Matches the delay in <see cref="NPCRespondToDialogueChoice"/> so the choice panel
     /// re-appears the exact moment the NPC begins their response.
     /// </summary>
@@ -78,10 +87,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().LookAtTarget(lookTarget);
         InitializeChoices(choices);
         dialogueChoiceContainer.SetActive(true);
+        _choicePanelShownFrame = Time.frameCount;
 
-        // Pre-select the first choice for controller players.
+        // Pre-select the first choice for controller players, and default to a hidden cursor
+        // so gamepad navigation doesn't compete with an on-screen pointer (mirrors the exam
+        // notebook checklist's controller behaviour).
         if (Gamepad.current != null)
+        {
             SetControllerSelection(0);
+            UIController.Instance.HideCursor();
+        }
     }
 
     private void EnterDialogueMode()
@@ -294,10 +309,15 @@ public class DialogueChoiceSystem : NetworkBehaviour
         ResetChoiceHighlights();
         InitializeChoices(choiceTexts);
         dialogueChoiceContainer.SetActive(true);
+        _choicePanelShownFrame = Time.frameCount;
 
-        // Pre-select the first choice so the player can confirm without moving the stick first.
+        // Pre-select the first choice so the player can confirm without moving the stick first,
+        // and default to a hidden cursor when a gamepad is connected.
         if (Gamepad.current != null)
+        {
             SetControllerSelection(0);
+            UIController.Instance.HideCursor();
+        }
     }
 
     /// <summary>Hides the choice panel without exiting dialogue mode.</summary>
@@ -395,35 +415,56 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (!IsInDialogueMode) return;
 
         // ── Controller: navigate and confirm choices ──────────────────────────
-        if (dialogueChoiceContainer.activeSelf && !_localChoiceLocked && Gamepad.current != null)
+        if (dialogueChoiceContainer.activeSelf && !_localChoiceLocked)
         {
-            var gp = Gamepad.current;
+            // Mouse/keyboard activity always wins: clear the controller highlight and restore
+            // the free cursor so mouse clicks on the choice buttons work as normal.
+            bool mkActivity = (Mouse.current != null &&
+                                (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f ||
+                                 Mouse.current.leftButton.wasPressedThisFrame ||
+                                 Mouse.current.rightButton.wasPressedThisFrame))
+                               || (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame);
 
-            bool navDown = gp.dpad.down.wasPressedThisFrame;
-            bool navUp   = gp.dpad.up.wasPressedThisFrame;
-
-            // Left stick with repeat cooldown so held input scrolls at a comfortable pace.
-            Vector2 stick = gp.leftStick.ReadValue();
-            if (stick.y < -0.5f && Time.time >= _stickNavTime) { navDown = true; _stickNavTime = Time.time + StickNavCooldown; }
-            if (stick.y >  0.5f && Time.time >= _stickNavTime) { navUp   = true; _stickNavTime = Time.time + StickNavCooldown; }
-
-            // Count only the active (populated) choice buttons.
-            int activeCount = 0;
-            foreach (var c in dialogueChoices)
-                if (c.gameObject.activeSelf) activeCount++;
-
-            if (activeCount > 0)
+            if (mkActivity)
             {
-                if (navDown || navUp)
-                {
-                    int dir = navDown ? 1 : -1;
-                    // Clamp rather than wrap so the selection doesn't jump from last→first.
-                    int newIdx = Mathf.Clamp(_controllerSelectedIndex + dir, 0, activeCount - 1);
-                    SetControllerSelection(newIdx);
-                }
+                if (_controllerSelectedIndex >= 0)
+                    ClearControllerSelection();
+                UIController.Instance.ShowCursor();
+            }
+            else if (Gamepad.current != null)
+            {
+                var gp = Gamepad.current;
 
-                if (gp.buttonSouth.wasPressedThisFrame && _controllerSelectedIndex >= 0)
-                    ChooseDialogueChoice(_controllerSelectedIndex);
+                bool navDown = gp.dpad.down.wasPressedThisFrame;
+                bool navUp   = gp.dpad.up.wasPressedThisFrame;
+
+                // Left stick with repeat cooldown so held input scrolls at a comfortable pace.
+                Vector2 stick = gp.leftStick.ReadValue();
+                if (stick.y < -0.5f && Time.time >= _stickNavTime) { navDown = true; _stickNavTime = Time.time + StickNavCooldown; }
+                if (stick.y >  0.5f && Time.time >= _stickNavTime) { navUp   = true; _stickNavTime = Time.time + StickNavCooldown; }
+
+                // Count only the active (populated) choice buttons.
+                int activeCount = 0;
+                foreach (var c in dialogueChoices)
+                    if (c.gameObject.activeSelf) activeCount++;
+
+                if (activeCount > 0 && (navDown || navUp || gp.buttonSouth.wasPressedThisFrame))
+                {
+                    // Any controller input takes over — hide the free cursor by default.
+                    UIController.Instance.HideCursor();
+
+                    if (navDown || navUp)
+                    {
+                        int dir = navDown ? 1 : -1;
+                        // Clamp rather than wrap so the selection doesn't jump from last→first.
+                        int newIdx = Mathf.Clamp(_controllerSelectedIndex + dir, 0, activeCount - 1);
+                        SetControllerSelection(newIdx);
+                    }
+
+                    if (gp.buttonSouth.wasPressedThisFrame && _controllerSelectedIndex >= 0
+                        && Time.frameCount != _choicePanelShownFrame)
+                        ChooseDialogueChoice(_controllerSelectedIndex);
+                }
             }
         }
 

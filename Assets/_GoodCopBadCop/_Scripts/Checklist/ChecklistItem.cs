@@ -180,6 +180,15 @@ public class ChecklistItem : MonoBehaviour
             checkbox.Uncheck();
     }
 
+    /// <summary>True while this item's checkbox can currently be toggled.</summary>
+    public bool IsInteractable => checkbox.IsInteractable;
+
+    /// <summary>Shows or hides this item's controller-navigation "Selected Box" highlight.</summary>
+    public void SetControllerSelected(bool value) => checkbox.SetSelected(value);
+
+    /// <summary>Toggles this item's checkbox exactly as a mouse click would, for controller (gamepad) input.</summary>
+    public void ActivateViaController() => checkbox.OnClick();
+
     /// <summary>
     /// Applies the locked/unlocked state to this checklist item.
     /// When locked: hides the container so the row is invisible, and blocks checkbox interaction.
