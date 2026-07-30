@@ -89,6 +89,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Skip to Day 2 — Kill Tutorial (Second Suspect)", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToKillTutorial());
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Skip to Day 2 — Vlad Out Back Cutscene", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay2());

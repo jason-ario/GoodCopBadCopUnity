@@ -62,6 +62,10 @@ public abstract class DiegeticViewController : MonoBehaviour
     private Vector3 _baseCameraPosition;
     private GameObject _playerArms;
     private GameObject _playerBody;
+    private PlayerInstance _playerInstance;
+
+    /// <summary>Cached outdoor/indoor state at the moment this view opened, restored on close.</summary>
+    private bool _preOpenLightActive;
 
     // ─── Public API ──────────────────────────────────────────────────────────
 
@@ -109,6 +113,16 @@ public abstract class DiegeticViewController : MonoBehaviour
         if (_playerBody != null)
             _playerBody.SetActive(false);
 
+        // Diegetic views must never leave the player's point light off — force it on
+        // regardless of any indoor/outdoor state or other system that may have hidden it,
+        // and remember whether it was already off so Close() can restore the true state.
+        _playerInstance = player.GetComponent<PlayerInstance>();
+        if (_playerInstance != null)
+        {
+            _preOpenLightActive = _playerInstance.IsOutsideLocal;
+            _playerInstance.SetPlayerLightActive(true);
+        }
+
         OnOpened();
     }
 
@@ -145,6 +159,14 @@ public abstract class DiegeticViewController : MonoBehaviour
         UIController.Instance.HideCursor();
         if (ShowBackButton)
             UIController.Instance.HideBackButton();
+
+        // Restore the point light to whatever the real outdoor/indoor state dictates —
+        // do not leave it force-enabled beyond the lifetime of this view.
+        if (_playerInstance != null)
+        {
+            _playerInstance.SetPlayerLightActive(_preOpenLightActive);
+            _playerInstance = null;
+        }
 
         if (_playerArms != null)
         {

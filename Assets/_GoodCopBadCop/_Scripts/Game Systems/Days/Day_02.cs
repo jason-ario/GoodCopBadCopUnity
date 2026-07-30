@@ -1291,6 +1291,48 @@ public class Day_02 : DayBase, IDailyTask
         ArmOchoBoothEncounter();
     }
 
+    /// <summary>
+    /// Debug-only: jumps the suspect lineup counter so the very next suspect summoned is
+    /// treated as index 1 — the kill-tutorial suspect (see <see cref="OnKillTutorialSuspectArrived"/>)
+    /// — and reveals the Mutation Exam notebook, which is normally only unlocked mid-way through
+    /// the first suspect's mutation tutorial and is required for the kill tutorial's "file exam
+    /// pages" step. Bypasses the mutation tutorial entirely. Called by <see cref="DebugConsole"/>'s
+    /// F12 cheat menu.
+    /// </summary>
+    public void DebugSkipToKillTutorial()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        // Bypass the mutation tutorial so it never fires on top of the suspect this cheat spawns.
+        if (!_mutationTutorialFired)
+        {
+            _mutationTutorialFired = true;
+            SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
+        }
+
+        // Reveal the Mutation Exam notebook — normally unlocked mid-tutorial, required for the
+        // kill tutorial's "file exam pages" step.
+        _mutationNotebook?.SetVisible(true);
+        _mutationNotebook?.SetInteractableNetworked(true);
+
+        // Jump the lineup counter so the next suspect spawned is index 1 — the kill tutorial
+        // target. OnKillTutorialSuspectArrived (already subscribed in DayActivated) picks it up
+        // from there and forces the >10 anomaly count.
+        if (SuspectController.Instance != null)
+            SuspectController.Instance.suspectIndex.Value = 0;
+
+        ShiftManager.OnNextSuspectReadyForBell += AutoSummonKillTutorialSuspect;
+
+        Debug.Log("[Day_02] DebugSkipToKillTutorial: mutation tutorial bypassed, notebook revealed, " +
+                  "suspect index armed for the kill tutorial target.");
+    }
+
+    private void AutoSummonKillTutorialSuspect()
+    {
+        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonKillTutorialSuspect;
+        SuspectController.Instance?.NextSuspect();
+    }
+
     // -------------------------------------------------------------------------
     // Ocho Booth Encounter — arms as the next suspect right after the kill tutorial
     // -------------------------------------------------------------------------

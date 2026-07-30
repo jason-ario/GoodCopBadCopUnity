@@ -6,8 +6,10 @@ using UnityEngine;
 ///
 /// Rotation progress ranges 0 (Off) → 1 (On). The diegetic controller feeds
 /// screen-space angle deltas each frame via <see cref="AddDragDelta"/>. When the
-/// player releases the mouse, <see cref="OnRelease"/> springs the knob back to Off
-/// unless progress has reached <see cref="IsAtOnPosition"/>.
+/// player releases the mouse, <see cref="OnRelease"/> always springs the knob back
+/// to Off — even after reaching the On position — since the knob is a momentary
+/// interaction; whether the puzzle solved is decided by <see cref="IsAtOnPosition"/>
+/// at the moment of release, before the spring-back animation runs.
 /// </summary>
 public class TurningNobController : MonoBehaviour
 {
@@ -38,6 +40,9 @@ public class TurningNobController : MonoBehaviour
     [Tooltip("Looping sound played while the knob is being turned.")]
     [SerializeField] private AudioClip _rotatingSound;
 
+    [Tooltip("Looping sound played while the knob is springing back toward Off. Stops as soon as it's no longer rotating back.")]
+    [SerializeField] private AudioClip _springBackSound;
+
     [Tooltip("One-shot sound played the moment the knob reaches its On position.")]
     [SerializeField] private AudioClip _fullyRotatedSound;
 
@@ -65,6 +70,7 @@ public class TurningNobController : MonoBehaviour
     {
         CancelSpring();
         StopRotatingSound();
+        StopSpringBackSound();
         _progress = 0f;
         ApplyRotation();
     }
@@ -90,11 +96,15 @@ public class TurningNobController : MonoBehaviour
             PlayRotatingSound();
     }
 
-    /// <summary>Called when the player releases the drag. Springs back if not yet at On.</summary>
+    /// <summary>
+    /// Called when the player releases the drag. Always springs the knob back to Off,
+    /// even after reaching the On position — callers should check <see cref="IsAtOnPosition"/>
+    /// immediately after calling this (before the spring-back coroutine has a chance to run)
+    /// to decide whether the puzzle was solved.
+    /// </summary>
     public void OnRelease()
     {
         StopRotatingSound();
-        if (IsAtOnPosition) return;
         _springCoroutine = StartCoroutine(SpringBackRoutine());
     }
 
@@ -128,6 +138,8 @@ public class TurningNobController : MonoBehaviour
 
     private IEnumerator SpringBackRoutine()
     {
+        PlaySpringBackSound();
+
         while (_progress > 0f)
         {
             _progress = Mathf.MoveTowards(_progress, 0f, _springBackSpeed * Time.deltaTime);
@@ -135,6 +147,7 @@ public class TurningNobController : MonoBehaviour
             yield return null;
         }
 
+        StopSpringBackSound();
         _springCoroutine = null;
     }
 
@@ -143,6 +156,7 @@ public class TurningNobController : MonoBehaviour
         if (_springCoroutine == null) return;
         StopCoroutine(_springCoroutine);
         _springCoroutine = null;
+        StopSpringBackSound();
     }
 
     private void PlayRotatingSound()
@@ -159,6 +173,23 @@ public class TurningNobController : MonoBehaviour
     {
         if (_audioSource == null) return;
         if (_audioSource.isPlaying && _audioSource.clip == _rotatingSound)
+            _audioSource.Stop();
+    }
+
+    private void PlaySpringBackSound()
+    {
+        if (_audioSource == null || _springBackSound == null) return;
+        if (_audioSource.isPlaying && _audioSource.clip == _springBackSound) return;
+
+        _audioSource.clip = _springBackSound;
+        _audioSource.loop = true;
+        _audioSource.Play();
+    }
+
+    private void StopSpringBackSound()
+    {
+        if (_audioSource == null) return;
+        if (_audioSource.isPlaying && _audioSource.clip == _springBackSound)
             _audioSource.Stop();
     }
 

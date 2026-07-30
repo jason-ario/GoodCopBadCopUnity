@@ -17,7 +17,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &2071820733296136941
 Transform:
   m_ObjectHideFlags: 0
@@ -316,6 +316,7 @@ GameObject:
   - component: {fileID: 1975681329025854799}
   - component: {fileID: 8315051559757950217}
   - component: {fileID: 7122842654448128560}
+  - component: {fileID: 1724650693271488679}
   m_Layer: 0
   m_Name: Turning_nob
   m_TagString: Untagged
@@ -434,10 +435,108 @@ MonoBehaviour:
   _degreesForFullTravel: 270
   _springBackSpeed: 1.5
   _onThreshold: 0.95
-  _audioSource: {fileID: 0}
-  _rotatingSound: {fileID: 0}
-  _fullyRotatedSound: {fileID: 0}
-  _fullyRotatedSoundSecondary: {fileID: 0}
+  _audioSource: {fileID: 1724650693271488679}
+  _rotatingSound: {fileID: 8300000, guid: 3488453b10b2ab846be4116baf37816e, type: 3}
+  _springBackSound: {fileID: 8300000, guid: 08f5f6ad4341e214fb72a3c9d88177b7, type: 3}
+  _fullyRotatedSound: {fileID: 8300000, guid: 9a4e63d5830ff63438420f47ba706eb5, type: 3}
+  _fullyRotatedSoundSecondary: {fileID: 8300000, guid: dcca6e0426d39f34aa8cd61021d91e5a, type: 3}
+--- !u!82 &1724650693271488679
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 933740264661043053}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 5
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1407905521772622538
 GameObject:
   m_ObjectHideFlags: 0
@@ -1141,7 +1240,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ElectricObject
   OnElectricityTurnOn:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 9162534978165970484}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: OnPowerOn
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   OnElectricityTurnOff:
     m_PersistentCalls:
       m_Calls:

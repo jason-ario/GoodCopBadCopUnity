@@ -7,10 +7,25 @@ using UnityEngine;
 /// When cash is earned, plays a dispense sound and spawns <see cref="CouponPickup"/>
 /// NetworkObjects one after another at <see cref="_couponSpawnPoint"/>.
 /// Spawning is server-authoritative; the singleton is readable from all contexts.
+///
+/// Electricity responsiveness:
+///   Add an <see cref="ElectricObject"/> to this GameObject and register it with the booth's
+///   <see cref="ElectricityController"/>. Wire its events:
+///     OnElectricityTurnOn  → ATM.OnElectricityOn
+///     OnElectricityTurnOff → ATM.OnElectricityOff
+///   While unpowered, <see cref="SpawnCoupons"/> is a no-op — the ATM simply won't dispense.
 /// </summary>
 public class ATM : NetworkBehaviour
 {
     public static ATM Instance;
+
+    [Header("Electricity")]
+    [Tooltip("Whether the ATM currently has power. Defaults to true so behavior is unchanged " +
+             "if no ElectricObject is wired up. Driven by OnElectricityOn/OnElectricityOff.")]
+    [SerializeField] private bool _isPowered = true;
+
+    /// <summary>True while the ATM has electricity and can dispense coupons.</summary>
+    public bool IsPowered => _isPowered;
 
     [Header("Spawning")]
     [Tooltip("Prefab that has a CouponPickup component and a NetworkObject. Spawned for each coupon unit.")]
@@ -108,6 +123,12 @@ public class ATM : NetworkBehaviour
         if (!IsServer) return;
         if (amount <= 0) return;
 
+        if (!_isPowered)
+        {
+            Debug.Log("[ATM] No electricity — coupons not dispensed.");
+            return;
+        }
+
         int adjustedAmount = CheckpointIntegrityService.Instance != null
             ? CheckpointIntegrityService.Instance.ApplyMultiplier(amount)
             : amount;
@@ -122,6 +143,26 @@ public class ATM : NetworkBehaviour
 
         StartCoroutine(SpawnCouponsRoutine(count));
         StartCoroutine(ShowPaymentDelayedRoutine(adjustedAmount));
+    }
+
+    // ── Electricity callbacks — wire via Inspector through ElectricObject events ────
+
+    /// <summary>
+    /// Wire to the <see cref="ElectricObject.OnElectricityTurnOn"/> UnityEvent on this
+    /// GameObject's ElectricObject component in the Inspector.
+    /// </summary>
+    public void OnElectricityOn()
+    {
+        _isPowered = true;
+    }
+
+    /// <summary>
+    /// Wire to the <see cref="ElectricObject.OnElectricityTurnOff"/> UnityEvent on this
+    /// GameObject's ElectricObject component in the Inspector.
+    /// </summary>
+    public void OnElectricityOff()
+    {
+        _isPowered = false;
     }
 
     // ── Private ──────────────────────────────────────────────────────────────
