@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -69,6 +70,12 @@ public class ScriptedDialogueNode
              "set on ScriptedDialogueRunner. Every scripted line wobbles by default — only assign this " +
              "if you want a different effect on this specific line.")]
     public TMPWobbleProfile wobbleProfileOverride;
+
+    [Tooltip("Optional TMP font asset override for this line. Leave null to use the subtitle prefab's " +
+             "default font. Must be registered in ScriptedDialogueRunner's _additionalFontAssets to take " +
+             "effect over the network — assign this for a speaker who should visibly read as a different " +
+             "voice/character (e.g. a new, unfamiliar megaphone voice).")]
+    public TMP_FontAsset fontOverride;
 
     [Tooltip("If true, plays a random clip from the speaker's SpeakingInteraction laugh clips " +
              "when this line starts. Requires laugh clips to be assigned on the speaker.")]

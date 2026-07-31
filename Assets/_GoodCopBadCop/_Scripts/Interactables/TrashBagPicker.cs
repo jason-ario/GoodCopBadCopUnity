@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -35,6 +36,14 @@ public class TrashBagPicker : Interactable
     [Tooltip("Sound played on every successful dispense (optional).")]
     [SerializeField] private AudioClip _dispenseSound;
 
+    /// <summary>
+    /// Fired locally, on whichever client successfully grabs a bag from ANY
+    /// <see cref="TrashBagPicker"/> instance. Purely a local detection signal — day scripts that
+    /// need every connected client to react (e.g. dismissing a tutorial arrow) should relay this
+    /// through <see cref="TutorialTaskSync"/> rather than subscribing directly.
+    /// </summary>
+    public static event Action OnBagDispensedLocally;
+
     protected override void Awake()
     {
         base.Awake();
@@ -69,5 +78,7 @@ public class TrashBagPicker : Interactable
 
         if (_dispenseSound != null)
             SFXController.Instance.PlayAtPosition(_dispenseSound, transform.position);
+
+        OnBagDispensedLocally?.Invoke();
     }
 }

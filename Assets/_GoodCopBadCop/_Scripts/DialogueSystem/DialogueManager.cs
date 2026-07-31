@@ -355,11 +355,13 @@ public class DialogueManager : NetworkBehaviour
 
         subtitles.SetText(text, characterName, nameColor);
 
-        // Apply wobble effect to NPC lines. The profile is consumed once per subtitle spawn.
+        // Apply wobble effect and font override to NPC lines. Each is consumed once per subtitle spawn.
         if (!isPlayer)
         {
             subtitles.SetWobble(_nextLineWobbleProfile);
             _nextLineWobbleProfile = null;
+            subtitles.SetFontOverride(_nextLineFontOverride);
+            _nextLineFontOverride = null;
         }
         subtitles.transform.SetAsLastSibling();
 
@@ -417,6 +419,20 @@ public class DialogueManager : NetworkBehaviour
     /// Called by <see cref="ScriptedDialogueRunner"/> via ClientRpc before each line.
     /// </summary>
     public void SetNextLineWobbleProfile(TMPWobbleProfile profile) => _nextLineWobbleProfile = profile;
+
+    // -------------------------------------------------------------------------
+    // Font override — consumed once when the next NPC subtitle is spawned.
+    // -------------------------------------------------------------------------
+
+    private TMP_FontAsset _nextLineFontOverride;
+
+    /// <summary>
+    /// Primes the next NPC subtitle spawned via <see cref="SpawnSubtitles"/> to use the given
+    /// <paramref name="font"/>. Pass <c>null</c> to keep the subtitle prefab's default font.
+    /// The value is consumed and cleared on use. Called by <see cref="ScriptedDialogueRunner"/>
+    /// via ClientRpc before each line.
+    /// </summary>
+    public void SetNextLineFontOverride(TMP_FontAsset font) => _nextLineFontOverride = font;
 
     /// <summary>
     /// Called by any client pressing Space — notifies the server to advance for everyone.

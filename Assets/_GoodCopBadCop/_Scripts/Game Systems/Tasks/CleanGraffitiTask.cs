@@ -99,8 +99,11 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public event Action OnDailyTaskCompleted;
 
     /// <summary>
-    /// Spawns a random number of graffiti pieces at day start.
-    /// Despawns any leftovers from a previous cycle first.
+    /// Spawns a random number of graffiti pieces and activates the task — shows the HUD threat
+    /// entry and registers as a pending daily task with <see cref="ShiftManager"/>. Despawns any
+    /// leftovers from a previous cycle first, unless <see cref="SpawnGraffitiEarly"/> already
+    /// pre-spawned graffiti for this cycle, in which case those pieces are reused instead of
+    /// spawning a duplicate set.
     /// Server-only; safe to call from <see cref="DailyTaskScheduler"/> or day scripts.
     /// </summary>
     public void TriggerDailyTask()
@@ -109,20 +112,59 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _isComplete = false;
         _scrubbed.Value = 0;
-        DespawnExistingGraffiti();
 
-        int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+        if (_spawnedGraffiti.Count > 0)
+        {
+            // SpawnGraffitiEarly already placed graffiti for this cycle (e.g. Day 1's
+            // pre-spawn at game start) — reuse it instead of despawning and re-rolling.
+            Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — reusing {_spawnedGraffiti.Count} " +
+                      "already-spawned graffiti piece(s) from SpawnGraffitiEarly.");
+        }
+        else
+        {
+            DespawnExistingGraffiti();
 
-        int spawnedCount = SpawnGraffiti(count);
-        _totalCount.Value = spawnedCount;
+            int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+
+            int spawnedCount = SpawnGraffiti(count);
+            _totalCount.Value = spawnedCount;
+
+            Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {spawnedCount} graffiti piece(s).");
+        }
 
         // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
         _isActive.Value = true;
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
+    }
 
-        Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — spawning {spawnedCount} graffiti piece(s).");
+    /// <summary>
+    /// Day-1-only helper: spawns graffiti immediately (e.g. right at game/day start) purely for
+    /// visual presence, WITHOUT activating the task — no HUD threat entry, no
+    /// <see cref="ShiftManager"/> registration, no tutorial objective. This lets the player see
+    /// the graffiti on the checkpoint walls well before they're actually given the "clean
+    /// graffiti" task at end of shift. A later call to <see cref="TriggerDailyTask"/> in the same
+    /// day cycle detects the pre-spawned pieces and reuses them instead of spawning a duplicate
+    /// set. Server-only. No-op if graffiti has already been spawned this cycle.
+    /// </summary>
+    public void SpawnGraffitiEarly()
+    {
+        if (!IsServer) return;
+
+        if (_spawnedGraffiti.Count > 0)
+        {
+            Debug.LogWarning("[CleanGraffitiTask] SpawnGraffitiEarly: graffiti already spawned this cycle — skipping.");
+            return;
+        }
+
+        int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+
+        int spawnedCount = SpawnGraffiti(count);
+        _totalCount.Value = spawnedCount;
+
+        Debug.Log($"[CleanGraffitiTask] SpawnGraffitiEarly — pre-spawned {spawnedCount} graffiti " +
+                  "piece(s) for early visibility; task remains inactive until TriggerDailyTask.");
     }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────

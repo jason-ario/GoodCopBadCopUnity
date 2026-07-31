@@ -7,8 +7,11 @@ using UnityEngine;
 ///
 /// Scrubbing begins when a <see cref="Mop"/> detects this collider via its overlap sphere while
 /// the owner holds LMB. Progress is accumulated server-side and replicated via
-/// <see cref="_scrubProgress"/>, which all clients use to fade the graffiti renderer.
-/// When progress reaches 1 the server notifies <see cref="GraffitiThreat"/> and despawns.
+/// <see cref="_scrubProgress"/>, which all clients use to drive the renderer's dissolve shader
+/// directly (no remapping) — so at completion the piece looks exactly as scrubbed as
+/// <see cref="_completionThreshold"/> indicates (e.g. 80%), not fully clean.
+/// When progress reaches <see cref="_completionThreshold"/> the server notifies the
+/// completion callback and despawns.
 ///
 /// Multiple players can scrub simultaneously — each active mop increases the scrub rate.
 /// Progress persists if scrubbing is interrupted and resumes from where it left off.
@@ -27,9 +30,10 @@ public class GraffitiInteractable : NetworkBehaviour
     [Tooltip("Seconds required to fully scrub this graffiti when a single mop is active.")]
     [SerializeField] private float _scrubDuration = 3f;
 
-    [Tooltip("Scrub progress [0, 1] at which the graffiti is considered fully cleaned and despawns. " +
-             "Lower than 1 so completion reads clearly instead of requiring a slow final sliver of progress. " +
-             "The visual fade is remapped so it reaches fully-clean exactly at this threshold.")]
+    [Tooltip("Scrub progress [0, 1] at which the graffiti is considered cleaned and despawns. " +
+             "Lower than 1 so completion fires before requiring a slow final sliver of progress. " +
+             "The visual fade shows the raw progress value directly, so the graffiti will still be " +
+             "partially visible (e.g. 80% scrubbed, not fully invisible) right up until it completes.")]
     [Range(0.1f, 1f)]
     [SerializeField] private float _completionThreshold = 0.8f;
 
@@ -150,21 +154,18 @@ public class GraffitiInteractable : NetworkBehaviour
     /// Pushes the current scrub progress into the renderer's <see cref="MaterialPropertyBlock"/>.
     /// The graffiti material must use the <c>GoodCopBadCop/GraffitiScrub</c> shader,
     /// which dissolves the texture in organic chunks as <c>_ScrubProgress</c> rises from 0 to 1.
+    /// Passed through unmapped — the graffiti visually reads as scrubbed to whatever raw
+    /// percentage <see cref="_completionThreshold"/> is (e.g. 80% dissolved at completion),
+    /// rather than being stretched to look fully clean/invisible at that point.
     /// </summary>
     private void ApplyScrubVisual(float progress)
     {
         if (_graffitiRenderer == null) return;
 
-        // Remap so the visual fade reaches fully-clean (1) exactly when completion
-        // fires at _completionThreshold, instead of requiring raw progress to hit 1.
-        float visualProgress = _completionThreshold > 0f
-            ? Mathf.Clamp01(progress / _completionThreshold)
-            : 1f;
-
         // MaterialPropertyBlock avoids creating a new material instance per renderer.
         MaterialPropertyBlock block = new MaterialPropertyBlock();
         _graffitiRenderer.GetPropertyBlock(block);
-        block.SetFloat(ScrubProgressProperty, visualProgress);
+        block.SetFloat(ScrubProgressProperty, progress);
         _graffitiRenderer.SetPropertyBlock(block);
     }
 

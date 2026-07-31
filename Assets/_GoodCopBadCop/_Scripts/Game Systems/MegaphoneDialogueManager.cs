@@ -39,6 +39,13 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip[] _audioClips;
 
+    [Tooltip("Alternate megaphone voice clips used when a scripted announcement plays with " +
+             "useAlternateVoice set (see ScriptedDialogueRunner.PlayMegaphoneDialogue). Use for a " +
+             "one-off speaker who is NOT the usual megaphone voice — e.g. the new, unfamiliar " +
+             "voice that takes over the megaphone on Day 4 after Vlad's death. Falls back to the " +
+             "default AudioClips above if left empty.")]
+    [SerializeField] private AudioClip[] _alternateVoiceClips;
+
     [Header("Settings")]
     [Tooltip("When true, all dialogue output is suppressed.")]
     public bool disabled = true;
@@ -435,6 +442,15 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// standard dialogue audio system when playing megaphone scripted dialogue.
     /// </summary>
     public AudioClip[] AudioClips => _audioClips;
+
+    /// <summary>
+    /// Alternate megaphone voice clips for a one-off speaker distinct from the usual megaphone
+    /// voice (see <see cref="_alternateVoiceClips"/>). Falls back to <see cref="AudioClips"/> if
+    /// none are assigned, so callers can pass <c>useAlternateVoice: true</c> safely even before
+    /// clips are authored.
+    /// </summary>
+    public AudioClip[] AlternateVoiceClips =>
+        (_alternateVoiceClips != null && _alternateVoiceClips.Length > 0) ? _alternateVoiceClips : _audioClips;
 
     /// <summary>
     /// The AudioSource used for megaphone speech playback.

@@ -61,6 +61,15 @@ public class TutorialTaskSync : NetworkBehaviour
     /// </summary>
     public static event Action OnTrashTaskReadyAllClients;
 
+    /// <summary>
+    /// Fired on ALL clients once the server confirms a player grabbed a bag from the Day 1
+    /// trash bag dispenser for the first time this cycle. <see cref="TrashBagPicker"/>'s
+    /// dispense signal only fires locally on whichever client performed the interaction, so
+    /// this relay is required to dismiss the dispenser tutorial arrow and reveal the highlighted
+    /// junk items for every connected client.
+    /// </summary>
+    public static event Action OnTrashBagGrabbedAllClients;
+
     // ── Server-side counters / guards ─────────────────────────────────────────
 
     private int  _vladDocsPickedUpCount;
@@ -68,6 +77,7 @@ public class TutorialTaskSync : NetworkBehaviour
     private bool _examPickedUpBroadcast;
     private bool _deskFolderPlacedBroadcast;
     private bool _windowHandOffBroadcast;
+    private bool _trashBagGrabbedBroadcast;
 
     // ── NetworkBehaviour lifecycle ────────────────────────────────────────────
 
@@ -97,6 +107,7 @@ public class TutorialTaskSync : NetworkBehaviour
         _examPickedUpBroadcast = false;
         _deskFolderPlacedBroadcast = false;
         _windowHandOffBroadcast = false;
+        _trashBagGrabbedBroadcast = false;
     }
 
     // ── Vlad document pickup ──────────────────────────────────────────────────
@@ -260,5 +271,26 @@ public class TutorialTaskSync : NetworkBehaviour
     private void BroadcastTrashTaskReadyClientRpc()
     {
         OnTrashTaskReadyAllClients?.Invoke();
+    }
+
+    // ── Trash bag grabbed (Day 1 dispenser tutorial) ──────────────────────────
+
+    /// <summary>
+    /// Called by whichever client grabs a bag from the Day 1 trash bag dispenser
+    /// (<see cref="TrashBagPicker.OnBagDispensedLocally"/>). The server ensures the broadcast
+    /// fires exactly once even if reported more than once (e.g. two players both grab a bag).
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ReportTrashBagGrabbedServerRpc()
+    {
+        if (_trashBagGrabbedBroadcast) return;
+        _trashBagGrabbedBroadcast = true;
+        BroadcastTrashBagGrabbedClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastTrashBagGrabbedClientRpc()
+    {
+        OnTrashBagGrabbedAllClients?.Invoke();
     }
 }

@@ -359,15 +359,13 @@ public class AlexeiController : NetworkBehaviour
         // Trigger TakeOutTrashTask to spawn all task items immediately. TriggerTask registers
         // itself with ShiftManager as a pending daily task (see TakeOutTrashTask.RegisterPendingDailyTask
         // usage), so the timecard machine stays un-primed until every item is turned in.
+        // Junk items are NOT highlighted here — Day_01.OnTrashBagGrabbedSync defers that until
+        // the player actually grabs their first bag from the Trash Spawner dispenser, so the
+        // tutorial arrow points them to the dispenser first.
         if (TakeOutTrashTask.Instance != null)
         {
             Debug.Log($"[AlexeiController] Calling TakeOutTrashTask.TriggerTask(). IsServer={IsServer}");
             TakeOutTrashTask.Instance.TriggerTask();
-
-            // Day 1 tutorial only: highlight every piece of trash so it's easy to find.
-            // EndOfShiftSetupSequence is exclusive to Day 1 (Alexei's sequence), so this
-            // does not affect later days' triggers of this same shared task instance.
-            TakeOutTrashTask.Instance.HighlightAllItemsForTutorial();
         }
         else
         {

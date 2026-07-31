@@ -278,6 +278,15 @@ public class Day_01 : DayBase
     [Tooltip("The bunk bed's Interactable — highlighted after the bunker door opens, guiding the player to sleep.")]
     [SerializeField] private BunkBedInteractable _bunkBedInteractable;
 
+    [Tooltip("World-space point above the Trash Spawner dispenser — marker shown during the end-of-shift " +
+             "'take out the trash' task until the player grabs their first bag, at which point the junk " +
+             "items scattered in the yard are highlighted instead.")]
+    [SerializeField] private Transform _markerTrashSpawner;
+
+    [Tooltip("The Trash Spawner's Interactable — force-highlighted (outline) alongside its tutorial arrow " +
+             "during the end-of-shift 'take out the trash' task, until the player grabs their first bag.")]
+    [SerializeField] private TrashBagPicker _trashSpawnerInteractable;
+
     [Header("Day 1 — Quarantine Tutorial")]
     [Tooltip("Task text shown while the player needs to grab the quarantine stamp.")]
     [SerializeField] private string _taskGrabQuarantineStampText = "Grab the quarantine stamp";
@@ -302,6 +311,11 @@ public class Day_01 : DayBase
              "day-gated auto-scheduler) the instant the trash/graffiti tasks both finish.")]
     [SerializeField] private MutantBreachData _firstBreachData;
 
+    [Tooltip("Seconds after the trash/graffiti tasks finish before the first mutant breach " +
+             "actually triggers — gives the end-of-shift beat a moment to breathe instead of " +
+             "cutting straight to the alarm.")]
+    [SerializeField] private float _breachTriggerDelay = 5f;
+
     [Tooltip("First checkpoint shovel — locked until the first mutant breach begins, then unlocked " +
              "and highlighted with a tutorial arrow so the player knows to grab it and fight back.")]
     [SerializeField] private Shovel _breachShovel1;
@@ -312,6 +326,10 @@ public class Day_01 : DayBase
 
     [Tooltip("Seconds between the two megaphone breach-warning barks.")]
     [SerializeField] private float _breachBarkGap = 2f;
+
+    [Tooltip("Seconds after the second breach-warning bark before the checkpoint shovels are " +
+             "unlocked, force-highlighted, and pointed at with a tutorial arrow.")]
+    [SerializeField] private float _breachShovelUnlockDelay = 0f;
 
     [Tooltip("First megaphone bark played the instant the first breach begins.")]
     [TextArea(2, 4)]
@@ -596,6 +614,8 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
         TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
+        TutorialTaskSync.OnTrashBagGrabbedAllClients    -= OnTrashBagGrabbedSync;
+        TrashBagPicker.OnBagDispensedLocally            -= OnTrashBagDispensedLocal;
 
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
@@ -611,7 +631,10 @@ public class Day_01 : DayBase
         MutantBreachManager.OnBreachClearedAllClients      -= OnMutantBreachCleared;
 
         // Checkpoint shovels are free to use from Day 2 onward regardless of how the breach
-        // tutorial resolved (e.g. day skipped via debug tools).
+        // tutorial resolved (e.g. day skipped via debug tools). Also clears any leftover
+        // highlight/arrow/pickup subscription if the day ends mid-breach.
+        DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+        DisarmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
         _breachShovel1?.UnlockInteractableNetworked();
         _breachShovel2?.UnlockInteractableNetworked();
 
@@ -703,6 +726,8 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnFolderPlacedOnDeskAllClients -= OnFolderPlacedOnDeskSync;
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
         TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
+        TutorialTaskSync.OnTrashBagGrabbedAllClients    -= OnTrashBagGrabbedSync;
+        TrashBagPicker.OnBagDispensedLocally            -= OnTrashBagDispensedLocal;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -730,6 +755,17 @@ public class Day_01 : DayBase
         ShowClockInArrow(true);
 
         if (!NetworkManager.Singleton.IsServer) return;
+
+        // Day 1 only: pre-spawn the graffiti right at the start of the day, purely so it's
+        // visually present on the checkpoint walls well before the player is actually given the
+        // "clean graffiti" task at end of shift (see AlexeiController.EndOfShiftSetupSequence,
+        // which calls CleanGraffitiTask.TriggerDailyTask() later that same day). This only spawns
+        // the pieces — no HUD entry, no ShiftManager registration, no tutorial yet. TriggerDailyTask
+        // detects these pre-spawned pieces later and reuses them instead of spawning a duplicate
+        // set. Safe to call here every time OnDayStarted fires (guarded by _dayStartedFired above)
+        // — CleanGraffitiTask's own OnDayStart cleanup of the previous day's leftovers is
+        // subscribed before Day_01's, so it always runs first in this same event dispatch.
+        CleanGraffitiTask.Instance?.SpawnGraffitiEarly();
 
         // DayActivated runs before NGO spawns scene NetworkObjects on the debug-skip path,
         // so stamp calls there are silently ignored. Re-apply the correct locked state here
@@ -2100,22 +2136,38 @@ public class Day_01 : DayBase
     /// Also shows the trash and graffiti tutorial overlay screens back-to-back — this is
     /// the same moment both end-of-shift tasks are first triggered (see
     /// <see cref="AlexeiController.EndOfShiftSetupSequence"/>).
+    /// The trash and graffiti objective rows are added independently of one another so a
+    /// missing/null singleton for one task can never silently suppress the other's row.
+    /// Marks the Trash Spawner dispenser with a tutorial arrow and waits for the player to
+    /// grab their first bag (see <see cref="OnTrashBagGrabbedSync"/>) before highlighting the
+    /// junk items scattered in the yard.
     /// </summary>
     private void OnTrashTaskReadySync()
     {
         TutorialTaskSync.OnTrashTaskReadyAllClients -= OnTrashTaskReadySync;
 
-        if (TakeOutTrashTask.Instance == null) return;
+        Debug.Log($"[Day_01] OnTrashTaskReadySync fired. TakeOutTrashTask.Instance={(TakeOutTrashTask.Instance != null)}, " +
+                  $"CleanGraffitiTask.Instance={(CleanGraffitiTask.Instance != null)}, " +
+                  $"TutorialObjectiveList.Instance={(TutorialObjectiveList.Instance != null)}, " +
+                  $"TutorialOverlay.Instance={(TutorialOverlay.Instance != null)}");
 
         _trashTaskDone    = false;
         _graffitiTaskDone = false;
 
-        _taskThrowTrash = TutorialObjectiveList.Instance?.AddObjective(
-            GetTrashTaskText(TakeOutTrashTask.Instance.DepositedCount,
-                             TakeOutTrashTask.Instance.TotalCount));
+        if (TakeOutTrashTask.Instance != null)
+        {
+            _taskThrowTrash = TutorialObjectiveList.Instance?.AddObjective(
+                GetTrashTaskText(TakeOutTrashTask.Instance.DepositedCount,
+                                 TakeOutTrashTask.Instance.TotalCount));
 
-        TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
-        TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
+            TakeOutTrashTask.OnProgressChanged    += OnTrashProgressChanged;
+            TakeOutTrashTask.OnAllItemsDeposited  += OnTrashTaskComplete;
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] OnTrashTaskReadySync: TakeOutTrashTask.Instance is null — trash objective not shown.");
+            _trashTaskDone = true;
+        }
 
         // The graffiti objective row is owned here (not by CleanGraffitiTask itself) so we
         // control exactly when it appears — right alongside the trash task, matching the
@@ -2133,8 +2185,43 @@ public class Day_01 : DayBase
             _graffitiTaskDone = true;
         }
 
+        // Point the player at the dispenser first — junk items stay un-highlighted until they
+        // actually grab a bag (see OnTrashBagGrabbedSync).
+        TutorialMarkerManager.Instance?.Mark(_markerTrashSpawner);
+        _trashSpawnerInteractable?.SetForceHighlight(true);
+        TrashBagPicker.OnBagDispensedLocally += OnTrashBagDispensedLocal;
+        TutorialTaskSync.OnTrashBagGrabbedAllClients += OnTrashBagGrabbedSync;
+
         TutorialOverlay.Instance?.ShowTrashTutorial(
             () => TutorialOverlay.Instance?.ShowGraffitiTutorial());
+    }
+
+    /// <summary>
+    /// Fires locally the instant this client grabs a bag from the Trash Spawner. Self-unsubscribes
+    /// and reports to the server so <see cref="OnTrashBagGrabbedSync"/> fires on every client.
+    /// </summary>
+    private void OnTrashBagDispensedLocal()
+    {
+        TrashBagPicker.OnBagDispensedLocally -= OnTrashBagDispensedLocal;
+        TutorialTaskSync.Instance?.ReportTrashBagGrabbedServerRpc();
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="TutorialTaskSync.OnTrashBagGrabbedAllClients"/> the
+    /// instant any player grabs their first bag from the Trash Spawner. Dismisses the dispenser
+    /// tutorial arrow, then highlights every junk item in the yard so it's easy to spot.
+    /// </summary>
+    private void OnTrashBagGrabbedSync()
+    {
+        TutorialTaskSync.OnTrashBagGrabbedAllClients -= OnTrashBagGrabbedSync;
+
+        TutorialMarkerManager.Instance?.Unmark(_markerTrashSpawner);
+        _trashSpawnerInteractable?.SetForceHighlight(false);
+
+        // Day 1 tutorial only: highlight every piece of trash so it's easy to find, now that
+        // the player has a bag in hand. Does not affect later/other triggers of this same
+        // shared task instance — callers must invoke this explicitly.
+        TakeOutTrashTask.Instance?.HighlightAllItemsForTutorial();
     }
 
     private void OnGraffitiProgressChanged()
@@ -2307,12 +2394,19 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called as the onComplete of <see cref="TryFinishTrashAndGraffitiTutorials"/>'s
-    /// HideAndClear — i.e. the instant both the trash and graffiti tasks are done. Triggers
-    /// Day 1's scripted first breach directly (bypassing the day-gated auto-scheduler) so it
-    /// always happens right here, well before the timecard machine is ever unlocked.
+    /// HideAndClear — i.e. the instant both the trash and graffiti tasks are done. Waits
+    /// <see cref="_breachTriggerDelay"/> seconds, then triggers Day 1's scripted first breach
+    /// directly (bypassing the day-gated auto-scheduler) so it always happens right here, well
+    /// before the timecard machine is ever unlocked.
     /// </summary>
     private void BeginMutantBreachSequence()
     {
+        StartCoroutine(BeginMutantBreachSequenceRoutine());
+    }
+
+    private IEnumerator BeginMutantBreachSequenceRoutine()
+    {
+        yield return new WaitForSeconds(_breachTriggerDelay);
         MutantBreachManager.Instance?.TriggerBreach(_firstBreachData);
     }
 
@@ -2334,21 +2428,47 @@ public class Day_01 : DayBase
         yield return new WaitForSeconds(_breachBarkGap);
         MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachWarningBark2);
 
-        // The shovels were non-interactable for the entirety of Day 1 up to this point —
-        // free them up now so the player can actually fight back.
-        _breachShovel1?.UnlockInteractableNetworked();
-        _breachShovel2?.UnlockInteractableNetworked();
-
-        if (TutorialMarkerManager.Instance != null)
-        {
-            if (_breachShovel1 != null) TutorialMarkerManager.Instance.Mark(_breachShovel1.transform);
-            if (_breachShovel2 != null) TutorialMarkerManager.Instance.Mark(_breachShovel2.transform);
-        }
-
         TutorialOverlay.Instance?.ShowMutantBreachTutorial();
 
         _taskRepelMutants = TutorialObjectiveList.Instance?.AddObjective(_taskRepelMutantsText);
+
+        yield return new WaitForSeconds(_breachShovelUnlockDelay);
+
+        // The shovels were non-interactable for the entirety of Day 1 up to this point — free
+        // them up now so the player can actually fight back. Each stays force-highlighted and
+        // arrowed until it is individually picked up (see OnBreachShovel1PickedUp/2PickedUp).
+        ArmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+        ArmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
     }
+
+    /// <summary>Unlocks, force-highlights, and arrows a single checkpoint shovel, then wires it to clear itself the instant it's picked up.</summary>
+    private void ArmBreachShovel(Shovel shovel, System.Action onPickedUp)
+    {
+        if (shovel == null) return;
+
+        shovel.UnlockInteractableNetworked();
+        shovel.SetForceHighlight(true);
+        TutorialMarkerManager.Instance?.Mark(shovel.transform);
+
+        shovel.OnPickedUpEvent += onPickedUp;
+    }
+
+    /// <summary>Clears a single checkpoint shovel's highlight/arrow and unsubscribes its pickup handler. Safe to call more than once.</summary>
+    private void DisarmBreachShovel(Shovel shovel, System.Action onPickedUp)
+    {
+        if (shovel == null) return;
+
+        shovel.OnPickedUpEvent -= onPickedUp;
+        shovel.SetForceHighlight(false);
+        TutorialMarkerManager.Instance?.Unmark(shovel.transform);
+    }
+
+    /// <summary>Fires the moment _breachShovel1 is first picked up during the breach — clears its highlight/arrow immediately rather than waiting for the breach to end.</summary>
+    private void OnBreachShovel1PickedUp() => DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+
+    /// <summary>Fires the moment _breachShovel2 is first picked up during the breach — clears its highlight/arrow immediately rather than waiting for the breach to end.</summary>
+    private void OnBreachShovel2PickedUp() => DisarmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
+
 
     /// <summary>
     /// Fires on ALL clients via <see cref="MutantBreachManager.OnBreachCountChangedAllClients"/>
@@ -2373,11 +2493,10 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnMutantBreachCleared()
     {
-        if (TutorialMarkerManager.Instance != null)
-        {
-            if (_breachShovel1 != null) TutorialMarkerManager.Instance.Unmark(_breachShovel1.transform);
-            if (_breachShovel2 != null) TutorialMarkerManager.Instance.Unmark(_breachShovel2.transform);
-        }
+        // Safety net in case a shovel was never picked up during the fight — each one already
+        // clears itself immediately on pickup via OnBreachShovel1PickedUp/2PickedUp.
+        DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+        DisarmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
 
         if (_taskRepelMutants != null)
         {

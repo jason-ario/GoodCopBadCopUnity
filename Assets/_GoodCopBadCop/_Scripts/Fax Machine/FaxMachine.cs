@@ -20,6 +20,17 @@ public class FaxMachine : NetworkBehaviour
     [Tooltip("World-space arrow that points at the fax machine while a delivered fax is waiting to be picked up.")]
     [SerializeField] private GameObject _tutorialArrow;
 
+    // The fax paper spawned for the current day, if any, so it can be despawned next day
+    // (mirrors DailyNewspaperSpawnManager's _activeNewspaper tracking).
+    private NetworkObject _activeFax;
+
+    // The PickableObject on the active fax, so its pickup events can be unsubscribed.
+    private PickableObject _activeFaxPickable;
+
+    // True once the player has ever picked up a daily fax — guards ShowDailyFaxTutorial so it
+    // only ever plays the first time, not every subsequent day's fax pickup.
+    private bool _hasShownDailyFaxTutorial;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -38,6 +49,9 @@ public class FaxMachine : NetworkBehaviour
             ShiftManager.Instance.OnNightPhaseBegin -= SpawnNewspaper;
             ShiftManager.Instance.OnDayStart -= SpawnDailyFax;
         }
+
+        if (_activeFaxPickable != null)
+            _activeFaxPickable.OnPickedUpEvent -= HandleFaxPickedUpFirstTime;
     }
 
     private void SpawnNewspaper()
@@ -95,9 +109,13 @@ public class FaxMachine : NetworkBehaviour
     /// <summary>
     /// Populates the daily fax canvas then ejects a fax paper from the machine.
     /// Falls back to the newspaper spawn point if no dedicated fax spawn point is assigned.
+    /// Despawns the previous day's fax paper first (if still present), so at most one daily
+    /// fax exists in the scene at a time — mirrors <see cref="DailyNewspaperSpawnManager"/>.
     /// </summary>
     IEnumerator WaitAndSpawnFax()
     {
+        DespawnPreviousFax();
+
         if (_dailyFaxContents == null)
         {
             Debug.LogWarning("[FaxMachine] No DailyFaxContentsController assigned — skipping daily fax.");
@@ -144,7 +162,63 @@ public class FaxMachine : NetworkBehaviour
 
         pickable.UnlockInteractableNetworked();
 
+        _activeFax = networkObject;
+        _activeFaxPickable = pickable;
+
+        ShowFaxTutorial(pickable);
+    }
+
+    /// <summary>
+    /// Despawns the previous day's fax paper if it's still sitting unpicked in the scene.
+    /// Clears its highlight/arrow and unsubscribes before the instance is despawned, mirroring
+    /// <see cref="DailyNewspaperSpawnManager.DespawnPreviousNewspaper"/>.
+    /// </summary>
+    private void DespawnPreviousFax()
+    {
+        if (_activeFaxPickable != null)
+        {
+            _activeFaxPickable.OnPickedUpEvent -= HandleFaxPickedUpFirstTime;
+            _activeFaxPickable.SetForceHighlight(false);
+        }
+        _activeFaxPickable = null;
+
+        if (_tutorialArrow != null)
+            _tutorialArrow.SetActive(false);
+
+        if (_activeFax != null && _activeFax.IsSpawned)
+            _activeFax.Despawn();
+
+        _activeFax = null;
+    }
+
+    /// <summary>
+    /// Highlights the freshly delivered fax and points the tutorial arrow at it until it's
+    /// picked up. The very first time any fax is ever grabbed, also shows the "Daily Fax"
+    /// tutorial overlay explaining what the fax is for.
+    /// </summary>
+    private void ShowFaxTutorial(PickableObject pickable)
+    {
+        if (pickable == null) return;
+
+        pickable.SetForceHighlight(true);
         ShowTutorialArrowUntilPickedUp(pickable);
+
+        pickable.OnPickedUpEvent += HandleFaxPickedUpFirstTime;
+    }
+
+    private void HandleFaxPickedUpFirstTime()
+    {
+        if (_activeFaxPickable != null)
+        {
+            _activeFaxPickable.OnPickedUpEvent -= HandleFaxPickedUpFirstTime;
+            _activeFaxPickable.SetForceHighlight(false);
+        }
+
+        if (!_hasShownDailyFaxTutorial)
+        {
+            _hasShownDailyFaxTutorial = true;
+            TutorialOverlay.Instance?.ShowDailyFaxTutorial();
+        }
     }
 
     /// <summary>

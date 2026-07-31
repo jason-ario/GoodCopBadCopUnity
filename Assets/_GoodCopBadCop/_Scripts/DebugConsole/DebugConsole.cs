@@ -577,10 +577,12 @@ public class DebugConsole : MonoBehaviour
 
     /// <summary>
     /// Skips to Day 1 in the booth with the shift already started, the booth door unlocked and
-    /// opened, and the end-of-shift trash and graffiti tutorial tasks triggered — mirroring
-    /// <see cref="AlexeiController.TriggerEndOfShiftSetup"/>, the same production code path used
-    /// after the real Alexei sequence. No suspects will arrive. The timecard machine only primes
-    /// for clock-out once the player actually finishes both tutorial tasks.
+    /// opened, and the end-of-shift trash and graffiti tutorial tasks triggered — mirroring both
+    /// <see cref="AlexeiController.TriggerEndOfShiftSetup"/> and the
+    /// <see cref="TutorialTaskSync.BroadcastTrashTaskReadyServer"/> call Day_01 makes right after
+    /// it, the same production code path used after the real Alexei sequence. No suspects will
+    /// arrive. The timecard machine only primes for clock-out once the player actually finishes
+    /// both tutorial tasks.
     /// </summary>
     public void SkipToEndOfDay1()
     {
@@ -620,19 +622,31 @@ public class DebugConsole : MonoBehaviour
         ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
         ShiftManager.Instance?.TryStartShift();
 
-        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
-        yield return null;
-        yield return null;
+        // TryStartShift's OpenWindowSequence coroutine locks the booth door on its own (via
+        // ShiftManager.OnDoorLock) ~3 s after the shift starts, whenever the active day has
+        // IsDoorLockedForShift set — Day 1 does. That lock fires on a delay independent of us,
+        // so if we called TriggerEndOfShiftSetup() right away (as before), its unlock would be
+        // immediately clobbered a few seconds later when OpenWindowSequence's own lock finally
+        // fires, leaving the booth door locked instead of open. Wait past that window first so
+        // the natural shift-start lock happens and settles before we unlock for end-of-shift.
+        yield return new WaitForSeconds(3.5f);
 
         // Run the real end-of-shift setup: unlocks/opens the booth door, triggers the trash and
-        // graffiti tutorial tasks (highlighting trash items), and marks suspects complete so the
+        // graffiti tasks (highlighting trash items), and marks suspects complete so the
         // timecard machine primes once both tasks are actually finished.
         if (AlexeiController.Instance != null)
             AlexeiController.Instance.TriggerEndOfShiftSetup();
         else
-            Debug.LogWarning("[DebugConsole] SkipToEndOfDay1: AlexeiController.Instance not found — door and tutorial tasks not triggered.");
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay1: AlexeiController.Instance not found — door and tasks not triggered.");
 
-        Debug.Log("[DebugConsole] Skipped to end of Day 1 — booth door opened, trash and graffiti tutorial tasks triggered.");
+        // Mirror Day_01's post-Alexei-dialogue callback: broadcast to all clients that the trash
+        // task is ready. Day_01.OnTrashTaskReadySync is what actually adds the "throw away trash"
+        // and "clean graffiti" tutorial objectives and shows the trash/graffiti tutorial overlay
+        // screens — TriggerEndOfShiftSetup alone only spawns/highlights the trash items and
+        // registers the tasks, it does not show the tutorials themselves.
+        TutorialTaskSync.Instance?.BroadcastTrashTaskReadyServer();
+
+        Debug.Log("[DebugConsole] Skipped to end of Day 1 — booth door opened, trash and graffiti tutorials triggered.");
     }
     /// <summary>
     /// Skips straight to the start of Day 2 with the player positioned inside the bunker,

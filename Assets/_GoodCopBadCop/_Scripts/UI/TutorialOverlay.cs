@@ -34,6 +34,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject fixFenceTutorialScreen;
     [SerializeField] private GameObject mutantBreachTutorialScreen;
     [SerializeField] private GameObject checkpointIntegrityTutorialScreen;
+    [SerializeField] private GameObject dailyFaxTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -42,6 +43,12 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private float fillDrainMultiplier = 2f;
     [Tooltip("Seconds to wait after triggering the close animation before deactivating the root.")]
     [SerializeField] private float hideDelay = 1.1f;
+
+    [Header("Audio")]
+    [Tooltip("Sound effect played whenever a tutorial screen is shown.")]
+    [SerializeField] private AudioClip showTutorialSfx;
+    [Range(0f, 1f)]
+    [SerializeField] private float showTutorialSfxVolume = 1f;
 
     private bool _isShowing;
     private float _holdProgress;
@@ -139,6 +146,13 @@ public class TutorialOverlay : MonoBehaviour
     public void ShowCheckpointIntegrityTutorial(Action onComplete = null) => ShowScreen(checkpointIntegrityTutorialScreen, onComplete);
 
     /// <summary>
+    /// Shows the "Daily Fax" tutorial overlay — explains that the daily fax reports new
+    /// symptoms the player needs to look out for during their shift. Triggered the first time
+    /// the player ever picks up a fax delivered by the <see cref="FaxMachine"/> (starting Day 2).
+    /// </summary>
+    public void ShowDailyFaxTutorial(Action onComplete = null) => ShowScreen(dailyFaxTutorialScreen, onComplete);
+
+    /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.
     /// Safe to call even if the overlay is not currently showing.
     /// </summary>
@@ -165,6 +179,9 @@ public class TutorialOverlay : MonoBehaviour
 
         SetAllScreensInactive();
         screen.SetActive(true);
+
+        if (showTutorialSfx != null && SFXController.Instance != null)
+            SFXController.Instance.Play(showTutorialSfx, showTutorialSfxVolume);
 
         // Cancel any in-progress close animation before re-showing.
         if (_hideCoroutine != null)

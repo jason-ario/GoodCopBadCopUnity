@@ -42,6 +42,20 @@ public class Subtitles : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Applies the given font <paramref name="font"/> override to the subtitle text.
+    /// Pass <c>null</c> to leave the subtitle prefab's default font untouched — since each
+    /// subtitle is a fresh prefab instance, no explicit reset is needed between lines.
+    /// </summary>
+    public void SetFontOverride(TMP_FontAsset font)
+    {
+        if (font == null || textReveal == null) return;
+
+        var tmp = textReveal.GetComponent<TextMeshProUGUI>();
+        if (tmp != null)
+            tmp.font = font;
+    }
+
     /// <summary>Shows or hides the continue prompt, waiting for the typewriter to finish before showing it.</summary>
     public void ShowContinuePrompt(bool show)
     {

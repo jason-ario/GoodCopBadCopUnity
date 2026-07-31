@@ -77,6 +77,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
              "Index 0 here maps to RPC profile index 0 (the default is always RPC index -1).")]
     [SerializeField] private TMPWobbleProfile[] _additionalWobbleProfiles;
 
+    [Header("Fonts")]
+    [Tooltip("Font assets that nodes can reference as per-line overrides via fontOverride. " +
+             "A node's fontOverride must appear in this list to be sent over the network. " +
+             "Leave a node's fontOverride null to keep the subtitle prefab's default font.")]
+    [SerializeField] private TMPro.TMP_FontAsset[] _additionalFontAssets;
+
     [Header("Multi-Player Advance")]
     [Tooltip("Seconds after the first player advances (or submits a choice) before the " +
              "sequence continues automatically without the second player's input.")]
@@ -313,7 +319,28 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// The advance gate and cam cleanup still run normally.
     /// </para>
     /// </summary>
-    public void PlayMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete = null, bool unlocked = false)
+    /// <param name="speakerNameOverride">
+    /// Optional subtitle speaker name for this sequence only, overriding the configured
+    /// <see cref="_megaphoneSpeakerName"/>. Use for a one-off speaker distinct from the usual
+    /// megaphone voice (e.g. the unfamiliar new voice that takes over on Day 4). Leave null to
+    /// use the default name.
+    /// </param>
+    /// <param name="speakerColorOverride">
+    /// Optional subtitle name colour paired with <paramref name="speakerNameOverride"/>. Leave
+    /// null to use the default <see cref="_megaphoneSpeakerColor"/>.
+    /// </param>
+    /// <param name="useAlternateVoice">
+    /// When true, audio is played from <see cref="MegaphoneDialogueManager.AlternateVoiceClips"/>
+    /// instead of the default <see cref="MegaphoneDialogueManager.AudioClips"/>, so the one-off
+    /// speaker sounds distinct from the usual megaphone voice.
+    /// </param>
+    public void PlayMegaphoneDialogue(
+        ScriptedDialogue dialogue,
+        Action onComplete = null,
+        bool unlocked = false,
+        string speakerNameOverride = null,
+        Color? speakerColorOverride = null,
+        bool useAlternateVoice = false)
     {
         if (!IsServer) return;
 
@@ -324,7 +351,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked));
+        string speakerName = string.IsNullOrEmpty(speakerNameOverride) ? _megaphoneSpeakerName : speakerNameOverride;
+        Color speakerColor = speakerColorOverride ?? _megaphoneSpeakerColor;
+
+        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice));
     }
 
     // -------------------------------------------------------------------------
@@ -453,6 +483,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // camera hijacked by a dialogue they are not yet part of.
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty, BuildParticipantRpcParams());
             SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
 
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
@@ -875,7 +906,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Megaphone sequence
     // -------------------------------------------------------------------------
 
-    private IEnumerator RunMegaphoneDialogue(ScriptedDialogue dialogue, Action onComplete, bool unlocked = false)
+    private IEnumerator RunMegaphoneDialogue(
+        ScriptedDialogue dialogue,
+        Action onComplete,
+        bool unlocked,
+        string speakerName,
+        Color speakerColor,
+        bool useAlternateVoice)
     {
         // When unlocked, the player is already free (caller called ExitScriptedMode first).
         // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
@@ -889,7 +926,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
             SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
-            yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine));
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
+            yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine, speakerName, speakerColor, useAlternateVoice));
             SetSpeakerSpeakingClientRpc(false);
         }
 
@@ -900,31 +938,33 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Debug.Log("[ScriptedDialogueRunner] Megaphone dialogue complete.");
     }
 
-    private IEnumerator SayMegaphoneLineAndWait(string text)
+    private IEnumerator SayMegaphoneLineAndWait(string text, string speakerName, Color speakerColor, bool useAlternateVoice)
     {
         _awaitingScriptedInput = true;
         SetAwaitingInputClientRpc(true);
-        SayMegaphoneLineClientRpc(text);
+        SayMegaphoneLineClientRpc(text, speakerName, speakerColor, useAlternateVoice);
         yield return StartCoroutine(WaitForScriptedAdvance());
         SetAwaitingInputClientRpc(false);
         _awaitingScriptedInput = false;
     }
 
     /// <summary>
-    /// Displays a subtitle line using the megaphone speaker identity and plays its audio
+    /// Displays a subtitle line using the given megaphone speaker identity and plays its audio
     /// through <see cref="MegaphoneDialogueManager"/>. Uses the standard dialogue audio slot
     /// so the player clicking to advance stops the audio, matching character dialogue behaviour.
     /// </summary>
     [ClientRpc]
-    private void SayMegaphoneLineClientRpc(string text)
+    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice)
     {
         var mgr = MegaphoneDialogueManager.Instance;
-        AudioClip[] clips = mgr != null ? mgr.AudioClips : System.Array.Empty<AudioClip>();
+        AudioClip[] clips = mgr != null
+            ? (useAlternateVoice ? mgr.AlternateVoiceClips : mgr.AudioClips)
+            : System.Array.Empty<AudioClip>();
         AudioSource source = mgr != null ? mgr.MegaphoneAudioSource : null;
 
         mgr?.SetSpeakerSpeaking(true);
 
-        DialogueManager.Instance.SpawnSubtitles(text, _megaphoneSpeakerName, _megaphoneSpeakerColor,
+        DialogueManager.Instance.SpawnSubtitles(text, speakerName, speakerColor,
             isPlayer: false, clearHistory: false, waitForInput: true);
 
         if (clips.Length > 0 && source != null)
@@ -1319,6 +1359,62 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         Debug.LogWarning($"[ScriptedDialogueRunner] Wobble profile index {index} is out of range. Falling back to default.");
         return _defaultWobbleProfile;
+    }
+
+    // -------------------------------------------------------------------------
+    // Client RPCs — fonts
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Primes <see cref="DialogueManager"/> with the font asset to use for the next subtitle.
+    /// <paramref name="fontIndex"/> of -1 resolves to the subtitle prefab's default font (no
+    /// override); 0+ indexes into <see cref="_additionalFontAssets"/>.
+    /// </summary>
+    [ClientRpc]
+    private void SetFontClientRpc(int fontIndex)
+    {
+        DialogueManager.Instance.SetNextLineFontOverride(ResolveFontAssetByIndex(fontIndex));
+    }
+
+    /// <summary>
+    /// Server-side: maps a node's optional font override to an RPC-safe index.
+    /// Returns -1 for no override (null), or the index within <see cref="_additionalFontAssets"/>
+    /// for a registered override. Logs a warning and falls back to -1 if not registered.
+    /// </summary>
+    private int ResolveFontAssetIndex(TMPro.TMP_FontAsset overrideFont)
+    {
+        if (overrideFont == null)
+            return -1;
+
+        if (_additionalFontAssets != null)
+        {
+            for (int i = 0; i < _additionalFontAssets.Length; i++)
+            {
+                if (_additionalFontAssets[i] == overrideFont)
+                    return i;
+            }
+        }
+
+        Debug.LogWarning($"[ScriptedDialogueRunner] fontOverride '{overrideFont.name}' is not registered " +
+                         $"in _additionalFontAssets. Falling back to the default font.");
+        return -1;
+    }
+
+    /// <summary>
+    /// Client-side: resolves an RPC font index back to the corresponding <see cref="TMPro.TMP_FontAsset"/>.
+    /// -1 returns null (no override, keep the subtitle prefab's default font); 0+ indexes into
+    /// <see cref="_additionalFontAssets"/>.
+    /// </summary>
+    private TMPro.TMP_FontAsset ResolveFontAssetByIndex(int index)
+    {
+        if (index < 0)
+            return null;
+
+        if (_additionalFontAssets != null && index < _additionalFontAssets.Length)
+            return _additionalFontAssets[index];
+
+        Debug.LogWarning($"[ScriptedDialogueRunner] Font index {index} is out of range. Falling back to the default font.");
+        return null;
     }
 
     // -------------------------------------------------------------------------

@@ -49,10 +49,15 @@ public class StatBar : MonoBehaviour
     /// </summary>
     protected void UpdateBar(float current, float max)
     {
-        if (fillImage == null) return;
-
         float newFill = max > 0f ? current / max : 0f;
-        fillImage.fillAmount = newFill;
+
+        // fillImage is optional — some stat bars (e.g. CheckpointIntegrityBar) are
+        // percentage-text-only with no fill graphic. Previously this bailed out entirely
+        // when fillImage was null, which also silently skipped the percentageText update
+        // below, leaving those text-only bars permanently stuck at their editor-authored
+        // placeholder value no matter how the underlying stat changed.
+        if (fillImage != null)
+            fillImage.fillAmount = newFill;
 
         if (percentageText != null)
             percentageText.text = $"{Mathf.RoundToInt(newFill * 100f)}%";

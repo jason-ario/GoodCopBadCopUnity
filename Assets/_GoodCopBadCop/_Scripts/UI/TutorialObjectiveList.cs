@@ -19,7 +19,28 @@ using UnityEngine;
 /// </summary>
 public class TutorialObjectiveList : MonoBehaviour
 {
-    public static TutorialObjectiveList Instance { get; private set; }
+    private static TutorialObjectiveList _instance;
+
+    /// <summary>
+    /// Self-healing singleton accessor. Falls back to a scene search (including inactive
+    /// objects) if the cached reference is null or was left pointing at a destroyed object —
+    /// e.g. if this panel's hierarchy is torn down and recreated by a menu-to-gameplay
+    /// transition (<c>MainMenuController.TransitionToGameplay</c>) after some other script
+    /// already cached the stale reference. Without this, silent no-ops on the null-conditional
+    /// <c>Instance?.AddObjective(...)</c> calls used throughout the day scripts would leave
+    /// tutorial objectives (e.g. Day 1's trash/graffiti tasks) permanently invisible with no
+    /// error ever logged.
+    /// </summary>
+    public static TutorialObjectiveList Instance
+    {
+        get
+        {
+            if (_instance == null)
+                _instance = FindFirstObjectByType<TutorialObjectiveList>(FindObjectsInactive.Include);
+            return _instance;
+        }
+        private set => _instance = value;
+    }
 
     private static readonly int IsShowingHash = Animator.StringToHash("IsShowing");
 
@@ -49,6 +70,12 @@ public class TutorialObjectiveList : MonoBehaviour
         Instance = this;
     }
 
+    private void OnDestroy()
+    {
+        if (_instance == this)
+            _instance = null;
+    }
+
     private void Start()
     {
         // Clear design-time placeholder items then deactivate the card root.
@@ -66,6 +93,12 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <returns>The created <see cref="TutorialObjectiveItem"/> handle, used to mark it complete later.</returns>
     public TutorialObjectiveItem AddObjective(string text)
     {
+        Debug.Log($"[TutorialObjectiveList] AddObjective(\"{text}\") called. " +
+                  $"instance={(this != null)}, gameObject.activeInHierarchy={gameObject.activeInHierarchy}, " +
+                  $"objectiveListRoot={(objectiveListRoot != null ? objectiveListRoot.name : "NULL")}, " +
+                  $"objectiveListRoot.activeInHierarchy={(objectiveListRoot != null && objectiveListRoot.activeInHierarchy)}, " +
+                  $"taskItemPrefab={(taskItemPrefab != null)}, taskListContainer={(taskListContainer != null)}");
+
         if (taskItemPrefab == null)
         {
             Debug.LogError("[TutorialObjectiveList] taskItemPrefab is not assigned.", this);
@@ -95,6 +128,9 @@ public class TutorialObjectiveList : MonoBehaviour
 
         item.SetText(text);
         _items.Add(item);
+        Debug.Log($"[TutorialObjectiveList] Objective row created under '{taskListContainer.name}'. " +
+                  $"_isShowing={_isShowing}, objectiveListRoot.activeInHierarchy={objectiveListRoot.activeInHierarchy}, " +
+                  $"item.gameObject.activeInHierarchy={item.gameObject.activeInHierarchy}");
         return item;
     }
 
@@ -189,6 +225,10 @@ public class TutorialObjectiveList : MonoBehaviour
         _isShowing = true;
         objectiveListRoot.SetActive(true);
         listAnimator.SetBool(IsShowingHash, true);
+        Debug.Log($"[TutorialObjectiveList] Show() — objectiveListRoot.activeSelf={objectiveListRoot.activeSelf}, " +
+                  $"activeInHierarchy={objectiveListRoot.activeInHierarchy}, listAnimator.enabled={listAnimator.enabled}, " +
+                  $"listAnimator.gameObject.activeInHierarchy={listAnimator.gameObject.activeInHierarchy}, " +
+                  $"runtimeAnimatorController={(listAnimator.runtimeAnimatorController != null ? listAnimator.runtimeAnimatorController.name : "NULL")}");
     }
 
     private IEnumerator HideAndClearRoutine(float preHideDelay, Action onComplete)
