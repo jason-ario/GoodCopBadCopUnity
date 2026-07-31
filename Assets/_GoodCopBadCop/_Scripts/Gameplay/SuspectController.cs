@@ -20,6 +20,17 @@ public class SuspectController : NetworkBehaviour
     public static event System.Action OnSuspectQuarantined;
 
     /// <summary>
+    /// Fired on the server exactly once, the very first time the player ever kills a suspect
+    /// (any day, any suspect). Consumed by <see cref="CampaignManager"/> to arm Ocho's booth
+    /// encounter as the next suspect. Guarded by <see cref="_hasEverKilled"/> so it can never
+    /// fire more than once per run.
+    /// </summary>
+    public static event System.Action OnFirstKillEver;
+
+    /// <summary>Set the first time <see cref="OnFirstKillEver"/> fires — guards it to a single shot.</summary>
+    private static bool _hasEverKilled;
+
+    /// <summary>
     /// Fired on every peer (server and clients) whenever <see cref="suspectIndex"/> changes,
     /// carrying the new lineup index and the total number of suspects for the current shift.
     /// Consumed by <see cref="GoodCopBadCop.EnvironmentSystem.EnvironmentSuspectProgressAdapter"/>
@@ -1506,6 +1517,12 @@ public class SuspectController : NetworkBehaviour
             SuspectRunRecords.Instance.SaveRecords();
             if (populationService != null)
                 SaveDataManager.Instance?.SavePopulation(populationService.ToSaveData());
+
+            if (!_hasEverKilled)
+            {
+                _hasEverKilled = true;
+                OnFirstKillEver?.Invoke();
+            }
         }
 
         yield return new WaitForSeconds(1f);

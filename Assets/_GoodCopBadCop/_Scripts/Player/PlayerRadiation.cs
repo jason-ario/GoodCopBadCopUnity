@@ -162,6 +162,21 @@ public class PlayerRadiation : NetworkBehaviour
             hasTriggeredCritical = false;
     }
 
+    /// <summary>
+    /// Clears accrued radiation back to zero and resets critical-state tracking.
+    /// Intended for server-side use (e.g. at the start of a new day) — does not
+    /// touch <see cref="isTakingPill"/>/<see cref="pillTimer"/> pill state, which
+    /// will simply resume draining against the now-zeroed radiation on its own.
+    /// </summary>
+    public void ResetRadiation()
+    {
+        currentRadiation = 0f;
+        hasTriggeredCritical = false;
+        _previousRadiationForRate = 0f;
+        _smoothedRadiationRate = 0f;
+        OnRadiationChanged?.Invoke(currentRadiation, maxRadiation);
+    }
+
     public void TakeRadiationPill()
     {
         isTakingPill = true;

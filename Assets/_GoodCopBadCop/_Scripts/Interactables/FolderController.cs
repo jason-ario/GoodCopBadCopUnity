@@ -340,7 +340,7 @@ public class FolderController : PickableObject
             Debug.Log("Already Stamped");
         }
 
-        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Reality Exam Page" or "Biological Exam Page" )
+        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Supernatural Exam Page" or "Biological Exam Page" )
         {
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
@@ -351,7 +351,7 @@ public class FolderController : PickableObject
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
 
-        if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Reality Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook")
+        if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Supernatural Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook")
         {
             Debug.Log($"[FolderController] Notebook interaction on client {NetworkManager.Singleton.LocalClientId}: held={heldItem.ItemData.name}, hasPage={HasNotebookPage(heldItem.ItemData.name)}");
             if (HasNotebookPage(heldItem.ItemData.name) == false)
@@ -368,7 +368,7 @@ public class FolderController : PickableObject
         {
             "Mutation Exam Notebook"       => "Mutation Exam Page",
             "Behavior Exam Notebook"       => "Behavior Exam Page",
-            "Reality Exam Notebook"        => "Reality Exam Page",
+            "Supernatural Exam Notebook"    => "Supernatural Exam Page",
             "Documentation Exam Notebook"  => "Documentation Exam Page",
             "Biological Exam Notebook"     => "Biological Exam Page",
             _                              => null,
@@ -950,7 +950,7 @@ public class FolderController : PickableObject
 
         // --- Exam pages: queue logic ---
         bool isExamPage = itemName is
-            "Behavior Exam Page" or "Mutation Exam Page" or "Reality Exam Page" or
+            "Behavior Exam Page" or "Mutation Exam Page" or "Supernatural Exam Page" or
             "Documentation Exam Page" or "Biological Exam Page";
 
         if (!isExamPage) return;
@@ -1128,7 +1128,7 @@ public class FolderController : PickableObject
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }
         
-        if (itemName == "Reality Exam Notebook")
+        if (itemName == "Supernatural Exam Notebook")
         {
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }

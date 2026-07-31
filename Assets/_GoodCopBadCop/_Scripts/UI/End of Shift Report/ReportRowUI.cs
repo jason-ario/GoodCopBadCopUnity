@@ -65,7 +65,7 @@ public class EndOfShiftReportRow : MonoBehaviour
 
     public IEnumerator RevealValue(string text, Color color, TMPWobbleProfile wobbleProfile)
     {
-        text = "Rewards " + text;
+        text = text;
         
         if (valueText != null)
             valueText.color = color;

@@ -86,9 +86,6 @@ public class OchoBoothEncounter : NetworkBehaviour
     [Tooltip("Maximum seconds to wait for a player to spot Ocho before giving up and having him vanish anyway.")]
     [SerializeField] private float _spotTimeoutSeconds = 12f;
 
-    [Tooltip("Seconds between the stinger playing and the sequence continuing (power outage / despawn).")]
-    [SerializeField] private float _stingerToVanishDelay = 0.5f;
-
     [Header("Ocho Booth Encounter — Jumpscare Zoom")]
     [Tooltip("Seconds the zoom-in takes, from wherever Ocho is standing to right next to the player, " +
              "before he vanishes and the stinger plays.")]
@@ -104,21 +101,6 @@ public class OchoBoothEncounter : NetworkBehaviour
 
     [Tooltip("Scale multiplier applied to Ocho's root at the peak of the jumpscare for extra punch (1 = no change).")]
     [SerializeField] private float _jumpscareScaleMultiplier = 1.15f;
-
-    [Header("Ocho Booth Encounter — Reappear Twitching")]
-    [Tooltip("Name of the Animator Int parameter that selects a twitch animation variant (1 to " +
-             "_twitchVariantCount, 0 = none). Matches the shared NPC controller's 'RandomTwitch' parameter.")]
-    [SerializeField] private string _twitchAnimatorParam = "RandomTwitch";
-
-    [Tooltip("Number of twitch animation variants available on the Animator (a random value from 1 to this " +
-             "count is picked on each trigger).")]
-    [SerializeField] private int _twitchVariantCount = 5;
-
-    [Tooltip("Minimum seconds between rapid twitch triggers while Ocho stands behind the player waiting to be spotted.")]
-    [SerializeField] private float _twitchMinInterval = 0.15f;
-
-    [Tooltip("Maximum seconds between rapid twitch triggers while Ocho stands behind the player waiting to be spotted.")]
-    [SerializeField] private float _twitchMaxInterval = 0.4f;
 
     [Header("Ocho Booth Encounter — Power Outage")]
     [SerializeField] private AudioSource _audioSource;
@@ -143,7 +125,6 @@ public class OchoBoothEncounter : NetworkBehaviour
     private bool _handled;
     private bool _spotted;
     private Coroutine _monitorCoroutine;
-    private Coroutine _twitchCoroutine;
     private ApplicationLetter _spawnedApplicationLetter;
 
     private void Awake()
@@ -209,6 +190,12 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         SuspectController controller = SuspectController.Instance;
 
+        // Same ambient screen-glitch/film-grain beat used when a fully-mutated suspect is
+        // presenting at the booth (see GlitchController) — kicks in as Ocho starts his
+        // reaction and carries through the vanish/reappear/jumpscare/power-outage beats.
+        // Clears automatically once he's despawned at the end of RedStampSequence.
+        _self.TriggerUncannyGlitchPresence();
+
         _self.animator?.SetTrigger("Give");
         yield return new WaitForSeconds(_takeFolderDelay);
 
@@ -234,16 +221,18 @@ public class OchoBoothEncounter : NetworkBehaviour
         }
 
         ReappearClientRpc();
-        _twitchCoroutine = StartCoroutine(RapidTwitchLoop());
         yield return new WaitForSeconds(_reappearToLineDelay);
 
         // Wait until a player actually turns around and spots him standing behind them
         // (or the timeout elapses), then he startles them with a stinger and vanishes.
         yield return WaitForPlayerToSpotOcho();
 
-        StopTwitching();
         PlayStingerAndVanishClientRpc();
-        yield return new WaitForSeconds(_stingerToVanishDelay);
+
+        // The stinger fires immediately, but the visual vanish (see JumpscareZoomAndVanish) only
+        // completes once the client-local zoom-in animation finishes — wait exactly that long so
+        // the power outage lands the instant he actually disappears, not some arbitrary delay later.
+        yield return new WaitForSeconds(_jumpscareZoomDuration);
 
         Debug.Log($"[OchoBoothEncounter] Verdict was {attemptedStamp} — running the power outage sequence.");
         RedStampSequence(controller);
@@ -257,34 +246,6 @@ public class OchoBoothEncounter : NetworkBehaviour
             case StampContainer.StampType.Quarantine: return _quarantineRejectedLine;
             default: return _passRejectedLine;
         }
-    }
-
-    /// <summary>
-    /// Server-only: rapidly fires random twitch animations (via the Animator's Int parameter,
-    /// replicated to clients through NetworkAnimator) while Ocho stands behind the player waiting
-    /// to be spotted, for an extra creepy "something's wrong with him" effect. Stopped by
-    /// <see cref="StopTwitching"/> the moment he's spotted (or the wait times out).
-    /// </summary>
-    private IEnumerator RapidTwitchLoop()
-    {
-        while (true)
-        {
-            int index = Random.Range(1, _twitchVariantCount + 1);
-            _self.animator?.SetInteger(_twitchAnimatorParam, index);
-
-            yield return new WaitForSeconds(Random.Range(_twitchMinInterval, _twitchMaxInterval));
-        }
-    }
-
-    private void StopTwitching()
-    {
-        if (_twitchCoroutine != null)
-        {
-            StopCoroutine(_twitchCoroutine);
-            _twitchCoroutine = null;
-        }
-
-        _self.animator?.SetInteger(_twitchAnimatorParam, 0);
     }
 
     /// <summary>

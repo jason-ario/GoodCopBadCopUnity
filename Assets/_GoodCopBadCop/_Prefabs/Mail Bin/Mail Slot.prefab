@@ -285,7 +285,6 @@ GameObject:
   - component: {fileID: 6476089076048282}
   - component: {fileID: 4104833604418862107}
   - component: {fileID: 7512819337586445495}
-  - component: {fileID: 4142840564971489545}
   m_Layer: 0
   m_Name: Mail Slot
   m_TagString: Untagged
@@ -402,22 +401,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MailCubbySlot
   _assignedResident: {fileID: 0}
   _triggerZone: {fileID: 4104833604418862107}
-  _placementSlot: {fileID: 0}
+  _placementSlot: {fileID: 2075323809044726220}
   _label: {fileID: 7428740280876589738}
---- !u!114 &4142840564971489545
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7380735032739081528}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fbd2ccbf336670e49ab47124d367fbec, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlacementSlot
-  isHanging: 0
-  _snapPoint: {fileID: 8937093242718762956}
 --- !u!1 &8845782961925605930
 GameObject:
   m_ObjectHideFlags: 0
@@ -427,8 +412,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8937093242718762956}
+  - component: {fileID: 2075323809044726220}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: Placement Slot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -443,9 +429,25 @@ Transform:
   m_GameObject: {fileID: 8845782961925605930}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.0000013709067, z: -0, w: 1}
-  m_LocalPosition: {x: 0.11141356, y: -0.5449616, z: 0.67621195}
+  m_LocalPosition: {x: 0.041, y: -0.342, z: 0.17}
   m_LocalScale: {x: 6.0132017, y: 6.013202, z: 6.0132046}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6820488546809958850}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2075323809044726220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8845782961925605930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbd2ccbf336670e49ab47124d367fbec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlacementSlot
+  isHanging: 0
+  showGhostWhileAiming: 0
+  aimHoverText: Place Item
+  _snapPoint: {fileID: 8937093242718762956}

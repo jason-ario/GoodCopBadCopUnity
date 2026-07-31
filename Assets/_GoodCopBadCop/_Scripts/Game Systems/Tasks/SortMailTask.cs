@@ -615,8 +615,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         OnAllPackagesSorted?.Invoke();
 
-        TutorialObjectiveList.Instance?.CompleteObjective(_mailObjective);
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        // Only removes this task's own row — other concurrently-tracked Day 2 objectives (e.g.
+        // "Fix Perimeter Fences") keep showing until they finish too. See
+        // TutorialObjectiveList.CompleteAndRemoveObjective.
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_mailObjective, preHideDelay: 1.5f);
         _mailObjective = null;
     }
 
@@ -673,25 +675,18 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Shows a lightweight, non-blocking alert on every client — the mail-sorting equivalent of
-    /// the "Someone is waiting at the booth" prompt — announcing today's delivery and which
-    /// goods categories are prohibited. Uses the same reveal-and-fade notification style as the
-    /// booth waiting alert (see <see cref="UIController.ShowMailDeliveryNotification"/>), but on
-    /// its own notification instance so it never gets dismissed by booth-arrival logic.
+    /// Pops up the tutorial objective list overlay (see <see cref="TutorialObjectiveList"/>)
+    /// showing how much mail is left to put away, on every client. The row stays up — updated
+    /// live as packages are sorted — until <see cref="NotifyAllPackagesSortedClientRpc"/>
+    /// completes and hides it.
     ///
-    /// Also pops up the tutorial objective list overlay (see <see cref="TutorialObjectiveList"/>)
-    /// showing how much mail is left to put away. The row stays up — updated live as packages
-    /// are sorted — until <see cref="NotifyAllPackagesSortedClientRpc"/> completes and hides it.
+    /// Previously also showed a text popup announcing the delivery and prohibited goods
+    /// (the mail-sorting equivalent of the "Someone is waiting at the booth" prompt); that popup
+    /// was deemed unnecessary and removed.
     /// </summary>
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
     {
-        if (UIController.Instance == null) return;
-
-        string prohibited = _todaysProhibitedGoods.Count > 0 ? string.Join(", ", _todaysProhibitedGoods) : "none";
-        string message = $"A mail delivery has arrived — sort it at the mail bins.\nToday's prohibited goods: {prohibited}";
-        UIController.Instance.ShowMailDeliveryNotification(message);
-
         _mailObjective = TutorialObjectiveList.Instance?.AddObjective(GetMailObjectiveText());
     }
 

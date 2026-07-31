@@ -206,22 +206,26 @@ public class SupplyBox : PickableObject
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// LMB / Right Trigger — pick up the box. Routed here by
+    /// <see cref="PlayerInteractionController"/> regardless of input device.
+    /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
-        // E Key -> Toggle open / closed
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            if (!isOpen)
-                OpenBoxNetworked();
-            else
-                CloseBoxNetworked();
-        }
-        // Left Click -> Pick up the box
-        else if (Input.GetMouseButtonDown(0))
-        {
-            if (canPickUp)
-                base.Interact(player);
-        }
+        if (canPickUp)
+            base.Interact(player);
+    }
+
+    /// <summary>
+    /// E key / ButtonWest (Xbox X) — toggle open / closed. Routed here by
+    /// <see cref="PlayerInteractionController"/> regardless of input device.
+    /// </summary>
+    public override void InteractAlternate(PlayerInteractionController player)
+    {
+        if (!isOpen)
+            OpenBoxNetworked();
+        else
+            CloseBoxNetworked();
     }
 
     // ── Open / Close (networked) ──────────────────────────────────────────────

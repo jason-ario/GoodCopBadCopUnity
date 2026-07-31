@@ -89,12 +89,6 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
-        _cheats.Add(("Skip to Day 2 — Kill Tutorial (Second Suspect)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToKillTutorial());
-            SetVisible(false);
-        }));
-
         _cheats.Add(("Skip to Day 2 — Vlad Out Back Cutscene", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay2());
@@ -165,8 +159,9 @@ public class CheatConsoleUI : MonoBehaviour
 
         _cheats.Add(("Trigger Mail Delivery Task", () =>
         {
+            // SortMailTask adds/updates its own "Sort the mail" tutorial objective row
+            // automatically as soon as the delivery triggers — no extra call needed here.
             SortMailTask.Instance?.TriggerDailyTask();
-            Day_02.Instance?.EnsureSortMailObjective();
             SetVisible(false);
         }));
 

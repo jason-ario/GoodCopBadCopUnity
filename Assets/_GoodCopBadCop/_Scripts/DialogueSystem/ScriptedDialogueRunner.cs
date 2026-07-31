@@ -346,10 +346,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Q or the "Back" button lets the local player leave the scripted dialogue early —
         // checked before the advance/skip input so it never also fires an advance vote.
+        // Only outside/bystander players may back out this way: they are never required to
+        // be present for a scripted sequence. Booth-inside players are mandatory participants
+        // (the sequence may be gating paperwork, tutorial steps, etc.) and must not be able to
+        // bail out — this also prevents Q from being misread as "leave dialogue" immediately
+        // after it was used to exit a diegetic view (tool locker, quarantine board, etc.) that
+        // shares the same exit key, right as the player is pulled into a scripted sequence.
         bool pressedLeave = Input.GetKeyDown(KeyCode.Q)
                              || Input.GetButtonDown("Back")
                              || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
-        if (pressedLeave)
+        if (pressedLeave && PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
         {
             LeaveScriptedDialogueServerRpc();
             return;
@@ -1026,6 +1032,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
+
+        // Always exit any open diegetic view (tool locker, quarantine board, etc.) immediately,
+        // regardless of the inside/outside/lockOutsidePlayers branching below. Some of those
+        // branches (outside player + lockOutsidePlayers == false) return early without ever
+        // calling DialogueChoiceSystem.EnterScriptedDialogueMode/…Outside — which is the only
+        // place that otherwise closes the view — leaving the view's own input handling (mouse
+        // interactions, exit key) active underneath the incoming dialogue and blocking it.
+        DiegeticViewController.Current?.Close();
 
         UIController.Instance?.ClosePlayerUI();
 

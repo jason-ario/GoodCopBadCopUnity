@@ -9,11 +9,12 @@ using UnityEngine;
 /// all fully clean/repaired, dropping toward <see cref="_minScore"/> (50% by default) as more
 /// of those three categories are left unattended.
 ///
-/// This is intentionally scoped to exactly three systemic threats — <see cref="GraffitiThreat"/>,
-/// <see cref="TakeOutTrashTask"/>, and <see cref="FenceThreat"/> — rather than every
+/// This is intentionally scoped to exactly three systemic threats — <see cref="CleanGraffitiTask"/>,
+/// <see cref="TakeOutTrashTask"/>, and <see cref="FenceRepairTask"/> — rather than every
 /// <see cref="ISystemicThreat"/> in the game (e.g. mutants), since those three represent the
-/// physical state of the booth itself. Each is weighted equally by default via
-/// <see cref="_categoryWeights"/>.
+/// physical state of the booth itself and are the task components actually placed in the scene.
+/// Each is weighted equally by default via <see cref="_graffitiWeight"/>, <see cref="_trashWeight"/>,
+/// and <see cref="_fenceWeight"/>.
 ///
 /// Purely a read-side aggregator: it owns no networked state of its own. Every tracked
 /// threat already replicates its ThreatLevel via NetworkVariable(ReadPermission.Everyone), so
@@ -151,9 +152,9 @@ public class CheckpointIntegrityService : MonoBehaviour
         float weightedTotal = 0f;
         float totalWeight   = 0f;
 
-        if (GraffitiThreat.Instance != null && _graffitiWeight > 0f)
+        if (CleanGraffitiTask.Instance != null && _graffitiWeight > 0f)
         {
-            weightedTotal += (1f - Mathf.Clamp01(GraffitiThreat.Instance.ThreatLevel)) * _graffitiWeight;
+            weightedTotal += (1f - Mathf.Clamp01(CleanGraffitiTask.Instance.ThreatLevel)) * _graffitiWeight;
             totalWeight   += _graffitiWeight;
         }
 
@@ -163,9 +164,9 @@ public class CheckpointIntegrityService : MonoBehaviour
             totalWeight   += _trashWeight;
         }
 
-        if (FenceThreat.Instance != null && _fenceWeight > 0f)
+        if (FenceRepairTask.Instance != null && _fenceWeight > 0f)
         {
-            weightedTotal += (1f - Mathf.Clamp01(FenceThreat.Instance.ThreatLevel)) * _fenceWeight;
+            weightedTotal += (1f - Mathf.Clamp01(FenceRepairTask.Instance.ThreatLevel)) * _fenceWeight;
             totalWeight   += _fenceWeight;
         }
 

@@ -96,7 +96,7 @@ public class DeliveryTruckController : NetworkBehaviour
     [FormerlySerializedAs("idleDurationAtDestination")]
     [SerializeField] private float idleDurationAtDestination = 8f;
     [Tooltip("How long the truck waits at pointB after the gate opens for the open animation to finish before continuing to pointC.")]
-    [SerializeField] private float gateOpenWaitDuration = 3f;
+    [SerializeField] private float gateOpenWaitDuration = 1.5f;
     [Tooltip("How long after the truck passes back through the checkpoint gate (on the pointC-to-pointA return leg) before the gate closes.")]
     [SerializeField] private float gateCloseDelayAfterPassing = 1f;
 

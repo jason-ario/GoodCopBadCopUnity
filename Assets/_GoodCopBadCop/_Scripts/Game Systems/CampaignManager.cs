@@ -79,6 +79,39 @@ public class CampaignManager : NetworkBehaviour
     {
         Instance = this;
         CollectDays();
+
+        // Listen for the whole run, not just while a particular day is active — the player's
+        // first-ever kill can happen on any day from Day 2 onward.
+        SuspectController.OnFirstKillEver += OnFirstKillEver_ArmOcho;
+    }
+
+    private void OnDestroy()
+    {
+        SuspectController.OnFirstKillEver -= OnFirstKillEver_ArmOcho;
+    }
+
+    /// <summary>
+    /// Fires once, the very first time the player ever kills a suspect (see
+    /// <see cref="SuspectController.OnFirstKillEver"/>). Arms Ocho's booth encounter as the
+    /// next suspect via <see cref="Day_02.ArmOchoBoothEncounter"/> — the day's scene references
+    /// and scripted-suspect prefab live on that component regardless of which day is currently
+    /// active, since <see cref="CollectDays"/> only deactivates each day's GameObject, not the
+    /// component itself.
+    /// </summary>
+    private void OnFirstKillEver_ArmOcho()
+    {
+        SuspectController.OnFirstKillEver -= OnFirstKillEver_ArmOcho;
+
+        if (!IsServer) return;
+
+        if (_days.TryGetValue(2, out DayBase day2) && day2 is Day_02 day2Script)
+        {
+            day2Script.ArmOchoBoothEncounter();
+        }
+        else
+        {
+            Debug.LogWarning("[CampaignManager] OnFirstKillEver_ArmOcho: Day_02 instance not found — cannot arm Ocho booth encounter.");
+        }
     }
 
     private void OnEnable()
@@ -340,9 +373,9 @@ public class CampaignManager : NetworkBehaviour
         dayBase.DayActivated();
         OnDayChanged?.Invoke(day);
 
-        // Fully heal all players at the start of every new day.
+        // Fully heal and de-irradiate all players at the start of every new day.
         if (IsServer)
-            ResetAllPlayersHealth();
+            ResetAllPlayersHealthAndRadiation();
 
         // The Day 1 scripted Soldier only exists for his one Day 1 cutscene moment.
         // Once any other day is active — whether reached via normal progression or a
@@ -433,20 +466,26 @@ public class CampaignManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Resets every connected player's health to max at the start of a new day.
-    /// Server-only; <see cref="PlayerHealth.ResetHealth"/> propagates state to clients via NetworkVariable.
+    /// Resets every connected player's health to max and radiation to zero at the start of a
+    /// new day. Server-only; <see cref="PlayerHealth.ResetHealth"/> propagates state to clients
+    /// via NetworkVariable, and <see cref="PlayerRadiation.ResetRadiation"/> runs directly on
+    /// the server since radiation is server-authoritative but non-networked.
     /// </summary>
-    private void ResetAllPlayersHealth()
+    private void ResetAllPlayersHealthAndRadiation()
     {
         foreach (var client in NetworkManager.ConnectedClientsList)
         {
             if (client.PlayerObject == null) continue;
 
             PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
-            if (playerHealth == null) continue;
+            if (playerHealth != null)
+                playerHealth.ResetHealth();
 
-            playerHealth.ResetHealth();
-            Debug.Log($"[CampaignManager] Reset health for client {client.ClientId}.");
+            PlayerRadiation playerRadiation = client.PlayerObject.GetComponent<PlayerRadiation>();
+            if (playerRadiation != null)
+                playerRadiation.ResetRadiation();
+
+            Debug.Log($"[CampaignManager] Reset health and radiation for client {client.ClientId}.");
         }
     }
 }

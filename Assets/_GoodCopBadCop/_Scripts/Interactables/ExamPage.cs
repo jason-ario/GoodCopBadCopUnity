@@ -224,8 +224,12 @@ public class ExamPage : FolderItem
             item.name = $"Checklist Item {i}";
             item.gameObject.layer = parent.gameObject.layer;
 
+            // Slots run bottom-to-top from checklistItemStartLocalPosition, but anomalies should
+            // fill top-down, so the first anomaly (i == 0) goes in the top-most slot and
+            // subsequent anomalies fill downward toward the bottom-most slot.
+            int slotFromBottom = anomalyNames.Length - 1 - i;
             Transform t = item.transform;
-            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, i * checklistItemSpacingY, 0f);
+            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, slotFromBottom * checklistItemSpacingY, 0f);
             t.localRotation = Quaternion.Euler(checklistItemLocalRotationEuler);
             t.localScale = checklistItemLocalScale;
 

@@ -823,6 +823,22 @@ public class SuspectCharacter : Interactable
     public static event Action<SuspectCharacter, int> OnSuspectPresentingUncanny;
 
     /// <summary>
+    /// Fires the same "uncanny presence" signal normally raised when a fully-mutated suspect (or
+    /// a replacement, see <see cref="InitializeAsReplacement"/>) arrives at the booth — this is
+    /// what drives <see cref="GlitchController"/>'s screen glitch/film-grain effect. Use this for
+    /// scripted encounters that need that same glitch beat without touching InfectionScore or
+    /// spawning an actual mutant form (e.g. Ocho's booth jumpscare in <c>OchoBoothEncounter</c>).
+    /// The effect clears automatically the next time <see cref="SuspectController.OnCurrentSuspectDespawned"/>
+    /// fires, so callers don't need to turn it off manually as long as the suspect eventually despawns.
+    /// Server-only, matching every other call site of this event.
+    /// </summary>
+    public void TriggerUncannyGlitchPresence()
+    {
+        if (!IsServer) return;
+        OnSuspectPresentingUncanny?.Invoke(this, 100);
+    }
+
+    /// <summary>
     /// Primary initialization path for regular suspects.
     /// Reads the persistent infection score and activates the proportional anomaly set.
     /// </summary>

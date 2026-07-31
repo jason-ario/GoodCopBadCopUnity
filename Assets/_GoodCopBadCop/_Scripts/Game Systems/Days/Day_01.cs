@@ -129,9 +129,9 @@ public class Day_01 : DayBase
     [Tooltip("The Documentation Exam shop item — locked until the documentation tutorial begins.")]
     [SerializeField] private ShopItem _documentationExamShopItem;
 
-    [Tooltip("Number of documentation anomalies to force-activate on the random quarantine tutorial suspect (index 2) for the Day 1 tutorial.")]
+    [Tooltip("Number of documentation anomalies to force-activate on the random quarantine tutorial suspect (index 2) for the Day 1 tutorial. Matches the '2 symptoms = Quarantine' threshold.")]
     [FormerlySerializedAs("_ivanDocumentationAnomalyCount")]
-    [SerializeField] private int _quarantineDocumentationAnomalyCount = 5;
+    [SerializeField] private int _quarantineDocumentationAnomalyCount = 2;
 
     [Tooltip("Task text shown while the player needs to get a documentation checklist.")]
     [SerializeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
@@ -292,6 +292,55 @@ public class Day_01 : DayBase
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 1.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
+    [Tooltip("The Hammer used to fix perimeter fences — not interactable until the first mutant " +
+             "breach clears (if it damaged any fences). Force-highlighted and pointed at with a " +
+             "tutorial arrow at that point, until the player picks it up for the first time.")]
+    [SerializeField] private PickableObject _hammer;
+
+    [Header("Day 1 — Mutant Breach Tutorial")]
+    [Tooltip("Preset used for Day 1's scripted first breach — triggered directly (bypassing the " +
+             "day-gated auto-scheduler) the instant the trash/graffiti tasks both finish.")]
+    [SerializeField] private MutantBreachData _firstBreachData;
+
+    [Tooltip("First checkpoint shovel — locked until the first mutant breach begins, then unlocked " +
+             "and highlighted with a tutorial arrow so the player knows to grab it and fight back.")]
+    [SerializeField] private Shovel _breachShovel1;
+
+    [Tooltip("Second checkpoint shovel — locked until the first mutant breach begins, then unlocked " +
+             "and highlighted with a tutorial arrow so the player knows to grab it and fight back.")]
+    [SerializeField] private Shovel _breachShovel2;
+
+    [Tooltip("Seconds between the two megaphone breach-warning barks.")]
+    [SerializeField] private float _breachBarkGap = 2f;
+
+    [Tooltip("First megaphone bark played the instant the first breach begins.")]
+    [TextArea(2, 4)]
+    [SerializeField] private string _breachWarningBark1 = "Ah shit, not again. The mutants are coming.";
+
+    [Tooltip("Second megaphone bark played shortly after the first breach-warning bark.")]
+    [TextArea(2, 4)]
+    [SerializeField] private string _breachWarningBark2 = "Quick, grab anything you can find and fend them off!";
+
+    [Tooltip("Task label shown in the objective list while mutants remain during the breach. " +
+             "The defeated/total count is appended automatically, e.g. 'Repel the mutants (1/3)'.")]
+    [SerializeField] private string _taskRepelMutantsText = "Repel the mutants";
+
+    [Tooltip("Vlad's megaphone bark once the first breach is fully repelled.")]
+    [TextArea(2, 4)]
+    [SerializeField] private string _breachClearedBark1 = "Well done, you survived your first breach.";
+
+    [Tooltip("Follow-up megaphone bark after the breach-cleared line.")]
+    [TextArea(2, 4)]
+    [SerializeField] private string _breachClearedBark2 = "Get some rest — tomorrow's another long one.";
+
+    [Tooltip("Seconds between the two breach-cleared megaphone barks.")]
+    [SerializeField] private float _breachClearedBarkGap = 2.5f;
+
+    [Header("Day 1 — Fix Perimeter Fences (post-breach)")]
+    [Tooltip("Base objective text shown in the tutorial list for the post-breach fence-repair " +
+             "task. The repaired/total count is appended automatically, e.g. 'Fix Perimeter Fences 1/3'.")]
+    [SerializeField] private string _taskFixFencesText = "Fix Perimeter Fences";
+
     // Guards against OnDayStarted running more than once if OnDayStart fires twice.
     private bool _dayStartedFired = false;
 
@@ -347,6 +396,18 @@ public class Day_01 : DayBase
     // when the row appears/disappears in the shared TutorialObjectiveList.
     private TutorialObjectiveItem _taskCleanGraffiti;
 
+    // Active mutant-breach tutorial task, shown while the first breach's mutants are still alive.
+    private TutorialObjectiveItem _taskRepelMutants;
+
+    // Blocks ShiftManager.TryEnableClockOut() until the first breach (and any resulting
+    // fence-repair follow-up) has fully resolved. Registered at DayActivated, completed by
+    // CompleteMutantBreachGateAndAdvance().
+    private MutantBreachGateTask _breachGateTask;
+
+    // Active post-breach "Fix Perimeter Fences" tutorial objective — null when no fences were
+    // damaged by the breach, or once repairs are complete.
+    private TutorialObjectiveItem _taskFixFences;
+
     // Both the trash and graffiti objectives are added to the same shared
     // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
     // These flags gate HideAndClear so the whole list isn't cleared out from
@@ -401,6 +462,25 @@ public class Day_01 : DayBase
         _mutationNotebook?.SetInteractableNetworked(false);
         _biologicalNotebook?.SetVisible(false);
         _biologicalNotebook?.SetInteractableNetworked(false);
+
+        // The hammer isn't introduced until Day 3's "Fix Perimeter Fences" tutorial.
+        _hammer?.SetInteractableNetworked(false);
+
+        // The checkpoint shovels stay non-interactable until the first mutant breach begins —
+        // see OnMutantBreachStarted, which unlocks them the moment the alarm sounds.
+        _breachShovel1?.LockInteractableNetworked();
+        _breachShovel2?.LockInteractableNetworked();
+
+        MutantBreachManager.OnBreachStartedAllClients      += OnMutantBreachStarted;
+        MutantBreachManager.OnBreachCountChangedAllClients += OnMutantBreachCountChanged;
+        MutantBreachManager.OnBreachClearedAllClients      += OnMutantBreachCleared;
+
+        // Blocks the timecard machine from unlocking until the first breach (and any resulting
+        // fence-repair follow-up) has fully resolved, even though trash/graffiti — the only other
+        // pending daily tasks today — may finish well before then. Registered up front so it's
+        // guaranteed to be pending no matter how the rest of the day's tasks are ordered.
+        _breachGateTask = new MutantBreachGateTask();
+        ShiftManager.Instance?.RegisterPendingDailyTask(_breachGateTask);
 
         ShiftManager.Instance.OnDayStart += OnDayStarted;
         SuspectController.OnSuspectArrived += OnVladArrivedAtWindow;
@@ -526,6 +606,22 @@ public class Day_01 : DayBase
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
 
+        MutantBreachManager.OnBreachStartedAllClients      -= OnMutantBreachStarted;
+        MutantBreachManager.OnBreachCountChangedAllClients -= OnMutantBreachCountChanged;
+        MutantBreachManager.OnBreachClearedAllClients      -= OnMutantBreachCleared;
+
+        // Checkpoint shovels are free to use from Day 2 onward regardless of how the breach
+        // tutorial resolved (e.g. day skipped via debug tools).
+        _breachShovel1?.UnlockInteractableNetworked();
+        _breachShovel2?.UnlockInteractableNetworked();
+
+        // Safety net: if Day 1 ends before the breach/fence sequence naturally completes it
+        // (e.g. a debug day-skip), resolve the gate anyway so clock-out never stays stuck on a
+        // future day. Safe to call more than once.
+        _breachGateTask?.Complete();
+        _breachGateTask = null;
+        _taskFixFences = null;
+
         HandOffPoint.ClearPendingVerdict();
 
         UnsubscribeDocumentPickupEvents();
@@ -593,6 +689,10 @@ public class Day_01 : DayBase
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
         BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
+
+        MutantBreachManager.OnBreachStartedAllClients      -= OnMutantBreachStarted;
+        MutantBreachManager.OnBreachCountChangedAllClients -= OnMutantBreachCountChanged;
+        MutantBreachManager.OnBreachClearedAllClients      -= OnMutantBreachCleared;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced -= OnFolderPlacedOnDesk;
@@ -2077,16 +2177,18 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Only clears the shared objective list and advances to the clock-out step once BOTH
-    /// the trash and graffiti end-of-shift tasks have been completed — whichever finishes
+    /// Only clears the shared objective list and advances to the post-shift mutant breach once
+    /// BOTH the trash and graffiti end-of-shift tasks have been completed — whichever finishes
     /// second triggers this. Prevents the list (and the still in-progress task's row) from
-    /// being wiped out early.
+    /// being wiped out early. The timecard machine stays locked (see <see cref="_breachGateTask"/>)
+    /// until the breach — and any resulting fence-repair follow-up — fully resolves; only then
+    /// does <see cref="ShowClockOutTask"/> run.
     /// </summary>
     private void TryFinishTrashAndGraffitiTutorials()
     {
         if (!_trashTaskDone || !_graffitiTaskDone) return;
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowClockOutTask);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: BeginMutantBreachSequence);
     }
 
     private string GetTrashTaskText(int deposited, int total) =>
@@ -2197,6 +2299,227 @@ public class Day_01 : DayBase
         // that didn't reach this client), force it closed now so it never carries over into
         // the night phase or the next day. Safe to call when already hidden.
         TutorialObjectiveList.Instance?.HideAndClear();
+    }
+
+    // -------------------------------------------------------------------------
+    // Mutant Breach Tutorial
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called as the onComplete of <see cref="TryFinishTrashAndGraffitiTutorials"/>'s
+    /// HideAndClear — i.e. the instant both the trash and graffiti tasks are done. Triggers
+    /// Day 1's scripted first breach directly (bypassing the day-gated auto-scheduler) so it
+    /// always happens right here, well before the timecard machine is ever unlocked.
+    /// </summary>
+    private void BeginMutantBreachSequence()
+    {
+        MutantBreachManager.Instance?.TriggerBreach(_firstBreachData);
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="MutantBreachManager.OnBreachStartedAllClients"/> the
+    /// instant the first breach's alarm sounds. Only Day 1 reacts to it — Day_01 is the only
+    /// script subscribed to this event while Day 1 is active. Plays the two-line megaphone
+    /// warning, unlocks the checkpoint shovels, arrows them, shows the "Mutant Breach" tutorial
+    /// overlay, and adds the "Repel the mutants" objective.
+    /// </summary>
+    private void OnMutantBreachStarted()
+    {
+        StartCoroutine(MutantBreachWarningSequence());
+    }
+
+    private IEnumerator MutantBreachWarningSequence()
+    {
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachWarningBark1);
+        yield return new WaitForSeconds(_breachBarkGap);
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachWarningBark2);
+
+        // The shovels were non-interactable for the entirety of Day 1 up to this point —
+        // free them up now so the player can actually fight back.
+        _breachShovel1?.UnlockInteractableNetworked();
+        _breachShovel2?.UnlockInteractableNetworked();
+
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_breachShovel1 != null) TutorialMarkerManager.Instance.Mark(_breachShovel1.transform);
+            if (_breachShovel2 != null) TutorialMarkerManager.Instance.Mark(_breachShovel2.transform);
+        }
+
+        TutorialOverlay.Instance?.ShowMutantBreachTutorial();
+
+        _taskRepelMutants = TutorialObjectiveList.Instance?.AddObjective(_taskRepelMutantsText);
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="MutantBreachManager.OnBreachCountChangedAllClients"/>
+    /// every time a breach mutant is killed or begins fleeing (both count as resolved). Updates
+    /// the "Repel the mutants" objective row with a live X/Y count.
+    /// </summary>
+    private void OnMutantBreachCountChanged(int remaining, int total)
+    {
+        if (_taskRepelMutants == null) return;
+
+        int defeated = total - remaining;
+        _taskRepelMutants.SetText(remaining > 0
+            ? $"{_taskRepelMutantsText} ({defeated}/{total})"
+            : $"{_taskRepelMutantsText} — all clear!");
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="MutantBreachManager.OnBreachClearedAllClients"/> once
+    /// every breach mutant has been killed or fled. Clears the tutorial arrows/objective, plays
+    /// Vlad's "you survived" megaphone barks, then checks whether the breach damaged any fences
+    /// before finally letting the day proceed to clock-out.
+    /// </summary>
+    private void OnMutantBreachCleared()
+    {
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_breachShovel1 != null) TutorialMarkerManager.Instance.Unmark(_breachShovel1.transform);
+            if (_breachShovel2 != null) TutorialMarkerManager.Instance.Unmark(_breachShovel2.transform);
+        }
+
+        if (_taskRepelMutants != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteObjective(_taskRepelMutants);
+            _taskRepelMutants = null;
+        }
+
+        StartCoroutine(MutantBreachClearedBarkSequence());
+    }
+
+    private IEnumerator MutantBreachClearedBarkSequence()
+    {
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachClearedBark1);
+        yield return new WaitForSeconds(_breachClearedBarkGap);
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachClearedBark2);
+
+        BeginPostBreachFenceCheck();
+    }
+
+    // -------------------------------------------------------------------------
+    // Fix Perimeter Fences Tutorial (post-breach)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Breaks a batch of perimeter fences to represent the breach's damage (server-only), then
+    /// checks whether any fences actually came out damaged before deciding whether to run the
+    /// fence-repair tutorial or skip straight to clock-out.
+    /// </summary>
+    private void BeginPostBreachFenceCheck()
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            FenceRepairTask.Instance?.TriggerTask();
+
+        StartCoroutine(WaitForFenceCountThenProceed());
+    }
+
+    /// <summary>
+    /// Gives the server's TriggerTask() call a moment to run and its NetworkVariables to
+    /// replicate to every client before reading <see cref="FenceRepairTask.TotalCount"/>.
+    /// </summary>
+    private IEnumerator WaitForFenceCountThenProceed()
+    {
+        yield return new WaitForSeconds(0.5f);
+
+        if (FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0)
+        {
+            EnsureFixFencesObjective();
+            ShowHammerTutorial();
+        }
+        else
+        {
+            // No fences were damaged by this breach — nothing to repair, proceed immediately.
+            CompleteMutantBreachGateAndAdvance();
+        }
+    }
+
+    /// <summary>
+    /// Adds the "Fix Perimeter Fences" objective to the tutorial objective list and subscribes
+    /// to live progress until every broken fence is repaired. Safe to call multiple times —
+    /// no-ops if the objective is already tracked.
+    /// </summary>
+    private void EnsureFixFencesObjective()
+    {
+        if (_taskFixFences != null) return;
+
+        _taskFixFences = TutorialObjectiveList.Instance?.AddObjective(GetFixFencesTaskText());
+
+        FenceRepairTask.OnProgressChanged   += OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired += OnFixFencesTaskComplete;
+    }
+
+    private void OnFixFencesProgressChanged()
+    {
+        _taskFixFences?.SetText(GetFixFencesTaskText());
+    }
+
+    private void OnFixFencesTaskComplete()
+    {
+        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFixFences, preHideDelay: 1.5f);
+        _taskFixFences = null;
+
+        CompleteMutantBreachGateAndAdvance();
+    }
+
+    private string GetFixFencesTaskText() =>
+        FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
+            ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
+            : _taskFixFencesText;
+
+    /// <summary>
+    /// Unlocks the Hammer, force-highlights it, and points a world-space tutorial arrow at it —
+    /// both stay active until the player picks it up for the first time, at which point
+    /// <see cref="OnHammerPickedUpFirstTime"/> clears them and shows the fence + checkpoint
+    /// integrity tutorial overlays.
+    /// </summary>
+    private void ShowHammerTutorial()
+    {
+        if (_hammer == null)
+        {
+            CompleteMutantBreachGateAndAdvance();
+            return;
+        }
+
+        _hammer.SetInteractableNetworked(true);
+        _hammer.SetForceHighlight(true);
+        TutorialMarkerManager.Instance?.Mark(_hammer.transform);
+
+        _hammer.OnPickedUpEvent += OnHammerPickedUpFirstTime;
+    }
+
+    /// <summary>
+    /// Fires the first time the player picks up the Hammer after the breach. Clears the
+    /// highlight/arrow, then chains the "fix a fence with a hammer" tutorial overlay straight
+    /// into the "Checkpoint Integrity Score" tutorial overlay.
+    /// </summary>
+    private void OnHammerPickedUpFirstTime()
+    {
+        if (_hammer != null)
+        {
+            _hammer.OnPickedUpEvent -= OnHammerPickedUpFirstTime;
+            _hammer.SetForceHighlight(false);
+            TutorialMarkerManager.Instance?.Unmark(_hammer.transform);
+        }
+
+        TutorialOverlay.Instance?.ShowFixFenceTutorial(
+            () => TutorialOverlay.Instance?.ShowCheckpointIntegrityTutorial());
+    }
+
+    /// <summary>
+    /// Resolves the timecard-machine gate and proceeds to the normal end-of-shift clock-out
+    /// flow. Called once the breach has cleared and either no fences were damaged or every
+    /// damaged fence has been repaired.
+    /// </summary>
+    private void CompleteMutantBreachGateAndAdvance()
+    {
+        _breachGateTask?.Complete();
+        _breachGateTask = null;
+
+        ShowClockOutTask();
     }
 
     // -------------------------------------------------------------------------

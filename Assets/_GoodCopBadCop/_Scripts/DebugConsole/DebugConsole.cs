@@ -702,53 +702,10 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Skips to Day 2 with the opening Vlad sequence suppressed, bypasses the mutation tutorial,
-    /// reveals the Mutation Exam notebook, and jumps the suspect lineup counter so the very next
-    /// suspect summoned is the kill-tutorial target (forced past the ">10 anomalies = kill"
-    /// threshold) — dropping the player straight into the "file exam pages, then use the red
-    /// stamp" tutorial.
-    /// </summary>
-    public void SkipToKillTutorial()
-    {
-        if (CampaignManager.Instance == null)
-        {
-            Debug.LogWarning("[DebugConsole] SkipToKillTutorial: CampaignManager not available — start the game first.");
-            return;
-        }
-
-        SkipToDay(2);
-        StartCoroutine(SkipToKillTutorialAfterDelay());
-    }
-
-    private IEnumerator SkipToKillTutorialAfterDelay()
-    {
-        // Wait one frame for Day_02 to activate and subscribe its events.
-        yield return null;
-
-        if (Day_02.Instance == null)
-        {
-            Debug.LogWarning("[DebugConsole] SkipToKillTutorial: Day_02.Instance not found after SkipToDay(2).");
-            yield break;
-        }
-
-        _startShiftGate?.ForceIntroComplete();
-
-        // Suppress the opening Vlad sequence (tool locker unlock etc.) and arm the kill tutorial.
-        Day_02.Instance.DebugSkipOpening();
-        Day_02.Instance.DebugSkipToKillTutorial();
-
-        const float KillTutorialSuspectArrivalDelay = 2f;
-        ShiftManager.OverrideFirstArrivalInterval = new Vector2(KillTutorialSuspectArrivalDelay, KillTutorialSuspectArrivalDelay);
-        ShiftManager.Instance?.TryStartShift();
-
-        Debug.Log("[DebugConsole] Skipped to Day 2 kill tutorial — suspect will arrive in ~2 s.");
-    }
-
-    /// <summary>
     /// Skips to Day 2 with the opening Vlad sequence suppressed, arms Ocho's booth encounter
     /// (fake ID, antagonizing dialogue, verdict rejection, blackout) as the very next suspect,
-    /// and auto-summons him a couple of seconds after the shift starts — bypassing the mutation
-    /// and kill tutorials and the switch button entirely.
+    /// and auto-summons him a couple of seconds after the shift starts — bypassing the switch
+    /// button entirely.
     /// </summary>
     public void SkipToOchoBoothEncounter()
     {

@@ -7,7 +7,9 @@ using UnityEngine;
 ///
 /// At day start, spawns gore and body-part junk items across the yard's
 /// <see cref="TakeOutTrashTask"/> spawn zones (instead of standard trash), triggering the
-/// Take Out Trash task so players must bag up every piece of gore.
+/// Take Out Trash task so players must bag up every piece of gore. Each gore piece also drops
+/// a blood decal, which arms <see cref="CleanBloodTask"/> so players must mop up every
+/// splatter with the <see cref="Mop"/> as a separate task.
 ///
 /// Right after the last suspect for the day is processed (before clock-out):
 ///   1. The power cuts out via a fuse-required outage (<see cref="ElectricityController.PowerOffFuseRequired"/>),
@@ -133,6 +135,9 @@ public class Day_03 : DayBase
     {
         base.DayActivated();
 
+        // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
+        // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
+        CleanBloodTask.Instance?.TriggerTask();
         TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
 
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
@@ -403,6 +408,10 @@ public class Day_03 : DayBase
         TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
         Debug.Log("[Day_03] Power restored at the power station — RepairPowerThreat resolved.");
     }
+
+    // -------------------------------------------------------------------------
+    // Fix Perimeter Fences Tutorial
+    // -------------------------------------------------------------------------
 
     // -------------------------------------------------------------------------
     // Debug

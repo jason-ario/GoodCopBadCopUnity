@@ -24,7 +24,9 @@ using Random = UnityEngine.Random;
 ///     for days that dress the yard with gore instead of standard junk.
 ///   - Assign _bloodDecalPrefabs (flat ground-decal prefabs, also registered as Network
 ///     Prefabs) to have a blood splatter spawned under each gore item when useGorePrefabs
-///     is true. Optional — leave empty to disable.
+///     is true. Optional — leave empty to disable. Prefabs with a GraffitiInteractable
+///     component (e.g. "Random Blood Splatter Variant.prefab") are automatically registered
+///     with CleanBloodTask so they count toward the Day 3 "Clean Blood" mop task.
 ///   - Assign _spawnZones with centre Transforms and half-extents.
 ///   - Set _groundLayer to match your environment layer.
 ///   - Register this component in TaskRegistry via AlexeiController.
@@ -272,6 +274,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _isActive.Value = true;
 
+        // Explicitly re-register on every client rather than relying solely on
+        // _isActive's OnValueChanged — if the task was already active (e.g. left
+        // active across a day rollover), the NetworkVariable write above is a no-op
+        // and OnIsActiveChanged never fires, silently dropping the task from the HUD.
+        RegisterInTaskRegistryClientRpc();
+
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         Debug.Log($"[TakeOutTrashTask] ActivateForExistingItems — activated for {count} existing JunkItem(s) (no new items spawned).");
@@ -332,6 +340,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Flip the active flag — OnIsActiveChanged fires on all clients (and late joiners
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
         _isActive.Value = true;
+
+        // Explicitly re-register on every client rather than relying solely on
+        // _isActive's OnValueChanged — if the task was already active from a prior
+        // trigger this cycle (e.g. left active across a day rollover), the NetworkVariable
+        // write above is a no-op and OnIsActiveChanged never fires, silently dropping the
+        // task from the HUD even though new items (e.g. Day 3's gore) were just spawned.
+        RegisterInTaskRegistryClientRpc();
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
@@ -467,6 +482,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         OnDailyTaskCompleted?.Invoke();
     }
 
+    /// <summary>
+    /// Explicitly (re-)adds this task to <see cref="TaskRegistry"/> on every client. Called
+    /// right after every trigger, independent of <see cref="_isActive"/>'s OnValueChanged —
+    /// that callback only fires on an actual value transition, so re-triggering the task
+    /// while it was already active (e.g. gore spawned on Day 3 on top of an unfinished prior
+    /// day's trash) would otherwise leave the task silently missing from the HUD even though
+    /// new items were spawned into the world.
+    /// </summary>
+    [ClientRpc]
+    private void RegisterInTaskRegistryClientRpc()
+    {
+        TaskRegistry.Instance?.AddThreat(this);
+    }
+
     private void OnJunkItemCollected()
     {
         if (!IsServer) return;
@@ -512,6 +541,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Spawns a random blood decal from <see cref="_bloodDecalPrefabs"/> at <paramref name="position"/>,
     /// oriented so its forward axis faces down into the ground surface described by
     /// <paramref name="groundNormal"/>. No-op when no decal prefabs are assigned. Server-only.
+    ///
+    /// Registers the spawned decal with <see cref="CleanBloodTask"/> so it counts toward the
+    /// Day 3 "Clean Blood" task — decal prefabs with a <see cref="GraffitiInteractable"/> (e.g.
+    /// "Random Blood Splatter Variant.prefab") become mop-cleanable and count toward the total;
+    /// decals without one are left as purely cosmetic and are ignored by that task.
     /// </summary>
     private void SpawnBloodDecal(Vector3 position, Vector3 groundNormal)
     {
@@ -534,6 +568,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedDecals.Add(netObj);
+
+        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
     }
 
     private void PruneCollectedItems()

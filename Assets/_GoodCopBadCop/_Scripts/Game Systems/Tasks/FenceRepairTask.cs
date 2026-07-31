@@ -9,7 +9,7 @@ using Random = UnityEngine.Random;
 ///
 /// Unlike <see cref="FenceThreat"/> (a continuous night-phase systemic threat active from
 /// Day <c>_firstActiveDay</c> onward), this task is manually triggered — e.g. once at the start
-/// of Day 2 as a scripted tutorial beat (see <see cref="Day_02"/>) — and breaks a batch of
+/// of Day 3 as a scripted tutorial beat (see <see cref="Day_03"/>) — and breaks a batch of
 /// fences immediately rather than damaging them one at a time on a timer.
 ///
 /// When triggered on the server:
@@ -20,21 +20,27 @@ using Random = UnityEngine.Random;
 ///
 /// Players repair fences by hitting them with HammerPickable. When all broken fences are
 /// repaired, the task is marked complete, the coupon reward is granted, and
-/// <see cref="OnAllFencesRepaired"/> fires so subscribers (e.g. Day_02's tutorial objective
+/// <see cref="OnAllFencesRepaired"/> fires so subscribers (e.g. Day_03's tutorial objective
 /// list entry) can react.
 ///
 /// Scene setup:
 ///   - Add a NetworkObject component to this GameObject.
 ///   - Assign all PerimiterFence instances present in the scene to _allFences.
+///
+/// Also implements <see cref="ISystemicThreat"/> so <see cref="CheckpointIntegrityService"/>
+/// can factor broken/unrepaired fence segments into the Checkpoint Integrity Score, alongside
+/// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class FenceRepairTask : NetworkBehaviour
+public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 {
     public static FenceRepairTask Instance { get; private set; }
 
     [Header("Task Properties")]
     [SerializeField] private string _taskName = "Fix Perimeter Fences";
     [SerializeField] private int _couponReward = 15;
+    [Tooltip("Relative weight of this threat when computing the Checkpoint Integrity Score.")]
+    [SerializeField] private float _scoreWeight = 1f;
 
     [Header("Fence Configuration")]
     [Tooltip("Every PerimiterFence in the scene. A random subset is broken each time TriggerTask() is called.")]
@@ -76,6 +82,31 @@ public class FenceRepairTask : NetworkBehaviour
 
     /// <summary>Fired on every client once every broken fence has been repaired.</summary>
     public static event Action OnAllFencesRepaired;
+
+    // ── ISystemicThreat ──────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public string ThreatName  => _taskName;
+
+    /// <inheritdoc/>
+    public float  ScoreWeight => _scoreWeight;
+
+    /// <summary>
+    /// Fraction of this round's broken fences still unrepaired (0 = all repaired/no fences
+    /// currently broken, 1 = none repaired yet). Mirrors the pattern used by
+    /// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>.
+    /// </summary>
+    public float ThreatLevel =>
+        TotalCount > 0 ? 1f - Mathf.Clamp01((float)RepairedCount / TotalCount) : 0f;
+
+    /// <inheritdoc/>
+    public string ThreatDescription => TaskDescription;
+
+    /// <summary>No-op — this task is manually triggered (e.g. a scripted day beat), not by the night phase.</summary>
+    public void BeginNightPhase() { }
+
+    /// <summary>No-op.</summary>
+    public void EndNightPhase() { }
 
     // ── Networked state ──────────────────────────────────────────────────────
 

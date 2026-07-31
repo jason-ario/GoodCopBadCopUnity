@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// Server-authoritative orchestrator for "mutant breach" events — a scripted alarm followed by
@@ -24,6 +26,29 @@ using UnityEngine;
 public class MutantBreachManager : NetworkBehaviour
 {
     public static MutantBreachManager Instance;
+
+    /// <summary>
+    /// Fired on ALL clients (including host) the instant a breach's alarm/notification effects
+    /// start — before the alarm lead time elapses and mutants spawn. Day scripts (e.g. Day_01's
+    /// first-breach tutorial) subscribe to this to layer their own reactions (megaphone barks,
+    /// tutorial overlays, unlocking weapons) on top of the generic breach flow without this
+    /// manager needing to know about any day-specific tutorial content.
+    /// </summary>
+    public static event Action OnBreachStartedAllClients;
+
+    /// <summary>
+    /// Fired on ALL clients whenever the number of still-active breach mutants changes (including
+    /// the initial report right after spawning finishes, and the final 0-remaining report).
+    /// A mutant counts as resolved the instant it dies OR begins fleeing — see
+    /// <see cref="AllBreachMutantsDefeated"/>/<see cref="MutantEnemy.IsDead"/>.
+    /// </summary>
+    public static event Action<int, int> OnBreachCountChangedAllClients;
+
+    /// <summary>
+    /// Fired on ALL clients once every breach mutant has been resolved and the alarm/music has
+    /// been stopped.
+    /// </summary>
+    public static event Action OnBreachClearedAllClients;
 
     [Header("Scene References")]
     [Tooltip("Fixed world locations mutants can spawn at for a breach. At least one is required.")]
@@ -167,6 +192,25 @@ public class MutantBreachManager : NetworkBehaviour
         }
     }
 
+    // ── Manual Trigger ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Immediately runs a breach using <paramref name="data"/>, bypassing day gating, the
+    /// <see cref="DayBase.HasMutantBreach"/> flag, the once-per-day limit, and the random
+    /// scheduling delay entirely. Use for deterministic scripted breaches driven directly by a
+    /// day script (e.g. Day_01's first-breach tutorial, triggered right after the trash/graffiti
+    /// tasks finish) rather than the generic day-gated auto-scheduler.
+    /// Server-only; no-op if a breach is already active or <paramref name="data"/> is null.
+    /// </summary>
+    public void TriggerBreach(MutantBreachData data)
+    {
+        if (!IsServer || data == null || _isBreachActive)
+            return;
+
+        CancelSchedule();
+        _breachCoroutine = StartCoroutine(RunBreach(data));
+    }
+
     // ── Debug ────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -198,8 +242,7 @@ public class MutantBreachManager : NetworkBehaviour
             return;
         }
 
-        CancelSchedule();
-        _breachCoroutine = StartCoroutine(RunBreach(data));
+        TriggerBreach(data);
         Debug.Log($"[MutantBreachManager] DEBUG — force-triggered breach '{data.breachName}'.");
     }
 
@@ -229,7 +272,23 @@ public class MutantBreachManager : NetworkBehaviour
 
         yield return StartCoroutine(SpawnBreachMutants(data));
 
-        yield return new WaitUntil(AllBreachMutantsDefeated);
+        int total = data.mutantCount;
+        int lastRemaining = _activeBreachMutants.Count;
+        ReportBreachCountClientRpc(lastRemaining, total);
+
+        while (!AllBreachMutantsDefeated())
+        {
+            int remaining = _activeBreachMutants.Count;
+            if (remaining != lastRemaining)
+            {
+                lastRemaining = remaining;
+                ReportBreachCountClientRpc(remaining, total);
+            }
+            yield return null;
+        }
+
+        if (lastRemaining != 0)
+            ReportBreachCountClientRpc(0, total);
 
         Debug.Log("[MutantBreachManager] Breach cleared — ending alarm.");
         EndBreachEffectsClientRpc();
@@ -271,6 +330,16 @@ public class MutantBreachManager : NetworkBehaviour
             if (i < data.mutantCount - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);
         }
+    }
+
+    /// <summary>
+    /// Broadcasts the current remaining/total breach mutant count to all clients so day
+    /// scripts can drive a HUD checklist (e.g. Day_01's "Repel the mutants" tutorial objective).
+    /// </summary>
+    [ClientRpc]
+    private void ReportBreachCountClientRpc(int remaining, int total)
+    {
+        OnBreachCountChangedAllClients?.Invoke(remaining, total);
     }
 
     /// <summary>
@@ -317,6 +386,8 @@ public class MutantBreachManager : NetworkBehaviour
     [ClientRpc]
     private void TriggerBreachEffectsClientRpc(string message, float holdDuration)
     {
+        OnBreachStartedAllClients?.Invoke();
+
         if (alarmLights != null)
             alarmLights.StartAlarm();
 
@@ -338,6 +409,8 @@ public class MutantBreachManager : NetworkBehaviour
     [ClientRpc]
     private void EndBreachEffectsClientRpc()
     {
+        OnBreachClearedAllClients?.Invoke();
+
         if (alarmLights != null)
             alarmLights.StopAlarm();
 

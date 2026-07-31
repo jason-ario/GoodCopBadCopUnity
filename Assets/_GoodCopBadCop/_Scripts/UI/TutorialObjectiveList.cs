@@ -119,6 +119,14 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <summary>
     /// Hides the objective list with its slide-out animation, then destroys all items.
     /// Safe to call when the list is not showing.
+    ///
+    /// WARNING: this unconditionally tears down every row in the shared list, including ones
+    /// owned by other, still-in-progress task sequences (multiple sequences can be tracked in
+    /// this list at once — e.g. Day 2's "Sort the mail" and "Fix Perimeter Fences" objectives
+    /// run concurrently). Only call this when the caller is certain it owns every row currently
+    /// showing (e.g. a single self-contained linear sequence, or a hard reset on day change).
+    /// When a task may run alongside others, use <see cref="CompleteAndRemoveObjective"/> instead
+    /// so finishing early doesn't hide a sibling task's still-active row.
     /// </summary>
     /// <param name="preHideDelay">Seconds to pause before starting the hide animation, so completed tasks remain visible.</param>
     /// <param name="onComplete">Optional callback fired after items are destroyed.</param>
@@ -132,7 +140,49 @@ public class TutorialObjectiveList : MonoBehaviour
         _clearCoroutine = StartCoroutine(HideAndClearRoutine(preHideDelay, onComplete));
     }
 
+    /// <summary>
+    /// Marks <paramref name="item"/> complete and removes only that row, leaving every other
+    /// concurrently-tracked objective (e.g. a sibling task's still-in-progress row) untouched.
+    /// The panel only plays its slide-out-and-hide animation once this was the LAST remaining
+    /// row — safe to use even while other tasks are still being tracked in the same shared list.
+    /// Safe to call with a null <paramref name="item"/>.
+    /// </summary>
+    /// <param name="item">The objective row to complete and remove.</param>
+    /// <param name="preHideDelay">Seconds to pause after marking complete before the row (and, if last, the whole panel) actually hides.</param>
+    /// <param name="onComplete">Optional callback fired once the row (and panel, if applicable) has been removed.</param>
+    public void CompleteAndRemoveObjective(TutorialObjectiveItem item, float preHideDelay = 0f, Action onComplete = null)
+    {
+        if (item == null) return;
+
+        item.MarkComplete();
+        StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
+    }
+
     // ── Private ─────────────────────────────────────────────────────────
+
+    private IEnumerator RemoveObjectiveRoutine(TutorialObjectiveItem item, float preHideDelay, Action onComplete)
+    {
+        if (preHideDelay > 0f)
+            yield return new WaitForSeconds(preHideDelay);
+
+        _items.Remove(item);
+        if (item != null)
+            Destroy(item.gameObject);
+
+        // Only slide the panel out and deactivate it once every tracked row is gone —
+        // other concurrently-tracked tasks may still have rows showing.
+        if (_items.Count == 0 && _isShowing)
+        {
+            _isShowing = false;
+
+            if (_clearCoroutine != null) StopCoroutine(_clearCoroutine);
+            _clearCoroutine = StartCoroutine(HideAndClearRoutine(0f, onComplete));
+        }
+        else
+        {
+            onComplete?.Invoke();
+        }
+    }
 
     private void Show()
     {

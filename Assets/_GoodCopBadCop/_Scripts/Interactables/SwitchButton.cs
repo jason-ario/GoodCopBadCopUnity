@@ -70,7 +70,15 @@ public class SwitchButton : Interactable
     {
         powerOn = true;
 
-        if (buttonReady)
+        // Reconcile with the authoritative game state on top of the locally cached
+        // buttonReady flag. A forced/scripted outage can hit mid-frame while
+        // HandleNextSuspectReady's deferred (one-frame) coroutine is still pending —
+        // e.g. if the outage deactivates the booth objects and aborts that coroutine —
+        // which would otherwise leave buttonReady stuck at false forever even though a
+        // suspect is genuinely waiting to be summoned. ShiftManager.NextSuspectReadyForBell
+        // is only meaningful server-side (it is not networked), but that's sufficient:
+        // the server's own SetReady(true) call always rebroadcasts to every client below.
+        if (buttonReady || (IsServer && ShiftManager.NextSuspectReadyForBell))
         {
             SetReady(true);
         }

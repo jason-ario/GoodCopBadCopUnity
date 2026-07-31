@@ -31,6 +31,9 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject sortingMailTutorialScreen;
     [SerializeField] private GameObject killCriteriaTutorialScreen;
     [SerializeField] private GameObject fixPowerTutorialScreen;
+    [SerializeField] private GameObject fixFenceTutorialScreen;
+    [SerializeField] private GameObject mutantBreachTutorialScreen;
+    [SerializeField] private GameObject checkpointIntegrityTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -113,6 +116,27 @@ public class TutorialOverlay : MonoBehaviour
     /// switch button will let them summon the next suspect (e.g. Day 2's Ocho encounter).
     /// </summary>
     public void ShowElectricalPanelTutorial(Action onComplete = null) => ShowScreen(fixPowerTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "fix a fence with a hammer" tutorial overlay. Triggered the first time the
+    /// player picks up the Hammer once Day 3's "Fix Perimeter Fences" task is active.
+    /// </summary>
+    public void ShowFixFenceTutorial(Action onComplete = null) => ShowScreen(fixFenceTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "Mutant Breach" tutorial overlay. Triggered by Day_01 the instant the first
+    /// mutant breach begins — explains that the checkpoint must be defended and any mutants
+    /// that appear must be repelled with combat (killed or made to flee).
+    /// </summary>
+    public void ShowMutantBreachTutorial(Action onComplete = null) => ShowScreen(mutantBreachTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "Checkpoint Integrity Score" tutorial overlay — explains that graffiti, trash,
+    /// and damaged fences all lower the score, and that a lower score reduces coupon payouts.
+    /// Triggered by Day_01 immediately after the "fix a fence with a hammer" tutorial overlay
+    /// closes, the first time the post-breach fence-repair tutorial fires.
+    /// </summary>
+    public void ShowCheckpointIntegrityTutorial(Action onComplete = null) => ShowScreen(checkpointIntegrityTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

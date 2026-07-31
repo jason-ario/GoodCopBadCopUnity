@@ -65,7 +65,6 @@ public class PerimiterFence : NetworkBehaviour
     // ── Local state ────────────────────────────────────────────────────────────
 
     private NavMeshObstacle _navMeshObstacle;
-    private Collider[] _colliders;
 
     /// <summary>Prevents audio from playing during initial spawn synchronisation.</summary>
     private bool _initialized;
@@ -107,7 +106,6 @@ public class PerimiterFence : NetworkBehaviour
     private void Awake()
     {
         _navMeshObstacle = GetComponent<NavMeshObstacle>();
-        _colliders = GetComponentsInChildren<Collider>(true);
     }
 
     public override void OnNetworkSpawn()
@@ -151,27 +149,16 @@ public class PerimiterFence : NetworkBehaviour
     }
 
     /// <summary>
-    /// Derives the visual damage state from the current health value, then applies mesh visuals,
-    /// NavMeshObstacle (if present), and collider enabled state accordingly.
+    /// Derives the visual damage state from the current health value, then applies mesh visuals
+    /// accordingly. Physical (non-trigger) colliders are intentionally left untouched — they stay
+    /// enabled at every damage state so the fence keeps physically blocking players even when
+    /// fully broken, and so the hammer's hit collider (used to detect repair hits) keeps
+    /// registering hits at the most-damaged state.
     /// </summary>
     private void ApplyHealthState(float health)
     {
-        int state    = GetDamageState(health);
-        bool passable = IsPassableByMutant;
-
+        int state = GetDamageState(health);
         ApplyDamageVisuals(state);
-
-        // Disable non-trigger colliders when broken so mutants can walk through.
-        // We no longer manage NavMeshObstacles here; the fence is always "walkable" 
-        // on the NavMesh and is physically blocked only by these colliders.
-        if (_colliders != null)
-        {
-            foreach (Collider col in _colliders)
-            {
-                if (!col.isTrigger)
-                    col.enabled = !passable;
-            }
-        }
     }
 
     /// <summary>

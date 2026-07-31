@@ -208,18 +208,9 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         // Increase distance significantly to detect "Too Far" objects
-        if (Physics.Raycast(ray, out RaycastHit hit, 10f, interactLayer))
+        if (TryGetBestInteractHit(ray, out RaycastHit hit))
         {
-            Interactable interactable = hit.collider.GetComponent<Interactable>(); 
-            InteractableCollider interactableCollider = hit.collider.GetComponent<InteractableCollider>();
-            
-            // Only resolve from InteractableCollider when the MonoBehaviour is enabled —
-            // SetInteractable(false) disables it as a belt-and-suspenders guard in case
-            // the physics Collider is re-enabled by a late network update.
-            if (interactableCollider != null && interactableCollider.enabled)
-            {
-                interactable = interactableCollider.Interactable;
-            }
+            Interactable interactable = ResolveInteractable(hit.collider);
 
             // The local player's held object keeps its colliders active during the server
             // round-trip after pickup. Treat it as non-interactable immediately so the
@@ -288,6 +279,12 @@ public class PlayerInteractionController : NetworkBehaviour
             
             // Handle non-interactable placement surfaces (like PlacementBoard) and free placement
             bool placerInRange = hit.distance <= placementDistance;
+
+            // Boards opted into ShowGhostWhileAiming (e.g. a mail cubby's PlacementSlot) show the
+            // ghost — and put the reticle into its interact/hover state — as soon as the player
+            // aims at them while holding an item, without needing to hold RMB first.
+            bool aimGhostRequested = placementBoard != null && placementBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject;
+
             if (placerInRange)
             {
                 if (LmbDown && RmbHeld)
@@ -295,7 +292,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     _placerBlocked = true;
                 }
 
-                if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace)
+                if ((aimGhostRequested || (RmbHeld && !LmbHeld && !_placerBlocked)) && pickupController.CanPickUpAndPlace)
                 {
                     CheckActivatePlacer(placementBoard, hit, true);
                 }
@@ -306,7 +303,10 @@ public class PlayerInteractionController : NetworkBehaviour
                 
                 if (_playerPickupController.IsHoldingObject)
                 {
-                    reticle.SetInteractState(false);
+                    if (aimGhostRequested)
+                        reticle.SetInteractState(true, placementBoard.AimHoverText);
+                    else
+                        reticle.SetInteractState(false);
                     reticle.SetTooFarState(false);
                     return;
                 }
@@ -314,7 +314,7 @@ public class PlayerInteractionController : NetworkBehaviour
             else
             {
                 // Out of placement range — keep the placer visible but tint it red so the player knows they can't drop here
-                if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
+                if ((aimGhostRequested || (RmbHeld && !LmbHeld && !_placerBlocked)) && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
                 {
                     CheckActivatePlacer(placementBoard, hit, false);
                 }
@@ -339,13 +339,14 @@ public class PlayerInteractionController : NetworkBehaviour
             // The surface itself usually isn't a PlacementBoard, but a tutorial hand-off
             // board may sit right on top of it, so snap to one nearby if present.
             PlacementBoard nearbyBoard = FindNearbyPlacementBoard(surfaceHit.point);
+            bool nearbyAimGhostRequested = nearbyBoard != null && nearbyBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject;
 
             if (LmbDown && RmbHeld)
             {
                 _placerBlocked = true;
             }
 
-            if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace)
+            if ((nearbyAimGhostRequested || (RmbHeld && !LmbHeld && !_placerBlocked)) && pickupController.CanPickUpAndPlace)
             {
                 CheckActivatePlacer(nearbyBoard, surfaceHit, true);
             }
@@ -356,7 +357,10 @@ public class PlayerInteractionController : NetworkBehaviour
 
             if (_playerPickupController.IsHoldingObject)
             {
-                reticle.SetInteractState(false);
+                if (nearbyAimGhostRequested)
+                    reticle.SetInteractState(true, nearbyBoard.AimHoverText);
+                else
+                    reticle.SetInteractState(false);
                 reticle.SetTooFarState(false);
                 return;
             }
@@ -377,6 +381,76 @@ public class PlayerInteractionController : NetworkBehaviour
         // Reset both states if no valid target was found or returned early
         reticle.SetInteractState(false);
         reticle.SetTooFarState(false);
+    }
+
+    /// <summary>
+    /// Resolves the <see cref="Interactable"/> associated with a hit collider, following
+    /// <see cref="InteractableCollider"/> indirection when present and enabled (belt-and-suspenders
+    /// guard for late network re-enables of the underlying physics Collider).
+    /// </summary>
+    private Interactable ResolveInteractable(Collider collider)
+    {
+        Interactable interactable = collider.GetComponent<Interactable>();
+        InteractableCollider interactableCollider = collider.GetComponent<InteractableCollider>();
+
+        if (interactableCollider != null && interactableCollider.enabled)
+        {
+            interactable = interactableCollider.Interactable;
+        }
+
+        return interactable;
+    }
+
+    /// <summary>
+    /// Performs the interact-layer raycast against ALL overlapping colliders instead of just the
+    /// single closest one. When two interactables' colliders occupy nearly the same distance along
+    /// the ray (e.g. a pickup sitting directly in front of another interactable), Unity's raycast
+    /// ordering for near-equal distances is unstable and can flip between them every frame, making
+    /// the front item impossible to reliably highlight/grab. This resolves that by:
+    /// 1) Preferring whichever interactable was highlighted last frame if it's still among the
+    ///    near-closest candidates (sticky selection — kills the frame-to-frame flicker).
+    /// 2) Otherwise preferring the closest candidate that actually resolves to an enabled
+    ///    Interactable over a closer but non-interactable collider hit.
+    /// </summary>
+    private bool TryGetBestInteractHit(Ray ray, out RaycastHit bestHit)
+    {
+        RaycastHit[] hits = Physics.RaycastAll(ray, 10f, interactLayer);
+
+        if (hits.Length == 0)
+        {
+            bestHit = default;
+            return false;
+        }
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        const float stickyEpsilon = 0.05f;
+        float closestDistance = hits[0].distance;
+
+        if (lastInteractable != null)
+        {
+            for (int i = 0; i < hits.Length && hits[i].distance <= closestDistance + stickyEpsilon; i++)
+            {
+                if (ResolveInteractable(hits[i].collider) == lastInteractable)
+                {
+                    bestHit = hits[i];
+                    return true;
+                }
+            }
+        }
+
+        for (int i = 0; i < hits.Length && hits[i].distance <= closestDistance + stickyEpsilon; i++)
+        {
+            Interactable candidate = ResolveInteractable(hits[i].collider);
+            if (candidate != null && candidate.enabled)
+            {
+                bestHit = hits[i];
+                return true;
+            }
+        }
+
+        bestHit = hits[0];
+        return true;
     }
 
     /// <summary>

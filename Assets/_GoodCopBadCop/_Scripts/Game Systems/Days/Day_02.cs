@@ -74,32 +74,24 @@ public class Day_02 : DayBase, IDailyTask
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 2.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
+    [Tooltip("The Hammer used to fix perimeter fences — not introduced until Day 3, so it must " +
+             "stay non-interactable through Day 2.")]
+    [SerializeField] private PickableObject _hammer;
+
     // Whether the mutation notebook tutorial beat has already fired this shift.
     private bool _mutationTutorialFired;
 
     // Persistent flags for early-action guards (mirrors Day_01 pattern).
     private bool _notebookPageFiled;
 
-    [Header("Day 2 — Kill Tutorial (Second Suspect)")]
-    [Tooltip("The green (pass) ink stamp station — locked during the kill tutorial's stamp step so the player can only use the red stamp.")]
-    [SerializeField] private InkStamp _greenStampSlot;
-
-    [Tooltip("The yellow (quarantine) ink stamp station — locked during the kill tutorial's stamp step.")]
-    [SerializeField] private InkStamp _yellowStampSlot;
-
-    [Tooltip("The red (kill) ink stamp station.")]
+    [Header("Day 2 — Kill Stamp")]
+    [Tooltip("The red (kill) ink stamp station — unlocked for interaction starting Day 2, same as the green and yellow stamps. Killing is no longer tutorialized; the player can use it whenever they judge a suspect warrants it.")]
     [SerializeField] private InkStamp _redStampSlot;
 
-    [Tooltip("Number of documentation + physical (mutation) anomalies to force-activate on the second Day 2 suspect (index 1), so they always clear the '>10 active anomalies = kill' threshold.")]
-    [SerializeField] private int _killTutorialAnomalyCount = 10;
-
-    [Tooltip("World-space point above the red stamp slot — marker shown during the 'grab the red stamp' task.")]
-    [SerializeField] private Transform _markerRedStamp;
-
-    [Header("Day 2 — Ocho Booth Encounter (Third Suspect)")]
+    [Header("Day 2 — Ocho Booth Encounter")]
     [Tooltip("Ocho's booth-encounter SuspectCharacter prefab (the clown-faced 'Nunya Business' " +
              "suspect with OchoBoothEncounter attached). Spawned as the next suspect right after " +
-             "the kill tutorial folder is handed off — see OnKillFolderHandedOff.")]
+             "the player's first-ever kill — see CampaignManager.OnFirstKillEver_ArmOcho.")]
     [SerializeField] private SuspectCharacter _ochoBoothEncounterPrefab;
 
     [Tooltip("Scene point behind the player's usual position in the booth. Injected into the " +
@@ -114,25 +106,6 @@ public class Day_02 : DayBase, IDailyTask
              "Ocho's power outage tutorial is showing, cleared once power is restored. Injected into the " +
              "spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
     [SerializeField] private Interactable _ochoElectricalPanelInteractable;
-
-    [Tooltip("Task text shown while the player needs to file the Documentation and Mutation exam pages into the folder.")]
-    [SerializeField] private string _taskAddExamPagesText = "Add the Documentation and Mutation exam pages to the folder";
-
-    [Tooltip("Task text shown while the player needs to grab the red ink stamp.")]
-    [SerializeField] private string _taskGrabRedStampText = "Grab the red ink stamp";
-
-    [Tooltip("Task text shown while the player needs to place the stamped folder at the window.")]
-    [SerializeField] private string _taskKillHandOffText = "Place the folder at the window";
-
-    // Guards / runtime state for the kill tutorial (second suspect, index 1).
-    private bool _killTutorialFired;
-    private SuspectCharacter _killTargetSuspect;
-    private PickableObject _killDoc1;
-    private PickableObject _killDoc2;
-    private int _killExamPagesFiledCount;
-    private TutorialObjectiveItem _taskAddExamPages;
-    private TutorialObjectiveItem _taskGrabRedStamp;
-    private TutorialObjectiveItem _taskKillHandOff;
 
     // -------------------------------------------------------------------------
     // Day 2 Opening Sequence
@@ -208,24 +181,6 @@ public class Day_02 : DayBase, IDailyTask
 
     // Set by DebugSkipOpening to bypass Day2OpeningSequence entirely.
     private bool _debugSkipOpening;
-
-    [Header("Day 2 — Mail Sorting Tutorial")]
-    [Tooltip("Base objective text shown in the tutorial list. The sorted/total count is appended automatically, " +
-             "e.g. 'Sort the mail 0/18'.")]
-    [SerializeField] private string _taskSortMailText = "Sort the mail";
-
-    // Active tutorial objective item for the mail sorting task — kept as a field so
-    // OnSortMailProgressChanged can update its text from outside the coroutine.
-    private TutorialObjectiveItem _taskSortMail;
-
-    [Header("Day 2 — Fix Perimeter Fences Tutorial")]
-    [Tooltip("Base objective text shown in the tutorial list. The repaired/total count is appended automatically, " +
-             "e.g. 'Fix Perimeter Fences 1/3'.")]
-    [SerializeField] private string _taskFixFencesText = "Fix Perimeter Fences";
-
-    // Active tutorial objective item for the fence repair task — kept as a field so
-    // OnFixFencesProgressChanged can update its text from outside the coroutine.
-    private TutorialObjectiveItem _taskFixFences;
 
     // -------------------------------------------------------------------------
     // Day 2 Post-Shift Vlad Sequence (Out Back)
@@ -360,15 +315,6 @@ public class Day_02 : DayBase, IDailyTask
         if (NetworkManager.Singleton.IsServer)
             _fireBarrel?.Extinguish();
 
-        // Break a random batch of perimeter fences the instant Day 2 activates. DayActivated()
-        // is called directly by CampaignManager when the day changes, so — unlike
-        // ShiftManager.OnDayStart (which is tied to shift begin/end cycles and can be skipped
-        // entirely by debug/day-jump paths) — it's guaranteed to fire exactly once per day.
-        // Surfacing the "Fix Perimeter Fences" objective on the tutorial overlay is a separate
-        // concern handled later, after Vlad's tool locker dialogue (see StartMailSortingSequence).
-        if (NetworkManager.Singleton.IsServer)
-            FenceRepairTask.Instance?.TriggerTask();
-
         // Unlock the mutation exam refill in the tool locker shop for all clients.
         if (NetworkManager.Singleton.IsServer && MegaphoneDialogueManager.Instance != null)
             MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced("Mutation Exams (5)");
@@ -381,15 +327,19 @@ public class Day_02 : DayBase, IDailyTask
         _biologicalNotebook?.SetVisible(false);
         _biologicalNotebook?.SetInteractableNetworked(false);
 
+        // The hammer isn't introduced until Day 3's "Fix Perimeter Fences" tutorial.
+        _hammer?.SetInteractableNetworked(false);
+
         _mutationTutorialFired = false;
 
         // Listen for each suspect's paperwork so we can detect the first with a mutation anomaly.
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
-        // Kill tutorial (second suspect, index 1) — force >10 documentation+physical anomalies.
-        _killTutorialFired = false;
-        _killExamPagesFiledCount = 0;
-        SuspectController.OnSuspectArrived += OnKillTutorialSuspectArrived;
+        // Killing is no longer tutorialized — unlock the red stamp the moment Day 2 begins,
+        // same as green/yellow (green/yellow are already unlocked by Day 1's own tutorial
+        // completion steps). Suspects are generated normally; the player kills whenever they
+        // judge a suspect warrants it.
+        _redStampSlot?.SetSlotInteractable(true);
 
         // Ensure the first booth suspect has at least one mutation anomaly for the tutorial.
         if (NetworkManager.Singleton.IsServer)
@@ -464,28 +414,9 @@ public class Day_02 : DayBase, IDailyTask
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
 
-        // Kill tutorial cleanup — unsubscribe everything regardless of which step was active.
-        SuspectController.OnSuspectArrived   -= OnKillTutorialSuspectArrived;
-        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
-        UnsubscribeKillTutorialDocumentPickupEvents();
-        ExamNotebook.OnAnyNotebookPageFiled  -= OnKillExamPageFiledLocal;
-        FolderController.OnAnyFolderStamped  -= OnKillFolderStamped;
-        FolderController.OnFolderHandedOff   -= OnKillFolderHandedOff;
-        if (_markerRedStamp != null) TutorialMarkerManager.Instance?.Unmark(_markerRedStamp);
-        _taskAddExamPages   = null;
-        _taskGrabRedStamp   = null;
-        _taskKillHandOff    = null;
-        _killTargetSuspect  = null;
-
-        // Clean up mail sorting tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
-        SortMailTask.OnProgressChanged   -= OnSortMailProgressChanged;
-        SortMailTask.OnAllPackagesSorted -= OnSortMailTaskComplete;
-        _taskSortMail = null;
-
-        // Clean up fence repair tutorial subscriptions — StopAllCoroutines won't unsubscribe events.
-        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
-        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
-        _taskFixFences = null;
+        // Mail-sorting objective tracking lives entirely on SortMailTask itself (see
+        // SortMailTask.NotifyDeliveryAlertClientRpc/NotifyAllPackagesSortedClientRpc) — nothing
+        // to unsubscribe or clear here.
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -529,13 +460,6 @@ public class Day_02 : DayBase, IDailyTask
         if (Instance == this) Instance = null;
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
-
-        SuspectController.OnSuspectArrived   -= OnKillTutorialSuspectArrived;
-        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
-        UnsubscribeKillTutorialDocumentPickupEvents();
-        ExamNotebook.OnAnyNotebookPageFiled  -= OnKillExamPageFiledLocal;
-        FolderController.OnAnyFolderStamped  -= OnKillFolderStamped;
-        FolderController.OnFolderHandedOff   -= OnKillFolderHandedOff;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -583,10 +507,9 @@ public class Day_02 : DayBase, IDailyTask
         else
             SortMailTask.Instance?.TriggerDeferredDelivery();
 
-        // The tutorial overlay is being skipped entirely, so add the objectives directly —
-        // OnMailSortingTutorialClosed will never fire on this path.
-        EnsureSortMailObjective();
-        EnsureFixFencesObjective();
+        // The tutorial overlay is being skipped entirely. The "Sort the mail" objective is
+        // added automatically by SortMailTask itself as soon as the delivery triggers (see
+        // TriggerDeferredDelivery above / SortMailTask.NotifyDeliveryAlertClientRpc).
 
         Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked.");
     }
@@ -727,10 +650,8 @@ public class Day_02 : DayBase, IDailyTask
 
         // Now that Vlad has unlocked the tool locker, trigger the Day 2 mail delivery (deferred
         // from the automatic day-change trigger) and show the sorting-mail tutorial overlay on
-        // all clients. See StartMailSortingSequence. Also surface the "Fix Perimeter Fences"
-        // objective (broken at Day 2 start — see OnDay2Started) on the tutorial objective list.
+        // all clients. See StartMailSortingSequence.
         StartMailSortingSequence();
-        Day02NetworkSync.Instance?.ShowFixFencesObjective();
 
         // ── Phase 5: Vlad returns to the yard and settles in ───────────────────
         yield return new WaitForSeconds(_vladExitDelay);
@@ -890,113 +811,15 @@ public class Day_02 : DayBase, IDailyTask
 
     /// <summary>
     /// Runs on every client via <see cref="Day02NetworkSync.ShowMailSortingTutorialClientRpc"/>.
-    /// Shows the sorting-mail tutorial overlay; once the player closes it, shows the tutorial
-    /// objective list with the "Sort the mail" task and tracks live progress until every package
-    /// has been correctly sorted.
+    /// Shows the sorting-mail tutorial overlay. The "Sort the mail" tutorial objective row itself
+    /// (and its live progress tracking) is owned entirely by <see cref="SortMailTask"/> — it
+    /// already popped up when the delivery was triggered (see
+    /// <see cref="SortMailTask.NotifyDeliveryAlertClientRpc"/>), independent of this overlay.
     /// </summary>
     public void ShowMailSortingTutorialLocal()
     {
-        TutorialOverlay.Instance?.ShowSortingMailTutorial(OnMailSortingTutorialClosed);
+        TutorialOverlay.Instance?.ShowSortingMailTutorial(null);
     }
-
-    /// <summary>
-    /// Called once the player closes the sorting-mail tutorial overlay. Adds the "Sort the mail"
-    /// objective to the tutorial objective list.
-    /// </summary>
-    private void OnMailSortingTutorialClosed()
-    {
-        EnsureSortMailObjective();
-    }
-
-    /// <summary>
-    /// Adds the "Sort the mail" objective to the tutorial objective list (which slides the list
-    /// in automatically) and subscribes to live progress until every package is sorted.
-    /// Safe to call multiple times — no-ops if the objective is already tracked, so both the
-    /// normal tutorial-overlay flow and any debug path that triggers the mail delivery directly
-    /// (e.g. <see cref="DebugSkipOpening"/>, the F12 "Trigger Mail Delivery Task" cheat) always
-    /// end up showing the objective.
-    /// </summary>
-    public void EnsureSortMailObjective()
-    {
-        if (_taskSortMail != null) return;
-
-        _taskSortMail = TutorialObjectiveList.Instance?.AddObjective(GetSortMailTaskText());
-
-        SortMailTask.OnProgressChanged   += OnSortMailProgressChanged;
-        SortMailTask.OnAllPackagesSorted += OnSortMailTaskComplete;
-    }
-
-    /// <summary>
-    /// Called whenever <see cref="SortMailTask.OnProgressChanged"/> fires (driven by replicated
-    /// NetworkVariable changes, so this runs identically on every client). Updates the live
-    /// count label on the tutorial objective row.
-    /// </summary>
-    private void OnSortMailProgressChanged()
-    {
-        _taskSortMail?.SetText(GetSortMailTaskText());
-    }
-
-    private void OnSortMailTaskComplete()
-    {
-        SortMailTask.OnProgressChanged   -= OnSortMailProgressChanged;
-        SortMailTask.OnAllPackagesSorted -= OnSortMailTaskComplete;
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskSortMail);
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
-        _taskSortMail = null;
-    }
-
-    private string GetSortMailTaskText() =>
-        SortMailTask.Instance != null && SortMailTask.Instance.TotalCount > 0
-            ? $"{_taskSortMailText} {SortMailTask.Instance.SortedCount}/{SortMailTask.Instance.TotalCount}"
-            : _taskSortMailText;
-
-    // -------------------------------------------------------------------------
-    // Fix Perimeter Fences Tutorial
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Adds the "Fix Perimeter Fences" objective to the tutorial objective list (which slides
-    /// the list in automatically) and subscribes to live progress until every broken fence is
-    /// repaired. Safe to call multiple times — no-ops if the objective is already tracked, so
-    /// both the normal tool-locker-dialogue flow and <see cref="DebugSkipOpening"/> always end
-    /// up showing the objective. Runs locally on every client (invoked via
-    /// <see cref="Day02NetworkSync.ShowFixFencesObjective"/>).
-    /// </summary>
-    public void EnsureFixFencesObjective()
-    {
-        if (_taskFixFences != null) return;
-
-        _taskFixFences = TutorialObjectiveList.Instance?.AddObjective(GetFixFencesTaskText());
-
-        FenceRepairTask.OnProgressChanged   += OnFixFencesProgressChanged;
-        FenceRepairTask.OnAllFencesRepaired += OnFixFencesTaskComplete;
-    }
-
-    /// <summary>
-    /// Called whenever <see cref="FenceRepairTask.OnProgressChanged"/> fires (driven by
-    /// replicated NetworkVariable changes, so this runs identically on every client). Updates
-    /// the live count label on the tutorial objective row.
-    /// </summary>
-    private void OnFixFencesProgressChanged()
-    {
-        _taskFixFences?.SetText(GetFixFencesTaskText());
-    }
-
-    private void OnFixFencesTaskComplete()
-    {
-        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
-        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskFixFences);
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
-        _taskFixFences = null;
-    }
-
-    private string GetFixFencesTaskText() =>
-        FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
-            ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
-            : _taskFixFencesText;
 
     // -------------------------------------------------------------------------
     // Suspect arrival — fire tutorial once on the first suspect with a mutation anomaly
@@ -1092,262 +915,16 @@ public class Day_02 : DayBase, IDailyTask
     }
 
     // -------------------------------------------------------------------------
-    // Kill Tutorial — Second Suspect (index 1)
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fires on all clients when any suspect arrives. Reacts to index 1 (the second suspect
-    /// to reach the booth window on Day 2). Forces exactly <see cref="_killTutorialAnomalyCount"/>
-    /// anomalies drawn only from the documentation and physical (mutation) pools onto this
-    /// suspect via <see cref="SuspectCharacter.InitializeWithDocumentationAndPhysicalAnomalies"/>,
-    /// so they always clear the "more than 10 active anomalies = kill" threshold. Captures the
-    /// arriving suspect and waits for their own paperwork to spawn (see
-    /// <see cref="OnKillTutorialPaperworkSpawned"/>) before wiring the pickup trigger that starts
-    /// the scripted kill dialogue. Mirrors Day_01's index-2 quarantine tutorial suspect pattern.
-    /// Unsubscribes itself so it only fires once per day.
-    /// </summary>
-    private void OnKillTutorialSuspectArrived(int index)
-    {
-        if (index != 1) return;
-        SuspectController.OnSuspectArrived -= OnKillTutorialSuspectArrived;
-
-        _killTargetSuspect = SuspectController.Instance?.CurrentSuspect;
-        SuspectController.OnPaperworkSpawned += OnKillTutorialPaperworkSpawned;
-
-        if (NetworkManager.Singleton.IsServer)
-        {
-            SuspectController.Instance.CurrentSuspect?
-                .InitializeWithDocumentationAndPhysicalAnomalies(_killTutorialAnomalyCount);
-        }
-    }
-
-    /// <summary>
-    /// Fires on all clients whenever ANY suspect's paperwork spawns while we're waiting for the
-    /// kill tutorial suspect (index 1). Verifies the event actually belongs to
-    /// <see cref="_killTargetSuspect"/> before wiring pickup triggers — guards against ever
-    /// attaching the kill tutorial to the wrong suspect, exactly like Day_01's quarantine
-    /// tutorial guard.
-    /// </summary>
-    private void OnKillTutorialPaperworkSpawned(IDCard card, PickableObject appForm)
-    {
-        SuspectController.OnPaperworkSpawned -= OnKillTutorialPaperworkSpawned;
-
-        if (SuspectController.Instance?.CurrentSuspect != _killTargetSuspect)
-        {
-            Debug.LogWarning("[Day_02] OnKillTutorialPaperworkSpawned: paperwork belongs to a " +
-                              "different suspect than the index-1 kill-tutorial target — the target's own " +
-                              "paperwork never spawned. Skipping the kill tutorial for this day.");
-            _killTargetSuspect = null;
-            return;
-        }
-
-        _killTargetSuspect = null;
-        _killDoc1 = card;
-        _killDoc2 = appForm;
-
-        if (card != null)    card.OnPickedUpEvent    += OnKillPickupTrigger;
-        if (appForm != null) appForm.OnPickedUpEvent  += OnKillPickupTrigger;
-        FolderController.OnFolderEquipped += OnKillPickupTrigger;
-    }
-
-    // Parameterless adapter — used by PickableObject.OnPickedUpEvent.
-    private void OnKillPickupTrigger() => StartKillTutorial();
-
-    // FolderController.OnFolderEquipped passes the instance — we ignore it.
-    private void OnKillPickupTrigger(FolderController _) => StartKillTutorial();
-
-    private void UnsubscribeKillTutorialDocumentPickupEvents()
-    {
-        if (_killDoc1 != null) { _killDoc1.OnPickedUpEvent -= OnKillPickupTrigger; _killDoc1 = null; }
-        if (_killDoc2 != null) { _killDoc2.OnPickedUpEvent -= OnKillPickupTrigger; _killDoc2 = null; }
-        FolderController.OnFolderEquipped -= OnKillPickupTrigger;
-    }
-
-    /// <summary>
-    /// Fires when the player picks up one of the kill-tutorial suspect's documents or any
-    /// folder. Single-fire — removes all triggers and starts the scripted kill dialogue on
-    /// the server.
-    /// </summary>
-    private void StartKillTutorial()
-    {
-        if (_killTutorialFired) return;
-        _killTutorialFired = true;
-
-        UnsubscribeKillTutorialDocumentPickupEvents();
-
-        if (NetworkManager.Singleton.IsServer)
-            StartCoroutine(KillTutorialDialogueSequence());
-    }
-
-    /// <summary>
-    /// Server-only coroutine. Plays a quick scripted megaphone bark explaining that this
-    /// subject must be killed with the red stamp, then shows the kill-criteria tutorial
-    /// overlay (">5 symptoms = Quarantine. >10 = Kill. Don't hesitate!"). Once the overlay is
-    /// dismissed, <see cref="OnKillCriteriaOverlayClosed"/> begins the exam-page filing step.
-    /// </summary>
-    private IEnumerator KillTutorialDialogueSequence()
-    {
-        yield return ShowAndWait("This one's too far gone — more than ten active symptoms. That's not a quarantine, that's a kill.");
-        yield return new WaitForSeconds(0.5f);
-        yield return ShowAndWait("File the Documentation and Mutation exam pages, then use the red stamp. Don't hesitate.");
-
-        TutorialOverlay.Instance?.ShowKillCriteriaTutorial(OnKillCriteriaOverlayClosed);
-    }
-
-    /// <summary>
-    /// Fires when the player closes the kill-criteria tutorial overlay. Begins the "add exam
-    /// pages" task — completes once two exam pages (Documentation + Mutation) are filed into
-    /// the folder.
-    /// </summary>
-    private void OnKillCriteriaOverlayClosed()
-    {
-        _killExamPagesFiledCount = 0;
-        _taskAddExamPages = TutorialObjectiveList.Instance?.AddObjective(_taskAddExamPagesText);
-
-        ExamNotebook.AnyPageFiled = false;
-        ExamNotebook.OnAnyNotebookPageFiled += OnKillExamPageFiledLocal;
-    }
-
-    /// <summary>
-    /// Fires on all clients each time any exam notebook page is filed while the kill tutorial's
-    /// "add exam pages" step is active. Advances to the stamp step once two pages have been
-    /// filed — the Documentation page and the Mutation page.
-    /// </summary>
-    private void OnKillExamPageFiledLocal()
-    {
-        _killExamPagesFiledCount++;
-        if (_killExamPagesFiledCount < 2) return;
-
-        ExamNotebook.OnAnyNotebookPageFiled -= OnKillExamPageFiledLocal;
-        StartKillStampStep();
-    }
-
-    /// <summary>
-    /// Begins the red-stamp phase of the kill tutorial. Completes the "add exam pages" task,
-    /// locks the green and yellow stamps so only the red stamp is usable, shows the "grab the
-    /// red ink stamp" task with its marker, and waits for the folder to be stamped.
-    /// </summary>
-    private void StartKillStampStep()
-    {
-        if (_taskAddExamPages != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskAddExamPages);
-            _taskAddExamPages = null;
-        }
-
-        _greenStampSlot?.SetSlotInteractable(false);
-        _yellowStampSlot?.SetSlotInteractable(false);
-        _redStampSlot?.SetSlotInteractable(true);
-
-        _taskGrabRedStamp = TutorialObjectiveList.Instance?.AddObjective(_taskGrabRedStampText);
-
-        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
-            TutorialMarkerManager.Instance.Mark(_markerRedStamp);
-
-        FolderController.OnAnyFolderStamped += OnKillFolderStamped;
-    }
-
-    /// <summary>
-    /// Fires on all clients when any folder is stamped after the kill tutorial's stamp step
-    /// began. Completes the stamp task, removes the arrow, restores the green/yellow stamps,
-    /// and shows the "place folder at window" task — mirrors Day_01's quarantine hand-off step,
-    /// but for the kill verdict.
-    /// </summary>
-    private void OnKillFolderStamped()
-    {
-        FolderController.OnAnyFolderStamped -= OnKillFolderStamped;
-
-        if (_taskGrabRedStamp != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskGrabRedStamp);
-            _taskGrabRedStamp = null;
-        }
-
-        if (TutorialMarkerManager.Instance != null && _markerRedStamp != null)
-            TutorialMarkerManager.Instance.Unmark(_markerRedStamp);
-
-        _greenStampSlot?.SetSlotInteractable(true);
-        _yellowStampSlot?.SetSlotInteractable(true);
-
-        _taskKillHandOff = TutorialObjectiveList.Instance?.AddObjective(_taskKillHandOffText);
-
-        FolderController.OnFolderHandedOff += OnKillFolderHandedOff;
-    }
-
-    /// <summary>
-    /// Fires on all clients when the stamped folder is handed off at the window. The kill
-    /// verdict itself (despawning the suspect, payout, etc.) is resolved automatically by
-    /// <see cref="SuspectController.DeliverVerdict"/> based on the folder's Kill stamp type —
-    /// this only finishes the kill tutorial's task list.
-    /// </summary>
-    private void OnKillFolderHandedOff()
-    {
-        FolderController.OnFolderHandedOff -= OnKillFolderHandedOff;
-
-        if (_taskKillHandOff != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskKillHandOff);
-            _taskKillHandOff = null;
-        }
-
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
-
-        Debug.Log("[Day_02] Kill tutorial complete — folder handed off with the red stamp.");
-
-        ArmOchoBoothEncounter();
-    }
-
-    /// <summary>
-    /// Debug-only: jumps the suspect lineup counter so the very next suspect summoned is
-    /// treated as index 1 — the kill-tutorial suspect (see <see cref="OnKillTutorialSuspectArrived"/>)
-    /// — and reveals the Mutation Exam notebook, which is normally only unlocked mid-way through
-    /// the first suspect's mutation tutorial and is required for the kill tutorial's "file exam
-    /// pages" step. Bypasses the mutation tutorial entirely. Called by <see cref="DebugConsole"/>'s
-    /// F12 cheat menu.
-    /// </summary>
-    public void DebugSkipToKillTutorial()
-    {
-        if (!NetworkManager.Singleton.IsServer) return;
-
-        // Bypass the mutation tutorial so it never fires on top of the suspect this cheat spawns.
-        if (!_mutationTutorialFired)
-        {
-            _mutationTutorialFired = true;
-            SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
-        }
-
-        // Reveal the Mutation Exam notebook — normally unlocked mid-tutorial, required for the
-        // kill tutorial's "file exam pages" step.
-        _mutationNotebook?.SetVisible(true);
-        _mutationNotebook?.SetInteractableNetworked(true);
-
-        // Jump the lineup counter so the next suspect spawned is index 1 — the kill tutorial
-        // target. OnKillTutorialSuspectArrived (already subscribed in DayActivated) picks it up
-        // from there and forces the >10 anomaly count.
-        if (SuspectController.Instance != null)
-            SuspectController.Instance.suspectIndex.Value = 0;
-
-        ShiftManager.OnNextSuspectReadyForBell += AutoSummonKillTutorialSuspect;
-
-        Debug.Log("[Day_02] DebugSkipToKillTutorial: mutation tutorial bypassed, notebook revealed, " +
-                  "suspect index armed for the kill tutorial target.");
-    }
-
-    private void AutoSummonKillTutorialSuspect()
-    {
-        ShiftManager.OnNextSuspectReadyForBell -= AutoSummonKillTutorialSuspect;
-        SuspectController.Instance?.NextSuspect();
-    }
-
-    // -------------------------------------------------------------------------
-    // Ocho Booth Encounter — arms as the next suspect right after the kill tutorial
+    // Ocho Booth Encounter — armed by CampaignManager on the player's first-ever kill
     // -------------------------------------------------------------------------
 
     /// <summary>
     /// Arms <see cref="SuspectController.InterceptNextSuspectSpawn"/> so Ocho's booth-encounter
     /// prefab (fake name, fake ID, antagonizing dialogue, and a verdict that never actually
-    /// processes) spawns as the very next suspect. Server-only. Safe to call directly from the
-    /// F12 debug cheat to skip straight to the encounter.
+    /// processes) spawns as the very next suspect. Server-only. Called by
+    /// <see cref="CampaignManager"/>'s <c>OnFirstKillEver</c> handler the first time the player
+    /// ever kills a suspect (on whichever day that happens), and directly from the F12 debug
+    /// cheat to skip straight to the encounter.
     /// </summary>
     public void ArmOchoBoothEncounter()
     {

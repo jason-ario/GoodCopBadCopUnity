@@ -14,8 +14,8 @@ public class EndOfShiftReportTester : MonoBehaviour
             new EndOfShiftReportUI.ReportRowData("Passed: 2", 60),
             new EndOfShiftReportUI.ReportRowData("Quarantined: 1", 60),
             new EndOfShiftReportUI.ReportRowData("Killed: 3", 60),
-            new EndOfShiftReportUI.ReportRowData("    Infected: 2", 60),
-            new EndOfShiftReportUI.ReportRowData("    Non-Infected: 1", 30, true),
+            new EndOfShiftReportUI.ReportRowData("Infected: 2", 60),
+            new EndOfShiftReportUI.ReportRowData("Non-Infected: 1", 30, true),
         };
 
         reportUI.PlayReport(rows);

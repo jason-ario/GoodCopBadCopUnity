@@ -267,10 +267,8 @@ public class AnomalyController : MonoBehaviour
     /// <summary>
     /// Activates exactly <paramref name="count"/> anomalies chosen at random from the combined
     /// documentation and mutation (physical) pools only. Every other category stays unavailable,
-    /// exactly like <see cref="InitializeWithDocumentationAnomalies"/>. Used for scripted tutorial
-    /// suspects that must exhibit both a paperwork discrepancy and a visible physical mutation —
-    /// e.g. the Day 2 kill-tutorial suspect who must clear the "more than 10 active anomalies"
-    /// kill threshold using only paperwork and physical symptoms.
+    /// exactly like <see cref="InitializeWithDocumentationAnomalies"/>. Used for scripted suspects
+    /// that must exhibit both a paperwork discrepancy and a visible physical mutation.
     /// <para>
     /// <see cref="MissingDocumentAnomaly"/> is always excluded from selection here for the same
     /// reason as <see cref="InitializeWithDocumentationAnomalies"/>: it would make
