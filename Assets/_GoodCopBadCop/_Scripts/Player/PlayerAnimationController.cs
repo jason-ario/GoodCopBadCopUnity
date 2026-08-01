@@ -321,12 +321,31 @@ public class PlayerAnimationController : NetworkBehaviour
     
 
     /// <summary>
+    /// Gates Update()/LateUpdate() while ragdoll physics is in control. Previously
+    /// <see cref="RagdollController"/> disabled this component's own Unity 'enabled' flag —
+    /// but this component is a NetworkBehaviour, and toggling that flag at runtime made its
+    /// inclusion in Netcode's scene/spawn-object synchronization diverge between the server
+    /// (disabled once the player died) and any client that joins afterward (freshly-loaded,
+    /// still enabled), corrupting that client's sync buffer and crashing it. This flag is
+    /// purely local — it only stops writing bone transforms in Update()/LateUpdate() — so it
+    /// never needs to be perfectly synced to late joiners the way real networked state does.
+    /// </summary>
+    private bool _disabledForRagdoll;
+
+    /// <summary>Call from RagdollController to stop this component from writing bone
+    /// transforms once ragdoll physics takes over, without touching this NetworkBehaviour's
+    /// own Unity 'enabled' flag. See <see cref="_disabledForRagdoll"/>.</summary>
+    public void SetActiveForRagdoll(bool active) => _disabledForRagdoll = !active;
+
+    /// <summary>
     /// Feeds all IK rig targets their current-frame world position and rotation.
     /// Must run in Update so Animation Rigging — which evaluates between Update and LateUpdate —
     /// solves the constraint against up-to-date data rather than the previous frame's values.
     /// </summary>
     private void Update()
     {
+        if (_disabledForRagdoll) return;
+
         if (RightArmIKTarget != null)
         {
             rightArmRigIKTarget.position = RightArmIKTarget.position;
@@ -370,6 +389,8 @@ public class PlayerAnimationController : NetworkBehaviour
 
     private void LateUpdate()
     {
+        if (_disabledForRagdoll) return;
+
         if (IsOwner == false)
         {
             // Proxy: drive animations from NetworkVariables, then apply bone-level pitch.

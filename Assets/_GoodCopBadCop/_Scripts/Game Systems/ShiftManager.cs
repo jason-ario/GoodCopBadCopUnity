@@ -1688,18 +1688,20 @@ public class ShiftManager : NetworkBehaviour
         ResetEnvironment(true);
         SuspectController.Instance.ResetSuspects();
 
-        // Wait for a valid PlayerInstance before touching the camera below — mirrors the
-        // WaitUntil guard used elsewhere (e.g. SkipToBoothReadySequence).
+        // Wait for a valid PlayerInstance instead of a bare null check — on a client whose
+        // local player hasn't finished spawning/reassigning PlayerInstance.Instance yet (e.g.
+        // Player Two joining or initializing slightly behind the host), a bare null check
+        // silently skipped the teleport for that one frame with no retry, leaving that player
+        // stuck outside instead of brought inside with Player One. Mirrors the WaitUntil guard
+        // already used in RunInitiateIntroCutsceneSequence/SkipToBoothReadySequence.
         //
-        // Deliberately NOT repositioning the player here anymore. Players are already at their
-        // correct spawn/booth position by the time the intro cutscene ends — they were placed
-        // there before the cutscene ever started (see PlayIntroCutscene's ResetEverything calls
-        // and the initial lobby/gameplay spawn flow). Re-teleporting via GetBoothSpawnPoint() on
-        // top of that was redundant at best, and when both players joined together from the same
-        // lobby it could actively move Player Two away from their already-correct position for
-        // no reason.
-        yield return new WaitUntil(() => PlayerInstance.Instance != null);
+        // This teleport IS needed here — it's what brings the player back inside to the booth
+        // spawn point after the (Day 1) intro cutscene, distinct from the separate intro
+        // cinematic text-panel sequence, which never repositions anyone at all.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
 
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        PlayerInstance.Instance.RequestSetIsOutside(false);
         // Reset the camera to a neutral forward orientation so the view doesn't snap
         // to whatever angle the player was looking at before or during the cutscene.
         PlayerInstance.Instance.ResetCameraOrientation();

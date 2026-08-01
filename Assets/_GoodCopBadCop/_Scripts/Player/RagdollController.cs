@@ -153,8 +153,10 @@ public class RagdollController : MonoBehaviour
 
         // Stop PlayerAnimationController from writing bone transforms in LateUpdate,
         // which would fight ragdoll physics every frame and cause violent shaking.
+        // Uses an internal flag rather than this NetworkBehaviour's own 'enabled' flag —
+        // see PlayerAnimationController.SetActiveForRagdoll for why.
         if (_playerAnimationController != null)
-            _playerAnimationController.enabled = false;
+            _playerAnimationController.SetActiveForRagdoll(false);
 
         SetRagdollActive(true);
 
