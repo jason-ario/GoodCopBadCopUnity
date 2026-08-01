@@ -7,7 +7,6 @@ public class PlayerRadiation : NetworkBehaviour
 {
     [Header("Radiation")]
     [SerializeField] private float maxRadiation = 100f;
-    [SerializeField] private float currentRadiation = 0f;
     [SerializeField] private float passiveRadiationPerSecond = 0.15f;
 
     [Header("Pills")]
@@ -49,9 +48,25 @@ public class PlayerRadiation : NetworkBehaviour
     private PlayerHealth playerHealth;
     private PlayerInstance playerInstance;
 
-    public float CurrentRadiation => currentRadiation;
+    /// <summary>
+    /// Server-authoritative accrued radiation, replicated to every client via NetworkVariable.
+    /// Previously this was a plain field only ever mutated inside Update() — which early-returns
+    /// on every non-host client (see Update() below) — so a non-host client's OWN copy of their
+    /// own radiation never advanced locally: their radiation bar/HUD stayed frozen near zero even
+    /// while the server's authoritative copy climbed and correctly applied real damage via
+    /// PlayerHealth. That looked exactly like "taking damage rapidly for no reason" because the
+    /// only thing that was wrong was the display, not the damage. Being a NetworkVariable, its
+    /// current value (and every subsequent change) is delivered correctly to every client,
+    /// including late joiners, via ordinary replication.
+    /// </summary>
+    private readonly NetworkVariable<float> _networkRadiation = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public float CurrentRadiation => _networkRadiation.Value;
     public float MaxRadiation => maxRadiation;
-    public float Normalized => currentRadiation / maxRadiation;
+    public float Normalized => _networkRadiation.Value / maxRadiation;
     [SerializeField] private GameObject hurtVignette;
 
     /// <summary>When true, passive radiation gain and radiation damage are paused. Server-side only.</summary>
@@ -70,11 +85,25 @@ public class PlayerRadiation : NetworkBehaviour
         playerInstance = GetComponent<PlayerInstance>();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        _networkRadiation.OnValueChanged += HandleRadiationChanged;
+
+        // Sync initial state immediately, including for late-joining clients.
+        OnRadiationChanged?.Invoke(_networkRadiation.Value, maxRadiation);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        _networkRadiation.OnValueChanged -= HandleRadiationChanged;
+    }
+
     private void Update()
     {
         // Only the server drives radiation damage to avoid per-frame ServerRpc spam.
-        // Cosmetic radiation state (vignette, UI) should subscribe to a networked variable
-        // if you want it to display on all clients in the future.
         if (!IsServer)
             return;
 
@@ -89,12 +118,12 @@ public class PlayerRadiation : NetworkBehaviour
         if (playerInstance != null && playerInstance.IsInCutscene)
             return;
 
-        AddRadiation(passiveRadiationPerSecond * RadiationMultiplier * Time.deltaTime);
+        ApplyAddRadiationServer(passiveRadiationPerSecond * RadiationMultiplier * Time.deltaTime);
 
         if (isTakingPill)
         {
             pillTimer -= Time.deltaTime;
-            RemoveRadiation(pillDrainPerSecond * Time.deltaTime);
+            ApplyRemoveRadiationServer(pillDrainPerSecond * Time.deltaTime);
 
             if (pillTimer <= 0f)
                 isTakingPill = false;
@@ -102,7 +131,6 @@ public class PlayerRadiation : NetworkBehaviour
 
         UpdateRadiationRate();
         ApplyRadiationDamage();
-        CheckRadiationState();
     }
 
     /// <summary>
@@ -111,6 +139,7 @@ public class PlayerRadiation : NetworkBehaviour
     /// </summary>
     private void UpdateRadiationRate()
     {
+        float currentRadiation = _networkRadiation.Value;
         float instantRate = (currentRadiation - _previousRadiationForRate) / Time.deltaTime;
         _previousRadiationForRate = currentRadiation;
 
@@ -143,23 +172,26 @@ public class PlayerRadiation : NetworkBehaviour
         playerHealth.TakeDamage(damage, effectKey);
     }
 
+    /// <summary>Adds radiation. Can be called from any client — routes through a ServerRpc when not on the server.</summary>
     public void AddRadiation(float amount)
     {
         if (amount <= 0f) return;
 
-        currentRadiation = Mathf.Clamp(currentRadiation + amount, 0f, maxRadiation);
-        OnRadiationChanged?.Invoke(currentRadiation, maxRadiation);
+        if (IsServer)
+            ApplyAddRadiationServer(amount);
+        else
+            AddRadiationServerRpc(amount);
     }
 
+    /// <summary>Removes radiation. Can be called from any client — routes through a ServerRpc when not on the server.</summary>
     public void RemoveRadiation(float amount)
     {
         if (amount <= 0f) return;
 
-        currentRadiation = Mathf.Clamp(currentRadiation - amount, 0f, maxRadiation);
-        OnRadiationChanged?.Invoke(currentRadiation, maxRadiation);
-
-        if (Normalized < 0.75f)
-            hasTriggeredCritical = false;
+        if (IsServer)
+            ApplyRemoveRadiationServer(amount);
+        else
+            RemoveRadiationServerRpc(amount);
     }
 
     /// <summary>
@@ -170,29 +202,82 @@ public class PlayerRadiation : NetworkBehaviour
     /// </summary>
     public void ResetRadiation()
     {
-        currentRadiation = 0f;
-        hasTriggeredCritical = false;
-        _previousRadiationForRate = 0f;
-        _smoothedRadiationRate = 0f;
-        OnRadiationChanged?.Invoke(currentRadiation, maxRadiation);
+        if (IsServer)
+            ApplyResetRadiationServer();
+        else
+            ResetRadiationServerRpc();
     }
 
     public void TakeRadiationPill()
+    {
+        if (IsServer)
+            ApplyTakeRadiationPillServer();
+        else
+            TakeRadiationPillServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void AddRadiationServerRpc(float amount) => ApplyAddRadiationServer(amount);
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RemoveRadiationServerRpc(float amount) => ApplyRemoveRadiationServer(amount);
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ResetRadiationServerRpc() => ApplyResetRadiationServer();
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TakeRadiationPillServerRpc() => ApplyTakeRadiationPillServer();
+
+    private void ApplyAddRadiationServer(float amount)
+    {
+        if (amount <= 0f) return;
+        _networkRadiation.Value = Mathf.Clamp(_networkRadiation.Value + amount, 0f, maxRadiation);
+    }
+
+    private void ApplyRemoveRadiationServer(float amount)
+    {
+        if (amount <= 0f) return;
+        _networkRadiation.Value = Mathf.Clamp(_networkRadiation.Value - amount, 0f, maxRadiation);
+    }
+
+    private void ApplyResetRadiationServer()
+    {
+        hasTriggeredCritical = false;
+        _previousRadiationForRate = 0f;
+        _smoothedRadiationRate = 0f;
+        _networkRadiation.Value = 0f;
+    }
+
+    private void ApplyTakeRadiationPillServer()
     {
         isTakingPill = true;
         pillTimer = pillReductionDuration;
         pillDrainPerSecond = pillReductionAmount / pillReductionDuration;
     }
 
-    private void CheckRadiationState()
+    /// <summary>
+    /// Fires on every client whenever <see cref="_networkRadiation"/> changes, including the
+    /// initial replication for late joiners. Drives the local UI event and the one-shot
+    /// critical/death triggers — replacing logic that previously ran only inside the
+    /// server-gated Update(), which meant non-host clients never saw their own critical/death
+    /// feedback fire at all.
+    /// </summary>
+    private void HandleRadiationChanged(float previousValue, float newValue)
     {
-        if (!hasTriggeredCritical && Normalized >= 0.75f)
+        OnRadiationChanged?.Invoke(newValue, maxRadiation);
+
+        float normalized = newValue / maxRadiation;
+
+        if (normalized < 0.75f)
+            hasTriggeredCritical = false;
+
+        if (!hasTriggeredCritical && normalized >= 0.75f)
         {
             hasTriggeredCritical = true;
             OnRadiationCritical?.Invoke();
         }
 
-        if (dieAtMaxRadiation && currentRadiation >= maxRadiation)
+        if (dieAtMaxRadiation && newValue >= maxRadiation)
         {
             OnRadiationDeath?.Invoke();
         }

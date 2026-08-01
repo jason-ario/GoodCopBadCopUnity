@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -27,6 +28,15 @@ public class RadiationHotspot : MonoBehaviour
 
     private void Update()
     {
+        // Only the server drives radiation accumulation — mirrors the authority model used by
+        // PlayerRadiation.Update() and OffTrailRadiation.Update(). This component is a plain
+        // MonoBehaviour (not a NetworkBehaviour), so without this guard every client's own local
+        // physics simulation of this trigger independently called AddRadiation() too, each
+        // accumulating its own separate, unsynced amount on top of whatever the server was
+        // already tracking authoritatively.
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
+            return;
+
         if (!_playerInside || _playerRadiation == null) return;
 
         _playerRadiation.AddRadiation(bonusRadiationPerSecond * _playerRadiation.RadiationMultiplier * Time.deltaTime);

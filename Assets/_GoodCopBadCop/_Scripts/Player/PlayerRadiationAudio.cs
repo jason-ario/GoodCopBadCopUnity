@@ -9,14 +9,11 @@ using UnityEngine;
 ///   Medium : hotspot is actively irradiating the player at a moderate pace.
 ///   High   : player is in a strong radiation source or radiation is stacking fast.
 ///
-/// NOTE: Radiation is server-authoritative and not replicated via a NetworkVariable, so
-/// <see cref="PlayerRadiation.CurrentRadiation"/> is only kept up to date on the machine
-/// that owns the underlying <see cref="PlayerRadiation.Update"/> call (the host). As a
-/// result this component only ever produces correct audio on the host, and only for the
-/// host's own locally-owned player — gating on <c>IsOwner</c> (rather than <c>IsServer</c>)
-/// is what keeps the host from also hearing every other player's radiation ticker. When
-/// <see cref="PlayerRadiation"/> exposes a networked radiation value, remote clients will
-/// start hearing their own ticker too without any further changes here.
+/// NOTE: PlayerRadiation.CurrentRadiation is now replicated via a NetworkVariable, so this
+/// component correctly plays each player's own radiation ticker on their own machine. Gating on
+/// <c>IsOwner</c> (rather than <c>IsServer</c>) is still required — on the host, IsServer is true
+/// for every player's NetworkObject, so gating on IsServer would make the host compute and play
+/// every player's radiation audio simultaneously instead of just its own.
 /// </summary>
 [RequireComponent(typeof(PlayerRadiation))]
 public class PlayerRadiationAudio : NetworkBehaviour
