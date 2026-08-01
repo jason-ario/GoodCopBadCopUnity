@@ -27,6 +27,13 @@ public class ObjectPlacer : MonoBehaviour
     private PickableItemData _pickableItemData;
     private PickableObject _clonedItem;
     private PlacementBoard _currentPlacementBoard;
+
+    /// <summary>
+    /// True while the current placement board is a <see cref="PlacementSlot"/> — an exact,
+    /// unambiguous fixed pose (e.g. a mail cubby's snap point) makes the trajectory arc redundant
+    /// noise, unlike free-surface placement where it helps show where the item will land.
+    /// </summary>
+    private bool _suppressArc;
     private readonly List<Material> _ghostMaterials = new List<Material>();
     public bool IsActive;
     public bool IsInRange { get; private set; } = true;
@@ -58,7 +65,7 @@ public class ObjectPlacer : MonoBehaviour
             deactivatedThisFrame = false;
         }
 
-        if (IsActive)
+        if (IsActive && !_suppressArc)
         {
             RenderArcLineFromPlayerToThis();
         }
@@ -269,6 +276,7 @@ public class ObjectPlacer : MonoBehaviour
     public void ActivatePlacer(PlacementBoard placementBoard = null)
     {
         _currentPlacementBoard = placementBoard;
+        _suppressArc = placementBoard is PlacementSlot;
         container.gameObject.SetActive(true);
         IsActive = true;
 
@@ -277,7 +285,18 @@ public class ObjectPlacer : MonoBehaviour
         if (_clonedItem != null)
             _clonedItem.gameObject.SetActive(true);
 
-        if (arcLine != null) arcLine.enabled = true;
+        if (arcLine != null)
+        {
+            if (_suppressArc)
+            {
+                arcLine.positionCount = 0;
+                arcLine.enabled = false;
+            }
+            else
+            {
+                arcLine.enabled = true;
+            }
+        }
     }
 
     public void DeactivatePlacer()
@@ -294,6 +313,7 @@ public class ObjectPlacer : MonoBehaviour
         IsInRange = true;
         container.gameObject.SetActive(false);
         IsActive = false;
+        _suppressArc = false;
 
         if (arcLine != null)
         {

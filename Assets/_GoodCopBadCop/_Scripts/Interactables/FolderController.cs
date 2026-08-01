@@ -971,10 +971,14 @@ public class FolderController : PickableObject
         if (dropObject)
         {
             // Direct-drop path: called on the local client from InteractWithItem.
-            // The slot selection and NetworkVariable write must happen on the server
-            // so all clients see the correct occupancy. We pass the slot index so the
-            // server can write _examPageQueue and _queueSlots authoritatively.
-            RegisterExamPageInQueueServerRpc(new NetworkObjectReference(pickableObject.NetworkObject), slotIndex);
+            // targetSlot here is only a same-frame best guess for the optimistic local drop —
+            // on a non-host client, GetFreeQueueSlotIndex() above read the (possibly stale)
+            // synced NetworkVariables, so it can pick the same slot as a page that was just
+            // added moments earlier but hasn't replicated back yet. The slot selection and
+            // NetworkVariable write must therefore be re-resolved authoritatively on the
+            // server (see RegisterExamPageInQueueServerRpc), which also corrects every
+            // client's visual placement via SnapExamPageToSlotClientRpc if the guess was wrong.
+            RegisterExamPageInQueueServerRpc(new NetworkObjectReference(pickableObject.NetworkObject));
             player.DropObject(targetSlot);
         }
         else
@@ -1029,17 +1033,37 @@ public class FolderController : PickableObject
     /// Server-authoritative registration of a directly-dropped exam page into the queue.
     /// Called from AddDocument (dropObject=true) so the _examPageQueue and _queueSlots
     /// writes always happen on the server regardless of which client initiated the drop.
+    /// The free slot is resolved here — on the server — rather than trusting a
+    /// client-supplied index, because a non-host client's own free-slot guess can be based
+    /// on stale NetworkVariable state and collide with a slot another page just took.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void RegisterExamPageInQueueServerRpc(NetworkObjectReference pageRef, int slotIndex)
+    private void RegisterExamPageInQueueServerRpc(NetworkObjectReference pageRef)
     {
         if (!pageRef.TryGet(out NetworkObject netObj)) return;
         ExamPage examPage = netObj.GetComponent<ExamPage>();
         if (examPage == null) return;
-        if (slotIndex < 0 || slotIndex >= _examPageQueue.Length) return;
+
+        // Re-check the one-page-per-type rule authoritatively — the client-side check in
+        // AddDocument can also be stale for the same reason as the slot index.
+        if (IsExamPageTypeInQueue(examPage.ItemData.name)) return;
+
+        int slotIndex = GetFreeQueueSlotIndex();
+        if (slotIndex < 0)
+        {
+            Debug.LogWarning($"[FolderController] RegisterExamPageInQueueServerRpc: all {examPageSlots.Length} exam slots are full — cannot register {examPage.ItemData.name}.");
+            return;
+        }
 
         _examPageQueue[slotIndex] = examPage;
         _queueSlots[slotIndex].Value = examPage.ItemData.name;
+
+        // Track this page so DespawnTrackedDocuments() (called when the folder/suspect is
+        // cleaned up) actually despawns it. Direct-drop pages previously never reached
+        // _serverDocuments — only the notebook path did, via PlacePageInSlotNetworked —
+        // so a directly-dropped exam page could linger in the scene after the folder was gone.
+        if (!_serverDocuments.Contains(pageRef))
+            _serverDocuments.Add(pageRef);
 
         // Apply the folder's current open state so a page added to a closed folder is
         // immediately non-interactable on all clients, and one added to an open folder
@@ -1047,7 +1071,27 @@ public class FolderController : PickableObject
         // idCard and application.
         examPage.SetInteractableNetworked(isOpen.Value);
 
+        // Correct every client's visual placement to the authoritative slot in case the
+        // dropping client's optimistic guess (used for the immediate player.DropObject call)
+        // didn't match the slot actually resolved here.
+        SnapExamPageToSlotClientRpc(pageRef, slotIndex);
+
         Debug.Log($"[FolderController] RegisterExamPageInQueueServerRpc: registered {examPage.ItemData.name} at queue slot {slotIndex}");
+    }
+
+    /// <summary>
+    /// Received on all clients after a directly-dropped exam page is authoritatively
+    /// registered into a queue slot. Re-points the page's SocketFollow to the correct slot
+    /// Transform, correcting any client whose optimistic local drop guessed a different slot.
+    /// </summary>
+    [ClientRpc]
+    private void SnapExamPageToSlotClientRpc(NetworkObjectReference pageRef, int slotIndex)
+    {
+        if (!pageRef.TryGet(out NetworkObject netObj)) return;
+        PickableObject doc = netObj.GetComponent<PickableObject>();
+        if (doc == null || slotIndex < 0 || slotIndex >= examPageSlots.Length) return;
+
+        doc.SetSocketFollow(examPageSlots[slotIndex]);
     }
 
     public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)

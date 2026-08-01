@@ -19,6 +19,15 @@ public class PlayerPickupController : NetworkBehaviour
 
     public PickableObject HeldObject => _heldObject;
     private PickableObject _heldObject; // the actual world instance being carried
+
+    /// <summary>
+    /// Server-authoritative reference to the currently held NetworkObject. Unlike
+    /// <see cref="HeldObject"/> (a plain local field only ever set on the owner's machine),
+    /// this is backed by a replicated NetworkVariable, so the server (and every other client)
+    /// can reliably resolve it — e.g. to validate a ServerRpc actually came from the player
+    /// holding the object it claims to be using.
+    /// </summary>
+    public NetworkObjectReference HeldObjectRef => _heldObjectRef.Value;
     private PickableObject _camEquippedItem;
     private PickableObject _bodyCurrentlyEquippedItem;
 

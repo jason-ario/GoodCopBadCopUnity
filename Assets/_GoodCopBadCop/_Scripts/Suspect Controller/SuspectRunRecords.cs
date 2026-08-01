@@ -71,6 +71,8 @@ public class SuspectRunRecords : MonoBehaviour
             record.quarantinedOnDay        = entry.QuarantinedOnDay;
             record.infectionScore          = entry.InfectionScore;
             record.isLegacyMutant          = entry.IsLegacyMutant;
+            record.daysShown               = entry.DaysShown;
+            record.lastDayShown            = entry.LastDayShown;
             applied++;
         }
 

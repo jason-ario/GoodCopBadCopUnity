@@ -214,8 +214,14 @@ public class Pistol : PickableObject, IAmmoProvider
             return;
 
         // Only the client actually holding this pistol may fire.
+        // NOTE: PlayerPickupController.HeldObject is a plain field that is only ever set on the
+        // owning client's own machine, so it reads as null here on the server for any
+        // non-host client — checking it would silently drop every remote client's shots
+        // (no damage, no ammo consumed, no VFX relayed). HeldObjectRef is backed by a
+        // NetworkVariable and is therefore reliably replicated to the server.
         PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc?.HeldObject != this) return;
+        if (ppc == null) return;
+        if (!ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj) || heldNetObj != NetworkObject) return;
 
         if (_roundsRemaining.Value <= 0) return;
 
@@ -345,7 +351,8 @@ public class Pistol : PickableObject, IAmmoProvider
         }
 
         PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || ppc.HeldObject is not PistolAmmo ammo)
+        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj)
+            || heldNetObj.GetComponent<PistolAmmo>() is not PistolAmmo ammo)
         {
             Debug.LogWarning($"[Pistol] ReloadServerRpc: client {clientId} is not holding PistolAmmo.");
             return;

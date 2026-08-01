@@ -11,17 +11,17 @@ namespace GoodCopBadCop.EnvironmentSystem
         void ApplyPrevious();
 
         /// <summary>
-        /// Reports how far the current shift's suspect lineup has been processed and updates
-        /// the day/night blend target accordingly. At 0 suspects processed the environment
-        /// targets the day preset; once <paramref name="suspectsProcessed"/> reaches
-        /// <paramref name="totalSuspects"/> it targets the night preset for the current day.
+        /// Reports how far the current shift's suspect lineup has been processed. At 0 suspects
+        /// processed the environment stays on the day preset; the instant
+        /// <paramref name="suspectsProcessed"/> reaches <paramref name="totalSuspects"/> (dusk),
+        /// the environment is switched to the night preset for the current day immediately —
+        /// there is no gradient/blend, it's a hard cut.
         /// </summary>
         void SetSuspectProgress(int suspectsProcessed, int totalSuspects);
 
         /// <summary>
-        /// Same calculation as <see cref="SetSuspectProgress"/>, but snaps the environment to
-        /// the resulting blend immediately instead of smoothing toward it. Intended for editor
-        /// debug tooling previews.
+        /// Same calculation as <see cref="SetSuspectProgress"/>. Intended for editor debug
+        /// tooling previews.
         /// </summary>
         void ForceSuspectProgress(int suspectsProcessed, int totalSuspects);
     }
@@ -42,9 +42,9 @@ namespace GoodCopBadCop.EnvironmentSystem
             int safeDay = Mathf.Max(1, day);
             model.SelectDay(safeDay);
 
-            // Reset the blend target to the start of the shift before the day/night presets
-            // change, so EnvironmentRenderAdapter snaps to the new day's morning look instead
-            // of animating backward from wherever the previous shift ended.
+            // Reset the progress tracker to the start of the shift before the day/night presets
+            // change, so a fresh SetSuspectProgress(0, ...) call doesn't immediately re-trigger
+            // the dusk night-switch from a stale progress value left over from the prior shift.
             model.SelectDayNightProgress(0f);
 
             EnvironmentPreset preset = schedule != null
@@ -96,12 +96,39 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         public void SetSuspectProgress(int suspectsProcessed, int totalSuspects)
         {
-            model.SelectDayNightProgress(CalculateProgress(suspectsProcessed, totalSuspects));
+            float progress = CalculateProgress(suspectsProcessed, totalSuspects);
+            model.SelectDayNightProgress(progress);
+            ApplyNightIfDuskReached(progress);
         }
 
         public void ForceSuspectProgress(int suspectsProcessed, int totalSuspects)
         {
-            model.ForceDayNightProgress(CalculateProgress(suspectsProcessed, totalSuspects));
+            float progress = CalculateProgress(suspectsProcessed, totalSuspects);
+            model.ForceDayNightProgress(progress);
+            ApplyNightIfDuskReached(progress);
+        }
+
+        /// <summary>
+        /// The instant the shift's suspect lineup is fully processed (progress reaches 1 —
+        /// dusk), switches <see cref="EnvironmentModel.CurrentPresetMutable"/> straight to the
+        /// current day's night preset. This is a hard cut, not a blend: EnvironmentRenderAdapter
+        /// applies whatever preset it's handed as-is.
+        /// </summary>
+        private void ApplyNightIfDuskReached(float progress)
+        {
+            if (progress < 1f)
+            {
+                return;
+            }
+
+            EnvironmentPreset nightPreset = model.CurrentNightPresetMutable.Value;
+            if (nightPreset == null)
+            {
+                Debug.LogWarning("[EnvironmentService] Dusk reached but no night preset is configured for the current day.");
+                return;
+            }
+
+            model.SelectPreset(nightPreset);
         }
 
         private static float CalculateProgress(int suspectsProcessed, int totalSuspects)

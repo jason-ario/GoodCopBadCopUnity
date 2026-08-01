@@ -39,12 +39,51 @@ public class MailCubbyManager : NetworkBehaviour
     [Tooltip("If true, automatically randomizes which cubbies are enabled and their assignments once when this NetworkObject spawns on the server.")]
     [SerializeField] private bool _assignOnAwake = false;
 
+    // Server-only cache of the last assignment broadcast, so late-joining clients (who connect
+    // after AutoAssignRandomResidents already ran and its ClientRpc already went out) can be
+    // brought up to date individually instead of being stuck with whatever _assignedResident/
+    // active-state came baked into the prefab. Without this, any player who joins after the
+    // initial shuffle never receives the assignment and sees blank/mismatched cubby labels —
+    // this is the "names not synced across clients" bug.
+    private bool[] _lastActiveFlags;
+    private int[] _lastResidentAssignment;
+    private bool _hasAssignment;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        if (IsServer && _assignOnAwake)
-            AutoAssignRandomResidents();
+        if (IsServer)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+
+            if (_assignOnAwake)
+                AutoAssignRandomResidents();
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+
+        base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// Server-only. Replays the last broadcast cubby assignment to a single newly-connected
+    /// client so late joiners end up with the exact same layout as everyone else, instead of the
+    /// prefab-default (unassigned) state their <see cref="MailCubbySlot"/> instances start with.
+    /// </summary>
+    private void OnClientConnected(ulong clientId)
+    {
+        if (!_hasAssignment) return;
+
+        var rpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        };
+        ApplyAssignmentClientRpc(_lastActiveFlags, _lastResidentAssignment, rpcParams);
     }
 
     /// <summary>
@@ -102,19 +141,26 @@ public class MailCubbyManager : NetworkBehaviour
         }
 
         ApplyAssignment(allSlots, activeFlags, residentAssignment);
+
+        // Cache so late-joining clients can be caught up individually via OnClientConnected.
+        _lastActiveFlags = activeFlags;
+        _lastResidentAssignment = residentAssignment;
+        _hasAssignment = true;
+
         ApplyAssignmentClientRpc(activeFlags, residentAssignment);
 
         Debug.Log($"[MailCubbyManager] Randomly enabled {activeCount}/{allSlots.Length} cubby slot(s) and assigned residents from a pool of {residentPoolIndices.Count}, replicated to all clients.");
     }
 
     /// <summary>
-    /// Replicates the server's cubby layout to every client (including the host, which skips this
+    /// Replicates the server's cubby layout to a client (including the host, which skips this
     /// since it already applied the layout locally). Indices refer to <see cref="_suspectPool"/>,
     /// which every client shares as the same static asset, so no object references need to cross
-    /// the network.
+    /// the network. Defaults to broadcasting to everyone, but <see cref="OnClientConnected"/> also
+    /// targets this at a single late-joining client via <paramref name="rpcParams"/>.
     /// </summary>
     [ClientRpc]
-    private void ApplyAssignmentClientRpc(bool[] activeFlags, int[] residentAssignment)
+    private void ApplyAssignmentClientRpc(bool[] activeFlags, int[] residentAssignment, ClientRpcParams rpcParams = default)
     {
         if (IsServer) return;
 

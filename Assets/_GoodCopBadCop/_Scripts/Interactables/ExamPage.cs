@@ -28,6 +28,17 @@ public class ExamPage : FolderItem
     /// <summary>Vertical distance in local space between consecutive checklist item slots.</summary>
     [SerializeField] private float checklistItemSpacingY = 0.1397143f;
 
+    /// <summary>
+    /// Total number of printed checklist lines on the page artwork (the largest anomaly
+    /// category size across the progression asset — currently Documentation/Vitals/Behavior/
+    /// Supernatural all have 7). Used to compute a fixed top-of-page anchor so the checklist
+    /// always starts right below the header and grows downward, regardless of how many
+    /// anomalies the current category actually has (e.g. Physical's 5). Without this, pages
+    /// with fewer anomalies than the max would anchor to the bottom-most printed line instead
+    /// and leave a gap under the header.
+    /// </summary>
+    [SerializeField] private int checklistTotalSlotCount = 7;
+
     /// <summary>Local rotation (Euler, degrees) applied to every spawned checklist item.</summary>
     [SerializeField] private Vector3 checklistItemLocalRotationEuler = new Vector3(0f, 0f, 90f);
 
@@ -224,12 +235,16 @@ public class ExamPage : FolderItem
             item.name = $"Checklist Item {i}";
             item.gameObject.layer = parent.gameObject.layer;
 
-            // Slots run bottom-to-top from checklistItemStartLocalPosition, but anomalies should
-            // fill top-down, so the first anomaly (i == 0) goes in the top-most slot and
-            // subsequent anomalies fill downward toward the bottom-most slot.
-            int slotFromBottom = anomalyNames.Length - 1 - i;
+            // checklistItemStartLocalPosition is the bottom-most printed line, shared by every
+            // page regardless of category. To make the checklist always start right below the
+            // header (instead of bottom-anchoring and leaving a gap under the header for
+            // categories with fewer than checklistTotalSlotCount anomalies), compute the fixed
+            // top-most slot and fill downward from there: the first anomaly (i == 0) goes in
+            // the top-most slot, and each subsequent anomaly moves one slot down toward the
+            // bottom of the page.
+            int slotFromTop = checklistTotalSlotCount - 1 - i;
             Transform t = item.transform;
-            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, slotFromBottom * checklistItemSpacingY, 0f);
+            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, slotFromTop * checklistItemSpacingY, 0f);
             t.localRotation = Quaternion.Euler(checklistItemLocalRotationEuler);
             t.localScale = checklistItemLocalScale;
 
@@ -349,7 +364,8 @@ public class ExamPage : FolderItem
         if (_originalItemPositions == null || _originalItemPositions.Length != _checklistItems.Length)
             return;
 
-        // Collect slot Y values from the original positions, sorted top-to-bottom (descending).
+        // Collect slot Y values from the original positions, sorted top-to-bottom (descending —
+        // confirmed empirically: higher local Y renders higher on the printed page).
         float[] slotYValues = new float[_checklistItems.Length];
         for (int i = 0; i < _checklistItems.Length; i++)
             slotYValues[i] = _originalItemPositions[i].y;

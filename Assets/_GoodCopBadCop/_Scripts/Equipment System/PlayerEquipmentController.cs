@@ -15,6 +15,9 @@ public class PlayerEquipmentController : NetworkBehaviour
     [Tooltip("Item data for the Radiation Mask — used to spawn the pickup when unequipping.")]
     [SerializeField] private PickableItemData radiationMaskItemData;
 
+    [Tooltip("Sound effect played (at the player's position, for everyone nearby) when the radiation mask is equipped.")]
+    [SerializeField] private AudioClip maskEquipSound;
+
     [Header("Backpack")]
     [Tooltip("The backpack mesh GameObject on the player's back. Shown when a BackpackPickable is equipped.")]
     [SerializeField] private GameObject backpackMesh;
@@ -32,11 +35,15 @@ public class PlayerEquipmentController : NetworkBehaviour
             backpackMesh.SetActive(visible);
     }
 
-    [Tooltip("Multiplier applied to all radiation accumulation while the mask is worn. 0.2 = 20% of normal rate.")]
-    [SerializeField] private float maskRadiationMultiplier = 0.2f;
+    [Tooltip("Multiplier applied to all radiation accumulation while the mask is worn. 0.05 = 5% of normal rate (much less radiation while masked).")]
+    [SerializeField] private float maskRadiationMultiplier = 0.05f;
 
     private PlayerPickupController _pickupController;
     private PlayerRadiation _radiationController;
+    private PlayerHatController _hatController;
+
+    /// <summary>Hat index that was equipped before the mask was worn, so it can be restored on unequip. -1 = none.</summary>
+    private int _hatIndexBeforeMask = -1;
 
     private readonly NetworkVariable<bool> _isMaskEquipped = new(
         false,
@@ -50,6 +57,7 @@ public class PlayerEquipmentController : NetworkBehaviour
     {
         _pickupController = GetComponent<PlayerPickupController>();
         _radiationController = GetComponent<PlayerRadiation>();
+        _hatController = GetComponent<PlayerHatController>();
     }
 
     public override void OnNetworkSpawn()
@@ -74,7 +82,16 @@ public class PlayerEquipmentController : NetworkBehaviour
             UnequipMask();
     }
 
-    private void OnMaskEquippedChanged(bool previous, bool current) => UpdateMaskVisibility(current);
+    private void OnMaskEquippedChanged(bool previous, bool current)
+    {
+        UpdateMaskVisibility(current);
+
+        // Play the equip sound exactly once, on the equip transition — every client hears it
+        // spatially at the wearer's position. UpdateMaskVisibility alone can't distinguish a real
+        // transition from the initial state sync applied to late-joiners in OnNetworkSpawn.
+        if (current && maskEquipSound != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(maskEquipSound, transform.position);
+    }
 
     private void UpdateMaskVisibility(bool equipped)
     {
@@ -111,6 +128,13 @@ public class PlayerEquipmentController : NetworkBehaviour
             return;
         }
 
+        // Temporarily hide whatever hat is currently worn — it reappears when the mask is unequipped.
+        if (_hatController != null && _hatController.EquippedHatIndex != -1)
+        {
+            _hatIndexBeforeMask = _hatController.EquippedHatIndex;
+            _hatController.RemoveHat();
+        }
+
         EquipMaskServerRpc();
     }
 
@@ -138,6 +162,13 @@ public class PlayerEquipmentController : NetworkBehaviour
         }
 
         UnequipMaskServerRpc();
+
+        // Restore whatever hat was worn before the mask went on.
+        if (_hatController != null && _hatIndexBeforeMask != -1)
+        {
+            _hatController.EquipHat(_hatIndexBeforeMask);
+            _hatIndexBeforeMask = -1;
+        }
 
         // Spawn the mask pickup at the hold point so it lands directly in the player's hand.
         Transform spawnPoint = _pickupController != null ? _pickupController.holdPoint : transform;

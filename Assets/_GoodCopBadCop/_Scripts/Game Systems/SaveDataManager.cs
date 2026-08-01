@@ -329,6 +329,8 @@ public class SaveDataManager : MonoBehaviour
                 QuarantinedOnDay = r.quarantinedOnDay,
                 InfectionScore   = r.infectionScore,
                 IsLegacyMutant   = r.isLegacyMutant,
+                DaysShown        = r.daysShown,
+                LastDayShown     = r.lastDayShown,
             };
         }
 
@@ -653,6 +655,19 @@ public class SuspectSaveEntry
     /// than killed) and is currently a candidate for <see cref="MutantSpawner"/>'s legacy-mutant pool.
     /// </summary>
     public bool IsLegacyMutant;
+
+    /// <summary>
+    /// Number of shifts this suspect has appeared in across the run. Drives "has this suspect been
+    /// seen before" history checks (e.g. <see cref="PC.HasMetSuspect"/>) and DailySuspectManager's
+    /// repeat-appearance logic.
+    /// </summary>
+    public int DaysShown;
+
+    /// <summary>
+    /// Campaign day this suspect was most recently shown on (-1/0 = never shown this run).
+    /// Used to render the suspect's last newspaper/profile entry date.
+    /// </summary>
+    public int LastDayShown;
 }
 
 [Serializable]

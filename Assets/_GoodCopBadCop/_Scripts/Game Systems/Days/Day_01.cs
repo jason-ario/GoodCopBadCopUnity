@@ -495,10 +495,13 @@ public class Day_01 : DayBase
 
         // Blocks the timecard machine from unlocking until the first breach (and any resulting
         // fence-repair follow-up) has fully resolved, even though trash/graffiti — the only other
-        // pending daily tasks today — may finish well before then. Registered up front so it's
-        // guaranteed to be pending no matter how the rest of the day's tasks are ordered.
-        _breachGateTask = new MutantBreachGateTask();
-        ShiftManager.Instance?.RegisterPendingDailyTask(_breachGateTask);
+        // pending daily tasks today — may finish well before then. NOT registered here: doing so
+        // at DayActivated is too early — ShiftManager.OpenWindowSequence (run once the player
+        // clocks in and the shift actually starts) calls ResetSuspectsProcessed(), which clears
+        // every pending daily task, wiping this registration out before the breach ever fires and
+        // leaving clock-out gated only by trash/graffiti. Instead, register it on
+        // ShiftManager.OnShiftStart, which fires after that reset — see RegisterMutantBreachGate.
+        ShiftManager.Instance.OnShiftStart += RegisterMutantBreachGate;
 
         ShiftManager.Instance.OnDayStart += OnDayStarted;
         SuspectController.OnSuspectArrived += OnVladArrivedAtWindow;
@@ -569,7 +572,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart -= RegisterMutantBreachGate;
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
+        }
 
         TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
         TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
@@ -669,7 +675,10 @@ public class Day_01 : DayBase
         ShiftManager.OnNextSuspectReadyForBell -= AutoSummonVlad;
 
         if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnShiftStart -= RegisterMutantBreachGate;
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
+        }
 
         TimecardMachine.OnClockInServer -= OnPlayerClockedIn;
         TimecardMachine.OnClockInAllClients -= OnClockInAllClientsLocal;
@@ -2639,6 +2648,22 @@ public class Day_01 : DayBase
         _breachGateTask = null;
 
         ShowClockOutTask();
+    }
+
+    /// <summary>
+    /// Fired by <see cref="ShiftManager.OnShiftStart"/> once the player clocks in and the booth
+    /// window actually opens for suspects — i.e. right after
+    /// <see cref="ShiftManager"/>'s internal ResetSuspectsProcessed() clears every pending daily
+    /// task for the new day. Creating and registering the gate here (rather than at
+    /// DayActivated) guarantees it survives that reset and stays pending for the rest of the day,
+    /// no matter how quickly trash/graffiti finish. Safe to call more than once.
+    /// </summary>
+    private void RegisterMutantBreachGate()
+    {
+        if (_breachGateTask != null) return;
+
+        _breachGateTask = new MutantBreachGateTask();
+        ShiftManager.Instance?.RegisterPendingDailyTask(_breachGateTask);
     }
 
     // -------------------------------------------------------------------------

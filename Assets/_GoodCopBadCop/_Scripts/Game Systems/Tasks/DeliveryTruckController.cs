@@ -18,10 +18,12 @@ using UnityEngine.Serialization;
 ///      the crate rides along on the roof for the whole trip. _pointB sits in front of the
 ///      checkpoint gate.
 ///   3. On arrival at _pointB, the truck stops and waits — a "shipment is waiting at the gate"
-///      alert is shown (see <see cref="SortMailTask.NotifyShipmentWaitingAtGate"/>) and the truck
-///      idles until a player opens the gate via <see cref="CheckpointGateController"/> (e.g. by
-///      pressing the gate button). Once open, it waits _gateOpenWaitDuration more for the open
-///      animation to finish before continuing.
+///      alert is shown (see <see cref="SortMailTask.NotifyShipmentWaitingAtGate"/>) and keeps
+///      fading out and back in on a loop while the truck idles, until a player opens the gate
+///      via <see cref="CheckpointGateController"/> (e.g. by pressing the gate button) — at which
+///      point the alert is dismissed for good (see <see cref="SortMailTask.NotifyShipmentGateOpened"/>).
+///      Once open, it waits _gateOpenWaitDuration more for the open animation to finish before
+///      continuing.
 ///   4. Drives from _pointB through the (now open) gate to _pointC — the crate still rides along.
 ///   5. On arrival at _pointC, the roof constraint is released and the crate tumbles down to its
 ///      resting spot on the ground. Once it settles, the server spawns the mail delivery via
@@ -186,14 +188,17 @@ public class DeliveryTruckController : NetworkBehaviour
         yield return new WaitForSeconds(driveRevDelay + driveToPointBDuration);
 
         // Truck has stopped at pointB, right in front of the checkpoint gate — alert players
-        // that a shipment is waiting, then wait for a player to actually open the gate (e.g. by
-        // pressing the gate button) before driving through.
+        // that a shipment is waiting (the alert loops — fades out and back in — until the gate
+        // actually opens), then wait for a player to open it (e.g. by pressing the gate button)
+        // before driving through.
         if (checkpointGate != null)
         {
-            SortMailTask.Instance?.NotifyShipmentWaitingAtGate();
-
             if (!checkpointGate.IsOpen)
+            {
+                SortMailTask.Instance?.NotifyShipmentWaitingAtGate();
                 yield return StartCoroutine(WaitForGateOpen());
+                SortMailTask.Instance?.NotifyShipmentGateOpened();
+            }
 
             yield return new WaitForSeconds(gateOpenWaitDuration);
         }

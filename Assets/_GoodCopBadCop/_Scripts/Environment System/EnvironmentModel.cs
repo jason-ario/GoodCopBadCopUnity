@@ -26,8 +26,10 @@ namespace GoodCopBadCop.EnvironmentSystem
         public readonly ReactiveProperty<EnvironmentPreset> CurrentNightPresetMutable = new(null);
 
         /// <summary>
-        /// 0 at the start of a shift (fully on the day preset), 1 once the last suspect in the
-        /// lineup has been processed (fully lerped to the night preset).
+        /// 0 at the start of a shift, 1 once the last suspect in the lineup has been processed
+        /// (dusk). EnvironmentService watches this via SetSuspectProgress/ForceSuspectProgress
+        /// and, the instant it reaches 1, hard-switches CurrentPreset to the night preset — no
+        /// blending happens against this value, it's purely a progress readout.
         /// </summary>
         public readonly ReactiveProperty<float> DayNightProgressMutable = new(0f);
         public readonly ReactiveProperty<bool> CurrentRainEnabledMutable = new(false);
@@ -74,9 +76,9 @@ namespace GoodCopBadCop.EnvironmentSystem
         }
 
         /// <summary>
-        /// Sets the target day/night blend amount (0-1). EnvironmentRenderAdapter smoothly
-        /// catches up to this target rather than snapping, so repeated calls as suspects are
-        /// processed read as a progressive lerp rather than a hard cut.
+        /// Sets the day/night progress readout (0-1). Purely informational for
+        /// EnvironmentRenderAdapter/UI — EnvironmentService is what actually reacts to it by
+        /// hard-switching the preset once it reaches 1.
         /// </summary>
         public void SelectDayNightProgress(float progress)
         {
@@ -84,8 +86,8 @@ namespace GoodCopBadCop.EnvironmentSystem
         }
 
         /// <summary>
-        /// Sets the day/night blend target and immediately snaps to it, bypassing
-        /// EnvironmentRenderAdapter's normal smoothing. Intended for editor debug tooling.
+        /// Sets the day/night progress readout and notifies listeners that this was a forced
+        /// (editor-debug-driven) update rather than one arising from normal gameplay.
         /// </summary>
         public void ForceDayNightProgress(float progress)
         {

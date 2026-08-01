@@ -230,7 +230,10 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             
             bool inRange = hit.distance <= interactDistance;
-            PlacementBoard placementBoard = hit.collider.GetComponent<PlacementBoard>();
+            // Search children too — a PlacementSlot used purely for ghosting/snap-pose is often
+            // authored on a dedicated child Transform (e.g. a mail cubby's snap point) separate
+            // from the GameObject that carries the trigger collider the raycast actually hits.
+            PlacementBoard placementBoard = hit.collider.GetComponentInChildren<PlacementBoard>();
             if (placementBoard == null)
                 placementBoard = FindNearbyPlacementBoard(hit.point);
 
@@ -469,7 +472,9 @@ public class PlayerInteractionController : NetworkBehaviour
 
         foreach (Collider col in nearbyColliders)
         {
-            PlacementBoard board = col.GetComponent<PlacementBoard>();
+            // Search children too — see the matching comment above where placementBoard is
+            // first resolved from the raycast hit.
+            PlacementBoard board = col.GetComponentInChildren<PlacementBoard>();
             if (board == null) continue;
 
             float distance = Vector3.Distance(point, col.ClosestPoint(point));

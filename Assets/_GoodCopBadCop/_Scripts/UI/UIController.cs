@@ -530,11 +530,15 @@ public class UIController : MonoBehaviour
     /// Shows the same bottom-centre reveal-and-fade notification style as the booth waiting
     /// alert, but with a caller-supplied message. Used by tasks (e.g. Sort Mail) that need an
     /// unobtrusive popup that can appear at any time, independent of the booth-waiting alert.
+    /// If <paramref name="loop"/> is true, the notification keeps fading out and back in
+    /// (rather than disappearing for good) until <see cref="HideMailDeliveryNotification"/> is
+    /// called — e.g. for the "shipment is waiting at the gate" alert, which should keep
+    /// resurfacing until a player actually opens the gate.
     /// </summary>
-    public void ShowMailDeliveryNotification(string message)
+    public void ShowMailDeliveryNotification(string message, bool loop = false)
     {
         if (mailDeliveryNotification != null)
-            mailDeliveryNotification.Show(message);
+            mailDeliveryNotification.Show(message, loop);
     }
 
     /// <summary>Hides the mail delivery notification.</summary>

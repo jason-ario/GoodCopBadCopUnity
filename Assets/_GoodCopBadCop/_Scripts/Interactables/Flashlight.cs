@@ -165,7 +165,7 @@ public class Flashlight : PickableObject
     {
         base.InteractWithItem(playerInteractionController, item);
 
-        if (item.name == "Battery")
+        if (item.GetComponent<Battery>() != null)
         {
             if (internalBattery.GetBatteryLevel() < 1)
             {

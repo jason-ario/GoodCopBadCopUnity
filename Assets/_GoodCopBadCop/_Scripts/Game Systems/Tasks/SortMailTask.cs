@@ -660,7 +660,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Shows a lightweight, non-blocking alert on every client telling players a shipment is
     /// waiting at the checkpoint gate. Called by <see cref="DeliveryTruckController"/> when the
     /// truck arrives at the gate and stops, waiting for a player to open it (e.g. via the gate
-    /// button) before continuing on to the drop-off point.
+    /// button) before continuing on to the drop-off point. The alert keeps fading out and back
+    /// in on a loop — it does not disappear for good — until <see cref="NotifyShipmentGateOpened"/>
+    /// is called once the gate is actually opened.
     /// </summary>
     public void NotifyShipmentWaitingAtGate()
     {
@@ -671,7 +673,23 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyShipmentWaitingAtGateClientRpc()
     {
-        UIController.Instance?.ShowMailDeliveryNotification("A shipment is waiting at the gate.");
+        UIController.Instance?.ShowMailDeliveryNotification("A shipment is waiting at the gate.", loop: true);
+    }
+
+    /// <summary>
+    /// Dismisses the looping "shipment is waiting at the gate" alert on every client. Called by
+    /// <see cref="DeliveryTruckController"/> as soon as a player opens the checkpoint gate.
+    /// </summary>
+    public void NotifyShipmentGateOpened()
+    {
+        if (!IsServer) return;
+        NotifyShipmentGateOpenedClientRpc();
+    }
+
+    [ClientRpc]
+    private void NotifyShipmentGateOpenedClientRpc()
+    {
+        UIController.Instance?.HideMailDeliveryNotification();
     }
 
     /// <summary>

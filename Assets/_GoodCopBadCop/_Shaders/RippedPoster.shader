@@ -4,6 +4,7 @@ Shader "GoodCopBadCop/RippedPoster"
     {
         _MainTex        ("Poster Texture",        2D)           = "white" {}
         _Color          ("Tint",                  Color)         = (1,1,1,1)
+        _AlphaCutoff    ("Alpha Cutoff",           Range(0,1))    = 0.5
 
         [Header(Rip Shape)]
         _RipAmount      ("Rip Amount",            Range(0,1))    = 0.40
@@ -41,8 +42,11 @@ Shader "GoodCopBadCop/RippedPoster"
             HLSLPROGRAM
             #pragma vertex   vert
             #pragma fragment frag
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
 
@@ -57,6 +61,7 @@ Shader "GoodCopBadCop/RippedPoster"
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
                 half4  _Color;
+                half   _AlphaCutoff;
                 half   _RipAmount;
                 half   _RipScale;
                 half   _RipSeed;
@@ -83,6 +88,7 @@ Shader "GoodCopBadCop/RippedPoster"
                 float3 normalWS   : TEXCOORD1;
                 float3 positionWS : TEXCOORD2;
                 float  fogFactor  : TEXCOORD3;
+                float4 shadowCoord : TEXCOORD4;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -158,6 +164,7 @@ Shader "GoodCopBadCop/RippedPoster"
                 OUT.normalWS   = vni.normalWS;
                 OUT.uv         = TRANSFORM_TEX(IN.uv, _MainTex);
                 OUT.fogFactor  = ComputeFogFactor(vpi.positionCS.z);
+                OUT.shadowCoord = GetShadowCoord(vpi);
                 return OUT;
             }
 
@@ -178,14 +185,30 @@ Shader "GoodCopBadCop/RippedPoster"
                 // Sample texture
                 half4 texColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv) * _Color;
 
+                // Discard fully transparent parts of the texture (e.g. torn edges baked into art)
+                clip(texColor.a - _AlphaCutoff);
+
                 // Lighting: main directional + URP ambient/SH (same as URP Lit shader)
                 float3 normalWS  = normalize(IN.normalWS);
-                Light  mainLight = GetMainLight();
+                Light  mainLight = GetMainLight(IN.shadowCoord);
                 half   NdotL     = saturate(dot(normalWS, mainLight.direction));
 
                 // SampleSH gives correct ambient from the scene's environment/skybox/probes
                 half3  ambient   = SampleSH(normalWS);
-                half3  diffuse   = mainLight.color * NdotL + ambient;
+                half3  diffuse   = mainLight.color * mainLight.shadowAttenuation * NdotL + ambient;
+
+                // Additional (point/spot) lights
+                #if defined(_ADDITIONAL_LIGHTS)
+                    InputData inputData = (InputData)0;
+                    inputData.positionWS             = IN.positionWS;
+                    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
+                    uint pixelLightCount = GetAdditionalLightsCount();
+                    LIGHT_LOOP_BEGIN(pixelLightCount)
+                        Light light = GetAdditionalLight(lightIndex, IN.positionWS, half4(1,1,1,1));
+                        half3 attenuatedColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
+                        diffuse += attenuatedColor * saturate(dot(normalWS, light.direction));
+                    LIGHT_LOOP_END
+                #endif
 
                 half3 litColor = texColor.rgb * diffuse;
 
@@ -229,9 +252,13 @@ Shader "GoodCopBadCop/RippedPoster"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
                 half4  _Color;
+                half   _AlphaCutoff;
                 half   _RipAmount;
                 half   _RipScale;
                 half   _RipSeed;
@@ -326,6 +353,8 @@ Shader "GoodCopBadCop/RippedPoster"
             half4 fragShadow(Varyings IN) : SV_Target
             {
                 clip(RipDist(IN.uv));
+                half texAlpha = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv).a;
+                clip(texAlpha - _AlphaCutoff);
                 return 0;
             }
 
@@ -350,9 +379,13 @@ Shader "GoodCopBadCop/RippedPoster"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
                 half4  _Color;
+                half   _AlphaCutoff;
                 half   _RipAmount;
                 half   _RipScale;
                 half   _RipSeed;
@@ -427,6 +460,8 @@ Shader "GoodCopBadCop/RippedPoster"
             float4 fragDepth(Varyings IN) : SV_Target
             {
                 clip(RipDist(IN.uv));
+                half texAlpha = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv).a;
+                clip(texAlpha - _AlphaCutoff);
                 float3 n = normalize(IN.normalWS) * 0.5 + 0.5;
                 return float4(n, 1.0);
             }

@@ -197,6 +197,13 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     private readonly HashSet<string> _correctCategoryTypeNames = new HashSet<string>();
 
+    // Individual symptom (anomaly instance) counts for the post-verdict popup — populated by
+    // CalculateCategoryScores. Distinct from the category-level fields above: a single checked
+    // category box can cover multiple active anomaly instances, and the popup should reflect
+    // the actual number of symptoms present/found rather than the number of category checkboxes.
+    private int _symptomsFound = 0;
+    private int _symptomsTotal = 0;
+
     [Header("Coupon Payouts")]
     [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
@@ -1193,6 +1200,8 @@ public class SuspectController : NetworkBehaviour
         _categoriesMissed = 0;
         _totalActiveCategories = 0;
         _correctCategoryTypeNames.Clear();
+        _symptomsFound = 0;
+        _symptomsTotal = 0;
 
         if (suspectCharacter == null)
             return 100;
@@ -1226,12 +1235,39 @@ public class SuspectController : NetworkBehaviour
             else if (!wasChecked && hasAnomaly)  _categoriesMissed++;
         }
 
+        // Individual symptom counts: total is every active anomaly instance on the suspect,
+        // and found is how many of those instances belong to a category the player correctly
+        // identified. This is what the post-verdict popup shows (e.g. "Found 1/2 symptoms"),
+        // since a suspect can have several symptoms stacked inside a single checked category.
+        _symptomsTotal = ac.activeAnomalies.Count;
+        foreach (Anomaly anomaly in ac.activeAnomalies)
+        {
+            if (AnomalyBelongsToCorrectCategory(anomaly))
+                _symptomsFound++;
+        }
+
         // Accuracy = fraction of active categories correctly identified.
         // A clean suspect (no active categories) is 100% only if the player made no false claims.
         if (_totalActiveCategories == 0)
             return _categoriesFalsePositive == 0 ? 100 : 0;
 
         return Mathf.Max(0, (_categoriesCorrect * 100) / _totalActiveCategories);
+    }
+
+    /// <summary>
+    /// Walks <paramref name="anomaly"/>'s type hierarchy up to its category base class and
+    /// returns true if that category name is in <see cref="_correctCategoryTypeNames"/>.
+    /// </summary>
+    private bool AnomalyBelongsToCorrectCategory(Anomaly anomaly)
+    {
+        System.Type t = anomaly.GetType();
+        while (t != null && t != typeof(Anomaly))
+        {
+            if (_correctCategoryTypeNames.Contains(t.Name))
+                return true;
+            t = t.BaseType;
+        }
+        return false;
     }
 
     // Keep for backward compat with any external callers; routes to the new implementation.
@@ -1302,8 +1338,8 @@ public class SuspectController : NetworkBehaviour
 
         ShowScoringResultsClientRpc(
             percentReward,
-            _categoriesCorrect,
-            _totalActiveCategories,
+            _symptomsFound,
+            _symptomsTotal,
             perfectBonusAmount + evidenceBonus,
             totalCoupons);
     }
@@ -1311,26 +1347,26 @@ public class SuspectController : NetworkBehaviour
     [ClientRpc]
     private void ShowScoringResultsClientRpc(
         int anomalyAmount,
-        int correctCount,
-        int totalCount,
+        int symptomsFound,
+        int symptomsTotal,
         int totalBonusAmount,
         int totalCoupons)
     {
-        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, correctCount, totalCount, totalBonusAmount, totalCoupons));
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, symptomsFound, symptomsTotal, totalBonusAmount, totalCoupons));
     }
 
     private IEnumerator ShowCashPopUpSequence(
         int anomalyAmount,
-        int correctCount,
-        int totalCount,
+        int symptomsFound,
+        int symptomsTotal,
         int totalBonusAmount,
         int totalCoupons)
     {
         yield return new WaitForSeconds(2f);
 
-        // Message 1: Category identification breakdown.
-        string anomalyMessage = totalCount > 0
-            ? $"Categories Identified: {correctCount}/{totalCount}"
+        // Message 1: Individual symptom identification breakdown.
+        string anomalyMessage = symptomsTotal > 0
+            ? $"Found {symptomsFound}/{symptomsTotal} symptoms"
             : "No anomalies present";
         UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
 
