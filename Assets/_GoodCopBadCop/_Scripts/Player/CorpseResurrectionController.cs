@@ -172,9 +172,11 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (mutantEnemy != null)
         {
             // Must run before this NetworkObject spawns so MutantEnemy stays dormant until
-            // Resurrect() explicitly calls InitialiseServer() on it.
+            // Resurrect() explicitly calls InitialiseServer() on it. MutantEnemy's own Unity
+            // 'enabled' flag is never toggled (it stays permanently true from its own Awake) —
+            // dormancy is tracked by its internal _isActive NetworkVariable instead, which
+            // already defaults to false, so there is nothing to disable here.
             mutantEnemy.DisableAutoInit();
-            mutantEnemy.enabled = false;
         }
 
         // Cache bones and their spawn-pose localPositions now, before any ragdoll
@@ -307,7 +309,6 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (mutantEnemy != null)
         {
             mutantEnemy.SetAnimator(_animator);
-            mutantEnemy.enabled = true;
             mutantEnemy.InitialiseServer();
         }
         else

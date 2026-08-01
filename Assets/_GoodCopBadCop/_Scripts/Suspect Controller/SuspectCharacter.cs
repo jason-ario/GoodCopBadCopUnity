@@ -136,7 +136,10 @@ public class SuspectCharacter : Interactable
 
         // Disable MutantEnemy before AssignMutatedAnimator so any exception inside
         // AssignMutatedAnimator cannot leave it in an active state.
-        if (_mutantEnemy != null) _mutantEnemy.enabled = false;
+        // NOTE: MutantEnemy's own Unity 'enabled' flag is never toggled anymore (it stays
+        // permanently true) — dormancy is tracked by MutantEnemy's internal _isActive
+        // NetworkVariable instead, which InitialiseServer() sets. It already defaults to
+        // false, so there is nothing to reset here before InitialiseServer() runs.
 
         AssignMutatedAnimator();
         ActivateFullMutantFormClientRpc();
@@ -235,8 +238,7 @@ public class SuspectCharacter : Interactable
         if (_baseVersion != null) _baseVersion.SetActive(false);
         if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
         AssignMutatedAnimator();
-
-        if (_mutantEnemy != null) _mutantEnemy.enabled = false;
+        // See ActivateFullMutantForm above — MutantEnemy's 'enabled' flag is never toggled.
     }
 
     /// <summary>
@@ -319,7 +321,7 @@ public class SuspectCharacter : Interactable
 
         _isMutant = true;
         StopNavigation();
-        enabled = false;
+        _suspectUpdateDisabled = true;
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
         SetMutantVoiceClientRpc(true);
 
@@ -356,7 +358,6 @@ public class SuspectCharacter : Interactable
             return;
         }
 
-        _mutantEnemy.enabled = true;
         _mutantEnemy.InitialiseServer();
         EnableMutantEnemyClientRpc();
     }
@@ -364,7 +365,9 @@ public class SuspectCharacter : Interactable
     [ClientRpc]
     private void EnableMutantEnemyClientRpc()
     {
-        if (_mutantEnemy != null) _mutantEnemy.enabled = true;
+        // No-op now that MutantEnemy's 'enabled' flag is never toggled — its InitialiseServer()
+        // call already set its internal _isActive NetworkVariable, which replicates on its own.
+        // Kept as a harmless RPC stub in case future callers still expect this hook to exist.
     }
 
     /// <summary>
@@ -412,7 +415,7 @@ public class SuspectCharacter : Interactable
 
         ActivateFullMutantForm();
         _isMutant = true;
-        enabled = false;
+        _suspectUpdateDisabled = true;
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
         SetMutantVoiceClientRpc(true);
 
@@ -434,22 +437,21 @@ public class SuspectCharacter : Interactable
             _mutantEnemy.SetAggroTarget(initialAggroTarget);
             _mutantEnemy.SetForceAggro(true);
         }
-        _mutantEnemy.enabled = true;
         _mutantEnemy.InitialiseServer();
         EnableMutantEnemyClientRpc();
     }
 
     /// <summary>
-    /// Disables <see cref="SuspectCharacter"/> on all non-server clients.
-    /// When <paramref name="enableMutantEnemy"/> is true also enables <see cref="MutantEnemy"/>
-    /// directly (fallback path). The preferred path lets <see cref="MutantSuspectBehaviour"/>
-    /// enable <see cref="MutantEnemy"/> via its own ClientRpc after breakthrough.
+    /// Disables <see cref="SuspectCharacter"/>'s own Update() on all non-server clients.
+    /// When <paramref name="enableMutantEnemy"/> is true, the fallback path expects
+    /// <see cref="MutantEnemy"/>'s InitialiseServer()-driven _isActive NetworkVariable to have
+    /// already replicated (no explicit action needed here). The preferred path lets
+    /// <see cref="MutantSuspectBehaviour"/> hand off to <see cref="MutantEnemy"/> after breakthrough.
     /// </summary>
     [ClientRpc]
     private void TransitionToMutantBehaviorClientRpc(bool enableMutantEnemy)
     {
-        if (enableMutantEnemy && _mutantEnemy != null) _mutantEnemy.enabled = true;
-        enabled = false;
+        _suspectUpdateDisabled = true;
     }
 
     [ClientRpc]
@@ -682,6 +684,18 @@ public class SuspectCharacter : Interactable
 
     private bool _facingPlayer;
 
+    /// <summary>
+    /// Gates Update() once this suspect hands off control to MutantEnemy. Previously this was
+    /// done by setting this NetworkBehaviour's own Unity 'enabled' flag to false — but doing so
+    /// at runtime made this component's inclusion in Netcode's scene-object synchronization
+    /// stream diverge between the server (component disabled) and any client that joins later
+    /// (freshly-loaded, still enabled), corrupting that client's sync buffer and crashing it.
+    /// This flag is purely local/cosmetic (it only suppresses a look-at-player rotation in
+    /// Update()), so it never needs to be perfectly synced to late joiners the way the actual
+    /// networked mutant-transition state does.
+    /// </summary>
+    private bool _suspectUpdateDisabled;
+
     [Header("Combat")]
     [Tooltip("Maximum health points. Reaching zero triggers the death animation.")]
     [SerializeField] private float maxHealth = 100f;
@@ -790,20 +804,17 @@ public class SuspectCharacter : Interactable
             _mutantSuspectBehaviour = GetComponent<MutantSuspectBehaviour>();
 
         // MutantEnemy must stay fully dormant until BeginMutantBehavior() fires after the booth
-        // cutscene. Disabling the component's 'enabled' flag alone is NOT enough — Netcode calls
-        // OnNetworkSpawn() on every NetworkBehaviour regardless of its enabled state, so without
-        // DisableAutoInit() here, MutantEnemy.InitialiseServer() would still fire the instant this
-        // NetworkObject spawns (immediately for scene-placed suspects, since in-scene NetworkObjects
-        // auto-spawn on scene load) and throw trying to drive a NavMeshAgent that Awake disables
-        // below. Both calls must happen before NetworkObject.Spawn(), which Awake guarantees.
+        // cutscene. DisableAutoInit() prevents InitialiseServer() from firing automatically on
+        // spawn — MutantEnemy's own internal _isActive flag (a NetworkVariable, defaulting to
+        // false) tracks dormancy from here on, not this component's Unity 'enabled' flag, which
+        // MutantEnemy now keeps permanently true from its own Awake(). Toggling 'enabled' at
+        // runtime made a live mutant's component-inclusion state diverge from a late-joining
+        // client's freshly-loaded default state, corrupting that client's scene synchronization
+        // buffer and crashing it outright — see MutantEnemy._isActive for the full explanation.
         if (_mutantEnemy != null)
         {
             _mutantEnemy.DisableAutoInit();
-            _mutantEnemy.enabled = false;
         }
-
-        if (_mutantSuspectBehaviour != null)
-            _mutantSuspectBehaviour.enabled = false;
 
         // Cache and disable NavMeshAgent by default; server enables it via InitNavigation().
         _navAgent = GetComponent<NavMeshAgent>();
@@ -1237,7 +1248,7 @@ public class SuspectCharacter : Interactable
     /// </summary>
     public override void Highlight(bool highlight)
     {
-        if (_junkItem == null || !_junkItem.enabled)
+        if (_junkItem == null || !_junkItem.IsCollectible.Value)
             return;
 
         base.Highlight(highlight);
@@ -1246,7 +1257,7 @@ public class SuspectCharacter : Interactable
     public override void Interact(PlayerInteractionController player)
     {
         // Route to junk collection when the body is collectible (JunkItem enabled on death).
-        if (_junkItem != null && _junkItem.enabled)
+        if (_junkItem != null && _junkItem.IsCollectible.Value)
         {
             _junkItem.Interact(player);
             return;
@@ -1394,6 +1405,7 @@ public class SuspectCharacter : Interactable
 
         // Apply immediately on the server so TriggerTask's FindObjectsByType scan
         // counts this body as a pre-existing JunkItem before spawning trash.
+        _junkItem.SetCollectible(true);
         ApplyJunkPickupState();
         EnableJunkPickupClientRpc();
     }
@@ -1413,7 +1425,6 @@ public class SuspectCharacter : Interactable
 
     private void ApplyJunkPickupState()
     {
-        _junkItem.enabled = true;
         SetCanInteract(true);
         interactText = JunkItem.DefaultInteractText;
 
@@ -1425,7 +1436,7 @@ public class SuspectCharacter : Interactable
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         // Route to junk collection when the body is collectible (JunkItem enabled on death).
-        if (_junkItem != null && _junkItem.enabled)
+        if (_junkItem != null && _junkItem.IsCollectible.Value)
         {
             _junkItem.InteractWithItem(playerInteractionController, item);
             return;
@@ -1646,6 +1657,8 @@ public class SuspectCharacter : Interactable
 
     private void Update()
     {
+        if (_suspectUpdateDisabled) return;
+
         if (_facingPlayer)
         {
             Vector3 targetPosition = PlayerInstance.Instance.transform.position;

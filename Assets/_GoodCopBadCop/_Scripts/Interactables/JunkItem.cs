@@ -13,7 +13,9 @@ using UnityEngine;
 ///   - Collider on the Interactable layer
 ///   - Trash Bag PickableItemData assigned to itemsThatCanInteractWith in the Inspector
 /// Standalone junk prefabs must be registered as Network Prefabs in the NetworkManager.
-/// When added to a SuspectCharacter, keep the component disabled — it is enabled on death.
+/// When added to a SuspectCharacter, it starts non-collectible — SuspectCharacter.EnableJunkPickup()
+/// marks it collectible (via IsCollectible) on death. This component's own Unity 'enabled' flag is
+/// never toggled; see IsCollectible for why.
 /// </summary>
 public class JunkItem : Interactable
 {
@@ -33,6 +35,28 @@ public class JunkItem : Interactable
     /// Set this immediately after spawning on the server.
     /// </summary>
     [System.NonSerialized] public System.Action OnCollected;
+
+    /// <summary>
+    /// Server-authoritative "is this currently collectible" flag. Replaces toggling this
+    /// component's own Unity 'enabled' flag: doing so at runtime (enabling a JunkItem added to
+    /// a SuspectCharacter once the suspect dies) made this NetworkBehaviour's inclusion in
+    /// Netcode's scene-object synchronization stream diverge between the server (enabled) and
+    /// any client that joins afterward (freshly-loaded, still disabled), corrupting that
+    /// client's sync buffer and crashing it. Being a NetworkVariable, its current value is
+    /// delivered correctly to every client — including late joiners — via ordinary replication.
+    /// </summary>
+    public readonly NetworkVariable<bool> IsCollectible = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Server-only. Marks this body as collectible junk (or clears it). Does not touch
+    /// this component's Unity 'enabled' flag — see <see cref="IsCollectible"/>.</summary>
+    public void SetCollectible(bool collectible)
+    {
+        if (!IsServer) return;
+        IsCollectible.Value = collectible;
+    }
 
     protected override void Awake()
     {

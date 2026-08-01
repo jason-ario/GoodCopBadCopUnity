@@ -255,7 +255,6 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 _mutantEnemy.SetAggroTarget(_controller.transform);
             
             _mutantEnemy.SetForceAggro(true);
-            _mutantEnemy.enabled = true;
             _mutantEnemy.InitialiseServer();
 
             // Defer the lineup slot release until the mutant is removed from play (fled or died),
@@ -631,12 +630,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _animator.SetBool(paramName, value);
     }
 
-    /// <summary>Enables MutantEnemy on all clients so chase animations and logic activate.</summary>
+    /// <summary>No-op now that MutantEnemy's 'enabled' flag is never toggled — its
+    /// InitialiseServer() call already set its internal _isActive NetworkVariable, which
+    /// replicates on its own. Kept as a harmless RPC stub in case other callers still expect
+    /// this hook to exist.</summary>
     [ClientRpc]
     private void EnableMutantEnemyClientRpc()
     {
-        if (_mutantEnemy != null)
-            _mutantEnemy.enabled = true;
     }
 
     /// <summary>Triggers hit feedback (sound + shake) on the shutter for all clients.</summary>

@@ -256,6 +256,26 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>
+    /// Server-authoritative gameplay-active flag. Replaces toggling <c>enabled</c> on this
+    /// component: this NetworkBehaviour's own Unity-level enabled state must never change again
+    /// (see <see cref="Awake"/>) because Netcode decides which NetworkBehaviours to include in a
+    /// scene-object's synchronization stream based on each machine's own local
+    /// isActiveAndEnabled at that moment — if the server had this component enabled (active
+    /// mutant) while a newly-joining client's freshly-loaded copy still had it disabled (its own
+    /// Awake-time default), the two machines built different-length synchronization payloads for
+    /// the same object, corrupting the byte stream and native-crashing the client
+    /// (NetworkObject.SynchronizeNetworkBehaviours). Being a NetworkVariable, this flag's current
+    /// value is delivered correctly to every client — including ones that join long after the
+    /// mutant activated — via ordinary variable replication instead of a ClientRpc that only
+    /// reaches whoever happens to be connected at the moment it fires.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isActive = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -267,7 +287,14 @@ public class MutantEnemy : NetworkBehaviour
 
         if (lookAnimator == null)
             lookAnimator = GetComponentInChildren<FIMSpace.FLook.FLookAnimator>(true);
+
+        // Always stay enabled — see the comment on _isActive above. Dormancy is now driven
+        // entirely by _isActive (defaults to false), never by this component's own Unity
+        // enabled flag, so every client's synchronization payload for this NetworkBehaviour
+        // stays consistent regardless of when it joins.
+        enabled = true;
     }
+
 
     public override void OnNetworkSpawn()
     {
@@ -314,9 +341,10 @@ public class MutantEnemy : NetworkBehaviour
 
         _health = data.maxHealth;
 
-        // Ensure the component is active so Update() and ChaseLoop() run correctly
-        // even if the prefab has the script disabled by default.
-        enabled = true;
+        // Marks this mutant as gameplay-active. Does NOT touch this component's Unity
+        // enabled flag — that stays permanently true from Awake() onward (see _isActive).
+        if (IsServer)
+            _isActive.Value = true;
 
         _agent.speed = data.moveSpeed;
         _agent.angularSpeed = data.angularSpeed;
@@ -630,7 +658,7 @@ public class MutantEnemy : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServer || !_agent.isActiveAndEnabled) return;
+        if (!IsServer || !_isActive.Value || !_agent.isActiveAndEnabled) return;
 
         // Always sync locomotion state so clients see movement during flee even though _isDead is true.
         _networkSpeed.Value = _agent.velocity.magnitude;
