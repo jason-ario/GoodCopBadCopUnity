@@ -351,12 +351,20 @@ public class LobbyManager : MonoBehaviour
     // INVITES
     // =========================
 
-    public void OpenInviteFriendsPopup()
+    public async void OpenInviteFriendsPopup()
     {
         if (CurrentLobby.Id == 0)
         {
-            Debug.LogWarning("Cannot open invite popup: no active Steam lobby.");
-            return;
+            // No lobby yet (e.g. the scene was entered directly instead of via the
+            // normal host flow). Create one on the fly so the invite overlay always
+            // has a valid lobby to invite friends into.
+            Debug.LogWarning("[OpenInviteFriendsPopup] No active Steam lobby — creating one now.");
+            bool created = await CreateLobby();
+            if (!created)
+            {
+                Debug.LogError("[OpenInviteFriendsPopup] Failed to create a lobby — cannot open invite overlay.");
+                return;
+            }
         }
 
         inviteOverlayWasOpenedByUs = true;

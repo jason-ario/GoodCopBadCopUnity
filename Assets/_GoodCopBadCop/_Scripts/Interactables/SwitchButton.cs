@@ -63,24 +63,30 @@ public class SwitchButton : Interactable
     public void PowerOff()
     {
         powerOn = false;
-        anim.SetBool("Ready", false);
+
+        // Route through SetReady (not a bare anim.SetBool) so buttonReady and the visual
+        // never diverge, and the server rebroadcasts the false state to every client.
+        SetReady(false);
     }
 
     public void PowerOn()
     {
         powerOn = true;
 
-        // Reconcile with the authoritative game state on top of the locally cached
-        // buttonReady flag. A forced/scripted outage can hit mid-frame while
-        // HandleNextSuspectReady's deferred (one-frame) coroutine is still pending —
-        // e.g. if the outage deactivates the booth objects and aborts that coroutine —
-        // which would otherwise leave buttonReady stuck at false forever even though a
-        // suspect is genuinely waiting to be summoned. ShiftManager.NextSuspectReadyForBell
-        // is only meaningful server-side (it is not networked), but that's sufficient:
-        // the server's own SetReady(true) call always rebroadcasts to every client below.
-        if (buttonReady || (IsServer && ShiftManager.NextSuspectReadyForBell))
+        // Server-authoritative recompute: always re-derive from the live game state
+        // (ShiftManager.NextSuspectReadyForBell) and always rebroadcast via SetReady, rather
+        // than only reacting when a locally-cached buttonReady already happened to be true.
+        //
+        // Previously this only called SetReady(true) conditionally, so a client whose local
+        // buttonReady cache had gone stale (e.g. a dropped/missed SetReadyClientRpc, or the
+        // deferred one-frame HandleNextSuspectReady->SetReadyIfStillPending coroutine getting
+        // aborted mid-flight by the outage) would never be told to re-sync — the button kept
+        // working (HandleButtonPressServer only ever checks the server's own buttonReady) but
+        // stayed visually dark on that client forever. Unconditionally rebroadcasting here
+        // closes that gap: every power-restore is now a hard resync point for every client.
+        if (IsServer)
         {
-            SetReady(true);
+            SetReady(ShiftManager.NextSuspectReadyForBell);
         }
     }
 
@@ -143,24 +149,20 @@ public class SwitchButton : Interactable
 
     /// <summary>
     /// Authoritative button-press logic. Must run on the server only.
+    /// The switch's sole function is summoning the next suspect once the shift signals one
+    /// is ready — starting the shift itself is handled by <see cref="TimecardMachine"/>'s
+    /// clock-in punch.
     /// </summary>
     private void HandleButtonPressServer()
     {
-        if (!buttonReady || !powerOn) return;
+        if (!buttonReady || !powerOn || !ShiftManager.NextSuspectReadyForBell) return;
 
         SetReady(false);
         NotifyPressedClientRpc();
         PlayButtonSoundClientRpc();
 
-        if (!ShiftManager.Instance.shiftStarted.Value)
-        {
-            ShiftManager.Instance.TryStartShift();
-        }
-        else if (ShiftManager.NextSuspectReadyForBell)
-        {
-            ShiftManager.Instance.PlayBuzzerSoundNetworked();
-            SuspectController.Instance.NextSuspect();
-        }
+        ShiftManager.Instance.PlayBuzzerSoundNetworked();
+        SuspectController.Instance.NextSuspect();
     }
 
     /// <summary>Broadcasts the press event to every client so local listeners can react.</summary>

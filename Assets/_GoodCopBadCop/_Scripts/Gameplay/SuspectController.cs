@@ -1872,6 +1872,20 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Forces every client's dialogue mode closed for the suspect currently being processed by
+    /// a verdict. Fixes an edge case where one player delivers the verdict while another player
+    /// is still mid-dialogue with that same suspect: that other client's suspect cam (and
+    /// movement/look lock) would otherwise never be torn down, leaving their camera stuck on the
+    /// suspect as they walk away — and blocking whatever plays next (e.g. the Alexei cutscene).
+    /// No-op on clients whose local player is not currently in dialogue mode.
+    /// </summary>
+    [ClientRpc]
+    private void ForceExitDialogueForVerdictClientRpc()
+    {
+        DialogueChoiceSystem.Instance?.ForceExitDialogueForVerdict();
+    }
+
+    /// <summary>
     /// Performs the full verdict sequence: accuracy calculation, payout, and suspect processing.
     /// Must only be called on the server.
     /// </summary>
@@ -1897,6 +1911,13 @@ public class SuspectController : NetworkBehaviour
             ochoEncounter.HandleVerdictAttempt(folder);
             return;
         }
+
+        // Edge case: another player may still be mid-dialogue with this suspect (they clicked
+        // in right as this verdict was delivered). Dialogue mode is tracked as local, per-client
+        // state, so without this broadcast that other client's suspect cam would never be
+        // deactivated and would stay locked onto the suspect as they walk away, hiding whatever
+        // plays next (e.g. the Alexei cutscene). No-op on clients not currently in dialogue.
+        ForceExitDialogueForVerdictClientRpc();
 
         suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();
 

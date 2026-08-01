@@ -147,7 +147,16 @@ public class ExamPage : FolderItem
     private void SetupRenderTexture()
     {
         if (_checklistCamera == null || _paperRenderer == null)
+        {
+            Debug.LogWarning($"[ExamPage] SetupRenderTexture: '{name}' is missing _checklistCamera or _paperRenderer — this page will keep rendering the shared default checklist texture instead of a unique per-instance one, which can make its checklist appear to show another page's content.");
             return;
+        }
+
+        if (_paperRenderer.sharedMaterials.Length < 2)
+        {
+            Debug.LogWarning($"[ExamPage] SetupRenderTexture: '{name}' has fewer than 2 material slots on its paper renderer — cannot create a unique overlay material instance, so this page will keep rendering the shared default checklist texture instead of a unique per-instance one.");
+            return;
+        }
 
         // Clone the descriptor from the project-asset template so the runtime RT inherits all
         // GPU flags (depth format, color format, MSAA, etc.) that URP's DBuffer/Decal pass

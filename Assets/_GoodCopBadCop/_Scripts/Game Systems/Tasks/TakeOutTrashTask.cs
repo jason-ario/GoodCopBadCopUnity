@@ -421,19 +421,30 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Registers an externally-spawned <see cref="JunkItem"/>'s NetworkObject with this task
-    /// (e.g. a gore chunk dropped by a killed mutant that landed inside the yard). Collection
-    /// is already tracked generically via the static <see cref="JunkItem.OnAnyJunkItemCollected"/>
-    /// event, so this only needs to keep the HUD denominator accurate: if the task is currently
-    /// active, the item is added to the tracked list and the total count is incremented
-    /// immediately. If the task hasn't started yet, this is a no-op — the item will be picked
-    /// up automatically by <see cref="TriggerTask"/> or <see cref="ActivateForExistingItems"/>
-    /// once the task begins, since it will already be an active JunkItem in the scene.
-    /// Server-only.
+    /// (e.g. a gore chunk dropped by a killed mutant that landed inside the yard, or a corpse
+    /// that just became collectible junk). Collection is already tracked generically via the
+    /// static <see cref="JunkItem.OnAnyJunkItemCollected"/> event, so this only needs to keep
+    /// the HUD denominator accurate.
+    ///
+    /// If the task is already active, the item is added to the tracked list and the total
+    /// count is incremented immediately. If no trash task is currently running, this call
+    /// dynamically starts one via <see cref="ActivateForExistingItems"/> — since the caller
+    /// already enabled/spawned <paramref name="netObj"/> before calling this, it (plus any
+    /// other junk already active in the scene) is swept up into the freshly-activated task
+    /// rather than being silently dropped. Server-only.
     /// </summary>
     public void RegisterExternalJunkItem(NetworkObject netObj)
     {
-        if (!IsServer || netObj == null || !_taskActive)
+        if (!IsServer || netObj == null)
             return;
+
+        if (!_taskActive)
+        {
+            // No active trash task — dynamically trigger one for whatever junk is already
+            // active in the scene, which by now includes netObj itself.
+            ActivateForExistingItems();
+            return;
+        }
 
         _spawnedItems.Add(netObj);
         _totalCount.Value++;

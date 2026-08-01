@@ -95,8 +95,17 @@ public class JunkItem : Interactable
         if (bag.IsFull) return;
 
         bag.AddJunk();
+
+        // Despawn BEFORE firing the collection events: TakeOutTrashTask.OnJunkItemCollected
+        // prunes its tracked list by checking NetworkObject.IsSpawned, so listeners must see
+        // this item as already despawned, otherwise the just-collected item survives that
+        // prune and is only removed on the *next* collection — permanently leaking a stale
+        // "ghost" entry for the last item of any run (nothing ever prunes it again), which
+        // keeps ThreatLevel (and therefore CheckpointIntegrityService's score) from ever
+        // fully reaching 0/100% even once everything visible has been cleaned up.
+        NetworkObject.Despawn(destroy: true);
+
         OnCollected?.Invoke();
         OnAnyJunkItemCollected?.Invoke();
-        NetworkObject.Despawn(destroy: true);
     }
 }

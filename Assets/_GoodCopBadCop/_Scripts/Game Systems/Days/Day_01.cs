@@ -33,6 +33,15 @@ public class Day_01 : DayBase
     {
         Instance = this;
     }
+
+    /// <summary>
+    /// Day 1 shows its own hand-scripted "Process N subjects" counter (see
+    /// <see cref="ShowSubjectCounterTask"/> below) only after Vlad's opening tutorial sequence
+    /// completes — suppress DayBase's automatic version, which would otherwise show a second,
+    /// redundant counter the moment the shift starts.
+    /// </summary>
+    protected override bool UseAutomaticSubjectCounterTask => false;
+
     [Header("Day 1 — Fire Barrel")]
     [Tooltip("The yard fire barrel — lit for the entirety of Day 1, extinguished at the start of Day 2.")]
     [SerializeField] private FirePit _fireBarrel;
@@ -359,6 +368,19 @@ public class Day_01 : DayBase
              "task. The repaired/total count is appended automatically, e.g. 'Fix Perimeter Fences 1/3'.")]
     [SerializeField] private string _taskFixFencesText = "Fix Perimeter Fences";
 
+    [Header("Day 1 — Take Out Gore / Clean Blood (post-breach)")]
+    [Tooltip("Base objective text shown in the tutorial list for the post-breach gore clean-up " +
+             "task (corpses and gore pieces the breach left in the yard). The deposited/total " +
+             "count is appended automatically, e.g. 'Take out the gore 1/3'. Only shown if the " +
+             "breach actually left junk behind.")]
+    [SerializeField] private string _taskTakeOutGoreText = "Take out the gore";
+
+    [Tooltip("Base objective text shown in the tutorial list for the post-breach blood clean-up " +
+             "task (splatters left by gore that landed in the yard). The scrubbed/total count is " +
+             "appended automatically, e.g. 'Clean all blood splatter 1/3'. Only shown if the " +
+             "breach actually left blood behind.")]
+    [SerializeField] private string _taskCleanBloodSplatterText = "Clean all blood splatter";
+
     // Guards against OnDayStarted running more than once if OnDayStart fires twice.
     private bool _dayStartedFired = false;
 
@@ -425,6 +447,19 @@ public class Day_01 : DayBase
     // Active post-breach "Fix Perimeter Fences" tutorial objective — null when no fences were
     // damaged by the breach, or once repairs are complete.
     private TutorialObjectiveItem _taskFixFences;
+
+    // Active post-breach "Take out the gore" / "Clean all blood splatter" tutorial objectives —
+    // null when the breach left nothing behind to collect/scrub, or once cleanup is complete.
+    private TutorialObjectiveItem _taskTakeOutGore;
+    private TutorialObjectiveItem _taskCleanBloodSplatter;
+
+    // Post-breach cleanup barrier — CompleteMutantBreachGateAndAdvance only runs once fences,
+    // gore, and blood have all individually resolved (see BeginPostBreachFenceCheck and
+    // TryCompleteMutantBreachGate). Each flag starts false at the top of BeginPostBreachFenceCheck
+    // and flips true either immediately (nothing to do) or once its objective completes.
+    private bool _fencesResolved;
+    private bool _goreResolved;
+    private bool _bloodResolved;
 
     // Both the trash and graffiti objectives are added to the same shared
     // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
@@ -625,9 +660,14 @@ public class Day_01 : DayBase
 
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
         if (CleanGraffitiTask.Instance != null)
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
+        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
+        if (CleanBloodTask.Instance != null)
+            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
 
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
@@ -650,6 +690,8 @@ public class Day_01 : DayBase
         _breachGateTask?.Complete();
         _breachGateTask = null;
         _taskFixFences = null;
+        _taskTakeOutGore = null;
+        _taskCleanBloodSplatter = null;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -716,9 +758,14 @@ public class Day_01 : DayBase
         // Trash/graffiti task tutorial cleanup (safe to call even if tasks never started).
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
         if (CleanGraffitiTask.Instance != null)
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
+        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
+        if (CleanBloodTask.Instance != null)
+            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
         BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
 
@@ -2532,14 +2579,24 @@ public class Day_01 : DayBase
     /// <summary>
     /// Breaks a batch of perimeter fences to represent the breach's damage (server-only), then
     /// checks whether any fences actually came out damaged before deciding whether to run the
-    /// fence-repair tutorial or skip straight to clock-out.
+    /// fence-repair tutorial or skip straight to clock-out. Also kicks off the post-breach gore
+    /// and blood clean-up objectives (see <see cref="EnsureTakeOutGoreObjective"/> and
+    /// <see cref="EnsureCleanBloodSplatterObjective"/>) — all three resolve independently and
+    /// converge on <see cref="TryCompleteMutantBreachGate"/>.
     /// </summary>
     private void BeginPostBreachFenceCheck()
     {
+        _fencesResolved = false;
+        _goreResolved   = false;
+        _bloodResolved  = false;
+
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             FenceRepairTask.Instance?.TriggerTask();
 
         StartCoroutine(WaitForFenceCountThenProceed());
+
+        EnsureTakeOutGoreObjective();
+        EnsureCleanBloodSplatterObjective();
     }
 
     /// <summary>
@@ -2557,8 +2614,9 @@ public class Day_01 : DayBase
         }
         else
         {
-            // No fences were damaged by this breach — nothing to repair, proceed immediately.
-            CompleteMutantBreachGateAndAdvance();
+            // No fences were damaged by this breach — nothing to repair on this front.
+            _fencesResolved = true;
+            TryCompleteMutantBreachGate();
         }
     }
 
@@ -2590,13 +2648,126 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFixFences, preHideDelay: 1.5f);
         _taskFixFences = null;
 
-        CompleteMutantBreachGateAndAdvance();
+        _fencesResolved = true;
+        TryCompleteMutantBreachGate();
     }
 
     private string GetFixFencesTaskText() =>
         FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
             ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
             : _taskFixFencesText;
+
+    // -------------------------------------------------------------------------
+    // Take Out Gore / Clean Blood Splatter Tutorial (post-breach)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the "Take out the gore" objective if the breach left any uncollected junk behind
+    /// (corpses, gore pieces landed in the yard) — <see cref="TakeOutTrashTask"/> is dynamically
+    /// re-activated by that junk the instant it's spawned/enabled (see
+    /// <see cref="TakeOutTrashTask.RegisterExternalJunkItem"/>), so its counts are already
+    /// accurate by the time the breach clears. No-op (immediately resolved) if there's nothing
+    /// left to collect.
+    /// </summary>
+    private void EnsureTakeOutGoreObjective()
+    {
+        if (TakeOutTrashTask.Instance != null &&
+            TakeOutTrashTask.Instance.TotalCount > TakeOutTrashTask.Instance.DepositedCount)
+        {
+            _taskTakeOutGore = TutorialObjectiveList.Instance?.AddObjective(GetTakeOutGoreTaskText());
+
+            TakeOutTrashTask.OnProgressChanged   += OnTakeOutGoreProgressChanged;
+            TakeOutTrashTask.OnAllItemsDeposited += OnTakeOutGoreTaskComplete;
+        }
+        else
+        {
+            _goreResolved = true;
+        }
+    }
+
+    private void OnTakeOutGoreProgressChanged()
+    {
+        if (TakeOutTrashTask.Instance == null) return;
+        _taskTakeOutGore?.SetText(GetTakeOutGoreTaskText());
+    }
+
+    private void OnTakeOutGoreTaskComplete()
+    {
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskTakeOutGore);
+        _taskTakeOutGore = null;
+
+        _goreResolved = true;
+        TryCompleteMutantBreachGate();
+    }
+
+    private string GetTakeOutGoreTaskText() =>
+        TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.TotalCount > 0
+            ? $"{_taskTakeOutGoreText} {TakeOutTrashTask.Instance.DepositedCount}/{TakeOutTrashTask.Instance.TotalCount}"
+            : _taskTakeOutGoreText;
+
+    /// <summary>
+    /// Adds the "Clean all blood splatter" objective if the breach left any unscrubbed blood
+    /// behind — <see cref="CleanBloodTask"/> is dynamically re-activated the instant a splatter
+    /// is registered (see <see cref="CleanBloodTask.RegisterBloodSplatter"/>), so its counts are
+    /// already accurate by the time the breach clears. No-op (immediately resolved) if there's
+    /// nothing left to scrub.
+    /// </summary>
+    private void EnsureCleanBloodSplatterObjective()
+    {
+        if (CleanBloodTask.Instance != null &&
+            CleanBloodTask.Instance.TotalCount > CleanBloodTask.Instance.ScrubbedCount)
+        {
+            _taskCleanBloodSplatter = TutorialObjectiveList.Instance?.AddObjective(GetCleanBloodSplatterTaskText());
+
+            CleanBloodTask.OnProgressChanged             += OnCleanBloodSplatterProgressChanged;
+            CleanBloodTask.Instance.OnDailyTaskCompleted += OnCleanBloodSplatterTaskComplete;
+        }
+        else
+        {
+            _bloodResolved = true;
+        }
+    }
+
+    private void OnCleanBloodSplatterProgressChanged()
+    {
+        if (CleanBloodTask.Instance == null) return;
+        _taskCleanBloodSplatter?.SetText(GetCleanBloodSplatterTaskText());
+    }
+
+    private void OnCleanBloodSplatterTaskComplete()
+    {
+        if (CleanBloodTask.Instance != null)
+            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
+        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
+
+        TutorialObjectiveList.Instance?.CompleteObjective(_taskCleanBloodSplatter);
+        _taskCleanBloodSplatter = null;
+
+        _bloodResolved = true;
+        TryCompleteMutantBreachGate();
+    }
+
+    private string GetCleanBloodSplatterTaskText() =>
+        CleanBloodTask.Instance != null && CleanBloodTask.Instance.TotalCount > 0
+            ? $"{_taskCleanBloodSplatterText} {CleanBloodTask.Instance.ScrubbedCount}/{CleanBloodTask.Instance.TotalCount}"
+            : _taskCleanBloodSplatterText;
+
+    /// <summary>
+    /// Only advances past the breach epilogue once fences, gore, and blood have ALL
+    /// individually resolved — whichever finishes last calls
+    /// <see cref="CompleteMutantBreachGateAndAdvance"/>. Mirrors
+    /// <see cref="TryFinishTrashAndGraffitiTutorials"/>'s dual-task barrier pattern for three
+    /// tasks instead of two.
+    /// </summary>
+    private void TryCompleteMutantBreachGate()
+    {
+        if (!_fencesResolved || !_goreResolved || !_bloodResolved) return;
+
+        CompleteMutantBreachGateAndAdvance();
+    }
 
     /// <summary>
     /// Unlocks the Hammer, force-highlights it, and points a world-space tutorial arrow at it —
@@ -2608,7 +2779,8 @@ public class Day_01 : DayBase
     {
         if (_hammer == null)
         {
-            CompleteMutantBreachGateAndAdvance();
+            _fencesResolved = true;
+            TryCompleteMutantBreachGate();
             return;
         }
 

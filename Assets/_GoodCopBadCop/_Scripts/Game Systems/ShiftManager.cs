@@ -1646,18 +1646,23 @@ public class ShiftManager : NetworkBehaviour
         ResetEnvironment(true);
         SuspectController.Instance.ResetSuspects();
 
-        if (PlayerInstance.Instance != null)
-        {
-            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
-            PlayerInstance.Instance.RequestSetIsOutside(false);
-            // Reset the camera to a neutral forward orientation so the view doesn't snap
-            // to whatever angle the player was looking at before or during the cutscene.
-            PlayerInstance.Instance.ResetCameraOrientation();
-            // Re-enable the player's own CinemachineCamera now, while the screen is still
-            // fully black, so the brain has already settled on it before FadeOut reveals
-            // the world again.
-            PlayerInstance.Instance.SetOwnCameraActive(true);
-        }
+        // Wait for a valid PlayerInstance instead of a bare null check — on a client whose
+        // local player hasn't finished spawning/reassigning PlayerInstance.Instance yet (e.g.
+        // Player Two joining or initializing slightly behind the host), the old plain "if"
+        // silently skipped the teleport for that one frame with no retry, leaving that player
+        // stuck wherever the cutscene left them instead of at their booth spawn point. Mirrors
+        // the WaitUntil guard already used in RunInitiateIntroCutsceneSequence/SkipToBoothReadySequence.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        PlayerInstance.Instance.RequestSetIsOutside(false);
+        // Reset the camera to a neutral forward orientation so the view doesn't snap
+        // to whatever angle the player was looking at before or during the cutscene.
+        PlayerInstance.Instance.ResetCameraOrientation();
+        // Re-enable the player's own CinemachineCamera now, while the screen is still
+        // fully black, so the brain has already settled on it before FadeOut reveals
+        // the world again.
+        PlayerInstance.Instance.SetOwnCameraActive(true);
 
         yield return new WaitForSeconds(1f);
         UIController.Instance.FadeOut();

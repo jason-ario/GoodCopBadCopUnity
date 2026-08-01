@@ -159,6 +159,7 @@ public class PerimiterFence : NetworkBehaviour
     {
         int state = GetDamageState(health);
         ApplyDamageVisuals(state);
+        ApplyNavMeshObstacleState(state);
     }
 
     /// <summary>
@@ -193,6 +194,22 @@ public class PerimiterFence : NetworkBehaviour
             if (_damageStateMeshRoots[i] != null)
                 _damageStateMeshRoots[i].SetActive(i == state);
         }
+    }
+
+    /// <summary>
+    /// Enables/disables the NavMeshObstacle's carving based on damage state so mutants can
+    /// pathfind straight through this fence once it reaches its most-damaged (passable) state.
+    /// The physical BoxCollider is never touched here, so the player can never walk through the
+    /// fence regardless of its damage state.
+    /// </summary>
+    private void ApplyNavMeshObstacleState(int state)
+    {
+        if (_navMeshObstacle == null) return;
+
+        // Only the worst damage state (index == MaxDamageLevel) is passable by mutants.
+        bool passable = state >= MaxDamageLevel;
+        _navMeshObstacle.carving = !passable;
+        _navMeshObstacle.enabled = !passable;
     }
 
     // ── Public server API ──────────────────────────────────────────────────────

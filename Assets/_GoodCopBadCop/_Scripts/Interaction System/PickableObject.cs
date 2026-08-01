@@ -58,6 +58,15 @@ public class PickableObject : Interactable
     /// <see cref="OnEquip"/> which only fires on the local client.
     /// </summary>
     public event Action OnPickedUpNetworked;
+
+    /// <summary>
+    /// Fired on the requesting client when the server rejects its
+    /// <see cref="ClaimHolderServerRpc"/>/<see cref="RequestOwnershipServerRpc"/> call because
+    /// another player already claimed this object first (the race window between two players
+    /// grabbing the same object in the same frame). <see cref="PlayerPickupController"/> should
+    /// undo the optimistic local pickup it performed when this fires.
+    /// </summary>
+    public event Action OnGrabRejected;
     protected bool isUsing;
 
     /// <summary>
@@ -331,7 +340,29 @@ public class PickableObject : Interactable
     [ServerRpc(RequireOwnership = false)]
     public void ClaimHolderServerRpc(ServerRpcParams rpcParams = default)
     {
-        _holdingClientId.Value = rpcParams.Receive.SenderClientId;
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        // Arbitrate: if another client already claimed this object first (two players grabbing
+        // the same object in the same frame), reject the later request instead of silently
+        // overwriting the holder — otherwise both clients end up believing they hold it.
+        if (_holdingClientId.Value != ulong.MaxValue && _holdingClientId.Value != clientId)
+        {
+            NotifyGrabRejectedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+            return;
+        }
+
+        _holdingClientId.Value = clientId;
+    }
+
+    /// <summary>Tells the requesting client that its grab/ownership claim was rejected because
+    /// another player already holds this object, so it can revert its optimistic local pickup.</summary>
+    [ClientRpc]
+    private void NotifyGrabRejectedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        OnGrabRejected?.Invoke();
     }
 
     /// <summary>Clears the holder registration on the server, making the object free to grab.</summary>
@@ -349,6 +380,18 @@ public class PickableObject : Interactable
     public void RequestOwnershipServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
+
+        // Same race-condition guard as ClaimHolderServerRpc: don't let a later request steal
+        // (or merely re-confirm over) an object another client already claimed this frame.
+        if (_holdingClientId.Value != ulong.MaxValue && _holdingClientId.Value != clientId)
+        {
+            NotifyGrabRejectedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+            return;
+        }
+
         NetworkObject.ChangeOwnership(clientId);
         _holdingClientId.Value = clientId;
     }

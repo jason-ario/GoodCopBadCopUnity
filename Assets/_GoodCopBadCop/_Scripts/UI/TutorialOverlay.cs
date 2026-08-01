@@ -35,6 +35,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject mutantBreachTutorialScreen;
     [SerializeField] private GameObject checkpointIntegrityTutorialScreen;
     [SerializeField] private GameObject dailyFaxTutorialScreen;
+    [SerializeField] private GameObject followTrailTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -151,6 +152,14 @@ public class TutorialOverlay : MonoBehaviour
     /// the player ever picks up a fax delivered by the <see cref="FaxMachine"/> (starting Day 2).
     /// </summary>
     public void ShowDailyFaxTutorial(Action onComplete = null) => ShowScreen(dailyFaxTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "Follow the Trail" tutorial overlay — explains that the player should switch
+    /// their flashlight to UV mode and follow the glowing blood trail. Triggered the first time
+    /// the "Follow the trail" HUD task becomes active (Day 2, right after Vlad's final dead
+    /// animal dialogue).
+    /// </summary>
+    public void ShowFollowTrailTutorial(Action onComplete = null) => ShowScreen(followTrailTutorialScreen, onComplete);
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

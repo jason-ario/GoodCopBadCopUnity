@@ -21,6 +21,13 @@ public class PlayerPickupController : NetworkBehaviour
     private PickableObject _heldObject; // the actual world instance being carried
 
     /// <summary>
+    /// The object this client most recently sent a grab/ownership request for and is still
+    /// waiting to hear back about. Used to unwind <see cref="OnPendingGrabRejected"/> if the
+    /// server rejects the request because another player claimed the object first.
+    /// </summary>
+    private PickableObject _pendingGrabObject;
+
+    /// <summary>
     /// Server-authoritative reference to the currently held NetworkObject. Unlike
     /// <see cref="HeldObject"/> (a plain local field only ever set on the owner's machine),
     /// this is backed by a replicated NetworkVariable, so the server (and every other client)
@@ -576,11 +583,27 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        // Extra guard on top of the collider-based optimistic lock below: if the network state
+        // has already caught up and shows this object as held, don't even attempt the grab.
+        if (pickableObject.IsHeld)
+        {
+            return;
+        }
+
         // Disable colliders immediately as an optimistic lock so no other player's raycast
         // can pick up the same object during the network round-trip for ClaimHolderServerRpc.
         // OnEquipped will call SetInteractable(false) again once constraints are established,
         // and DropBroadcastClientRpc / OnUnequip restore it via SetInteractable(true).
         pickableObject.SetInteractable(false);
+
+        // If another player's grab request for this same object reaches the server first, it
+        // will reject ours and fire OnGrabRejected on this client so we can undo the optimistic
+        // equip below instead of ending up in a desynced "both players think they hold it" state.
+        // Unsubscribe first in case this exact object was grabbed-and-released by this client
+        // before, to avoid double-subscribing the handler.
+        pickableObject.OnGrabRejected -= OnPendingGrabRejected;
+        pickableObject.OnGrabRejected += OnPendingGrabRejected;
+        _pendingGrabObject = pickableObject;
 
         // Transfer ownership to this client so NetworkTransform replicates from our side.
         // Ownership RPC also claims the holder in one round-trip (no separate ClaimHolderServerRpc needed).
@@ -676,6 +699,61 @@ public class PlayerPickupController : NetworkBehaviour
         if (nt != null) nt.enabled = false;
 
         StartCoroutine(PickUpCoolDown());
+    }
+
+    /// <summary>
+    /// Undoes the optimistic local pickup performed in <see cref="PickUpObject"/> when the
+    /// server reports that another player's grab request for the same object won the race and
+    /// claimed it first. Mirrors the local-state cleanup in <see cref="DropObject"/>, but never
+    /// touches the object's transform, holder, or ownership — the winning player's grab already
+    /// established server-authoritative state for those, so this client must only unwind its own
+    /// optimistic equip visuals/state and let the true holder's state sync in normally.
+    /// </summary>
+    private void OnPendingGrabRejected()
+    {
+        PickableObject rejected = _pendingGrabObject;
+        _pendingGrabObject = null;
+        if (rejected != null)
+        {
+            rejected.OnGrabRejected -= OnPendingGrabRejected;
+        }
+
+        // Nothing to unwind if this object was already superseded by another pickup/drop, or
+        // the rejection arrived for a stale/mismatched request.
+        if (rejected == null || _heldObject != rejected)
+        {
+            return;
+        }
+
+        DisableArmIKs();
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+
+        foreach (var objectContainer in objectContainers)
+        {
+            objectContainer.UnequipItem(this);
+        }
+
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        _heldObjectRef.Value = default;
+        itemEquippedIndex.Value = -1;
+        _playerAnimationController.DisableRightArmMask();
+        OnHeldObjectChanged?.Invoke(null);
+
+        ObjectPlacer.Instance.DeactivatePlacer();
+
+        // Re-enable NetworkTransform: PickUpObject disabled it optimistically so this client's
+        // ParentConstraint could drive position, but this client never actually became the
+        // holder, so it needs NetworkTransform re-enabled to receive the true holder's updates.
+        NetworkTransform nt = rejected.GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        // Belt-and-suspenders: force local collider state to match the true holder state now,
+        // regardless of whether OnHoldingClientChanged has already run on this client this frame.
+        rejected.SetInteractable(!rejected.IsHeld);
     }
     
     IEnumerator PickUpCoolDown()
@@ -799,6 +877,21 @@ public class PlayerPickupController : NetworkBehaviour
             _heldObject.transform.position = dropPos;
             _heldObject.transform.rotation = dropRot;
 
+            // Clear the server-authoritative "held" flag BEFORE the position/placement RPCs
+            // below (DropServerRpc / PlaceInSlotServerRpc) land on the server. Those RPCs move
+            // the object's authoritative transform into its drop spot immediately, which for a
+            // package dropped into a MailCubbySlot/MailSortBin trigger can fire OnTriggerEnter
+            // on the very same frame it lands — MailCubbySlot/MailSortBin ignore that overlap
+            // while the package still reads as held (see MailPackageItem.IsHeld). For a
+            // non-host client both RPCs travel over the real network, so sending
+            // ReleaseHolderServerRpc after the drop/placement RPC left a real window where the
+            // server had already moved the package into the trigger while still seeing it as
+            // held, silently swallowing the sort — remote (non-host) clients hit this far more
+            // often than the host, whose local RPC calls resolve within the same frame. Sending
+            // it first here guarantees IsHeld is already false by the time the drop position is
+            // applied, for every client.
+            _heldObject.ReleaseHolderServerRpc();
+
             if (dropPoint != null)
             {
                 // Placing the document into a folder slot: instead of re-enabling NT (which
@@ -840,7 +933,6 @@ public class PlayerPickupController : NetworkBehaviour
                 _heldObject.DropServerRpc(dropPos, dropRot);
             }
 
-            _heldObject.ReleaseHolderServerRpc();
             if (_heldObject is Flashlight flashlight)
                 flashlight.TurnOff();
             _heldObject.OnDropped();

@@ -49,6 +49,25 @@ public class MailCubbyManager : NetworkBehaviour
     private int[] _lastResidentAssignment;
     private bool _hasAssignment;
 
+    /// <summary>Scene-wide singleton, mirroring <see cref="SortMailTask.Instance"/> — there is only ever one Mail Cubby manager in the scene.</summary>
+    public static MailCubbyManager Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Debug.LogWarning("[MailCubbyManager] Duplicate instance detected — destroying self.", this);
+            Destroy(this);
+            return;
+        }
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -68,6 +87,42 @@ public class MailCubbyManager : NetworkBehaviour
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
 
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// Server-only. Turns on the outline highlight for every currently active
+    /// <see cref="MailCubbySlot"/> on every client. Intended to be called right after a delivery
+    /// arrives (see <see cref="DeliveryTruckController"/>) so players can immediately spot where
+    /// to drop off packages — cleared again as soon as any package is dropped into any cubby, via
+    /// <see cref="ClearAllHighlights"/> (see <see cref="SortMailTask.EvaluateSort"/>).
+    /// </summary>
+    public void HighlightAllActiveCubbies()
+    {
+        if (!IsServer) return;
+        SetHighlightClientRpc(true);
+    }
+
+    /// <summary>
+    /// Server-only. Turns off the outline highlight on every <see cref="MailCubbySlot"/> (active
+    /// or not) on every client. Safe to call even if nothing is currently highlighted.
+    /// </summary>
+    public void ClearAllHighlights()
+    {
+        if (!IsServer) return;
+        SetHighlightClientRpc(false);
+    }
+
+    [ClientRpc]
+    private void SetHighlightClientRpc(bool highlight)
+    {
+        MailCubbySlot[] allSlots = GetComponentsInChildren<MailCubbySlot>(true);
+        foreach (MailCubbySlot slot in allSlots)
+        {
+            // Only ever highlight cubbies that are actually in use — active state is already
+            // replicated identically to every client via ApplyAssignment/ApplyAssignmentClientRpc.
+            if (highlight && !slot.gameObject.activeSelf) continue;
+            slot.SetHighlight(highlight);
+        }
     }
 
     /// <summary>

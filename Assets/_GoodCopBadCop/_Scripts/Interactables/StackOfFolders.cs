@@ -5,12 +5,6 @@ public class StackOfFolders : Interactable
 {
     [SerializeField] private PickableItemData folder;
 
-    private readonly NetworkVariable<bool> _folderGrabbedAlready = new NetworkVariable<bool>(
-        false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
-
     /// <summary>
     /// When false the stack is locked and cannot be interacted with.
     /// Defaults to true so the stack works normally outside of Day 1.
@@ -22,23 +16,6 @@ public class StackOfFolders : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server
     );
-
-    private void Start()
-    {
-        SuspectController.Instance.OnTakeFolder += OnShiftEnd;
-    }
-
-    private void OnDestroy()
-    {
-        if (SuspectController.Instance != null)
-            SuspectController.Instance.OnTakeFolder -= OnShiftEnd;
-    }
-
-    private void OnShiftEnd()
-    {
-        if (IsServer)
-            _folderGrabbedAlready.Value = false;
-    }
 
     /// <summary>
     /// Locks or unlocks the stack. When locked, players cannot grab a folder from it.
@@ -61,18 +38,6 @@ public class StackOfFolders : Interactable
 
         base.Interact(player);
 
-        if (_folderGrabbedAlready.Value)
-        {
-            return;
-        }
-
-        SetFolderGrabbedServerRpc();
         player.pickupController.SpawnAndPickUp(folder, transform);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void SetFolderGrabbedServerRpc()
-    {
-        _folderGrabbedAlready.Value = true;
     }
 }

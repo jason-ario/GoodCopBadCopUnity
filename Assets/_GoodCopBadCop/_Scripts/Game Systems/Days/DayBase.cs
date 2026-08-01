@@ -134,6 +134,75 @@ public abstract class DayBase : MonoBehaviour
     public GuardPurchasePoint[] GuardPurchasePointsToActivate;
 
     // -------------------------------------------------------------------------
+    // Subject Counter Task ("Process N subjects")
+    // -------------------------------------------------------------------------
+    //
+    // Shows a "Process N subjects X/Y" objective in TutorialObjectiveList as soon as the
+    // shift starts (ShiftManager.OnShiftStart), and keeps it updated as subjects are handed
+    // off until the day's quota (SubjectsToProcess) is met, at which point it is removed
+    // automatically. This runs for EVERY day by default — override
+    // UseAutomaticSubjectCounterTask to suppress it for a day (e.g. Day 1) that manages its
+    // own scripted version of this same counter at a custom moment in its tutorial sequence.
+
+    /// <summary>
+    /// When true (the default), this day automatically shows the "Process N subjects" counter
+    /// task the moment the shift starts. Override to false for a day that shows its own
+    /// hand-scripted version of this counter at a different moment (e.g. Day 1, which only
+    /// reveals it after its opening tutorial sequence completes).
+    /// </summary>
+    protected virtual bool UseAutomaticSubjectCounterTask => true;
+
+    private TutorialObjectiveItem _autoSubjectCounterTask;
+    private int _autoSubjectCounterProcessedCount;
+
+    private void OnShiftStartShowSubjectCounter()
+    {
+        if (UseAutomaticSubjectCounterTask)
+            ShowAutomaticSubjectCounterTask();
+    }
+
+    /// <summary>
+    /// Shows the "Process N subjects" counter task and starts tracking hand-offs via
+    /// <see cref="FolderController.OnFolderHandedOff"/>. Safe to call multiple times — a no-op
+    /// if the task is already showing or the quota has already been met.
+    /// </summary>
+    protected void ShowAutomaticSubjectCounterTask()
+    {
+        if (_autoSubjectCounterTask != null) return;
+        if (_autoSubjectCounterProcessedCount >= SuspectsToProcess) return;
+
+        _autoSubjectCounterTask = TutorialObjectiveList.Instance?.AddObjective(GetAutomaticSubjectCounterText());
+        FolderController.OnFolderHandedOff += OnAutomaticSubjectCounterProcessed;
+    }
+
+    private void OnAutomaticSubjectCounterProcessed()
+    {
+        _autoSubjectCounterProcessedCount++;
+        _autoSubjectCounterTask?.SetText(GetAutomaticSubjectCounterText());
+
+        if (_autoSubjectCounterProcessedCount >= SuspectsToProcess)
+            HideAutomaticSubjectCounterTask();
+    }
+
+    /// <summary>
+    /// Stops tracking hand-offs and removes the counter task's row from
+    /// TutorialObjectiveList, if it is currently showing. Safe to call at any time.
+    /// </summary>
+    protected void HideAutomaticSubjectCounterTask()
+    {
+        FolderController.OnFolderHandedOff -= OnAutomaticSubjectCounterProcessed;
+
+        if (_autoSubjectCounterTask != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_autoSubjectCounterTask, preHideDelay: 1.5f);
+            _autoSubjectCounterTask = null;
+        }
+    }
+
+    private string GetAutomaticSubjectCounterText() =>
+        $"Process {SuspectsToProcess} subjects {Mathf.Min(_autoSubjectCounterProcessedCount, SuspectsToProcess)}/{SuspectsToProcess}";
+
+    // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses
     // -------------------------------------------------------------------------
 
@@ -199,7 +268,10 @@ public abstract class DayBase : MonoBehaviour
         // power is already in the correct state — so there's no need to track "did we already
         // catch it" and unsubscribe early.
         if (ShiftManager.Instance != null)
+        {
             ShiftManager.Instance.OnDayStart += RestorePowerIfNoOutageIntendedOnDayStart;
+            ShiftManager.Instance.OnShiftStart += OnShiftStartShowSubjectCounter;
+        }
 
         // Final safety net independent of ShiftManager.OnDayStart entirely: some transition
         // paths can end up never firing OnDayStart while this day's subscription window is
@@ -359,7 +431,14 @@ public abstract class DayBase : MonoBehaviour
         Debug.Log($"[Day {DayNumber}] Day deactivated.");
 
         if (ShiftManager.Instance != null)
+        {
             ShiftManager.Instance.OnDayStart -= RestorePowerIfNoOutageIntendedOnDayStart;
+            ShiftManager.Instance.OnShiftStart -= OnShiftStartShowSubjectCounter;
+        }
+
+        // Safety net: never let a still-active counter task or hand-off subscription leak
+        // into the next day (e.g. a debug day-skip mid-shift).
+        HideAutomaticSubjectCounterTask();
 
         if (_powerRestoreRetryCoroutine != null)
         {

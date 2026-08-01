@@ -228,6 +228,25 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void ExitScriptedDialogueMode() => ExitDialogueMode();
 
     /// <summary>
+    /// Called on every client when <see cref="SuspectController"/> begins processing a verdict
+    /// (Pass/Quarantine/Kill) for the current suspect. Edge case: one player can deliver the
+    /// verdict while ANOTHER player is still mid-dialogue with that same suspect — dialogue mode
+    /// is tracked as local, per-client state, so without this the other player's suspect cam
+    /// (and movement/look lock) would never be torn down and would stay latched onto the suspect
+    /// as they walk away, hiding whatever plays next (e.g. the Alexei cutscene). No-op if the
+    /// local player is not currently in dialogue mode.
+    /// </summary>
+    public void ForceExitDialogueForVerdict()
+    {
+        if (!IsInDialogueMode) return;
+
+        Debug.Log("[DialogueChoiceSystem] ForceExitDialogueForVerdict — another player delivered the " +
+                  "verdict while the local player was still in dialogue with this suspect; forcing exit.");
+
+        ExitDialogueMode();
+    }
+
+    /// <summary>
     /// Enters scripted dialogue mode for outside-world cutscenes. Locks player movement and
     /// shows the cursor but does NOT activate the booth suspect camera. Use for NPC dialogues
     /// that occur outside the interrogation booth (e.g. Vlad out-back sequence).

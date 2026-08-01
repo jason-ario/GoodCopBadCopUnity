@@ -477,13 +477,21 @@ public class CampaignManager : NetworkBehaviour
         {
             if (client.PlayerObject == null) continue;
 
-            PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
-            if (playerHealth != null)
-                playerHealth.ResetHealth();
-
+            // Clear radiation before healing. PlayerRadiation.Update() runs server-side every
+            // frame and immediately re-applies damage once accrued radiation is above its
+            // damage threshold — resetting health first left a window where that leftover
+            // radiation could tick a TakeDamage call right after the heal, which visibly
+            // played the Hit/hurt animation on what should have been a clean full-health
+            // wake-up. Zeroing radiation first removes that damage source before health
+            // is restored, so day transitions never taketh with one hand and giveth with
+            // the other.
             PlayerRadiation playerRadiation = client.PlayerObject.GetComponent<PlayerRadiation>();
             if (playerRadiation != null)
                 playerRadiation.ResetRadiation();
+
+            PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
+            if (playerHealth != null)
+                playerHealth.ResetHealth();
 
             Debug.Log($"[CampaignManager] Reset health and radiation for client {client.ClientId}.");
         }

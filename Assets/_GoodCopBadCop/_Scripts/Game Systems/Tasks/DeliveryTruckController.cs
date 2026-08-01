@@ -213,6 +213,10 @@ public class DeliveryTruckController : NetworkBehaviour
         // Crate has settled — this is the moment the mail delivery spawns.
         SortMailTask.Instance?.TriggerTask();
 
+        // Call out where to deliver the mail until a player drops a package into any cubby —
+        // cleared automatically as soon as that happens, see SortMailTask.EvaluateSort.
+        MailCubbyManager.Instance?.HighlightAllActiveCubbies();
+
         yield return new WaitForSeconds(idleDurationAtDestination);
 
         BeginDriveClientRpc(DriveLeg.Back);
