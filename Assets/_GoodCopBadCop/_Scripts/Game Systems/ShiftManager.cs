@@ -1341,6 +1341,15 @@ public class ShiftManager : NetworkBehaviour
         PlayerInstance.Instance?.SetOwnCameraActive(false);
 
         ResetEverything(true);
+
+        // The host has now been repositioned inside for the cutscene (ResetEverything's
+        // RequestSetIsOutside(false) resolves synchronously on the server/host). Clear the
+        // race-window flag so a client connecting from here on reads the host's real,
+        // now-correct IsOutside state instead of the stale pre-cutscene value.
+        // See GameManager.IsIntroCutsceneEntering for details.
+        if (IsServer)
+            GameManager.Instance.ClearIntroCutsceneEntering();
+
         yield return new WaitForSeconds(1);
         ResetEverything(true); // Called twice — player position was not resetting reliably in a single call
 

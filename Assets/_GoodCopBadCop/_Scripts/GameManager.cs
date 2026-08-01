@@ -61,7 +61,30 @@ public class GameManager : NetworkBehaviour
     /// <summary>
     /// Marks the intro cutscene as started. Call this server-side when the cutscene is initiated.
     /// </summary>
-    public void SetIntroCutsceneStarted() => HasIntroCutsceneStarted = true;
+    public void SetIntroCutsceneStarted()
+    {
+        HasIntroCutsceneStarted = true;
+        IsIntroCutsceneEntering = true;
+    }
+
+    /// <summary>
+    /// True only for the brief server-side window between <see cref="SetIntroCutsceneStarted"/>
+    /// and the moment the host's own player has actually been repositioned inside for the
+    /// cutscene (<see cref="ClearIntroCutsceneEntering"/>). The host's <c>PlayerInstance.IsOutside</c>
+    /// NetworkVariable doesn't flip to false until partway through the cutscene's fade-in, so a
+    /// client connecting during this window would otherwise read a stale "host is outside" value
+    /// in <see cref="Networking.LobbyManager"/>'s late-join spawn check and get routed to the lobby
+    /// instead of the booth. See <see cref="ClearIntroCutsceneEntering"/>.
+    /// </summary>
+    public bool IsIntroCutsceneEntering { get; private set; }
+
+    /// <summary>
+    /// Call this server-side once the host has been positioned inside for the intro cutscene
+    /// (right after the first <c>ResetEverything</c> pass in <see cref="Game_Systems.ShiftManager"/>'s
+    /// PlayIntroCutscene, or the equivalent point in EndIntroCutsceneSequence). Ends the race window
+    /// described on <see cref="IsIntroCutsceneEntering"/>.
+    /// </summary>
+    public void ClearIntroCutsceneEntering() => IsIntroCutsceneEntering = false;
 
     /// <summary>
     /// True while a lobby transition sequence is in progress and the spawn is being deferred.

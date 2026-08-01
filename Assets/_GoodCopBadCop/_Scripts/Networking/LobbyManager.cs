@@ -462,6 +462,18 @@ public class LobbyManager : MonoBehaviour
                 hostIsOutside = hostPlayerInstance != null && hostPlayerInstance.IsOutside;
             }
 
+            // The intro cutscene moves the host from outside to inside, but the host's own
+            // IsOutside NetworkVariable doesn't flip to false until partway through the
+            // cutscene's fade-in — a brief window where HasIntroCutsceneStarted is already
+            // true but hostIsOutside still reads stale. A client connecting in that window
+            // would otherwise be routed to the lobby even though the cutscene is about to
+            // (or already did) place everyone at the booth. Treat that window as "inside".
+            if (GameManager.Instance.IsIntroCutsceneEntering)
+            {
+                Debug.Log("[Host] IsIntroCutsceneEntering=true — overriding stale hostIsOutside, treating host as inside.");
+                hostIsOutside = false;
+            }
+
             Debug.Log($"[Host] hostClientId={hostClientId} hostIsOutside={hostIsOutside}");
 
             if (hostIsOutside)
