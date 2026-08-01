@@ -395,28 +395,33 @@ public class PlayerInstance : NetworkBehaviour
 
     /// <summary>
     /// Moves this player to <paramref name="position"/>. This player's <c>NetworkTransform</c>
-    /// is server-authoritative, so a direct <c>transform</c> write here only "sticks" when
-    /// called on the server (e.g. the host moving its own player). When called on a client —
-    /// including the owning client moving its own player, such as at the end of the intro
-    /// cutscene — the write is not authoritative and gets silently overwritten by the next
-    /// NetworkTransform sync from the server, which produces an apparent teleport to a stale
-    /// position. Route the write through the server in that case.
+    /// is configured with <c>AuthorityMode.Owner</c> (not server-authoritative) — only the
+    /// owning client's writes are committed and broadcast to observers. A write from anyone
+    /// else (including the server, when the server isn't also the owner) is silently ignored
+    /// by the NetworkTransform and gets overwritten by the next interpolation tick, which is
+    /// why teleports like the post-intro-cutscene booth placement previously worked for the
+    /// host (owner == server) but silently no-op'd for non-host clients (owner != server).
+    /// Route the write to whichever client actually owns this object.
     /// </summary>
     public void SetPosition(Transform position)
     {
-        if (IsServer)
+        if (IsOwner)
         {
             transform.position = position.position;
             transform.rotation = position.rotation;
         }
         else
         {
-            SetPositionServerRpc(position.position, position.rotation);
+            var rpcParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+            };
+            SetPositionClientRpc(position.position, position.rotation, rpcParams);
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void SetPositionServerRpc(Vector3 position, Quaternion rotation)
+    [ClientRpc]
+    private void SetPositionClientRpc(Vector3 position, Quaternion rotation, ClientRpcParams rpcParams = default)
     {
         transform.position = position;
         transform.rotation = rotation;
