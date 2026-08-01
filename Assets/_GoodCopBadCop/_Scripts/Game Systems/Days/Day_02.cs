@@ -569,11 +569,13 @@ public class Day_02 : DayBase, IDailyTask
         else
         {
             bool introDone = false;
+            _spawnedVlad.SetCanInteractNetworked(false);
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladIntroDialogue,
                 () => introDone = true);
             yield return new WaitUntil(() => introDone);
+            _spawnedVlad.SetCanInteractNetworked(true);
         }
 
         // Short beat after dialogue before Vlad starts moving.
@@ -641,11 +643,13 @@ public class Day_02 : DayBase, IDailyTask
         if (_vladToolLockerDialogue != null)
         {
             bool lockerDone = false;
+            _spawnedVlad.SetCanInteractNetworked(false);
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladToolLockerDialogue,
                 () => lockerDone = true);
             yield return new WaitUntil(() => lockerDone);
+            _spawnedVlad.SetCanInteractNetworked(true);
         }
 
         // Now that Vlad has unlocked the tool locker, trigger the Day 2 mail delivery (deferred

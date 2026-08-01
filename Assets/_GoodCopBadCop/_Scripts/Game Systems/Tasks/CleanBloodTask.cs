@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -12,20 +13,26 @@ using UnityEngine;
 /// this task's total grows to match however much gore actually landed that cycle.
 ///
 /// Implements <see cref="ISystemicThreat"/> for HUD / performance scoring, same as
-/// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>.
+/// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>. Also implements
+/// <see cref="IDailyTask"/> so it blocks clock-out via <see cref="ShiftManager.RegisterPendingDailyTask"/>
+/// until every registered splatter has been scrubbed — same as <see cref="TakeOutTrashTask"/>.
 ///
 /// Scene setup:
 ///   - NetworkObject on this GameObject (in-scene placed — no prefab registration needed).
-///   - No prefabs or spawn points to assign here — TakeOutTrashTask feeds this task splatters
-///     directly via RegisterBloodSplatter.
-///   - The blood decal prefab(s) assigned to TakeOutTrashTask's _bloodDecalPrefabs must each
-///     have a GraffitiInteractable component (e.g. "Random Blood Splatter Variant.prefab") —
-///     decals without one are skipped (treated as purely cosmetic, not counted).
-///   - Call TriggerTask() from Day_03.DayActivated() BEFORE TakeOutTrashTask.TriggerTask(useGorePrefabs: true)
-///     so the task is active in time to register every blood decal spawned that cycle.
+///   - No prefabs or spawn points to assign here — TakeOutTrashTask (or MutantEnemy, for gore
+///     landing in the yard during a mutant breach) feeds this task splatters directly via
+///     RegisterBloodSplatter.
+///   - The blood decal prefab(s) fed in must each have a GraffitiInteractable component (e.g.
+///     "Random Blood Splatter Variant.prefab") — decals without one are skipped (treated as
+///     purely cosmetic, not counted).
+///   - Calling TriggerTask() is optional — RegisterBloodSplatter auto-activates the task the
+///     first time a splatter is registered while it's inactive, so days/events that spawn gore
+///     dynamically (e.g. a Day 1 mutant breach) don't need to call TriggerTask() themselves.
+///     Days that want the task active BEFORE any splatters are registered (e.g. Day 3's
+///     scripted gore trash task) can still call TriggerTask() explicitly first.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
+public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 {
     public static CleanBloodTask Instance { get; private set; }
 
@@ -33,6 +40,10 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
     [SerializeField] private string _taskName = "Clean Blood";
     [Tooltip("Number of coupons the ATM dispenses when all blood has been scrubbed.")]
     [SerializeField] private int _couponReward = 10;
+
+    [Header("Daily Task")]
+    [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool, if this task is ever added to it.")]
+    [SerializeField] private string _dailyTaskId = "CleanBlood";
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -78,6 +89,30 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
     /// <summary>No-op.</summary>
     public void EndNightPhase() { }
 
+    // ── IDailyTask ───────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public string DailyTaskId => _dailyTaskId;
+
+    /// <summary>Delegates to <see cref="TriggerTask"/>. Server-only; TriggerTask enforces the IsServer guard.</summary>
+    public void TriggerDailyTask() => TriggerTask();
+
+    /// <inheritdoc/>
+    public event Action OnDailyTaskCompleted;
+
+    /// <summary>
+    /// Fired on every client whenever <see cref="ScrubbedCount"/> or <see cref="TotalCount"/>
+    /// changes. Subscribe to drive live count updates in tutorial UI (e.g. Day_01's post-breach
+    /// "Clean all blood splatter" objective).
+    /// </summary>
+    public static event Action OnProgressChanged;
+
+    /// <summary>Blood splatters scrubbed clean so far this task run.</summary>
+    public int ScrubbedCount => _scrubbed.Value;
+
+    /// <summary>Total blood splatters registered for this task run.</summary>
+    public int TotalCount => _totalCount.Value;
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -94,8 +129,8 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _scrubbed.OnValueChanged   += OnProgressChanged;
-        _totalCount.OnValueChanged += OnProgressChanged;
+        _scrubbed.OnValueChanged   += OnNetworkValueChanged;
+        _totalCount.OnValueChanged += OnNetworkValueChanged;
         _isActive.OnValueChanged   += OnIsActiveChanged;
 
         // Handle the initial value for late-joining clients.
@@ -106,14 +141,15 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _scrubbed.OnValueChanged   -= OnProgressChanged;
-        _totalCount.OnValueChanged -= OnProgressChanged;
+        _scrubbed.OnValueChanged   -= OnNetworkValueChanged;
+        _totalCount.OnValueChanged -= OnNetworkValueChanged;
         _isActive.OnValueChanged   -= OnIsActiveChanged;
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        OnDailyTaskCompleted = null;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -143,28 +179,60 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
         // dropping the task from the HUD (see the equivalent fix in TakeOutTrashTask).
         RegisterInTaskRegistryClientRpc();
 
+        // Block clock-out until every splatter registered this cycle is scrubbed clean —
+        // same gating TakeOutTrashTask uses for trash.
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
         Debug.Log("[CleanBloodTask] Task triggered — awaiting blood splatter registrations.");
     }
 
     /// <summary>
     /// Registers an externally-spawned blood splatter's NetworkObject with this task — called
     /// by <see cref="TakeOutTrashTask"/> immediately after it spawns a blood decal alongside a
-    /// gore piece. Routes the splatter's <see cref="GraffitiInteractable.OnScrubCompleted"/>
-    /// callback to this task and counts it toward the total. No-op if the task isn't active or
-    /// the splatter has no <see cref="GraffitiInteractable"/> (a purely cosmetic decal variant
-    /// with nothing to mop). Server-only.
+    /// gore piece, or by <see cref="MutantEnemy"/> when a gore piece it dropped lands inside the
+    /// yard during a mutant breach. Routes the splatter's <see cref="GraffitiInteractable.OnScrubCompleted"/>
+    /// callback to this task and counts it toward the total.
+    ///
+    /// If no blood-cleanup task is currently active, this dynamically activates one (rather than
+    /// silently dropping the splatter) so any blood spawned outside a scripted TriggerTask() call
+    /// (e.g. a Day 1 mutant breach) still has to be scrubbed before clocking out.
+    ///
+    /// No-op if the splatter has no <see cref="GraffitiInteractable"/> (a purely cosmetic decal
+    /// variant with nothing to mop). Server-only.
     /// </summary>
     public void RegisterBloodSplatter(NetworkObject netObj)
     {
-        if (!IsServer || netObj == null || !_taskActive) return;
+        if (!IsServer || netObj == null) return;
 
         GraffitiInteractable interactable = netObj.GetComponent<GraffitiInteractable>();
         if (interactable == null) return;
+
+        if (!_taskActive)
+            ActivateDynamically();
 
         interactable.OnScrubCompleted = OnBloodScrubbed;
 
         _spawnedSplatters.Add(netObj);
         _totalCount.Value++;
+    }
+
+    /// <summary>
+    /// Activates the blood-cleanup task without resetting progress or despawning existing
+    /// splatters — used by <see cref="RegisterBloodSplatter"/> when a splatter is registered
+    /// while no task is currently running. Server-only, expects <see cref="_taskActive"/> to
+    /// already be false.
+    /// </summary>
+    private void ActivateDynamically()
+    {
+        _taskActive = true;
+        _isComplete = false;
+
+        _isActive.Value = true;
+        RegisterInTaskRegistryClientRpc();
+
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
+        Debug.Log("[CleanBloodTask] Dynamically activated — a blood splatter was registered with no active task.");
     }
 
     // ── Scrub callback (called by GraffitiInteractable on the server) ─────────
@@ -200,6 +268,11 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
     {
         _isComplete = true;
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+
+        // Fired on every client (including the host, which is also "a client" for RPC
+        // purposes) so ShiftManager's clock-out gate — subscribed via RegisterPendingDailyTask
+        // — actually unblocks. Mirrors TakeOutTrashTask.NotifyTaskCompletedClientRpc.
+        OnDailyTaskCompleted?.Invoke();
     }
 
     private void DespawnExistingSplatters()
@@ -228,8 +301,9 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat
             TaskRegistry.Instance?.RemoveThreat(this);
     }
 
-    private void OnProgressChanged(int previous, int current)
+    private void OnNetworkValueChanged<T>(T previous, T current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+        OnProgressChanged?.Invoke();
     }
 }

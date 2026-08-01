@@ -19,8 +19,20 @@ public class GameManager : NetworkBehaviour
 
     public GateController GateController;
 
-    private bool _isSinglePlayer;
-    public bool IsSinglePlayer => _isSinglePlayer;
+    /// <summary>
+    /// Whether this session only has one connected player. Written by the server only, but
+    /// replicated via NetworkVariable so every client can read a correct value — plain
+    /// <c>NetworkManager.Singleton.ConnectedClients</c> checks are unreliable on non-host
+    /// clients (that collection is only fully populated on the server), which previously
+    /// caused non-host clients to always evaluate as single-player and use the wrong
+    /// (single-player) spawn transform, e.g. during bunker/day-transition teleports.
+    /// </summary>
+    private readonly NetworkVariable<bool> _networkIsSinglePlayer = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public bool IsSinglePlayer => _networkIsSinglePlayer.Value;
 
     /// <summary>
     /// Set to true on the server before a Restart Day scene reload so that
@@ -307,7 +319,7 @@ public class GameManager : NetworkBehaviour
         if (!IsServer) return;
 
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
-        _isSinglePlayer = isSinglePlayer;
+        _networkIsSinglePlayer.Value = isSinglePlayer;
 
         PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
     }
@@ -315,7 +327,7 @@ public class GameManager : NetworkBehaviour
     private void SpawnAllPlayersAtLobby()
     {
         bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
-        _isSinglePlayer = isSinglePlayer;
+        _networkIsSinglePlayer.Value = isSinglePlayer;
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
@@ -350,7 +362,8 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator TransitionToGameplay(bool skipTransition = false)
     {
-        _isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        if (IsServer)
+            _networkIsSinglePlayer.Value = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
 
         if (skipTransition)
         {
@@ -393,7 +406,7 @@ public class GameManager : NetworkBehaviour
         PlayerInstance.Instance.transform.position =
             PlayerSpawner.Instance.GetSpawnPoint(
                 PlayerInstance.Instance.OwnerClientId,
-                _isSinglePlayer
+                IsSinglePlayer
             ).position;
 
         PlayerInstance.Instance.SetIsOutside(false);

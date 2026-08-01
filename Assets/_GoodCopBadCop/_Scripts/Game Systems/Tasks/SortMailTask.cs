@@ -428,6 +428,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
 
+        // A package has been dropped into *some* cubby (right or wrong) — the tutorial-style
+        // "drop mail here" highlight has done its job, so clear it on every client now rather
+        // than waiting for a *correct* sort. See MailCubbyManager.HighlightAllActiveCubbies,
+        // called from DeliveryTruckController once the mail arrives.
+        if (binType == MailSortBinType.Delivery)
+            MailCubbyManager.Instance?.ClearAllHighlights();
+
         bool isCorrect = binType == MailSortBinType.Delivery
             ? package.CorrectBin == MailSortBinType.Delivery &&
               string.Equals(slotResidentName?.Trim(), package.ResidentName?.Trim(), StringComparison.OrdinalIgnoreCase)

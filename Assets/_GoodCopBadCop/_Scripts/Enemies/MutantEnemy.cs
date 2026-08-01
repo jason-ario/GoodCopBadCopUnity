@@ -93,18 +93,8 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Collider used to compute random surface spawn points for gore pieces. Defaults to a CapsuleCollider or, failing that, any Collider found on this GameObject.")]
     [SerializeField] private Collider goreCollider;
 
-    [Tooltip("Random gore chunk/giblet prefabs that can pop out of this mutant on hit and burst out on death. Leave empty to disable gore entirely.")]
+    [Tooltip("Random gore chunk/giblet prefabs that burst out of this mutant on a permanent death. Leave empty to disable gore entirely.")]
     [SerializeField] private GameObject[] goreDropPrefabs;
-
-    [Tooltip("Chance (0-1) that a gore piece pops out each time this mutant takes damage and survives the hit.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float goreDropChanceOnHit = 0.3f;
-
-    [Tooltip("Minimum and maximum number of gore pieces spawned when a hit gore chance roll succeeds.")]
-    [SerializeField] private Vector2Int goreHitCountRange = new Vector2Int(1, 1);
-
-    [Tooltip("Minimum and maximum random pop speed (units/sec) applied to a gore piece spawned from a survived hit.")]
-    [SerializeField] private Vector2 goreHitSpeedRange = new Vector2(1.5f, 4f);
 
     [Tooltip("Minimum and maximum number of gore pieces spawned in the burst when this mutant dies.")]
     [SerializeField] private Vector2Int deathGoreBurstCountRange = new Vector2Int(4, 8);
@@ -116,7 +106,7 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0f)]
     [SerializeField] private float goreLifetime = 10f;
 
-    [Tooltip("Blood decal prefabs spawned on the ground where a cosmetic gore piece lands. Leave empty to disable landing decals.")]
+    [Tooltip("Blood decal prefabs spawned on the ground where a cosmetic gore piece lands (i.e. one that landed outside the Trash Task's yard). Purely cosmetic/local — leave empty to disable landing decals.")]
     [SerializeField] private GameObject[] bloodDecalPrefabs;
 
     [Tooltip("Layer(s) considered 'ground' for the purpose of spawning a landing blood decal under a gore piece.")]
@@ -125,6 +115,28 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Seconds before a landing blood decal is automatically destroyed. 0 = never.")]
     [Min(0f)]
     [SerializeField] private float bloodDecalLifetime = 20f;
+
+    [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
+             "under a gore piece that lands inside the Trash Task's yard. Registered with CleanBloodTask " +
+             "so they must be mopped up before clocking out, just like the gore piece itself is registered " +
+             "as junk. All must be registered as Network Prefabs in the NetworkManager. Leave empty to " +
+             "disable yard blood splatters.")]
+    [SerializeField] private GameObject[] yardBloodDecalPrefabs;
+
+    [Header("Corpse Junk")]
+    [Tooltip("Optional JunkItem component pre-attached (and disabled) to this corpse, matching the same " +
+             "pre-attached-but-disabled pattern documented on JunkItem for SuspectCharacter bodies. When " +
+             "assigned and Death Behaviour is PlayAnimation (the corpse persists instead of despawning " +
+             "immediately), this is enabled on death so the corpse becomes collectible junk and is " +
+             "registered with TakeOutTrashTask. Leave unassigned to skip (e.g. mutants using the Destroy " +
+             "death behaviour, which despawn immediately and leave nothing to collect).")]
+    [SerializeField] private JunkItem corpseJunkItem;
+
+    [Tooltip("Dedicated interaction collider for corpseJunkItem. Kept disabled until death and excluded " +
+             "from DisableColliders() so junk pickup still works after the corpse's other colliders are " +
+             "disabled. Required (on the Interactable layer) when corpseJunkItem is assigned.")]
+    [SerializeField] private Collider corpseJunkInteractionCollider;
+
 
     [Header("Aggro Target")]
     [Tooltip("If false, this mutant will never head for the booth on its own, regardless of the aggro chance roll.")]
@@ -1014,28 +1026,15 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
-        TrySpawnHitGore();
+        // Gore no longer pops out on a survived hit — it only bursts out on death
+        // (see SpawnDeathGoreBurst), so shooting an enemy that doesn't kill it leaves no
+        // gore/junk/blood behind.
 
         if (_hurtSounds != null && _hurtSounds.Length > 0)
         {
             int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
             PlayHurtSoundClientRpc(idx);
         }
-    }
-
-    /// <summary>
-    /// Rolls <see cref="goreDropChanceOnHit"/> and, on success, pops <see cref="goreHitCountRange"/>
-    /// random gore pieces out of random points on <see cref="goreCollider"/>'s surface.
-    /// </summary>
-    private void TrySpawnHitGore()
-    {
-        if (goreDropPrefabs == null || goreDropPrefabs.Length == 0)
-            return;
-
-        if (UnityEngine.Random.value > goreDropChanceOnHit)
-            return;
-
-        SpawnGoreBurst(goreHitCountRange, goreHitSpeedRange);
     }
 
     /// <summary>
@@ -1134,7 +1133,11 @@ public class MutantEnemy : NetworkBehaviour
         rb.linearVelocity = velocity;
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
-        AttachGoreLandingDecalSpawner(piece);
+        // Yard pieces get a server-authoritative, networked blood splatter registered with
+        // CleanBloodTask instead of the purely-cosmetic/local GoreLandingDecalSpawner used by
+        // cosmetic pieces — it needs to be trackable/mop-cleanable just like the gore itself
+        // is trackable as junk.
+        SpawnYardBloodDecal(position);
 
         junk.enabled = true;
         netObj.Spawn(destroyWithScene: true);
@@ -1142,6 +1145,47 @@ public class MutantEnemy : NetworkBehaviour
         TakeOutTrashTask.Instance?.RegisterExternalJunkItem(netObj);
 
         return true;
+    }
+
+    /// <summary>
+    /// Server-side spawn of a networked blood-decal splatter under a gore piece that landed
+    /// inside the Trash Task's yard, raycast downward from just above <paramref name="originPosition"/>
+    /// to find the ground. Registers the spawned decal with <see cref="CleanBloodTask"/> so it
+    /// counts toward the "Clean Blood" task — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>.
+    /// No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
+    /// </summary>
+    private void SpawnYardBloodDecal(Vector3 originPosition)
+    {
+        if (yardBloodDecalPrefabs == null || yardBloodDecalPrefabs.Length == 0)
+            return;
+
+        Vector3 groundPoint = originPosition;
+        Vector3 groundNormal = Vector3.up;
+
+        Vector3 castOrigin = originPosition + Vector3.up * 5f;
+        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, goreGroundLayer, QueryTriggerInteraction.Ignore))
+        {
+            groundPoint = hit.point;
+            groundNormal = hit.normal;
+        }
+
+        GameObject prefab = yardBloodDecalPrefabs[UnityEngine.Random.Range(0, yardBloodDecalPrefabs.Length)];
+        if (prefab == null)
+            return;
+
+        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(groundNormal);
+        GameObject decalGo = Instantiate(prefab, groundPoint, rotation);
+        NetworkObject decalNetObj = decalGo.GetComponent<NetworkObject>();
+
+        if (decalNetObj == null)
+        {
+            Debug.LogWarning("[MutantEnemy] yardBloodDecalPrefabs entry is missing a NetworkObject component — skipping blood splatter registration.");
+            Destroy(decalGo);
+            return;
+        }
+
+        decalNetObj.Spawn(destroyWithScene: true);
+        CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
     }
 
     /// <summary>
@@ -1183,6 +1227,11 @@ public class MutantEnemy : NetworkBehaviour
     {
         foreach (Collider col in GetComponentsInChildren<Collider>(true))
         {
+            // Excluded so a persisting corpse (PlayAnimation death behaviour) can still be
+            // interacted with/collected as junk after death — see EnableCorpseJunkPickup.
+            if (col == corpseJunkInteractionCollider)
+                continue;
+
             col.enabled = false;
         }
     }
@@ -1318,6 +1367,10 @@ public class MutantEnemy : NetworkBehaviour
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {
+            // The corpse persists (never despawned — see DespawnAfterDelay comment below),
+            // so let it be collected as junk, matching what happens to the gore it dropped.
+            EnableCorpseJunkPickup();
+
             TriggerDeathAnimationClientRpc();
             //StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
         }
@@ -1328,6 +1381,43 @@ public class MutantEnemy : NetworkBehaviour
             if (IsSpawned)
                 NetworkObject.Despawn();
         }
+    }
+
+    /// <summary>
+    /// Enables this corpse as a collectible <see cref="JunkItem"/> and registers it with
+    /// <see cref="TakeOutTrashTask"/>. Called on a permanent death when <see cref="deathBehaviour"/>
+    /// is <see cref="DeathBehaviour.PlayAnimation"/> (the corpse persists in the scene instead of
+    /// despawning immediately). No-op if <see cref="corpseJunkItem"/> isn't assigned. Mirrors
+    /// <c>SuspectCharacter.EnableJunkPickup</c>/<c>ApplyJunkPickupState</c> for a body that becomes
+    /// pickable trash once its owner is confirmed dead.
+    /// </summary>
+    private void EnableCorpseJunkPickup()
+    {
+        if (corpseJunkItem == null)
+            return;
+
+        // Apply immediately on the server so TakeOutTrashTask's FindObjectsByType scan (run
+        // from RegisterExternalJunkItem's dynamic activation, or a later TriggerTask/
+        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away.
+        ApplyCorpseJunkPickupState();
+        EnableCorpseJunkPickupClientRpc();
+
+        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(NetworkObject);
+    }
+
+    [ClientRpc]
+    private void EnableCorpseJunkPickupClientRpc()
+    {
+        if (IsServer) return; // already applied on the server above
+        ApplyCorpseJunkPickupState();
+    }
+
+    private void ApplyCorpseJunkPickupState()
+    {
+        corpseJunkItem.enabled = true;
+
+        if (corpseJunkInteractionCollider != null)
+            corpseJunkInteractionCollider.enabled = true;
     }
 
     /// <summary>

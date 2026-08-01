@@ -141,9 +141,17 @@ public class PlayerSpawner : NetworkBehaviour
 
     /// <summary>
     /// Returns the booth (gameplay) spawn point used for mid-shift and end-of-shift resets.
+    /// Falls back to <see cref="singlePlayerSpawnPoint"/> if no multiplayer booth spawns are
+    /// assigned — without this guard, an empty <see cref="multiplayerSpawnPoints"/> array threw
+    /// a divide-by-zero exception here, which silently aborted the calling coroutine
+    /// (e.g. the post-intro-cutscene teleport) partway through, leaving that player stuck
+    /// wherever the cutscene left them instead of teleported to their booth position.
     /// </summary>
     public Transform GetBoothSpawnPoint(ulong clientId)
     {
+        if (multiplayerSpawnPoints == null || multiplayerSpawnPoints.Length == 0)
+            return singlePlayerSpawnPoint;
+
         int index = (int)(clientId % (ulong)multiplayerSpawnPoints.Length);
         return multiplayerSpawnPoints[index];
     }
@@ -155,7 +163,7 @@ public class PlayerSpawner : NetworkBehaviour
     /// </summary>
     public Transform GetOutsideSpawnPoint(ulong clientId)
     {
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        bool isSinglePlayer = GameManager.Instance != null && GameManager.Instance.IsSinglePlayer;
         return GetLobbySpawnPoint(clientId, isSinglePlayer);
     }
 
@@ -165,7 +173,11 @@ public class PlayerSpawner : NetworkBehaviour
     /// </summary>
     public Transform GetOutsideBunkerSpawnPoint(ulong clientId)
     {
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        // Read the server-replicated single-player flag rather than recomputing from
+        // NetworkManager.Singleton.ConnectedClients — that collection is only reliably
+        // populated on the server, so non-host clients would always see a count of 1 here
+        // and incorrectly fall back to the single-player spawn transform.
+        bool isSinglePlayer = GameManager.Instance != null && GameManager.Instance.IsSinglePlayer;
         if (isSinglePlayer || multiplayerOutsideBunkerSpawnPoints == null || multiplayerOutsideBunkerSpawnPoints.Length == 0)
             return singlePlayerOutsideBunkerSpawnPoint != null ? singlePlayerOutsideBunkerSpawnPoint : singlePlayerSpawnPoint;
 
@@ -179,7 +191,8 @@ public class PlayerSpawner : NetworkBehaviour
     /// </summary>
     public Transform GetInsideBunkerSpawnPoint(ulong clientId)
     {
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        // See GetOutsideBunkerSpawnPoint — use the replicated flag, not a local recompute.
+        bool isSinglePlayer = GameManager.Instance != null && GameManager.Instance.IsSinglePlayer;
         if (isSinglePlayer || multiplayerInsideBunkerSpawnPoints == null || multiplayerInsideBunkerSpawnPoints.Length == 0)
             return singlePlayerInsideBunkerSpawnPoint != null ? singlePlayerInsideBunkerSpawnPoint : singlePlayerSpawnPoint;
 

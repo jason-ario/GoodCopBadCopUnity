@@ -118,6 +118,16 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private Coroutine _proximityCoroutine;
 
+    // True once the "Follow the trail" tutorial overlay has ever been shown — guards
+    // ShowFollowTrailTutorial so it only ever plays the first time the task becomes active,
+    // not on subsequent days that reuse this same threat. Local (non-networked); each client
+    // sets its own copy since OnFollowTrailActiveChanged already fires on every peer.
+    private bool _hasShownFollowTrailTutorial;
+
+    // The tutorial objective-list row for this task, if currently showing. Local (non-networked);
+    // each client creates/removes its own row since OnFollowTrailActiveChanged fires on every peer.
+    private TutorialObjectiveItem _followTrailObjective;
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName        => _threatName;
@@ -199,8 +209,35 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private void OnFollowTrailActiveChanged(bool previous, bool current)
     {
-        if (current) TaskRegistry.Instance?.AddThreat(this);
-        else         TaskRegistry.Instance?.RemoveThreat(this);
+        if (current)
+        {
+            TaskRegistry.Instance?.AddThreat(this);
+
+            // Fires locally on every client (this NetworkVariable callback runs on ALL peers),
+            // so the tutorial overlay pops up for everyone the very first time the "Follow the
+            // trail" task ever becomes active — never again on subsequent days/triggers.
+            if (!_hasShownFollowTrailTutorial)
+            {
+                _hasShownFollowTrailTutorial = true;
+                TutorialOverlay.Instance?.ShowFollowTrailTutorial();
+            }
+
+            // Add the "Follow the trail" row to the tutorial objective list on every client.
+            _followTrailObjective = TutorialObjectiveList.Instance?.AddObjective(_threatName);
+        }
+        else
+        {
+            TaskRegistry.Instance?.RemoveThreat(this);
+
+            // Remove the row — this fires both when the destination is discovered (task
+            // resolved) and on day cleanup, so either way the row disappears in sync with
+            // the main HUD task.
+            if (_followTrailObjective != null)
+            {
+                TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_followTrailObjective, preHideDelay: 1f);
+                _followTrailObjective = null;
+            }
+        }
     }
 
     private void OnKillMutantCountChanged(int previous, int current)

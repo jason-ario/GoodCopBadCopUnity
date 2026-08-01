@@ -123,6 +123,13 @@ public class TimecardMachine : Interactable
         _clockInReady = false;
         OnClockInServer?.Invoke();
         PunchClockInClientRpc();
+
+        // Day 1 drives its own scripted opening (shutter, Vlad reveal) and calls
+        // ShiftManager.TryStartShift() itself once that sequence is ready — see
+        // Day_01.OnPlayerClockedIn / Day1OpeningSequence. Every other day starts the
+        // shift the instant the clock-in punch lands.
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay != 1)
+            ShiftManager.Instance.TryStartShift();
     }
 
     [ClientRpc]

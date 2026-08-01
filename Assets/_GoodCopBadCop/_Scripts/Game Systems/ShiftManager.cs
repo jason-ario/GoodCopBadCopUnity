@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using GoodCopBadCop.Population;
+using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -1350,8 +1351,49 @@ public class ShiftManager : NetworkBehaviour
             _playingDirector.gameObject.SetActive(true);
         }
 
-        yield return new WaitForSeconds(.5f);
+        // Wait until this client's CinemachineBrain has actually finished blending onto
+        // the cutscene's vcam instead of a fixed 0.5s delay. A fixed delay assumes the
+        // brain settles within that window on every machine — but a client that's still
+        // catching up on network/asset load right as the cutscene starts (most often the
+        // non-host Player Two) can still be mid-blend when the fixed delay expires. FadeOut
+        // then reveals a camera that hasn't settled yet, which is what produces the
+        // "erratic camera for a few seconds" symptom on that client. Polling the brain's
+        // actual state guarantees FadeOut only reveals the finished cutscene shot, on every
+        // client, regardless of how long that client took to get there.
+        yield return StartCoroutine(WaitForCutsceneCameraToSettle());
         UIController.Instance.FadeOut();
+    }
+
+    /// <summary>
+    /// Waits until the local player's CinemachineBrain reports the intro cutscene's
+    /// CinemachineCamera as its active, fully-blended-in camera. Falls back to a short
+    /// fixed delay if either reference can't be resolved, and always gives up after
+    /// <c>timeout</c> seconds so a missing/misconfigured vcam can never stall the sequence.
+    /// </summary>
+    private IEnumerator WaitForCutsceneCameraToSettle()
+    {
+        const float timeout = 3f;
+
+        CinemachineBrain brain = PlayerInstance.Instance?.GetCamera()?.GetComponent<CinemachineBrain>();
+        CinemachineCamera cutsceneVcam = _playingDirector != null
+            ? _playingDirector.GetComponentInChildren<CinemachineCamera>(true)
+            : null;
+
+        if (brain == null || cutsceneVcam == null)
+        {
+            yield return new WaitForSeconds(.5f);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < timeout)
+        {
+            if (ReferenceEquals(brain.ActiveVirtualCamera, cutsceneVcam) && !brain.IsBlending)
+                yield break;
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
     }
 
     /// <summary>
@@ -1646,18 +1688,23 @@ public class ShiftManager : NetworkBehaviour
         ResetEnvironment(true);
         SuspectController.Instance.ResetSuspects();
 
-        if (PlayerInstance.Instance != null)
-        {
-            PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
-            PlayerInstance.Instance.RequestSetIsOutside(false);
-            // Reset the camera to a neutral forward orientation so the view doesn't snap
-            // to whatever angle the player was looking at before or during the cutscene.
-            PlayerInstance.Instance.ResetCameraOrientation();
-            // Re-enable the player's own CinemachineCamera now, while the screen is still
-            // fully black, so the brain has already settled on it before FadeOut reveals
-            // the world again.
-            PlayerInstance.Instance.SetOwnCameraActive(true);
-        }
+        // Wait for a valid PlayerInstance instead of a bare null check — on a client whose
+        // local player hasn't finished spawning/reassigning PlayerInstance.Instance yet (e.g.
+        // Player Two joining or initializing slightly behind the host), the old plain "if"
+        // silently skipped the teleport for that one frame with no retry, leaving that player
+        // stuck wherever the cutscene left them instead of at their booth spawn point. Mirrors
+        // the WaitUntil guard already used in RunInitiateIntroCutsceneSequence/SkipToBoothReadySequence.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        PlayerInstance.Instance.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId));
+        PlayerInstance.Instance.RequestSetIsOutside(false);
+        // Reset the camera to a neutral forward orientation so the view doesn't snap
+        // to whatever angle the player was looking at before or during the cutscene.
+        PlayerInstance.Instance.ResetCameraOrientation();
+        // Re-enable the player's own CinemachineCamera now, while the screen is still
+        // fully black, so the brain has already settled on it before FadeOut reveals
+        // the world again.
+        PlayerInstance.Instance.SetOwnCameraActive(true);
 
         yield return new WaitForSeconds(1f);
         UIController.Instance.FadeOut();

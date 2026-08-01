@@ -1,3 +1,4 @@
+using HighlightPlus;
 using TMPro;
 using UnityEngine;
 
@@ -31,6 +32,9 @@ public class MailCubbySlot : MonoBehaviour
 
     [Tooltip("TMP text displaying the assigned resident's name on the cubby's tape label. Falls back to the first TMP_Text found in children if unassigned.")]
     [SerializeField] private TMP_Text _label;
+
+    [Tooltip("Outline highlight used by MailCubbyManager to call out this cubby (e.g. right after a delivery arrives) until a package is dropped into any cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
+    [SerializeField] private HighlightEffect _highlightEffect;
 
     /// <summary>The resident this physical cubby is currently labelled for.</summary>
     public SuspectData AssignedResident => _assignedResident;
@@ -77,6 +81,9 @@ public class MailCubbySlot : MonoBehaviour
         if (_label == null)
             _label = GetComponentInChildren<TMP_Text>(true);
 
+        if (_highlightEffect == null)
+            _highlightEffect = GetComponent<HighlightEffect>();
+
         if (_assignedResident == null)
             Debug.LogWarning($"[MailCubbySlot] '{name}' has no assigned resident — this cubby will never accept a delivery.", this);
 
@@ -101,6 +108,20 @@ public class MailCubbySlot : MonoBehaviour
 
         if (_label != null)
             _label.text = AbbreviatedResidentName;
+    }
+
+    /// <summary>
+    /// Turns this cubby's outline highlight on or off. Used by <see cref="MailCubbyManager"/> to
+    /// call out every active cubby right after a delivery arrives, clearing again as soon as a
+    /// package is dropped into any cubby slot (see <see cref="SortMailTask.EvaluateSort"/>).
+    /// No-op if this cubby has no <see cref="HighlightEffect"/> assigned or found.
+    /// </summary>
+    public void SetHighlight(bool highlight)
+    {
+        if (_highlightEffect == null) return;
+
+        _highlightEffect.enabled = true;
+        _highlightEffect.highlighted = highlight;
     }
 
     private void OnTriggerEnter(Collider other)

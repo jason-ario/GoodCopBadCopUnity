@@ -22,29 +22,47 @@ public class TutorialMarker : MonoBehaviour
     [Tooltip("Seconds to fade in / out when shown or hidden.")]
     [SerializeField] private float fadeDuration = 0.3f;
 
+    [Header("Distance Scaling")]
+    [Tooltip("Camera distance at which the marker renders at its original authored size (1x).")]
+    [SerializeField] private float referenceDistance = 10f;
+    [Tooltip("Smallest allowed scale multiplier, applied when the camera is very close.")]
+    [SerializeField] private float minScaleMultiplier = 0.5f;
+    [Tooltip("Largest allowed scale multiplier, applied when the camera is far away. Keeps the marker from becoming absurdly huge at long range.")]
+    [SerializeField] private float maxScaleMultiplier = 2.5f;
+
     // ── Private state ────────────────────────────────────────────────────────
     private Transform _target;
     private Renderer[] _renderers;
     private float _bobOffset;   // per-instance phase offset to desync multiple markers
+    private Vector3 _baseLocalScale; // authored scale at referenceDistance, before distance scaling
 
     // ── Unity ────────────────────────────────────────────────────────────────
     private void Awake()
     {
         _renderers = GetComponentsInChildren<Renderer>(true);
+        _baseLocalScale = transform.localScale;
     }
 
     private void LateUpdate()
     {
-        if (Camera.main != null)
+        Camera cam = Camera.main;
+        if (cam != null)
         {
-            Vector3 camPos = Camera.main.transform.position;
+            Vector3 camPos = cam.transform.position;
             Vector3 direction = camPos - transform.position;
             direction.y = 0f;
 
             if (direction.sqrMagnitude > 0f)
                 transform.rotation = Quaternion.LookRotation(direction);
+
+            // Keep the marker at a roughly consistent on-screen size regardless of
+            // distance, clamped so it never shrinks to nothing up close or balloons
+            // to an unreasonable size far away.
+            float distance = Vector3.Distance(camPos, transform.position);
+            float scaleMultiplier = Mathf.Clamp(distance / referenceDistance, minScaleMultiplier, maxScaleMultiplier);
+            transform.localScale = _baseLocalScale * scaleMultiplier;
         }
-        
+
         if (_target == null) return;
 
         float bob = Mathf.Sin((Time.time + _bobOffset) * bobFrequency * Mathf.PI * 2f) * bobAmplitude;
