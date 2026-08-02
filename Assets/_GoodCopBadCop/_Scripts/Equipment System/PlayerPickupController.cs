@@ -584,8 +584,15 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         // Extra guard on top of the collider-based optimistic lock below: if the network state
-        // has already caught up and shows this object as held, don't even attempt the grab.
-        if (pickableObject.IsHeld)
+        // has already caught up and shows this object held by SOMEONE ELSE, don't even attempt
+        // the grab. Deliberately IsHeldByOtherPlayer rather than IsHeld: StowCurrentItemToPoint
+        // stashes an item without releasing its holder registration (so another player can't
+        // grab it out of this player's inventory while it's stowed), which means UnstowItemToHand
+        // calls back into this method while the item still reads as held — by this same client.
+        // Using the plain IsHeld check here rejected that reclaim outright, leaving the item
+        // reactivated and repositioned at the hold point (see UnstowItemToHand) but never actually
+        // equipped — it just floated in front of the camera, unheld, until dropped some other way.
+        if (pickableObject.IsHeldByOtherPlayer)
         {
             return;
         }
