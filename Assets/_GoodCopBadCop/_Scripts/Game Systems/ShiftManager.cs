@@ -1370,6 +1370,17 @@ public class ShiftManager : NetworkBehaviour
     {
         yield return new WaitUntil(() => PlayerInstance.Instance != null);
 
+        // Disable the local player's own CinemachineCamera immediately, in the same frame the
+        // cutscene sequence begins — before the screen fade even starts. ForceExitSoldierDialogueBeforeCutscene
+        // (called moments earlier on the server, same RPC batch as this sequence's trigger) may have just
+        // deactivated a suspect-cam that this client was locked onto, which leaves CinemachineBrain about to
+        // blend back onto this still-enabled vcam. That blend is only invisible if it never gets a frame to
+        // render — waiting until after FadeInAndWait (as PlayIntroCutscene used to) leaves a window where the
+        // fade hasn't reached full opacity yet, and the blend-back plays visibly, reading as an erratic camera
+        // jolt right as the intro cutscene starts. Cutting the camera here, before any of that can render,
+        // removes the window entirely.
+        PlayerInstance.Instance.SetOwnCameraActive(false);
+
         // Safety net: clear any on-screen subtitle still lingering from the outside Soldier's
         // dialogue. ForceExitSoldierDialogueBeforeCutscene tears down dialogue MODE (movement,
         // camera, cursor) for the engaged player, but the subtitle textbox itself is a purely
@@ -1399,10 +1410,10 @@ public class ShiftManager : NetworkBehaviour
         // Wait until the screen is fully dark before teleporting the player.
         yield return StartCoroutine(UIController.Instance.FadeInAndWait());
 
-        // Fully disable the local player's own CinemachineCamera now that the screen is black.
-        // Leaving it active while ResetEverything teleports the player causes CinemachineBrain
-        // to blend toward the vcam's moving/stale transform once the cutscene vcam takes over,
-        // which is what produces the erratic camera on clients when the cutscene starts.
+        // Own camera was already disabled at the very start of RunInitiateIntroCutsceneSequence
+        // (before this fade began) — this call is now just a defensive no-op guaranteeing it's
+        // off before ResetEverything teleports the player, in case anything re-enabled it
+        // (e.g. Respawn) during the fade.
         PlayerInstance.Instance?.SetOwnCameraActive(false);
 
         ResetEverything(true);

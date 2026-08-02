@@ -308,6 +308,47 @@ public class FolderController : PickableObject
         // OnFolderHandedOff is now fired via isHandedOff.OnValueChanged on all clients.
     }
 
+    /// <summary>
+    /// Tells the server that this stamped folder is being held back for a deferred verdict
+    /// (see <see cref="HandOffPoint.BlockVerdict"/>). <see cref="HandOffPoint.PendingVerdictFolder"/>
+    /// is a per-process static, but the deferred delivery is only ever read on the server
+    /// (it fires from a server-only dialogue completion callback). When a non-host client
+    /// places the folder, only that client's own static would otherwise get set — the
+    /// server's copy would stay null and the deferred verdict would be silently dropped.
+    /// This routes the reference to the server via RPC when called from a non-host client so
+    /// the server's static is always populated regardless of who placed the folder.
+    /// </summary>
+    public void NotifyPendingVerdictHandoff()
+    {
+        if (IsServer)
+        {
+            HandOffPoint.SetPendingVerdictFolder(this);
+        }
+        else
+        {
+            NotifyPendingVerdictHandoffServerRpc(GetComponent<NetworkObject>().NetworkObjectId);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void NotifyPendingVerdictHandoffServerRpc(ulong folderNetworkObjectId)
+    {
+        if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(folderNetworkObjectId, out NetworkObject folderNetObj))
+        {
+            Debug.LogError($"NotifyPendingVerdictHandoffServerRpc: could not find NetworkObject with id {folderNetworkObjectId}.");
+            return;
+        }
+
+        FolderController folder = folderNetObj.GetComponent<FolderController>();
+        if (folder == null)
+        {
+            Debug.LogError("NotifyPendingVerdictHandoffServerRpc: NetworkObject does not have a FolderController.");
+            return;
+        }
+
+        HandOffPoint.SetPendingVerdictFolder(folder);
+    }
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
     {
         // Block all item interactions while the folder is being held by any player.

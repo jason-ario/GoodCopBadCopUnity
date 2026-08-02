@@ -21,6 +21,16 @@ public class HandOffPoint : PlacementBoard
         PendingVerdictFolder = null;
     }
 
+    /// <summary>
+    /// Sets the deferred verdict folder on THIS process's static state. Only meaningful when
+    /// called on the server — see <see cref="OnPlaced"/> for why a server-side write is
+    /// required regardless of which client performed the placement.
+    /// </summary>
+    public static void SetPendingVerdictFolder(FolderController folder)
+    {
+        PendingVerdictFolder = folder;
+    }
+
     public override void OnPlaced(PickableObject pickableObject)
     {
         base.OnPlaced(pickableObject);
@@ -42,7 +52,18 @@ public class HandOffPoint : PlacementBoard
         if (BlockVerdict)
         {
             // Store for deferred delivery — do not call DeliverVerdict now.
+            // BlockVerdict/PendingVerdictFolder are per-process statics: DayActivated sets
+            // BlockVerdict on every client independently, but the eventual deferred delivery
+            // (Day_01.DeliverDeferredVerdict, invoked from a server-only dialogue callback)
+            // only ever reads PendingVerdictFolder on the SERVER. If Player 2 (a non-host
+            // client) is the one who places the folder, this line alone only sets Player 2's
+            // own local static — the server's copy stays null and the deferred verdict is
+            // silently dropped, even though everything appears to work locally for Player 2.
+            // NotifyPendingVerdictHandoff routes the folder reference to the server (via RPC
+            // when called on a non-host client) so the server's static is always populated,
+            // regardless of who placed the folder.
             PendingVerdictFolder = folderController;
+            folderController.NotifyPendingVerdictHandoff();
             return;
         }
 

@@ -228,25 +228,29 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
-    /// Enables or disables this player's own first-person <see cref="Unity.Cinemachine.CinemachineCamera"/>
-    /// component. Use this to fully remove the vcam from CinemachineBrain consideration during
-    /// scripted sequences (e.g. the intro cutscene) instead of relying on Priority alone — while
-    /// the player is being teleported/reset off-screen, a still-active vcam can cause the brain to
-    /// blend toward its moving/stale transform, producing an erratic camera for the duration
-    /// of the blend.
-    /// Toggles the component's <c>enabled</c> flag directly (rather than deactivating the whole
-    /// GameObject) so CinemachineBrain immediately drops/re-adds it from its camera stack via the
-    /// component's OnEnable/OnDisable, without also disabling unrelated siblings (e.g. view-model
-    /// arms) parented under the same transform.
+    /// Enables or disables this player's own first-person camera rig for the duration of a
+    /// scripted sequence (e.g. the intro cutscene): both the <see cref="Unity.Cinemachine.CinemachineCamera"/>
+    /// vcam and the physical <see cref="UnityEngine.Camera"/> GameObject that hosts the
+    /// CinemachineBrain and AudioListener.
+    /// Mirrors exactly what <see cref="PlayerMovementController.OnNetworkSpawn"/> already does
+    /// for remote players' cameras — disabling only the vcam left the physical Camera (and its
+    /// AudioListener) active and rendering underneath/alongside whatever camera the cutscene
+    /// itself activates (e.g. an actor-held prop camera in the intro cutscene rig with a higher
+    /// depth), which is what produced the erratic/flickering view rather than a clean cut to the
+    /// cutscene's own camera. Disabling the whole physical Camera GameObject removes it from
+    /// rendering and audio listening entirely, not just from CinemachineBrain's vcam stack.
     /// </summary>
     public void SetOwnCameraActive(bool active)
     {
-        Transform cameraTransform = _playerMovementController?.CameraTransform;
-        if (cameraTransform == null) return;
+        if (_playerMovementController == null) return;
 
-        var cinemachineCam = cameraTransform.GetComponent<Unity.Cinemachine.CinemachineCamera>();
-        if (cinemachineCam != null)
-            cinemachineCam.enabled = active;
+        Transform cameraTransform = _playerMovementController.CameraTransform;
+        if (cameraTransform != null)
+            cameraTransform.gameObject.SetActive(active);
+
+        Camera camera = _playerMovementController.Camera;
+        if (camera != null)
+            camera.gameObject.SetActive(active);
     }
 
     /// <summary>
