@@ -228,19 +228,25 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
-    /// Enables or disables this player's own first-person CinemachineCamera GameObject.
-    /// Use this to fully remove the vcam from CinemachineBrain consideration during scripted
-    /// sequences (e.g. the intro cutscene) instead of relying on Priority alone — while the
-    /// player is being teleported/reset off-screen, a still-active vcam can cause the brain to
+    /// Enables or disables this player's own first-person <see cref="Unity.Cinemachine.CinemachineCamera"/>
+    /// component. Use this to fully remove the vcam from CinemachineBrain consideration during
+    /// scripted sequences (e.g. the intro cutscene) instead of relying on Priority alone — while
+    /// the player is being teleported/reset off-screen, a still-active vcam can cause the brain to
     /// blend toward its moving/stale transform, producing an erratic camera for the duration
-    /// of the blend. Mirrors the pattern already used by <see cref="Respawn"/> and
-    /// <see cref="StartSpectating"/>.
+    /// of the blend.
+    /// Toggles the component's <c>enabled</c> flag directly (rather than deactivating the whole
+    /// GameObject) so CinemachineBrain immediately drops/re-adds it from its camera stack via the
+    /// component's OnEnable/OnDisable, without also disabling unrelated siblings (e.g. view-model
+    /// arms) parented under the same transform.
     /// </summary>
     public void SetOwnCameraActive(bool active)
     {
         Transform cameraTransform = _playerMovementController?.CameraTransform;
-        if (cameraTransform != null)
-            cameraTransform.gameObject.SetActive(active);
+        if (cameraTransform == null) return;
+
+        var cinemachineCam = cameraTransform.GetComponent<Unity.Cinemachine.CinemachineCamera>();
+        if (cinemachineCam != null)
+            cinemachineCam.enabled = active;
     }
 
     /// <summary>

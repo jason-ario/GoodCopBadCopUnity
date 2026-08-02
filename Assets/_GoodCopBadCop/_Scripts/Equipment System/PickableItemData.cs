@@ -22,6 +22,18 @@ public class PickableItemData : ScriptableObject
     [SerializeField] private AudioClip pickupSound;
     public AudioClip PickupSound => pickupSound;
 
+    [Tooltip("Played whenever this item is placed down (e.g. via DropObject/PlacementFeedback) — " +
+             "regardless of whether the placement turns out to be a correct one for whatever system " +
+             "evaluates that (e.g. a mail package landing in ANY bin/cubby, right or wrong; sorting " +
+             "outcomes like MailPackageItem's success chime play separately, on top of this, only " +
+             "when the sort is actually correct). Leave empty for a silent placement.")]
+    [SerializeField] private AudioClip placementSound;
+    public AudioClip PlacementSound => placementSound;
+
+    [Tooltip("Volume for placementSound.")]
+    [SerializeField] private float placementSoundVolume = 1f;
+    public float PlacementSoundVolume => placementSoundVolume;
+
     [Header("Animation Data")]
     public bool usesTwoArms;
     public string pickupAnimBool;

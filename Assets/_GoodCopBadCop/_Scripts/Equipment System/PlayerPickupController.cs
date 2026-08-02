@@ -944,12 +944,15 @@ public class PlayerPickupController : NetworkBehaviour
                 flashlight.TurnOff();
             _heldObject.OnDropped();
 
-            // Placement feedback: punch scale + surface poof particle.
+            // Placement feedback: punch scale + surface poof particle + this item's own
+            // placement sound (PickableItemData.PlacementSound — different objects get their own
+            // distinct thud; PlacementFeedback falls back to its default clip if unset).
             if (ObjectPlacer.Instance != null && ObjectPlacer.Instance.PlacementFeedback != null)
             {
                 Vector3 surfaceNormal = ObjectPlacer.Instance.transform.up;
                 ObjectPlacer.Instance.PlacementFeedback.PlayPlacementFeedback(
-                    _heldObject.transform, dropPos, surfaceNormal);
+                    _heldObject.transform, dropPos, surfaceNormal,
+                    _heldObject.ItemData.PlacementSound, _heldObject.ItemData.PlacementSoundVolume);
             }
         }
 

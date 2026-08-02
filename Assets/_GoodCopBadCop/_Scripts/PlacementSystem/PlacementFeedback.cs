@@ -31,6 +31,14 @@ public class PlacementFeedback : MonoBehaviour
     [Tooltip("Half-angle of the launch cone relative to the surface normal.")]
     [SerializeField][Range(0f, 90f)] private float spreadAngle = 35f;
 
+    [Header("Placement Sound")]
+    [Tooltip("Fallback clip played when the placed item's PickableItemData has no PlacementSound " +
+             "of its own assigned. Prefer setting a per-item sound on PickableItemData.PlacementSound " +
+             "so different objects (mail package, folder, mop, etc.) get their own distinct thud.")]
+    [SerializeField] private AudioClip _defaultPlacementSfxClip;
+    [Tooltip("Volume for _defaultPlacementSfxClip.")]
+    [SerializeField] private float _defaultPlacementSfxVolume = 1f;
+
     private ParticleSystem _ps;
 
     private void Awake()
@@ -39,15 +47,21 @@ public class PlacementFeedback : MonoBehaviour
     }
 
     /// <summary>
-    /// Fires DOPunchScale on <paramref name="placedObject"/> and emits a poof burst
-    /// at the collider face touching the surface, oriented by <paramref name="surfaceNormal"/>.
+    /// Fires DOPunchScale on <paramref name="placedObject"/>, emits a poof burst at the collider
+    /// face touching the surface (oriented by <paramref name="surfaceNormal"/>), and plays a
+    /// placement sound. <paramref name="placementSfxClip"/>/<paramref name="placementSfxVolume"/>
+    /// are normally sourced from the placed item's own <see cref="PickableItemData.PlacementSound"/>
+    /// so each object type gets its own distinct sound — pass null to fall back to this
+    /// component's <see cref="_defaultPlacementSfxClip"/> instead.
     /// </summary>
-    public void PlayPlacementFeedback(Transform placedObject, Vector3 contactPoint, Vector3 surfaceNormal)
+    public void PlayPlacementFeedback(Transform placedObject, Vector3 contactPoint, Vector3 surfaceNormal,
+        AudioClip placementSfxClip = null, float placementSfxVolume = 1f)
     {
         if (placedObject != null)
             PlayPunchScale(placedObject);
 
         PlayPoofParticle(placedObject, contactPoint, surfaceNormal);
+        PlayPlacementSfx(contactPoint, placementSfxClip, placementSfxVolume);
     }
 
     // -------------------------------------------------------------------------
@@ -58,6 +72,27 @@ public class PlacementFeedback : MonoBehaviour
     {
         target.DOKill(complete: true);
         target.DOPunchScale(Vector3.Scale(target.localScale, punchStrength), punchDuration, punchVibrato, punchElasticity);
+    }
+
+    // -------------------------------------------------------------------------
+    // Placement sound
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Plays the "object placed" thud at <paramref name="contactPoint"/>. Fires on every
+    /// placement unconditionally — success/failure feedback for a specific placement outcome
+    /// (e.g. MailPackageItem's sort-success chime) is layered on top of this by whatever system
+    /// evaluates that outcome, separately and slightly after this call. Uses
+    /// <paramref name="clip"/> (normally the placed item's own PickableItemData.PlacementSound)
+    /// when provided, otherwise falls back to <see cref="_defaultPlacementSfxClip"/>.
+    /// </summary>
+    private void PlayPlacementSfx(Vector3 contactPoint, AudioClip clip, float volume)
+    {
+        AudioClip resolvedClip = clip != null ? clip : _defaultPlacementSfxClip;
+        float resolvedVolume = clip != null ? volume : _defaultPlacementSfxVolume;
+
+        if (resolvedClip != null)
+            SFXController.Instance?.PlayAtPosition(resolvedClip, contactPoint, resolvedVolume);
     }
 
     // -------------------------------------------------------------------------
