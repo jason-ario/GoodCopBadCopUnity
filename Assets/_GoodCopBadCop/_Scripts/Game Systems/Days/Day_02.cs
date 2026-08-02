@@ -413,6 +413,7 @@ public class Day_02 : DayBase, IDailyTask
 
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
+        SortMailTask.OnMailDelivered         -= OnMailActuallyDelivered;
 
         // Mail-sorting objective tracking lives entirely on SortMailTask itself (see
         // SortMailTask.NotifyDeliveryAlertClientRpc/NotifyAllPackagesSortedClientRpc) — nothing
@@ -460,6 +461,7 @@ public class Day_02 : DayBase, IDailyTask
         if (Instance == this) Instance = null;
         SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         ExamNotebook.OnAnyNotebookPageFiled  -= OnNotebookPageFiled;
+        SortMailTask.OnMailDelivered         -= OnMailActuallyDelivered;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDay2Started;
@@ -802,14 +804,31 @@ public class Day_02 : DayBase, IDailyTask
     /// <summary>
     /// Server-only. Triggers the Day 2 mail delivery — deferred from the automatic day-change
     /// trigger via <see cref="SortMailTask.DeferAutoTriggerForDay"/> so it never appears before
-    /// Vlad has unlocked the tool locker — and broadcasts to all clients that the sorting-mail
-    /// tutorial overlay should show. Called right after the tool locker dialogue finishes.
+    /// Vlad has unlocked the tool locker. The sorting-mail tutorial overlay itself isn't shown
+    /// here — the truck still has to drive to the gate, wait for it to open, and drive the crate
+    /// to its drop point, which can take a while — instead <see cref="OnMailActuallyDelivered"/>
+    /// is subscribed to <see cref="SortMailTask.OnMailDelivered"/> so the overlay only appears
+    /// once the mail has actually been dropped off. Called right after the tool locker dialogue
+    /// finishes.
     /// </summary>
     private void StartMailSortingSequence()
     {
         if (!NetworkManager.Singleton.IsServer) return;
 
+        SortMailTask.OnMailDelivered += OnMailActuallyDelivered;
         SortMailTask.Instance?.TriggerDeferredDelivery();
+    }
+
+    /// <summary>
+    /// One-shot handler for <see cref="SortMailTask.OnMailDelivered"/>, fired on the server the
+    /// moment the mail delivery's packages actually spawn (truck has dropped the crate) — see
+    /// <see cref="SortMailTask.TriggerTask"/>/<see cref="DeliveryTruckController"/>. Broadcasts
+    /// the sorting-mail tutorial overlay to all clients and unsubscribes so it never fires again
+    /// for later days.
+    /// </summary>
+    private void OnMailActuallyDelivered()
+    {
+        SortMailTask.OnMailDelivered -= OnMailActuallyDelivered;
         Day02NetworkSync.Instance?.ShowMailSortingTutorial();
     }
 

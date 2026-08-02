@@ -14,12 +14,12 @@ using UnityEngine.Animations;
 /// pattern used by <c>TakeOutTrashTask</c>/<c>CleanBoothMessTask</c> for Day 3 pre-shift tasks).
 ///
 /// Sequence, once a player comes within <see cref="_detectionRadius"/> of Ocho:
-///   1. Ocho stops eating: the Animator's "StopAndLook" trigger plays the
-///      "Ocho Eating Stop And Look" animation and the eating-loop sound is cut.
-///   2. After <see cref="_lookDelay"/> he starts looking at the nearest player by
-///      dynamically setting the attached FIMSpace <see cref="FLookAnimator"/>'s look
-///      target and switching its look weight on (see <see cref="LocalSetLooking"/>), and
-///      holds that look for <see cref="_lookHoldDuration"/>.
+///   1. Ocho stops eating: the eating-loop sound is cut (the "StopAndLook" Animator
+///      trigger/animation is disabled — see <see cref="LocalPlayStopAndLook"/>).
+///   2. Immediately after, he starts looking at the nearest player by dynamically setting
+///      the attached FIMSpace <see cref="FLookAnimator"/>'s look target and switching its
+///      look weight on (see <see cref="LocalSetLooking"/>), and holds that look for
+///      <see cref="_lookHoldDuration"/>.
 ///   3. He drops the held Vlad pieces. For each entry in <see cref="_vladPieceRoots"/>, a
 ///      pre-spawned networked "physics double" (see <see cref="_networkedVladPiecePrefabs"/>)
 ///      takes over: its <see cref="ParentConstraint"/> (which tracked the held visual piece
@@ -114,9 +114,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     // ── Inspector — Look Timing ──────────────────────────────────────────────
 
     [Header("Look Timing")]
-    [Tooltip("Delay after the Stop-And-Look animation starts before Ocho begins procedurally turning to look at the player.")]
-    [SerializeField] private float _lookDelay = 1.2f;
-
     [Tooltip("How long Ocho holds his look-at-player pose before dropping Vlad's pieces.")]
     [SerializeField] private float _lookHoldDuration = 2f;
 
@@ -261,9 +258,10 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
     private IEnumerator RunCutsceneSequence()
     {
+        // Animation-driven "StopAndLook" trigger is disabled — enabling the FLookAnimator
+        // directly (below) reads better than the canned turn animation. LocalPlayStopAndLook
+        // still cuts the eating-loop audio; only its Animator.SetTrigger call is skipped now.
         PlayStopAndLookClientRpc();
-        yield return new WaitForSeconds(_lookDelay);
-
         SetLookingClientRpc(true);
         yield return new WaitForSeconds(_lookHoldDuration);
 
@@ -348,8 +346,11 @@ public class OchoEatingVladCutscene : NetworkBehaviour
                 _audioSource.PlayOneShot(_stopEatingClip);
         }
 
-        if (_ochoAnimator != null && !string.IsNullOrEmpty(_stopAndLookTrigger))
-            _ochoAnimator.SetTrigger(_stopAndLookTrigger);
+        // Disabled: the "StopAndLook" Animator trigger is no longer fired — enabling the
+        // FLookAnimator directly (see RunCutsceneSequence -> SetLookingClientRpc) looks better
+        // than the canned turn animation. Kept commented for easy revert.
+        // if (_ochoAnimator != null && !string.IsNullOrEmpty(_stopAndLookTrigger))
+        //     _ochoAnimator.SetTrigger(_stopAndLookTrigger);
     }
 
     private void LocalDropVladPiecesAndIdle()

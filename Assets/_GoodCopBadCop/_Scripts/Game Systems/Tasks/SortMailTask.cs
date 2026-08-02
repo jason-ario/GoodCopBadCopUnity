@@ -189,6 +189,17 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>Fired on every client whenever the sorted/total counts change.</summary>
     public static event Action OnProgressChanged;
 
+    /// <summary>
+    /// Fired on the server right after a delivery's packages have actually spawned in the world
+    /// (i.e. once the mail has truly been dropped off — see <see cref="TriggerTask"/>, called by
+    /// <see cref="DeliveryTruckController"/> once the crate settles at pointC). Used instead of
+    /// hooking the truck's earlier "sequence started"/"waiting at gate" beats so anything that
+    /// should only appear once the mail is actually here (e.g. Day 2's sorting tutorial overlay,
+    /// broadcast to clients separately once the server-side handler reacts) isn't shown
+    /// prematurely while the truck is still en route.
+    /// </summary>
+    public static event Action OnMailDelivered;
+
     public int SortedCount => _sortedCount.Value;
     public int TotalCount  => _totalCount.Value;
 
@@ -400,6 +411,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         NotifyDeliveryAlertClientRpc();
+
+        OnMailDelivered?.Invoke();
 
         Debug.Log($"[SortMailTask] Delivery triggered — spawned {_spawnedPackages.Count} package(s). " +
                   $"Prohibited today: {string.Join(", ", _todaysProhibitedGoods)}");
