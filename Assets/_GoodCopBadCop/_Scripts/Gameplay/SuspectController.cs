@@ -1110,12 +1110,23 @@ public class SuspectController : NetworkBehaviour
         DialogueManager.Instance.SayDialogue(suspectCharacter, exitDialogue);
     }
 
+    /// <summary>
+    /// True when the suspect currently being processed is Vlad, the scripted Day 1 tutorial
+    /// suspect (always suspect index 0 on Day 1 — see <see cref="Day_01.OnSubjectProcessed"/>,
+    /// which applies the same exclusion to its own "Process N subjects" HUD counter). Vlad is
+    /// not a real subject and must not count toward <see cref="ShiftManager.suspectsProcessed"/>
+    /// or its correct/wrong tallies.
+    /// </summary>
+    private bool IsScriptedDay1TutorialSuspect =>
+        CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay == 1 && SuspectIndex < 1;
+
     private IEnumerator PassSequence()
     {
         if (suspectCharacter == null)
             yield break;
 
-        ShiftManager.Instance.PassedSuspect(suspectCharacter);
+        if (!IsScriptedDay1TutorialSuspect)
+            ShiftManager.Instance.PassedSuspect(suspectCharacter);
         SuspectRecord passRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);
         if (passRecord != null)
         {
@@ -1426,7 +1437,8 @@ public class SuspectController : NetworkBehaviour
 
         bool isClient = !IsServer;
 
-        ShiftManager.Instance.QuarantinedSuspect(suspectCharacter);
+        if (!IsScriptedDay1TutorialSuspect)
+            ShiftManager.Instance.QuarantinedSuspect(suspectCharacter);
 
         if (!isClient)
         {
@@ -1493,7 +1505,7 @@ public class SuspectController : NetworkBehaviour
 
         suspectCharacter.animator.SetBool("BeingRestrained", true);
 
-        float quarantiningTime = 9f;
+        float quarantiningTime = 4.5f;
         float timeElapsed = 0f;
 
         while (timeElapsed < quarantiningTime)
@@ -1539,7 +1551,8 @@ public class SuspectController : NetworkBehaviour
         if (suspectCharacter == null)
             yield break;
 
-        ShiftManager.Instance.KillSuspect(suspectCharacter);
+        if (!IsScriptedDay1TutorialSuspect)
+            ShiftManager.Instance.KillSuspect(suspectCharacter);
 
         // Permanently remove this suspect from future shifts.
         SuspectRecord killRecord = SuspectRunRecords.Instance?.GetRecord(suspectCharacter.Data);

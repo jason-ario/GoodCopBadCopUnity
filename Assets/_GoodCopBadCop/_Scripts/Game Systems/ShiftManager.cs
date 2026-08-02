@@ -974,6 +974,18 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator InBetweenShiftSequence()
     {
+        // Make every connected player invincible for the whole transition, starting right now —
+        // before the fade-in even begins. CampaignManager.ResetAllPlayersHealthAndRadiation()
+        // (called later, once the screen is fully black) only guards against damage applied
+        // *after* the reset; it can't undo a radiation/hazard tick that lands during the fade-in
+        // itself (e.g. a player who ended the shift already above the radiation damage
+        // threshold keeps ticking damage every frame until the reset runs). That tick still
+        // fires PlayerHealth.OnHealthChanged, which plays the Hit/hurt animation on that
+        // player's body — visible to every client — even though health is fully restored a
+        // moment later. Blanket invincibility from the very start of the transition removes the
+        // damage source entirely instead of racing to reset it after the fact.
+        SetAllPlayersInvincible(true);
+
         // End the previous night phase and score it before resetting the world.
         BetweenShiftTaskManager.Instance?.EndNightPhase();
 
@@ -1009,6 +1021,10 @@ public class ShiftManager : NetworkBehaviour
             else
                 CampaignManager.Instance.AdvanceDay();
         }
+
+        // Health and radiation have now been fully reset for the new day (or the campaign has
+        // ended) — safe to drop the blanket invincibility applied at the top of this coroutine.
+        SetAllPlayersInvincible(false);
 
         // Teleport the local player to their inside-bunker spawn while the screen is dark,
         // and force the bunker door closed so the new day always starts locked inside.
@@ -1053,6 +1069,29 @@ public class ShiftManager : NetworkBehaviour
         if (IsServer)
         {
             _networkCurrentDay.Value = _currentDay;
+        }
+    }
+
+    /// <summary>
+    /// Toggles <see cref="PlayerHealth.IsInvincible"/> and <see cref="PlayerRadiation.IsInvincible"/>
+    /// for every connected player. Server-only. Used to shield players from stray damage/radiation
+    /// ticks during scripted transitions such as the between-shift day change.
+    /// </summary>
+    private void SetAllPlayersInvincible(bool invincible)
+    {
+        if (!IsServer) return;
+
+        foreach (var client in NetworkManager.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
+            if (playerHealth != null)
+                playerHealth.IsInvincible = invincible;
+
+            PlayerRadiation playerRadiation = client.PlayerObject.GetComponent<PlayerRadiation>();
+            if (playerRadiation != null)
+                playerRadiation.IsInvincible = invincible;
         }
     }
 
@@ -1274,6 +1313,7 @@ public class ShiftManager : NetworkBehaviour
     {
         if (IsServer)
         {
+            ForceExitSoldierDialogueBeforeCutscene();
             GameManager.Instance.SetIntroCutsceneStarted();
             InitiateIntroCutsceneClientRpc();
         }
@@ -1284,8 +1324,24 @@ public class ShiftManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestInitiateIntroCutsceneServerRpc()
     {
+        ForceExitSoldierDialogueBeforeCutscene();
         GameManager.Instance.SetIntroCutsceneStarted();
         InitiateIntroCutsceneClientRpc();
+    }
+
+    /// <summary>
+    /// Server-only. If a player is still mid-conversation with the outside Soldier (or any
+    /// other scripted dialogue) when the host starts the intro cutscene, force the whole
+    /// sequence to end for every client before the cutscene begins. Without this, the engaged
+    /// player's dialogue lock (movement/look/cursor) never gets released, and the on-screen
+    /// subtitle box is never told to clear for any client — including a bystander player who
+    /// was merely seeing the soldier's lines from a distance and never entered dialogue mode.
+    /// </summary>
+    private void ForceExitSoldierDialogueBeforeCutscene()
+    {
+        if (!IsServer) return;
+        if (ScriptedDialogueRunner.IsScriptedModeActive)
+            ScriptedDialogueRunner.Instance?.ExitScriptedMode();
     }
 
     [ClientRpc]
@@ -1313,6 +1369,15 @@ public class ShiftManager : NetworkBehaviour
     private IEnumerator RunInitiateIntroCutsceneSequence()
     {
         yield return new WaitUntil(() => PlayerInstance.Instance != null);
+
+        // Safety net: clear any on-screen subtitle still lingering from the outside Soldier's
+        // dialogue. ForceExitSoldierDialogueBeforeCutscene tears down dialogue MODE (movement,
+        // camera, cursor) for the engaged player, but the subtitle textbox itself is a purely
+        // local/per-client visual that is only ever cleared by the next line spawning or its own
+        // display timer — never by dialogue mode exiting. Without this, a bystander player who
+        // was simply watching the soldier's lines (and never entered dialogue mode) would be left
+        // with a stuck subtitle once the cutscene takes over the screen.
+        DialogueManager.Instance?.ClearHistory();
 
         UIController.Instance.ClosePlayerUI();
         PlayerInstance.Instance.SetCanInteract(false);

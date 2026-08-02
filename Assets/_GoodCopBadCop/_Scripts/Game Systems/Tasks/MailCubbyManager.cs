@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -90,10 +91,11 @@ public class MailCubbyManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-only. Turns on the outline highlight for every currently active
-    /// <see cref="MailCubbySlot"/> on every client. Intended to be called right after a delivery
-    /// arrives (see <see cref="DeliveryTruckController"/>) so players can immediately spot where
-    /// to drop off packages — cleared again as soon as any package is dropped into any cubby, via
+    /// Server-only. Turns on the outline highlight on every physical "Mail Cubbies" stand (the
+    /// <see cref="HighlightEffect"/> lives on each stand's root GameObject, not on the individual
+    /// <see cref="MailCubbySlot"/> cubbies) on every client. Intended to be called right after a
+    /// delivery arrives (see <see cref="DeliveryTruckController"/>) so players can immediately spot
+    /// where to go — cleared again as soon as any package is dropped into any cubby, via
     /// <see cref="ClearAllHighlights"/> (see <see cref="SortMailTask.EvaluateSort"/>).
     /// </summary>
     public void HighlightAllActiveCubbies()
@@ -103,8 +105,8 @@ public class MailCubbyManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-only. Turns off the outline highlight on every <see cref="MailCubbySlot"/> (active
-    /// or not) on every client. Safe to call even if nothing is currently highlighted.
+    /// Server-only. Turns off the outline highlight on every "Mail Cubbies" stand root on every
+    /// client. Safe to call even if nothing is currently highlighted.
     /// </summary>
     public void ClearAllHighlights()
     {
@@ -115,13 +117,14 @@ public class MailCubbyManager : NetworkBehaviour
     [ClientRpc]
     private void SetHighlightClientRpc(bool highlight)
     {
-        MailCubbySlot[] allSlots = GetComponentsInChildren<MailCubbySlot>(true);
-        foreach (MailCubbySlot slot in allSlots)
+        // The outline highlight lives on each "Mail Cubbies" stand's root GameObject (see the
+        // "Mail Cubbies" prefab), not on the individual MailCubbySlot cubbies — this points the
+        // player at the whole stand rather than calling out every slot separately.
+        HighlightEffect[] cubbyHighlights = GetComponentsInChildren<HighlightEffect>(true);
+        foreach (HighlightEffect fx in cubbyHighlights)
         {
-            // Only ever highlight cubbies that are actually in use — active state is already
-            // replicated identically to every client via ApplyAssignment/ApplyAssignmentClientRpc.
-            if (highlight && !slot.gameObject.activeSelf) continue;
-            slot.SetHighlight(highlight);
+            fx.enabled = true;
+            fx.highlighted = highlight;
         }
     }
 

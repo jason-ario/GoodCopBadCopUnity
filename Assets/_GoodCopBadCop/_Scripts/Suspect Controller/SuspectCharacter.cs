@@ -1285,17 +1285,14 @@ public class SuspectCharacter : Interactable
             return;
         }
 
-        // Booth suspects: direct interaction opens the free-form question dialogue (sourced
-        // from SuspectData.questionResponses) so the player can ask questions independent of
-        // the linear scripted intro/cutscene sequence — including checking for story mismatches
-        // via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly. Suppressed while a
-        // scripted sequence or another dialogue session is already controlling the player.
-        if (speaking != null &&
-            !ScriptedDialogueRunner.IsScriptedModeActive &&
-            !DialogueChoiceSystem.IsInDialogueMode)
-        {
-            speaking.InitiateChoices();
-        }
+        // Booth suspects: direct interaction used to open the free-form question dialogue
+        // (sourced from SuspectData.questionResponses) so the player could ask questions
+        // independent of the linear scripted intro/cutscene sequence — including checking for
+        // story mismatches via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly.
+        // DISABLED FOR NOW: booth suspects should only speak via their scripted intro/exit
+        // dialogue (ScriptedDialogueRunner), not via a player-initiated choice-based dialogue.
+        // The scripted intro/exit flow and SuspectWorldDialogue conversations above are
+        // unaffected by this.
     }
 
     public void SetCanInteract(bool canInteract)

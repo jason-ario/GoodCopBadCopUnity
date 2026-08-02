@@ -24,7 +24,7 @@ public class BoothWaitingNotification : MonoBehaviour
     [SerializeField] private float _displayDuration = 4f;
     [SerializeField] private float _fadeDuration = 0.4f;
     [Tooltip("Only used in looping mode (see Show(string, loop: true)) — how long the notification stays hidden between fade-out and fade-back-in.")]
-    [SerializeField] private float _repeatGapDuration = 1.5f;
+    [SerializeField] private float _repeatGapDuration = 4.5f;
 
     private Coroutine _hideCoroutine;
     private bool _looping;

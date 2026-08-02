@@ -33,7 +33,7 @@ public class MailCubbySlot : MonoBehaviour
     [Tooltip("TMP text displaying the assigned resident's name on the cubby's tape label. Falls back to the first TMP_Text found in children if unassigned.")]
     [SerializeField] private TMP_Text _label;
 
-    [Tooltip("Outline highlight used by MailCubbyManager to call out this cubby (e.g. right after a delivery arrives) until a package is dropped into any cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
+    [Tooltip("Optional per-cubby outline highlight. Not used by MailCubbyManager (which highlights the whole \"Mail Cubbies\" stand root instead — see MailCubbyManager.HighlightAllActiveCubbies) — kept here only for callers that want to call out one specific cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
     [SerializeField] private HighlightEffect _highlightEffect;
 
     /// <summary>The resident this physical cubby is currently labelled for.</summary>
@@ -111,10 +111,10 @@ public class MailCubbySlot : MonoBehaviour
     }
 
     /// <summary>
-    /// Turns this cubby's outline highlight on or off. Used by <see cref="MailCubbyManager"/> to
-    /// call out every active cubby right after a delivery arrives, clearing again as soon as a
-    /// package is dropped into any cubby slot (see <see cref="SortMailTask.EvaluateSort"/>).
-    /// No-op if this cubby has no <see cref="HighlightEffect"/> assigned or found.
+    /// Turns this cubby's own outline highlight on or off, if it has one assigned. Not called by
+    /// <see cref="MailCubbyManager"/> — see <see cref="MailCubbyManager.HighlightAllActiveCubbies"/>,
+    /// which highlights the whole "Mail Cubbies" stand root instead. No-op if this cubby has no
+    /// <see cref="HighlightEffect"/> assigned or found.
     /// </summary>
     public void SetHighlight(bool highlight)
     {

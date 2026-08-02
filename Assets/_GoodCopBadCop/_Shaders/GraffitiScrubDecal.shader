@@ -31,8 +31,18 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         {
             "RenderPipeline" = "UniversalPipeline"
             "RenderType"     = "Opaque"
-            // Drawn in the Transparent queue so it composites after opaque geometry.
-            "Queue"          = "Transparent"
+            // Drawn at the tail of the OPAQUE queue range (not the Transparent queue).
+            // This is required for the volumetric fog (VolumetricFogAndMist2) to affect this
+            // decal: that render feature composites into the color buffer at
+            // RenderPassEvent.BeforeRenderingTransparents, i.e. AFTER the opaque queue draws
+            // but BEFORE the transparent queue draws. Since this decal writes color (via alpha
+            // blending) but never writes depth (ZWrite Off), leaving it in the opaque range lets
+            // it paint onto the real surface's depth first, then the fog pass composites over it
+            // using that same (unmodified) depth buffer — exactly like it does for ordinary
+            // opaque geometry. If this stayed in the Transparent queue it would always draw
+            // AFTER the fog composite and fully overwrite it, which is why the decal looked like
+            // it ignored / sat in front of the fog.
+            "Queue"          = "AlphaTest"
         }
 
         Pass

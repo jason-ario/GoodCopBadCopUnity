@@ -325,6 +325,15 @@ public class Day_01 : DayBase
              "cutting straight to the alarm.")]
     [SerializeField] private float _breachTriggerDelay = 5f;
 
+    [Tooltip("Fake-out megaphone bark played the instant both end-of-shift tasks (trash + " +
+             "graffiti) finish — congratulates the player and implies they can clock out now. " +
+             "The timecard machine is NOT actually unlocked yet; the first mutant breach fires " +
+             "shortly after this line, so the player learns clocking out is gated behind " +
+             "surviving the breach.")]
+    [TextArea(2, 4)]
+    [SerializeField] private string _preBreachClockOutFakeoutBark =
+        "Great work, you can now clock out to end the day.";
+
     [Tooltip("First checkpoint shovel — locked until the first mutant breach begins, then unlocked " +
              "and highlighted with a tutorial arrow so the player knows to grab it and fight back.")]
     [SerializeField] private Shovel _breachShovel1;
@@ -356,9 +365,10 @@ public class Day_01 : DayBase
     [TextArea(2, 4)]
     [SerializeField] private string _breachClearedBark1 = "Well done, you survived your first breach.";
 
-    [Tooltip("Follow-up megaphone bark after the breach-cleared line.")]
+    [Tooltip("Follow-up megaphone bark after the breach-cleared line — sends the player into the " +
+             "post-breach gore/blood/fence cleanup instead of straight to bed.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _breachClearedBark2 = "Get some rest — tomorrow's another long one.";
+    [SerializeField] private string _breachClearedBark2 = "Clean up all this blood and gore before bed, will you?";
 
     [Tooltip("Seconds between the two breach-cleared megaphone barks.")]
     [SerializeField] private float _breachClearedBarkGap = 2.5f;
@@ -2323,13 +2333,16 @@ public class Day_01 : DayBase
     /// Only clears the shared objective list and advances to the post-shift mutant breach once
     /// BOTH the trash and graffiti end-of-shift tasks have been completed — whichever finishes
     /// second triggers this. Prevents the list (and the still in-progress task's row) from
-    /// being wiped out early. The timecard machine stays locked (see <see cref="_breachGateTask"/>)
+    /// being wiped out early. Immediately plays a fake-out megaphone bark implying the player
+    /// can now clock out — the timecard machine stays locked (see <see cref="_breachGateTask"/>)
     /// until the breach — and any resulting fence-repair follow-up — fully resolves; only then
     /// does <see cref="ShowClockOutTask"/> run.
     /// </summary>
     private void TryFinishTrashAndGraffitiTutorials()
     {
         if (!_trashTaskDone || !_graffitiTaskDone) return;
+
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_preBreachClockOutFakeoutBark);
 
         TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: BeginMutantBreachSequence);
     }
@@ -2805,8 +2818,15 @@ public class Day_01 : DayBase
             TutorialMarkerManager.Instance?.Unmark(_hammer.transform);
         }
 
-        TutorialOverlay.Instance?.ShowFixFenceTutorial(
-            () => TutorialOverlay.Instance?.ShowCheckpointIntegrityTutorial());
+        TutorialOverlay.Instance?.ShowFixFenceTutorial(() =>
+        {
+            // Checkpoint Integrity stays pinned at 100% with its HUD bar hidden all of Day 1 —
+            // turn the system on and reveal the bar right as its tutorial screen appears.
+            CheckpointIntegrityService.SetEnabled(true);
+            PlayerUI.Instance?.CheckpointIntegrityBar?.Show();
+
+            TutorialOverlay.Instance?.ShowCheckpointIntegrityTutorial();
+        });
     }
 
     /// <summary>

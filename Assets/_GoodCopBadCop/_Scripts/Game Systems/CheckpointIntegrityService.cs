@@ -63,6 +63,27 @@ public class CheckpointIntegrityService : MonoBehaviour
     /// <summary>Upper bound of <see cref="IntegrityScore"/> — used by HUD bars to normalise the fill amount.</summary>
     public float MaxScore => _maxScore;
 
+    /// <summary>
+    /// Whether the integrity system is actively tracking graffiti/trash/fence state and applying
+    /// a payout multiplier. Starts disabled — Day 1 leaves the score pinned at
+    /// <see cref="_maxScore"/> (100%) and the HUD bar hidden until the mutant-breach epilogue
+    /// shows the "Checkpoint Integrity Score" tutorial, at which point <see cref="SetEnabled"/>
+    /// is called to turn the system on for the rest of the campaign.
+    /// </summary>
+    public static bool IsEnabled { get; private set; } = false;
+
+    /// <summary>
+    /// Enables or disables the integrity system. Forces an immediate <see cref="Recalculate"/>
+    /// so the score (and any subscribed HUD bars) reflect the new state right away.
+    /// </summary>
+    public static void SetEnabled(bool enabled)
+    {
+        if (IsEnabled == enabled) return;
+
+        IsEnabled = enabled;
+        Instance.Recalculate();
+    }
+
     private static CheckpointIntegrityService _instance;
     private float _timer;
 
@@ -119,6 +140,19 @@ public class CheckpointIntegrityService : MonoBehaviour
     /// </summary>
     public void Recalculate()
     {
+        // Day 1 keeps the system disabled: pin the score at 100% (ignoring graffiti/trash/fence
+        // state entirely) until SetEnabled(true) is called at the end-of-day tutorial.
+        if (!IsEnabled)
+        {
+            if (!Mathf.Approximately(IntegrityScore, _maxScore))
+            {
+                IntegrityScore = _maxScore;
+                OnIntegrityScoreChanged?.Invoke(IntegrityScore);
+            }
+
+            return;
+        }
+
         float cleanliness = GetWeightedCleanliness();
         float newScore = Mathf.Lerp(_minScore, _maxScore, cleanliness);
 

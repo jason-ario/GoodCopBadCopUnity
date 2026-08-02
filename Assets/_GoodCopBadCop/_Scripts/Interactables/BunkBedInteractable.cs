@@ -33,13 +33,26 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private PlayerInteractionController _interactingPlayer;
 
     /// <summary>
+    /// True only once <see cref="ShiftManager.OnShiftEnd"/> has fired for the current day.
+    /// <see cref="ShiftManager.shiftStarted"/> is <c>false</c> both "before the shift has
+    /// started" and "after the shift has ended", so it cannot distinguish those two cases on
+    /// its own. Without this flag, the brief window at the start of a new day — after
+    /// <see cref="ShiftManager.OnDayStart"/> resets <c>shiftStarted</c> to false but before the
+    /// player has started the next shift, and while no tasks are registered yet — would make
+    /// <see cref="AllTasksComplete"/> report true and let the bed be used to "end the day" again
+    /// immediately. Reset to false whenever a new day/shift begins.
+    /// </summary>
+    private bool _shiftEndedThisCycle;
+
+    /// <summary>
     /// Returns true when the shift has ended AND all completable tasks are finished.
     /// Reads <see cref="ShiftManager.shiftStarted"/> directly — a <see cref="NetworkVariable{T}"/>
     /// set by <see cref="ShiftManager.EndShift"/> — so it is always reliable regardless of local
     /// event subscription state.
     /// </summary>
     private bool CanSleep =>
-        ShiftManager.Instance != null
+        _shiftEndedThisCycle
+        && ShiftManager.Instance != null
         && !ShiftManager.Instance.shiftStarted.Value
         && AllTasksComplete();
 
@@ -88,6 +101,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         {
             ShiftManager.Instance.OnShiftEnd   += HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart += HandleShiftStart;
+            ShiftManager.Instance.OnDayStart   += HandleDayStart;
         }
 
         // Keep the interact label in sync whenever task state changes.
@@ -103,6 +117,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         {
             ShiftManager.Instance.OnShiftEnd   -= HandleShiftEnd;
             ShiftManager.Instance.OnShiftStart -= HandleShiftStart;
+            ShiftManager.Instance.OnDayStart   -= HandleDayStart;
         }
 
         TaskRegistry.OnTaskListChanged  -= UpdateInteractText;
@@ -114,6 +129,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     /// <summary>Queues the go-to-bed task on the HUD and refreshes the hover label when the shift ends.</summary>
     private void HandleShiftEnd()
     {
+        _shiftEndedThisCycle = true;
         GoToBunkerTask.CreateAndRegister();
         UpdateInteractText();
     }
@@ -121,7 +137,21 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     /// <summary>Resets the hover label when a new shift begins and cleans up any leftover go-to-bed task.</summary>
     private void HandleShiftStart()
     {
+        _shiftEndedThisCycle = false;
         GoToBunkerTask.CompleteAndRemove();
+        interactText = InteractTextNotReady;
+    }
+
+    /// <summary>
+    /// Resets the end-of-day flag as soon as a new day begins — this fires before the next
+    /// shift officially starts, closing the window where <see cref="ShiftManager.shiftStarted"/>
+    /// is still false (carried over from the previous day's end) and no tasks have been
+    /// registered yet for the new day, which would otherwise make <see cref="CanSleep"/>
+    /// incorrectly report true.
+    /// </summary>
+    private void HandleDayStart()
+    {
+        _shiftEndedThisCycle = false;
         interactText = InteractTextNotReady;
     }
 

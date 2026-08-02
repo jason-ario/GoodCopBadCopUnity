@@ -296,7 +296,14 @@ public class FolderController : PickableObject
 
     public void OnHandOff()
     {
-        isHandedOff.Value = true;
+        // isHandedOff is Server-write-only. When this is called on a non-host client
+        // (e.g. Player 2 delivering the verdict), writing it directly here would throw a
+        // NetworkVariablePermissionException and abort the rest of DeliverVerdict() before it
+        // ever reaches DeliverVerdictServerRpc — silently breaking verdict delivery for every
+        // non-host player. Only write it here when we're actually the server; the server-side
+        // call to OnHandOff() made from DeliverVerdictServerRpc performs the authoritative write.
+        if (IsServer)
+            isHandedOff.Value = true;
         SetOpenServerRpc(false);
         // OnFolderHandedOff is now fired via isHandedOff.OnValueChanged on all clients.
     }

@@ -117,10 +117,11 @@ public class MutantEnemy : NetworkBehaviour
     [SerializeField] private float bloodDecalLifetime = 20f;
 
     [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
-             "under a gore piece that lands inside the Trash Task's yard. Registered with CleanBloodTask " +
-             "so they must be mopped up before clocking out, just like the gore piece itself is registered " +
-             "as junk. All must be registered as Network Prefabs in the NetworkManager. Leave empty to " +
-             "disable yard blood splatters.")]
+             "under EVERY gore piece dropped in a death burst, whether or not it lands inside the Trash " +
+             "Task's yard. Registered with CleanBloodTask so they must be mopped up before clocking out, " +
+             "just like the gore piece itself is registered as junk when it lands in the yard. All must " +
+             "be registered as Network Prefabs in the NetworkManager. Leave empty to disable gore blood " +
+             "splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
     [Header("Corpse Junk")]
@@ -442,13 +443,21 @@ public class MutantEnemy : NetworkBehaviour
                         InvalidateDestination();
                     }
 
+                    // Re-check for a fence directly between us and the aggro target before
+                    // committing to a NavMesh route — this must happen every tick (not just when
+                    // _fenceTarget is null in Update()) so a freshly-detected fence redirects the
+                    // agent immediately instead of first routing the long way around via NavMesh.
+                    if (_fenceTarget == null)
+                        _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position);
+
                     if (_fenceTarget != null)
                     {
-                        // Navigate toward the fence — the NavMeshObstacle carved boundary
-                        // is the natural stopping point; no manual stop position needed.
+                        // Navigate straight to the point on the fence blocking our path — not its
+                        // GameObject pivot, which may sit on the unwalkable carved-out point or far
+                        // along a long fence run.
                         _agent.isStopped = false;
                         _agent.stoppingDistance = data.stoppingDistance;
-                        SetAgentDestination(_fenceTarget.transform.position, _fenceTarget);
+                        SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
 
                         if (IsFenceTargetInRange())
                             TryAttackFence();
@@ -584,19 +593,37 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// SphereCasts directly in front of the mutant's movement direction and returns
-    /// the first non-passable <see cref="PerimiterFence"/> found within a short distance.
-    /// This ensures the mutant only attacks fences that are physically blocking its path.
+    /// SphereCasts in a straight line from the mutant directly toward <paramref name="targetPosition"/>
+    /// and returns the nearest non-passable <see cref="PerimiterFence"/> found along that line, up to
+    /// the full distance to the target.
+    ///
+    /// This is intentionally independent of the mutant's current facing/movement direction: while
+    /// aggroed, the NavMeshAgent's own path (which routes around the fence's carved NavMeshObstacle)
+    /// must not be trusted to reveal fences that stand directly between the mutant and its target — an
+    /// aggroed mutant knows it can smash through fences, so it should beeline straight at the target and
+    /// only detour to attack whichever fence segment is actually in the way of that straight line.
     /// </summary>
-    private PerimiterFence FindBlockingFenceInFront()
+    private PerimiterFence FindBlockingFenceTowardTarget(Vector3 targetPosition)
     {
-        // Cast from chest height forward.
+        // Cast from chest height toward the target, ignoring vertical offset.
         Vector3 origin = transform.position + Vector3.up * 1f;
-        Vector3 direction = transform.forward;
-        float distance = 1.5f; // Short range check
+        Vector3 toTarget = targetPosition - origin;
+        toTarget.y = 0f;
+
+        float distance = toTarget.magnitude;
+        if (distance < 0.01f)
+            return null;
+
+        Vector3 direction = toTarget / distance;
         float radius = 0.75f;
 
-        if (Physics.SphereCast(origin, radius, direction, out RaycastHit hit, distance))
+        RaycastHit[] hits = Physics.SphereCastAll(origin, radius, direction, distance);
+        if (hits.Length == 0)
+            return null;
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (RaycastHit hit in hits)
         {
             PerimiterFence fence = hit.collider.GetComponentInParent<PerimiterFence>();
             if (fence != null && fence.IsSpawned && !fence.IsPassableByMutant)
@@ -604,6 +631,18 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns the point on <paramref name="fence"/>'s collider closest to the mutant, used as the
+    /// NavMesh destination so the mutant walks straight up to the fence segment that is actually
+    /// blocking it rather than toward the fence GameObject's pivot (which may sit on an unwalkable
+    /// carved-out point, or far along a long fence run).
+    /// </summary>
+    private Vector3 GetClosestFencePoint(PerimiterFence fence)
+    {
+        Collider fenceCollider = fence.GetComponentInChildren<Collider>();
+        return fenceCollider != null ? fenceCollider.ClosestPoint(transform.position) : fence.transform.position;
     }
 
     /// <summary>
@@ -720,9 +759,10 @@ public class MutantEnemy : NetworkBehaviour
         {
             if (_fenceTarget == null)
             {
-                // Only look for a fence if we are currently moving or trying to move.
-                if (_agent.velocity.sqrMagnitude > 0.01f || _agent.hasPath)
-                    _fenceTarget = FindBlockingFenceInFront();
+                // Check the straight line to the aggro target every frame, independent of the
+                // agent's current facing/movement — while aggroed the mutant beelines for the
+                // target and only detours to smash through whichever fence is actually in the way.
+                _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position);
             }
             else if (!_fenceTarget.IsSpawned || _fenceTarget.IsPassableByMutant)
             {
@@ -1083,7 +1123,11 @@ public class MutantEnemy : NetworkBehaviour
     /// spawn data for each piece. Pieces that land inside the Trash Task's yard area are
     /// spawned server-side as real <see cref="JunkItem"/> NetworkObjects that count toward the
     /// task; all other pieces are purely cosmetic and broadcast in a single RPC so every client
-    /// spawns the same non-networked result.
+    /// spawns the same non-networked result. Every piece — yard or not (e.g. gore from a
+    /// checkpoint breach fight) — also gets a server-authoritative, networked blood-splatter
+    /// decal registered with <see cref="CleanBloodTask"/> via <see cref="SpawnGoreBloodDecal"/>,
+    /// so mutant gore always leaves behind blood that has to be mopped up, not just gore that
+    /// happens to land in the yard.
     /// </summary>
     private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
     {
@@ -1101,6 +1145,8 @@ public class MutantEnemy : NetworkBehaviour
             int prefabIndex = UnityEngine.Random.Range(0, goreDropPrefabs.Length);
             float speed = UnityEngine.Random.Range(speedRange.x, speedRange.y);
             Vector3 velocity = GetRandomPopVelocity(position, speed);
+
+            SpawnGoreBloodDecal(position);
 
             if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(position)
                 && SpawnGoreJunkItem(position, prefabIndex, velocity))
@@ -1161,12 +1207,9 @@ public class MutantEnemy : NetworkBehaviour
         rb.linearVelocity = velocity;
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
-        // Yard pieces get a server-authoritative, networked blood splatter registered with
-        // CleanBloodTask instead of the purely-cosmetic/local GoreLandingDecalSpawner used by
-        // cosmetic pieces — it needs to be trackable/mop-cleanable just like the gore itself
-        // is trackable as junk.
-        SpawnYardBloodDecal(position);
-
+        // The blood splatter for this piece is already spawned by the caller (see
+        // SpawnGoreBurst's unconditional SpawnGoreBloodDecal call) — it needs to be
+        // trackable/mop-cleanable just like the gore itself is trackable as junk.
         junk.enabled = true;
         netObj.Spawn(destroyWithScene: true);
 
@@ -1176,13 +1219,16 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-side spawn of a networked blood-decal splatter under a gore piece that landed
-    /// inside the Trash Task's yard, raycast downward from just above <paramref name="originPosition"/>
-    /// to find the ground. Registers the spawned decal with <see cref="CleanBloodTask"/> so it
-    /// counts toward the "Clean Blood" task — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>.
+    /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
+    /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
+    /// ground. Registers the spawned decal with <see cref="CleanBloodTask"/> so it counts toward
+    /// the "Clean Blood" task — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>. Called for every
+    /// gore piece in a death burst (see <see cref="SpawnGoreBurst"/>), whether or not the piece
+    /// itself ends up landing inside the Trash Task's yard as collectible junk, so any breach
+    /// (e.g. at the checkpoint, well outside the yard) always leaves behind mop-cleanable blood.
     /// No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
-    private void SpawnYardBloodDecal(Vector3 originPosition)
+    private void SpawnGoreBloodDecal(Vector3 originPosition)
     {
         if (yardBloodDecalPrefabs == null || yardBloodDecalPrefabs.Length == 0)
             return;
