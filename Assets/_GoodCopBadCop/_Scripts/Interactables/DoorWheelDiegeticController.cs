@@ -81,17 +81,38 @@ public class DoorWheelDiegeticController : DiegeticViewController
     private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
     private bool LmbUp   => Input.GetMouseButtonUp(0)   || (Gamepad.current?.rightTrigger.wasReleasedThisFrame  ?? false);
 
+    // ─── MonoBehaviour ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The wheel's own collider sits directly in front of the door's interaction collider,
+    /// so it must stay disabled outside this view — otherwise it blocks raycasts/clicks
+    /// meant for <see cref="BunkerDoorInteractable"/>. It's only re-enabled while this
+    /// diegetic view is open (see <see cref="OnOpened"/>/<see cref="OnClosed"/>), when it's
+    /// needed for <see cref="IsPointerOverWheel"/>.
+    /// </summary>
+    private void Awake()
+    {
+        if (_wheelCollider != null)
+            _wheelCollider.enabled = false;
+    }
+
     protected override void OnOpened()
     {
         _accumulatedRotation = 0f;
         _totalCCWDegrees     = 0f;
         _isDragging          = false;
+
+        if (_wheelCollider != null)
+            _wheelCollider.enabled = true;
     }
 
     protected override void OnClosed()
     {
         SetDragging(false);
         _occupancy?.Release();
+
+        if (_wheelCollider != null)
+            _wheelCollider.enabled = false;
     }
 
     protected override void OnUpdate()

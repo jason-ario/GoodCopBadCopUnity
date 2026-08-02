@@ -575,9 +575,18 @@ public class PlayerInteractionController : NetworkBehaviour
         if (!ObjectPlacer.Instance.IsActive)
         {
             ObjectPlacer.Instance.SetItem(_playerPickupController.HeldObject.ItemData);
-            ObjectPlacer.Instance.ActivatePlacer(placementBoard);
+
+            // Move the placer to the target pose BEFORE activating it. ActivatePlacer spawns
+            // the ghost clone (SpawnClone), which snaps to its pose relative to this transform
+            // right there and then — activating first left the clone's pose baked against
+            // whatever stale position/rotation the placer had left over from its previous use
+            // (e.g. another mail slot, or wherever it last sat), so the ghost for a PlacementSlot
+            // receptacle (no per-item PlacementAnchor, like the mail package) could appear stuck
+            // at the parent trigger's pose (e.g. the cubby's "Mail Slot") instead of snapping to
+            // the intended child PlacementSlot pose.
             ObjectPlacer.Instance.transform.rotation = targetRotation;
             ObjectPlacer.Instance.transform.position = targetPosition;
+            ObjectPlacer.Instance.ActivatePlacer(placementBoard);
         }
 
         ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, targetRotation, Time.deltaTime * objectPlacerLerpSpeed);
