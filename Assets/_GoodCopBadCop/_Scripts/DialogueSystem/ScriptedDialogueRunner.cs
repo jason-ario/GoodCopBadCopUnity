@@ -186,7 +186,27 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     public static ulong ActiveDialogueSpeakerNetId { get; private set; }
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        Instance = this;
+
+        // Static state survives between Editor Play Mode sessions (and can be left stuck true
+        // if a dialogue coroutine is interrupted mid-sequence, e.g. by a day transition or scene
+        // reload that destroys this NetworkObject before RunDialogue reaches its cleanup).
+        // Reset explicitly — mirrors the equivalent fix already applied in
+        // DialogueChoiceSystem.Awake() for IsInDialogueMode. Without this, UIController.ShowPlayerUI()
+        // permanently refuses to reveal the HUD because its guard checks this flag.
+        IsScriptedModeActive = false;
+    }
+
+    private void OnDestroy()
+    {
+        // Safety net: if this object is destroyed while a scripted dialogue coroutine is
+        // still running (e.g. mid-sequence day transition), the coroutine is silently killed
+        // and never reaches the normal exit cleanup that clears this flag. Clear it here so a
+        // future ShowPlayerUI() call is never blocked forever by a leaked lock.
+        IsScriptedModeActive = false;
+    }
 
     // -------------------------------------------------------------------------
     // Helpers

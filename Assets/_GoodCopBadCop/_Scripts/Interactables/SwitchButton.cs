@@ -17,12 +17,6 @@ public class SwitchButton : Interactable
     /// <summary>Raised on all clients the moment the switch is successfully pressed.</summary>
     public static event Action OnPressed;
     
-    protected override void Awake()
-    {
-        base.Awake();
-        ShiftManager.Instance.OnShiftReady += OnShiftReady;
-    }
-
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -36,12 +30,14 @@ public class SwitchButton : Interactable
         ShiftManager.OnNextSuspectReadyForBell -= HandleNextSuspectReady;
     }
 
-    void OnShiftReady()
-    {
-        // Day 1 switch readiness is driven by Day_01's tutorial sequence — skip auto-ready.
-        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
-        SetReady(true);
-    }
+    // NOTE: The switch used to also auto-arm itself the instant ShiftManager.OnShiftReady
+    // fired (i.e. as soon as the day/night transition finished), independent of whether the
+    // player had actually clocked in yet at the Time Card Machine. That raced ahead of the
+    // clock-in gate — the switch could show "ready" before the shift had even started. The
+    // switch's only real job is summoning the next suspect once one is actually ready, which
+    // is already correctly gated behind the player clocking in via
+    // TimecardMachine.HandleClockIn -> ShiftManager.TryStartShift -> OpenWindowSequence ->
+    // OnNextSuspectReadyForBell (handled below). No separate OnShiftReady hook is needed.
 
     /// <summary>
     /// Called server-side when the next suspect is ready to be summoned.

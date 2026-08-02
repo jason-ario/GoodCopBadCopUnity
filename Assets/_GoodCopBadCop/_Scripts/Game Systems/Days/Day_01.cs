@@ -2532,11 +2532,18 @@ public class Day_01 : DayBase
         TutorialMarkerManager.Instance?.Unmark(shovel.transform);
     }
 
-    /// <summary>Fires the moment _breachShovel1 is first picked up during the breach — clears its highlight/arrow immediately rather than waiting for the breach to end.</summary>
-    private void OnBreachShovel1PickedUp() => DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+    /// <summary>Fires the moment either checkpoint shovel is first picked up during the breach — clears BOTH shovels' highlight/arrow immediately (only one shovel is ever needed) rather than waiting for the breach to end.</summary>
+    private void OnBreachShovel1PickedUp() => DisarmBothBreachShovels();
 
-    /// <summary>Fires the moment _breachShovel2 is first picked up during the breach — clears its highlight/arrow immediately rather than waiting for the breach to end.</summary>
-    private void OnBreachShovel2PickedUp() => DisarmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
+    /// <summary>Fires the moment either checkpoint shovel is first picked up during the breach — clears BOTH shovels' highlight/arrow immediately (only one shovel is ever needed) rather than waiting for the breach to end.</summary>
+    private void OnBreachShovel2PickedUp() => DisarmBothBreachShovels();
+
+    /// <summary>Clears highlight/arrow on both checkpoint shovels — called the instant either one is picked up, since only one shovel is needed to fight off the breach.</summary>
+    private void DisarmBothBreachShovels()
+    {
+        DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
+        DisarmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
+    }
 
 
     /// <summary>
@@ -2910,8 +2917,11 @@ public class Day_01 : DayBase
         _lever?.AnimateOpenServerSide(0.3f);
         _lever?.SetInteractable(false);
 
-        // Vlad's closing dialogue will never play, so unblock the verdict.
+        // Vlad's closing dialogue will never play, so unblock the verdict on every client
+        // (not just the server) — see ClearBlockVerdictAcrossAllClients for why a
+        // server-only write here would leave non-host clients permanently stuck.
         HandOffPoint.BlockVerdict = false;
+        SuspectController.Instance?.ClearBlockVerdictAcrossAllClients();
 
         if (_soldierCharacter == null || _soldierDialogue == null)
         {
@@ -2925,6 +2935,41 @@ public class Day_01 : DayBase
         };
 
         Debug.Log("[Day_01] DebugSkipToSoldierSlot: Soldier intercept armed. Call SuspectController.NextSuspect() to trigger.");
+    }
+
+    /// <summary>
+    /// Debug-only server method. Aborts the normal Day 1 opening sequence (mirrors
+    /// <see cref="DebugSkipToSoldierSlot"/>) but arms no suspect intercept — no suspects arrive
+    /// at all. Intended to be called by <see cref="DebugConsole"/> right before starting the
+    /// shift and immediately triggering the first breach via <see cref="DebugTriggerFirstBreach"/>,
+    /// so the player lands directly at the scripted first mutant breach without needing to play
+    /// through Vlad, the soldier, or the trash/graffiti tutorials first.
+    /// </summary>
+    public void DebugSkipToMutantBreach()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        DebugSkipToSoldierSlot();
+
+        // DebugSkipToSoldierSlot arms a soldier intercept on the next suspect spawn — clear it
+        // since no suspects should spawn on this skip path.
+        SuspectController.InterceptNextSuspectSpawn = null;
+    }
+
+    /// <summary>
+    /// Debug-only server method. Immediately triggers Day 1's scripted first mutant breach via
+    /// <see cref="_firstBreachData"/> — the same breach normally fired by
+    /// <see cref="BeginMutantBreachSequenceRoutine"/> once the trash/graffiti tutorial tasks
+    /// finish. Intended to be called by <see cref="DebugConsole"/> after the shift has started
+    /// (so <see cref="RegisterMutantBreachGate"/> has run) following
+    /// <see cref="DebugSkipToMutantBreach"/>.
+    /// </summary>
+    public void DebugTriggerFirstBreach()
+    {
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        MutantBreachManager.Instance?.TriggerBreach(_firstBreachData);
+        Debug.Log("[Day_01] DebugTriggerFirstBreach: first mutant breach triggered via debug skip.");
     }
 
     /// <summary>
@@ -2955,6 +3000,28 @@ public class Day_01 : DayBase
         Debug.Log("[Day_01] DebugFreePlaySetup: Day 1 configured for free play — tutorial gates bypassed, normal suspects will arrive.");
     }
 
+    /// <summary>
+    /// Force-unlocks every Day 1 tutorial-gated interactable (stack of folders, documentation
+    /// exam pile, stamp slots) without touching anything else in Day 1's opening sequence.
+    /// <see cref="DayActivated"/> only runs while Day 1 itself is the active day, so a save
+    /// resumed on Day 2+ never locks these in the first place — this exists purely as an
+    /// explicit safety net so a resumed save is guaranteed to have them unlocked regardless of
+    /// any leftover state. Called by <see cref="ShiftManager.ResumeSavedDay"/>. Server-only;
+    /// each setter propagates its own state to clients via NetworkVariable.
+    /// </summary>
+    public void ForceUnlockTutorialItems()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        _stackOfFolders?.SetInteractable(true);
+        _documentationExamShopItem?.SetAvailable(true);
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+        _redStampSlot?.SetSlotInteractable(true);
+
+        Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items unlocked for a resumed save past Day 1.");
+    }
+
     // -------------------------------------------------------------------------
     // Deferred Verdict
     // -------------------------------------------------------------------------
@@ -2963,6 +3030,13 @@ public class Day_01 : DayBase
     {
         FolderController pending = HandOffPoint.PendingVerdictFolder;
         HandOffPoint.ClearPendingVerdict();
+
+        // ClearPendingVerdict() above only resets BlockVerdict on THIS process (the server).
+        // BlockVerdict was set to true independently on every client in DayActivated, so
+        // non-host clients (e.g. Player 2) would otherwise keep BlockVerdict stuck at true
+        // for the rest of Day 1 — silently swallowing every verdict they deliver afterward,
+        // including the quarantine tutorial suspect. Broadcast the clear to every client too.
+        SuspectController.Instance?.ClearBlockVerdictAcrossAllClients();
 
         if (pending != null && SuspectController.Instance != null)
             SuspectController.Instance.DeliverVerdict(pending);

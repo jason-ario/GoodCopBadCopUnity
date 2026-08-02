@@ -346,6 +346,22 @@ public class ObjectPlacer : MonoBehaviour
             return false;
         }
 
+        // An active PlacementSlot (e.g. a mail cubby's exact snap point) is authoritative over
+        // everything below — it is an explicit, unambiguous fixed pose. Without this check, an
+        // item with no PlacementAnchor that happens to match an entry in the hand's ItemsHeld
+        // array (e.g. a mail package sharing a generic hand-carry pose) would fall through to
+        // that unrelated pose instead, so the ghost (SpawnClone) and the real drop position
+        // (PlayerPickupController.DropObject) would both land away from the slot — only a
+        // correctly-delivered package gets silently re-snapped afterward by MailCubbySlot, which
+        // is why the mismatch only showed up for incorrect deliveries.
+        if (_currentPlacementBoard is PlacementSlot activeSlot)
+        {
+            Transform snap = activeSlot.SnapPoint;
+            position = snap.position;
+            rotation = snap.rotation;
+            return true;
+        }
+
         PlacementAnchor anchor = sourceItem.GetComponentInChildren<PlacementAnchor>(true);
         if (anchor != null)
         {

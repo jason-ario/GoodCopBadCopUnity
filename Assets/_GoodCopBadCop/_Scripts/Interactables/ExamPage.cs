@@ -79,6 +79,20 @@ public class ExamPage : FolderItem
     private Coroutine _snapshotCoroutine;
 
     /// <summary>
+    /// All currently-enabled ExamPage instances, used by <see cref="SnapshotRoutine"/> to
+    /// temporarily hide sibling pages' checklist artwork so this page's checklist camera —
+    /// which culls by the shared HiddenUI layer only, not by which page owns the content —
+    /// never picks up a neighboring page's checklist items when pages are physically close
+    /// together (stacked in a notebook, or two players standing near each other). Only
+    /// renderers are toggled here, never colliders or transforms, so click raycasting on
+    /// checkboxes is completely unaffected.
+    /// </summary>
+    private static readonly List<ExamPage> _activePages = new List<ExamPage>();
+
+    /// <summary>True while this page's checklist camera is actively capturing a snapshot.</summary>
+    private bool _isSnapshotting;
+
+    /// <summary>
     /// Original local positions of each checklist item captured at Awake.
     /// Used as the position pool when re-sorting by lock state so repeated
     /// calls to RefreshLockStates always produce a consistent result.
@@ -292,20 +306,80 @@ public class ExamPage : FolderItem
 
     private System.Collections.IEnumerator SnapshotRoutine()
     {
+        _isSnapshotting = true;
+
+        // Temporarily hide checklist artwork on every OTHER active page so this page's
+        // checklist camera (which culls by a layer shared across all pages) can only ever
+        // see its own content, regardless of how close another page physically is. Pages
+        // that are themselves mid-snapshot right now are skipped so two pages capturing at
+        // the exact same instant never blind each other.
+        List<System.Action> restoreActions = null;
+        for (int i = 0; i < _activePages.Count; i++)
+        {
+            ExamPage peer = _activePages[i];
+            if (peer == null || peer == this || peer._isSnapshotting) continue;
+
+            System.Action restore = peer.HideChecklistRenderersTemporarily();
+            if (restore == null) continue;
+
+            restoreActions ??= new List<System.Action>();
+            restoreActions.Add(restore);
+        }
+
         _checklistCamera.gameObject.SetActive(true);
         yield return new WaitForSeconds(_drawAnimationDuration);
         _checklistCamera.gameObject.SetActive(false);
+
+        if (restoreActions != null)
+        {
+            foreach (System.Action restore in restoreActions)
+                restore();
+        }
+
+        _isSnapshotting = false;
         _snapshotCoroutine = null;
+    }
+
+    /// <summary>
+    /// Disables every Renderer under this page's <see cref="checklistItemsParent"/> (its
+    /// checklist items' visuals) and returns an action that restores each renderer to its
+    /// exact previous enabled state. Never touches colliders or transforms, so this has no
+    /// effect on checkbox click raycasting. Returns null if there is nothing to hide.
+    /// </summary>
+    private System.Action HideChecklistRenderersTemporarily()
+    {
+        if (checklistItemsParent == null) return null;
+
+        Renderer[] renderers = checklistItemsParent.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) return null;
+
+        bool[] previousStates = new bool[renderers.Length];
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            previousStates[i] = renderers[i].enabled;
+            renderers[i].enabled = false;
+        }
+
+        return () =>
+        {
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                    renderers[i].enabled = previousStates[i];
+            }
+        };
     }
 
     private void OnEnable()
     {
         AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
+        _activePages.Add(this);
     }
 
     private void OnDisable()
     {
         AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
+        _activePages.Remove(this);
     }
 
     private void OnAnomalyUnlocked(string typeName)

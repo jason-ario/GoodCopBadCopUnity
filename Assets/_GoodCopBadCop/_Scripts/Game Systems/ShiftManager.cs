@@ -308,8 +308,16 @@ public class ShiftManager : NetworkBehaviour
         // OpenWindowSequence (which only runs once the player presses the "open window" button
         // inside the booth). Without this, the door stays unlocked from the moment the player
         // spawns until they press that button — too late to actually keep them inside.
+        //
+        // Conversely, explicitly unlock it when the new day does NOT require locking. The door's
+        // locked state (DoorController._isLocked) is not day-scoped — it just stays however the
+        // previous day left it — so without this, loading/skipping straight into a day that
+        // follows a locked tutorial day (e.g. Day 2 after Day 1) left the door locked with
+        // nothing left to ever unlock it.
         if (CampaignManager.Instance != null && CampaignManager.Instance.IsDoorLockedForShift)
             OnDoorLock?.Invoke();
+        else
+            OnDoorUnlock?.Invoke();
     }
     #endregion
 
@@ -1587,6 +1595,102 @@ public class ShiftManager : NetworkBehaviour
         OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
         PlayShiftStartFanfare();
+    }
+
+    /// <summary>
+    /// Resumes a loaded save that is already past Day 1. Skips the outside-lobby spawn, the
+    /// Start Shift Gate's Day 1 onboarding (walking up to the gate, the start-shift screen, and
+    /// the intro cutscene — see <see cref="GateStartShiftController"/>), and the main menu's
+    /// intro cinematic entirely: the player is dropped straight into the bunker as if resuming
+    /// mid-campaign. Also restores every pickable object's saved transform and force-unlocks the
+    /// Day 1 tutorial-only interactables (stack of folders, stamp slots) so they behave normally
+    /// even though Day 1 itself never activates for a resumed day. Firing <see cref="OnShiftReady"/>
+    /// below also flips every <see cref="GateStartShiftController"/>'s intro-complete flag, so
+    /// gate interactions just open/close the gate instead of opening the start-shift screen.
+    /// Called by <see cref="MainMenuController.ContinueGame"/> in place of
+    /// <see cref="GameManager.TransitionToLobby"/> whenever the active save slot's day is
+    /// greater than 1. Server initiates; every step below runs identically on every connected
+    /// client via <see cref="ResumeSavedDayClientRpc"/> for network sync, with save-file reads
+    /// and pickable/tutorial state changes gated to the server.
+    /// </summary>
+    public void ResumeSavedDay()
+    {
+        if (IsServer)
+            ResumeSavedDayClientRpc();
+        else
+            StartCoroutine(ResumeSavedDaySequence());
+    }
+
+    [ClientRpc]
+    private void ResumeSavedDayClientRpc()
+    {
+        StartCoroutine(ResumeSavedDaySequence());
+    }
+
+    private IEnumerator ResumeSavedDaySequence()
+    {
+        MainMenuController.Instance.TransitionToGameplay();
+        MainMenuController.Instance.FadeOutCutsceneMusic();
+        MainMenuController.Instance.StopMainMenuMusic();
+        AudioManager.Instance.StartAmbientAudio();
+
+        yield return new WaitForEndOfFrame();
+
+        if (_playingDirector != null)
+        {
+            _playingDirector.gameObject.SetActive(false);
+            _playingDirector = null;
+        }
+        else if (introCutscene != null)
+        {
+            introCutscene.gameObject.SetActive(false);
+        }
+
+        ResetShiftData();
+        ResetSuspectsProcessed();
+        ResetEnvironment();
+        SuspectController.Instance.ResetSuspects();
+
+        // Wait for a valid PlayerInstance — same guard as SkipToBoothReadySequence.
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+
+        Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        PlayerInstance.Instance.SetPosition(bunkerSpawn);
+        PlayerInstance.Instance.SetIsOutside(false);
+
+        // Force the bunker door closed, matching the natural start-of-day state.
+        _bunkerDoorController?.Reset();
+
+        if (IsServer)
+        {
+            RestorePickablesFromSave();
+            Day_01.Instance?.ForceUnlockTutorialItems();
+        }
+
+        UIController.Instance.ShowPlayerUI();
+        EnablePlayerControl();
+        GameManager.Instance.OnGameStart?.Invoke();
+        OnShiftReady?.Invoke();
+        OnDayStart?.Invoke();
+        PlayShiftStartFanfare();
+
+        Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} inside the bunker.");
+    }
+
+    /// <summary>
+    /// Server-only. Restores every registered pickable's transform from the active save slot's
+    /// last saved snapshot — the same data captured at Dusk via
+    /// <see cref="SaveDataManager.SaveDuskCheckpoint"/>. No-op if no save data exists.
+    /// </summary>
+    private void RestorePickablesFromSave()
+    {
+        if (!IsServer) return;
+
+        SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
+        if (slot == null) return;
+
+        PickableObjectRegistry.Instance?.RestoreAll(slot.PickableObjects);
+        Debug.Log($"[ShiftManager] ResumeSavedDay — restored {slot.PickableObjects?.Length ?? 0} pickable(s) from save.");
     }
 
     [ClientRpc]

@@ -63,7 +63,10 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             #pragma multi_compile_instancing
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -235,12 +238,34 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half  foamMask = (1.0 - edgeT) * holeMask;
                 half3 albedo   = lerp(texColor.rgb, _FoamColor.rgb * _FoamBrightness, foamMask);
 
-                // --- Ambient lighting via spherical harmonics ---
-                // Use the projector's local +Y as the approximate surface normal so
-                // the decal tints correctly with light probes / ambient light.
-                float3 normalWS = normalize(TransformObjectToWorldDir(float3(0, 1, 0)));
-                half3  ambient  = SampleSH(normalWS);
-                half3  finalRGB = albedo * ambient;
+                // --- Lighting (Lambert diffuse + shadow + ambient SH) ---
+                // Use the projector's local +Y as the approximate surface normal, since the
+                // real surface normal isn't available for a depth-reconstructed decal.
+                float3 normalWS   = normalize(TransformObjectToWorldDir(float3(0, 1, 0)));
+                float3 positionWS = TransformObjectToWorld(positionOS);
+
+                // Main directional light with shadow attenuation
+                float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
+                Light  mainLight   = GetMainLight(shadowCoord);
+
+                half  NdotL    = saturate(dot(normalWS, mainLight.direction));
+                half3 diffuse  = mainLight.color * (mainLight.shadowAttenuation * mainLight.distanceAttenuation) * NdotL;
+
+                // Spherical harmonics ambient
+                half3 ambient = SampleSH(normalWS);
+
+                half3 finalRGB = albedo * (diffuse + ambient);
+
+                // --- Additional point/spot lights ---
+#ifdef _ADDITIONAL_LIGHTS
+                uint lightCount = GetAdditionalLightsCount();
+                for (uint li = 0u; li < lightCount; ++li)
+                {
+                    Light light  = GetAdditionalLight(li, positionWS);
+                    half  NdotLi = saturate(dot(normalWS, light.direction));
+                    finalRGB += albedo * light.color * (light.shadowAttenuation * light.distanceAttenuation) * NdotLi;
+                }
+#endif
 
                 return half4(finalRGB, alpha);
             }

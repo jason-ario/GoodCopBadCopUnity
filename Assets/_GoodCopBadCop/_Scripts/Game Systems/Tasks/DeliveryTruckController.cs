@@ -154,6 +154,19 @@ public class DeliveryTruckController : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Server-only. Hides the delivery crate that was dropped off during a previous delivery.
+    /// Called by <see cref="SortMailTask.OnDayChanged"/> at the start of the day following a
+    /// delivery day, so the crate doesn't sit visible/active on the ground indefinitely — it is
+    /// simply reactivated and repositioned on the truck's roof (see <see cref="MountCrateOnRoof"/>)
+    /// the next time a delivery sequence begins. No-op if the crate is already hidden.
+    /// </summary>
+    public void DeactivateCrate()
+    {
+        if (!IsServer) return;
+        DeactivateCrateClientRpc();
+    }
+
+    /// <summary>
     /// Server-only. Starts the full activate → drive-to-B → spawn packages → idle → drive-back →
     /// deactivate sequence. Safe to call even if a previous sequence is still finishing — the call
     /// is ignored while one is already running.
@@ -295,6 +308,18 @@ public class DeliveryTruckController : NetworkBehaviour
         if (truckAudioSource != null)
             truckAudioSource.Stop();
         SetVisualActive(false);
+    }
+
+    /// <summary>
+    /// Hides the delivery crate that was left sitting at its resting spot from a previous
+    /// delivery. Reactivated (and repositioned on the roof) the next time
+    /// <see cref="MountCrateOnRoof"/> runs.
+    /// </summary>
+    [ClientRpc]
+    private void DeactivateCrateClientRpc()
+    {
+        if (deliveryCrate != null)
+            deliveryCrate.gameObject.SetActive(false);
     }
 
     /// <summary>

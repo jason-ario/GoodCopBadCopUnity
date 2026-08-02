@@ -297,6 +297,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Clear out any packages left sitting in mailboxes/bins from the previous day's delivery.
         DespawnResolvedPackages();
 
+        // If yesterday had a delivery, its crate has been sitting active on the ground ever
+        // since (see DeliveryTruckController — only the truck itself deactivates after driving
+        // off, not the crate it dropped). Hide it now that a new day has started; it gets
+        // reactivated and repositioned on the truck's roof next time a delivery sequence begins.
+        if (_deliveryTruck != null && _lastTriggeredDay == day - 1)
+            _deliveryTruck.DeactivateCrate();
+
         if (day != _lastGoodsRollDay)
         {
             _lastGoodsRollDay = day;

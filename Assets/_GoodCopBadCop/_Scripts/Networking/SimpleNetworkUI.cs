@@ -39,7 +39,7 @@ public class SimpleNetworkUI : MonoBehaviour
         // -------- STEAM / FACEPUNCH --------
         if (transport is FacepunchTransport facepunch)
         {
-            Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(2);
+            Lobby lobby = (Lobby)await SteamMatchmaking.CreateLobbyAsync(3);
             lobby.SetPublic();
 
             long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

@@ -117,6 +117,21 @@ public class UIController : MonoBehaviour
             return;
         }
 
+        // Failsafe: the invite panel is normally dismissed by the Steam overlay's
+        // OnGameOverlayActivated callback, but that callback never fires if the
+        // overlay isn't available (Editor Play Mode, overlay disabled, etc.). Let
+        // the player back out manually so they're never stuck on a dark screen.
+        if (inviteFriendsPanel.activeSelf)
+        {
+            bool cancelInput = Input.GetButtonDown("Cancel")
+                               || Input.GetKeyDown(KeyCode.Escape)
+                               || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+            if (cancelInput)
+            {
+                CloseInviteFriendsScreen();
+            }
+        }
+
         bool pauseInput = Input.GetButtonDown("Pause")
                           || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
         if (pauseInput)
@@ -420,6 +435,7 @@ public class UIController : MonoBehaviour
     {
         PlayerInstance.Instance.ClosedUIPanel();
         inviteFriendsPanel.SetActive(false);
+        LobbyManager.Instance?.CancelInviteOverlayTracking();
     }
 
     public void ShowCursor()

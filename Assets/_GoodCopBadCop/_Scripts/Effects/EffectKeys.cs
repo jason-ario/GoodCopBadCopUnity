@@ -6,6 +6,8 @@ namespace GoodCopBadCop.Effects
         public const string MutantMeleeDamage = "player.damage.mutant_melee";
         public const string BearTrapDamage = "player.damage.bear_trap";
         public const string FriendlyMeleeDamage = "player.damage.friendly_melee";
+        public const string FriendlyGunshotDamage = "player.damage.friendly_gunshot";
+        public const string FriendlyFlamethrowerDamage = "player.damage.friendly_flamethrower";
         public const string RadiationTickDamage = "player.damage.radiation_tick";
         public const string ScriptedRifleDamage = "player.damage.scripted_rifle";
         public const string PlayerHeal = "player.heal.default";

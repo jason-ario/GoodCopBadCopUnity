@@ -38,6 +38,20 @@ public class NameTag : NetworkBehaviour
         _camera = Camera.main;
     }
 
+    /// <summary>
+    /// Re-resolves the main camera if it's missing or was destroyed. Needed because a remote
+    /// player's NameTag can OnEnable (via network replication) before the local player's own
+    /// camera has spawned and been tagged MainCamera, which would otherwise leave _camera
+    /// permanently null on that client.
+    /// </summary>
+    private Camera ResolveCamera()
+    {
+        if (_camera == null)
+            _camera = Camera.main;
+
+        return _camera;
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -95,13 +109,16 @@ public class NameTag : NetworkBehaviour
 
     private void LateUpdate()
     {
-        if (IsOwner || nameTagObject == null || followTarget == null || _camera == null) return;
+        if (IsOwner || nameTagObject == null || followTarget == null) return;
+
+        Camera cam = ResolveCamera();
+        if (cam == null) return;
 
         // Position and billboard the name tag object each frame, facing the camera on the
         // Y axis only so it stays upright instead of tilting with the camera's pitch/roll.
         nameTagObject.transform.position = followTarget.position + offset;
 
-        Vector3 directionToCamera = nameTagObject.transform.position - _camera.transform.position;
+        Vector3 directionToCamera = nameTagObject.transform.position - cam.transform.position;
         directionToCamera.y = 0f;
 
         if (directionToCamera.sqrMagnitude > 0.0001f)

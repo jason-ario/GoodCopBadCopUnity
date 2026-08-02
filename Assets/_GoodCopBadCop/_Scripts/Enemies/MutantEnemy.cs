@@ -214,11 +214,36 @@ public class MutantEnemy : NetworkBehaviour
     private PerimiterFence _fenceTarget;
     private DoorController _doorTarget;
 
+    /// <summary>
+    /// When true, the Chase branch of <see cref="ChaseLoop"/> re-targets whichever living
+    /// player is currently nearest with no <see cref="MutantEnemyData.detectionRadius"/> cap,
+    /// and smashes through any blocking <see cref="PerimiterFence"/> along the way — same as
+    /// the aggro-to-<see cref="aggroTarget"/> path, but toward a dynamic player target instead
+    /// of a fixed structure. Set via <see cref="SetBreachChargeMode"/>, used by
+    /// <see cref="MutantBreachManager"/> so breach mutants relentlessly charge players instead
+    /// of patrolling or waiting for one to wander into detection range.
+    /// </summary>
+    private bool _breachChargeMode;
+
+    /// <summary>
+    /// Earliest time (Time.time) at which the breach-charge Chase branch is allowed to hunt for
+    /// a new blocking fence again after the previous one broke. Gives the mutant a couple of
+    /// seconds to actually walk through the gap it just opened before the straight-line sweep in
+    /// <see cref="FindBlockingFenceTowardTarget"/> is allowed to flag a neighbouring, merely
+    /// nearby fence segment as "blocking" — without this, a mutant would immediately re-detect
+    /// an adjacent intact panel it never actually needed to break and go smash that too instead
+    /// of walking through the opening straight ahead of it.
+    /// </summary>
+    private float _fenceRecheckAllowedTime;
+
     // Destination deduplication — prevents redundant SetDestination calls for stationary
     // targets, which cause a 1-frame path-recalculation stutter every retarget tick.
     private Vector3 _lastSetDestination = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
     private object _lastDestinationTarget;
     private const float DestinationChangeSqrThreshold = 0.25f; // skip re-set if target moved < 0.5 m
+
+    /// <summary>Grace period after breaking a fence before hunting for another blocking one — see <see cref="_fenceRecheckAllowedTime"/>.</summary>
+    private const float FenceRecheckGraceSeconds = 2f;
 
     /// <summary>
     /// True once this enemy has died, regardless of whether it has been despawned yet.
@@ -403,7 +428,7 @@ public class MutantEnemy : NetworkBehaviour
             }
 
             bool wasChasing = _currentTarget != null;
-            _currentTarget = FindNearestLivingPlayer();
+            _currentTarget = FindNearestLivingPlayer(ignoreDetectionRadius: _breachChargeMode);
 
             if (!wasChasing && _currentTarget != null)
                 OnAnyMutantSpottedPlayer?.Invoke();
@@ -411,6 +436,38 @@ public class MutantEnemy : NetworkBehaviour
             if (_currentTarget != null)
             {
                 // ── Chase ──────────────────────────────────────────────────────
+
+                // Breach charge mode: re-check for a blocking fence every tick, same as the
+                // aggro-to-booth path, so a relentless breach mutant smashes through fences in
+                // its way toward the nearest player instead of getting stuck avoiding a
+                // non-carving obstacle it can never actually route around.
+                if (_breachChargeMode)
+                {
+                    if (_fenceTarget == null && Time.time >= _fenceRecheckAllowedTime)
+                        _fenceTarget = FindBlockingFenceTowardTarget(_currentTarget.position);
+
+                    if (_fenceTarget != null && _fenceTarget.IsSpawned && !_fenceTarget.IsPassableByMutant)
+                    {
+                        _agent.isStopped = false;
+                        _agent.stoppingDistance = data.fenceStopDistance;
+                        SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
+
+                        if (IsFenceTargetInRange())
+                            TryAttackFence();
+
+                        yield return new WaitForSeconds(retargetInterval);
+                        continue;
+                    }
+
+                    // No blocking fence (or it just broke) — drop it, give ourselves a couple of
+                    // seconds to actually walk through the opening before hunting for another
+                    // one, and fall through to a direct charge at the player below.
+                    if (_fenceTarget != null)
+                        _fenceRecheckAllowedTime = Time.time + FenceRecheckGraceSeconds;
+                    _fenceTarget = null;
+                    _agent.stoppingDistance = data.stoppingDistance;
+                }
+
                 SetAgentDestination(_currentTarget.position, _currentTarget);
 
                 float distanceToTarget = Vector3.Distance(transform.position, _currentTarget.position);
@@ -454,9 +511,12 @@ public class MutantEnemy : NetworkBehaviour
                     {
                         // Navigate straight to the point on the fence blocking our path — not its
                         // GameObject pivot, which may sit on the unwalkable carved-out point or far
-                        // along a long fence run.
+                        // along a long fence run. Uses fenceStopDistance (tuned to the fence's
+                        // surface) rather than the general-purpose stoppingDistance, so the mutant
+                        // closes in all the way to melee range instead of stopping at the same
+                        // distance it would use for chasing a player or bashing a door.
                         _agent.isStopped = false;
-                        _agent.stoppingDistance = data.stoppingDistance;
+                        _agent.stoppingDistance = data.fenceStopDistance;
                         SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
 
                         if (IsFenceTargetInRange())
@@ -615,7 +675,12 @@ public class MutantEnemy : NetworkBehaviour
             return null;
 
         Vector3 direction = toTarget / distance;
-        float radius = 0.75f;
+
+        // Kept tight (well under half a fence panel's width) so only a fence genuinely dead
+        // ahead of the mutant registers as "blocking" — a wider sweep was grazing the edge of
+        // an adjacent, easily-walkable-around panel right after breaking the one actually in
+        // the way, causing the mutant to smash a second fence it never needed to.
+        float radius = 0.35f;
 
         RaycastHit[] hits = Physics.SphereCastAll(origin, radius, direction, distance);
         if (hits.Length == 0)
@@ -755,7 +820,10 @@ public class MutantEnemy : NetworkBehaviour
         UpdateLookAtTarget();
 
         // ── Aggro / Fence Logic ────────────────────────────────────────────────
-        if (_isAggroed && aggroTarget != null)
+        // Skipped entirely in breach charge mode — ChaseLoop's Chase branch already handles
+        // fence-smashing toward the dynamic nearest-player target every retarget tick, and this
+        // legacy block would otherwise fight it by driving the agent toward the fixed aggroTarget.
+        if (!_breachChargeMode && _isAggroed && aggroTarget != null)
         {
             if (_fenceTarget == null)
             {
@@ -775,8 +843,12 @@ public class MutantEnemy : NetworkBehaviour
             }
             else if (IsFenceTargetInRange())
             {
-                // Stop the agent so it doesn't try to push through the obstacle while attacking.
-                _agent.isStopped = true;
+                // Do NOT force _agent.isStopped here — attackRange (used by IsFenceTargetInRange)
+                // is intentionally larger than the fence-specific approach distance, so freezing
+                // movement as soon as it's true stops the mutant well before it closes in to
+                // fenceStopDistance. Let the NavMeshAgent's own stoppingDistance/autoBraking (set
+                // to data.fenceStopDistance in ChaseLoop) bring it to a natural stop right at the
+                // fence, and only gate the attack trigger on range here.
                 TryAttackFence();
             }
         }
@@ -805,6 +877,16 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// Enables/disables breach charge mode — see <see cref="_breachChargeMode"/>.
+    /// Safe to call before or after <see cref="NetworkObject.Spawn"/>; takes effect on the very
+    /// next <see cref="ChaseLoop"/> tick.
+    /// </summary>
+    public void SetBreachChargeMode(bool chargeMode)
+    {
+        _breachChargeMode = chargeMode;
+    }
+
+    /// <summary>
     /// Disables this component and stops all running coroutines so that
     /// <see cref="MutantSuspectBehaviour"/> can take exclusive control during a lineup sequence.
     /// Called by <see cref="MutantSuspectBehaviour.BeginLineup"/> before the lineup coroutine starts.
@@ -821,10 +903,17 @@ public class MutantEnemy : NetworkBehaviour
     /// Players who are inside a scripted dialogue cutscene are excluded — they cannot be
     /// aggroed while the cutscene holds their controls.
     /// </summary>
-    private Transform FindNearestLivingPlayer()
+    /// <param name="ignoreDetectionRadius">
+    /// When true, finds the globally nearest living player with no distance cap at all —
+    /// used by <see cref="_breachChargeMode"/> so breach mutants are always aware of the
+    /// closest player regardless of <see cref="MutantEnemyData.detectionRadius"/>.
+    /// </param>
+    private Transform FindNearestLivingPlayer(bool ignoreDetectionRadius = false)
     {
         Transform nearest = null;
-        float nearestSqrDist = data.detectionRadius * data.detectionRadius;
+        float nearestSqrDist = ignoreDetectionRadius
+            ? float.MaxValue
+            : data.detectionRadius * data.detectionRadius;
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {

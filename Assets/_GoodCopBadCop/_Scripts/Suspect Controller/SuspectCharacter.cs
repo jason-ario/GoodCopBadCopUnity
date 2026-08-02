@@ -788,11 +788,35 @@ public class SuspectCharacter : Interactable
     private bool _isMutant;
     private bool _hasFled;
 
+    /// <summary>
+    /// True only while this suspect is the current one standing at the booth window
+    /// (set by <see cref="SuspectController"/> once its arrival sequence completes).
+    /// Server-authoritative and intentionally not networked — combat is only ever
+    /// resolved server-side (see <see cref="TakeDamage"/> and <see cref="GetShotServerRpc"/>),
+    /// so clients never need to read it. Suspects that are merely standing/walking around the
+    /// scene (e.g. a scripted intro NPC before it reaches the window) are not shootable.
+    /// </summary>
+    private bool _isAtBooth;
+
     /// <summary>True once this suspect has died, regardless of visual state.</summary>
     public bool IsDead => _isDead;
 
     /// <summary>True once this suspect has fled the booth after being wounded past woundedFleeHealth.</summary>
     public bool HasFled => _hasFled;
+
+    /// <summary>True while this suspect is standing at the booth window and can be shot or wounded.</summary>
+    public bool IsAtBooth => _isAtBooth;
+
+    /// <summary>
+    /// Server-only. Marks whether this suspect is currently standing at the booth window.
+    /// Called by <see cref="SuspectController"/> when the suspect arrives (true) and when it
+    /// stops being the current suspect — despawned, replaced, or otherwise removed (false).
+    /// </summary>
+    public void SetIsAtBooth(bool isAtBooth)
+    {
+        if (!IsServer) return;
+        _isAtBooth = isAtBooth;
+    }
 
     /// <summary>Fired on the server whenever this suspect takes damage (before death check).</summary>
     public event Action OnHit;
@@ -1559,7 +1583,7 @@ public class SuspectCharacter : Interactable
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || _isDead || _hasFled)
+        if (!IsServer || _isDead || _hasFled || !_isAtBooth)
             return;
 
         SpawnHitParticleClientRpc(hitPoint);
@@ -1654,6 +1678,9 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void GetShotServerRpc()
     {
+        if (_isDead || !_isAtBooth)
+            return;
+
         _isDead = true;
         GetShotClientRpc();
     }

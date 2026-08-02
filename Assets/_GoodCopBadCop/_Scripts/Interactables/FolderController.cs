@@ -271,7 +271,7 @@ public class FolderController : PickableObject
         SFXController.Instance.PlayAtPosition(clip, transform.position);
 
         // Only update document interactability when the folder is NOT being held.
-        // While held, OnEquipped / OnDropped manage it; here we handle desk-placed state.
+        // While held, OnHeldStateChanged manages it once the folder is actually released.
         if (IsHeld) return;
 
         // Use the networked path on the server so the NetworkVariable override is cleared.
@@ -281,16 +281,7 @@ public class FolderController : PickableObject
         // Routing through the server ensures the NetworkVariable update reaches every client.
         if (IsServer)
         {
-            if (idCard != null)       idCard.SetInteractableNetworked(newVal);
-            if (application != null)  application.SetInteractableNetworked(newVal);
-
-            // Exam pages are tracked separately in _examPageQueue — apply the same open-state
-            // change so they become interactable when the folder opens and non-interactable
-            // when it closes, matching the behaviour of idCard and application.
-            foreach (ExamPage examPage in _examPageQueue)
-            {
-                if (examPage != null) examPage.SetInteractableNetworked(newVal);
-            }
+            RefreshDocumentInteractability(newVal);
         }
     }
 
@@ -1239,21 +1230,43 @@ public class FolderController : PickableObject
     public override void OnDropped()
     {
         base.OnDropped();
-        if (isOpen.Value)
-        {
-            // Route through the server so the NetworkVariable override is updated for all clients.
-            // The local SetInteractable alone is overridden by ApplyNetworkInteractableState on any
-            // client where _networkInteractableOverride != -1 (e.g. a tutorial-locked document).
-            if (IsServer)
-            {
-                if (idCard != null)       idCard.SetInteractableNetworked(true);
-                if (application != null)  application.SetInteractableNetworked(true);
+        // The authoritative re-enable now happens in OnHeldStateChanged, which fires once
+        // _holdingClientId has actually finished updating on the server — OnDropped runs
+        // immediately on the dropping client, which can be before that NetworkVariable
+        // write (via ReleaseHolderServerRpc) has taken effect, so relying on it here alone
+        // raced and could leave documents permanently stuck non-interactable.
+    }
 
-                foreach (ExamPage examPage in _examPageQueue)
-                {
-                    if (examPage != null) examPage.SetInteractableNetworked(true);
-                }
-            }
+    /// <summary>
+    /// Fires on every machine, including the server, exactly when this folder's authoritative
+    /// held state changes — regardless of which client picked it up or dropped it. Used
+    /// instead of OnDropped to avoid the race where OnDropped (running immediately and only
+    /// on the dropping client) could check IsHeld before ReleaseHolderServerRpc's effect on
+    /// _holdingClientId had actually propagated, permanently leaving filed documents
+    /// non-interactable even after the folder was placed down and open.
+    /// </summary>
+    protected override void OnHeldStateChanged(bool isHeld)
+    {
+        if (!IsServer) return;
+        if (isHeld) return;
+        if (!isOpen.Value) return;
+
+        RefreshDocumentInteractability(true);
+    }
+
+    /// <summary>
+    /// Server-only: pushes the given interactable state to the ID card, application, and every
+    /// queued exam page via the networked path so the change reaches every client and clears
+    /// any stale tutorial override.
+    /// </summary>
+    private void RefreshDocumentInteractability(bool interactable)
+    {
+        if (idCard != null)       idCard.SetInteractableNetworked(interactable);
+        if (application != null)  application.SetInteractableNetworked(interactable);
+
+        foreach (ExamPage examPage in _examPageQueue)
+        {
+            if (examPage != null) examPage.SetInteractableNetworked(interactable);
         }
     }
 

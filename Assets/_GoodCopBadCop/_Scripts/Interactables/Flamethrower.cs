@@ -1,4 +1,5 @@
 using System;
+using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -44,6 +45,10 @@ public class Flamethrower : PickableObject, IAmmoProvider
 
     [Tooltip("Spherecast radius for enemy hit detection — controls how wide the flame cone feels.")]
     [SerializeField] private float _flameWidth = 0.5f;
+
+    [Header("Flamethrower — Combat")]
+    [Tooltip("Damage dealt to a fellow player per hit-check tick (every HitCheckInterval seconds) while they stand in the flame.")]
+    [SerializeField] private float _playerDamagePerTick = 5f;
 
     [Header("Flamethrower — Audio")]
     [Tooltip("Looping AudioSource for the flame sound. Starts and stops with firing.")]
@@ -283,6 +288,8 @@ public class Flamethrower : PickableObject, IAmmoProvider
     {
         if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
 
+        ulong shooterClientId = rpcParams.Receive.SenderClientId;
+
         float fuelRatio  = Mathf.Clamp01(_fuel.Value / MaxFuel);
         float effectiveRange = Mathf.Lerp(_minVelocityRatio * _maxFlameRange, _maxFlameRange, fuelRatio);
 
@@ -298,7 +305,7 @@ public class Flamethrower : PickableObject, IAmmoProvider
                 continue;
             }
 
-            // ── Dead player corpses / resurrected mutants ──────────────────────
+            // ── Dead player corpses / resurrected mutants / living fellow players ──
             // Must be checked BEFORE the generic MutantEnemy branch below: once a
             // CorpseResurrectionController's dormant MutantEnemy is added to the Player
             // prefab, GetComponentInParent<MutantEnemy>() would otherwise match every
@@ -306,6 +313,11 @@ public class Flamethrower : PickableObject, IAmmoProvider
             CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
             if (corpse != null)
             {
+                // Never burn the shooter's own player.
+                NetworkObject corpseNetObj = corpse.GetComponent<NetworkObject>();
+                if (corpseNetObj != null && corpseNetObj.OwnerClientId == shooterClientId)
+                    continue;
+
                 PlayerHealth corpsePlayerHealth = corpse.GetComponent<PlayerHealth>();
                 if (corpsePlayerHealth != null && corpsePlayerHealth.IsDead)
                 {
@@ -320,9 +332,13 @@ public class Flamethrower : PickableObject, IAmmoProvider
                     if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
                         IgniteEnemyClientRpc(new NetworkObjectReference(corpse.NetworkObject));
                 }
+                else if (corpsePlayerHealth != null)
+                {
+                    // Living fellow player caught in the flame — friendly-fire damage.
+                    corpsePlayerHealth.TakeDamage(_playerDamagePerTick, EffectKeys.FriendlyFlamethrowerDamage);
+                }
 
-                // Living players are immune to this branch entirely — never fall through to
-                // the MutantEnemy check below.
+                // Never fall through to the MutantEnemy check below for players.
                 continue;
             }
 

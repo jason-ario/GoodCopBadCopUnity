@@ -182,6 +182,11 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     private void ShowPickupArrow()
     {
         if (_pickupTutorialArrow == null) return;
+
+        // Day 1 has its own scripted introduction to the newspaper (see the intro timeline /
+        // Day_01 flow), so the generic mailbox tutorial arrow would be redundant there.
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
+
         MegaphoneDialogueManager.Instance?.SetGameObjectActiveSynced(_pickupTutorialArrow, true);
     }
 

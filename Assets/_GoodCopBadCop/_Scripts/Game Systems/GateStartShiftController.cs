@@ -121,9 +121,8 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
         if (willBeOpen && audioSource != null && doorOpenClip != null)
             PlayGateSoundClientRpc(true);
 
-        yield return new WaitForSeconds(waitDelay);
-
-        // Apply visuals immediately on the interacting client — no RTT wait.
+        // Apply visuals immediately — the animation must play the instant the player
+        // interacts, with no delay, on the interacting client's own prediction.
         ApplyGateVisuals(willBeOpen, openedIn);
         if (!willBeOpen && audioSource != null && doorCloseClip != null)
             audioSource.PlayOneShot(doorCloseClip);

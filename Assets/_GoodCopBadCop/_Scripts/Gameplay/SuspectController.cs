@@ -600,6 +600,9 @@ public class SuspectController : NetworkBehaviour
         _activeStandPos = NextSuspectStandPosOverride != null ? NextSuspectStandPosOverride : standPos;
         NextSuspectStandPosOverride = null;
 
+        // Not shootable/woundable yet — only becomes true once ArrivedAtPosition fires below.
+        suspectCharacter.SetIsAtBooth(false);
+
         suspectCharacter.SetLocomotionState(true);
         suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 
@@ -667,6 +670,9 @@ public class SuspectController : NetworkBehaviour
     private void ArrivedAtPosition()
     {
         if (suspectCharacter == null) return;
+
+        // Now standing at the window — shootable/woundable from here on.
+        suspectCharacter.SetIsAtBooth(true);
 
         // Ensure all non-activated anomalies (including those from locked categories that
         // were skipped during the initial activation pass) have their shader state cleaned up.
@@ -1653,6 +1659,9 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectToDespawn == null) return;
 
+        // No longer at the booth once it's leaving — blocks any in-flight damage/shot RPCs.
+        suspectToDespawn.SetIsAtBooth(false);
+
         NetworkObject netObj = suspectToDespawn.GetComponent<NetworkObject>();
         if (netObj != null && netObj.IsSpawned)
         {
@@ -1899,6 +1908,31 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server-only. Clears <see cref="HandOffPoint.BlockVerdict"/> on every client, not just
+    /// the server. <see cref="HandOffPoint.BlockVerdict"/> is a per-process static that
+    /// Day_01.DayActivated sets to true independently on every client (host and non-host
+    /// alike). When the deferred verdict (e.g. Vlad's) is delivered, only the server's own
+    /// copy of the flag was ever reset (via HandOffPoint.ClearPendingVerdict, called locally
+    /// from the server-only dialogue-completion callback). A non-host client's (Player 2's)
+    /// copy of BlockVerdict stayed stuck at true for the rest of the day, so every subsequent
+    /// folder that client placed at the window — including the quarantine tutorial suspect —
+    /// was silently rerouted into the deferred-verdict branch instead of being delivered,
+    /// making it look like the verdict never registered. Call this immediately after
+    /// HandOffPoint.ClearPendingVerdict() so every client's flag is reset together.
+    /// </summary>
+    public void ClearBlockVerdictAcrossAllClients()
+    {
+        if (!IsServer) return;
+        ClearBlockVerdictClientRpc();
+    }
+
+    [ClientRpc]
+    private void ClearBlockVerdictClientRpc()
+    {
+        HandOffPoint.BlockVerdict = false;
+    }
+
+    /// <summary>
     /// Performs the full verdict sequence: accuracy calculation, payout, and suspect processing.
     /// Must only be called on the server.
     /// </summary>
@@ -1911,6 +1945,15 @@ public class SuspectController : NetworkBehaviour
             Debug.LogWarning("[SuspectController] ExecuteVerdict: no current suspect on the server — ignoring verdict.");
             return;
         }
+
+        // Authoritatively disable interaction on EVERY client, not just the one who delivered
+        // the verdict. DeliverVerdict's SetCanInteract(false) call only ever runs on the local
+        // client that placed the stamped folder — SuspectCharacter.SetCanInteract() just flips a
+        // Collider.enabled flag, which NGO does not auto-replicate. Without this broadcast, a
+        // second player (e.g. Player 2) whose client never disabled the collider could still
+        // click the suspect while it walks away mid Pass/Quarantine/Kill sequence, re-entering
+        // dialogue mode and snapping their camera onto the departing suspect.
+        suspectCharacter.SetCanInteractNetworked(false);
 
         // Scripted encounters (e.g. Ocho's booth confrontation) can reject verdicts entirely —
         // neither the kill machine nor quarantine actually process the suspect. Fully hand off

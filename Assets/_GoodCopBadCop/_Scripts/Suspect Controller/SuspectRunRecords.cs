@@ -344,6 +344,9 @@ public class SuspectRunRecords : MonoBehaviour
     /// Advances each living suspect's infection score by a per-character random amount.
     /// Quarantine-treated suspects have their score reset instead — unless they are fully mutated,
     /// in which case the quarantine has no effect.
+    /// Suspects who have never been shown to the player (<see cref="SuspectRecord.daysShown"/> == 0)
+    /// are skipped entirely — their score stays at its initial base value until their first
+    /// appearance, regardless of how many campaign days have elapsed in the meantime.
     /// Checks whether any killed suspect has waited long enough to have their replacement activate.
     /// Persists all changes to disk after advancing.
     /// Call this before DailySuspectManager populates the next shift.
@@ -373,6 +376,13 @@ public class SuspectRunRecords : MonoBehaviour
 
             // Replacement suspects also skip normal infection advancement (they're handled as doppelgangers).
             if (record.isReplacement) continue;
+
+            // Suspects the player has never encountered stay at their base infection score —
+            // no matter how many days have passed — so their first appearance always reflects
+            // the starting range, not a backlog of unseen days. Progression only begins once
+            // they've actually been shown to the player (record.daysShown > 0, set in
+            // SuspectCharacter.MarkSuspectShown).
+            if (record.daysShown <= 0) continue;
 
             if (record.pendingVaccineReset)
             {

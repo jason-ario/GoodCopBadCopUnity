@@ -576,6 +576,55 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Skips to Day 1 and jumps straight to the scripted first mutant breach — bypasses Vlad,
+    /// the soldier, and the trash/graffiti tutorials entirely, starts the shift with no suspects
+    /// due to arrive, and triggers the breach directly once the shift-start callbacks (door
+    /// lock, breach-gate registration) have settled.
+    /// </summary>
+    public void SkipToMutantBreach()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToMutantBreach: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(1);
+        StartCoroutine(SkipToMutantBreachAfterDelay());
+    }
+
+    private IEnumerator SkipToMutantBreachAfterDelay()
+    {
+        // Wait one frame for Day_01 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_01.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToMutantBreach: Day_01.Instance not found after SkipToDay(1).");
+            yield break;
+        }
+
+        // Ensure the gate is in post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Suppress the opening sequence — no suspects will spawn on this skip path.
+        Day_01.Instance.DebugSkipToMutantBreach();
+
+        // Start the shift so shiftStarted = true and RegisterMutantBreachGate runs. Use a large
+        // first-arrival interval so no suspect can arrive before/during the breach.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Mirrors SkipToEndOfDay1AfterDelay: wait past ShiftManager's own shift-start door lock
+        // window before doing anything else, so nothing clobbers it afterward.
+        yield return new WaitForSeconds(3.5f);
+
+        Day_01.Instance.DebugTriggerFirstBreach();
+
+        Debug.Log("[DebugConsole] Skipped to Day 1 — first mutant breach triggered.");
+    }
+
+    /// <summary>
     /// Skips to Day 1 in the booth with the shift already started, the booth door unlocked and
     /// opened, and the end-of-shift trash and graffiti tutorial tasks triggered — mirroring both
     /// <see cref="AlexeiController.TriggerEndOfShiftSetup"/> and the

@@ -15,7 +15,10 @@ using DG.Tweening;
 ///
 /// Prefab setup:
 ///   - NetworkObject on this GameObject.
-///   - NavMeshObstacle on this GameObject (carving enabled).
+///   - NavMeshObstacle on this GameObject (carving disabled — this obstacle only pushes
+///     agents away via runtime avoidance rather than cutting a hole in the baked navmesh).
+///     Hit-feedback shakes the active child mesh root instead of this GameObject's own
+///     transform, so the obstacle itself never moves.
 ///   - Four child GameObjects (one per visual state) assigned to DamageStateMeshRoots.
 ///   - AudioSource on this GameObject.
 /// </summary>
@@ -65,6 +68,14 @@ public class PerimiterFence : NetworkBehaviour
     // ── Local state ────────────────────────────────────────────────────────────
 
     private NavMeshObstacle _navMeshObstacle;
+
+    /// <summary>
+    /// The currently active entry from <see cref="_damageStateMeshRoots"/>, kept up to date by
+    /// <see cref="ApplyDamageVisuals"/>. Hit-feedback shakes this instead of <c>transform</c> so
+    /// the NavMeshObstacle (on this GameObject) never itself moves — see
+    /// <see cref="PlayMutantHitFeedbackClientRpc"/> and <see cref="ApplyNavMeshObstacleState"/>.
+    /// </summary>
+    private GameObject _activeMeshRoot;
 
     /// <summary>Prevents audio from playing during initial spawn synchronisation.</summary>
     private bool _initialized;
@@ -194,11 +205,21 @@ public class PerimiterFence : NetworkBehaviour
             if (_damageStateMeshRoots[i] != null)
                 _damageStateMeshRoots[i].SetActive(i == state);
         }
+
+        // Track the currently visible mesh root so hit-feedback can shake it instead of the
+        // root transform (which carries the NavMeshObstacle — see PlayMutantHitFeedbackClientRpc).
+        _activeMeshRoot = (_damageStateMeshRoots != null && state >= 0 && state < _damageStateMeshRoots.Length)
+            ? _damageStateMeshRoots[state]
+            : null;
     }
 
     /// <summary>
-    /// Enables/disables the NavMeshObstacle's carving based on damage state so mutants can
-    /// pathfind straight through this fence once it reaches its most-damaged (passable) state.
+    /// Enables/disables the NavMeshObstacle based on damage state so mutants can pathfind
+    /// straight through this fence once it reaches its most-damaged (passable) state.
+    /// Carving is intentionally left OFF at all times — even with the shake moved off this
+    /// transform (see <see cref="PlayMutantHitFeedbackClientRpc"/>), carving still caused
+    /// mutant navigation problems, so this obstacle now only pushes agents away at runtime via
+    /// NavMeshObstacle's built-in avoidance rather than cutting a hole in the baked navmesh.
     /// The physical BoxCollider is never touched here, so the player can never walk through the
     /// fence regardless of its damage state.
     /// </summary>
@@ -208,7 +229,7 @@ public class PerimiterFence : NetworkBehaviour
 
         // Only the worst damage state (index == MaxDamageLevel) is passable by mutants.
         bool passable = state >= MaxDamageLevel;
-        _navMeshObstacle.carving = !passable;
+        _navMeshObstacle.carving = false;
         _navMeshObstacle.enabled = !passable;
     }
 
@@ -278,7 +299,11 @@ public class PerimiterFence : NetworkBehaviour
         }
 
         // Shake
-        transform.DOComplete();
-        transform.DOShakePosition(0.5f, strength: 0.10f, vibrato: 30, randomness: 90f, snapping: false, fadeOut: true);
+        // Shake the currently visible mesh root, NOT this GameObject's own transform — this
+        // transform carries the NavMeshObstacle, and moving it (even briefly) causes carving
+        // (with CarveOnlyStationary) to intermittently drop, breaking mutant navigation.
+        Transform shakeTarget = _activeMeshRoot != null ? _activeMeshRoot.transform : transform;
+        shakeTarget.DOComplete();
+        shakeTarget.DOShakePosition(0.5f, strength: 0.10f, vibrato: 30, randomness: 90f, snapping: false, fadeOut: true);
     }
 }

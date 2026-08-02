@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using GoodCopBadCop.Effects;
 using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
@@ -235,6 +236,10 @@ public class Pistol : PickableObject, IAmmoProvider
             {
                 enemy.TakeDamage(_damage, hit.point);
             }
+            else if (TryDamagePlayer(hit.collider, clientId, _damage))
+            {
+                // Friendly-fire hit landed — handled inside TryDamagePlayer.
+            }
             else
             {
                 // Check for breakable glass — register the hit server-side and broadcast visuals
@@ -267,6 +272,30 @@ public class Pistol : PickableObject, IAmmoProvider
                 Send = new ClientRpcSendParams { TargetClientIds = others }
             });
         }
+    }
+
+    /// <summary>
+    /// Checks whether <paramref name="hitCollider"/> belongs to a fellow player and, if so,
+    /// applies friendly-fire damage. Skips the shooter's own player (via <see cref="NetworkObject.OwnerClientId"/>)
+    /// so hitting yourself never registers damage.
+    /// </summary>
+    /// <returns><see langword="true"/> if a fellow player was found and damaged.</returns>
+    private static bool TryDamagePlayer(Collider hitCollider, ulong shooterClientId, float damage)
+    {
+        Transform root = hitCollider.transform.root;
+        if (!root.CompareTag("Player"))
+            return false;
+
+        NetworkObject playerNetObj = hitCollider.GetComponentInParent<NetworkObject>();
+        if (playerNetObj != null && playerNetObj.OwnerClientId == shooterClientId)
+            return false;
+
+        PlayerHealth playerHealth = hitCollider.GetComponentInParent<PlayerHealth>();
+        if (playerHealth == null)
+            return false;
+
+        playerHealth.TakeDamage(damage, EffectKeys.FriendlyGunshotDamage);
+        return true;
     }
 
     /// <summary>

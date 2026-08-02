@@ -54,8 +54,10 @@ public class MutantBreachManager : NetworkBehaviour
     [Tooltip("Fixed world locations mutants can spawn at for a breach. At least one is required.")]
     [SerializeField] private Transform[] breachPoints;
 
-    [Tooltip("Optional target breached mutants head toward when a breach's forceAggro is enabled. " +
-             "Leave null to fall back to each mutant's normal nearest-player targeting.")]
+    [Tooltip("Fallback target breached mutants head toward ONLY when no living, non-cutscened " +
+             "player exists to charge (every breach mutant is always in breach charge mode, " +
+             "which takes priority — see MutantEnemy.SetBreachChargeMode). Leave null to just " +
+             "patrol/idle in that edge case instead.")]
     [SerializeField] private Transform aggroTarget;
 
     [Tooltip("Controls the red pulsing alarm lights on all clients.")]
@@ -316,6 +318,13 @@ public class MutantBreachManager : NetworkBehaviour
             }
 
             MutantEnemy enemy = instance.GetComponent<MutantEnemy>();
+
+            // Breach mutants relentlessly charge whichever player is currently nearest —
+            // ignoring MutantEnemyData.detectionRadius — and smash through any blocking
+            // PerimiterFence along the way, rather than heading for a fixed aggroTarget or
+            // waiting to patrol into detection range.
+            enemy?.SetBreachChargeMode(true);
+
             if (aggroTarget != null)
                 enemy?.SetAggroTarget(aggroTarget);
             if (data.forceAggro)

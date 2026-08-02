@@ -249,7 +249,26 @@ public class PickableObject : Interactable
         // Notify all instances (including server) when this object transitions to being held.
         if (previous == ulong.MaxValue && current != ulong.MaxValue)
             OnPickedUpNetworked?.Invoke();
+
+        // Fires on every machine (including the server) only once the authoritative
+        // held state has actually changed — unlike a local OnDropped() call, which can run
+        // before the ReleaseHolderServerRpc that clears this NetworkVariable has taken
+        // effect. Subclasses that need to react to a reliably-correct "no longer held"
+        // transition (e.g. FolderController re-enabling its filed documents) should
+        // override OnHeldStateChanged rather than relying on OnDropped's timing.
+        OnHeldStateChanged(current != ulong.MaxValue);
     }
+
+    /// <summary>
+    /// Called on every machine whenever this object's authoritative <see cref="IsHeld"/>
+    /// state actually changes (i.e. after the <c>_holdingClientId</c> NetworkVariable has
+    /// updated) — including on the server, regardless of which client picked up or dropped
+    /// the object. Prefer this over reacting inside <see cref="OnDropped"/> for logic that
+    /// depends on the held state being authoritatively correct, since OnDropped runs
+    /// immediately and locally on the dropping client, before the corresponding
+    /// ReleaseHolderServerRpc round-trip has necessarily completed.
+    /// </summary>
+    protected virtual void OnHeldStateChanged(bool isHeld) { }
 
     private void OnNetworkInteractableOverrideChanged(int previous, int current)
         => ApplyNetworkInteractableState();

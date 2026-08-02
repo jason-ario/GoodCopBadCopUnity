@@ -360,8 +360,26 @@ public class MainMenuController : MonoBehaviour
             {
                 await WaitUntilHostReady();
                 SaveDataManager.Instance.InitialiseActiveSlot();
-                GameManager.Instance.TransitionToLobby();
+
+                // A save already past Day 1 skips the lobby-outside spawn, the Start Shift
+                // Gate's Day 1 onboarding (start-shift screen + intro cutscene), and the main
+                // menu's intro cinematic entirely — the player is dropped straight into the
+                // bunker as if resuming mid-campaign. See ShiftManager.ResumeSavedDay.
+                bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+
                 GameManager.Instance.TryStartGame();
+
+                if (resumingPastDay1)
+                {
+                    // Not going through the lobby transition — clear the flag it would
+                    // otherwise have cleared itself once players were spawned there.
+                    GameManager.Instance.CancelLobbyTransition();
+                    ShiftManager.Instance.ResumeSavedDay();
+                }
+                else
+                {
+                    GameManager.Instance.TransitionToLobby();
+                }
             }
             else
             {
