@@ -97,8 +97,14 @@ public class NameTag : NetworkBehaviour
     {
         if (IsOwner || nameTagObject == null || followTarget == null || _camera == null) return;
 
-        // Position and billboard the name tag object each frame.
+        // Position and billboard the name tag object each frame, facing the camera on the
+        // Y axis only so it stays upright instead of tilting with the camera's pitch/roll.
         nameTagObject.transform.position = followTarget.position + offset;
-        nameTagObject.transform.rotation = _camera.transform.rotation;
+
+        Vector3 directionToCamera = nameTagObject.transform.position - _camera.transform.position;
+        directionToCamera.y = 0f;
+
+        if (directionToCamera.sqrMagnitude > 0.0001f)
+            nameTagObject.transform.rotation = Quaternion.LookRotation(directionToCamera, Vector3.up);
     }
 }
