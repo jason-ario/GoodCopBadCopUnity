@@ -557,10 +557,13 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
-    /// Moves the character to <paramref name="destination"/> using a DOTween position tween,
-    /// then invokes <paramref name="onArrived"/>. Duration is derived from distance and
-    /// <see cref="_walkSpeed"/>. Cancels any in-progress movement before starting.
-    /// The NavMeshAgent is not used and remains disabled.
+    /// Moves the character to <paramref name="destination"/> by pathfinding across the NavMesh
+    /// with the <see cref="NavMeshAgent"/>, then invokes <paramref name="onArrived"/>. The agent
+    /// is enabled for the duration of the move (restoring its previous enabled state afterward)
+    /// so callers don't need to manage it manually. Cancels any in-progress movement before
+    /// starting. Falls back to a direct DOTween move only if no NavMeshAgent is present or the
+    /// character can't be linked onto the NavMesh (e.g. spawned off-mesh), so Vlad and other
+    /// suspects walk around geometry instead of straight through it.
     /// </summary>
     /// <param name="destination">World-space destination.</param>
     /// <param name="onArrived">Optional callback invoked on arrival.</param>
@@ -568,10 +571,10 @@ public class SuspectCharacter : Interactable
     {
         if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
         _activeTween?.Kill();
-        _navMoveCoroutine = StartCoroutine(WalkToCoroutine(destination, onArrived));
+        _navMoveCoroutine = StartCoroutine(NavigateToCoroutine(destination, onArrived));
     }
 
-    /// <summary>Stops the current DOTween movement immediately.</summary>
+    /// <summary>Stops the current movement (NavMeshAgent path or DOTween) immediately.</summary>
     public void StopNavigation()
     {
         if (_navMoveCoroutine != null)
@@ -580,10 +583,73 @@ public class SuspectCharacter : Interactable
             _navMoveCoroutine = null;
         }
 
+        if (_navAgent != null && _navAgent.enabled && _navAgent.isOnNavMesh)
+            _navAgent.ResetPath();
+
         _activeTween?.Kill();
         _activeTween = null;
     }
 
+    private IEnumerator NavigateToCoroutine(Vector3 destination, Action onArrived)
+    {
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+
+        if (_navAgent == null)
+        {
+            // No NavMeshAgent on this character at all — legacy straight-line fallback.
+            yield return StartCoroutine(WalkToCoroutine(destination, onArrived));
+            yield break;
+        }
+
+        bool wasEnabled = _navAgent.enabled;
+        if (!_navAgent.enabled)
+        {
+            _navAgent.enabled = true;
+            // Give the agent a frame to link onto the NavMesh after being re-enabled.
+            yield return null;
+        }
+
+        if (!_navAgent.isOnNavMesh)
+        {
+            Debug.LogWarning($"[SuspectCharacter] {name}: NavMeshAgent is not on the NavMesh at " +
+                              $"{transform.position} — falling back to a direct move for this leg.");
+            yield return StartCoroutine(WalkToCoroutine(destination, onArrived));
+            _navAgent.enabled = wasEnabled;
+            yield break;
+        }
+
+        _navAgent.speed = _walkSpeed;
+        _navAgent.angularSpeed = _angularSpeed;
+        _navAgent.stoppingDistance = _stoppingDistance;
+
+        bool previousUpdateRotation = _navAgent.updateRotation;
+        _navAgent.updateRotation = true; // Turn along the path while actively pathfinding.
+        _navAgent.isStopped = false;
+        _navAgent.SetDestination(destination);
+
+        while (_navAgent.pathPending)
+            yield return null;
+
+        while (_navAgent.enabled && _navAgent.isOnNavMesh &&
+               (_navAgent.remainingDistance > _navAgent.stoppingDistance || _navAgent.velocity.sqrMagnitude > 0.01f))
+        {
+            yield return null;
+        }
+
+        if (_navAgent.enabled && _navAgent.isOnNavMesh)
+            _navAgent.ResetPath();
+
+        _navAgent.updateRotation = previousUpdateRotation;
+        _navAgent.enabled = wasEnabled;
+
+        _navMoveCoroutine = null;
+        onArrived?.Invoke();
+    }
+
+    /// <summary>
+    /// Legacy direct-line movement via DOTween. Used only as a fallback when a NavMeshAgent
+    /// isn't available or the character can't be linked onto the NavMesh.
+    /// </summary>
     private IEnumerator WalkToCoroutine(Vector3 destination, Action onArrived)
     {
         // Snap to face the destination direction before moving.

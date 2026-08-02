@@ -1458,12 +1458,20 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Enables this corpse as a collectible <see cref="JunkItem"/> and registers it with
-    /// <see cref="TakeOutTrashTask"/>. Called on a permanent death when <see cref="deathBehaviour"/>
+    /// Enables this corpse as a collectible <see cref="JunkItem"/> so it can always be picked up
+    /// by a player holding a TrashBag. Called on a permanent death when <see cref="deathBehaviour"/>
     /// is <see cref="DeathBehaviour.PlayAnimation"/> (the corpse persists in the scene instead of
     /// despawning immediately). No-op if <see cref="corpseJunkItem"/> isn't assigned. Mirrors
     /// <c>SuspectCharacter.EnableJunkPickup</c>/<c>ApplyJunkPickupState</c> for a body that becomes
     /// pickable trash once its owner is confirmed dead.
+    ///
+    /// Only registers with <see cref="TakeOutTrashTask"/> — and therefore only counts toward the
+    /// trash/gore task total and <see cref="CheckpointIntegrityService"/>'s score — when this
+    /// corpse died inside one of the task's yard <see cref="SpawnZone"/>s (mirroring
+    /// <see cref="SpawnGoreJunkItem"/>'s same in-yard check for gore pieces). A body that dies
+    /// outside the yard (e.g. a breach mutant killed mid-chase away from the trash zones) still
+    /// becomes collectible junk so its gore/mess can be cleaned up, it just doesn't count toward
+    /// the task or score.
     /// </summary>
     private void EnableCorpseJunkPickup()
     {
@@ -1472,11 +1480,13 @@ public class MutantEnemy : NetworkBehaviour
 
         // Apply immediately on the server so TakeOutTrashTask's FindObjectsByType scan (run
         // from RegisterExternalJunkItem's dynamic activation, or a later TriggerTask/
-        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away.
+        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away
+        // (when it's inside the yard — see the IsPositionInYard check below).
         ApplyCorpseJunkPickupState();
         EnableCorpseJunkPickupClientRpc();
 
-        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(NetworkObject);
+        if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(transform.position))
+            TakeOutTrashTask.Instance.RegisterExternalJunkItem(NetworkObject);
     }
 
     [ClientRpc]

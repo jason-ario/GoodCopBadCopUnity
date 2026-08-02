@@ -140,6 +140,11 @@ public class PlayerInteractionController : NetworkBehaviour
         {
             if (_playerPickupController.HeldObject == null)
                 TryWorldInteract(alternate: EKeyDown);
+            else if (TryPlaceHeldObjectAtGhost())
+            {
+                // Handled: an aim-shown ghost (e.g. a mail cubby's PlacementSlot) was active
+                // and in range, so LMB/E committed the placement — skip TryItemUse below.
+            }
             else if (!Cursor.visible || EKeyDown)
                 TryItemUse();
         }
@@ -494,6 +499,28 @@ public class PlayerInteractionController : NetworkBehaviour
     /// oriented by the surface normal. When a PlacementBoard is provided, its transform
     /// orientation is used instead.
     /// </summary>
+    /// <summary>
+    /// Commits the held object into the currently active placement ghost via LMB or the interact
+    /// key, without needing to hold-then-release RMB first. Normal free-surface/board placement
+    /// only ever commits on RMB release (see <see cref="PlayerPickupController"/>'s Update), which
+    /// is fine there since the ghost only appears while RMB is held. Boards that opted into
+    /// <see cref="PlacementBoard.ShowGhostWhileAiming"/> (e.g. a mail cubby's <see cref="PlacementSlot"/>)
+    /// show their ghost passively just from aiming — the player may never hold RMB at all — so
+    /// this gives them an equivalent commit path via LMB/E instead. Returns true if the placement
+    /// was committed, so the caller can skip its normal held-item-use handling for this press.
+    /// </summary>
+    private bool TryPlaceHeldObjectAtGhost()
+    {
+        if (!_playerPickupController.IsHoldingObject) return false;
+        if (!ObjectPlacer.Instance.IsActive || !ObjectPlacer.Instance.IsInRange) return false;
+
+        PlacementBoard board = ObjectPlacer.Instance.PlacementBoard;
+        if (board == null || !board.ShowGhostWhileAiming) return false;
+
+        _playerPickupController.DropObject();
+        return true;
+    }
+
     void CheckActivatePlacer(PlacementBoard placementBoard, RaycastHit hit, bool inRange)
     {
         if (!_playerPickupController.IsHoldingObject) return;
