@@ -252,9 +252,10 @@ public class MutantBreachManager : NetworkBehaviour
 
     private IEnumerator RunBreach(MutantBreachData data)
     {
-        if (data.mutantPrefabs == null || data.mutantPrefabs.Length == 0)
+        List<GameObject> spawnQueue = BuildSpawnQueue(data);
+        if (spawnQueue.Count == 0)
         {
-            Debug.LogError("[MutantBreachManager] Chosen MutantBreachData has no mutantPrefabs — aborting breach.", this);
+            Debug.LogError("[MutantBreachManager] Chosen MutantBreachData has no mutantPrefabs or uniqueMutantPrefabs — aborting breach.", this);
             yield break;
         }
 
@@ -267,14 +268,14 @@ public class MutantBreachManager : NetworkBehaviour
         _isBreachActive = true;
         _hasTriggeredToday = true;
 
-        Debug.Log($"[MutantBreachManager] Breach triggered: '{data.breachName}' — {data.mutantCount} mutant(s).");
+        Debug.Log($"[MutantBreachManager] Breach triggered: '{data.breachName}' — {spawnQueue.Count} mutant(s).");
         TriggerBreachEffectsClientRpc(data.notificationMessage, data.notificationHoldDuration);
 
         yield return new WaitForSeconds(data.alarmLeadTimeSeconds);
 
-        yield return StartCoroutine(SpawnBreachMutants(data));
+        yield return StartCoroutine(SpawnBreachMutants(data, spawnQueue));
 
-        int total = data.mutantCount;
+        int total = spawnQueue.Count;
         int lastRemaining = _activeBreachMutants.Count;
         ReportBreachCountClientRpc(lastRemaining, total);
 
@@ -307,19 +308,61 @@ public class MutantBreachManager : NetworkBehaviour
         _activeBreachMutants.Clear();
     }
 
-    private IEnumerator SpawnBreachMutants(MutantBreachData data)
+    /// <summary>
+    /// Builds the ordered list of prefabs to spawn for a breach: every entry in
+    /// <see cref="MutantBreachData.uniqueMutantPrefabs"/> exactly once, then random picks from
+    /// <see cref="MutantBreachData.mutantPrefabs"/> filling the remaining slots up to
+    /// <see cref="MutantBreachData.mutantCount"/>. The combined list is shuffled so unique
+    /// mutants don't always spawn first/in a predictable stagger slot.
+    /// </summary>
+    private List<GameObject> BuildSpawnQueue(MutantBreachData data)
     {
-        for (int i = 0; i < data.mutantCount; i++)
+        var queue = new List<GameObject>();
+
+        if (data.uniqueMutantPrefabs != null)
+        {
+            foreach (GameObject prefab in data.uniqueMutantPrefabs)
+            {
+                if (prefab != null)
+                    queue.Add(prefab);
+            }
+        }
+
+        if (queue.Count > data.mutantCount)
+        {
+            Debug.LogWarning($"[MutantBreachManager] '{data.breachName}' has more uniqueMutantPrefabs ({queue.Count}) than mutantCount ({data.mutantCount}) — spawning all unique mutants; no random picks will be added.", this);
+        }
+
+        bool hasRandomPool = data.mutantPrefabs != null && data.mutantPrefabs.Length > 0;
+        int remaining = Mathf.Max(0, data.mutantCount - queue.Count);
+        for (int i = 0; i < remaining && hasRandomPool; i++)
+        {
+            queue.Add(data.mutantPrefabs[Random.Range(0, data.mutantPrefabs.Length)]);
+        }
+
+        // Fisher-Yates shuffle so unique mutants are mixed randomly among the random picks.
+        for (int i = queue.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (queue[i], queue[j]) = (queue[j], queue[i]);
+        }
+
+        return queue;
+    }
+
+    private IEnumerator SpawnBreachMutants(MutantBreachData data, List<GameObject> spawnQueue)
+    {
+        for (int i = 0; i < spawnQueue.Count; i++)
         {
             Transform point = breachPoints[Random.Range(0, breachPoints.Length)];
-            GameObject prefab = data.mutantPrefabs[Random.Range(0, data.mutantPrefabs.Length)];
+            GameObject prefab = spawnQueue[i];
 
             GameObject instance = Instantiate(prefab, point.position, point.rotation);
             NetworkObject netObj = instance.GetComponent<NetworkObject>();
 
             if (netObj == null)
             {
-                Debug.LogError("[MutantBreachManager] A prefab in MutantBreachData.mutantPrefabs is missing a NetworkObject component.", this);
+                Debug.LogError("[MutantBreachManager] A prefab in MutantBreachData.mutantPrefabs/uniqueMutantPrefabs is missing a NetworkObject component.", this);
                 Destroy(instance);
                 continue;
             }
@@ -343,7 +386,7 @@ public class MutantBreachManager : NetworkBehaviour
             netObj.Spawn(true);
             _activeBreachMutants.Add(netObj);
 
-            if (i < data.mutantCount - 1)
+            if (i < spawnQueue.Count - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);
         }
     }

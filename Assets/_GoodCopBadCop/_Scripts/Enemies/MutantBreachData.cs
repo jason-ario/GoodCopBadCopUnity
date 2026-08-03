@@ -19,9 +19,19 @@ public class MutantBreachData : ScriptableObject
              "Each must contain a MutantEnemy component and be registered in NetworkManager's prefab list.")]
     public GameObject[] mutantPrefabs;
 
-    [Tooltip("Fixed total number of mutants spawned when this breach triggers.")]
+    [Tooltip("Fixed total number of mutants spawned when this breach triggers. Includes any " +
+             "uniqueMutantPrefabs — e.g. mutantCount 4 with 1 unique entry spawns that unique " +
+             "mutant plus 3 random picks from mutantPrefabs.")]
     [Min(1)]
     public int mutantCount = 4;
+
+    [Tooltip("Optional prefabs guaranteed to spawn exactly once each per breach — e.g. a singular " +
+             "boss/unique mutant mixed in with the random pool. Each must contain a MutantEnemy " +
+             "component and be registered in NetworkManager's prefab list. Spawn order among the " +
+             "full mutantCount is shuffled, so unique mutants don't always appear first. If the " +
+             "number of unique prefabs exceeds mutantCount, all unique prefabs still spawn and the " +
+             "cap is exceeded for them (no random picks are added).")]
+    public GameObject[] uniqueMutantPrefabs;
 
     [Header("Timing")]
     [Tooltip("Seconds between the alarm/notification starting and the first mutant spawning. " +

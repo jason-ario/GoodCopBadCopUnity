@@ -409,6 +409,11 @@ public class PlayerAnimationController : NetworkBehaviour
             ? _rightForeArmBone.position
             : Vector3.zero;
 
+        bool leftIKActiveOwner = leftArmRig.weight > 0.01f;
+        Vector3 leftElbowHintOwner = leftIKActiveOwner && _leftForeArmBone != null
+            ? _leftForeArmBone.position
+            : Vector3.zero;
+
         ApplyLocalBodyLean();
         ApplyCrouchLean();
 
@@ -421,6 +426,23 @@ public class PlayerAnimationController : NetworkBehaviour
             SolveTwoBoneIK(
                 _rightUpperArmBone, _rightForeArmBone, _rightHandBone,
                 rightArmRigIKTarget.position, rightElbowHintOwner, rightArmRig.weight);
+        }
+
+        // Left arm re-solve, for the general lean-correction reasons above, and additionally
+        // to fix a one-frame lag on two-handed weapons (e.g. shotgun): LeftArmIKTarget is a
+        // child transform riding on the gun, which itself is parented under the right hand
+        // bone. Update() copies LeftArmIKTarget's world position into leftArmRigIKTarget
+        // BEFORE Animation Rigging solves the right arm this frame, so it always reads last
+        // frame's hand pose. Re-solving here, after the right arm has already moved for the
+        // current frame, lets the left hand target the gun's up-to-date position instead of
+        // trailing behind it.
+        if (leftIKActiveOwner && LeftArmIKTarget != null
+            && _leftUpperArmBone != null && _leftForeArmBone != null
+            && _leftHandBone != null && leftArmRigIKTarget != null)
+        {
+            SolveTwoBoneIK(
+                _leftUpperArmBone, _leftForeArmBone, _leftHandBone,
+                LeftArmIKTarget.position, leftElbowHintOwner, leftArmRig.weight);
         }
     }
 
