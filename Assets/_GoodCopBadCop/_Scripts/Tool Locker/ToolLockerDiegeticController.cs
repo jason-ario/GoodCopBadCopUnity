@@ -21,6 +21,9 @@ public class ToolLockerDiegeticController : DiegeticViewController
     [Tooltip("Cursor-following prompt shown when hovering a purchasable item. Optional.")]
     [SerializeField] private CursorPromptController _cursorPrompt;
 
+    [Tooltip("Standalone cash counter shown while this diegetic view is open. Lives outside the Player HUD (which is hidden for diegetic views) so it stays visible for the player to see their money while shopping.")]
+    [SerializeField] private GameObject _cashCounterDisplay;
+
     [Header("Item Zoom Camera")]
     [Tooltip("Secondary CinemachineCamera that activates and zooms in on the selected shop item when the purchase popup is open.")]
     [SerializeField] private CinemachineCamera _itemZoomCamera;
@@ -77,6 +80,11 @@ public class ToolLockerDiegeticController : DiegeticViewController
         // Start hidden — shown on hover, hidden on exit
         _cursorPrompt?.Hide();
 
+        // Player HUD (and its own cash counter) is hidden while this view is open —
+        // show this standalone counter so the player can still see their money.
+        if (_cashCounterDisplay != null)
+            _cashCounterDisplay.SetActive(true);
+
         UIController.OnPauseMenuOpened += CloseItemPopup;
 
         foreach (ShopItem item in _shopItems)
@@ -111,6 +119,9 @@ public class ToolLockerDiegeticController : DiegeticViewController
         _subs.Clear();
 
         _cursorPrompt?.Hide();
+
+        if (_cashCounterDisplay != null)
+            _cashCounterDisplay.SetActive(false);
 
         // Always deactivate the item zoom camera regardless of how the view was closed
         // (purchase, Q key, or back button). Without this the zoom camera stays active

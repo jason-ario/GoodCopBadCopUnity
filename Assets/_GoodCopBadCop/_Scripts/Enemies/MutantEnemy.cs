@@ -215,6 +215,7 @@ public class MutantEnemy : NetworkBehaviour
     private float _doorOpenCooldownTimer;
     private float _chaseScreamTimer;
     private bool _isDead;
+    private Coroutine _knockbackCoroutine;
 
     // Patrol & aggro state (server only)
     private Vector3 _spawnPosition;
@@ -1198,6 +1199,59 @@ public class MutantEnemy : NetworkBehaviour
             _agent.isStopped = false;
     }
 
+    /// <summary>
+    /// Shoves the mutant along <paramref name="direction"/> (horizontal plane only) over
+    /// <see cref="MutantEnemyData.knockbackDuration"/> seconds, using an ease-out
+    /// <see cref="NavMeshAgent.Move"/> so the shove stays clamped to the NavMesh. Interrupts
+    /// pathing for the duration, then hands control straight back to <see cref="ChaseLoop"/>,
+    /// which re-issues a destination on its next tick — mirroring the resume behaviour of
+    /// <see cref="Immobilize"/>.
+    /// </summary>
+    private void ApplyKnockback(Vector3 direction)
+    {
+        if (!IsServer || _isDead || _agent == null || !_agent.isOnNavMesh)
+            return;
+
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
+        direction.Normalize();
+
+        if (_knockbackCoroutine != null)
+            StopCoroutine(_knockbackCoroutine);
+        _knockbackCoroutine = StartCoroutine(KnockbackCoroutine(direction));
+    }
+
+    private IEnumerator KnockbackCoroutine(Vector3 direction)
+    {
+        float distance = data.knockbackDistance;
+        float duration = data.knockbackDuration;
+
+        if (distance <= 0f || duration <= 0f)
+            yield break;
+
+        _agent.isStopped = true;
+
+        // Ease-out shove: initial velocity chosen so total displacement over `duration`
+        // equals `distance`, decaying linearly to zero.
+        float initialSpeed = 2f * distance / duration;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float t = elapsed / duration;
+            float speed = initialSpeed * (1f - t);
+            _agent.Move(direction * speed * Time.deltaTime);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!_isDead)
+            _agent.isStopped = false;
+
+        _knockbackCoroutine = null;
+    }
+
     // ── Damage / Death ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1210,7 +1264,13 @@ public class MutantEnemy : NetworkBehaviour
     /// permanently, even on units with <see cref="fleeInsteadOfDie"/> enabled — it's the only
     /// way to finish off a fully-mutated resident for good.
     /// </param>
-    public void TakeDamage(float amount, Vector3 hitPoint, bool isFireDamage = false)
+    /// <param name="knockbackDirection">
+    /// When provided (non-null, non-zero), shoves the mutant this direction on a survived hit.
+    /// Pass this only for a real physical impact — a melee swing or a gunshot — not for damage
+    /// ticks like fire or radiation, which should hurt without physically knocking the mutant
+    /// around. Ignored if the hit is lethal.
+    /// </param>
+    public void TakeDamage(float amount, Vector3 hitPoint, bool isFireDamage = false, Vector3? knockbackDirection = null)
     {
         if (!IsServer || _isDead)
             return;
@@ -1234,6 +1294,9 @@ public class MutantEnemy : NetworkBehaviour
             int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
             PlayHurtSoundClientRpc(idx);
         }
+
+        if (knockbackDirection.HasValue)
+            ApplyKnockback(knockbackDirection.Value);
     }
 
     /// <summary>

@@ -33,6 +33,11 @@ public class LockController : Interactable
              "Used to persist unlock state across sessions.")]
     [SerializeField] private string _lockId;
 
+    [Tooltip("If greater than 0, this padlock automatically unlocks once the campaign reaches this " +
+             "day (or later), regardless of whether a key was ever used. Checked on spawn — including " +
+             "right after a save file is loaded — via SaveDataManager.CurrentDay. Set to 0 to disable.")]
+    [SerializeField] private int _autoUnlockOnDay = 0;
+
     [Header("Audio")]
     [Tooltip("Played when a player tries to interact without the required key.")]
     [SerializeField] private AudioSource audioSource;
@@ -165,8 +170,9 @@ public class LockController : Interactable
 
     /// <summary>
     /// Server-only: called on spawn to check whether this lock was already unlocked in a previous
-    /// session. If so, silently applies the unlock to the ILockable and despawns this object
-    /// without playing any animation — it simply won't appear in the world.
+    /// session, or should be auto-unlocked because <see cref="_autoUnlockOnDay"/> has been reached.
+    /// If so, silently applies the unlock to the ILockable and despawns this object without playing
+    /// any animation — it simply won't appear in the world.
     /// Otherwise ensures the ILockable is locked, so lockables that default to unlocked
     /// (e.g. <see cref="GateController"/>) are correctly locked at startup.
     /// </summary>
@@ -176,8 +182,18 @@ public class LockController : Interactable
             && SaveDataManager.Instance != null
             && SaveDataManager.Instance.IsLockUnlocked(_lockId);
 
-        if (alreadyUnlocked)
+        // SaveDataManager.CurrentDay is loaded from disk in SaveDataManager.Awake(), which always
+        // runs before any NetworkObject's OnNetworkSpawn — so this is correct immediately after
+        // loading a save file, not just during normal play.
+        bool dayUnlocked = _autoUnlockOnDay > 0
+            && SaveDataManager.Instance != null
+            && SaveDataManager.Instance.CurrentDay >= _autoUnlockOnDay;
+
+        if (alreadyUnlocked || dayUnlocked)
         {
+            if (dayUnlocked && !alreadyUnlocked && !string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
+                SaveDataManager.Instance.SaveUnlockedLock(_lockId);
+
             _isLocked.Value = false;
             _lockable?.Unlock();
             StartCoroutine(DespawnNextFrameCoroutine());

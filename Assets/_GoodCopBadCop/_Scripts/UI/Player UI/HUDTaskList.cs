@@ -1,106 +1,96 @@
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Displays active <see cref="TutorialTask"/> entries from <see cref="TaskRegistry"/>
-/// as a compact list in the player HUD. Only tutorial tasks (Day 1 step prompts, etc.)
-/// appear here; regular systemic-threat tasks are shown exclusively on the Task Page.
-/// Hides the container automatically when there are no tutorial tasks.
+/// Bridges <see cref="TaskRegistry"/> into the tutorial overlay's <see cref="TutorialObjectiveList"/>.
+/// Every active <see cref="ISystemicThreat"/> — tutorial step prompts and regular systemic-threat
+/// tasks alike — gets a row in the objective list; rows are added, relabeled, and completed as the
+/// registry changes, so all current tasks live in one place instead of a separate HUD list.
 /// </summary>
 public class HUDTaskList : MonoBehaviour
 {
-    [Tooltip("Prefab for a single task row. Must have a TextMeshProUGUI somewhere in its hierarchy for the task name.")]
-    [SerializeField] private GameObject _taskRowPrefab;
-
-    [Tooltip("Parent RectTransform that holds the spawned rows. Should have a VerticalLayoutGroup.")]
-    [SerializeField] private RectTransform _rowContainer;
-
-    private readonly List<GameObject> _rows = new();
-
-    private void Awake()
-    {
-        if (_taskRowPrefab == null)
-            Debug.LogWarning("[HUDTaskList] Task row prefab not assigned.", this);
-
-        if (_rowContainer == null)
-            Debug.LogWarning("[HUDTaskList] Row container not assigned.", this);
-    }
+    private readonly Dictionary<ISystemicThreat, TutorialObjectiveItem> _rows = new();
 
     private void OnEnable()
     {
         TaskRegistry.OnTaskListChanged += Rebuild;
-        TaskRegistry.OnTaskStateChanged += Rebuild;
+        TaskRegistry.OnTaskStateChanged += RefreshLabels;
         Rebuild();
     }
 
     private void OnDisable()
     {
         TaskRegistry.OnTaskListChanged -= Rebuild;
-        TaskRegistry.OnTaskStateChanged -= Rebuild;
+        TaskRegistry.OnTaskStateChanged -= RefreshLabels;
     }
 
-    /// <summary>Clears and rebuilds all rows from the current registry state.</summary>
+    /// <summary>Syncs objective-list rows with the current registry state: adds new, removes stale.</summary>
     private void Rebuild()
     {
-        ClearRows();
+        TutorialObjectiveList list = TutorialObjectiveList.Instance;
+        if (list == null) return;
 
-        if (_rowContainer == null)
-            return;
-
-        IReadOnlyList<ISystemicThreat> allThreats = TaskRegistry.Instance != null
+        IReadOnlyList<ISystemicThreat> active = TaskRegistry.Instance != null
             ? TaskRegistry.Instance.Threats
             : System.Array.Empty<ISystemicThreat>();
 
-        // Only display tutorial tasks in the HUD; regular tasks live on the Task Page.
-        var tutorialTasks = new List<ISystemicThreat>();
-        foreach (ISystemicThreat threat in allThreats)
+        // Add a row for every newly-active threat.
+        foreach (ISystemicThreat threat in active)
         {
-            if (threat is TutorialTask)
-                tutorialTasks.Add(threat);
+            if (_rows.ContainsKey(threat)) continue;
+
+            // ProcessResidentsTask mirrors the exact same requirement DayBase already shows as
+            // its own hand-scripted "Process N subjects X/Y" row (see DayBase.ShowAutomaticSubjectCounterTask).
+            // Skip it here so the two don't both add a row for the same thing.
+            if (threat is ProcessResidentsTask) continue;
+
+            TutorialObjectiveItem item = list.AddObjective(BuildLabel(threat));
+            if (item != null)
+                _rows[threat] = item;
         }
 
-        bool hasTutorialTasks = tutorialTasks.Count > 0;
+        // Complete and remove rows for threats no longer in the registry.
+        List<ISystemicThreat> stale = null;
+        foreach (KeyValuePair<ISystemicThreat, TutorialObjectiveItem> kvp in _rows)
+        {
+            bool stillActive = false;
+            foreach (ISystemicThreat threat in active)
+            {
+                if (ReferenceEquals(threat, kvp.Key))
+                {
+                    stillActive = true;
+                    break;
+                }
+            }
 
-        // Show/hide the row container rather than this MonoBehaviour so that
-        // registry events are still received when the list is empty.
-        _rowContainer.gameObject.SetActive(hasTutorialTasks);
+            if (!stillActive)
+                (stale ??= new List<ISystemicThreat>()).Add(kvp.Key);
+        }
 
-        if (!hasTutorialTasks || _taskRowPrefab == null)
-            return;
+        if (stale == null) return;
 
-        foreach (ISystemicThreat threat in tutorialTasks)
-            SpawnRow(threat);
+        foreach (ISystemicThreat threat in stale)
+        {
+            list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: 1.5f);
+            _rows.Remove(threat);
+        }
     }
 
-    /// <summary>Instantiates the task row prefab and populates its TMP label.</summary>
-    private void SpawnRow(ISystemicThreat threat)
+    /// <summary>Refreshes row text for threats whose description/level changed without list membership changing.</summary>
+    private void RefreshLabels()
     {
-        GameObject row = Instantiate(_taskRowPrefab, _rowContainer);
-        row.name = "Task Row";
+        TutorialObjectiveList list = TutorialObjectiveList.Instance;
+        if (list == null) return;
 
-        TextMeshProUGUI label = row.GetComponentInChildren<TextMeshProUGUI>();
-        if (label != null)
-        {
-            bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
-            label.text = hasDescription
-                ? $"{threat.ThreatName} {threat.ThreatDescription}"
-                : threat.ThreatName;
-        }
-        else
-            Debug.LogWarning("[HUDTaskList] Task row prefab has no TextMeshProUGUI in its hierarchy.", row);
-
-        _rows.Add(row);
+        foreach (KeyValuePair<ISystemicThreat, TutorialObjectiveItem> kvp in _rows)
+            list.UpdateObjective(kvp.Value, BuildLabel(kvp.Key));
     }
 
-    private void ClearRows()
+    private static string BuildLabel(ISystemicThreat threat)
     {
-        foreach (GameObject row in _rows)
-        {
-            if (row != null)
-                Destroy(row);
-        }
-
-        _rows.Clear();
+        bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
+        return hasDescription
+            ? $"{threat.ThreatName} {threat.ThreatDescription}"
+            : threat.ThreatName;
     }
 }

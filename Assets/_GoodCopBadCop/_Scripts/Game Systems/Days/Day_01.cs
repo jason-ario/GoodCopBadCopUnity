@@ -680,6 +680,8 @@ public class Day_01 : DayBase
             CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
 
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnShiftEnd -= OnShiftEndedForBunker;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
 
         MutantBreachManager.OnBreachStartedAllClients      -= OnMutantBreachStarted;
@@ -2373,9 +2375,20 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients via <see cref="TimecardMachine.OnClockOutAllClients"/> the instant
-    /// the player punches out. Dismisses the clock-out tutorial, then advances to the
-    /// "open the bunker" step.
+    /// the player punches out. Dismisses the clock-out tutorial immediately, then waits for
+    /// <see cref="ShiftManager.OnShiftEnd"/> before advancing to the "open the bunker" step.
     /// </summary>
+    /// <remarks>
+    /// <see cref="TimecardMachine"/> fires <c>OnClockOutAllClients</c> the instant the punch
+    /// animation starts, but only calls <see cref="ShiftManager.EndShift"/> — which flips
+    /// <see cref="ShiftManager.shiftStarted"/> to false and fires <see cref="ShiftManager.OnShiftEnd"/>
+    /// — a short delay later (<c>TimecardMachine._punchToReportDelay</c>). Without waiting for
+    /// that event here, a fast player can walk from the timecard machine through the bunker door
+    /// to the bunk bed faster than that delay, arriving while the shift has technically not
+    /// ended yet. <see cref="BunkBedInteractable.CanSleep"/> requires the shift to have already
+    /// ended, so the bed would refuse to offer the "end the day" option even though every task
+    /// is complete. Gating on <c>OnShiftEnd</c> guarantees that can never happen.
+    /// </remarks>
     private void OnClockedOutForBunker()
     {
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
@@ -2386,7 +2399,31 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskClockOut);
         _taskClockOut = null;
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowOpenBunkerTask);
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: WaitForShiftEndThenOpenBunker);
+    }
+
+    /// <summary>
+    /// Proceeds to <see cref="ShowOpenBunkerTask"/> immediately if the shift has already ended
+    /// (e.g. slow client/network conditions), otherwise waits for
+    /// <see cref="ShiftManager.OnShiftEnd"/> to fire first. See <see cref="OnClockedOutForBunker"/>.
+    /// </summary>
+    private void WaitForShiftEndThenOpenBunker()
+    {
+        if (ShiftManager.Instance == null || !ShiftManager.Instance.shiftStarted.Value)
+        {
+            ShowOpenBunkerTask();
+            return;
+        }
+
+        ShiftManager.Instance.OnShiftEnd += OnShiftEndedForBunker;
+    }
+
+    private void OnShiftEndedForBunker()
+    {
+        if (ShiftManager.Instance != null)
+            ShiftManager.Instance.OnShiftEnd -= OnShiftEndedForBunker;
+
+        ShowOpenBunkerTask();
     }
 
     // ── Open Bunker ───────────────────────────────────────────────────────────

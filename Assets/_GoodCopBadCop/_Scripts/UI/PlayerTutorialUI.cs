@@ -151,6 +151,15 @@ public class PlayerTutorialUI : MonoBehaviour
 
     private void SetPlayerUIActive(bool active)
     {
+        // Guard: never reveal the HUD while a scripted cutscene or dialogue session is still
+        // active. Mirrors the guard in UIController.ShowPlayerUI() — without this, Dismiss()
+        // (called by SetSuspectCamActive(false) whenever the suspect cam deactivates, e.g. via
+        // ScriptedDialogueRunner.ClearCamerasKeepMode during the Day 1 Alexei cutscene) would
+        // directly SetActive(true) the HUD GameObject, bypassing UIController's guard entirely
+        // and popping the HUD back up mid-cutscene, before the player has regained control.
+        if (active && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+            return;
+
         if (PlayerUI.Instance != null)
             PlayerUI.Instance.gameObject.SetActive(active);
         else

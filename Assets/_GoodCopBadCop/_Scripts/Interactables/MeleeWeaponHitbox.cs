@@ -191,7 +191,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             if (enemy != null)
             {
                 Vector3 enemyHitPosition = col.ClosestPoint(attackOrigin);
-                enemy.TakeDamage(damage, enemyHitPosition);
+                Vector3 knockbackDirection = enemyHitPosition - attackOrigin;
+                enemy.TakeDamage(damage, enemyHitPosition, knockbackDirection: knockbackDirection);
                 Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
                 NotifyHitClientRpc(enemyHitPosition, ownerParams);
                 return;

@@ -234,7 +234,7 @@ public class Pistol : PickableObject, IAmmoProvider
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy != null)
             {
-                enemy.TakeDamage(_damage, hit.point);
+                enemy.TakeDamage(_damage, hit.point, knockbackDirection: rayDirection);
             }
             else if (TryDamagePlayer(hit.collider, clientId, _damage))
             {

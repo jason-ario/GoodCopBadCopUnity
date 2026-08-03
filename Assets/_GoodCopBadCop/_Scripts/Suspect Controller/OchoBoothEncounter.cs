@@ -139,11 +139,16 @@ public class OchoBoothEncounter : NetworkBehaviour
 
         if (IsServer && _useDrawingForEntryReason)
             SuspectController.OnApplicationFormSpawned += HandleApplicationFormSpawned;
+
+        // Fires on every client (see SuspectController.OnPaperworkSpawned) the moment Ocho's
+        // ID/application form land on the desk — this is the "hands you an ID" beat.
+        SuspectController.OnPaperworkSpawned += HandlePaperworkSpawned;
     }
 
     public override void OnNetworkDespawn()
     {
         SuspectController.OnApplicationFormSpawned -= HandleApplicationFormSpawned;
+        SuspectController.OnPaperworkSpawned -= HandlePaperworkSpawned;
         base.OnNetworkDespawn();
     }
 
@@ -156,6 +161,46 @@ public class OchoBoothEncounter : NetworkBehaviour
         SuspectController.OnApplicationFormSpawned -= HandleApplicationFormSpawned;
         _spawnedApplicationLetter = applicationLetter;
         applicationLetter.SetEntryReasonDrawing(true);
+    }
+
+    /// <summary>
+    /// Fires on every client — see <see cref="SuspectController.OnPaperworkSpawned"/> — the
+    /// instant Ocho's ID and application form land on the desk (the "hands you an ID" beat).
+    /// Ocho is the only active suspect at the booth while this component is alive, so this is
+    /// always his own paperwork. Swaps the ID card's real mesh for the pre-authored fake-ID mesh
+    /// and kicks off the same ambient screen-glitch/film-grain beat used when a fully-mutated
+    /// suspect is presenting at the booth (see GlitchController) — it now runs for the rest of
+    /// the encounter and clears automatically once he's despawned at the end of
+    /// RedStampSequence, so no explicit "turn it off" call is needed here.
+    /// </summary>
+    private void HandlePaperworkSpawned(IDCard idCard, PickableObject appForm)
+    {
+        SuspectController.OnPaperworkSpawned -= HandlePaperworkSpawned;
+        ActivateFakeIdAnomaly(idCard);
+        _self.TriggerUncannyGlitchPresence();
+    }
+
+    /// <summary>
+    /// Client-visual only, runs identically on every client: disables the ID card's normal
+    /// card-mesh renderer, reveals the pre-authored "Fake ID" mesh child in its place, and hides
+    /// the normal ID photo mesh. Matches the "ID card (1)" / "Fake ID" / "ID photo" hierarchy
+    /// authored on the ID card prefab.
+    /// </summary>
+    private void ActivateFakeIdAnomaly(IDCard idCard)
+    {
+        if (idCard == null) return;
+
+        Transform cardMesh = idCard.transform.Find("ID card (1)");
+        if (cardMesh == null) return;
+
+        MeshRenderer cardRenderer = cardMesh.GetComponent<MeshRenderer>();
+        if (cardRenderer != null) cardRenderer.enabled = false;
+
+        Transform fakeId = cardMesh.Find("Fake ID");
+        if (fakeId != null) fakeId.gameObject.SetActive(true);
+
+        Transform idPhoto = cardMesh.Find("ID photo");
+        if (idPhoto != null) idPhoto.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -190,11 +235,11 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         SuspectController controller = SuspectController.Instance;
 
-        // Same ambient screen-glitch/film-grain beat used when a fully-mutated suspect is
-        // presenting at the booth (see GlitchController) — kicks in as Ocho starts his
-        // reaction and carries through the vanish/reappear/jumpscare/power-outage beats.
-        // Clears automatically once he's despawned at the end of RedStampSequence.
-        _self.TriggerUncannyGlitchPresence();
+        // Note: the ambient screen-glitch/film-grain beat (GlitchController) and the fake-ID
+        // mesh swap are already kicked off back in HandlePaperworkSpawned, the moment his ID
+        // hit the desk — both carry through the reaction/vanish/reappear/jumpscare/power-outage
+        // beats below and clear automatically once he's despawned at the end of
+        // RedStampSequence, so nothing extra is needed here.
 
         _self.animator?.SetTrigger("Give");
         yield return new WaitForSeconds(_takeFolderDelay);

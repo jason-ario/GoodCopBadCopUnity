@@ -621,9 +621,13 @@ public class PlayerPickupController : NetworkBehaviour
         ObjectPlacer.Instance.SetItem(itemData);
 
         int itemIndex = rightArmCamObjectContainer.ItemIndex(itemData);
-        itemEquippedIndex.Value = itemIndex;
 
+        // Set _camEquippedItem BEFORE writing the NetworkVariable: on the owner, setting
+        // itemEquippedIndex.Value invokes OnItemValueChanged synchronously, and that callback
+        // reads _camEquippedItem (for IK targets). If it's still null at that point it throws.
         _camEquippedItem = pickableObject;
+
+        itemEquippedIndex.Value = itemIndex;
 
 
         if (itemData.hand == PickableItemData.Hand.Right)

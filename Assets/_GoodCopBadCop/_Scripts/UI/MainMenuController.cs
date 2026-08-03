@@ -581,8 +581,23 @@ public class MainMenuController : MonoBehaviour
         await WaitUntilHostReady();
 
         SaveDataManager.Instance.InitialiseActiveSlot();
-        GameManager.Instance.TransitionToLobby();
+
+        // Mirror ContinueGame: a save already past Day 1 skips the lobby-outside spawn, the
+        // Start Shift Gate's Day 1 onboarding (start-shift screen + intro cutscene), and the
+        // main menu's intro cinematic entirely — see ShiftManager.ResumeSavedDay.
+        bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+
         GameManager.Instance.TryStartGame();
+
+        if (resumingPastDay1)
+        {
+            GameManager.Instance.CancelLobbyTransition();
+            ShiftManager.Instance.ResumeSavedDay();
+        }
+        else
+        {
+            GameManager.Instance.TransitionToLobby();
+        }
     }
 #endif
 

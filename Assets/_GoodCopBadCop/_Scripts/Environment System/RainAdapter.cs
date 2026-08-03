@@ -34,6 +34,11 @@ namespace GoodCopBadCop.EnvironmentSystem
             {
                 rainEffect.SetEnabled(enabled);
             }
+
+            if (global::AudioManager.Instance != null)
+            {
+                global::AudioManager.Instance.SetRainAmbience(enabled);
+            }
         }
     }
 }

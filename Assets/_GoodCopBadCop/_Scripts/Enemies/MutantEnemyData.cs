@@ -64,4 +64,11 @@ public class MutantEnemyData : ScriptableObject
     [Header("Health")]
     [Tooltip("Starting health points for this enemy.")]
     public float maxHealth = 60f;
+
+    [Header("Knockback")]
+    [Tooltip("Distance (world units) the mutant is shoved back on a survived melee or gunshot hit.")]
+    public float knockbackDistance = 0.6f;
+
+    [Tooltip("Seconds the knockback shove takes to play out before the mutant resumes normal movement.")]
+    public float knockbackDuration = 0.25f;
 }
