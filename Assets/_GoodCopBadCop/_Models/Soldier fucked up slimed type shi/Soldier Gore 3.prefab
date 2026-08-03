@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 3366900494644433306}
   - component: {fileID: 8119504622121533897}
   - component: {fileID: 3636948329680624744}
+  - component: {fileID: 8350804499388046277}
   m_Layer: 0
   m_Name: Bone.003
   m_TagString: Untagged
@@ -187,6 +188,20 @@ ConfigurableJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!114 &8350804499388046277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 798218842736540413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 2158876729252629108}
+  ShopItem: {fileID: 0}
 --- !u!1 &973986043123058770
 GameObject:
   m_ObjectHideFlags: 0
@@ -298,6 +313,7 @@ GameObject:
   - component: {fileID: 6828013865927031524}
   - component: {fileID: 3357239583878672205}
   - component: {fileID: 7472731263821102582}
+  - component: {fileID: 5056654428042121745}
   m_Layer: 0
   m_Name: Bone.001
   m_TagString: Untagged
@@ -473,6 +489,20 @@ ConfigurableJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!114 &5056654428042121745
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1607915620221295922}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 2158876729252629108}
+  ShopItem: {fileID: 0}
 --- !u!1 &3318186292292799970
 GameObject:
   m_ObjectHideFlags: 0
@@ -1009,7 +1039,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3250539285
+  GlobalObjectIdHash: 3511836607
   InScenePlacedSourceGlobalObjectIdHash: 3511836607
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1035,7 +1065,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JunkItem
   ShowTopMostFoldoutHeaderGroup: 1
-  itemsThatCanInteractWith: []
+  itemsThatCanInteractWith:
+  - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: 
   highlightNameFilter: 
 --- !u!1 &5536548658312064782
@@ -1050,6 +1081,7 @@ GameObject:
   - component: {fileID: 1656323611758721433}
   - component: {fileID: 6576272028560848514}
   - component: {fileID: 3833019622787452039}
+  - component: {fileID: 8264106990518362622}
   m_Layer: 0
   m_Name: Bone.002
   m_TagString: Untagged
@@ -1225,6 +1257,20 @@ ConfigurableJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!114 &8264106990518362622
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5536548658312064782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 2158876729252629108}
+  ShopItem: {fileID: 0}
 --- !u!1 &6466574953305662624
 GameObject:
   m_ObjectHideFlags: 0
@@ -1236,6 +1282,7 @@ GameObject:
   - component: {fileID: 6528969257534251439}
   - component: {fileID: 2618076406079720476}
   - component: {fileID: 8616522986219686346}
+  - component: {fileID: 6013109813706038521}
   m_Layer: 0
   m_Name: Bone
   m_TagString: Untagged
@@ -1309,6 +1356,20 @@ CapsuleCollider:
   m_Height: 0.29678667
   m_Direction: 1
   m_Center: {x: -0.00000017330538, y: 0.14839332, z: 0.00000004422466}
+--- !u!114 &6013109813706038521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6466574953305662624}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 2158876729252629108}
+  ShopItem: {fileID: 0}
 --- !u!1 &7581686469466931749
 GameObject:
   m_ObjectHideFlags: 0
@@ -1321,6 +1382,7 @@ GameObject:
   - component: {fileID: 833146257042066090}
   - component: {fileID: 3619374995064644434}
   - component: {fileID: 5605219326155426638}
+  - component: {fileID: 7821800040206214479}
   m_Layer: 0
   m_Name: Bone.004
   m_TagString: Untagged
@@ -1496,6 +1558,20 @@ ConfigurableJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!114 &7821800040206214479
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7581686469466931749}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 2158876729252629108}
+  ShopItem: {fileID: 0}
 --- !u!1 &9098880172943134138
 GameObject:
   m_ObjectHideFlags: 0

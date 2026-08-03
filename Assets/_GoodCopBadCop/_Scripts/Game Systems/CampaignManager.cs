@@ -179,6 +179,11 @@ public class CampaignManager : NetworkBehaviour
         {
             _currentDay = Mathf.Max(1, SaveDataManager.Instance.CurrentDay);
             _networkCurrentDay.Value = _currentDay;
+
+            // Restore the coupon total from the active save slot. GlobalHostVariables.money is
+            // a NetworkVariable that always starts at 0 on scene load, so without this the
+            // player's persisted cash silently resets to 0 whenever a save file is loaded.
+            GlobalHostVariables.Instance?.SetMoney(SaveDataManager.Instance.CurrentCash);
         }
         else
         {
