@@ -247,6 +247,55 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
+    /// Defensive resync, call before a scripted sequence hands the screen to a scene vcam
+    /// (e.g. the intro cutscene). For every OTHER connected player's <see cref="PlayerInstance"/>,
+    /// forces their camera rig into the same disabled state <see cref="PlayerMovementController.OnNetworkSpawn"/>
+    /// normally applies for remote players on spawn.
+    /// <see cref="PlayerMovementController.OnNetworkSpawn"/> disables a remote player's
+    /// MainCamera-tagged Camera (and vcam) the moment that remote player's NetworkObject spawn
+    /// message is processed locally. Over low-latency transports (LAN/Unity Transport) this has
+    /// always resolved well before any scripted sequence starts. Over higher-latency relay
+    /// transports (e.g. Steam Relay/SDR) — especially for a client that only just joined — that
+    /// spawn callback can still be pending at the exact moment the intro cutscene starts, leaving
+    /// two MainCamera-tagged Camera components (and two AudioListeners) simultaneously enabled on
+    /// that client. That's what produces an erratic/flickering camera specifically for the
+    /// non-host client under relay, while LAN's near-instant spawn sync hides the race entirely.
+    /// Safe to call redundantly — a no-op for any player whose remote camera is already disabled.
+    /// </summary>
+    public static void EnsureRemotePlayerCamerasDisabled()
+    {
+        var networkManager = Unity.Netcode.NetworkManager.Singleton;
+        if (networkManager == null) return;
+
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            var playerInstance = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (playerInstance == null || playerInstance.IsLocalPlayer) continue;
+
+            playerInstance.ForceDisableAsRemoteCamera();
+        }
+    }
+
+    /// <summary>
+    /// Forces this player's camera rig (vcam + physical Camera/AudioListener) into the disabled
+    /// state <see cref="PlayerMovementController.OnNetworkSpawn"/> applies for remote players.
+    /// See <see cref="EnsureRemotePlayerCamerasDisabled"/> for why this needs to be re-affirmable
+    /// on demand rather than relying solely on the one-time OnNetworkSpawn callback.
+    /// </summary>
+    private void ForceDisableAsRemoteCamera()
+    {
+        Transform cameraTransform = _playerMovementController?.CameraTransform;
+        if (cameraTransform != null)
+            cameraTransform.gameObject.SetActive(false);
+
+        Camera camera = _playerMovementController?.Camera;
+        if (camera != null)
+            camera.gameObject.SetActive(false);
+    }
+
+    /// <summary>
     /// Kills the local player: disables movement and interaction, then activates the death camera.
     /// Ragdoll activation is handled automatically by <see cref="RagdollController"/> via OnDeath.
     /// </summary>

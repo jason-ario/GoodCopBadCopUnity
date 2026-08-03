@@ -295,6 +295,13 @@ public class MutantBreachManager : NetworkBehaviour
         Debug.Log("[MutantBreachManager] Breach cleared — ending alarm.");
         EndBreachEffectsClientRpc();
 
+        if (data.showThanksForPlayingOnClear)
+        {
+            Debug.Log("[MutantBreachManager] Finale breach cleared — ending the demo.");
+            CampaignManager.Instance?.ForceCampaignComplete();
+            ShowThanksForPlayingScreenClientRpc();
+        }
+
         _isBreachActive = false;
         _breachCoroutine = null;
         _activeBreachMutants.Clear();

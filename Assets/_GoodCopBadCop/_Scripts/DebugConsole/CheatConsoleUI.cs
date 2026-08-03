@@ -113,11 +113,6 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
-        _cheats.Add(("Skip to Day 3 — Power Outage + Phone Call", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay3PowerOutage());
-            SetVisible(false);
-        }));
         _cheats.Add(("Free Play — Day 4 Booth", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlay());

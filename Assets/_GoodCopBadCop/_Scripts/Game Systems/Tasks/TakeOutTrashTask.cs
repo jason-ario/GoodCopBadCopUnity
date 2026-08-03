@@ -65,6 +65,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "Network Prefabs in the NetworkManager. Leave empty to disable blood decals.")]
     [SerializeField] private GameObject[] _bloodDecalPrefabs;
 
+    [Tooltip("Small cosmetic blood-spray particle spawned alongside every blood decal, aligned with " +
+             "the same ground normal and in world space. Purely cosmetic/local — not a NetworkObject, " +
+             "broadcast to every client via RPC. Leave unassigned to disable.")]
+    [SerializeField] private GameObject _bloodParticlePrefab;
+
+    [Tooltip("Seconds before a spawned blood particle effect is automatically destroyed.")]
+    [Min(0f)]
+    [SerializeField] private float _bloodParticleLifetime = 3f;
+
     [Tooltip("One or more zones in which items are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
 
@@ -581,6 +590,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _spawnedDecals.Add(netObj);
 
         CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
+
+        SpawnBloodParticleClientRpc(position, rotation);
+    }
+
+    /// <summary>
+    /// Spawns <see cref="_bloodParticlePrefab"/> on every client at the same position/rotation as
+    /// a just-spawned blood-splatter decal (see <see cref="SpawnBloodDecal"/>), so the cosmetic
+    /// spray effect appears everywhere the networked decal does. No-op when
+    /// <see cref="_bloodParticlePrefab"/> is unassigned.
+    /// </summary>
+    [ClientRpc]
+    private void SpawnBloodParticleClientRpc(Vector3 position, Quaternion rotation)
+    {
+        BloodDecalUtility.SpawnAlignedParticle(_bloodParticlePrefab, position, rotation, _bloodParticleLifetime);
     }
 
     private void PruneCollectedItems()

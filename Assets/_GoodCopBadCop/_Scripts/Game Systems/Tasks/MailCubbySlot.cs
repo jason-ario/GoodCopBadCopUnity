@@ -36,6 +36,9 @@ public class MailCubbySlot : MonoBehaviour
     [Tooltip("Optional per-cubby outline highlight. Not used by MailCubbyManager (which highlights the whole \"Mail Cubbies\" stand root instead — see MailCubbyManager.HighlightAllActiveCubbies) — kept here only for callers that want to call out one specific cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
     [SerializeField] private HighlightEffect _highlightEffect;
 
+    [Tooltip("Optional locker door guarding this cubby's opening (see \"Door Hinge/Locker Door\"). While assigned and closed, packages are rejected even if something manages to clip into the trigger zone — the door's own collider is what normally blocks physical entry, this is just a defensive backstop. Falls back to GetComponentInChildren<LockerDoorInteractable>() if unassigned.")]
+    [SerializeField] private LockerDoorInteractable _lockerDoor;
+
     /// <summary>The resident this physical cubby is currently labelled for.</summary>
     public SuspectData AssignedResident => _assignedResident;
 
@@ -84,6 +87,9 @@ public class MailCubbySlot : MonoBehaviour
         if (_highlightEffect == null)
             _highlightEffect = GetComponent<HighlightEffect>();
 
+        if (_lockerDoor == null)
+            _lockerDoor = GetComponentInChildren<LockerDoorInteractable>(true);
+
         if (_assignedResident == null)
             Debug.LogWarning($"[MailCubbySlot] '{name}' has no assigned resident — this cubby will never accept a delivery.", this);
 
@@ -130,6 +136,7 @@ public class MailCubbySlot : MonoBehaviour
         if (package == null) return;
         if (package.IsHeld) return; // ignore momentary overlaps while a player carries a package past the cubby
         if (package.IsResolved) return;
+        if (_lockerDoor != null && !_lockerDoor.IsOpen) return; // door's own collider normally blocks entry — this is just a backstop
 
         if (_placementSlot != null)
         {

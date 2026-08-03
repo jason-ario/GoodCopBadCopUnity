@@ -38,7 +38,10 @@ Shader "Custom/StagnantToxicWater"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            
+
+            #pragma multi_compile_fog
+            #pragma multi_compile_instancing
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
@@ -46,6 +49,7 @@ Shader "Custom/StagnantToxicWater"
             {
                 float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
@@ -53,6 +57,9 @@ Shader "Custom/StagnantToxicWater"
                 float4 positionCS : SV_POSITION;
                 float4 screenPos : TEXCOORD0;
                 float2 uv : TEXCOORD1;
+                float fogFactor : TEXCOORD2;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             TEXTURE2D(_NoiseTex);
@@ -71,14 +78,22 @@ Shader "Custom/StagnantToxicWater"
             Varyings vert (Attributes IN)
             {
                 Varyings OUT;
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
                 OUT.positionCS = TransformObjectToHClip(IN.positionOS.xyz);
                 OUT.screenPos = ComputeScreenPos(OUT.positionCS);
                 OUT.uv = IN.uv * _NoiseTex_ST.xy + _NoiseTex_ST.zw; 
+                OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
                 return OUT;
             }
 
             half4 frag (Varyings IN) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
                 float2 pannedUV = IN.uv + (_Time.y * _ScrollSpeed.xy);
                 half sludgeNoise = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, pannedUV).r;
 
@@ -94,6 +109,8 @@ Shader "Custom/StagnantToxicWater"
                 half4 finalColor = lerp(_ShallowColor, _DeepColor, noisyFade);
                 
                 finalColor.a = saturate((depthDifference * _EdgeSoftness) - (sludgeNoise * _NoiseStrength)); 
+
+                finalColor.rgb = MixFog(finalColor.rgb, IN.fogFactor);
 
                 return finalColor;
             }

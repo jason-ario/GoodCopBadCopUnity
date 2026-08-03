@@ -1,9 +1,7 @@
-using System.Collections;
-using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Day 3 — gore/body-part yard cleanup + end-of-shift power outage.
+/// Day 3 — gore/body-part yard cleanup + a scripted mutant breach that ends the demo.
 ///
 /// At day start, spawns gore and body-part junk items across the yard's
 /// <see cref="TakeOutTrashTask"/> spawn zones (instead of standard trash), triggering the
@@ -11,25 +9,12 @@ using UnityEngine;
 /// a blood decal, which arms <see cref="CleanBloodTask"/> so players must mop up every
 /// splatter with the <see cref="Mop"/> as a separate task.
 ///
-/// Right after the last suspect for the day is processed (before clock-out):
-///   1. The power cuts out via a fuse-required outage (<see cref="ElectricityController.PowerOffFuseRequired"/>),
-///      spawning fuses at the power station (<see cref="FuseSpawner"/>) and blocking the
-///      in-booth quick-fix panels (<see cref="ElectricPanelController"/>, <see cref="CircuitBox"/>)
-///      until the fuse box is solved.
-///   2. After a brief pause the phone starts ringing — an "Answer the phone" objective
-///      appears in the <see cref="TutorialObjectiveList"/>.
-///   3. When answered, that objective completes, a new "go fix the power outage at the
-///      power station" objective appears alongside a "find the fuse box" objective,
-///      <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/> delivers lines
-///      instructing the players to go fix the circuit box at the power station, and a
-///      <see cref="RepairPowerThreat"/> is registered so the task appears in the guidebook.
-///   4. Interacting with the <see cref="FuseBoxPuzzleController"/> completes "find the fuse
-///      box" and adds a live "find and input N fuses X/N" objective that updates as fuses
-///      are inserted or extracted (via <see cref="FuseBoxPuzzleController.OnFuseCountChanged"/>).
-///   5. Once all fuses are inserted, that objective completes and a final "use the power
-///      switch to restore power" objective appears.
-///   6. Flipping the <see cref="PowerSwitch"/> restores power, which completes both the
-///      "fix the power outage" and "use the power switch" objectives and resolves the threat.
+/// Right after the last suspect for the day is processed, <see cref="MutantBreachManager"/>
+/// (driven by <see cref="DayBase.HasMutantBreach"/> / <see cref="DayBase.PossibleBreaches"/>)
+/// schedules and runs this day's mutant breach automatically. This is currently the demo's
+/// final scripted breach, so its assigned <see cref="MutantBreachData"/> preset should have
+/// <see cref="MutantBreachData.showThanksForPlayingOnClear"/> set — once every breach mutant
+/// is defeated, the campaign is marked complete and the Thanks For Playing screen is shown.
 /// </summary>
 public class Day_03 : DayBase
 {
@@ -70,62 +55,23 @@ public class Day_03 : DayBase
     private bool _bunkerExitStingerPlayed;
 
     // -------------------------------------------------------------------------
-    // Inspector — Power Outage Sequence
+    // Inspector -- Yard Cleanup Objectives (gore, blood, fences)
     // -------------------------------------------------------------------------
 
-    [Header("Day 3 — Power Outage Sequence")]
-    [Tooltip("The ElectricityController that governs booth power. PowerOff() is called " +
-             "right after the last suspect for the day is processed.")]
-    [SerializeField] private ElectricityController _electricityController;
+    [Header("Day 3 -- Yard Cleanup Objectives")]
+    [Tooltip("Objective list text for the gore/corpse pickup task, shown once the player " +
+             "steps outside for the day.")]
+    [SerializeField] private string _taskTakeOutGoreText = "Take out the gore";
 
-    [Tooltip("Seconds after the last suspect is processed before the lights cut out. " +
-             "Keep at 0 for an immediate, causally-linked blackout.")]
-    [SerializeField] private float _powerOutageDelay = 0f;
+    [Tooltip("Objective list text for the blood splatter cleanup task.")]
+    [SerializeField] private string _taskCleanBloodSplatterText = "Clean up the blood";
 
-    [Tooltip("Seconds after the power cuts before the phone starts ringing.")]
-    [SerializeField] private float _phoneRingDelay = 3f;
+    [Tooltip("Objective list text for the perimeter fence repair task.")]
+    [SerializeField] private string _taskFixFencesText = "Fix perimeter fences";
 
-    [Tooltip("Seconds to wait after the player picks up the phone before the scripted " +
-             "dialogue starts — allows the grab animation to complete.")]
-    [SerializeField] private float _grabAnimDelay = 1.5f;
-
-    // -------------------------------------------------------------------------
-    // Inspector — Phone Dialogue
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Power Outage Phone Call")]
-    [Tooltip("ScriptedDialogue sequence played via ScriptedDialogueRunner when the player " +
-             "answers the power-outage phone call. Lines should direct the player to the " +
-             "power station to reset the circuit box.")]
-    [SerializeField] private ScriptedDialogue _powerOutageCallDialogue;
-
-    // -------------------------------------------------------------------------
-    // Inspector — Power Station Puzzle
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Power Station Puzzle")]
-    [Tooltip("The fuse box at the power station. Drives the fuse-box objective chain " +
-             "via its OnBoxInteracted / OnFuseCountChanged events.")]
-    [SerializeField] private FuseBoxPuzzleController _fuseBoxController;
-
-    // -------------------------------------------------------------------------
-    // Inspector — Objectives
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Objectives")]
-    [SerializeField] private string _answerPhoneObjectiveText = "Answer the phone";
-    [SerializeField] private string _fixPowerObjectiveText = "Go fix the power outage at the power station";
-    [SerializeField] private string _findFuseBoxObjectiveText = "Find the fuse box";
-    [Tooltip("Format string for the live fuse-counter objective. {0} = total fuses, {1} = fuses inserted so far.")]
-    [SerializeField] private string _fuseCountObjectiveFormat = "Find and input {0} fuses {1}/{0}";
-    [SerializeField] private string _useSwitchObjectiveText = "Use the power switch to restore power";
-
-    private TutorialObjectiveItem _answerPhoneObjective;
-    private TutorialObjectiveItem _fixPowerObjective;
-    private TutorialObjectiveItem _findFuseBoxObjective;
-    private TutorialObjectiveItem _fuseCountObjective;
-    private TutorialObjectiveItem _useSwitchObjective;
-    private RepairPowerThreat _repairPowerThreat;
+    private TutorialObjectiveItem _taskTakeOutGore;
+    private TutorialObjectiveItem _taskCleanBloodSplatter;
+    private TutorialObjectiveItem _taskFixFences;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -135,38 +81,32 @@ public class Day_03 : DayBase
     {
         base.DayActivated();
 
+        // Drop any leftover subscriptions/handles from a previous activation (e.g. a debug
+        // skip re-triggering Day 3) before arming everything fresh.
+        UnsubscribeAll();
+        _taskTakeOutGore = null;
+        _taskCleanBloodSplatter = null;
+        _taskFixFences = null;
+
         // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
         // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
         CleanBloodTask.Instance?.TriggerTask();
         TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
 
+        // Randomly breaks a batch of perimeter fence segments so the yard has repair work
+        // waiting alongside the gore/blood, mirroring the post-breach fence damage from Day 1
+        // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
+        FenceRepairTask.Instance?.TriggerTask();
+
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
-        // bunker for Day 3 — see OchoEatingVladCutscene for the full sequence.
+        // bunker for Day 3 -- see OchoEatingVladCutscene for the full sequence.
         OchoEatingVladCutscene.Instance?.TriggerTask();
 
-        // Plays a one-shot stinger the first time a player opens the bunker door and steps
-        // outside for Day 3. Reset per-day so a re-activation (e.g. debug skip) can replay it.
+        // Plays a one-shot stinger and reveals the yard-cleanup objective list the first time
+        // a player opens the bunker door and steps outside for Day 3. Reset per-day so a
+        // re-activation (e.g. debug skip) can replay it.
         _bunkerExitStingerPlayed = false;
         BunkerDoorController.OnDoorOpened += OnBunkerDoorOpenedFirstTime;
-
-        // Subscribe on ALL clients — these drive local UI (TutorialObjectiveList) and
-        // task-registry state, so every client must react independently.
-        Telephone.OnScriptedCallAnsweredAllClients += OnScriptedCallAnsweredAllClients;
-        Telephone.OnRingStarted += OnPhoneRingStartedAllClients;
-
-        if (_electricityController != null)
-            _electricityController.OnPowerRestoredAllClients += OnElectricityPowerRestoredAllClients;
-
-        if (_fuseBoxController != null)
-        {
-            _fuseBoxController.OnBoxInteracted += OnFuseBoxInteractedAllClients;
-            _fuseBoxController.OnFuseCountChanged += OnFuseCountChangedAllClients;
-        }
-
-        // Only the server drives the power-outage trigger, right after the last suspect for
-        // the day is processed — before clock-out is enabled.
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            ShiftManager.OnLastSuspectProcessed += OnLastSuspectProcessedServer;
     }
 
     public override void DayDeactivated()
@@ -184,101 +124,20 @@ public class Day_03 : DayBase
     private void UnsubscribeAll()
     {
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
-        Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
-        Telephone.OnRingStarted -= OnPhoneRingStartedAllClients;
 
-        if (_electricityController != null)
-            _electricityController.OnPowerRestoredAllClients -= OnElectricityPowerRestoredAllClients;
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
 
-        if (_fuseBoxController != null)
-        {
-            _fuseBoxController.OnBoxInteracted -= OnFuseBoxInteractedAllClients;
-            _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedAllClients;
-        }
+        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
+        if (CleanBloodTask.Instance != null)
+            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
+
+        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
     }
 
     // -------------------------------------------------------------------------
-    // Power outage sequence (server-only)
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fired on the server by <see cref="ShiftManager.OnLastSuspectProcessed"/> the instant
-    /// the final suspect for the day walks away — before clock-out is enabled. Starts the
-    /// power-outage sequence so the blackout feels like a direct consequence of finishing
-    /// the shift's suspects.
-    /// </summary>
-    private void OnLastSuspectProcessedServer()
-    {
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
-        StartCoroutine(PowerOutageSequence());
-    }
-
-    private IEnumerator PowerOutageSequence()
-    {
-        yield return new WaitForSeconds(_powerOutageDelay);
-
-        if (_electricityController != null)
-        {
-            // Fuse-required outage: cuts power, blocks the in-booth quick-fix panels, and
-            // triggers FuseSpawner to scatter fuses at the power station.
-            _electricityController.PowerOffFuseRequired();
-        }
-        else
-        {
-            Debug.LogWarning("[Day_03] _electricityController is not assigned — power outage skipped.");
-        }
-
-        yield return new WaitForSeconds(_phoneRingDelay);
-
-        if (Telephone.Instance != null)
-        {
-            Telephone.Instance.TriggerScriptedCall(OnPowerOutageCallAnswered);
-            Debug.Log("[Day_03] Power outage phone call triggered.");
-        }
-        else
-        {
-            Debug.LogWarning("[Day_03] Telephone.Instance is null — cannot ring phone.");
-        }
-    }
-
-    /// <summary>
-    /// Fired on the server the moment a player answers the ringing phone.
-    /// Waits for the grab animation, then plays the scripted dialogue.
-    /// </summary>
-    private void OnPowerOutageCallAnswered()
-    {
-        StartCoroutine(PlayPowerOutageDialogue());
-    }
-
-    private IEnumerator PlayPowerOutageDialogue()
-    {
-        yield return new WaitForSeconds(_grabAnimDelay);
-
-        if (_powerOutageCallDialogue == null)
-        {
-            Debug.LogWarning("[Day_03] _powerOutageCallDialogue is not assigned — skipping dialogue.");
-            yield break;
-        }
-
-        if (ScriptedDialogueRunner.Instance == null)
-        {
-            Debug.LogWarning("[Day_03] ScriptedDialogueRunner.Instance is null — skipping dialogue.");
-            yield break;
-        }
-
-        // unlocked: true — player keeps free movement while the voice plays,
-        // matching the feel of listening on a handset rather than a face-to-face conversation.
-        ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
-            _powerOutageCallDialogue,
-            onComplete: null,
-            unlocked: true);
-
-        Debug.Log("[Day_03] Power outage scripted dialogue started.");
-    }
-
-    // -------------------------------------------------------------------------
-    // Bunker exit stinger — all clients
+    // Bunker exit stinger + yard cleanup objectives -- all clients
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -286,7 +145,9 @@ public class Day_03 : DayBase
     /// the bunker door swings open. Since the door is force-closed at the start of every day
     /// (see <see cref="ShiftManager.InBetweenShiftSequence"/> / <see cref="BunkerDoorController.OnDayChanged"/>),
     /// the first invocation each Day 3 always corresponds to the player's first exit of the day.
-    /// Unsubscribes immediately so later door-opens that day (e.g. going back in and out) stay silent.
+    /// Plays the bunker-exit stinger and reveals the yard-cleanup objective list (gore, blood,
+    /// fences) in lockstep. Unsubscribes immediately so later door-opens that day (e.g. going
+    /// back in and out) stay silent.
     /// </summary>
     private void OnBunkerDoorOpenedFirstTime()
     {
@@ -296,141 +157,138 @@ public class Day_03 : DayBase
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
 
         if (_bunkerExitStinger == null)
-        {
-            Debug.LogWarning("[Day_03] _bunkerExitStinger is not assigned — skipping stinger playback.");
-            return;
-        }
-
-        SFXController.Instance?.Play(_bunkerExitStinger, _bunkerExitStingerVolume);
-    }
-
-    // -------------------------------------------------------------------------
-    // Objective + task registration — all clients
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fired on ALL clients (via <see cref="Telephone.OnRingStarted"/>) the moment the
-    /// scripted power-outage call starts ringing. Adds the "answer the phone" objective.
-    /// </summary>
-    private void OnPhoneRingStartedAllClients()
-    {
-        Telephone.OnRingStarted -= OnPhoneRingStartedAllClients;
-        _answerPhoneObjective = TutorialObjectiveList.Instance?.AddObjective(_answerPhoneObjectiveText);
-    }
-
-    /// <summary>
-    /// Fired on ALL clients when the scripted power-outage call is answered. Completes the
-    /// "answer the phone" objective, adds the "fix the power outage" objective, and
-    /// registers <see cref="RepairPowerThreat"/> in the local <see cref="TaskRegistry"/>
-    /// so every player sees the task in their guidebook.
-    /// </summary>
-    private void OnScriptedCallAnsweredAllClients()
-    {
-        Telephone.OnScriptedCallAnsweredAllClients -= OnScriptedCallAnsweredAllClients;
-
-        if (_answerPhoneObjective != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_answerPhoneObjective);
-            _answerPhoneObjective = null;
-        }
-
-        _fixPowerObjective = TutorialObjectiveList.Instance?.AddObjective(_fixPowerObjectiveText);
-        _findFuseBoxObjective = TutorialObjectiveList.Instance?.AddObjective(_findFuseBoxObjectiveText);
-
-        _repairPowerThreat = new RepairPowerThreat();
-        TaskRegistry.Instance?.AddThreat(_repairPowerThreat);
-        Debug.Log("[Day_03] RepairPowerThreat registered in TaskRegistry.");
-    }
-
-    /// <summary>
-    /// Fired on ALL clients (via <see cref="FuseBoxPuzzleController.OnBoxInteracted"/>) the
-    /// first time a player opens the fuse box. Completes "find the fuse box" and adds the
-    /// live fuse-counter objective.
-    /// </summary>
-    private void OnFuseBoxInteractedAllClients()
-    {
-        if (_findFuseBoxObjective == null) return;
-
-        if (_fuseBoxController != null)
-            _fuseBoxController.OnBoxInteracted -= OnFuseBoxInteractedAllClients;
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_findFuseBoxObjective);
-        _findFuseBoxObjective = null;
-
-        int total = _fuseBoxController != null ? _fuseBoxController.FuseSlotCount : 3;
-        _fuseCountObjective = TutorialObjectiveList.Instance?.AddObjective(
-            string.Format(_fuseCountObjectiveFormat, total, 0));
-    }
-
-    /// <summary>
-    /// Fired on ALL clients (via <see cref="FuseBoxPuzzleController.OnFuseCountChanged"/>)
-    /// whenever a fuse is inserted or extracted. Updates the live counter text, and once
-    /// every slot is filled, completes it and adds the final "use the power switch" objective.
-    /// </summary>
-    private void OnFuseCountChangedAllClients(int filled, int total)
-    {
-        if (_fuseCountObjective == null) return;
-
-        if (filled >= total)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_fuseCountObjective);
-            _fuseCountObjective = null;
-            _useSwitchObjective = TutorialObjectiveList.Instance?.AddObjective(_useSwitchObjectiveText);
-        }
+            Debug.LogWarning("[Day_03] _bunkerExitStinger is not assigned -- skipping stinger playback.");
         else
-        {
-            TutorialObjectiveList.Instance?.UpdateObjective(
-                _fuseCountObjective, string.Format(_fuseCountObjectiveFormat, total, filled));
-        }
-    }
+            SFXController.Instance?.Play(_bunkerExitStinger, _bunkerExitStingerVolume);
 
-    /// <summary>
-    /// Fired on ALL clients (via <see cref="ElectricityController.OnPowerRestoredAllClients"/>)
-    /// whenever power turns back on. Only acts if the "fix the power outage" objective is
-    /// still active, so unrelated power-on events (e.g. a later day) are ignored.
-    /// </summary>
-    private void OnElectricityPowerRestoredAllClients()
-    {
-        if (_fixPowerObjective == null) return;
-
-        TutorialObjectiveList.Instance?.CompleteObjective(_fixPowerObjective);
-        _fixPowerObjective = null;
-
-        if (_useSwitchObjective != null)
-        {
-            TutorialObjectiveList.Instance?.CompleteObjective(_useSwitchObjective);
-            _useSwitchObjective = null;
-        }
-
-        _repairPowerThreat?.Resolve();
-        _repairPowerThreat = null;
-
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
-        Debug.Log("[Day_03] Power restored at the power station — RepairPowerThreat resolved.");
+        EnsureTakeOutGoreObjective();
+        EnsureCleanBloodSplatterObjective();
+        EnsureFixFencesObjective();
     }
 
     // -------------------------------------------------------------------------
-    // Fix Perimeter Fences Tutorial
-    // -------------------------------------------------------------------------
-
-    // -------------------------------------------------------------------------
-    // Debug
+    // Take Out Gore Objective
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Forces the power outage sequence to start immediately, bypassing the
-    /// <see cref="ShiftManager.OnLastSuspectProcessed"/> gate. Server-only.
-    /// Called by <see cref="DebugConsole"/> to test the sequence without running
-    /// through the full suspect lineup.
+    /// Adds the "Take out the gore" objective if the day's gore/body-part junk hasn't already
+    /// been fully collected -- <see cref="TakeOutTrashTask"/>'s counts are already accurate by
+    /// the time the player walks outside, since it was triggered back in <see cref="DayActivated"/>.
+    /// No-op if there's nothing left to collect.
     /// </summary>
-    public void DebugTriggerPowerOutage()
+    private void EnsureTakeOutGoreObjective()
     {
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        if (TakeOutTrashTask.Instance != null &&
+            TakeOutTrashTask.Instance.TotalCount > TakeOutTrashTask.Instance.DepositedCount)
+        {
+            _taskTakeOutGore = TutorialObjectiveList.Instance?.AddObjective(GetTakeOutGoreTaskText());
 
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessedServer;
-        StopAllCoroutines();
-        StartCoroutine(PowerOutageSequence());
-        Debug.Log("[Day_03] DebugTriggerPowerOutage: power outage sequence forced.");
+            TakeOutTrashTask.OnProgressChanged   += OnTakeOutGoreProgressChanged;
+            TakeOutTrashTask.OnAllItemsDeposited += OnTakeOutGoreTaskComplete;
+        }
     }
+
+    private void OnTakeOutGoreProgressChanged()
+    {
+        if (TakeOutTrashTask.Instance == null) return;
+        _taskTakeOutGore?.SetText(GetTakeOutGoreTaskText());
+    }
+
+    private void OnTakeOutGoreTaskComplete()
+    {
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskTakeOutGore, preHideDelay: 1.5f);
+        _taskTakeOutGore = null;
+    }
+
+    private string GetTakeOutGoreTaskText() =>
+        TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.TotalCount > 0
+            ? $"{_taskTakeOutGoreText} {TakeOutTrashTask.Instance.DepositedCount}/{TakeOutTrashTask.Instance.TotalCount}"
+            : _taskTakeOutGoreText;
+
+    // -------------------------------------------------------------------------
+    // Clean Blood Splatter Objective
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the "Clean up the blood" objective if any blood splatters from the day's gore are
+    /// still unscrubbed -- <see cref="CleanBloodTask"/>'s counts are already accurate by the
+    /// time the player walks outside, since it was triggered back in <see cref="DayActivated"/>.
+    /// No-op if there's nothing left to scrub.
+    /// </summary>
+    private void EnsureCleanBloodSplatterObjective()
+    {
+        if (CleanBloodTask.Instance != null &&
+            CleanBloodTask.Instance.TotalCount > CleanBloodTask.Instance.ScrubbedCount)
+        {
+            _taskCleanBloodSplatter = TutorialObjectiveList.Instance?.AddObjective(GetCleanBloodSplatterTaskText());
+
+            CleanBloodTask.OnProgressChanged             += OnCleanBloodSplatterProgressChanged;
+            CleanBloodTask.Instance.OnDailyTaskCompleted += OnCleanBloodSplatterTaskComplete;
+        }
+    }
+
+    private void OnCleanBloodSplatterProgressChanged()
+    {
+        if (CleanBloodTask.Instance == null) return;
+        _taskCleanBloodSplatter?.SetText(GetCleanBloodSplatterTaskText());
+    }
+
+    private void OnCleanBloodSplatterTaskComplete()
+    {
+        if (CleanBloodTask.Instance != null)
+            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
+        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCleanBloodSplatter, preHideDelay: 1.5f);
+        _taskCleanBloodSplatter = null;
+    }
+
+    private string GetCleanBloodSplatterTaskText() =>
+        CleanBloodTask.Instance != null && CleanBloodTask.Instance.TotalCount > 0
+            ? $"{_taskCleanBloodSplatterText} {CleanBloodTask.Instance.ScrubbedCount}/{CleanBloodTask.Instance.TotalCount}"
+            : _taskCleanBloodSplatterText;
+
+    // -------------------------------------------------------------------------
+    // Fix Perimeter Fences Objective
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the "Fix perimeter fences" objective if any fence segments broken this cycle are
+    /// still unrepaired -- <see cref="FenceRepairTask"/> was triggered back in
+    /// <see cref="DayActivated"/>, so its counts are already accurate by the time the player
+    /// walks outside. No-op if no fences came out damaged.
+    /// </summary>
+    private void EnsureFixFencesObjective()
+    {
+        if (FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0)
+        {
+            _taskFixFences = TutorialObjectiveList.Instance?.AddObjective(GetFixFencesTaskText());
+
+            FenceRepairTask.OnProgressChanged   += OnFixFencesProgressChanged;
+            FenceRepairTask.OnAllFencesRepaired += OnFixFencesTaskComplete;
+        }
+    }
+
+    private void OnFixFencesProgressChanged()
+    {
+        _taskFixFences?.SetText(GetFixFencesTaskText());
+    }
+
+    private void OnFixFencesTaskComplete()
+    {
+        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFixFences, preHideDelay: 1.5f);
+        _taskFixFences = null;
+    }
+
+    private string GetFixFencesTaskText() =>
+        FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
+            ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
+            : _taskFixFencesText;
 }
 

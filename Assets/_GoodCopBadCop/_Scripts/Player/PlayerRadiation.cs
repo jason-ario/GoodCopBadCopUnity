@@ -20,10 +20,6 @@ public class PlayerRadiation : NetworkBehaviour
     [SerializeField] private float maxRadiationDamagePerSecond = 5f;
 
     [Header("Radiation Tick Feedback")]
-    [Tooltip("Radiation gain rate (units/sec) above which the distinct radiation-tick feedback " +
-             "(vignette pulse / camera kick / tick sound) plays on damage. Below this rate, damage " +
-             "still applies but uses the default damage feedback instead of the tick.")]
-    [SerializeField] private float tickFeedbackRateThreshold = 0.5f;
     [Tooltip("EMA time constant (seconds) used to smooth the measured radiation gain rate.")]
     [SerializeField] private float rateSmoothingWindow = 0.4f;
 
@@ -151,10 +147,13 @@ public class PlayerRadiation : NetworkBehaviour
 
     /// <summary>
     /// Deals damage to the player scaled linearly between the threshold and max radiation.
-    /// No damage is applied below the threshold. The distinct radiation-tick feedback (vignette
-    /// pulse / camera kick / tick sound) only plays while radiation is actively climbing fast
-    /// (<see cref="RadiationRate"/> above <see cref="tickFeedbackRateThreshold"/>) — not merely
-    /// because the accrued total is above the damage threshold.
+    /// No damage is applied below the threshold. Always routes through
+    /// <see cref="EffectKeys.RadiationTickDamage"/> — a dedicated preset with its camera
+    /// feedback disabled — so radiation damage never triggers a camera-shake kick, regardless
+    /// of how fast radiation is climbing. Radiation damage fires every frame while over the
+    /// threshold, so any preset with camera feedback enabled (e.g. the shared
+    /// <see cref="EffectKeys.DefaultPlayerDamage"/> single-hit preset) would retrigger its kick
+    /// dozens of times per second and look like violent, continuous shaking.
     /// </summary>
     private void ApplyRadiationDamage()
     {
@@ -165,11 +164,7 @@ public class PlayerRadiation : NetworkBehaviour
         float damageScale = (Normalized - radiationDamageThreshold) / (1f - radiationDamageThreshold);
         float damage = maxRadiationDamagePerSecond * damageScale * Time.deltaTime;
 
-        string effectKey = _smoothedRadiationRate >= tickFeedbackRateThreshold
-            ? EffectKeys.RadiationTickDamage
-            : EffectKeys.DefaultPlayerDamage;
-
-        playerHealth.TakeDamage(damage, effectKey);
+        playerHealth.TakeDamage(damage, EffectKeys.RadiationTickDamage);
     }
 
     /// <summary>Adds radiation. Can be called from any client — routes through a ServerRpc when not on the server.</summary>

@@ -7,6 +7,7 @@ public class DeathScreenUI : MonoBehaviour
 {
     [SerializeField] private GameObject restartDayButton;
     [SerializeField] private GameObject backToMenuButton;
+    [SerializeField] private GameObject spectateButton;
     [SerializeField] private TextMeshProUGUI daysSurvivedText;
 
     private void OnEnable()
@@ -50,6 +51,29 @@ public class DeathScreenUI : MonoBehaviour
 
         if (backToMenuButton != null)
             backToMenuButton.SetActive(true);
+
+        if (spectateButton != null)
+            spectateButton.SetActive(HasTeammate());
+    }
+
+    /// <summary>
+    /// Returns true when there is at least one other connected player (teammate)
+    /// in the party besides the local player.
+    /// </summary>
+    private bool HasTeammate()
+    {
+        if (NetworkManager.Singleton == null) return false;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+
+            var player = client.PlayerObject.GetComponent<PlayerInstance>();
+            if (player != null && player != PlayerInstance.Instance)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

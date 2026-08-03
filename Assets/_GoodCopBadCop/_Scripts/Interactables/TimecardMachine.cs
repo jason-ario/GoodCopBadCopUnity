@@ -104,25 +104,31 @@ public class TimecardMachine : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        // Clock-in takes priority — checked first so it can fire before clock-out is ever armed.
-        if (_clockInReady)
+        // Clock-out takes priority. In the normal flow the two flags are mutually
+        // exclusive, but if a stray EnableClockIn() (e.g. ShiftManager.OnShiftReady arming
+        // the *next* day) ever lands while clock-out is still armed for the *current* day,
+        // checking clock-in first would silently reinterpret the player's clock-OUT tap as a
+        // clock-in — re-running TryStartShift() and re-populating the suspect lineup. Clock-out
+        // must win that race since it always represents finishing the day already in progress.
+        if (_clockOutReady)
         {
             base.Interact(player);
+
             if (IsServer)
-                HandleClockIn();
+                HandleClockOut();
             else
-                RequestClockInServerRpc();
+                RequestClockOutServerRpc();
             return;
         }
 
-        if (!_clockOutReady) return;
+        if (!_clockInReady) return;
 
         base.Interact(player);
 
         if (IsServer)
-            HandleClockOut();
+            HandleClockIn();
         else
-            RequestClockOutServerRpc();
+            RequestClockInServerRpc();
     }
 
     // ── Clock-In ──────────────────────────────────────────────────────────────

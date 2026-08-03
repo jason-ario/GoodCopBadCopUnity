@@ -256,13 +256,16 @@ MonoBehaviour:
   deathGoreBurstCountRange: {x: 2, y: 4}
   deathGoreBurstSpeedRange: {x: 3, y: 7}
   goreLifetime: 10
-  bloodDecalPrefabs: []
+  bloodDecalPrefabs:
+  - {fileID: 5798377863730634803, guid: d152bf9d5562e0243a3197b173d44ade, type: 3}
   goreGroundLayer:
     serializedVersion: 2
     m_Bits: 1
   bloodDecalLifetime: 20
   yardBloodDecalPrefabs:
   - {fileID: 5798377863730634803, guid: d152bf9d5562e0243a3197b173d44ade, type: 3}
+  bloodParticlePrefab: {fileID: 893913727056456344, guid: 89207601446ace84aba6d7aba7eb7c8b, type: 3}
+  bloodParticleLifetime: 3
   corpseJunkItem: {fileID: 3067322814249485463}
   corpseJunkInteractionCollider: {fileID: 4345242163484371791}
   canAggro: 1
@@ -936,7 +939,7 @@ MonoBehaviour:
   AnimationFloorLevel: 0.001
   _Editor_Foldout_Setup_LegsList: 1
   _Editor_EnsureCount: 0
-  _Editor_OnValidateTrigger: 0
+  _Editor_OnValidateTrigger: 1
   _EditorAllowAutoUpdateFeetParams: 1
   _EditorCategory: 0
   _EditorSetupCategory: 0

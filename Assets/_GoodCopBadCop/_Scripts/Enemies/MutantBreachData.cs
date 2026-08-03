@@ -53,4 +53,11 @@ public class MutantBreachData : ScriptableObject
              "Thanks For Playing screen is shown on all clients. Use only on the demo's final " +
              "scripted breach (e.g. the Day 5 Ocho breach) — leave false on every other breach.")]
     public bool showThanksForPlayingOnFlee = false;
+
+    [Tooltip("When true, the moment every mutant spawned by this breach has been resolved " +
+             "(defeated or fled) and the breach's alarm/music has stopped, the campaign is " +
+             "marked complete and the Thanks For Playing screen is shown on all clients. Use " +
+             "only on the demo's final scripted breach (e.g. the Day 3 finale breach) — leave " +
+             "false on every other breach.")]
+    public bool showThanksForPlayingOnClear = false;
 }

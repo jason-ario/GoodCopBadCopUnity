@@ -124,6 +124,17 @@ public class MutantEnemy : NetworkBehaviour
              "splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
+    [Tooltip("Small cosmetic blood-spray particle spawned alongside every gore blood-splatter decal " +
+             "(both the yard splatter and any cosmetic landing decal), aligned with the same ground " +
+             "normal and in world space. Purely cosmetic/local — not a NetworkObject, but broadcast to " +
+             "every client via RPC for the yard splatter so it's visible everywhere. Leave unassigned " +
+             "to disable.")]
+    [SerializeField] private GameObject bloodParticlePrefab;
+
+    [Tooltip("Seconds before a spawned blood particle effect is automatically destroyed.")]
+    [Min(0f)]
+    [SerializeField] private float bloodParticleLifetime = 3f;
+
     [Header("Corpse Junk")]
     [Tooltip("Optional JunkItem component pre-attached (and disabled) to this corpse, matching the same " +
              "pre-attached-but-disabled pattern documented on JunkItem for SuspectCharacter bodies. When " +
@@ -341,6 +352,11 @@ public class MutantEnemy : NetworkBehaviour
         // All clients resolve the synced look target id into a local Transform for FLookAnimator.
         _networkLookTargetId.OnValueChanged += OnNetworkLookTargetChanged;
         ApplyLookTarget(_networkLookTargetId.Value);
+
+        // Server-only: any corpse still lingering (deathBehaviour == PlayAnimation, see Die())
+        // gets swept away the next time a day starts, regardless of where it died.
+        if (IsServer && ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart += DespawnCorpseOnDayStart;
     }
 
     public override void OnNetworkDespawn()
@@ -349,6 +365,27 @@ public class MutantEnemy : NetworkBehaviour
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
         _networkGrounded.OnValueChanged -= OnNetworkGroundedChanged;
         _networkLookTargetId.OnValueChanged -= OnNetworkLookTargetChanged;
+
+        if (IsServer && ShiftManager.Instance != null)
+            ShiftManager.Instance.OnDayStart -= DespawnCorpseOnDayStart;
+    }
+
+    /// <summary>
+    /// Server-side <see cref="ShiftManager.OnDayStart"/> handler. Corpses left behind by a
+    /// permanent kill with <see cref="deathBehaviour"/> set to <see cref="DeathBehaviour.PlayAnimation"/>
+    /// are never despawned by <see cref="Die"/> itself (they persist so they can be collected as
+    /// junk — see <see cref="EnableCorpseJunkPickup"/>), so any that are still around once the
+    /// next day starts are cleaned up here instead of lingering forever.
+    /// </summary>
+    private void DespawnCorpseOnDayStart()
+    {
+        // DiedPermanently (as opposed to _isDead alone) excludes mutants mid-flee — those
+        // despawn on their own via FleeAndDespawn and should survive to be re-encountered later,
+        // not be swept up as a corpse.
+        if (!DiedPermanently || !IsSpawned)
+            return;
+
+        NetworkObject.Despawn();
     }
 
     /// <summary>
@@ -1349,6 +1386,20 @@ public class MutantEnemy : NetworkBehaviour
 
         decalNetObj.Spawn(destroyWithScene: true);
         CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
+
+        SpawnBloodParticleClientRpc(groundPoint, rotation);
+    }
+
+    /// <summary>
+    /// Spawns <see cref="bloodParticlePrefab"/> on every client at the same position/rotation as
+    /// a just-spawned yard blood-splatter decal (see <see cref="SpawnGoreBloodDecal"/>), so the
+    /// cosmetic spray effect appears everywhere the networked decal does. No-op when
+    /// <see cref="bloodParticlePrefab"/> is unassigned.
+    /// </summary>
+    [ClientRpc]
+    private void SpawnBloodParticleClientRpc(Vector3 position, Quaternion rotation)
+    {
+        BloodDecalUtility.SpawnAlignedParticle(bloodParticlePrefab, position, rotation, bloodParticleLifetime);
     }
 
     /// <summary>
@@ -1466,7 +1517,7 @@ public class MutantEnemy : NetworkBehaviour
             return;
 
         GoreLandingDecalSpawner spawner = piece.AddComponent<GoreLandingDecalSpawner>();
-        spawner.Initialize(bloodDecalPrefabs, goreGroundLayer, bloodDecalLifetime);
+        spawner.Initialize(bloodDecalPrefabs, goreGroundLayer, bloodDecalLifetime, bloodParticlePrefab, bloodParticleLifetime);
     }
 
     [ClientRpc]
@@ -1554,28 +1605,33 @@ public class MutantEnemy : NetworkBehaviour
     /// <c>SuspectCharacter.EnableJunkPickup</c>/<c>ApplyJunkPickupState</c> for a body that becomes
     /// pickable trash once its owner is confirmed dead.
     ///
-    /// Only registers with <see cref="TakeOutTrashTask"/> — and therefore only counts toward the
-    /// trash/gore task total and <see cref="CheckpointIntegrityService"/>'s score — when this
-    /// corpse died inside one of the task's yard <see cref="SpawnZone"/>s (mirroring
-    /// <see cref="SpawnGoreJunkItem"/>'s same in-yard check for gore pieces). A body that dies
-    /// outside the yard (e.g. a breach mutant killed mid-chase away from the trash zones) still
-    /// becomes collectible junk so its gore/mess can be cleaned up, it just doesn't count toward
-    /// the task or score.
+    /// Only enabled — and therefore only interactable/highlightable with the reticle at all —
+    /// when this corpse died inside one of the task's yard <see cref="SpawnZone"/>s (mirroring
+    /// <see cref="SpawnGoreJunkItem"/>'s same in-yard check for gore pieces), since only those
+    /// corpses register with <see cref="TakeOutTrashTask"/> and count toward the trash/gore task
+    /// total and <see cref="CheckpointIntegrityService"/>'s score. A body that dies outside the
+    /// yard (e.g. a breach mutant killed mid-chase away from the trash zones) doesn't count
+    /// toward the task or score, so its <see cref="JunkItem"/> component is left disabled and it
+    /// stays a non-interactable corpse.
     /// </summary>
     private void EnableCorpseJunkPickup()
     {
         if (corpseJunkItem == null)
             return;
 
+        // Outside the yard, this corpse never counts toward the Trash Task, so leave the
+        // JunkItem disabled entirely rather than enabling it as uncounted, still-interactable
+        // junk — this keeps it out of reticle highlighting/interaction.
+        if (TakeOutTrashTask.Instance == null || !TakeOutTrashTask.Instance.IsPositionInYard(transform.position))
+            return;
+
         // Apply immediately on the server so TakeOutTrashTask's FindObjectsByType scan (run
         // from RegisterExternalJunkItem's dynamic activation, or a later TriggerTask/
-        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away
-        // (when it's inside the yard — see the IsPositionInYard check below).
+        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away.
         ApplyCorpseJunkPickupState();
         EnableCorpseJunkPickupClientRpc();
 
-        if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(transform.position))
-            TakeOutTrashTask.Instance.RegisterExternalJunkItem(NetworkObject);
+        TakeOutTrashTask.Instance.RegisterExternalJunkItem(NetworkObject);
     }
 
     [ClientRpc]

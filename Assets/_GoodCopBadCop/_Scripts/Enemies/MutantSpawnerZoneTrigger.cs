@@ -7,8 +7,8 @@ using UnityEngine;
 ///
 /// The linked spawner must have <c>Requires Zone Activation</c> checked. When the first
 /// player enters this collider, <see cref="MutantSpawner.ActivateFromZone"/> is called on
-/// the server to begin the spawn loop (provided it is currently night phase and the day
-/// threshold is met).
+/// the server to begin the spawn loop (provided the day threshold is met — ambient spawning
+/// runs any time of day, it is not gated by shift/day-night state).
 ///
 /// Optionally, when <see cref="_deactivateWhenAllPlayersLeave"/> is enabled, the spawner
 /// pauses again once every player has exited and will re-arm itself for the next entry.
@@ -24,7 +24,8 @@ public class MutantSpawnerZoneTrigger : MonoBehaviour
 
     [Tooltip("When enabled, the spawner pauses again once the last player leaves this zone. " +
              "The zone re-arms itself for the next entry. " +
-             "When disabled (default), the spawner runs until the day phase begins regardless of zone occupancy.")]
+             "When disabled (default), the spawner keeps running indefinitely once activated, " +
+             "regardless of zone occupancy or time of day.")]
     [SerializeField] private bool _deactivateWhenAllPlayersLeave = false;
 
     // How many player objects are currently inside the trigger volume.

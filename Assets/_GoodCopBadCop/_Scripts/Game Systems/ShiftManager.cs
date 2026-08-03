@@ -523,6 +523,12 @@ public class ShiftManager : NetworkBehaviour
     [ClientRpc]
     private void NotifyClockOutReadyClientRpc()
     {
+        // Vlad (the megaphone's default voice) dies at the end of Day 2 — see
+        // Day_03.OchoEatingVladCutscene — and no one takes over the megaphone until Day 4
+        // (MegaphoneDialogueManager's alternate-voice clips). So from Day 3 on, the megaphone
+        // has no one to bark the "clock out" line through; suppress it entirely.
+        if (CurrentDay >= 3) return;
+
         MegaphoneDialogueManager.Instance.SayClockOutReady();
     }
 
@@ -1389,6 +1395,14 @@ public class ShiftManager : NetworkBehaviour
         // removes the window entirely.
         PlayerInstance.Instance.SetOwnCameraActive(false);
 
+        // Defensive resync: on higher-latency relay transports (e.g. Steam Relay/SDR), a
+        // just-joined client's one-time PlayerMovementController.OnNetworkSpawn disable of the
+        // OTHER player's MainCamera-tagged camera can still be pending exactly when the cutscene
+        // starts, leaving two MainCamera cameras (and two AudioListeners) enabled simultaneously
+        // on that client — producing an erratic/flickering view that never shows up on
+        // low-latency LAN, where that one-time disable has always already resolved by now.
+        PlayerInstance.EnsureRemotePlayerCamerasDisabled();
+
         // Safety net: clear any on-screen subtitle still lingering from the outside Soldier's
         // dialogue. ForceExitSoldierDialogueBeforeCutscene tears down dialogue MODE (movement,
         // camera, cursor) for the engaged player, but the subtitle textbox itself is a purely
@@ -1423,6 +1437,7 @@ public class ShiftManager : NetworkBehaviour
         // off before ResetEverything teleports the player, in case anything re-enabled it
         // (e.g. Respawn) during the fade.
         PlayerInstance.Instance?.SetOwnCameraActive(false);
+        PlayerInstance.EnsureRemotePlayerCamerasDisabled();
 
         ResetEverything(true);
 

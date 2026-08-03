@@ -10,11 +10,15 @@ using UnityEngine;
 /// Spawn intervals are randomised between <see cref="spawnIntervalMin"/> and <see cref="spawnIntervalMax"/>.
 /// Each interval triggers a burst: a rapid sequence of spawns with a short delay between each one.
 ///
+/// Ambient mutants roam at any time of day — spawning is gated only by <see cref="firstActiveDay"/>
+/// (and, when <see cref="requiresZoneActivation"/> is set, by zone entry) and otherwise runs
+/// continuously regardless of shift/day-night state.
+///
 /// Ambient mutants spawned this way (including legacy-mutant reintroductions) never start
 /// aggroed — they always spawn with no aggro target, ignoring <see cref="MutantEnemyData.aggroChance"/>
-/// entirely. The only mutants that spawn already aggroed are those created by a
-/// <see cref="MutantBreachManager"/> breach (when <see cref="MutantBreachData.forceAggro"/> is set),
-/// or via the debug-only <see cref="ForceSpawnAggroed"/> cheat.
+/// entirely. Aggro is reserved for <see cref="MutantBreachManager"/> breach mutants (when
+/// <see cref="MutantBreachData.forceAggro"/> is set), or via the debug-only
+/// <see cref="ForceSpawnAggroed"/> cheat.
 /// </summary>
 public class MutantSpawner : NetworkBehaviour
 {
@@ -116,8 +120,6 @@ public class MutantSpawner : NetworkBehaviour
 
     private readonly List<NetworkObject> _activeEnemies = new List<NetworkObject>();
     private bool _isRunning;
-    // Tracks whether the night phase is currently active (server-only).
-    private bool _isNightPhase;
     // Burst-only mode cooldown state (server-only).
     private bool _isOnBurstCooldown;
     private Coroutine _burstCooldownCoroutine;
@@ -139,14 +141,13 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged += OnDayChanged;
 
-        if (ShiftManager.Instance != null)
+        // Ambient spawning runs any time of day — start immediately (subject to the day
+        // threshold and zone-activation gating) rather than waiting for a night phase.
+        int startingDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        if (startingDay >= firstActiveDay && !requiresZoneActivation)
         {
-            ShiftManager.Instance.OnShiftStart += OnShiftStarted;
-            ShiftManager.Instance.OnShiftEnd   += OnNightPhaseBegun;
-        }
-        else
-        {
-            Debug.LogWarning("[MutantSpawner] ShiftManager.Instance not found — day/night gating unavailable.", this);
+            BeginSpawning();
+            Debug.Log($"[MutantSpawner] Spawning started on network spawn (Day {startingDay}).");
         }
     }
 
@@ -157,58 +158,27 @@ public class MutantSpawner : NetworkBehaviour
         CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
         CancelBurstCooldown();
-
-        if (ShiftManager.Instance != null)
-        {
-            ShiftManager.Instance.OnShiftStart -= OnShiftStarted;
-            ShiftManager.Instance.OnShiftEnd   -= OnNightPhaseBegun;
-        }
     }
 
     /// <summary>
-    /// Stops spawning if the day drops below <see cref="firstActiveDay"/>.
-    /// Does not start spawning on day advance — that is handled by <see cref="OnNightPhaseBegun"/>.
+    /// Starts or stops spawning based on whether the new day meets <see cref="firstActiveDay"/>.
+    /// Ambient spawning is otherwise continuous — it is not gated by shift/day-night state.
     /// SERVER ONLY (subscribed only on the server in <see cref="OnNetworkSpawn"/>).
     /// </summary>
     private void OnDayChanged(int newDay)
     {
-        if (newDay < firstActiveDay && _isRunning)
-            StopSpawning();
-    }
-
-    /// <summary>
-    /// Stops the spawner when the shift starts so mutants do not spawn during the day phase.
-    /// </summary>
-    private void OnShiftStarted()
-    {
-        _isNightPhase = false;
-        CancelBurstCooldown();
-        if (_isRunning)
+        if (newDay < firstActiveDay)
         {
-            StopSpawning();
-            Debug.Log("[MutantSpawner] Spawning paused — shift started (day phase).");
-        }
-    }
-
-    /// <summary>
-    /// Starts the spawner when the night phase begins, provided the current day meets
-    /// the <see cref="firstActiveDay"/> threshold. Skipped when <see cref="requiresZoneActivation"/>
-    /// is enabled — the spawner will only start once a player enters the linked zone.
-    /// </summary>
-    private void OnNightPhaseBegun()
-    {
-        _isNightPhase = true;
-        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
-        if (currentDay < firstActiveDay) return;
-
-        if (requiresZoneActivation)
-        {
-            Debug.Log("[MutantSpawner] Night phase begun but zone activation required — waiting for player to enter zone.");
+            if (_isRunning)
+                StopSpawning();
             return;
         }
 
-        BeginSpawning();
-        Debug.Log($"[MutantSpawner] Spawning started — night phase begun (Day {currentDay}).");
+        if (!_isRunning && !requiresZoneActivation)
+        {
+            BeginSpawning();
+            Debug.Log($"[MutantSpawner] Spawning started — day threshold reached (Day {newDay}).");
+        }
     }
 
     private void BeginSpawning()
@@ -374,8 +344,9 @@ public class MutantSpawner : NetworkBehaviour
 
     /// <summary>
     /// Called by <see cref="MutantSpawnerZoneTrigger"/> when a player first enters the
-    /// linked zone. If the spawner is in zone-activation mode, the night phase is active,
-    /// and the day threshold is met, spawning begins immediately.
+    /// linked zone. If the spawner is in zone-activation mode and the day threshold is met,
+    /// spawning begins immediately (ambient spawning is not gated by day/night — it runs any
+    /// time of day once active).
     /// When <see cref="burstOnlyMode"/> is also enabled, fires a single burst then enters
     /// a <see cref="burstCooldownDuration"/> cooldown before the zone can trigger again.
     /// SERVER ONLY — no-op on clients.
@@ -407,13 +378,6 @@ public class MutantSpawner : NetworkBehaviour
 
         // ── Continuous loop mode ───────────────────────────────────────────────
         if (_isRunning) return;
-
-        if (!_isNightPhase)
-        {
-            Debug.Log("[MutantSpawner] Zone entered during day phase — spawner will start on next night phase.", this);
-            requiresZoneActivation = false;
-            return;
-        }
 
         BeginSpawning();
         Debug.Log("[MutantSpawner] Zone entered — spawning started.", this);

@@ -92,6 +92,18 @@ public class ExamPage : FolderItem
     /// <summary>True while this page's checklist camera is actively capturing a snapshot.</summary>
     private bool _isSnapshotting;
 
+    /// <summary>Peers this page's current/most-recent snapshot has requested be hidden.</summary>
+    private readonly List<ExamPage> _peersHiddenByThisSnapshot = new List<ExamPage>();
+
+    /// <summary>
+    /// How many other pages currently want THIS page's checklist renderers hidden. Reference
+    /// counted (rather than a plain bool) so overlapping hide requests from multiple
+    /// simultaneously-snapshotting peers can never restore visibility early.
+    /// </summary>
+    private int _hideRequestCount;
+    private Renderer[] _checklistRenderersCache;
+    private bool[] _preHideRendererEnabledStates;
+
     /// <summary>
     /// Original local positions of each checklist item captured at Awake.
     /// Used as the position pool when re-sorting by lock state so repeated
@@ -300,74 +312,113 @@ public class ExamPage : FolderItem
         if (_checklistCamera == null) return;
 
         if (_snapshotCoroutine != null)
+        {
+            // StopCoroutine aborts the coroutine immediately — any code after a "yield return"
+            // (including the restore step that un-hides peers requested by BeginSnapshot) never
+            // runs. EndSnapshot is called explicitly here so an interrupted capture can never
+            // permanently strand a peer's checklist renderers in the hidden state. Every page
+            // calls SnapshotChecklist twice during initialization (RefreshLockStates, then
+            // ApplyBitmask), so this interruption path runs routinely, not just on edge cases.
             StopCoroutine(_snapshotCoroutine);
+            _snapshotCoroutine = null;
+            EndSnapshot();
+        }
+
         _snapshotCoroutine = StartCoroutine(SnapshotRoutine());
     }
 
     private System.Collections.IEnumerator SnapshotRoutine()
     {
-        _isSnapshotting = true;
+        BeginSnapshot();
+        _checklistCamera.gameObject.SetActive(true);
+        yield return new WaitForSeconds(_drawAnimationDuration);
+        EndSnapshot();
+        _snapshotCoroutine = null;
+    }
 
-        // Temporarily hide checklist artwork on every OTHER active page so this page's
-        // checklist camera (which culls by a layer shared across all pages) can only ever
-        // see its own content, regardless of how close another page physically is. Pages
-        // that are themselves mid-snapshot right now are skipped so two pages capturing at
-        // the exact same instant never blind each other.
-        List<System.Action> restoreActions = null;
+    /// <summary>
+    /// Requests that every OTHER active page's checklist renderers be hidden for the duration
+    /// of this page's capture, so this page's checklist camera — which culls by a layer shared
+    /// across all pages — can only ever see its own content. Pages already mid-snapshot are
+    /// skipped so two pages capturing at the same instant never blind each other.
+    /// </summary>
+    private void BeginSnapshot()
+    {
+        _isSnapshotting = true;
+        _peersHiddenByThisSnapshot.Clear();
+
         for (int i = 0; i < _activePages.Count; i++)
         {
             ExamPage peer = _activePages[i];
             if (peer == null || peer == this || peer._isSnapshotting) continue;
 
-            System.Action restore = peer.HideChecklistRenderersTemporarily();
-            if (restore == null) continue;
-
-            restoreActions ??= new List<System.Action>();
-            restoreActions.Add(restore);
+            peer.RequestHideChecklistRenderers();
+            _peersHiddenByThisSnapshot.Add(peer);
         }
-
-        _checklistCamera.gameObject.SetActive(true);
-        yield return new WaitForSeconds(_drawAnimationDuration);
-        _checklistCamera.gameObject.SetActive(false);
-
-        if (restoreActions != null)
-        {
-            foreach (System.Action restore in restoreActions)
-                restore();
-        }
-
-        _isSnapshotting = false;
-        _snapshotCoroutine = null;
     }
 
     /// <summary>
-    /// Disables every Renderer under this page's <see cref="checklistItemsParent"/> (its
-    /// checklist items' visuals) and returns an action that restores each renderer to its
-    /// exact previous enabled state. Never touches colliders or transforms, so this has no
-    /// effect on checkbox click raycasting. Returns null if there is nothing to hide.
+    /// Turns this page's checklist camera off and releases every peer hide request this
+    /// snapshot made. Called both on normal completion and when a new snapshot interrupts an
+    /// in-flight one, so a request/release pair is guaranteed regardless of coroutine lifetime.
     /// </summary>
-    private System.Action HideChecklistRenderersTemporarily()
+    private void EndSnapshot()
     {
-        if (checklistItemsParent == null) return null;
+        if (_checklistCamera != null)
+            _checklistCamera.gameObject.SetActive(false);
 
-        Renderer[] renderers = checklistItemsParent.GetComponentsInChildren<Renderer>(true);
-        if (renderers.Length == 0) return null;
-
-        bool[] previousStates = new bool[renderers.Length];
-        for (int i = 0; i < renderers.Length; i++)
+        for (int i = 0; i < _peersHiddenByThisSnapshot.Count; i++)
         {
-            previousStates[i] = renderers[i].enabled;
-            renderers[i].enabled = false;
+            if (_peersHiddenByThisSnapshot[i] != null)
+                _peersHiddenByThisSnapshot[i].ReleaseHideChecklistRenderers();
+        }
+        _peersHiddenByThisSnapshot.Clear();
+
+        _isSnapshotting = false;
+    }
+
+    /// <summary>
+    /// Reference-counted: caches each renderer's real enabled state and disables it only on the
+    /// first request, so nested/overlapping requests from multiple simultaneous peers can never
+    /// restore visibility before every requester has released. Never touches colliders or
+    /// transforms, so checkbox click raycasting is unaffected.
+    /// </summary>
+    private void RequestHideChecklistRenderers()
+    {
+        if (_hideRequestCount == 0)
+        {
+            _checklistRenderersCache = checklistItemsParent != null
+                ? checklistItemsParent.GetComponentsInChildren<Renderer>(true)
+                : System.Array.Empty<Renderer>();
+            _preHideRendererEnabledStates = new bool[_checklistRenderersCache.Length];
+
+            for (int i = 0; i < _checklistRenderersCache.Length; i++)
+            {
+                if (_checklistRenderersCache[i] == null) continue;
+                _preHideRendererEnabledStates[i] = _checklistRenderersCache[i].enabled;
+                _checklistRenderersCache[i].enabled = false;
+            }
         }
 
-        return () =>
+        _hideRequestCount++;
+    }
+
+    /// <summary>Releases one hide request; only restores renderers once every requester has released.</summary>
+    private void ReleaseHideChecklistRenderers()
+    {
+        if (_hideRequestCount <= 0) return;
+
+        _hideRequestCount--;
+        if (_hideRequestCount > 0 || _checklistRenderersCache == null) return;
+
+        for (int i = 0; i < _checklistRenderersCache.Length; i++)
         {
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null)
-                    renderers[i].enabled = previousStates[i];
-            }
-        };
+            if (_checklistRenderersCache[i] != null)
+                _checklistRenderersCache[i].enabled = _preHideRendererEnabledStates[i];
+        }
+
+        _checklistRenderersCache = null;
+        _preHideRendererEnabledStates = null;
     }
 
     private void OnEnable()
@@ -380,6 +431,15 @@ public class ExamPage : FolderItem
     {
         AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
         _activePages.Remove(this);
+
+        // If this page was mid-snapshot when disabled, release any peers it was hiding so they
+        // don't get stranded. If other pages currently have THIS page hidden, leave that alone —
+        // their own EndSnapshot will release it, and this page is inactive/invisible anyway.
+        if (_snapshotCoroutine != null)
+        {
+            _snapshotCoroutine = null;
+            EndSnapshot();
+        }
     }
 
     private void OnAnomalyUnlocked(string typeName)

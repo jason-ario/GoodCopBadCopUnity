@@ -5,7 +5,8 @@ using UnityEngine;
 /// physics-driven gore piece that pops out with a Rigidbody velocity. On the first collision
 /// with a Collider on <see cref="_groundLayer"/>, spawns a random blood-decal prefab at the
 /// contact point, oriented with its forward axis facing down into the ground surface (via
-/// <see cref="BloodDecalUtility"/>), then removes itself so it never spawns more than once.
+/// <see cref="BloodDecalUtility"/>), then spawns an aligned cosmetic blood-particle effect at the
+/// same position/rotation before removing itself so it never spawns more than once.
 ///
 /// Purely cosmetic and local — does not use Netcode. Intended for client-local, non-networked
 /// gore pieces (e.g. <c>MutantEnemy</c>'s cosmetic gore bursts) where each client simulates its
@@ -16,17 +17,21 @@ public class GoreLandingDecalSpawner : MonoBehaviour
     private GameObject[] _decalPrefabs;
     private LayerMask _groundLayer;
     private float _decalLifetime;
+    private GameObject _particlePrefab;
+    private float _particleLifetime;
     private bool _hasLanded;
 
     /// <summary>
     /// Configures this spawner. Must be called right after adding the component, since its
     /// fields aren't serialized (the component is always added at runtime).
     /// </summary>
-    public void Initialize(GameObject[] decalPrefabs, LayerMask groundLayer, float decalLifetime)
+    public void Initialize(GameObject[] decalPrefabs, LayerMask groundLayer, float decalLifetime, GameObject particlePrefab, float particleLifetime)
     {
         _decalPrefabs = decalPrefabs;
         _groundLayer = groundLayer;
         _decalLifetime = decalLifetime;
+        _particlePrefab = particlePrefab;
+        _particleLifetime = particleLifetime;
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -59,5 +64,7 @@ public class GoreLandingDecalSpawner : MonoBehaviour
 
         if (_decalLifetime > 0f)
             Destroy(decal, _decalLifetime);
+
+        BloodDecalUtility.SpawnAlignedParticle(_particlePrefab, position, rotation, _particleLifetime);
     }
 }
