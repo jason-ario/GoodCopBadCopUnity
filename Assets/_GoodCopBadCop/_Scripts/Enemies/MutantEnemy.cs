@@ -924,14 +924,19 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Disables this component and stops all running coroutines so that
+    /// Stops all running coroutines (e.g. an auto-started ChaseLoop) so that
     /// <see cref="MutantSuspectBehaviour"/> can take exclusive control during a lineup sequence.
     /// Called by <see cref="MutantSuspectBehaviour.BeginLineup"/> before the lineup coroutine starts.
+    /// Does NOT disable this component — see the comment on <see cref="Awake"/> for why this
+    /// component's Unity-level enabled flag must never be toggled. <see cref="Update"/> already
+    /// no-ops while <see cref="_isActive"/> is false and while the NavMeshAgent is disabled
+    /// (both true for the duration of the lineup sequence), so leaving the component enabled is
+    /// safe and is required for its Grounded/Speed animator sync to resume automatically once
+    /// the mutant breaks through and <see cref="InitialiseServer"/> re-activates it.
     /// </summary>
     public void SuspendForLineup()
     {
         StopAllCoroutines();
-        enabled = false;
     }
 
     /// <summary>

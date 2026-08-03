@@ -208,11 +208,11 @@ public class SuspectController : NetworkBehaviour
     [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
     [SerializeField] int couponPerfectAnomaliesBonus = 5;
     [Tooltip("Maximum bonus coupons awarded when 100% of anomaly categories are identified. Scales linearly with percent caught (0% = 0 bonus, 100% = full bonus).")]
-    [SerializeField] int couponMaxPercentBonus = 20;
+    [SerializeField] int couponMaxPercentBonus = 25;
     [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
     /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
-    [SerializeField] int couponBaseReward = 5;
+    [SerializeField] int couponBaseReward = 10;
     [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
     [SerializeField] int couponPerEvidenceItem = 3;
     

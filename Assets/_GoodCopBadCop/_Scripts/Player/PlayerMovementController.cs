@@ -252,6 +252,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             // Exit + jump fires when the body root (feet) leave the zone so the
             // player swims all the way to the top before launching out.
             GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged += HandleBodyUnderwaterChanged;
+            // Day transitions can happen while the player is mid-sit-animation (e.g. asleep
+            // in a chair at end of day); force the animator out of the sitting pose so the
+            // next day never starts with a stuck "Sitting" animation.
+            CampaignManager.OnDayChanged += HandleDayChanged;
         }
     }
 
@@ -261,6 +265,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.UnregisterPlayerBody(transform);
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleCameraUnderwaterChanged;
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged -= HandleBodyUnderwaterChanged;
+        CampaignManager.OnDayChanged -= HandleDayChanged;
+    }
+
+    // Ensures the player animator never carries the "Sitting" pose across a day boundary.
+    private void HandleDayChanged(int newDay)
+    {
+        _isSitting = false;
+        _playerAnimationController?.SetAnimBool("Sitting", false);
     }
 
     // Camera crosses INTO zone → activate underwater physics (player is fully submerged)

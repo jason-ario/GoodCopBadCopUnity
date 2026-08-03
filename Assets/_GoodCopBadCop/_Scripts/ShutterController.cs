@@ -18,13 +18,16 @@ public class ShutterController : MonoBehaviour
     [Tooltip("The shutter mesh Transform to shake. Assign a child visual so it doesn't fight the Animator root.")]
     [SerializeField] private Transform shutterVisual;
     [Tooltip("Duration of the shake in seconds.")]
-    [SerializeField] private float shakeDuration = 0.25f;
+    [SerializeField] private float shakeDuration = 0.35f;
     [Tooltip("Maximum positional offset during the shake.")]
-    [SerializeField] private float shakeStrength = 0.04f;
+    [SerializeField] private float shakeStrength = 0.15f;
     [Tooltip("Number of oscillations during the shake.")]
-    [SerializeField] private int shakeVibrato = 12;
+    [SerializeField] private int shakeVibrato = 24;
+    [Tooltip("Maximum rotational offset (degrees) during the shake, layered on top of the positional shake for extra impact.")]
+    [SerializeField] private float shakeRotationStrength = 6f;
 
     private Tween _shakeTween;
+    private Tween _shakeRotationTween;
 
     /// <summary>True while the booth window is open.</summary>
     public bool IsOpen { get; private set; }
@@ -82,7 +85,9 @@ public class ShutterController : MonoBehaviour
         {
             // Kill any in-progress shake before starting a new one so rapid hits don't stack.
             _shakeTween?.Kill(complete: true);
+            _shakeRotationTween?.Kill(complete: true);
             _shakeTween = shutterVisual.DOShakePosition(shakeDuration, shakeStrength, shakeVibrato);
+            _shakeRotationTween = shutterVisual.DOShakeRotation(shakeDuration, shakeRotationStrength, shakeVibrato);
         }
     }
 }

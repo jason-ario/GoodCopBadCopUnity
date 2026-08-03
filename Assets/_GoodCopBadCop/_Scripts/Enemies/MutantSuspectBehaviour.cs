@@ -138,11 +138,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _mutantEnemy?.SuspendForLineup();
 
         // MutantEnemy.Update() is the only thing that syncs the networked "Grounded" animator
-        // state (from NavMeshAgent.isOnNavMesh), and SuspendForLineup() just disabled that
-        // component. Its NetworkVariable defaults to false, and nothing will ever flip it back
-        // to true while MutantEnemy stays disabled — so without this the mutant plays a
-        // floating/falling pose for the entire walk-in instead of walking. Force it true here
-        // since the mutant is standing on solid ground for the whole lineup sequence, not falling.
+        // state (from NavMeshAgent.isOnNavMesh), and it no-ops for the whole lineup sequence
+        // because SuspendForLineup() stops its coroutines while _isActive is still false and the
+        // NavMeshAgent is disabled for the DOTween walk-in. Its NetworkVariable defaults to
+        // false, and nothing will ever flip it back to true while those guards hold — so without
+        // this the mutant plays a floating/falling pose for the entire walk-in instead of
+        // walking. Force it true here since the mutant is standing on solid ground for the whole
+        // lineup sequence, not falling.
         SetAnimBool(GroundedAnimBool, true);
 
         StartCoroutine(LineupSequence());
@@ -523,8 +525,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         _mutantEnemy?.SuspendForLineup();
 
-        // See BeginLineup for why this is required — SuspendForLineup() disables MutantEnemy,
-        // which is the only thing that keeps the networked "Grounded" bool in sync, so it would
+        // See BeginLineup for why this is required — SuspendForLineup() stops MutantEnemy's
+        // coroutines but leaves it enabled, and its Update() (the only thing that keeps the
+        // networked "Grounded" bool in sync) no-ops while _isActive is false, so it would
         // otherwise be stuck at its default false for this entire scripted-entrance sequence too.
         SetAnimBool(GroundedAnimBool, true);
 

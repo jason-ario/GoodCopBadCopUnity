@@ -501,6 +501,21 @@ public class FolderController : PickableObject
         StartUseStampClientRpc(interactingPlayerId, stampType);
     }
 
+    /// <summary>
+    /// Server-authoritative rejection of pickup attempts while this folder is mid-stamp.
+    /// The folder is never marked "held" during the stamp sequence (it sits on the desk while
+    /// the player holds the stamp item — see <see cref="InteractWithItem"/>), so the usual
+    /// holder-based grab guard in <see cref="PickableObject.RequestOwnershipServerRpc"/> never
+    /// engages here. The client-side collider disable in <see cref="StartUseStampClientRpc"/>
+    /// only takes effect after the ClientRpc round-trip, leaving a window where another
+    /// client's optimistic pickup can reach the server first. Checking the server-only
+    /// <see cref="isStamping"/> flag here closes that window authoritatively.
+    /// </summary>
+    protected override bool CanBeGrabbedByServer(ulong requestingClientId)
+    {
+        return !isStamping;
+    }
+
     private bool IsQuarantineFull()
     {
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;

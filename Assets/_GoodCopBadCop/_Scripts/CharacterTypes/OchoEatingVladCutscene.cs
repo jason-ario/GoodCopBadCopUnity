@@ -114,8 +114,8 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     // ── Inspector — Look Timing ──────────────────────────────────────────────
 
     [Header("Look Timing")]
-    [Tooltip("How long Ocho holds his look-at-player pose before dropping Vlad's pieces.")]
-    [SerializeField] private float _lookHoldDuration = 2f;
+    [Tooltip("How long Ocho holds his look-at-player pose before dropping Vlad's pieces and fleeing.")]
+    [SerializeField] private float _lookHoldDuration = 20f;
 
     [Tooltip("Buffer after dropping the pieces / triggering Idle, before the jump sequence starts (lets the Idle blend settle).")]
     [SerializeField] private float _postDropDelay = 0.35f;

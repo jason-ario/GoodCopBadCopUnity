@@ -2808,11 +2808,17 @@ public class Day_01 : DayBase
         _hammer.SetForceHighlight(true);
         TutorialMarkerManager.Instance?.Mark(_hammer.transform);
 
-        _hammer.OnPickedUpEvent += OnHammerPickedUpFirstTime;
+        // Use the networked pickup signal (fires on every client, including the server,
+        // driven by the authoritative _holdingClientId NetworkVariable) rather than the
+        // local-only OnPickedUpEvent — otherwise the highlight/arrow would only clear on
+        // whichever client physically grabbed the hammer, leaving it force-highlighted
+        // forever on every teammate's screen.
+        _hammer.OnPickedUpNetworked += OnHammerPickedUpFirstTime;
     }
 
     /// <summary>
-    /// Fires the first time the player picks up the Hammer after the breach. Clears the
+    /// Fires the first time ANY player picks up the Hammer after the breach (on every
+    /// client, via <see cref="PickableObject.OnPickedUpNetworked"/>). Clears the
     /// highlight/arrow, then chains the "fix a fence with a hammer" tutorial overlay straight
     /// into the "Checkpoint Integrity Score" tutorial overlay.
     /// </summary>
@@ -2820,7 +2826,7 @@ public class Day_01 : DayBase
     {
         if (_hammer != null)
         {
-            _hammer.OnPickedUpEvent -= OnHammerPickedUpFirstTime;
+            _hammer.OnPickedUpNetworked -= OnHammerPickedUpFirstTime;
             _hammer.SetForceHighlight(false);
             TutorialMarkerManager.Instance?.Unmark(_hammer.transform);
         }

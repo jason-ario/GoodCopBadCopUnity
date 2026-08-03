@@ -619,7 +619,6 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
-        PlayBuzzerSound();
         windowLampController.TurnGreen();
 
 

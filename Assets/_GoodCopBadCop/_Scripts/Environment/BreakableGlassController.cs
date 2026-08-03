@@ -248,6 +248,11 @@ public class BreakableGlassController : MonoBehaviour
     {
         RefreshCrackOverlay(hitCount);
         PlayHitFeedback();
+
+        // Let players buy a replacement as soon as the glass shows any damage —
+        // no need to wait for the final, fully-smashed hit.
+        if (hitCount > 0)
+            ShowRepairInteractable();
     }
 
     /// <summary>
@@ -275,21 +280,7 @@ public class BreakableGlassController : MonoBehaviour
         }
 
         // Show the repair option — safe to call directly since ApplySmash already runs on all clients.
-        _repairInteractable?.SetAvailable(true);
-
-        // The repair interactable's GameObject starts inactive so NGO never auto-spawns its
-        // NetworkObject.  We must spawn it explicitly from the server so that the purchase
-        // ServerRpc / ClientRpc path can route correctly.
-        if (_repairInteractable != null)
-        {
-            var nm = NetworkManager.Singleton;
-            if (nm != null && (nm.IsServer || nm.IsHost))
-            {
-                var repairNetObj = _repairInteractable.NetworkObject;
-                if (repairNetObj != null && !repairNetObj.IsSpawned)
-                    repairNetObj.Spawn(true);   // true = destroyWithScene
-            }
-        }
+        ShowRepairInteractable();
 
         // Persist the smashed state (server/host only — SaveDataManager.Save() guards writes).
         SaveDataManager.Instance?.SetGlassSmashed(true);
@@ -445,6 +436,30 @@ public class BreakableGlassController : MonoBehaviour
 
         // Keep it inactive until the next smash triggers ApplySmash().
         _brokenGlass.SetActive(false);
+    }
+
+    /// <summary>
+    /// Makes the repair/purchase interactable available on the local client, spawning its
+    /// NetworkObject on the server if needed. Safe to call multiple times (e.g. once per
+    /// intermediate hit and again on the final smash) — spawning and activation are both no-ops
+    /// once already done.
+    /// </summary>
+    private void ShowRepairInteractable()
+    {
+        if (_repairInteractable == null) return;
+
+        _repairInteractable.SetAvailable(true);
+
+        // The repair interactable's GameObject starts inactive so NGO never auto-spawns its
+        // NetworkObject. We must spawn it explicitly from the server so that the purchase
+        // ServerRpc / ClientRpc path can route correctly.
+        var nm = NetworkManager.Singleton;
+        if (nm != null && (nm.IsServer || nm.IsHost))
+        {
+            var repairNetObj = _repairInteractable.NetworkObject;
+            if (repairNetObj != null && !repairNetObj.IsSpawned)
+                repairNetObj.Spawn(true);   // true = destroyWithScene
+        }
     }
 
     /// <summary>Sets the _CrackProgress material property to reflect the given hit count.</summary>

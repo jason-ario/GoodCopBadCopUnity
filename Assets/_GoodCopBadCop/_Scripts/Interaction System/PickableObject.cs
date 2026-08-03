@@ -411,9 +411,32 @@ public class PickableObject : Interactable
             return;
         }
 
+        // Server-authoritative hook for subclasses (e.g. FolderController mid-stamp) to reject
+        // a grab regardless of holder/collider state. Closes the race window where a second
+        // client's optimistic local pickup (collider disable) lands before the first client's
+        // in-progress action (which never claims IsHeld, e.g. stamping) has a chance to lock
+        // the object out. Rejecting here fires OnGrabRejected so the requester undoes its
+        // optimistic pickup — see PlayerPickupController.OnPendingGrabRejected.
+        if (!CanBeGrabbedByServer(clientId))
+        {
+            NotifyGrabRejectedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+            return;
+        }
+
         NetworkObject.ChangeOwnership(clientId);
         _holdingClientId.Value = clientId;
     }
+
+    /// <summary>
+    /// Server-only extension point checked at the top of <see cref="RequestOwnershipServerRpc"/>.
+    /// Override to reject a pickup while this object is in a state that shouldn't be
+    /// interrupted by another player grabbing it (e.g. a folder mid-stamp). Only ever
+    /// invoked on the server, so it's safe to read server-only fields here.
+    /// </summary>
+    protected virtual bool CanBeGrabbedByServer(ulong requestingClientId) => true;
 
     /// <summary>Returns NetworkObject ownership back to the server.</summary>
     [ServerRpc(RequireOwnership = false)]
