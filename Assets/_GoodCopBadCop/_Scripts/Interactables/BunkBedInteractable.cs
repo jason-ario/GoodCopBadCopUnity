@@ -45,16 +45,30 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private bool _shiftEndedThisCycle;
 
     /// <summary>
+    /// Debug/tutorial escape hatch. When true, <see cref="CanSleep"/> always returns true,
+    /// bypassing <see cref="_shiftEndedThisCycle"/>, <see cref="ShiftManager.shiftStarted"/>, and
+    /// <see cref="AllTasksComplete"/> entirely. Set by <see cref="Day_01"/> while its "go to bed"
+    /// tutorial marker is active — by the time that marker shows, Day 1's own tutorial gating
+    /// (clock-out already succeeded, bunker door already opened) has already proven the day is
+    /// genuinely done, so sleeping should never be blocked here even if one of the normal
+    /// conditions above is out of sync (e.g. after a debug skip that bypasses part of the
+    /// normal shift-end bookkeeping). Reset to false once sleep is confirmed or the marker
+    /// is dismissed.
+    /// </summary>
+    public static bool ForceAllowSleep = false;
+
+    /// <summary>
     /// Returns true when the shift has ended AND all completable tasks are finished.
     /// Reads <see cref="ShiftManager.shiftStarted"/> directly — a <see cref="NetworkVariable{T}"/>
     /// set by <see cref="ShiftManager.EndShift"/> — so it is always reliable regardless of local
     /// event subscription state.
     /// </summary>
     private bool CanSleep =>
-        _shiftEndedThisCycle
-        && ShiftManager.Instance != null
-        && !ShiftManager.Instance.shiftStarted.Value
-        && AllTasksComplete();
+        ForceAllowSleep
+        || (_shiftEndedThisCycle
+            && ShiftManager.Instance != null
+            && !ShiftManager.Instance.shiftStarted.Value
+            && AllTasksComplete());
 
     /// <summary>
     /// Returns true when every <see cref="IBetweenShiftTask"/> registered in the
@@ -72,7 +86,10 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
 #pragma warning disable CS0618
             if (threat is IBetweenShiftTask task && !task.IsComplete)
+            {
+                Debug.Log($"[BunkBedInteractable] AllTasksComplete: blocked by incomplete task '{threat.ThreatName}' ({threat.GetType().Name}).");
                 return false;
+            }
 #pragma warning restore CS0618
         }
 
@@ -132,6 +149,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         _shiftEndedThisCycle = true;
         GoToBunkerTask.CreateAndRegister();
         UpdateInteractText();
+        Debug.Log("[BunkBedInteractable] HandleShiftEnd — _shiftEndedThisCycle=true.");
     }
 
     /// <summary>Resets the hover label when a new shift begins and cleans up any leftover go-to-bed task.</summary>
@@ -193,7 +211,13 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         UIController.Instance.ShowCursor();
         UIController.Instance.ShowBackButton(OnCancelEndDay);
 
-        if (CanSleep)
+        bool canSleep = CanSleep;
+        Debug.Log($"[BunkBedInteractable] OpenBedView — CanSleep={canSleep}, ForceAllowSleep={ForceAllowSleep}, " +
+                   $"_shiftEndedThisCycle={_shiftEndedThisCycle}, " +
+                   $"shiftStarted.Value={(ShiftManager.Instance != null ? ShiftManager.Instance.shiftStarted.Value : (bool?)null)}, " +
+                   $"AllTasksComplete={AllTasksComplete()}.");
+
+        if (canSleep)
             UIController.Instance.OpenEndDayPopup(OnConfirmEndDay, OnCancelEndDay);
         else
             UIController.Instance.OpenEndDayBlockedPopup(OnCancelEndDay);

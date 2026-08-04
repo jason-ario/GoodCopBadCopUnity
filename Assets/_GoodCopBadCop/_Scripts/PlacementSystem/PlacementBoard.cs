@@ -26,6 +26,28 @@ public class PlacementBoard : MonoBehaviour
     /// <summary>Reticle hint text used by <see cref="showGhostWhileAiming"/>.</summary>
     public string AimHoverText => aimHoverText;
 
+    [Header("Item Restriction")]
+    [Tooltip("When non-empty, only a held item whose PickableItemData is in this list can be placed on this board (e.g. a mail slot should only accept the Small Package item, not any pickable). Leave empty to accept any item, matching the previous unrestricted behavior.")]
+    [SerializeField] private PickableItemData[] acceptedItems;
+
+    /// <summary>
+    /// True if this board has no item restriction (accepts anything), or the given item is in
+    /// its <see cref="acceptedItems"/> list. Checked by <see cref="PlayerInteractionController"/>
+    /// both for showing the aim-ghost preview and for actually committing a placement.
+    /// </summary>
+    public bool AcceptsItem(PickableItemData item)
+    {
+        if (acceptedItems == null || acceptedItems.Length == 0) return true;
+        if (item == null) return false;
+
+        for (int i = 0; i < acceptedItems.Length; i++)
+        {
+            if (acceptedItems[i] == item) return true;
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Fired locally whenever an item is successfully placed on this board.
     /// Subscribe from tutorial systems that need to react to a specific board being used.

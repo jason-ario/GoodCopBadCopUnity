@@ -9,11 +9,11 @@ using UnityEngine;
 /// a blood decal, which arms <see cref="CleanBloodTask"/> so players must mop up every
 /// splatter with the <see cref="Mop"/> as a separate task.
 ///
-/// The day's mail delivery ("Sort the mail" task) is deferred (see
-/// <see cref="SortMailTask.DeferAutoTriggerForDay"/>) so it does NOT appear automatically at
-/// day start — instead it triggers mid-shift, right after <see cref="_mailDeliverySuspectThreshold"/>
-/// suspects have been processed (see <see cref="OnSuspectProcessedForMailDelivery"/>), with a
-/// fallback that fires it at end of shift if that threshold is never reached.
+/// The day's mail delivery ("Sort the mail" task) is skipped entirely for Day 3 (see
+/// <see cref="SortMailTask.SkipDeliveryForDay"/>) — no delivery, no crate, no sorting task —
+/// since the mechanic is already established on Day 2 and Day 3 is already carrying the
+/// gore/blood/fence cleanup plus the finale breach. The daily prohibited-goods roll still runs
+/// as normal; only the delivery/crate/task is suppressed.
 ///
 /// Right after the last suspect for the day is processed, <see cref="MutantBreachManager"/>
 /// (driven by <see cref="DayBase.HasMutantBreach"/> / <see cref="DayBase.PossibleBreaches"/>)
@@ -80,19 +80,6 @@ public class Day_03 : DayBase
     private TutorialObjectiveItem _taskFixFences;
 
     // -------------------------------------------------------------------------
-    // Inspector -- Mid-Shift Mail Delivery Timing
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 -- Mail Delivery Timing")]
-    [Tooltip("Number of suspects that must be processed this shift before the mail delivery " +
-             "(\"Sort the mail\" task) triggers mid-shift, instead of appearing automatically " +
-             "at the start of the day.")]
-    [SerializeField] private int _mailDeliverySuspectThreshold = 2;
-
-    private int _mailDeliveryProcessedCount;
-    private bool _mailDeliveryTriggered;
-
-    // -------------------------------------------------------------------------
     // DayBase Lifecycle
     // -------------------------------------------------------------------------
 
@@ -127,16 +114,12 @@ public class Day_03 : DayBase
         _bunkerExitStingerPlayed = false;
         BunkerDoorController.OnDoorOpened += OnBunkerDoorOpenedFirstTime;
 
-        // Defer the automatic Day 3 mail delivery -- it should trigger mid-shift, right after
-        // the _mailDeliverySuspectThreshold-th suspect is processed, rather than appearing
-        // immediately at day start (see OnSuspectProcessedForMailDelivery /
-        // SortMailTask.DeferAutoTriggerForDay). Must be set here, before CampaignManager's
-        // OnDayChanged fires.
-        SortMailTask.DeferAutoTriggerForDay = 3;
-        _mailDeliveryProcessedCount = 0;
-        _mailDeliveryTriggered = false;
-        FolderController.OnFolderHandedOff += OnSuspectProcessedForMailDelivery;
-        ShiftManager.OnLastSuspectProcessed += OnLastSuspectProcessed_TriggerMailFallback;
+        // Skip the Day 3 mail delivery entirely -- no delivery, no crate, no "Sort the Mail"
+        // task. The mechanic is already established on Day 2; Day 3 is already carrying the
+        // gore/blood/fence cleanup plus the finale breach. Must be set here, before
+        // CampaignManager's OnDayChanged fires. The daily prohibited-goods roll in
+        // SortMailTask.OnDayChanged still runs as normal -- only the delivery is suppressed.
+        SortMailTask.SkipDeliveryForDay = 3;
     }
 
     public override void DayDeactivated()
@@ -155,9 +138,6 @@ public class Day_03 : DayBase
     {
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
 
-        FolderController.OnFolderHandedOff  -= OnSuspectProcessedForMailDelivery;
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessed_TriggerMailFallback;
-
         TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
 
@@ -167,54 +147,6 @@ public class Day_03 : DayBase
 
         FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
         FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
-    }
-
-    // -------------------------------------------------------------------------
-    // Mid-Shift Mail Delivery Trigger
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Counts processed suspects via <see cref="FolderController.OnFolderHandedOff"/> (fired on
-    /// all clients) and fires the deferred Day 3 mail delivery once
-    /// <see cref="_mailDeliverySuspectThreshold"/> suspects have been processed this shift.
-    /// <see cref="SortMailTask.TriggerDeferredDelivery"/> is server-only internally, so it's
-    /// safe to call unconditionally from every client here.
-    /// </summary>
-    private void OnSuspectProcessedForMailDelivery()
-    {
-        _mailDeliveryProcessedCount++;
-        if (_mailDeliveryProcessedCount < _mailDeliverySuspectThreshold) return;
-
-        TriggerDeferredMailDelivery();
-    }
-
-    /// <summary>
-    /// Safety net: if the shift ends (last suspect processed) before
-    /// <see cref="_mailDeliverySuspectThreshold"/> suspects were processed -- e.g. this day
-    /// rolled fewer suspects than the threshold -- fire the deferred mail delivery anyway so
-    /// it's never permanently skipped for the day.
-    /// </summary>
-    private void OnLastSuspectProcessed_TriggerMailFallback()
-    {
-        TriggerDeferredMailDelivery();
-    }
-
-    /// <summary>
-    /// One-shot: fires the Day 3 mail delivery that was deferred in <see cref="DayActivated"/>
-    /// and unsubscribes both triggers above so it can never fire twice in one shift.
-    /// </summary>
-    private void TriggerDeferredMailDelivery()
-    {
-        if (_mailDeliveryTriggered) return;
-        _mailDeliveryTriggered = true;
-
-        FolderController.OnFolderHandedOff  -= OnSuspectProcessedForMailDelivery;
-        ShiftManager.OnLastSuspectProcessed -= OnLastSuspectProcessed_TriggerMailFallback;
-
-        if (SortMailTask.DeferAutoTriggerForDay == 3)
-            SortMailTask.DeferAutoTriggerForDay = -1;
-
-        SortMailTask.Instance?.TriggerDeferredDelivery();
     }
 
     // -------------------------------------------------------------------------

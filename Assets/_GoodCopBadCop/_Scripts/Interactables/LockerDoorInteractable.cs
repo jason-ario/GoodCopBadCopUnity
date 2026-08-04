@@ -49,6 +49,20 @@ public class LockerDoorInteractable : Interactable, IHeldItemPassthrough
     /// <summary>True while the locker door is open.</summary>
     public bool IsOpen => _isOpen.Value;
 
+    /// <summary>
+    /// Local-only mirror of what this client has already applied visually. Reading
+    /// <see cref="_isOpen"/>'s NetworkVariable directly to decide the next toggle is unsafe: if the
+    /// player clicks again before the previous toggle's server round-trip has synced back down,
+    /// <c>_isOpen.Value</c> is still stale, so the "close" click would predict "open" again (same
+    /// value as before) — the sound for that direction plays, but the animator bool doesn't
+    /// actually flip, exactly reproducing the "plays a sound but doesn't close" symptom. This
+    /// field always reflects what was last predicted/applied locally, updated synchronously in
+    /// <see cref="Interact"/>, so back-to-back clicks always toggle correctly regardless of
+    /// network latency. <see cref="OnOpenStateChanged"/> resyncs it (and corrects the visuals) if
+    /// it ever drifts from the authoritative value, e.g. from a conflicting toggle by another player.
+    /// </summary>
+    private bool _predictedOpen;
+
     protected override void Awake()
     {
         base.Awake();
@@ -67,6 +81,7 @@ public class LockerDoorInteractable : Interactable, IHeldItemPassthrough
 
         // Sync visuals immediately (covers late joiners — OnValueChanged does not fire
         // retroactively for the value already present at spawn time).
+        _predictedOpen = _isOpen.Value;
         ApplyVisuals(_isOpen.Value);
     }
 
@@ -79,7 +94,8 @@ public class LockerDoorInteractable : Interactable, IHeldItemPassthrough
     {
         base.Interact(player);
 
-        bool willBeOpen = !_isOpen.Value;
+        bool willBeOpen = !_predictedOpen;
+        _predictedOpen = willBeOpen;
 
         // Predict locally so the door swing and sound respond immediately for the interacting
         // client instead of waiting on the server round-trip.
@@ -108,8 +124,15 @@ public class LockerDoorInteractable : Interactable, IHeldItemPassthrough
 
     private void OnOpenStateChanged(bool oldValue, bool newValue)
     {
-        // Only used for late-joining clients that missed the BroadcastVisualsClientRpc — the
-        // initial ApplyVisuals(_isOpen.Value) call in OnNetworkSpawn already covers that case.
+        // Normally a no-op — the initiating client already predicted this via Interact(), and
+        // other clients get their visuals from BroadcastVisualsClientRpc. This only does
+        // anything when the authoritative value disagrees with what we last predicted (e.g. a
+        // stale-read double-toggle, or a conflicting toggle from another player), in which case
+        // it resyncs the prediction flag and corrects the visuals to match the true state.
+        if (_predictedOpen == newValue) return;
+
+        _predictedOpen = newValue;
+        ApplyVisuals(newValue);
     }
 
     private void ApplyVisuals(bool isOpen)

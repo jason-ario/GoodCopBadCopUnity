@@ -291,7 +291,7 @@ public class PlayerInteractionController : NetworkBehaviour
             // Boards opted into ShowGhostWhileAiming (e.g. a mail cubby's PlacementSlot) show the
             // ghost — and put the reticle into its interact/hover state — as soon as the player
             // aims at them while holding an item, without needing to hold RMB first.
-            bool aimGhostRequested = placementBoard != null && placementBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject;
+            bool aimGhostRequested = placementBoard != null && placementBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject && placementBoard.AcceptsItem(_playerPickupController.HeldObject.ItemData);
 
             if (placerInRange)
             {
@@ -347,7 +347,7 @@ public class PlayerInteractionController : NetworkBehaviour
             // The surface itself usually isn't a PlacementBoard, but a tutorial hand-off
             // board may sit right on top of it, so snap to one nearby if present.
             PlacementBoard nearbyBoard = FindNearbyPlacementBoard(surfaceHit.point);
-            bool nearbyAimGhostRequested = nearbyBoard != null && nearbyBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject;
+            bool nearbyAimGhostRequested = nearbyBoard != null && nearbyBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject && nearbyBoard.AcceptsItem(_playerPickupController.HeldObject.ItemData);
 
             if (LmbDown && RmbHeld)
             {
@@ -549,6 +549,16 @@ public class PlayerInteractionController : NetworkBehaviour
 
         // Per-item opt-out
         if (_playerPickupController.HeldObject.ItemData.cantUsePlacementBoard == true)
+        {
+            reticle.SetInteractState(false);
+            if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();
+            lastInteractable = null;
+            return;
+        }
+
+        // Board-specific item restriction (e.g. a mail slot should only accept the Small Package
+        // item, not any pickable) — see PlacementBoard.AcceptsItem.
+        if (placementBoard != null && !placementBoard.AcceptsItem(_playerPickupController.HeldObject.ItemData))
         {
             reticle.SetInteractState(false);
             if (ObjectPlacer.Instance.IsActive) ObjectPlacer.Instance.DeactivatePlacer();

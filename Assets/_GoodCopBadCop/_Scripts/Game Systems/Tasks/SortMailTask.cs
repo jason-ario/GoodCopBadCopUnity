@@ -151,6 +151,18 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     public static int DeferAutoTriggerForDay = -1;
 
+    /// <summary>
+    /// When set to a day number, <see cref="OnDayChanged"/> skips its normal automatic delivery
+    /// trigger for that specific day entirely — no delivery, no crate, no "Sort the Mail" task —
+    /// and does NOT expect a later manual <see cref="TriggerDeferredDelivery"/> call. Unlike
+    /// <see cref="DeferAutoTriggerForDay"/>, the day is simply skipped rather than postponed.
+    /// The daily prohibited-goods roll (<see cref="ChooseTodaysProhibitedGoods"/>) still runs as
+    /// normal since it is independent of whether a delivery happens. Reset to -1 automatically
+    /// once consumed. Must be set before the day actually changes (e.g. in a day script's
+    /// DayActivated, which CampaignManager calls before OnDayChanged).
+    /// </summary>
+    public static int SkipDeliveryForDay = -1;
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _threatName;
@@ -314,6 +326,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (day == _lastTriggeredDay) return;
 
         _lastTriggeredDay = day;
+
+        if (day == SkipDeliveryForDay)
+        {
+            SkipDeliveryForDay = -1;
+            Debug.Log($"[SortMailTask] Day {day} delivery skipped entirely — no delivery will occur today.");
+            return;
+        }
 
         if (day == DeferAutoTriggerForDay)
         {

@@ -106,6 +106,12 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0f)]
     [SerializeField] private float goreLifetime = 10f;
 
+    [Tooltip("If a gore piece's Y position ever drops this many units below the point it spawned " +
+             "at (e.g. it clipped through the floor and is falling forever, out of reach), it is " +
+             "immediately despawned/destroyed instead of being left to fall indefinitely.")]
+    [Min(0.1f)]
+    [SerializeField] private float goreMaxFallDistance = 15f;
+
     [Tooltip("Blood decal prefabs spawned on the ground where a cosmetic gore piece lands (i.e. one that landed outside the Trash Task's yard). Purely cosmetic/local — leave empty to disable landing decals.")]
     [SerializeField] private GameObject[] bloodDecalPrefabs;
 
@@ -118,11 +124,11 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
              "under EVERY gore piece dropped in a death burst, whether or not it lands inside the Trash " +
-             "Task's yard. Registered with CleanBloodTask as transient blood (see " +
-             "CleanBloodTask.RegisterTransientBloodSplatter) so it despawns automatically the next time " +
-             "a day starts — players are never required to mop it up, unlike the gore piece itself, " +
-             "which IS registered as junk when it lands in the yard. All must be registered as Network " +
-             "Prefabs in the NetworkManager. Leave empty to disable gore blood splatters entirely.")]
+             "Task's yard. Registered with CleanBloodTask (see CleanBloodTask.RegisterBloodSplatter) so " +
+             "each splatter counts toward the post-breach clean-up objective and blocks clock-out until " +
+             "scrubbed — same as the gore piece itself, which IS registered as junk when it lands in the " +
+             "yard. All must be registered as Network Prefabs in the NetworkManager. Leave empty to " +
+             "disable gore blood splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
     [Tooltip("Small cosmetic blood-spray particle spawned alongside every gore blood-splatter decal " +
@@ -1138,6 +1144,11 @@ public class MutantEnemy : NetworkBehaviour
 
         TriggerAttackAnimationClientRpc();
 
+        // Freeze movement for the swing's windup so the mutant plants its feet and actually
+        // swings instead of continuing to slide toward the player mid-animation. DelayedHitScan
+        // releases the lock once the swing connects.
+        _agent.isStopped = true;
+
         // Schedule the sphere-cast to fire at the melee impact frame on the server.
         StartCoroutine(DelayedHitScan(data.damagePerHit));
     }
@@ -1161,10 +1172,16 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>
     /// Waits for the animation's melee point, then runs the hitbox sphere-cast on the server.
+    /// Also releases the movement lock set in <see cref="TryAttack"/> so the mutant resumes
+    /// chasing right after the swing connects rather than staying frozen for the rest of the
+    /// attack cooldown.
     /// </summary>
     private IEnumerator DelayedHitScan(float damage)
     {
         yield return new WaitForSeconds(attackHitDelay);
+
+        if (!_isDead)
+            _agent.isStopped = false;
 
         if (_isDead || attackHitbox == null)
             yield break;
@@ -1324,9 +1341,9 @@ public class MutantEnemy : NetworkBehaviour
     /// task; all other pieces are purely cosmetic and broadcast in a single RPC so every client
     /// spawns the same non-networked result. Every piece — yard or not (e.g. gore from a
     /// checkpoint breach fight) — also gets a server-authoritative, networked blood-splatter
-    /// decal registered with <see cref="CleanBloodTask"/> as transient blood via
-    /// <see cref="SpawnGoreBloodDecal"/>, so mutant gore always leaves behind blood — it just
-    /// despawns automatically the next day rather than requiring anyone to mop it up.
+    /// decal via <see cref="SpawnGoreBloodDecal"/>, which applies the same yard-bounds rule to
+    /// the splatter: in-yard blood counts toward <see cref="CleanBloodTask"/> and blocks
+    /// clock-out, out-of-yard blood is cosmetic-only and despawns automatically the next day.
     /// </summary>
     private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
     {
@@ -1417,34 +1434,54 @@ public class MutantEnemy : NetworkBehaviour
         // This piece was registered based on the position it was launched from, before physics
         // has had a chance to settle it — the pop velocity/gravity can carry it past the yard
         // boundary by the time it comes to rest. Once it settles, re-check its final position
-        // and drop it from the task if it ended up outside every yard SpawnZone.
-        StartCoroutine(UnregisterGoreIfSettledOutsideYard(netObj, rb));
+        // and drop it from the task if it ended up outside every yard SpawnZone. Also guards
+        // against it clipping through the floor and falling forever (e.g. spawned underground) —
+        // if it ever drops too far below its launch height it is despawned immediately so it
+        // can never soft-lock the player by being both required and unreachable.
+        StartCoroutine(MonitorGoreJunkItem(netObj, rb, position.y - goreMaxFallDistance));
 
         return true;
     }
 
     /// <summary>
-    /// Waits for <paramref name="rb"/> to come to rest (or a timeout, whichever comes first),
-    /// then unregisters <paramref name="netObj"/> from <see cref="TakeOutTrashTask"/> if its
-    /// final resting position no longer falls inside any configured yard SpawnZone — e.g. it
-    /// rolled or bounced past the boundary after being registered based on its initial launch
-    /// position in <see cref="SpawnGoreJunkItem"/>. No-op if the item was collected (despawned)
-    /// before settling. Server-only.
+    /// Server-only watchdog for a networked gore <see cref="JunkItem"/> spawned by
+    /// <see cref="SpawnGoreJunkItem"/>. Every frame, despawns it immediately if it has fallen
+    /// below <paramref name="minY"/> (e.g. it clipped through the floor and is falling forever,
+    /// out of reach — this piece is unregistered from the task first so it never soft-locks the
+    /// player by staying required-but-unreachable). Otherwise, once its Rigidbody settles (or a
+    /// timeout elapses), it is unregistered — but NOT despawned, remaining physically collectible
+    /// as a bonus — if its final resting position ended up outside every configured yard
+    /// SpawnZone. No-op once the item is collected (despawned) before either check fires.
     /// </summary>
-    private IEnumerator UnregisterGoreIfSettledOutsideYard(NetworkObject netObj, Rigidbody rb)
+    private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
     {
         const float settleTimeout = 5f;
         float elapsed = 0f;
+        bool settled = false;
 
-        while (elapsed < settleTimeout)
+        while (true)
         {
             if (netObj == null || !netObj.IsSpawned)
                 yield break;
 
-            if (rb == null || rb.IsSleeping())
+            if (netObj.transform.position.y < minY)
+            {
+                TakeOutTrashTask.Instance?.UnregisterExternalJunkItem(netObj);
+                netObj.Despawn(destroy: true);
+                yield break;
+            }
+
+            if (!settled)
+            {
+                if (rb == null || rb.IsSleeping() || elapsed >= settleTimeout)
+                    settled = true;
+                else
+                    elapsed += Time.deltaTime;
+            }
+
+            if (settled)
                 break;
 
-            elapsed += Time.deltaTime;
             yield return null;
         }
 
@@ -1458,14 +1495,15 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
     /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
-    /// ground. Registers the spawned decal with <see cref="CleanBloodTask"/> as transient blood
-    /// (see <see cref="CleanBloodTask.RegisterTransientBloodSplatter"/>) so it despawns
-    /// automatically the next time a day starts — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>
-    /// except it never blocks clock-out. Called for every gore piece in a death burst (see
-    /// <see cref="SpawnGoreBurst"/>), whether or not the piece itself ends up landing inside the
-    /// Trash Task's yard as collectible junk, so any breach (e.g. at the checkpoint, well outside
-    /// the yard) always leaves behind blood that's cleared away by the following day.
-    /// No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
+    /// ground. Mirrors <see cref="SpawnGoreJunkItem"/>'s yard-bounds rule for the gore piece
+    /// itself: a splatter that lands inside the Trash Task's yard is registered with
+    /// <see cref="CleanBloodTask"/> via <see cref="CleanBloodTask.RegisterBloodSplatter"/> so it
+    /// counts toward the post-breach clean-up objective and blocks clock-out until scrubbed;
+    /// a splatter outside the yard (e.g. from a checkpoint breach fight) is purely cosmetic and
+    /// registered via <see cref="CleanBloodTask.RegisterTransientBloodSplatter"/> instead, so it
+    /// never blocks clock-out and just despawns the next time a day starts. Called for every gore
+    /// piece in a death burst (see <see cref="SpawnGoreBurst"/>). No-op when
+    /// <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
     private void SpawnGoreBloodDecal(Vector3 originPosition)
     {
@@ -1498,7 +1536,15 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         decalNetObj.Spawn(destroyWithScene: true);
-        CleanBloodTask.Instance?.RegisterTransientBloodSplatter(decalNetObj);
+
+        // Only count this splatter toward the mop task if it landed inside the yard — mirrors
+        // SpawnGoreJunkItem's bounds check for the gore piece it belongs to. Splatters outside
+        // the yard (e.g. a checkpoint breach fight) are cosmetic-only and just despawn on their
+        // own the next day, same as out-of-yard gore never becoming a collectible JunkItem.
+        if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(originPosition))
+            CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
+        else
+            CleanBloodTask.Instance?.RegisterTransientBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
     }
@@ -1532,7 +1578,9 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Builds a velocity vector pointing outward from this mutant's body (with a bit of upward
     /// bias and random jitter), scaled to the given speed — used to make gore pieces look like
-    /// they're popping out of the mutant rather than just falling in place.
+    /// they're popping out of the mutant rather than just falling in place. The upward bias is
+    /// re-clamped AFTER jitter is applied so a piece can never end up launched downward — that
+    /// previously let some pieces punch straight into the floor and fall through it forever.
     /// </summary>
     private Vector3 GetRandomPopVelocity(Vector3 spawnPosition, float speed)
     {
@@ -1542,8 +1590,14 @@ public class MutantEnemy : NetworkBehaviour
         if (direction.sqrMagnitude < 0.0001f)
             direction = UnityEngine.Random.onUnitSphere;
 
-        direction = (direction.normalized + UnityEngine.Random.insideUnitSphere * 0.5f).normalized;
-        return direction * speed;
+        direction = direction.normalized + UnityEngine.Random.insideUnitSphere * 0.5f;
+
+        // Random jitter above can drag the y component back down (even negative) despite the
+        // upward bias already applied — re-clamp it so every gore piece always pops at least
+        // partly upward, never straight down into the floor.
+        direction.y = Mathf.Max(direction.y, 0.3f);
+
+        return direction.normalized * speed;
     }
 
     /// <summary>
@@ -1615,6 +1669,9 @@ public class MutantEnemy : NetworkBehaviour
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
         AttachGoreLandingDecalSpawner(piece);
+
+        GoreFallSafety fallSafety = piece.AddComponent<GoreFallSafety>();
+        fallSafety.Initialize(position.y - goreMaxFallDistance);
 
         Destroy(piece, goreLifetime);
     }

@@ -35,8 +35,13 @@ public class TrashBag : PickableObject, IAmmoProvider
     [SerializeField] private float _blendShapeTweenDuration = 0.4f;
 
     [Header("Audio")]
-    [Tooltip("Sound played on all clients each time a junk item is collected into this bag.")]
+    [Tooltip("Default sound played on all clients each time a junk item is collected into this bag.")]
     [SerializeField] private AudioClip _useSound;
+
+    [Tooltip("Additional 'splat' sound played alongside _useSound each time a junk item is " +
+             "collected into this bag — the same gore-landing splat used elsewhere (mutant gore " +
+             "bursts, Vlad's dropped torso/head). Leave unassigned to disable.")]
+    [SerializeField] private AudioClip _goreSplatSound;
 
     // ── Networked state ───────────────────────────────────────────────────────
 
@@ -141,8 +146,13 @@ public class TrashBag : PickableObject, IAmmoProvider
         OnAmmoChanged?.Invoke();
         UpdateBlendShapeSmooth(current);
 
-        if (_useSound != null && SFXController.Instance != null)
+        if (SFXController.Instance == null) return;
+
+        if (_useSound != null)
             SFXController.Instance.PlayAtPosition(_useSound, transform.position);
+
+        if (_goreSplatSound != null)
+            SFXController.Instance.PlayAtPosition(_goreSplatSound, transform.position);
     }
 
     /// <summary>

@@ -276,7 +276,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         int count = 0;
         foreach (JunkItem j in existingJunk)
         {
-            if (j.enabled && j.gameObject.activeInHierarchy)
+            if (IsCountablePreExistingJunkItem(j))
                 count++;
         }
 
@@ -337,12 +337,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Count pre-existing JunkItems in the scene BEFORE spawning (e.g. soldier body).
         // Uses FindObjectsInactive.Include so disabled-component JunkItems on active GameObjects
-        // are found, then filters to those that are actually enabled and active in the hierarchy.
+        // are found, then filters to those that are actually enabled, active in the hierarchy,
+        // inside the yard's spawn bounds, and not still attached to a living suspect.
         var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         int preExistingCount = 0;
         foreach (JunkItem j in existingJunk)
         {
-            if (j.enabled && j.gameObject.activeInHierarchy)
+            if (IsCountablePreExistingJunkItem(j))
                 preExistingCount++;
         }
 
@@ -440,6 +441,34 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="junk"/> should count toward this task's pre-existing
+    /// scene sweep (<see cref="ActivateForExistingItems"/>/<see cref="TriggerTask"/>). Filters
+    /// out two false-positive cases that previously inflated the task's denominator:
+    ///
+    /// 1. Mutant bodies/gore that landed (or later rolled/settled) outside every configured
+    ///    yard <see cref="SpawnZone"/> — dynamically-spawned gore already excludes these via
+    ///    <see cref="UnregisterExternalJunkItem"/>, but that unregister only removes tracking;
+    ///    the JunkItem component stays enabled on an active GameObject, so a later blanket
+    ///    scan would otherwise sweep it back in. Checked via <see cref="IsPositionInYard"/>.
+    /// 2. Living <see cref="SuspectCharacter"/>s. JunkItem components pre-attached to a suspect
+    ///    start non-collectible and are Unity-'enabled' the whole time the suspect is alive
+    ///    (see <see cref="JunkItem"/>'s class doc) — only <see cref="JunkItem.IsCollectible"/>
+    ///    flips true once <see cref="SuspectCharacter.EnableJunkPickup"/> runs on death. Skip
+    ///    any JunkItem still attached to a live suspect so alive characters are never counted.
+    /// </summary>
+    private bool IsCountablePreExistingJunkItem(JunkItem junk)
+    {
+        if (junk == null || !junk.enabled || !junk.gameObject.activeInHierarchy)
+            return false;
+
+        SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
+        if (suspect != null && !junk.IsCollectible.Value)
+            return false;
+
+        return IsPositionInYard(junk.transform.position);
     }
 
     /// <summary>

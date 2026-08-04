@@ -21,6 +21,16 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
 {
     public static ProcessResidentsTask Instance { get; private set; }
 
+    /// <summary>
+    /// Debug-only escape hatch. Set true right before <see cref="ShiftManager.TryStartShift"/>
+    /// to suppress this task's next <see cref="OnShiftStart"/> initialization — used by debug
+    /// skips (e.g. <see cref="Day_01.DebugSkipToMutantBreach"/>) that start the shift with no
+    /// suspects ever going to be processed, where tracking "Process N residents" would just
+    /// stay stuck at 0/N forever. Automatically consumed (reset to false) the next time
+    /// <see cref="OnShiftStart"/> fires, so it only ever suppresses a single shift.
+    /// </summary>
+    public static bool SuppressNextShiftStart = false;
+
     [Header("Task Properties")]
     [SerializeField] private string _taskName = "Process Residents";
 
@@ -138,6 +148,17 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     private void OnShiftStart()
     {
         if (!IsServer) return;
+
+        if (SuppressNextShiftStart)
+        {
+            SuppressNextShiftStart = false;
+            _processedCount.Value = 0;
+            _totalCount.Value = 0;
+            _isActive.Value = false;
+            Debug.Log("[ProcessResidentsTask] Shift started — suppressed via SuppressNextShiftStart (debug skip).");
+            return;
+        }
+
         StartCoroutine(InitializeAfterLineupPopulated());
     }
 
