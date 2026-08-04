@@ -56,7 +56,7 @@ public class InventoryHUDController : MonoBehaviour
     private void HandleSlotChanged(int slotIndex, PickableObject obj)
     {
         if (slotIndex < 0 || slotIndex >= slotUIs.Length) return;
-        slotUIs[slotIndex].SetItem(obj?.ItemData);
+        slotUIs[slotIndex].SetItem(obj);
     }
 
     private void HandleActiveSlotChanged(int activeIndex)
@@ -74,7 +74,7 @@ public class InventoryHUDController : MonoBehaviour
         for (int i = 0; i < slotUIs.Length; i++)
         {
             PickableObject item = _inventory.GetItemInSlot(i);
-            slotUIs[i].SetItem(item?.ItemData);
+            slotUIs[i].SetItem(item);
             slotUIs[i].SetSelected(_inventory.ActiveSlot == i);
         }
     }

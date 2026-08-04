@@ -29,7 +29,7 @@ using UnityEngine;
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class Pistol : PickableObject, IAmmoProvider
+public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 {
     /// <summary>Maximum number of rounds the pistol can hold.</summary>
     public const int MaxRounds = 30;
@@ -421,5 +421,95 @@ public class Pistol : PickableObject, IAmmoProvider
         }
 
         ppc.DestroyEquippedItem();
+    }
+
+    // ── Reloading from inventory (KeyCode.R) ────────────────────────────────────
+
+    /// <summary>Returns true if <paramref name="candidate"/> is a <see cref="PistolAmmo"/> clip.</summary>
+    public bool IsCompatibleAmmo(PickableObject candidate) => candidate is PistolAmmo;
+
+    /// <summary>
+    /// Called by <see cref="PlayerInventory"/> when the local player presses R while this pistol
+    /// is equipped and a <see cref="PistolAmmo"/> clip sits in the other inventory slot (not held).
+    /// </summary>
+    public void ReloadFromInventory(PickableObject ammoItem)
+    {
+        if (ammoItem is not PistolAmmo ammo) return;
+        if (_roundsRemaining.Value >= MaxRounds) return;
+        if (!ammo.TryGetComponent(out NetworkObject ammoNetObj)) return;
+
+        ReloadFromInventoryServerRpc(new NetworkObjectReference(ammoNetObj));
+    }
+
+    /// <summary>
+    /// Validates server-side that the requesting client owns both this pistol (currently holds it)
+    /// and the referenced <see cref="PistolAmmo"/> clip (it sits somewhere in their inventory),
+    /// then transfers rounds exactly like <see cref="ReloadServerRpc"/> — except the clip is never
+    /// brought to hand. If the clip empties, <see cref="ConsumeInventoryAmmoClientRpc"/> tells the
+    /// owning client to clear its inventory slot and despawn the clip.
+    /// RequireOwnership = false so any client can request this for their own pistol/ammo.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ReloadFromInventoryServerRpc(NetworkObjectReference ammoRef, ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+        {
+            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId} not found.");
+            return;
+        }
+
+        // Only the client actually holding this pistol may reload it.
+        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
+        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldWeaponObj) || heldWeaponObj != NetworkObject)
+        {
+            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId} is not holding this pistol.");
+            return;
+        }
+
+        if (!ammoRef.TryGet(out NetworkObject ammoNetObj) || ammoNetObj.GetComponent<PistolAmmo>() is not PistolAmmo ammo)
+        {
+            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId}'s ammo reference is invalid.");
+            return;
+        }
+
+        // The clip must actually belong to the requesting client (i.e. sit in their inventory).
+        if (ammoNetObj.OwnerClientId != clientId) return;
+        if (_roundsRemaining.Value >= MaxRounds) return;
+
+        int needed = MaxRounds - _roundsRemaining.Value;
+        int transferred = ammo.ConsumeRounds(needed);
+        _roundsRemaining.Value += transferred;
+
+        // Only despawn the clip when it has been fully emptied.
+        if (ammo.RoundsInClip <= 0)
+        {
+            ConsumeInventoryAmmoClientRpc(ammoRef, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Received only by the player who triggered the inventory reload. Removes the now-empty
+    /// clip from their <see cref="PlayerInventory"/> slot (so the UI clears immediately), then
+    /// asks the server to despawn it — mirroring <see cref="ConsumeAmmoClientRpc"/>'s ordering
+    /// for the held-clip path.
+    /// </summary>
+    [ClientRpc]
+    private void ConsumeInventoryAmmoClientRpc(NetworkObjectReference ammoRef, ClientRpcParams clientRpcParams = default)
+    {
+        if (!ammoRef.TryGet(out NetworkObject ammoNetObj)) return;
+
+        PickableObject ammoItem = ammoNetObj.GetComponent<PickableObject>();
+        if (ammoItem == null) return;
+
+        PlayerInventory inventory = NetworkManager.Singleton.LocalClient?.PlayerObject
+            ?.GetComponent<PlayerInventory>();
+        inventory?.ClearSlotForItem(ammoItem);
+
+        ammoItem.DespawnServerRpc();
     }
 }

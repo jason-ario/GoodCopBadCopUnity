@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -19,7 +20,7 @@ using UnityEngine;
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class ShotgunAmmo : PickableObject
+public class ShotgunAmmo : PickableObject, IAmmoProvider
 {
     /// <summary>Maximum shells a single box can carry.</summary>
     public const int MaxRoundsPerClip = 15;
@@ -32,6 +33,12 @@ public class ShotgunAmmo : PickableObject
     /// <summary>Current number of shells remaining in this box.</summary>
     public int RoundsInClip => _roundsInClip.Value;
 
+    // ── IAmmoProvider ─────────────────────────────────────────────────────────
+
+    public float CurrentAmmo => _roundsInClip.Value;
+    public float MaxAmmo => MaxRoundsPerClip;
+    public event Action OnAmmoChanged;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -43,7 +50,7 @@ public class ShotgunAmmo : PickableObject
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _roundsInClip.OnValueChanged += OnRoundsChanged;
+        _roundsInClip.OnValueChanged += HandleRoundsChanged;
 
         // Server initialises the authoritative count so late-joining clients replicate correctly.
         if (IsServer)
@@ -56,11 +63,14 @@ public class ShotgunAmmo : PickableObject
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _roundsInClip.OnValueChanged -= OnRoundsChanged;
+        _roundsInClip.OnValueChanged -= HandleRoundsChanged;
     }
 
-    private void OnRoundsChanged(int previous, int current)
-        => UpdateInteractText(current);
+    private void HandleRoundsChanged(int previous, int current)
+    {
+        UpdateInteractText(current);
+        OnAmmoChanged?.Invoke();
+    }
 
     private void UpdateInteractText(int rounds)
         => interactText = $"Shotgun Ammo ({rounds}/{MaxRoundsPerClip})";

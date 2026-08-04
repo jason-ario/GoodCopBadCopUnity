@@ -72,6 +72,41 @@ public class PlayerInventory : NetworkBehaviour
 
         if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
         if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
+        if (Input.GetKeyDown(KeyCode.R)) TryReloadActiveWeapon();
+    }
+
+    // ── Reloading ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pressing R reloads the currently equipped weapon directly from a compatible ammo item
+    /// sitting in the other inventory slot, without needing to bring the ammo to hand first.
+    /// No-ops if the held item isn't reloadable or no compatible ammo is carried.
+    /// </summary>
+    private void TryReloadActiveWeapon()
+    {
+        if (_activeSlot < 0) return;
+
+        PickableObject held = _slots[_activeSlot];
+        if (held is not IInventoryReloadable weapon) return;
+
+        int otherSlot = _activeSlot == 0 ? 1 : 0;
+        PickableObject ammoItem = _slots[otherSlot];
+        if (ammoItem == null || !weapon.IsCompatibleAmmo(ammoItem)) return;
+
+        weapon.ReloadFromInventory(ammoItem);
+    }
+
+    /// <summary>
+    /// Removes <paramref name="item"/> from whichever slot currently holds it, if any, and fires
+    /// <see cref="OnSlotChanged"/> so the HUD clears immediately. Called by weapons (e.g.
+    /// <see cref="Pistol"/>, <see cref="Shotgun"/>) right before despawning an ammo item that was
+    /// fully consumed via <see cref="TryReloadActiveWeapon"/> while sitting in inventory (not held).
+    /// </summary>
+    public void ClearSlotForItem(PickableObject item)
+    {
+        int index = SlotOf(item);
+        if (index >= 0)
+            ClearSlot(index);
     }
 
     // ── Pickup / drop tracking ────────────────────────────────────────────────
