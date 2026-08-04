@@ -244,6 +244,19 @@ public class PlayerInteractionController : NetworkBehaviour
 
             if (interactable != null && interactable.enabled)
             {
+                // Aiming at a genuine Interactable (e.g. a locker door leaf) always wins over any
+                // stale placement ghost left active from aiming at a nearby PlacementSlot/board
+                // moments earlier (see FindNearbyPlacementBoard) — every other branch below
+                // explicitly deactivates the placer when its conditions aren't met, but this one
+                // used to fall straight into its own logic and `return` without ever touching the
+                // placer. That left ObjectPlacer.Instance.IsActive/IsInRange true from the last
+                // frame the player aimed at the slot, so TryPlaceHeldObjectAtGhost() (checked
+                // before TryItemUse on LMB/E) would commit-drop the held package instead of
+                // forwarding the click to the interactable — e.g. a locker door that implements
+                // IHeldItemPassthrough would silently never open while holding a package.
+                if (ObjectPlacer.Instance.IsActive)
+                    ObjectPlacer.Instance.DeactivatePlacer();
+
                 if (inRange)
                 {
                     // When holding an item, only E triggers world interact so show [E].

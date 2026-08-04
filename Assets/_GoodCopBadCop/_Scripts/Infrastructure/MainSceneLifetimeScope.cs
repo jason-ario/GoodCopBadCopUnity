@@ -87,7 +87,17 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<EnvironmentRenderAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<EnvironmentCampaignAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<EnvironmentSuspectProgressAdapter>(Lifetime.Scoped);
-            builder.RegisterComponentInHierarchy<BunkerFogZone>();
+            // BunkerFogZone can have multiple instances in the scene (e.g. the power plant fog
+            // zones plus the bunker fog void), but RegisterComponentInHierarchy<T>() only finds
+            // and injects the FIRST instance encountered while walking the scene's root
+            // GameObjects — every other zone's IEnvironmentModel injection is silently skipped,
+            // leaving it to blend against stale RenderSettings values instead of the scheduler's
+            // current preset. Register each instance individually (with a unique key) so all of
+            // them receive the model.
+            foreach (BunkerFogZone zone in FindObjectsByType<BunkerFogZone>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                builder.RegisterComponent(zone).Keyed(zone);
+            }
             builder.RegisterComponentInHierarchy<RainEffectController>();
             builder.RegisterEntryPoint<RainAdapter>(Lifetime.Scoped);
 

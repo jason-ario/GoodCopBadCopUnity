@@ -134,7 +134,17 @@ public class MailCubbySlot : MonoBehaviour
     {
         MailPackageItem package = other.GetComponentInParent<MailPackageItem>();
         if (package == null) return;
-        if (package.IsHeld) return; // ignore momentary overlaps while a player carries a package past the cubby
+        // NOTE: do NOT gate on package.IsHeld here. A held package's colliders are disabled
+        // (see PickableColliderController.SetHeld), so a genuinely-held package can never
+        // physically overlap this trigger in the first place — this check can only ever see a
+        // package that was just dropped/placed. And package.IsHeld reads a server-authoritative
+        // NetworkVariable that the dropping client's own PlayerPickupController.DropObject
+        // re-enables this trigger's collider well ahead of (see PickableObject.OnDropped, which
+        // calls SetReleased() immediately/locally, "before the _holdingClientId NetworkVariable
+        // propagates back from the server"). Checking IsHeld here reads that stale "still held"
+        // value and silently swallows the delivery — this was the intermittent "dropped it in
+        // the right slot and it just didn't register" bug, worst for non-host clients where the
+        // round trip is a real network delay.
         if (package.IsResolved) return;
         if (_lockerDoor != null && !_lockerDoor.IsOpen) return; // door's own collider normally blocks entry — this is just a backstop
 

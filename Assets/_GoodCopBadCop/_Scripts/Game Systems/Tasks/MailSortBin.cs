@@ -89,7 +89,10 @@ public class MailSortBin : Interactable
     {
         MailPackageItem package = other.GetComponentInParent<MailPackageItem>();
         if (package == null) return;
-        if (package.IsHeld) return; // ignore momentary overlaps while a player carries a package past the bin
+        // NOTE: see the matching comment in MailCubbySlot.OnTriggerEnter — do NOT gate on
+        // package.IsHeld. Held packages have their colliders disabled, so this can only ever see
+        // a package that was just dropped; IsHeld itself can still read stale/true here because
+        // it's a server-authoritative NetworkVariable that hasn't round-tripped back yet.
         if (package.IsResolved) return;
 
         package.RequestSortServerRpc((int)_binType, string.Empty);

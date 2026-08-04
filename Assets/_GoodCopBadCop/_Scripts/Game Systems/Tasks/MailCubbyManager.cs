@@ -6,11 +6,16 @@ using Random = UnityEngine.Random;
 
 /// <summary>
 /// Placed on the "Mail Cubby manager" GameObject. Randomly picks which of the physical
-/// <see cref="MailCubbySlot"/> cubbies (found in children) are enabled — exactly one per eligible
-/// resident in <see cref="_suspectPool"/> — and assigns each enabled cubby a random resident,
-/// updating its tape label to match (see <see cref="MailCubbySlot.SetAssignedResident"/>). Any
-/// cubby not picked is deactivated so there are never more active cubbies than residents to fill
-/// them.
+/// <see cref="MailCubbySlot"/> cubbies (assigned via <see cref="_mailCubbySlots"/>) are enabled —
+/// exactly one per eligible resident in <see cref="_suspectPool"/> — and assigns each enabled
+/// cubby a random resident, updating its tape label to match (see
+/// <see cref="MailCubbySlot.SetAssignedResident"/>). Any cubby not picked is deactivated so there
+/// are never more active cubbies than residents to fill them.
+///
+/// The slots are no longer nested under this manager's GameObject: each <see cref="MailCubbySlot"/>
+/// carries its own <see cref="NetworkObject"/>, and Netcode's NetworkObject hierarchy only
+/// supports one level of NetworkObject parenting (no NetworkObject grandchildren). They must
+/// instead be manually wired up via <see cref="_mailCubbySlots"/>.
 ///
 /// Server-authoritative: the random shuffle only ever runs on the server. The resulting
 /// active/inactive flags and resident assignments (as indices into <see cref="_suspectPool"/>,
@@ -24,6 +29,8 @@ using Random = UnityEngine.Random;
 ///   - Requires a <see cref="NetworkObject"/> component on the same GameObject (scene object).
 ///   - Assign <see cref="_suspectPool"/> to the <see cref="SuspectSet"/> asset residents should be
 ///     drawn from (e.g. "All Suspects").
+///   - Assign every <see cref="MailCubbySlot"/> this manager should control to
+///     <see cref="_mailCubbySlots"/> (they live as sibling top-level objects, not children).
 ///   - Call <see cref="AutoAssignRandomResidents"/> (right-click the component in the Inspector —
 ///     server/host only — or leave <see cref="_assignOnAwake"/> enabled to run it automatically
 ///     once this NetworkObject spawns on the server).
@@ -49,6 +56,12 @@ public class MailCubbyManager : NetworkBehaviour
     private bool[] _lastActiveFlags;
     private int[] _lastResidentAssignment;
     private bool _hasAssignment;
+
+    [Tooltip("The physical MailCubbySlot cubbies this manager controls. Must be assigned manually — " +
+        "the slots are their own top-level NetworkObjects (not children of this manager), since " +
+        "Netcode's NetworkObject hierarchy only supports one level of nesting (no NetworkObject " +
+        "grandchildren). Order does not matter.")]
+    [SerializeField] private MailCubbySlot[] _mailCubbySlots;
 
     /// <summary>Scene-wide singleton, mirroring <see cref="SortMailTask.Instance"/> — there is only ever one Mail Cubby manager in the scene.</summary>
     public static MailCubbyManager Instance { get; private set; }
@@ -145,6 +158,24 @@ public class MailCubbyManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Returns the cubby slots this manager controls. Prefers the manually-assigned
+    /// <see cref="_mailCubbySlots"/> array (required now that slots are separate top-level
+    /// NetworkObjects and can no longer be discovered via <c>GetComponentsInChildren</c>). Falls
+    /// back to a children search for any legacy setup that hasn't been migrated yet, with a
+    /// warning so it gets caught and fixed.
+    /// </summary>
+    private MailCubbySlot[] GetSlots()
+    {
+        if (_mailCubbySlots != null && _mailCubbySlots.Length > 0)
+            return _mailCubbySlots;
+
+        Debug.LogWarning("[MailCubbyManager] _mailCubbySlots is not assigned — falling back to " +
+            "GetComponentsInChildren, which will find nothing now that slots are separate " +
+            "top-level NetworkObjects. Assign _mailCubbySlots in the inspector.", this);
+        return GetComponentsInChildren<MailCubbySlot>(true);
+    }
+
+    /// <summary>
     /// Server-only. Finds every <see cref="MailCubbySlot"/> under this manager (active or not),
     /// shuffles them, and enables a random subset — one per eligible resident in
     /// <see cref="_suspectPool"/> — while deactivating the rest. Each enabled cubby is then
@@ -161,10 +192,10 @@ public class MailCubbyManager : NetworkBehaviour
             return;
         }
 
-        MailCubbySlot[] allSlots = GetComponentsInChildren<MailCubbySlot>(true);
+        MailCubbySlot[] allSlots = GetSlots();
         if (allSlots.Length == 0)
         {
-            Debug.LogWarning("[MailCubbyManager] No MailCubbySlot found in children — nothing to assign.", this);
+            Debug.LogWarning("[MailCubbyManager] No MailCubbySlot assigned — nothing to assign.", this);
             return;
         }
 
@@ -222,7 +253,7 @@ public class MailCubbyManager : NetworkBehaviour
     {
         if (IsServer) return;
 
-        MailCubbySlot[] allSlots = GetComponentsInChildren<MailCubbySlot>(true);
+        MailCubbySlot[] allSlots = GetSlots();
         ApplyAssignment(allSlots, activeFlags, residentAssignment);
     }
 
