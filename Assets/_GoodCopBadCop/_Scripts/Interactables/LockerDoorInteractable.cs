@@ -20,8 +20,14 @@ using UnityEngine;
 ///   - Assign <see cref="_audioSource"/>, <see cref="_openClip"/> and <see cref="_closeClip"/> for
 ///     the open/close sounds. Falls back to <c>GetComponent&lt;AudioSource&gt;()</c> if
 ///     <see cref="_audioSource"/> is unassigned.
+///
+/// Implements <see cref="IHeldItemPassthrough"/> so the door still opens/closes while the
+/// player is holding an item (e.g. the mail package they're about to place through the slot) —
+/// without it, PlayerInteractionController.TryItemUse only forwards to InteractWithItem/held-item
+/// checks and this door isn't a match for either, so LMB/E silently did nothing whenever the
+/// player had something in hand.
 /// </summary>
-public class LockerDoorInteractable : Interactable
+public class LockerDoorInteractable : Interactable, IHeldItemPassthrough
 {
     private static readonly int LockerOpenParam = Animator.StringToHash("LockerOpen");
 

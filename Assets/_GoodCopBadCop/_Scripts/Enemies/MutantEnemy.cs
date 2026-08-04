@@ -118,10 +118,11 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
              "under EVERY gore piece dropped in a death burst, whether or not it lands inside the Trash " +
-             "Task's yard. Registered with CleanBloodTask so they must be mopped up before clocking out, " +
-             "just like the gore piece itself is registered as junk when it lands in the yard. All must " +
-             "be registered as Network Prefabs in the NetworkManager. Leave empty to disable gore blood " +
-             "splatters entirely.")]
+             "Task's yard. Registered with CleanBloodTask as transient blood (see " +
+             "CleanBloodTask.RegisterTransientBloodSplatter) so it despawns automatically the next time " +
+             "a day starts — players are never required to mop it up, unlike the gore piece itself, " +
+             "which IS registered as junk when it lands in the yard. All must be registered as Network " +
+             "Prefabs in the NetworkManager. Leave empty to disable gore blood splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
     [Tooltip("Small cosmetic blood-spray particle spawned alongside every gore blood-splatter decal " +
@@ -134,6 +135,10 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Seconds before a spawned blood particle effect is automatically destroyed.")]
     [Min(0f)]
     [SerializeField] private float bloodParticleLifetime = 3f;
+
+    [Tooltip("'Splat' sound played (spatialized at the contact point, via SFXController) the instant a " +
+             "cosmetic gore piece from the death burst first lands on the ground. Leave unassigned to disable.")]
+    [SerializeField] private AudioClip goreLandingSound;
 
     [Header("Corpse Junk")]
     [Tooltip("Optional JunkItem component pre-attached (and disabled) to this corpse, matching the same " +
@@ -1319,9 +1324,9 @@ public class MutantEnemy : NetworkBehaviour
     /// task; all other pieces are purely cosmetic and broadcast in a single RPC so every client
     /// spawns the same non-networked result. Every piece — yard or not (e.g. gore from a
     /// checkpoint breach fight) — also gets a server-authoritative, networked blood-splatter
-    /// decal registered with <see cref="CleanBloodTask"/> via <see cref="SpawnGoreBloodDecal"/>,
-    /// so mutant gore always leaves behind blood that has to be mopped up, not just gore that
-    /// happens to land in the yard.
+    /// decal registered with <see cref="CleanBloodTask"/> as transient blood via
+    /// <see cref="SpawnGoreBloodDecal"/>, so mutant gore always leaves behind blood — it just
+    /// despawns automatically the next day rather than requiring anyone to mop it up.
     /// </summary>
     private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
     {
@@ -1402,24 +1407,64 @@ public class MutantEnemy : NetworkBehaviour
         rb.angularVelocity = UnityEngine.Random.insideUnitSphere * UnityEngine.Random.Range(2f, 6f);
 
         // The blood splatter for this piece is already spawned by the caller (see
-        // SpawnGoreBurst's unconditional SpawnGoreBloodDecal call) — it needs to be
-        // trackable/mop-cleanable just like the gore itself is trackable as junk.
+        // SpawnGoreBurst's unconditional SpawnGoreBloodDecal call) — it despawns on its own the
+        // next day starts, independent of whether this gore piece gets bagged up as junk.
         junk.enabled = true;
         netObj.Spawn(destroyWithScene: true);
 
         TakeOutTrashTask.Instance?.RegisterExternalJunkItem(netObj);
 
+        // This piece was registered based on the position it was launched from, before physics
+        // has had a chance to settle it — the pop velocity/gravity can carry it past the yard
+        // boundary by the time it comes to rest. Once it settles, re-check its final position
+        // and drop it from the task if it ended up outside every yard SpawnZone.
+        StartCoroutine(UnregisterGoreIfSettledOutsideYard(netObj, rb));
+
         return true;
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="rb"/> to come to rest (or a timeout, whichever comes first),
+    /// then unregisters <paramref name="netObj"/> from <see cref="TakeOutTrashTask"/> if its
+    /// final resting position no longer falls inside any configured yard SpawnZone — e.g. it
+    /// rolled or bounced past the boundary after being registered based on its initial launch
+    /// position in <see cref="SpawnGoreJunkItem"/>. No-op if the item was collected (despawned)
+    /// before settling. Server-only.
+    /// </summary>
+    private IEnumerator UnregisterGoreIfSettledOutsideYard(NetworkObject netObj, Rigidbody rb)
+    {
+        const float settleTimeout = 5f;
+        float elapsed = 0f;
+
+        while (elapsed < settleTimeout)
+        {
+            if (netObj == null || !netObj.IsSpawned)
+                yield break;
+
+            if (rb == null || rb.IsSleeping())
+                break;
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (netObj == null || !netObj.IsSpawned)
+            yield break;
+
+        if (TakeOutTrashTask.Instance != null && !TakeOutTrashTask.Instance.IsPositionInYard(netObj.transform.position))
+            TakeOutTrashTask.Instance.UnregisterExternalJunkItem(netObj);
     }
 
     /// <summary>
     /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
     /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
-    /// ground. Registers the spawned decal with <see cref="CleanBloodTask"/> so it counts toward
-    /// the "Clean Blood" task — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>. Called for every
-    /// gore piece in a death burst (see <see cref="SpawnGoreBurst"/>), whether or not the piece
-    /// itself ends up landing inside the Trash Task's yard as collectible junk, so any breach
-    /// (e.g. at the checkpoint, well outside the yard) always leaves behind mop-cleanable blood.
+    /// ground. Registers the spawned decal with <see cref="CleanBloodTask"/> as transient blood
+    /// (see <see cref="CleanBloodTask.RegisterTransientBloodSplatter"/>) so it despawns
+    /// automatically the next time a day starts — mirrors <c>TakeOutTrashTask.SpawnBloodDecal</c>
+    /// except it never blocks clock-out. Called for every gore piece in a death burst (see
+    /// <see cref="SpawnGoreBurst"/>), whether or not the piece itself ends up landing inside the
+    /// Trash Task's yard as collectible junk, so any breach (e.g. at the checkpoint, well outside
+    /// the yard) always leaves behind blood that's cleared away by the following day.
     /// No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
     private void SpawnGoreBloodDecal(Vector3 originPosition)
@@ -1453,7 +1498,7 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         decalNetObj.Spawn(destroyWithScene: true);
-        CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
+        CleanBloodTask.Instance?.RegisterTransientBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
     }
@@ -1576,16 +1621,17 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>
     /// Adds a <see cref="GoreLandingDecalSpawner"/> to a physics-driven gore piece so a blood
-    /// decal appears on the ground at the point where it first lands. No-op when
-    /// <see cref="bloodDecalPrefabs"/> is empty.
+    /// decal (and landing "splat" sound) appears where it first lands. No-op when both
+    /// <see cref="bloodDecalPrefabs"/> and <see cref="goreLandingSound"/> are unassigned.
     /// </summary>
     private void AttachGoreLandingDecalSpawner(GameObject piece)
     {
-        if (bloodDecalPrefabs == null || bloodDecalPrefabs.Length == 0)
+        bool hasDecals = bloodDecalPrefabs != null && bloodDecalPrefabs.Length > 0;
+        if (!hasDecals && goreLandingSound == null)
             return;
 
         GoreLandingDecalSpawner spawner = piece.AddComponent<GoreLandingDecalSpawner>();
-        spawner.Initialize(bloodDecalPrefabs, goreGroundLayer, bloodDecalLifetime, bloodParticlePrefab, bloodParticleLifetime);
+        spawner.Initialize(bloodDecalPrefabs, goreGroundLayer, bloodDecalLifetime, bloodParticlePrefab, bloodParticleLifetime, goreLandingSound);
     }
 
     [ClientRpc]

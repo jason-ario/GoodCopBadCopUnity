@@ -88,6 +88,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &1000012855196106
 GameObject:
@@ -99,6 +100,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4000011240085458}
   - component: {fileID: 205000013743736396}
+  - component: {fileID: 1022024996291078471}
   m_Layer: 0
   m_Name: chainlink_barbwire-3
   m_TagString: Untagged
@@ -130,7 +132,7 @@ LODGroup:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1000012855196106}
-  serializedVersion: 2
+  serializedVersion: 3
   m_LocalReferencePoint: {x: -0.038473845, y: 1.2860587, z: -0.0035731196}
   m_Size: 2.8361812
   m_FadeMode: 0
@@ -146,6 +148,28 @@ LODGroup:
     renderers:
     - renderer: {fileID: 23000014099749656}
   m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
+--- !u!65 &1022024996291078471
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000012855196106}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.8361814, y: 2.617829, z: 0.1918018}
+  m_Center: {x: -0.0000028095587, y: 1.2398996, z: 0.011577406}
 --- !u!1 &1000013352661962
 GameObject:
   m_ObjectHideFlags: 0
@@ -234,4 +258,5 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}

@@ -133,6 +133,36 @@ public class OchoEatingVladCutscene : NetworkBehaviour
              "root, and be registered in Assets/DefaultNetworkPrefabs.asset.")]
     [SerializeField] private GameObject[] _networkedVladPiecePrefabs;
 
+    // ── Inspector — Piece Landing Effects ────────────────────────────────────
+
+    [Header("Piece Landing Effects")]
+    [Tooltip("Layer(s) considered 'ground' for the purpose of detecting when a dropped Vlad " +
+             "piece lands (server-only collision check; see GoreLandingEffectRelay).")]
+    [SerializeField] private LayerMask _pieceGroundLayer;
+
+    [Tooltip("Blood decal prefabs — same pool used for the mutant gore death bursts — spawned " +
+             "on the ground where a dropped Vlad piece (torso/head) first lands. Leave empty to " +
+             "disable landing decals.")]
+    [SerializeField] private GameObject[] _pieceLandingDecalPrefabs;
+
+    [Tooltip("Seconds before a landing blood decal is automatically destroyed. 0 = never.")]
+    [Min(0f)]
+    [SerializeField] private float _pieceLandingDecalLifetime = 20f;
+
+    [Tooltip("Small cosmetic blood-spray particle spawned alongside the landing decal, aligned " +
+             "with the ground normal — same prefab style used for the mutant gore bursts. Leave " +
+             "unassigned to disable.")]
+    [SerializeField] private GameObject _pieceLandingParticlePrefab;
+
+    [Tooltip("Seconds before a spawned blood particle effect is automatically destroyed.")]
+    [Min(0f)]
+    [SerializeField] private float _pieceLandingParticleLifetime = 3f;
+
+    [Tooltip("'Splat' sound played (spatialized at the contact point, via SFXController) on " +
+             "every client the instant a dropped Vlad piece (torso/head) first lands on the " +
+             "ground. Leave unassigned to disable.")]
+    [SerializeField] private AudioClip _pieceLandingSound;
+
     // ── Inspector — Jump Sequence ─────────────────────────────────────────────
 
     [Header("Jump Sequence")]
@@ -484,8 +514,51 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             netObj.Spawn(true);
             _spawnedPieceNetObjs[i] = netObj;
 
+            GoreLandingEffectRelay relay = instance.AddComponent<GoreLandingEffectRelay>();
+            relay.Initialize(_pieceGroundLayer, HandlePieceLanded);
+
             SetupNetworkedPieceClientRpc(new NetworkObjectReference(netObj), i);
         }
+    }
+
+    /// <summary>
+    /// SERVER ONLY — called by a dropped Vlad piece's <see cref="GoreLandingEffectRelay"/> the
+    /// instant it first hits the ground. Broadcasts the landing decal/particle/sound to every
+    /// client (see <see cref="SpawnPieceLandingEffectsClientRpc"/>) since only the server ever
+    /// simulates real physics for the piece (NetworkRigidbody keeps every other client's copy
+    /// kinematic).
+    /// </summary>
+    private void HandlePieceLanded(Vector3 position, Vector3 normal)
+    {
+        if (!IsServer) return;
+
+        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(normal);
+        SpawnPieceLandingEffectsClientRpc(position, rotation);
+    }
+
+    /// <summary>
+    /// Runs on every client: spawns a random <see cref="_pieceLandingDecalPrefabs"/> entry and
+    /// the aligned <see cref="_pieceLandingParticlePrefab"/> at the landing point/rotation, and
+    /// plays <see cref="_pieceLandingSound"/> spatialized at the same position.
+    /// </summary>
+    [ClientRpc]
+    private void SpawnPieceLandingEffectsClientRpc(Vector3 position, Quaternion rotation)
+    {
+        if (_pieceLandingDecalPrefabs != null && _pieceLandingDecalPrefabs.Length > 0)
+        {
+            GameObject prefab = _pieceLandingDecalPrefabs[UnityEngine.Random.Range(0, _pieceLandingDecalPrefabs.Length)];
+            if (prefab != null)
+            {
+                GameObject decal = Instantiate(prefab, position, rotation);
+                if (_pieceLandingDecalLifetime > 0f)
+                    Destroy(decal, _pieceLandingDecalLifetime);
+            }
+        }
+
+        BloodDecalUtility.SpawnAlignedParticle(_pieceLandingParticlePrefab, position, rotation, _pieceLandingParticleLifetime);
+
+        if (_pieceLandingSound != null)
+            SFXController.Instance?.PlayAtPosition(_pieceLandingSound, position);
     }
 
     /// <summary>

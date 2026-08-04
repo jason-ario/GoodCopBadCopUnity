@@ -13,6 +13,7 @@ public class Radio : Interactable
 {
     [SerializeField] private AudioClip[] songs;
     [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip   clickSound;
 
     // Whether the radio is currently muted (off) or audible (on).
     private readonly NetworkVariable<bool> _isOn = new NetworkVariable<bool>(
@@ -191,6 +192,8 @@ public class Radio : Interactable
 
     private void OnIsOnChanged(bool oldValue, bool newValue)
     {
+        PlayClickSound();
+
         if (newValue)
         {
             // The AudioSource keeps running while muted, so only re-sync if the clip
@@ -218,6 +221,17 @@ public class Radio : Interactable
     // -------------------------------------------------------------------------
     // Local audio helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Plays the on/off click cue locally. Uses PlayClipAtPoint so it is heard
+    /// on every client regardless of the radio's current mute state and doesn't
+    /// interfere with the music AudioSource.
+    /// </summary>
+    private void PlayClickSound()
+    {
+        if (clickSound == null) return;
+        AudioSource.PlayClipAtPoint(clickSound, transform.position);
+    }
 
     /// <summary>
     /// Loads the clip at <paramref name="songIndex"/>, seeks to the position

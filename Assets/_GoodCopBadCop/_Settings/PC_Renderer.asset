@@ -78,6 +78,24 @@ MonoBehaviour:
       surfaceData: 2
     screenSpaceSettings:
       normalBlend: 0
+--- !u!114 &-135517569053171247
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 03b4ec73907ff472f811959d3cd1919c, type: 3}
+  m_Name: DepthRenderPrePassFeature
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::VolumetricFogAndMist2.DepthRenderPrePassFeature
+  m_Active: 1
+  cameraLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  ignoreReflectionProbes: 1
+  useOptimizedDepthOnlyShader: 1
 --- !u!114 &-123111962723324806
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -133,7 +151,8 @@ MonoBehaviour:
   - {fileID: 6635397920722825757}
   - {fileID: 7300517804645528778}
   - {fileID: -6048748491816672947}
-  m_RendererFeatureMap: ad6b866f10d7b46cbc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d1548d42a45a7139b1db20cc840ab155ccab44f7643a650654d6196594b870eac
+  - {fileID: -135517569053171247}
+  m_RendererFeatureMap: ad6b866f10d7b46cbc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d1548d42a45a7139b1db20cc840ab155ccab44f7643a650654d6196594b870eacd1e1c22b7d8b1efe
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3

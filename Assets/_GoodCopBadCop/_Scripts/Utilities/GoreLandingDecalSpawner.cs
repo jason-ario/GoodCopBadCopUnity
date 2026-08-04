@@ -11,6 +11,11 @@ using UnityEngine;
 /// Purely cosmetic and local — does not use Netcode. Intended for client-local, non-networked
 /// gore pieces (e.g. <c>MutantEnemy</c>'s cosmetic gore bursts) where each client simulates its
 /// own physics and a perfectly-synced decal isn't required.
+///
+/// Also plays a "splat" impact sound (via <see cref="SFXController"/>, spatialized at the
+/// contact point) on landing, independent of whether a decal prefab is assigned — so this can
+/// be reused purely for the landing sound (e.g. gore hitting the ground in general) even when
+/// no decal is configured.
 /// </summary>
 public class GoreLandingDecalSpawner : MonoBehaviour
 {
@@ -19,19 +24,21 @@ public class GoreLandingDecalSpawner : MonoBehaviour
     private float _decalLifetime;
     private GameObject _particlePrefab;
     private float _particleLifetime;
+    private AudioClip _landingSound;
     private bool _hasLanded;
 
     /// <summary>
     /// Configures this spawner. Must be called right after adding the component, since its
     /// fields aren't serialized (the component is always added at runtime).
     /// </summary>
-    public void Initialize(GameObject[] decalPrefabs, LayerMask groundLayer, float decalLifetime, GameObject particlePrefab, float particleLifetime)
+    public void Initialize(GameObject[] decalPrefabs, LayerMask groundLayer, float decalLifetime, GameObject particlePrefab, float particleLifetime, AudioClip landingSound = null)
     {
         _decalPrefabs = decalPrefabs;
         _groundLayer = groundLayer;
         _decalLifetime = decalLifetime;
         _particlePrefab = particlePrefab;
         _particleLifetime = particleLifetime;
+        _landingSound = landingSound;
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -44,11 +51,13 @@ public class GoreLandingDecalSpawner : MonoBehaviour
 
         _hasLanded = true;
 
+        ContactPoint contact = collision.GetContact(0);
+
         if (_decalPrefabs != null && _decalPrefabs.Length > 0)
-        {
-            ContactPoint contact = collision.GetContact(0);
             SpawnDecal(contact.point, contact.normal);
-        }
+
+        if (_landingSound != null)
+            SFXController.Instance?.PlayAtPosition(_landingSound, contact.point);
 
         Destroy(this);
     }

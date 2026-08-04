@@ -65,6 +65,20 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Set by a day script (e.g. Day_01, in <c>DayActivated</c>/<c>DayDeactivated</c>) for the
+    /// entire duration it will show its OWN hand-scripted TutorialObjectiveList row for this
+    /// task — e.g. Day 1's tutorial-choreographed graffiti objective added in
+    /// <c>Day_01.OnTrashTaskReadySync</c>. Set it well before <see cref="TriggerDailyTask"/> can
+    /// possibly run (activation time, not trigger time) so <see cref="HUDTaskList"/> never has
+    /// a chance to add its own generic row first — that race would leave a stale duplicate row
+    /// behind even after this flag is later set. While true, HUDTaskList skips this threat
+    /// entirely (same pattern as <c>ProcessResidentsTask</c>'s exclusion for the automatic
+    /// subject counter). Days that don't hand-manage this task (e.g. Day 2+) leave this false
+    /// and get the task's row purely from the generic HUDTaskList/TaskRegistry bridge.
+    /// </summary>
+    public bool HasCustomTutorialRow { get; set; }
+
     public string ThreatName  => _taskName;
     public float  ScoreWeight => 1f;
 

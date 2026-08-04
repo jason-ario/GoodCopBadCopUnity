@@ -44,6 +44,13 @@ public class HUDTaskList : MonoBehaviour
             // Skip it here so the two don't both add a row for the same thing.
             if (threat is ProcessResidentsTask) continue;
 
+            // TakeOutTrashTask / CleanGraffitiTask are skipped whenever a day script (e.g. Day 1)
+            // is showing its own hand-scripted tutorial row for them — see HasCustomTutorialRow.
+            // Without this, Day 1 duplicates both the trash and graffiti objectives: one row from
+            // Day_01's tutorial choreography and a second from this generic registry bridge.
+            if (threat is TakeOutTrashTask trashTask && trashTask.HasCustomTutorialRow) continue;
+            if (threat is CleanGraffitiTask graffitiTask && graffitiTask.HasCustomTutorialRow) continue;
+
             TutorialObjectiveItem item = list.AddObjective(BuildLabel(threat));
             if (item != null)
                 _rows[threat] = item;

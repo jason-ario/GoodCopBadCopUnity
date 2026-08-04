@@ -121,6 +121,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedDecals = new();
     private bool _taskActive;
 
+    /// <summary>
+    /// Set by a day script (e.g. Day_01, in <c>DayActivated</c>/<c>DayDeactivated</c>) for the
+    /// entire duration it will show its OWN hand-scripted TutorialObjectiveList row for this
+    /// task — e.g. Day 1's tutorial-choreographed trash objective added in
+    /// <c>Day_01.OnTrashTaskReadySync</c>. Set it well before <see cref="TriggerTask"/> can
+    /// possibly run (activation time, not trigger time) so <see cref="HUDTaskList"/> never has
+    /// a chance to add its own generic row first — that race would leave a stale duplicate row
+    /// behind even after this flag is later set. While true, HUDTaskList skips this threat
+    /// entirely (same pattern as <c>ProcessResidentsTask</c>'s exclusion for the automatic
+    /// subject counter). Days that don't hand-manage this task (e.g. Day 2+) leave this false
+    /// and get the task's row purely from the generic HUDTaskList/TaskRegistry bridge.
+    /// </summary>
+    public bool HasCustomTutorialRow { get; set; }
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _threatName;
@@ -460,6 +474,31 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         UpdateThreatLevel();
     }
 
+    /// <summary>
+    /// Removes a previously-registered external <see cref="JunkItem"/> from this task's total —
+    /// used when a gore chunk registered via <see cref="RegisterExternalJunkItem"/> (based on
+    /// its initial in-yard launch position) later comes to rest outside every configured
+    /// <see cref="SpawnZone"/> once physics settles (e.g. it rolled or bounced past the yard
+    /// boundary). Decrements the total so the task no longer requires collecting it and
+    /// completes the task if it was the last outstanding item. The item itself is left alone —
+    /// still physically collectible as a bonus, just no longer counted or required. No-op if
+    /// the item was never tracked (e.g. already collected). Server-only.
+    /// </summary>
+    public void UnregisterExternalJunkItem(NetworkObject netObj)
+    {
+        if (!IsServer || netObj == null) return;
+        if (!_spawnedItems.Remove(netObj)) return;
+
+        _totalCount.Value = Mathf.Max(_depositedCount.Value, _totalCount.Value - 1);
+        UpdateThreatLevel();
+
+        Debug.Log($"[TakeOutTrashTask] External junk item landed outside the yard — unregistered. " +
+                  $"New total {_totalCount.Value}.");
+
+        if (_taskActive && _depositedCount.Value >= _totalCount.Value)
+            CompleteTask();
+    }
+
     // ── Private ────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -476,7 +515,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (_depositedCount.Value < _totalCount.Value) return;
 
-        // All items deposited — complete the task.
+        CompleteTask();
+    }
+
+    /// <summary>
+    /// Marks the task complete: stops listening for further collection/deposit events, awards
+    /// coupons, and removes the task from the HUD on all clients. Shared by
+    /// <see cref="OnTrashBagDeposited"/> (every item deposited) and
+    /// <see cref="UnregisterExternalJunkItem"/> (the last outstanding item turned out to be
+    /// untrackable, e.g. gore that rolled outside the yard). No-op if the task isn't active.
+    /// </summary>
+    private void CompleteTask()
+    {
+        if (!_taskActive) return;
+
         _taskActive = false;
         JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
