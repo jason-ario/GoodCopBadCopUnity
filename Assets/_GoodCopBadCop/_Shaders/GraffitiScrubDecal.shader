@@ -45,9 +45,13 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             "Queue"          = "AlphaTest"
         }
 
+        // Forward Lit Pass
         Pass
         {
             Name "GraffitiScrubDecal"
+            // Required so URP actually treats this as a forward-lit pass — without this tag
+            // the pass never receives proper light/shadow data and renders flat/unlit.
+            Tags { "LightMode" = "UniversalForward" }
 
             // Render the inner (back) faces of the box so the decal is visible even
             // when the camera is inside the projection volume.
@@ -62,9 +66,12 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             #pragma fragment frag
             #pragma multi_compile_instancing
 
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _FORWARD_PLUS
+            #pragma multi_compile_fog
             #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
             #pragma multi_compile _ SHADOWS_SHADOWMASK
 
@@ -266,6 +273,12 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                     finalRGB += albedo * light.color * (light.shadowAttenuation * light.distanceAttenuation) * NdotLi;
                 }
 #endif
+
+                // --- Standard distance/height fog, computed from the reconstructed
+                //     world position since this decal has no interpolated per-vertex fog ---
+                float4 reconstructedCS = TransformWorldToHClip(positionWS);
+                float  fogFactor       = ComputeFogFactor(reconstructedCS.z);
+                finalRGB = MixFog(finalRGB, fogFactor);
 
                 return half4(finalRGB, alpha);
             }

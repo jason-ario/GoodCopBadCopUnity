@@ -59,34 +59,31 @@ public class DuskNotificationUI : MonoBehaviour
     }
 
     private void OnEnable()  => ShiftManager.OnDuskBegin += ShowDusk;
-
-    private void OnDisable()
-    {
-        ShiftManager.OnDuskBegin -= ShowDusk;
-
-        // Defensive cleanup: StartCoroutine is killed outright the instant this object (or a
-        // parent, e.g. UIController's playerUI root which gets toggled via ClosePlayerUI/
-        // ShowPlayerUI around cutscenes and dialogue) is disabled — it does NOT resume once
-        // re-enabled. Without this, a disable landing mid fade-in/hold/fade-out permanently
-        // strands the panel active (and potentially at a non-zero alpha), so the banner never
-        // goes away even though NotificationRoutine's own cleanup line never gets to run.
-        _routine = null;
-        if (_notificationPanel != null)
-        {
-            _notificationPanel.SetActive(false);
-            if (_canvasGroup != null)
-                _canvasGroup.alpha = 0f;
-        }
-    }
+    private void OnDisable() => ShiftManager.OnDuskBegin -= ShowDusk;
 
     private void ShowDusk()
     {
         if (_notificationPanel == null || _canvasGroup == null) return;
 
-        if (_routine != null)
-            StopCoroutine(_routine);
+        // Run the routine on UIController.Instance rather than on `this`. This GameObject lives
+        // under UIController's "playerUI" root, which UIController.ClosePlayerUI/ShowPlayerUI
+        // (dialogue, cutscenes, the pause menu, tool shop, HQ order screen, etc.) toggles active
+        // on and off — and Unity kills a running Coroutine outright the instant its host is
+        // disabled, with no way to resume it later. If that toggle landed mid fade-in/hold/
+        // fade-out (very plausible right at Dusk, since a scripted dialogue exit often finishes
+        // in the same moment Dusk fires), the routine's own cleanup at the end never got to run,
+        // stranding the banner permanently visible — or, depending on exactly when the interrupt
+        // landed, cutting the fade so short it looked like an instant pop in/out instead of a
+        // smooth animation. UIController's own GameObject is never disabled, so hosting the
+        // coroutine there guarantees the full fade-in/hold/fade-out always plays out, even while
+        // this panel's ancestry is temporarily inactive (it simply won't render until the parent
+        // reactivates, then resumes exactly where the animation left off).
+        MonoBehaviour host = UIController.Instance != null ? (MonoBehaviour)UIController.Instance : this;
 
-        _routine = StartCoroutine(NotificationRoutine());
+        if (_routine != null)
+            host.StopCoroutine(_routine);
+
+        _routine = host.StartCoroutine(NotificationRoutine());
     }
 
     private IEnumerator NotificationRoutine()
