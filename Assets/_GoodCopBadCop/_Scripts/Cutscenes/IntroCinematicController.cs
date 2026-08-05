@@ -79,14 +79,22 @@ public class IntroCinematicController : MonoBehaviour
     }
 
     /// <summary>
-    /// Plays the intro cinematic once per application session. Safe to call every time the
-    /// lobby transition runs (e.g. Restart Day) — it is a no-op after the first successful play.
-    /// Runs entirely locally; call this on every client (it does not need network sync).
+    /// Plays the intro cinematic once per application session, and only on Day 1 — loading a
+    /// save from Day 2 onwards (or being on any later day when this first runs) must never show
+    /// it. Safe to call every time the lobby transition runs (e.g. Restart Day) — it is a no-op
+    /// after the first successful play. Runs entirely locally; call this on every client (it
+    /// does not need network sync).
     /// </summary>
     public IEnumerator PlayIfNeeded()
     {
         if (_hasPlayed || panelRoot == null || textReveal == null || storyLines == null || storyLines.Length == 0)
             yield break;
+
+        if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay > 1)
+        {
+            _hasPlayed = true;
+            yield break;
+        }
 
         _hasPlayed = true;
 

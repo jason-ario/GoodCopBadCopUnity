@@ -166,7 +166,10 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     {
         yield return null;
 
-        int total = DailySuspectManager.Instance != null ? DailySuspectManager.Instance.shiftSuspects.Count : 0;
+        DayBase activeDay = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        int total = activeDay != null && activeDay.SubjectsToProcessOverrideForDisplay >= 0
+            ? activeDay.SubjectsToProcessOverrideForDisplay
+            : (DailySuspectManager.Instance != null ? DailySuspectManager.Instance.shiftSuspects.Count : 0);
         _processedCount.Value = 0;
         _totalCount.Value = total;
         _isActive.Value = total > 0;

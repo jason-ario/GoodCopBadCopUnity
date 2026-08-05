@@ -12201,10 +12201,25 @@ MonoBehaviour:
   deathAnimationDuration: 2
   deathSound: {fileID: 0}
   _hurtSounds: []
-  _chaseSounds: []
-  _chaseScreamIntervalMin: 5
-  _chaseScreamIntervalMax: 15
+  _chaseSounds:
+  - {fileID: 8300000, guid: 8092c5cd55ab6f24b8dceb547858e77b, type: 3}
+  _chaseScreamIntervalMin: 3
+  _chaseScreamIntervalMax: 6
   _chaseMusicFadeOutSeconds: 2
+  _outsideFootstepClips:
+  - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
+  - {fileID: 8300000, guid: b5415257ad22548479f1a90f63a64471, type: 3}
+  - {fileID: 8300000, guid: 67f459d44640b944b948a170b424f802, type: 3}
+  - {fileID: 8300000, guid: ed08dcd489d312f4da7bfcef6834eb0a, type: 3}
+  - {fileID: 8300000, guid: 294b4c999f0f65e4ca28a10ea323363d, type: 3}
+  _insideFootstepClips:
+  - {fileID: 8300000, guid: a42fc632b28f4f24ca796f3bdcdb24c8, type: 3}
+  - {fileID: 8300000, guid: 732bb2f088072634ebf8ac37d0188980, type: 3}
+  - {fileID: 8300000, guid: 8d482751fe186e54fb4cb8e183c3e1e8, type: 3}
+  _footstepInterval: 0.5
+  _footstepMovementThreshold: 0.1
+  _footstepPitchRandomness: 0.1
+  _isOutside: 1
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8

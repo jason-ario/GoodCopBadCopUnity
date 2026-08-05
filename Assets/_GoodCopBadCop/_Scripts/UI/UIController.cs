@@ -96,21 +96,9 @@ public class UIController : MonoBehaviour
             return;
         }
 
-        // The back button (and its gamepad B/East equivalent) must work even while the
-        // player's main HUD is hidden — e.g. SuspectWorldDialogue closes playerUI for the
-        // duration of a world conversation — so this check runs before the playerUI-gated
-        // logic below, not after it.
-        // While a diegetic view is open, Q is its exit key — suppress the global
-        // "Back" shortcut so it doesn't double-fire through the back button as well.
-        if (backButtonUI.activeSelf == true && !DiegeticViewController.IsAnyViewActive)
-        {
-            bool backInput = Input.GetButtonDown("Back")
-                             || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
-            if (backInput)
-            {
-                backButton.onClick.Invoke();
-            }
-        }
+        // Back button input (Escape key / gamepad East) is handled directly by the
+        // KeyBackButtonActivator / GamepadBackButtonActivator components on the back
+        // button itself, so no manual polling is needed here.
 
         if (playerUI.activeSelf == false)
         {
@@ -132,7 +120,12 @@ public class UIController : MonoBehaviour
             }
         }
 
-        bool pauseInput = Input.GetButtonDown("Pause")
+        // Escape is shared between "Pause" and any currently-shown Back button (the Back
+        // button's own KeyBackButtonActivator consumes Escape directly). If a Back button
+        // is active and interactable right now, let it own Escape instead of also pausing.
+        bool escapePausePressed = Input.GetButtonDown("Pause")
+                                   && !KeyBackButtonActivator.AnyEscapeBackButtonInteractable;
+        bool pauseInput = escapePausePressed
                           || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
         if (pauseInput)
         {

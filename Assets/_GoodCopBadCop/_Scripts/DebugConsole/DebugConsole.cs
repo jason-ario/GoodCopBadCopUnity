@@ -717,8 +717,11 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Skips to Day 2 in the booth with the opening Vlad sequence suppressed and the shift
-    /// immediately ended, dropping the player straight into the post-shift Vlad out-back cutscene.
+    /// Skips to Day 2 in the booth with the opening Vlad sequence suppressed and every suspect
+    /// for the day marked processed, dropping the player straight into the post-shift Vlad
+    /// out-back sequence — matching the point at which a normal playthrough would have Vlad
+    /// walk out to the gate, unlock it with the Give gesture, and hand off into the Follow The
+    /// Trail task.
     /// </summary>
     public void SkipToEndOfDay2()
     {
@@ -749,7 +752,9 @@ public class DebugConsole : MonoBehaviour
         // Suppress the opening Vlad sequence and unlock the tool locker.
         Day_02.Instance.DebugSkipOpening();
 
-        // Start the shift with a huge first-arrival window — no suspects will arrive.
+        // Start the shift with a huge first-arrival window — no suspects will arrive, so the
+        // normal "last suspect processed" path (SetNextSuspectReady exhausting the lineup) will
+        // never fire on its own.
         ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
         ShiftManager.Instance?.TryStartShift();
 
@@ -757,11 +762,16 @@ public class DebugConsole : MonoBehaviour
         yield return null;
         yield return null;
 
-        // End the shift immediately — this fires ShiftEnded() on Day_02 and begins
-        // PostShiftSetupSequence() (megaphone bark → Vlad spawns out back).
-        ShiftManager.Instance?.EndShift();
+        // Mark every suspect for the day as processed. This is the same "Dusk" entry point the
+        // real lineup uses once the last suspect is booked — it fires
+        // ShiftManager.OnLastSuspectProcessed, which Day_02.OnAllSuspectsProcessed_Day2 listens
+        // for to register and immediately trigger its IDailyTask (PostShiftSetupSequence):
+        // megaphone bark → Vlad walks out back → gate unlock → Follow The Trail task starts.
+        // EndShift() alone does NOT do this — Day_02 no longer starts the Vlad sequence on
+        // clock-out, only on all-suspects-processed.
+        ShiftManager.Instance?.MarkSuspectsComplete();
 
-        Debug.Log("[DebugConsole] Skipped to end of Day 2 — post-shift Vlad cutscene starting.");
+        Debug.Log("[DebugConsole] Skipped to end of Day 2 — all suspects marked processed, post-shift Vlad sequence starting.");
     }
 
     /// <summary>

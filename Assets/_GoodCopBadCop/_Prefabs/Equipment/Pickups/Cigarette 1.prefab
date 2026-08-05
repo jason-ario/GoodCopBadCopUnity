@@ -49,6 +49,7 @@ GameObject:
   - component: {fileID: 2502274678708845504}
   - component: {fileID: 2858908102788523358}
   - component: {fileID: 6290767905466936882}
+  - component: {fileID: 7157100576935665103}
   m_Layer: 0
   m_Name: Cigarette 1
   m_TagString: Untagged
@@ -86,7 +87,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2741121073
+  GlobalObjectIdHash: 4223990417
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -131,6 +132,8 @@ MonoBehaviour:
   minLightIntensity: 0
   maxLightIntensity: 1.5
   lightFadeSpeed: 3
+  emissiveMaterialIndex: 1
+  emissionFadeSpeed: 3
 --- !u!114 &5221988229030730313
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -624,6 +627,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
+--- !u!65 &7157100576935665103
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 895366867388486387}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.02195682, y: 0.020103047, z: 0.27394453}
+  m_Center: {x: 0.0006885502, y: -0.00088102, z: 0.004482627}
 --- !u!1 &6080411248936914921
 GameObject:
   m_ObjectHideFlags: 0

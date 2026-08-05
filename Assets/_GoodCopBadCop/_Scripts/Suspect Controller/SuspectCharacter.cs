@@ -918,6 +918,52 @@ public class SuspectCharacter : Interactable
         // every client since it only reads local scene state, so no networking is required here.
         if (_hiddenUntilRevealed)
             SetVisualsHidden(true);
+
+        // Zero out procedural leg IK from the moment this suspect exists. The walk-in (and, for
+        // full mutants, the later window climb-through) is driven by transform.DOMove tweens, not
+        // real grounded locomotion — LegsAnimator's foot-planting logic fights that tweened motion
+        // and produces broken-looking walk/climb poses. We blend it back to full strength once the
+        // suspect actually arrives at the booth window (see SuspectController.ArrivedAtPosition)
+        // or, for a suspect that later transforms into a full mutant, once its window climb-through
+        // completes (see MutantSuspectBehaviour.ClimbThroughSequence). Setting the Blend field
+        // (rather than toggling 'enabled') is deliberate: LegsAnimator only calls its own
+        // Initialize() from Start()/OnEnable(), and disabling the component before its first
+        // Start() ever runs would permanently skip that initialization — Blend has no such
+        // lifecycle pitfall. This runs identically and locally on every peer, so no RPC is needed.
+        SetLegsAnimatorsBlend(0f);
+    }
+
+    /// <summary>
+    /// Sets <see cref="LegsAnimator.LegsAnimatorBlend"/> to <paramref name="blend"/> on every
+    /// LegsAnimator found on this suspect (and its children). Used instead of toggling the
+    /// component's 'enabled' flag so LegsAnimator's own Start()/Initialize() lifecycle is never
+    /// disrupted — see the call site in Awake() for the full explanation.
+    /// </summary>
+    private void SetLegsAnimatorsBlend(float blend)
+    {
+        foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
+        {
+            legsAnimator.LegsAnimatorBlend = blend;
+        }
+    }
+
+    /// <summary>
+    /// Restores full procedural leg IK on all clients. Call once this suspect has finished
+    /// arriving at the booth window (normal suspects/doppelgangers) — mutants restore it
+    /// themselves after their window climb-through instead (see
+    /// <see cref="MutantSuspectBehaviour"/>). Must be called on the server.
+    /// </summary>
+    public void RestoreLegsAnimators()
+    {
+        SetLegsAnimatorsBlend(1f);
+        RestoreLegsAnimatorsClientRpc();
+    }
+
+    [ClientRpc]
+    private void RestoreLegsAnimatorsClientRpc()
+    {
+        if (IsServer) return;
+        SetLegsAnimatorsBlend(1f);
     }
 
     /// <summary>Fired on the server when a suspect at stage 3 or 4 reaches the booth window.</summary>

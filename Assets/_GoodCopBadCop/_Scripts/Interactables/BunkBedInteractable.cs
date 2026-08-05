@@ -21,6 +21,13 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     [Tooltip("Sound played when the player confirms ending the day.")]
     [SerializeField] private AudioClip _endDaySFX;
 
+    [Header("Tutorial Objective List")]
+    [Tooltip("Text shown in the tutorial objective overlay once the shift is over and the player " +
+             "may go to bed. Day 1 drives its own scripted go-to-bed sequence, so this is skipped on Day 1.")]
+    [SerializeField] private string _goToBedObjectiveText = "Go to bed for the night";
+    [Tooltip("Seconds the completed objective row stays visible (struck through) before it is removed.")]
+    [SerializeField] private float _objectiveCompletedLingerDuration = 1f;
+
     private const string InteractTextReady    = "Sleep";
     private const string InteractTextNotReady = "Finish remaining tasks to end the day  ";
 
@@ -31,6 +38,14 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     public static event Action OnSleepConfirmed;
 
     private PlayerInteractionController _interactingPlayer;
+
+    /// <summary>
+    /// Tracks the tutorial objective overlay row shown once <see cref="CanSleep"/> first becomes
+    /// true for the current cycle. Day 1 drives its own scripted go-to-bed sequence (a world-space
+    /// arrow/marker, see Day_01.ShowGoToBedMarker), so this row is only added on days other than
+    /// Day 1 — see <see cref="UpdateInteractText"/>.
+    /// </summary>
+    private TutorialObjectiveItem _goToBedObjective;
 
     /// <summary>
     /// True only once <see cref="ShiftManager.OnShiftEnd"/> has fired for the current day.
@@ -158,6 +173,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         _shiftEndedThisCycle = false;
         GoToBunkerTask.CompleteAndRemove();
         interactText = InteractTextNotReady;
+        _goToBedObjective = null;
     }
 
     /// <summary>
@@ -171,16 +187,26 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     {
         _shiftEndedThisCycle = false;
         interactText = InteractTextNotReady;
+        _goToBedObjective = null;
     }
 
     /// <summary>
-    /// Syncs <see cref="Interactable.interactText"/> with the current <see cref="CanSleep"/> state.
-    /// Called on shift-end and whenever <see cref="TaskRegistry"/> reports a state change so the
-    /// tooltip updates as tasks are completed during the night phase.
+    /// Syncs <see cref="Interactable.interactText"/> with the current <see cref="CanSleep"/> state,
+    /// and — the first time <see cref="CanSleep"/> becomes true for the current cycle — adds the
+    /// "go to bed" row to the tutorial objective overlay (skipped on Day 1; see
+    /// <see cref="_goToBedObjective"/>). Called on shift-end and whenever <see cref="TaskRegistry"/>
+    /// reports a state change so both stay in sync as tasks are completed during the night phase.
     /// </summary>
     private void UpdateInteractText()
     {
-        interactText = CanSleep ? InteractTextReady : InteractTextNotReady;
+        bool canSleep = CanSleep;
+        interactText = canSleep ? InteractTextReady : InteractTextNotReady;
+
+        if (canSleep && _goToBedObjective == null &&
+            !(ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1))
+        {
+            _goToBedObjective = TutorialObjectiveList.Instance?.AddObjective(_goToBedObjectiveText);
+        }
     }
 
     // ─── IInteractable ───────────────────────────────────────────────────────
@@ -247,6 +273,12 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         CloseBedView();
 
         GoToBunkerTask.CompleteAndRemove();
+
+        if (_goToBedObjective != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_goToBedObjective, _objectiveCompletedLingerDuration);
+            _goToBedObjective = null;
+        }
 
         OnSleepConfirmed?.Invoke();
 

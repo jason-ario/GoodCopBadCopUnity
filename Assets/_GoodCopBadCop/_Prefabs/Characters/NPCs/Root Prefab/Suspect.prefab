@@ -1101,7 +1101,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1793420743
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1872,6 +1872,7 @@ MonoBehaviour:
   voiceAudioClips: []
   audioSource: {fileID: 1751970679333441786}
   _mutantDistortionLevel: 0.35
+  laughClips: []
   dialogueChoices: []
   suspectData: {fileID: 0}
   lookTarget: {fileID: 5330771091470271895}
@@ -2052,27 +2053,46 @@ MonoBehaviour:
   hitParticlePrefab: {fileID: 893913727056456344, guid: 57847ba3edbb34f4e9d1ea10ad1289a6, type: 3}
   goreCollider: {fileID: 0}
   goreDropPrefabs: []
-  goreDropChanceOnHit: 0.3
-  goreHitCountRange: {x: 1, y: 1}
-  goreHitSpeedRange: {x: 1.5, y: 4}
   deathGoreBurstCountRange: {x: 4, y: 8}
   deathGoreBurstSpeedRange: {x: 3, y: 7}
   goreLifetime: 10
+  goreMaxFallDistance: 15
   bloodDecalPrefabs: []
   goreGroundLayer:
     serializedVersion: 2
     m_Bits: 0
   bloodDecalLifetime: 20
+  yardBloodDecalPrefabs: []
+  bloodParticlePrefab: {fileID: 0}
+  bloodParticleLifetime: 3
+  goreLandingSound: {fileID: 0}
+  corpseJunkItem: {fileID: 0}
+  corpseJunkInteractionCollider: {fileID: 0}
   canAggro: 1
   aggroTarget: {fileID: 0}
   deathBehaviour: 0
   deathAnimationDuration: 2
   deathSound: {fileID: 0}
   _hurtSounds: []
-  _chaseSounds: []
-  _chaseScreamIntervalMin: 5
-  _chaseScreamIntervalMax: 15
+  _chaseSounds:
+  - {fileID: 8300000, guid: 8092c5cd55ab6f24b8dceb547858e77b, type: 3}
+  _chaseScreamIntervalMin: 3
+  _chaseScreamIntervalMax: 6
   _chaseMusicFadeOutSeconds: 2
+  _outsideFootstepClips:
+  - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
+  - {fileID: 8300000, guid: b5415257ad22548479f1a90f63a64471, type: 3}
+  - {fileID: 8300000, guid: 67f459d44640b944b948a170b424f802, type: 3}
+  - {fileID: 8300000, guid: ed08dcd489d312f4da7bfcef6834eb0a, type: 3}
+  - {fileID: 8300000, guid: 294b4c999f0f65e4ca28a10ea323363d, type: 3}
+  _insideFootstepClips:
+  - {fileID: 8300000, guid: a42fc632b28f4f24ca796f3bdcdb24c8, type: 3}
+  - {fileID: 8300000, guid: 732bb2f088072634ebf8ac37d0188980, type: 3}
+  - {fileID: 8300000, guid: 8d482751fe186e54fb4cb8e183c3e1e8, type: 3}
+  _footstepInterval: 0.5
+  _footstepMovementThreshold: 0.1
+  _footstepPitchRandomness: 0.1
+  _isOutside: 1
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
@@ -2590,7 +2610,7 @@ MonoBehaviour:
   AnimationFloorLevel: 0.001
   _Editor_Foldout_Setup_LegsList: 1
   _Editor_EnsureCount: 0
-  _Editor_OnValidateTrigger: 0
+  _Editor_OnValidateTrigger: 1
   _EditorAllowAutoUpdateFeetParams: 1
   _EditorCategory: 0
   _EditorSetupCategory: 0
@@ -3424,7 +3444,7 @@ MonoBehaviour:
   AnimationFloorLevel: 0.001
   _Editor_Foldout_Setup_LegsList: 1
   _Editor_EnsureCount: 0
-  _Editor_OnValidateTrigger: 0
+  _Editor_OnValidateTrigger: 1
   _EditorAllowAutoUpdateFeetParams: 1
   _EditorCategory: 0
   _EditorSetupCategory: 0

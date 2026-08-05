@@ -42,6 +42,16 @@ public class Day_01 : DayBase
     /// </summary>
     protected override bool UseAutomaticSubjectCounterTask => false;
 
+    /// <summary>
+    /// Day 1's real "subjects processed" total is Vlad (hand-scripted tutorial, credited up
+    /// front in <see cref="ShowSubjectCounterTask"/>) plus the 3 regular suspects tracked by
+    /// <see cref="OnSubjectProcessed"/> — 4 total. The lineup itself has a 5th populated slot
+    /// (the Soldier) purely to trigger the mutant-attack cutscene; he never hands off a folder
+    /// and is never "processed", so the Task Page total must exclude him too — see
+    /// <see cref="ProcessResidentsTask"/>.
+    /// </summary>
+    public override int SubjectsToProcessOverrideForDisplay => SubjectsToProcess;
+
     [Header("Day 1 — Fire Barrel")]
     [Tooltip("The yard fire barrel — lit for the entirety of Day 1, extinguished at the start of Day 2.")]
     [SerializeField] private FirePit _fireBarrel;
@@ -483,15 +493,17 @@ public class Day_01 : DayBase
     private bool _graffitiTaskDone;
 
     // "Process N subjects" counter task — shown after Vlad's tutorial sequence ends.
-    // Counts hand-offs for suspect indices 1-3 only (see OnSubjectProcessed's index < 1 guard):
-    // index 1 (random civilian), index 2 (documentation-anomaly/quarantine suspect), and
-    // index 3 (random civilian). The Soldier (index 4) never hands off a folder
-    // (ForceNextSuspectNoPaperwork — see ActivateAndStartSoldierDialogue) and immediately hands
-    // control to the scripted mutant-attack/end-of-shift sequence, so 3 is the maximum this
-    // counter can ever reach on Day 1 — a higher quota here would leave the row permanently
-    // stuck in-progress, orphaned in the shared TutorialObjectiveList once the trash/graffiti
-    // rows are added alongside it.
-    private const int SubjectsToProcess = 3;
+    // Vlad himself is credited immediately (see ShowSubjectCounterTask) since the player just
+    // finished fully processing his folder by hand — he simply isn't tracked via the same
+    // OnFolderHandedOff subscription used for the rest, because that subscription doesn't
+    // start until after his tutorial completes. OnSubjectProcessed then counts hand-offs for
+    // suspect indices 1-3 only (see its index < 1 guard): index 1 (random civilian), index 2
+    // (documentation-anomaly/quarantine suspect), and index 3 (random civilian). The Soldier
+    // (index 4) never hands off a folder (ForceNextSuspectNoPaperwork — see
+    // ActivateAndStartSoldierDialogue) and immediately hands control to the scripted
+    // mutant-attack/end-of-shift sequence, so he is never counted as a processed subject —
+    // 4 (Vlad + 3) is the maximum this counter can ever reach on Day 1.
+    private const int SubjectsToProcess = 4;
     private int _subjectProcessedCount;
     private TutorialObjectiveItem _taskSubjectCount;
 
@@ -1834,11 +1846,13 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called once the delay has elapsed. Shows the "Process N subjects" counter
-    /// task and subscribes to subsequent folder hand-offs to update it.
+    /// task and subscribes to subsequent folder hand-offs to update it. Starts at 1/4 —
+    /// Vlad, whose folder the player just finished processing by hand, is credited
+    /// immediately since <see cref="OnSubjectProcessed"/> only tracks hand-offs from here on.
     /// </summary>
     private void ShowSubjectCounterTask()
     {
-        _subjectProcessedCount = 0;
+        _subjectProcessedCount = 1; // Vlad already processed.
         _taskSubjectCount = TutorialObjectiveList.Instance?.AddObjective(GetSubjectCountText());
         FolderController.OnFolderHandedOff += OnSubjectProcessed;
     }
@@ -2303,6 +2317,28 @@ public class Day_01 : DayBase
         _trashSpawnerInteractable?.SetForceHighlight(true);
         TrashBagPicker.OnBagDispensedLocally += OnTrashBagDispensedLocal;
         TutorialTaskSync.OnTrashBagGrabbedAllClients += OnTrashBagGrabbedSync;
+
+        StartCoroutine(ShowTrashAndGraffitiTutorialAfterDusk());
+    }
+
+    /// <summary>
+    /// Waits for the Dusk notification banner (see <see cref="DuskNotificationUI"/>) to fully
+    /// fade in, hold, and fade out before showing the trash/graffiti tutorial overlays. Both the
+    /// Dusk banner and TutorialOverlay slide down from the top of the screen, so triggering them
+    /// at the same instant (as <see cref="OnTrashTaskReadySync"/> used to) made the tutorial
+    /// overlay stomp the Dusk banner mid-animation. Falls back to a fixed delay if the Dusk
+    /// banner's duration can't be read (e.g. its singleton hasn't initialized yet).
+    /// </summary>
+    private IEnumerator ShowTrashAndGraffitiTutorialAfterDusk()
+    {
+        const float fallbackDelay = 4.5f;
+        const float buffer = 0.5f;
+
+        float delay = DuskNotificationUI.Instance != null
+            ? DuskNotificationUI.Instance.TotalDisplayDuration + buffer
+            : fallbackDelay;
+
+        yield return new WaitForSeconds(delay);
 
         TutorialOverlay.Instance?.ShowTrashTutorial(
             () => TutorialOverlay.Instance?.ShowGraffitiTutorial());
@@ -2850,6 +2886,8 @@ public class Day_01 : DayBase
     /// </summary>
     private void EnsureCleanBloodSplatterObjective()
     {
+        if (_taskCleanBloodSplatter != null) return;
+
         if (CleanBloodTask.Instance != null &&
             CleanBloodTask.Instance.TotalCount > CleanBloodTask.Instance.ScrubbedCount)
         {

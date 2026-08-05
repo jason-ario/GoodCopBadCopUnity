@@ -1,3 +1,4 @@
+using System;
 using HighlightPlus;
 using TMPro;
 using UnityEngine;
@@ -10,12 +11,23 @@ using UnityEngine;
 /// addressee — dropping a deliverable package into any other resident's cubby bounces it back out,
 /// exactly like dropping it into the wrong bin entirely.
 ///
+/// Delivery is detected via <see cref="_placementSlot"/>'s <see cref="PlacementBoard.OnItemPlaced"/>
+/// event — fired by <see cref="PlayerPickupController.DropObject"/> the moment the player commits
+/// the ghost placement (RMB release or the LMB/E ghost-commit path, see
+/// <see cref="PlayerInteractionController.TryPlaceHeldObjectAtGhost"/>) — NOT via a physics trigger
+/// overlap. This is intentional: a package placed exactly via the ghost/snap-pose flow does not
+/// reliably re-trigger a fresh <c>OnTriggerEnter</c> (its colliders were disabled while held and
+/// the transform is simply set to the snap pose directly), which silently swallowed otherwise
+/// correct deliveries — the "dropped it in the right slot and it just didn't register" bug.
+/// Physically throwing/tossing a package so it collides into the cubby's opening no longer counts
+/// as a delivery at all; the player must use the interact/ghost placement flow.
+///
 /// Setup (per cubby instance on the "Mail Cubbies" prefab):
 ///   - Assign <see cref="_assignedResident"/> to the <see cref="SuspectData"/> this physical cubby
 ///     is labelled for, or let <see cref="MailCubbyManager"/> auto-assign it at random.
-///   - Assign <see cref="_triggerZone"/> to a Collider (isTrigger = true) covering the cubby
-///     opening. If left unassigned, this component falls back to the first Collider found on this
-///     GameObject.
+///   - Assign <see cref="_placementSlot"/> to the <see cref="PlacementSlot"/> covering the cubby's
+///     opening (its <see cref="PlacementBoard.OnItemPlaced"/> event drives delivery detection). If
+///     left unassigned, this component falls back to <see cref="GetComponent{T}"/>.
 ///   - Assign <see cref="_label"/> to the TMP text on the cubby's tape (e.g. "Tape/Label"). If left
 ///     unassigned, this component falls back to the first <see cref="TMP_Text"/> found in children.
 /// </summary>
@@ -24,7 +36,7 @@ public class MailCubbySlot : MonoBehaviour
     [Tooltip("The resident this physical cubby is labelled for. Packages are only counted as delivered here if addressed to this resident.")]
     [SerializeField] private SuspectData _assignedResident;
 
-    [Tooltip("Trigger collider covering the cubby's opening. Falls back to GetComponent<Collider>() if unassigned.")]
+    [Tooltip("Collider covering the cubby's opening, used only as the raycast target so PlayerInteractionController can find this cubby's PlacementSlot while aiming. No longer drives delivery detection. Falls back to GetComponent<Collider>() if unassigned.")]
     [SerializeField] private Collider _triggerZone;
 
     [Tooltip("Fixed placement pose a correctly delivered package should snap to. Falls back to GetComponent<PlacementSlot>() if unassigned.")]
@@ -70,16 +82,23 @@ public class MailCubbySlot : MonoBehaviour
 
     private void Awake()
     {
+        // _triggerZone is retained only as the raycast target PlayerInteractionController uses to
+        // find this cubby's PlacementBoard/PlacementSlot while aiming (see
+        // PlayerInteractionController.CheckActivatePlacer) — it no longer drives delivery
+        // detection itself (see the class doc comment).
         if (_triggerZone == null)
             _triggerZone = GetComponent<Collider>();
 
         if (_triggerZone == null)
-            Debug.LogWarning($"[MailCubbySlot] '{name}' has no trigger collider assigned or attached.", this);
-        else if (!_triggerZone.isTrigger)
-            Debug.LogWarning($"[MailCubbySlot] '{name}' trigger collider is not marked isTrigger — packages will not be detected.", this);
+            Debug.LogWarning($"[MailCubbySlot] '{name}' has no collider assigned or attached for aim detection.", this);
 
         if (_placementSlot == null)
             _placementSlot = GetComponent<PlacementSlot>();
+
+        if (_placementSlot == null)
+            Debug.LogWarning($"[MailCubbySlot] '{name}' has no PlacementSlot assigned or attached — this cubby will never accept a delivery.", this);
+        else
+            _placementSlot.OnItemPlaced += HandleItemPlaced;
 
         if (_label == null)
             _label = GetComponentInChildren<TMP_Text>(true);
@@ -94,6 +113,12 @@ public class MailCubbySlot : MonoBehaviour
             Debug.LogWarning($"[MailCubbySlot] '{name}' has no assigned resident — this cubby will never accept a delivery.", this);
 
         RefreshLabel();
+    }
+
+    private void OnDestroy()
+    {
+        if (_placementSlot != null)
+            _placementSlot.OnItemPlaced -= HandleItemPlaced;
     }
 
     /// <summary>
@@ -130,23 +155,52 @@ public class MailCubbySlot : MonoBehaviour
         _highlightEffect.highlighted = highlight;
     }
 
-    private void OnTriggerEnter(Collider other)
+    /// <summary>
+    /// Fired by <see cref="_placementSlot"/> (a <see cref="PlacementBoard"/>) the moment the
+    /// player commits a package into this cubby via the interact/ghost placement flow — see
+    /// <see cref="PlayerPickupController.DropObject"/>, which calls
+    /// <see cref="PlacementBoard.OnPlaced"/> before the drop position/network RPCs go out. Runs
+    /// locally on whichever client performed the placement; <see cref="MailPackageItem.RequestSortServerRpc"/>
+    /// routes the actual validation to the server. Physically throwing/tossing a package into this
+    /// cubby's opening no longer triggers a delivery — see the class doc comment.
+    /// </summary>
+    private void HandleItemPlaced(PickableObject placedObject)
     {
-        MailPackageItem package = other.GetComponentInParent<MailPackageItem>();
-        if (package == null) return;
-        // NOTE: do NOT gate on package.IsHeld here. A held package's colliders are disabled
-        // (see PickableColliderController.SetHeld), so a genuinely-held package can never
-        // physically overlap this trigger in the first place — this check can only ever see a
-        // package that was just dropped/placed. And package.IsHeld reads a server-authoritative
-        // NetworkVariable that the dropping client's own PlayerPickupController.DropObject
-        // re-enables this trigger's collider well ahead of (see PickableObject.OnDropped, which
-        // calls SetReleased() immediately/locally, "before the _holdingClientId NetworkVariable
-        // propagates back from the server"). Checking IsHeld here reads that stale "still held"
-        // value and silently swallows the delivery — this was the intermittent "dropped it in
-        // the right slot and it just didn't register" bug, worst for non-host clients where the
-        // round trip is a real network delay.
+        if (placedObject is not MailPackageItem package) return;
         if (package.IsResolved) return;
         if (_lockerDoor != null && !_lockerDoor.IsOpen) return; // door's own collider normally blocks entry — this is just a backstop
+
+        // Optimistically lock the package out of being picked back up the instant it lands in
+        // its addressee's cubby, instead of waiting for the RequestSortServerRpc round trip to
+        // confirm and call MailPackageItem.MarkDelivered -> LockInteractableNetworked. Even for
+        // a host, ServerRpcs are queued through Netcode's messaging pipeline rather than executed
+        // synchronously in this same call, which left a real (if brief) window where a
+        // correctly-delivered package's colliders were still enabled. Interactable.Interact only
+        // checks whether colliders are currently enabled (see PickableObject.IsInteractable), so
+        // a player quickly delivering several packages in a row could click back into that
+        // window and grab the just-delivered package straight back out. Since
+        // MailPackageItem.IsResolved is already true server-side by the time that round trip
+        // lands, EvaluateSort silently ignores every later placement attempt for that same
+        // package — it can never be delivered again. That is the "exactly one box quietly stops
+        // working" bug: it was delivered correctly, then picked back out by accident before the
+        // lock could land.
+        //
+        // IMPORTANT: this must call PickableObject.LockInteractable() rather than the plain
+        // SetInteractable(false) — DropObject() only just now called ReleaseHolderServerRpc to
+        // clear _holdingClientId, and when that NetworkVariable's change is delivered (moments
+        // after this handler returns, even on the host, since NetworkVariable writes are also
+        // flushed through Netcode's tick rather than applied inline) PickableObject.OnHoldingClientChanged
+        // runs and unconditionally calls SetInteractable(true) again (holder-based logic, since no
+        // network override is active yet) — silently undoing a plain SetInteractable(false) and
+        // reopening the exact same grab window a moment later. LockInteractable() sets the
+        // _interactableLocked guard flag that OnHoldingClientChanged explicitly checks and bails
+        // out on, so the held->released transition can no longer re-enable colliders out from
+        // under us. The eventual server confirmation
+        // (MarkDelivered -> LockInteractableNetworked -> _networkInteractableOverride) is still
+        // authoritative and applies the same lock networked, for every other client.
+        bool isCorrectResident = string.Equals(ResidentName?.Trim(), package.ResidentName?.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (isCorrectResident)
+            package.LockInteractable();
 
         if (_placementSlot != null)
         {

@@ -369,6 +369,14 @@ public class FolderController : PickableObject
                     return;
                 }
 
+                if (!IsFaceUp())
+                {
+                    // Folder landed upside-down (e.g. after being thrown) — can't stamp its underside.
+                    Debug.Log("[FolderController] Stamp blocked: folder is not facing upward.");
+                    UIController.Instance?.ShowShopNotification("<color=red>Folder must be face-up to stamp!</color>");
+                    return;
+                }
+
                 Debug.Log("Interact with item");
                 var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
                 StartUseStampServerRpc(clientId, inkStamp.StampType);
@@ -399,6 +407,15 @@ public class FolderController : PickableObject
             }
         }
     }
+
+    /// <summary>
+    /// True when the folder's cover normal is pointing generally upward, i.e. the folder is
+    /// resting right-side-up rather than upside-down. Used to block stamping a folder that
+    /// landed on its back after being thrown/dropped.
+    /// Note: the folder's cover normal is the -transform.up direction (the mesh's local "up"
+    /// axis is inverted relative to the visible cover face), so we dot against -transform.up.
+    /// </summary>
+    private bool IsFaceUp() => Vector3.Dot(-transform.up, Vector3.up) > 0f;
 
     bool HasNotebookPage(string itemName)
     {
@@ -472,6 +489,7 @@ public class FolderController : PickableObject
         Debug.Log($"[FolderController] StartUseStampServerRpc: isStamping={isStamping} isOpen={isOpen.Value} NetworkObjectId={NetworkObjectId}");
         if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
         if (isOpen.Value) { Debug.LogWarning("[FolderController] Stamp blocked: folder is open."); return; }
+        if (!IsFaceUp()) { Debug.LogWarning("[FolderController] Stamp blocked: folder is not facing upward (authoritative check)."); return; }
 
         if (stampType == StampContainer.StampType.Quarantine && IsQuarantineFull())
         {
@@ -694,6 +712,15 @@ public class FolderController : PickableObject
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
+
+        // Force the Rigidbody kinematic before the stamp animation begins. If the folder was
+        // thrown and came to rest on top of something (desk, another object) without ever being
+        // picked back up, its Rigidbody is still non-kinematic (see PickableObject.ThrowServerRpc)
+        // and remains subject to physics. Leaving it non-kinematic during the stamp sequence can
+        // let it clip through the surface it's resting on once the animation perturbs it. Placed/
+        // resting objects are always kinematic elsewhere in PickableObject, so this just applies
+        // the same invariant here.
+        if (_rb != null) _rb.isKinematic = true;
 
         // Capture into a local so that any subsequent write to the instance field
         // (e.g. from OnEquipped on another interaction) cannot corrupt this coroutine
@@ -947,6 +974,36 @@ public class FolderController : PickableObject
         page.NetworkObject.AutoObjectParentSync = false;
 
         RegisterDocumentServerRpc(new NetworkObjectReference(page.NetworkObject));
+    }
+
+    /// <summary>
+    /// Returns every <see cref="ExamPage"/> currently filed into one of this folder's
+    /// <see cref="examPageSlots"/>, resolved client-side by matching each live page's
+    /// <see cref="SocketFollow"/> target against this folder's slot transforms. Safe to call
+    /// on any client — unlike <c>_examPageQueue</c>, which is only ever populated on the server.
+    /// Used by <see cref="FolderScoreTab"/> to total the anomaly score of checked checklist items.
+    /// </summary>
+    public List<ExamPage> GetFiledExamPages()
+    {
+        var result = new List<ExamPage>();
+        ExamPage[] allPages = FindObjectsByType<ExamPage>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+        foreach (Transform slot in examPageSlots)
+        {
+            if (slot == null) continue;
+
+            foreach (ExamPage page in allPages)
+            {
+                SocketFollow follow = page.GetComponent<SocketFollow>();
+                if (follow != null && follow.Target == slot)
+                {
+                    result.Add(page);
+                    break;
+                }
+            }
+        }
+
+        return result;
     }
 
     // Mirrors PlayerPickupController.GetRelativePath so we can build slot paths from here.

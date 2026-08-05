@@ -474,16 +474,23 @@ public class MutantSpawner : NetworkBehaviour
     /// <paramref name="center"/> rather than this spawner's own position.
     /// Enemies are scattered using the same <see cref="spawnBoxHalfExtents"/> box and
     /// added to the active-enemy list. Optionally aggros all of them toward
-    /// <paramref name="packAggroTarget"/>. SERVER ONLY.
+    /// <paramref name="packAggroTarget"/>. Each spawned mutant is held in place (see
+    /// <see cref="MutantEnemy.SetHeld"/>) from the moment it exists, so it never patrols/chases
+    /// away before the caller decides to release it — pass <paramref name="onSpawned"/> to receive
+    /// the full list and release them (e.g. once a player approaches). SERVER ONLY.
     /// </summary>
-    public void SpawnPackAt(Vector3 center, int count, Transform packAggroTarget = null)
+    public void SpawnPackAt(Vector3 center, int count, Transform packAggroTarget = null,
+        System.Action<List<MutantEnemy>> onSpawned = null)
     {
         if (!IsServer) return;
-        StartCoroutine(SpawnPackAtCoroutine(center, count, packAggroTarget));
+        StartCoroutine(SpawnPackAtCoroutine(center, count, packAggroTarget, onSpawned));
     }
 
-    private IEnumerator SpawnPackAtCoroutine(Vector3 center, int count, Transform packAggroTarget)
+    private IEnumerator SpawnPackAtCoroutine(Vector3 center, int count, Transform packAggroTarget,
+        System.Action<List<MutantEnemy>> onSpawned)
     {
+        var spawned = new List<MutantEnemy>(count);
+
         for (int i = 0; i < count; i++)
         {
             Vector3 offset = new Vector3(
@@ -510,13 +517,17 @@ public class MutantSpawner : NetworkBehaviour
             if (packAggroTarget != null)
                 enemy?.SetAggroTarget(packAggroTarget);
             enemy?.SetForceAggro(packAggroTarget != null);
+            enemy?.SetHeld(true);
 
             netObj.Spawn(true);
             _activeEnemies.Add(netObj);
+            if (enemy != null) spawned.Add(enemy);
 
             if (i < count - 1)
                 yield return new WaitForSeconds(burstSpawnDelay);
         }
+
+        onSpawned?.Invoke(spawned);
 
         Debug.Log($"[MutantSpawner] Pack of {count} spawned at {center}.", this);
     }

@@ -183,20 +183,42 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Clips played spatially at random when this mutant takes a hit and survives.")]
     [SerializeField] private AudioClip[] _hurtSounds;
 
-    [Tooltip("Clips played spatially at random while this mutant is actively chasing a player.")]
+    [Tooltip("Clips played spatially at random while this mutant is actively chasing a player. " +
+             "Acts as an audible \"grunt\" that can alert nearby players to the mutant's presence.")]
     [SerializeField] private AudioClip[] _chaseSounds;
 
-    [Tooltip("Minimum seconds between random chase screams.")]
+    [Tooltip("Minimum seconds between random chase screams/grunts.")]
     [Min(0.5f)]
-    [SerializeField] private float _chaseScreamIntervalMin = 5f;
+    [SerializeField] private float _chaseScreamIntervalMin = 3f;
 
-    [Tooltip("Maximum seconds between random chase screams.")]
+    [Tooltip("Maximum seconds between random chase screams/grunts.")]
     [Min(0.5f)]
-    [SerializeField] private float _chaseScreamIntervalMax = 15f;
+    [SerializeField] private float _chaseScreamIntervalMax = 6f;
 
     [Tooltip("Seconds to fade out chase music when this mutant dies or flees.")]
     [Min(0f)]
     [SerializeField] private float _chaseMusicFadeOutSeconds = 2f;
+
+    [Header("Footsteps")]
+    [Tooltip("Clips played spatially at random for footsteps while this mutant is outside.")]
+    [SerializeField] private AudioClip[] _outsideFootstepClips;
+
+    [Tooltip("Clips played spatially at random for footsteps while this mutant is inside.")]
+    [SerializeField] private AudioClip[] _insideFootstepClips;
+
+    [Tooltip("Seconds between footstep sounds while moving. Mirrors the interval used by SuspectFootstepsAudio.")]
+    [Min(0.05f)]
+    [SerializeField] private float _footstepInterval = 0.5f;
+
+    [Tooltip("Minimum NavMeshAgent speed (m/s) required to trigger footsteps.")]
+    [SerializeField] private float _footstepMovementThreshold = 0.1f;
+
+    [Range(0f, 0.5f)]
+    [Tooltip("Random pitch variance applied to each footstep clip.")]
+    [SerializeField] private float _footstepPitchRandomness = 0.1f;
+
+    [Tooltip("Set to true when this mutant is outdoors, false when indoors. Controls which footstep clip set is used.")]
+    [SerializeField] private bool _isOutside = true;
 
     [Header("Flee Behaviour")]
     [Tooltip("When enabled, reaching zero health triggers a rapid flee-and-despawn instead of a normal death. " +
@@ -225,6 +247,7 @@ public class MutantEnemy : NetworkBehaviour
     private float _attackCooldownTimer;
     private float _doorOpenCooldownTimer;
     private float _chaseScreamTimer;
+    private float _footstepTimer;
     private bool _isDead;
     private Coroutine _knockbackCoroutine;
 
@@ -247,6 +270,15 @@ public class MutantEnemy : NetworkBehaviour
     /// of patrolling or waiting for one to wander into detection range.
     /// </summary>
     private bool _breachChargeMode;
+
+    /// <summary>
+    /// When true, this mutant is frozen in place — it does not target, chase, patrol, or attack,
+    /// regardless of any player's proximity. Used by pack spawns (e.g. <see cref="FollowTrailThreat"/>)
+    /// to keep freshly-spawned mutants exactly where they landed until a player actually approaches
+    /// the encounter area, instead of letting them immediately wander/patrol away from it. Set via
+    /// <see cref="SetHeld"/>; takes effect on the very next <see cref="ChaseLoop"/> tick.
+    /// </summary>
+    private bool _isHeld;
 
     /// <summary>
     /// Earliest time (Time.time) at which the breach-charge Chase branch is allowed to hunt for
@@ -281,6 +313,18 @@ public class MutantEnemy : NetworkBehaviour
     /// whether to register or clear the legacy-mutant record for this suspect.
     /// </summary>
     public bool DiedPermanently { get; private set; }
+
+    /// <summary>
+    /// True when this mutant is outdoors, false when indoors. Controls which footstep clip set
+    /// (<see cref="_outsideFootstepClips"/> vs <see cref="_insideFootstepClips"/>) is used.
+    /// Mirrors <see cref="SuspectFootstepsAudio.IsOutside"/> — set externally if a mutant needs
+    /// to track indoor/outdoor transitions at runtime. Defaults to the inspector-configured value.
+    /// </summary>
+    public bool IsOutside
+    {
+        get => _isOutside;
+        set => _isOutside = value;
+    }
 
     // Synced animator speed so non-owners see movement blend correctly
     private readonly NetworkVariable<float> _networkSpeed = new NetworkVariable<float>(
@@ -472,6 +516,14 @@ public class MutantEnemy : NetworkBehaviour
         {
             if (!_agent.isOnNavMesh)
             {
+                yield return new WaitForSeconds(retargetInterval);
+                continue;
+            }
+
+            if (_isHeld)
+            {
+                // Frozen — no targeting, no movement, no patrol. Just sit tight until released.
+                _agent.ResetPath();
                 yield return new WaitForSeconds(retargetInterval);
                 continue;
             }
@@ -836,6 +888,31 @@ public class MutantEnemy : NetworkBehaviour
             _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
         }
 
+        // ── Footsteps ──────────────────────────────────────────────────────────
+        // Server-driven, same as the chase scream above — the agent's movement state only
+        // reliably reflects reality on the server, so footstep timing is computed here and
+        // broadcast to clients via RPC rather than relying on each client's own (unmoved)
+        // NavMeshAgent velocity, matching the pattern used for chase/hurt sounds.
+        bool isMoving = _agent.velocity.sqrMagnitude > _footstepMovementThreshold * _footstepMovementThreshold;
+        if (isMoving)
+        {
+            _footstepTimer += Time.deltaTime;
+            if (_footstepTimer >= _footstepInterval)
+            {
+                _footstepTimer = 0f;
+                AudioClip[] clips = _isOutside ? _outsideFootstepClips : _insideFootstepClips;
+                if (clips != null && clips.Length > 0)
+                {
+                    int idx = UnityEngine.Random.Range(0, clips.Length);
+                    PlayFootstepClientRpc(_isOutside, idx);
+                }
+            }
+        }
+        else
+        {
+            _footstepTimer = 0f;
+        }
+
         // ── Rotation Tracking ──────────────────────────────────────────────────
         // If we are in range to attack something, ensure we rotate to face it 
         // regardless of whether the NavMeshAgent is currently "moving".
@@ -933,6 +1010,15 @@ public class MutantEnemy : NetworkBehaviour
     public void SetBreachChargeMode(bool chargeMode)
     {
         _breachChargeMode = chargeMode;
+    }
+
+    /// <summary>
+    /// Freezes/unfreezes this mutant — see <see cref="_isHeld"/>. Safe to call before or after
+    /// <see cref="NetworkObject.Spawn"/>; takes effect on the very next <see cref="ChaseLoop"/> tick.
+    /// </summary>
+    public void SetHeld(bool held)
+    {
+        _isHeld = held;
     }
 
     /// <summary>
@@ -1919,6 +2005,18 @@ public class MutantEnemy : NetworkBehaviour
         AudioClip clip = _chaseSounds[index];
         if (clip != null)
             SFXController.Instance?.PlayAtPosition(clip, transform.position);
+    }
+
+    [ClientRpc]
+    private void PlayFootstepClientRpc(bool outside, int index)
+    {
+        AudioClip[] clips = outside ? _outsideFootstepClips : _insideFootstepClips;
+        if (clips == null || index < 0 || index >= clips.Length) return;
+        AudioClip clip = clips[index];
+        if (clip == null) return;
+
+        float pitch = 1f + UnityEngine.Random.Range(-_footstepPitchRandomness, _footstepPitchRandomness);
+        SFXController.Instance?.PlayAtPosition(clip, transform.position, 1f, pitch);
     }
 
     /// <summary>Fades out and stops the looping chase music on all clients.</summary>

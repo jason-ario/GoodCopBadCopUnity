@@ -36,7 +36,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Follow the Trail";
+    [SerializeField] private string _threatName = "Use UV light to follow the trail of irradiated blood.";
     [Tooltip("Number of coupons the ATM dispenses when the trail destination is discovered.")]
     [SerializeField] private int _couponReward = 10;
 
@@ -62,6 +62,26 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Header("Destination Detection")]
     [Tooltip("Any player within this radius of the destination point completes the follow trail task.")]
     [SerializeField] private float _destinationRadius = 10f;
+
+    [Header("Pack Hold-In-Place")]
+    [Tooltip("Pack mutants spawned at the destination are held frozen in place (no patrol/wander/chase) " +
+             "until a player comes within this distance of the destination point — keeps them clustered " +
+             "at the end of the trail instead of wandering off before the player arrives.")]
+    [SerializeField] private float _packHoldReleaseRadius = 20f;
+
+    [Header("End-of-Trail Blood Splatters")]
+    [Tooltip("Cosmetic ground blood-splatter decal prefabs scattered around the destination point when " +
+             "the trail event spawns. One is chosen at random per spawned splatter. Leave empty to disable.")]
+    [SerializeField] private GameObject[] _endBloodSplatterPrefabs;
+
+    [Tooltip("Number of blood splatter decals scattered around the destination point.")]
+    [SerializeField] private int _endBloodSplatterCount = 8;
+
+    [Tooltip("Radius around the destination point within which splatters are scattered.")]
+    [SerializeField] private float _endBloodSplatterRadius = 4f;
+
+    [Tooltip("Y offset above the terrain surface applied to every spawned blood splatter.")]
+    [SerializeField] private float _endBloodSplatterGroundOffset = 0.02f;
 
     [Header("Off-Trail Radiation")]
     [Tooltip("When assigned, the active location's Trail is dynamically registered as a safe " +
@@ -105,6 +125,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     private GameObject _spawnedCorpse;
     private GameObject _spawnedDestination;
     private readonly List<GameObject> _spawnedTrailParticles = new();
+    private readonly List<GameObject> _spawnedBloodSplatters = new();
+
+    /// <summary>Pack mutants currently held frozen at the destination — see <see cref="_packHoldReleaseRadius"/>.</summary>
+    private readonly List<MutantEnemy> _heldPackMutants = new();
+    private Coroutine _packHoldReleaseCoroutine;
 
     /// <summary>The location that was last passed to SpawnEvent — used at destination discovery time.</summary>
     private FollowTrailLocation _currentLocation;
@@ -495,6 +520,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _spawnedDestination.GetComponent<NetworkObject>().Spawn(true);
         }
 
+        SpawnEndBloodSplatters(location.DestinationPoint);
+
         if (_trailParticlesPrefab == null)
         {
             Debug.LogWarning("[FollowTrailThreat] _trailParticlesPrefab is not assigned — no blood trail will spawn.", this);
@@ -541,7 +568,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Physically spawns the enemy pack defined on <see cref="_currentLocation"/> at the destination point.
-    /// Does NOT register the kill task — call <see cref="ActivateKillTask"/> for that.
+    /// Does NOT register the kill task — call <see cref="ActivateKillTask"/> for that. Spawned mutants
+    /// are held in place (see <see cref="MutantEnemy.SetHeld"/>) until a player comes within
+    /// <see cref="_packHoldReleaseRadius"/> of the destination — see <see cref="HoldPackUntilPlayerNear"/>.
     /// Returns the configured PackSize, or 0 if no pack is configured.
     /// </summary>
     private int SpawnPack()
@@ -552,10 +581,78 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         Transform center = _currentLocation.DestinationPoint;
         Vector3 spawnCenter = center != null ? center.position : transform.position;
 
-        _currentLocation.PackSpawner.SpawnPackAt(spawnCenter, _currentLocation.PackSize);
+        _currentLocation.PackSpawner.SpawnPackAt(spawnCenter, _currentLocation.PackSize,
+            onSpawned: OnPackSpawned);
 
         Debug.Log($"[FollowTrailThreat] Spawned pack of {_currentLocation.PackSize} at {spawnCenter}.", this);
         return _currentLocation.PackSize;
+    }
+
+    /// <summary>
+    /// Called once every mutant in the freshly-spawned pack exists. Tracks them and starts the
+    /// coroutine that releases their hold once a player gets close enough to the destination.
+    /// Server only.
+    /// </summary>
+    private void OnPackSpawned(List<MutantEnemy> mutants)
+    {
+        _heldPackMutants.Clear();
+        _heldPackMutants.AddRange(mutants);
+
+        if (_packHoldReleaseCoroutine != null) StopCoroutine(_packHoldReleaseCoroutine);
+        _packHoldReleaseCoroutine = StartCoroutine(HoldPackUntilPlayerNear(_currentLocation.DestinationPoint));
+    }
+
+    /// <summary>
+    /// Waits until any connected player is within <see cref="_packHoldReleaseRadius"/> of
+    /// <paramref name="destination"/>, then releases every held pack mutant so they resume normal
+    /// AI (patrol/aggro/chase). No-ops (releases immediately) if the destination is unassigned.
+    /// Server only.
+    /// </summary>
+    private IEnumerator HoldPackUntilPlayerNear(Transform destination)
+    {
+        if (destination == null)
+        {
+            ReleaseHeldPack();
+            yield break;
+        }
+
+        float sqrRadius = _packHoldReleaseRadius * _packHoldReleaseRadius;
+
+        while (true)
+        {
+            Vector3 destPos = destination.position;
+            bool playerNear = false;
+
+            foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                NetworkObject playerObj = client.PlayerObject;
+                if (playerObj == null) continue;
+
+                if ((playerObj.transform.position - destPos).sqrMagnitude <= sqrRadius)
+                {
+                    playerNear = true;
+                    break;
+                }
+            }
+
+            if (playerNear) break;
+
+            yield return null;
+        }
+
+        ReleaseHeldPack();
+    }
+
+    /// <summary>Releases every currently-held pack mutant and clears tracking state. Server only.</summary>
+    private void ReleaseHeldPack()
+    {
+        foreach (MutantEnemy mutant in _heldPackMutants)
+        {
+            if (mutant != null) mutant.SetHeld(false);
+        }
+
+        _heldPackMutants.Clear();
+        _packHoldReleaseCoroutine = null;
     }
 
     /// <summary>
@@ -622,6 +719,15 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _proximityCoroutine = null;
         }
 
+        // Stop watching for a player to approach and release any still-held pack mutants so
+        // they don't stay frozen forever if the day ends before the player reaches the trail.
+        if (_packHoldReleaseCoroutine != null)
+        {
+            StopCoroutine(_packHoldReleaseCoroutine);
+            _packHoldReleaseCoroutine = null;
+        }
+        ReleaseHeldPack();
+
         // Always clear the encounter listener — it may have been subscribed by SpawnEvent.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
 
@@ -651,14 +757,21 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _spawnedDestination = null;
         }
 
-        // Trail particles are local instances on each client — clean up via ClientRpc.
+        // Trail particles and blood splatters are local instances on each client — clean up via ClientRpc.
         if (IsSpawned)
+        {
             CleanupTrailParticlesClientRpc();
+            CleanupBloodSplattersClientRpc();
+        }
         else
         {
             foreach (GameObject trail in _spawnedTrailParticles)
                 if (trail != null) Destroy(trail);
             _spawnedTrailParticles.Clear();
+
+            foreach (GameObject splatter in _spawnedBloodSplatters)
+                if (splatter != null) Destroy(splatter);
+            _spawnedBloodSplatters.Clear();
         }
     }
 
@@ -673,6 +786,55 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             return hit.point + Vector3.up * yOffset;
 
         return new Vector3(position.x, position.y + yOffset, position.z);
+    }
+
+    /// <summary>
+    /// Scatters <see cref="_endBloodSplatterCount"/> cosmetic ground blood-splatter decals within
+    /// <see cref="_endBloodSplatterRadius"/> of <paramref name="destination"/>, snapped to terrain.
+    /// No-op if no prefabs are assigned or the destination is unassigned. Server only.
+    /// </summary>
+    private void SpawnEndBloodSplatters(Transform destination)
+    {
+        if (_endBloodSplatterPrefabs == null || _endBloodSplatterPrefabs.Length == 0) return;
+        if (destination == null || _endBloodSplatterCount <= 0) return;
+
+        Vector3[] positions = new Vector3[_endBloodSplatterCount];
+        int[] prefabIndices  = new int[_endBloodSplatterCount];
+
+        for (int i = 0; i < _endBloodSplatterCount; i++)
+        {
+            Vector2 offset2D = UnityEngine.Random.insideUnitCircle * _endBloodSplatterRadius;
+            Vector3 rawPos = destination.position + new Vector3(offset2D.x, 0f, offset2D.y);
+            positions[i]      = SnapToTerrain(rawPos, _endBloodSplatterGroundOffset);
+            prefabIndices[i]  = UnityEngine.Random.Range(0, _endBloodSplatterPrefabs.Length);
+        }
+
+        SpawnBloodSplattersClientRpc(positions, prefabIndices);
+    }
+
+    [ClientRpc]
+    private void SpawnBloodSplattersClientRpc(Vector3[] positions, int[] prefabIndices)
+    {
+        for (int i = 0; i < positions.Length; i++)
+        {
+            int prefabIndex = prefabIndices[i];
+            if (prefabIndex < 0 || prefabIndex >= _endBloodSplatterPrefabs.Length) continue;
+
+            GameObject prefab = _endBloodSplatterPrefabs[prefabIndex];
+            if (prefab == null) continue;
+
+            Quaternion rot = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
+            GameObject splatter = Instantiate(prefab, positions[i], rot);
+            _spawnedBloodSplatters.Add(splatter);
+        }
+    }
+
+    [ClientRpc]
+    private void CleanupBloodSplattersClientRpc()
+    {
+        foreach (GameObject splatter in _spawnedBloodSplatters)
+            if (splatter != null) Destroy(splatter);
+        _spawnedBloodSplatters.Clear();
     }
 
     [ClientRpc]

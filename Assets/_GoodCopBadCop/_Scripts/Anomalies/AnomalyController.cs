@@ -19,10 +19,10 @@ public class AnomalyController : MonoBehaviour
     // ── Thresholds ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Infection score at or above which a suspect is considered fully mutated.
-    /// At this threshold anomalies are suppressed entirely — the character's visual
-    /// transformation is the only observable signal. Below the threshold up to
-    /// <see cref="CATEGORY_CAP_BELOW_THRESHOLD"/> anomaly categories activate.
+    /// Infection score (0–100 legacy scale) at or above which a suspect is considered fully
+    /// mutated. At this threshold anomalies are suppressed entirely — the character's visual
+    /// transformation is the only observable signal. Below the threshold, anomalies are chosen
+    /// via the mutation-score points budget in <see cref="InitializeByMutationScore"/>.
     /// </summary>
     public const int FULLY_MUTATED_THRESHOLD = 80;
 
@@ -52,22 +52,27 @@ public class AnomalyController : MonoBehaviour
     // ── Primary Score-Based API ───────────────────────────────────────────────
 
     /// <summary>
-    /// Activates anomalies using a two-dimensional random strategy:
+    /// Activates anomalies for a suspect using a mutation-score point budget.
     ///
-    ///   Dimension 1 — which categories are active. Below <see cref="FULLY_MUTATED_THRESHOLD"/>
-    ///   exactly <see cref="CATEGORY_CAP_BELOW_THRESHOLD"/> (4) populated categories are chosen
-    ///   at random, leaving one dark. At or above the threshold the suspect is considered fully
-    ///   mutated and <see cref="InitializeClean"/> is called — no anomalies activate because the
-    ///   character's visual transformation is the only signal needed.
+    /// <paramref name="infectionScore"/> is on the legacy persistent 0–100 scale; it is first
+    /// converted to a 0–10 "mutation score" (10 = full mutant, 8 = will mutate that night,
+    /// 5 = a fair quarantine amount) via <c>Mathf.RoundToInt(infectionScore / 10f)</c>.
     ///
-    ///   Dimension 2 — how many anomalies within each active category. Anomalies are shuffled
-    ///   randomly within their pool and the count scales proportionally with the score, with
-    ///   a minimum of 1 per active category.
+    /// The mutation score is spent as a points budget across every unlocked anomaly, regardless
+    /// of category. Each anomaly category has its own point cost — configured on
+    /// <see cref="AnomalyManager"/> in the inspector (e.g. Physical/Supernatural cost 2, others
+    /// cost 1 by default). Unlocked anomalies from every category are shuffled together into one
+    /// pool and activated one at a time while affordable, so a score of 5 might buy 2 Physical
+    /// anomalies + 1 Documentation anomaly, or 5 Documentation anomalies, depending on the shuffle
+    /// and what's unlocked — never more than the budget allows.
     ///
     /// Only anomalies whose type name is unlocked in <see cref="AnomalyUnlockManager"/> are
     /// eligible for selection; locked anomalies are silently disabled and excluded from the pool.
     ///
-    /// Score 0 delegates to <see cref="InitializeClean"/>.
+    /// At or above <see cref="FULLY_MUTATED_THRESHOLD"/> the suspect is considered fully mutated
+    /// and <see cref="InitializeClean"/> is called instead — no anomalies activate because the
+    /// character's visual transformation is the only signal needed. Score 0 also delegates to
+    /// <see cref="InitializeClean"/>.
     /// </summary>
     public void InitializeByInfectionScore(int infectionScore)
     {
@@ -77,83 +82,114 @@ public class AnomalyController : MonoBehaviour
             return;
         }
 
-        bool fullyMutated = infectionScore >= FULLY_MUTATED_THRESHOLD;
-
-        if (fullyMutated)
+        if (infectionScore >= FULLY_MUTATED_THRESHOLD)
         {
             InitializeClean();
             Debug.Log($"[AnomalyController] Score {infectionScore} → fully mutated — anomalies suppressed.");
             return;
         }
 
+        int mutationScore = Mathf.Clamp(Mathf.RoundToInt(infectionScore / 10f), 0, 10);
+        InitializeByMutationScore(mutationScore);
+    }
+
+    /// <summary>
+    /// Activates anomalies for a suspect using a 0–10 mutation-score points budget directly
+    /// (10 = full mutant, 8 = will mutate that night, 5 = a fair quarantine amount).
+    ///
+    /// Every unlocked anomaly across all five categories is pooled together and shuffled; the
+    /// budget is then spent by activating anomalies one at a time for as long as their category's
+    /// point cost (see <see cref="AnomalyManager.GetPointCost"/>) still fits in the remaining
+    /// budget. This naturally distributes points across categories at random rather than forcing
+    /// an even split — a suspect can end up with anomalies from every category, or all its points
+    /// spent on a single cheap category.
+    ///
+    /// Score 0 delegates to <see cref="InitializeClean"/>.
+    /// </summary>
+    public void InitializeByMutationScore(int mutationScore)
+    {
+        if (mutationScore <= 0)
+        {
+            InitializeClean();
+            return;
+        }
+
         ClearInitializationState(deactivateActive: true);
 
-        // Build category pools and immediately filter out locked anomalies.
-        // FilterToUnlocked calls InitializeDisabled on each locked entry so
-        // they are both visually reset and recorded for client replication.
-        var categoryPools = new List<List<Anomaly>>
-        {
-            FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList()),
-            FilterToUnlocked(_vitalsAnomalies.Cast<Anomaly>().ToList()),
-            FilterToUnlocked(_behaviorAnomalies.Cast<Anomaly>().ToList()),
-            FilterToUnlocked(_mutationAnomalies.Cast<Anomaly>().ToList()),
-            FilterToUnlocked(_supernaturalAnomalies.Cast<Anomaly>().ToList()),
-        };
-        categoryPools.RemoveAll(p => p.Count == 0);
+        // Build the combined, unlocked anomaly pool tagged with its category so we can look up
+        // each anomaly's point cost. FilterToUnlocked calls InitializeDisabled on each locked
+        // entry so they are both visually reset and recorded for client replication.
+        var pool = new List<(Anomaly anomaly, AnomalyCategory category)>();
+        AddCategoryToPool(FilterToUnlocked(_documentationAnomalies.Cast<Anomaly>().ToList()), AnomalyCategory.Documentation, pool);
+        AddCategoryToPool(FilterToUnlocked(_vitalsAnomalies.Cast<Anomaly>().ToList()), AnomalyCategory.Vitals, pool);
+        AddCategoryToPool(FilterToUnlocked(_behaviorAnomalies.Cast<Anomaly>().ToList()), AnomalyCategory.Behavior, pool);
+        AddCategoryToPool(FilterToUnlocked(_mutationAnomalies.Cast<Anomaly>().ToList()), AnomalyCategory.Mutations, pool);
+        AddCategoryToPool(FilterToUnlocked(_supernaturalAnomalies.Cast<Anomaly>().ToList()), AnomalyCategory.Supernatural, pool);
 
-        if (categoryPools.Count == 0)
+        if (pool.Count == 0)
         {
             Debug.LogWarning("[AnomalyController] No unlocked anomalies available — suspect spawns clean.");
             return;
         }
 
-        // ── Dimension 1: randomly choose which categories are active ──────────
-        ShuffleList(categoryPools);
-        int activeCategoryCount = Mathf.Min(CATEGORY_CAP_BELOW_THRESHOLD, categoryPools.Count);
+        ShuffleList(pool);
 
-        // ── Dimension 2: randomly pick and activate anomalies within each category ──
+        // ── Spend the mutation-score points budget across the shuffled combined pool ──────
+        int remainingBudget = mutationScore;
         int totalActivated = 0;
+        var perCategoryCounts = new Dictionary<AnomalyCategory, int>();
 
-        for (int c = 0; c < categoryPools.Count; c++)
+        foreach ((Anomaly anomaly, AnomalyCategory category) entry in pool)
         {
-            List<Anomaly> pool = categoryPools[c];
+            int cost = GetAnomalyPointCost(entry.category);
 
-            if (c >= activeCategoryCount)
+            if (cost <= remainingBudget)
             {
-                foreach (Anomaly a in pool)
-                    InitializeDisabled(a);
-                continue;
+                ActivateAnomaly(entry.anomaly);
+                remainingBudget -= cost;
+                totalActivated++;
+                perCategoryCounts.TryGetValue(entry.category, out int existing);
+                perCategoryCounts[entry.category] = existing + 1;
             }
-
-            ShuffleList(pool);
-
-            int countInCategory = Mathf.Max(1, Mathf.FloorToInt((float)infectionScore / FULLY_MUTATED_THRESHOLD * pool.Count));
-
-            for (int i = 0; i < pool.Count; i++)
+            else
             {
-                if (i < countInCategory)
-                {
-                    ActivateAnomaly(pool[i]);
-                    totalActivated++;
-                }
-                else
-                {
-                    InitializeDisabled(pool[i]);
-                }
+                InitializeDisabled(entry.anomaly);
             }
         }
 
-        Debug.Log($"[AnomalyController] Score {infectionScore} → " +
-                  $"{activeCategoryCount}/{categoryPools.Count} categories, " +
-                  $"{totalActivated} anomaly/ies active.");
+        string breakdown = string.Join(", ", perCategoryCounts.Select(kvp => $"{kvp.Key}:{kvp.Value}"));
+        Debug.Log($"[AnomalyController] Mutation score {mutationScore} → {totalActivated} anomaly/ies active " +
+                  $"({breakdown}), {remainingBudget} point(s) unspent.");
     }
 
     /// <summary>
-    /// Maximum categories that may be active while the suspect is below
-    /// <see cref="FULLY_MUTATED_THRESHOLD"/>. One category always stays dark until
-    /// the suspect is truly too far gone.
+    /// Returns the point cost of a single anomaly in <paramref name="category"/>, sourced from
+    /// <see cref="AnomalyManager.GetPointCost"/> when available. Falls back to the documented
+    /// default costs (Physical/Supernatural = 2, Documentation/Behavior/Vitals = 1) when no
+    /// <see cref="AnomalyManager"/> instance exists (e.g. in tests). Also used by
+    /// <see cref="FolderScoreTab"/> to total checked checklist items with the same point values.
     /// </summary>
-    private const int CATEGORY_CAP_BELOW_THRESHOLD = 4;
+    public static int GetAnomalyPointCost(AnomalyCategory category)
+    {
+        if (AnomalyManager.Instance != null)
+            return AnomalyManager.Instance.GetPointCost(category);
+
+        return category switch
+        {
+            AnomalyCategory.Mutations    => 2,
+            AnomalyCategory.Supernatural => 2,
+            _                            => 1,
+        };
+    }
+
+    private static void AddCategoryToPool(
+        List<Anomaly> categoryAnomalies,
+        AnomalyCategory category,
+        List<(Anomaly anomaly, AnomalyCategory category)> pool)
+    {
+        foreach (Anomaly anomaly in categoryAnomalies)
+            pool.Add((anomaly, category));
+    }
 
     /// <summary>
     /// True when every populated anomaly category has at least one active anomaly.

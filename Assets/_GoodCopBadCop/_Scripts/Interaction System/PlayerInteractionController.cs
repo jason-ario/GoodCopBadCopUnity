@@ -423,19 +423,19 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Performs the interact-layer raycast against ALL overlapping colliders instead of just the
-    /// single closest one. When two interactables' colliders occupy nearly the same distance along
-    /// the ray (e.g. a pickup sitting directly on top of another interactable, like a fax paper
-    /// resting on a mini fridge lid), Unity's raycast ordering for near-equal distances is unstable
-    /// and can flip between them every frame, making the front item impossible to reliably
-    /// highlight/grab. This resolves that by, within the near-closest tie window:
-    /// 1) Preferring whichever interactable was highlighted last frame if it's still among the
-    ///    near-closest candidates (sticky selection — kills the frame-to-frame flicker).
-    /// 2) Otherwise preferring a PickableObject candidate (an item resting ON TOP of a static
-    ///    piece of furniture, e.g. a paper on a fridge, should always win the tie over the
-    ///    furniture it's sitting on).
-    /// 3) Otherwise preferring the closest candidate that actually resolves to an enabled
-    ///    Interactable over a closer but non-interactable collider hit.
+    /// Performs the interact-layer raycast and returns the single closest collider hit along the
+    /// ray, resolving through <see cref="ResolveInteractable"/> only to decide whether to keep
+    /// looking — the ray simply stops at the first collider that resolves to an enabled
+    /// Interactable, without any distance-tie/sticky preference between candidates.
+    ///
+    /// Previously this preferred a PickableObject within a "near-tie" distance window of the
+    /// closest hit (to stabilize a pickup resting directly on top of another interactable, e.g. a
+    /// fax paper on a mini fridge lid). That broke container interactables that are themselves a
+    /// PickableObject (e.g. <see cref="SupplyBox"/>): its own always-enabled interact collider
+    /// sits closer along the ray than an item resting further inside/behind it, so it was
+    /// incorrectly preferred over the item every time the two weren't within the tie window —
+    /// e.g. you could no longer grab a second item out of an open supply box once a nearer item
+    /// had already been taken out. Simply honoring the nearest valid hit fixes that.
     /// </summary>
     private bool TryGetBestInteractHit(Ray ray, out RaycastHit bestHit)
     {
@@ -449,40 +449,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
-        // Wide enough to absorb the near-coplanar gap between a thin pickup and the surface
-        // it's resting on (e.g. a fax paper sitting on a mini fridge lid), while small enough
-        // to not bridge genuinely separate objects.
-        const float stickyEpsilon = 0.15f;
-        float closestDistance = hits[0].distance;
-        int tieCount = 0;
-        while (tieCount < hits.Length && hits[tieCount].distance <= closestDistance + stickyEpsilon)
-        {
-            tieCount++;
-        }
-
-        if (lastInteractable != null)
-        {
-            for (int i = 0; i < tieCount; i++)
-            {
-                if (ResolveInteractable(hits[i].collider) == lastInteractable)
-                {
-                    bestHit = hits[i];
-                    return true;
-                }
-            }
-        }
-
-        for (int i = 0; i < tieCount; i++)
-        {
-            Interactable candidate = ResolveInteractable(hits[i].collider);
-            if (candidate != null && candidate.enabled && candidate is PickableObject)
-            {
-                bestHit = hits[i];
-                return true;
-            }
-        }
-
-        for (int i = 0; i < tieCount; i++)
+        for (int i = 0; i < hits.Length; i++)
         {
             Interactable candidate = ResolveInteractable(hits[i].collider);
             if (candidate != null && candidate.enabled)

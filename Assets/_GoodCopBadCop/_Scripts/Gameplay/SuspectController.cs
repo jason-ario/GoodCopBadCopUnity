@@ -674,6 +674,10 @@ public class SuspectController : NetworkBehaviour
         // Now standing at the window — shootable/woundable from here on.
         suspectCharacter.SetIsAtBooth(true);
 
+        // Walk-in is over — restore full procedural leg IK now that the suspect is done being
+        // tweened across the floor (see SuspectCharacter.Awake for why it was zeroed at spawn).
+        suspectCharacter.RestoreLegsAnimators();
+
         // Ensure all non-activated anomalies (including those from locked categories that
         // were skipped during the initial activation pass) have their shader state cleaned up.
         suspectCharacter.InitializeDisabledOnArrival();

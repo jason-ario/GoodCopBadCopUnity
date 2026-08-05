@@ -428,6 +428,10 @@ public class Day_02 : DayBase, IDailyTask
         if (FollowTrailThreat.Instance != null)
             FollowTrailThreat.Instance.OnDestinationDiscoveredOverride = null;
 
+        // Disarm/hide the giant-Ocho-in-the-woods sighting so it never lingers armed or
+        // visible into another day (e.g. if the player skipped or never finished the trail).
+        OchoInWoodsCutscene.Instance?.DebugReset();
+
         // Clear all out-back task NetworkVariables so every client's HUD is clean.
         // The NetworkVariable setters are server-only; clients have their own local TaskRegistry
         // copies that will update when the NetworkVariable changes propagate.
@@ -499,6 +503,21 @@ public class Day_02 : DayBase, IDailyTask
         // Unlock the tool locker so it isn't still padlocked when the player is in-world.
         _toolLockerLock?.ForceUnlock();
 
+        // Open the booth door — Vlad would normally have opened it while walking through the
+        // (now-skipped) waypoint sequence.
+        _boothDoor?.ForceOpen(openedIn: true);
+
+        // Since Day2OpeningSequence never runs, Vlad is left stranded wherever the scene happens
+        // to place him (which may not even be a valid NavMesh position if Day 1 never played out
+        // naturally) instead of ending up where a full playthrough of the opening sequence would
+        // leave him. Drop him straight into that same end state — settled and sitting at
+        // _vladInYardWaypoint — so the world stays consistent when the opening is skipped.
+        if (_vladCharacter != null)
+        {
+            _spawnedVlad = _vladCharacter;
+            StartCoroutine(DebugSettleVladAfterSkippedOpening());
+        }
+
         // Vlad's sequence — which would normally trigger the mail delivery right after the tool
         // locker dialogue — is being skipped entirely. If OnDayChanged hasn't deferred day 2's
         // delivery yet, clear the flag so it fires via the normal automatic trigger; otherwise
@@ -513,7 +532,19 @@ public class Day_02 : DayBase, IDailyTask
         // added automatically by SortMailTask itself as soon as the delivery triggers (see
         // TriggerDeferredDelivery above / SortMailTask.NotifyDeliveryAlertClientRpc).
 
-        Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked.");
+        Debug.Log("[Day_02] DebugSkipOpening: opening sequence suppressed, tool locker unlocked, mail delivery unblocked, Vlad settled in the yard.");
+    }
+
+    /// <summary>
+    /// Stands Vlad up out of whatever pose the scene left him in, then instantly settles him at
+    /// <see cref="_vladInYardWaypoint"/> — the same end state <see cref="VladWaypointSequence"/>
+    /// leaves him in after a full playthrough of the opening sequence. Used only by
+    /// <see cref="DebugSkipOpening"/>. Server-side only.
+    /// </summary>
+    private IEnumerator DebugSettleVladAfterSkippedOpening()
+    {
+        yield return StartCoroutine(StandUpAndLeaveYard(_spawnedVlad));
+        yield return StartCoroutine(SettleVladInYard(_spawnedVlad, teleportInstantly: true));
     }
 
     // -------------------------------------------------------------------------
@@ -679,12 +710,30 @@ public class Day_02 : DayBase, IDailyTask
     /// vanishing. Server-side only. Does not despawn or clear the passed-in reference; callers
     /// (or DayDeactivated) are responsible for eventually despawning it.
     /// </summary>
-    private IEnumerator SettleVladInYard(SuspectCharacter character)
+    /// <param name="teleportInstantly">
+    /// When true, skips the NavMeshAgent walk and snaps <paramref name="character"/> straight to
+    /// <see cref="_vladInYardWaypoint"/> instead. Used by <see cref="DebugSkipOpening"/> so the
+    /// debug-skip cheats don't try to walk Vlad from whatever ad-hoc scene position he started at.
+    /// </param>
+    private IEnumerator SettleVladInYard(SuspectCharacter character, bool teleportInstantly = false)
     {
         if (character == null) yield break;
 
         if (_vladInYardWaypoint != null)
-            yield return StartCoroutine(WalkVladTo(character, _vladInYardWaypoint));
+        {
+            if (teleportInstantly)
+            {
+                character.StopNavigation();
+                character.transform.SetPositionAndRotation(_vladInYardWaypoint.position, _vladInYardWaypoint.rotation);
+                character.InitNavigation();
+                character.SetAnimatorBool("Walking", false);
+                character.SetCanInteractNetworked(true);
+            }
+            else
+            {
+                yield return StartCoroutine(WalkVladTo(character, _vladInYardWaypoint));
+            }
+        }
 
         character.SetAnimatorBool("Sitting", true);
 
@@ -1283,6 +1332,11 @@ public class Day_02 : DayBase, IDailyTask
 
         // Spawn Ocho in the tree line as soon as the trail task goes live.
         SpawnOcho();
+
+        // Arm the giant-Ocho-in-the-woods sighting at the trail's destination — only ever
+        // triggered while this Day 2 trail/dead-animal task is the active one (see
+        // OchoInWoodsCutscene.TriggerTask / DayDeactivated's DebugReset cleanup below).
+        OchoInWoodsCutscene.Instance?.TriggerTask();
 
         Debug.Log("[Day_02] Trail event activated.");
     }

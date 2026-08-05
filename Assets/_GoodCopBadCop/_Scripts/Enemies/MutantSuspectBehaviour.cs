@@ -147,6 +147,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         // lineup sequence, not falling.
         SetAnimBool(GroundedAnimBool, true);
 
+        // Zero out procedural leg IK for the whole walk-in — it's driven by transform.DOMove,
+        // not real grounded locomotion, and LegsAnimator's foot planting fights that tweened
+        // motion. Restored once the mutant either breaks through the window (ClimbThroughSequence)
+        // or gives up and starts a genuine NavMeshAgent-driven retreat (RetreatingSequence).
+        SetLegsAnimatorsBlendClientRpc(0f);
+
         StartCoroutine(LineupSequence());
     }
 
@@ -211,7 +217,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         // Disable procedural leg IK for the duration of the climb — the tweened climb-through
         // motion isn't grounded locomotion, so LegsAnimator would otherwise fight the pose.
-        SetLegsAnimatorsEnabledClientRpc(false);
+        // (Already zero since spawn/BeginLineup — reasserted here in case this mutant entered via
+        // BeginAtStandPos after a normal-suspect arrival that had already restored it to full.)
+        SetLegsAnimatorsBlendClientRpc(0f);
 
         // Disable agent so DOTween can move freely across the counter (off-mesh).
         _agent.enabled = false;
@@ -234,7 +242,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         // Climb-through is complete — re-enable leg IK before the mutant resumes normal
         // grounded locomotion under MutantEnemy's control.
-        SetLegsAnimatorsEnabledClientRpc(true);
+        SetLegsAnimatorsBlendClientRpc(1f);
 
         if (_isDone) yield break;
 
@@ -461,6 +469,11 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         SetWalkingClientRpc(true);
 
+        // About to hand off to real NavMeshAgent-driven movement (not a DOTween) — restore
+        // procedural leg IK now so the retreat actually plants its feet correctly, mirroring
+        // ClimbThroughSequence's restore on the breakthrough path.
+        SetLegsAnimatorsBlendClientRpc(1f);
+
         // Re-enable the NavMeshAgent for retreat pathfinding (was disabled during walk-in).
         _agent.enabled = true;
         yield return null; // One frame for the agent to link onto the NavMesh.
@@ -531,6 +544,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         // otherwise be stuck at its default false for this entire scripted-entrance sequence too.
         SetAnimBool(GroundedAnimBool, true);
 
+        // Zero out procedural leg IK for the standing/climb sequence — see BeginLineup for why.
+        SetLegsAnimatorsBlendClientRpc(0f);
+
         StartCoroutine(AtStandPosSequence());
     }
 
@@ -597,15 +613,18 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     /// <summary>
     /// Enables or disables every <see cref="LegsAnimator"/> on this mutant (and its children)
-    /// on all clients. Used to suspend procedural leg IK during the tweened window climb-through,
-    /// then restore it once the mutant lands and resumes grounded locomotion.
+    /// on all clients by setting its Blend to 0 or 1 (rather than toggling 'enabled', which would
+    /// permanently skip LegsAnimator's own Start()/Initialize() if disabled before it first runs).
+    /// Used to suspend procedural leg IK during the DOTween-driven walk-in and window
+    /// climb-through, then restore it once the mutant resumes genuine NavMeshAgent-driven
+    /// grounded locomotion (post-breakthrough chase, or retreat).
     /// </summary>
     [ClientRpc]
-    private void SetLegsAnimatorsEnabledClientRpc(bool enabled)
+    private void SetLegsAnimatorsBlendClientRpc(float blend)
     {
         foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
         {
-            legsAnimator.enabled = enabled;
+            legsAnimator.LegsAnimatorBlend = blend;
         }
     }
 

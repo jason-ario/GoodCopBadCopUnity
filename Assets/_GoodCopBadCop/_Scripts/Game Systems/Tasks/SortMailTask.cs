@@ -215,11 +215,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public int SortedCount => _sortedCount.Value;
     public int TotalCount  => _totalCount.Value;
 
-    /// <summary>Client-local handle to this delivery's row in the tutorial objective list overlay
-    /// (see <see cref="TutorialObjectiveList"/>). Created when the delivery alert fires, kept
-    /// up to date as packages are sorted, and completed/hidden once every package is sorted.</summary>
-    private TutorialObjectiveItem _mailObjective;
-
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -274,7 +269,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnProgressChanged?.Invoke();
-        _mailObjective?.SetText(GetMailObjectiveText());
     }
 
     private void OnIsActiveChanged(bool previous, bool current)
@@ -660,12 +654,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void NotifyAllPackagesSortedClientRpc()
     {
         OnAllPackagesSorted?.Invoke();
-
-        // Only removes this task's own row — other concurrently-tracked Day 2 objectives (e.g.
-        // "Fix Perimeter Fences") keep showing until they finish too. See
-        // TutorialObjectiveList.CompleteAndRemoveObjective.
-        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_mailObjective, preHideDelay: 1.5f);
-        _mailObjective = null;
     }
 
     private void UpdateThreatLevel()
@@ -739,10 +727,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Pops up the tutorial objective list overlay (see <see cref="TutorialObjectiveList"/>)
-    /// showing how much mail is left to put away, on every client. The row stays up — updated
-    /// live as packages are sorted — until <see cref="NotifyAllPackagesSortedClientRpc"/>
-    /// completes and hides it.
+    /// Placeholder for delivery-alert side effects on every client. The mail task's progress is
+    /// already surfaced via the <see cref="ISystemicThreat"/> threat panel (see
+    /// <see cref="ThreatName"/>/<see cref="ThreatDescription"/>) registered through
+    /// <see cref="TaskRegistry"/>, so this no longer also adds a duplicate
+    /// <see cref="TutorialObjectiveList"/> row — the two showed the same "sorted/total" count
+    /// twice on screen (e.g. "Sort mail — Packages sorted 2/9" and "Put away the mail (2/9)").
     ///
     /// Previously also showed a text popup announcing the delivery and prohibited goods
     /// (the mail-sorting equivalent of the "Someone is waiting at the booth" prompt); that popup
@@ -751,10 +741,5 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
     {
-        _mailObjective = TutorialObjectiveList.Instance?.AddObjective(GetMailObjectiveText());
     }
-
-    /// <summary>Display text for <see cref="_mailObjective"/>, e.g. "Put away the mail (3/22)".</summary>
-    private string GetMailObjectiveText() =>
-        $"Put away the mail ({Mathf.Min(SortedCount, TotalCount)}/{TotalCount})";
 }

@@ -22,7 +22,7 @@ using Random = UnityEngine.Random;
 /// which is the same static asset on every build) are replicated to every client via
 /// <see cref="ApplyAssignmentClientRpc"/> so every peer's <see cref="MailCubbySlot"/> ends up with
 /// the exact same active state and tape label as the server — this is required because
-/// <see cref="MailCubbySlot.OnTriggerEnter"/> reads its own locally-assigned resident name and
+/// <see cref="MailCubbySlot.HandleItemPlaced"/> reads its own locally-assigned resident name and
 /// sends it up via <see cref="MailPackageItem.RequestSortServerRpc"/> for the server to validate.
 ///
 /// Setup:

@@ -92,6 +92,14 @@ public class DeliveryTruckController : NetworkBehaviour
     [SerializeField] private AudioClip crateDropSfxClip;
     [Tooltip("Volume for crateDropSfxClip.")]
     [SerializeField] private float crateDropSfxVolume = 1f;
+    [Tooltip("Random horn-honk one-shots played while the truck waits at pointB for a player to open the gate. One clip is picked at random each honk.")]
+    [SerializeField] private AudioClip[] honkClips;
+    [Tooltip("Volume for honkClips.")]
+    [SerializeField] private float honkVolume = 1f;
+    [Tooltip("Minimum seconds between honks while the truck waits at the gate.")]
+    [SerializeField] private float honkIntervalMin = 5f;
+    [Tooltip("Maximum seconds between honks while the truck waits at the gate.")]
+    [SerializeField] private float honkIntervalMax = 10f;
 
     [Header("Timing")]
     [Tooltip("How long the truck idles at pointC after dropping the crate before driving back — packages are spawned as soon as the crate settles.")]
@@ -209,7 +217,9 @@ public class DeliveryTruckController : NetworkBehaviour
             if (!checkpointGate.IsOpen)
             {
                 SortMailTask.Instance?.NotifyShipmentWaitingAtGate();
+                Coroutine honkRoutine = StartCoroutine(HonkWhileWaitingForGate());
                 yield return StartCoroutine(WaitForGateOpen());
+                StopCoroutine(honkRoutine);
                 SortMailTask.Instance?.NotifyShipmentGateOpened();
             }
 
@@ -250,6 +260,24 @@ public class DeliveryTruckController : NetworkBehaviour
     {
         while (checkpointGate != null && !checkpointGate.IsOpen)
             yield return null;
+    }
+
+    /// <summary>
+    /// Server-only. While the truck sits waiting at pointB for the gate to open, honks the horn
+    /// (via <see cref="PlayHonkClientRpc"/>) at random intervals between <see cref="honkIntervalMin"/>
+    /// and <see cref="honkIntervalMax"/> seconds. Stopped as soon as the gate opens (see
+    /// <see cref="ServerSequence"/>).
+    /// </summary>
+    private IEnumerator HonkWhileWaitingForGate()
+    {
+        while (checkpointGate != null && !checkpointGate.IsOpen)
+        {
+            float wait = Random.Range(honkIntervalMin, honkIntervalMax);
+            yield return new WaitForSeconds(wait);
+
+            if (checkpointGate != null && !checkpointGate.IsOpen)
+                PlayHonkClientRpc();
+        }
     }
 
     /// <summary>
@@ -299,6 +327,17 @@ public class DeliveryTruckController : NetworkBehaviour
     private void ReleaseCrateClientRpc()
     {
         StartCoroutine(TumbleCrateDown());
+    }
+
+    /// <summary>
+    /// Plays a random one-shot honk sound over the truck's current audio (idle loop keeps
+    /// playing underneath). Triggered by <see cref="HonkWhileWaitingForGate"/> while the truck
+    /// waits at pointB for a player to open the gate.
+    /// </summary>
+    [ClientRpc]
+    private void PlayHonkClientRpc()
+    {
+        PlayHonk();
     }
 
     [ClientRpc]
@@ -453,6 +492,20 @@ public class DeliveryTruckController : NetworkBehaviour
         truckAudioSource.loop = true;
         truckAudioSource.clip = clip;
         truckAudioSource.Play();
+    }
+
+    /// <summary>
+    /// Plays a random clip from <see cref="honkClips"/> as a one-shot, layered on top of
+    /// whatever is currently looping on <see cref="truckAudioSource"/>. No-op if no clips are
+    /// assigned.
+    /// </summary>
+    private void PlayHonk()
+    {
+        if (truckAudioSource == null || honkClips == null || honkClips.Length == 0) return;
+
+        AudioClip clip = honkClips[Random.Range(0, honkClips.Length)];
+        if (clip != null)
+            truckAudioSource.PlayOneShot(clip, honkVolume);
     }
 
     /// <summary>

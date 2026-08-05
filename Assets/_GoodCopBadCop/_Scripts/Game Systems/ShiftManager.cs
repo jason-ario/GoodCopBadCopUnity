@@ -621,6 +621,19 @@ public class ShiftManager : NetworkBehaviour
 
         windowLampController.TurnGreen();
 
+        // Notify the table bell/switch that the first suspect is ready to be called right away,
+        // instead of waiting for the window-opening visual beats below. The switch's readiness
+        // is a separate concern from the shift-start pacing (lamp, camera, door lock), so it
+        // should not be gated behind those cosmetic delays.
+        if (IsServer)
+        {
+            if (_suspectSchedulerCoroutine != null)
+                StopCoroutine(_suspectSchedulerCoroutine);
+
+            OverrideFirstArrivalInterval = null;
+            NextSuspectReadyForBell = true;
+            OnNextSuspectReadyForBell?.Invoke();
+        }
 
         yield return new WaitForSeconds(3f);
 
@@ -634,17 +647,6 @@ public class ShiftManager : NetworkBehaviour
         yield return new WaitForSeconds(0.5f);
 
         yield return new WaitForSeconds(3f);
-
-        // Notify the table bell that the first suspect is ready to be called.
-        if (IsServer)
-        {
-            if (_suspectSchedulerCoroutine != null)
-                StopCoroutine(_suspectSchedulerCoroutine);
-
-            OverrideFirstArrivalInterval = null;
-            NextSuspectReadyForBell = true;
-            OnNextSuspectReadyForBell?.Invoke();
-        }
     }
 
     public void EndShift()

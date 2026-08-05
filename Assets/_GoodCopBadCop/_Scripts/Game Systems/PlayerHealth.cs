@@ -63,8 +63,15 @@ public class PlayerHealth : NetworkBehaviour
     /// <summary>When true, all incoming damage is ignored. Server-side only.</summary>
     public bool IsInvincible { get; set; }
 
+    private PlayerInstance _playerInstance;
+
 
     // Lifecycle
+
+    private void Awake()
+    {
+        _playerInstance = GetComponent<PlayerInstance>();
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -153,6 +160,13 @@ public class PlayerHealth : NetworkBehaviour
             return;
 
         if (IsInvincible)
+            return;
+
+        // Players locked into (or otherwise participating in) a scripted dialogue must be
+        // fully immune to damage from every source (mutants, radiation, fire, etc.) — this
+        // is a server-authoritative backstop in addition to the mutant-side targeting/hit
+        // checks in MutantEnemy and MutantAttackHitbox.
+        if (_playerInstance != null && _playerInstance.IsInCutscene)
             return;
 
         _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage);

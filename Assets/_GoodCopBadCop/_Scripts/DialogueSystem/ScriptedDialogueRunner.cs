@@ -814,6 +814,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         UIController.Instance?.ShowPlayerUI();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
 
+        // Unconditional clear — mirrors ExitScriptedModeClientRpc so a player who leaves early
+        // via Q/Back while never movement-locked (e.g. an unlocked outside sequence) doesn't
+        // stay permanently immune/untargetable.
+        PlayerInstance.Instance?.SetIsInCutscene(false);
+
         if (PlayerInstance.Instance == null) return;
 
         if (PlayerInstance.Instance.IsOutsideLocal)
@@ -939,6 +944,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // so the player can reach whatever the instruction is asking them to do.
         if (!unlocked)
             EnterScriptedModeClientRpc(0UL);
+        else
+            // Still mark the player as "in cutscene" for mutant-immunity purposes even though
+            // movement and the camera stay free — ExitScriptedModeClientRpc below always clears
+            // this again once the sequence ends.
+            SetCutsceneImmunityClientRpc(true);
 
         yield return null; // flush RPCs before the first line
 
@@ -1088,6 +1098,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         netObj.GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.Hide();
     }
 
+    /// <summary>
+    /// Sets (or clears) mutant-immunity/no-targeting for the local player without touching
+    /// movement, camera, or <see cref="DialogueChoiceSystem.IsInDialogueMode"/>. Used for
+    /// dialogue sequences that deliberately leave the player free to move (e.g. an unlocked
+    /// megaphone instruction) but must still count as "in dialogue" for combat purposes.
+    /// </summary>
+    [ClientRpc]
+    private void SetCutsceneImmunityClientRpc(bool value)
+    {
+        PlayerInstance.Instance?.SetIsInCutscene(value);
+    }
+
     [ClientRpc]
     private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
@@ -1113,6 +1135,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                   $"ChoiceSystemInstance={DialogueChoiceSystem.Instance != null}");
 
         if (PlayerInstance.Instance == null) return;
+
+        // Always mark the participant as "in cutscene" regardless of whether their movement
+        // gets locked below — mutants must never target or damage a player who is actively
+        // participating in a scripted dialogue, even one that leaves them free to walk around
+        // (e.g. an unlocked outside sequence). This is separate from DialogueChoiceSystem's
+        // movement/camera lock, which only applies in the branches below.
+        PlayerInstance.Instance.SetIsInCutscene(true);
 
         // Resolve the speaker's transform so the player can rotate to face them.
         Transform lookTarget = null;
@@ -1143,8 +1172,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Deactivate any override camera before restoring the default cam state.
         DeactivateOverrideCam();
 
-        UIController.Instance?.ShowPlayerUI();
+        // Mirrors the unconditional set in EnterScriptedModeClientRpc — always clear cutscene
+        // immunity here so a player who was never movement-locked (e.g. an unlocked outside
+        // sequence) doesn't stay permanently immune/untargetable after the dialogue ends.
+        PlayerInstance.Instance?.SetIsInCutscene(false);
 
+        // Clear DialogueChoiceSystem.IsInDialogueMode BEFORE calling ShowPlayerUI() below —
+        // ShowPlayerUI() guards against revealing the HUD while that flag is still true, so
+        // calling it first (as before) left the guard blocking the restore for outside players
+        // whose IsInDialogueMode wasn't cleared until after ShowPlayerUI() had already bailed.
         if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
         {
             // Always call ExitScriptedDialogueModeOutside for outside players — covers both the
@@ -1155,6 +1191,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
                 DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
 
+            UIController.Instance?.ShowPlayerUI();
             _clientSpeakerNetId = 0;
             return;
         }
@@ -1162,6 +1199,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // ExitScriptedDialogueMode calls SuspectController.SetSuspectCamActive(false), which reads
         // _clientSpeakerNetId to find and deactivate the speaker's per-character cam — reset after.
         DialogueChoiceSystem.Instance.ExitScriptedDialogueMode();
+        UIController.Instance?.ShowPlayerUI();
         _clientSpeakerNetId = 0;
     }
 

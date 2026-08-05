@@ -60,6 +60,16 @@ public class TimecardMachine : Interactable
     [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
     [SerializeField] private string _clockInInteractText = "Clock In";
 
+    [Header("Tutorial Objective List")]
+    [Tooltip("Text shown in the tutorial objective overlay while clock-in is available. " +
+             "Day 1 drives its own scripted tutorial objectives, so this is skipped on Day 1.")]
+    [SerializeField] private string _clockInObjectiveText = "Clock in for the day";
+    [Tooltip("Text shown in the tutorial objective overlay while clock-out is available. " +
+             "Day 1 drives its own scripted tutorial objectives, so this is skipped on Day 1.")]
+    [SerializeField] private string _clockOutObjectiveText = "Clock out for the day";
+    [Tooltip("Seconds the completed objective row stays visible (struck through) before it is removed.")]
+    [SerializeField] private float _objectiveCompletedLingerDuration = 1f;
+
     /// <summary>Seconds to wait after the punch animation fires before triggering the end-of-shift.</summary>
     [SerializeField] private float _punchToReportDelay = 1.5f;
 
@@ -68,6 +78,12 @@ public class TimecardMachine : Interactable
 
     private bool _clockOutReady = false;
     private bool _clockInReady  = false;
+
+    // Tracks the tutorial objective overlay rows added while each punch is armed. Day 1 drives
+    // its own scripted objective sequence for clock-in/out (see Day_01.ShowClockOutTask and its
+    // arrow-based clock-in tutorial), so these are only added on days other than Day 1.
+    private TutorialObjectiveItem _clockInObjective;
+    private TutorialObjectiveItem _clockOutObjective;
 
     // Cached from the Inspector-assigned interactText so we can restore it after clock-in.
     private string _clockOutInteractText;
@@ -167,6 +183,8 @@ public class TimecardMachine : Interactable
     {
         _clockInReady = true;
         interactText  = _clockInInteractText;
+        SetLightReady(true);
+        AddObjectiveIfNotDay1(ref _clockInObjective, _clockInObjectiveText);
     }
 
     [ClientRpc]
@@ -174,6 +192,8 @@ public class TimecardMachine : Interactable
     {
         _clockInReady = false;
         interactText  = _clockOutInteractText;
+        SetLightReady(false);
+        CompleteObjective(ref _clockInObjective);
 
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
@@ -226,6 +246,8 @@ public class TimecardMachine : Interactable
         _clockOutReady = false;
         _clockInReady  = false;
         SetLightReady(false);
+        _clockInObjective  = null;
+        _clockOutObjective = null;
     }
 
     [ClientRpc]
@@ -233,6 +255,7 @@ public class TimecardMachine : Interactable
     {
         _clockOutReady = true;
         SetLightReady(true);
+        AddObjectiveIfNotDay1(ref _clockOutObjective, _clockOutObjectiveText);
 
         if (_fanfareSource != null && _fanfareClip != null)
             _fanfareSource.PlayOneShot(_fanfareClip);
@@ -243,6 +266,7 @@ public class TimecardMachine : Interactable
     {
         _clockOutReady = false;
         SetLightReady(false);
+        CompleteObjective(ref _clockOutObjective);
 
         // Silence the fanfare immediately so the power-cut feels like a direct consequence.
         if (_fanfareSource != null)
@@ -262,5 +286,24 @@ public class TimecardMachine : Interactable
     {
         if (_lightAnimator != null)
             _lightAnimator.SetBool(ReadyBool, ready);
+    }
+
+    /// <summary>
+    /// Adds a row to the tutorial objective overlay, unless the current day is Day 1 — Day 1
+    /// drives its own scripted objective sequence for clock-in/out (see Day_01.ShowClockOutTask
+    /// and its arrow-based clock-in tutorial), so adding a duplicate row here would conflict.
+    /// </summary>
+    private static void AddObjectiveIfNotDay1(ref TutorialObjectiveItem slot, string text)
+    {
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
+        slot = TutorialObjectiveList.Instance?.AddObjective(text);
+    }
+
+    /// <summary>Marks the given objective row complete and removes it shortly after, if one is tracked.</summary>
+    private void CompleteObjective(ref TutorialObjectiveItem slot)
+    {
+        if (slot == null) return;
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(slot, _objectiveCompletedLingerDuration);
+        slot = null;
     }
 }

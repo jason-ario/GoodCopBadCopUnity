@@ -12,6 +12,13 @@ using UnityEngine;
 /// </summary>
 public class DuskNotificationUI : MonoBehaviour
 {
+    /// <summary>
+    /// Singleton accessor so other systems (e.g. Day_01's trash/graffiti tutorial trigger) can
+    /// query <see cref="TotalDisplayDuration"/> and wait for this banner to fully clear before
+    /// showing their own top-of-screen overlay.
+    /// </summary>
+    public static DuskNotificationUI Instance { get; private set; }
+
     [Tooltip("Bell chime clip played when the notification appears.")]
     [SerializeField] private AudioClip _chimeClip;
 
@@ -20,6 +27,13 @@ public class DuskNotificationUI : MonoBehaviour
     [SerializeField] private float _holdDuration    = 2f;
     [SerializeField] private float _fadeOutDuration = 1f;
 
+    /// <summary>
+    /// Total seconds the banner is on screen (fade in + hold + fade out). Callers that show
+    /// their own top-of-screen overlay around the same moment as Dusk should wait at least this
+    /// long first so the two don't visually overlap.
+    /// </summary>
+    public float TotalDisplayDuration => _fadeInDuration + _holdDuration + _fadeOutDuration;
+
     private GameObject _notificationPanel;
     private CanvasGroup _canvasGroup;
     private Animator    _panelAnimator;
@@ -27,6 +41,8 @@ public class DuskNotificationUI : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
+
         // Auto-discover the child panel — finds the first child CanvasGroup (inactive included).
         _canvasGroup = GetComponentInChildren<CanvasGroup>(true);
 
@@ -43,7 +59,25 @@ public class DuskNotificationUI : MonoBehaviour
     }
 
     private void OnEnable()  => ShiftManager.OnDuskBegin += ShowDusk;
-    private void OnDisable() => ShiftManager.OnDuskBegin -= ShowDusk;
+
+    private void OnDisable()
+    {
+        ShiftManager.OnDuskBegin -= ShowDusk;
+
+        // Defensive cleanup: StartCoroutine is killed outright the instant this object (or a
+        // parent, e.g. UIController's playerUI root which gets toggled via ClosePlayerUI/
+        // ShowPlayerUI around cutscenes and dialogue) is disabled — it does NOT resume once
+        // re-enabled. Without this, a disable landing mid fade-in/hold/fade-out permanently
+        // strands the panel active (and potentially at a non-zero alpha), so the banner never
+        // goes away even though NotificationRoutine's own cleanup line never gets to run.
+        _routine = null;
+        if (_notificationPanel != null)
+        {
+            _notificationPanel.SetActive(false);
+            if (_canvasGroup != null)
+                _canvasGroup.alpha = 0f;
+        }
+    }
 
     private void ShowDusk()
     {

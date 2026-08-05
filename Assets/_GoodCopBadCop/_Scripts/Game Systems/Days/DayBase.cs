@@ -40,6 +40,20 @@ public abstract class DayBase : MonoBehaviour
     [Min(0)]
     public int SuspectsToProcess = 5;
 
+    /// <summary>
+    /// How many of this day's populated lineup slots (<see cref="DailySuspectManager.shiftSuspects"/>)
+    /// actually represent a "subject to process" for HUD/objective display purposes — read by
+    /// <see cref="ProcessResidentsTask"/> for its Task Page total. Defaults to -1, a sentinel meaning
+    /// "no override" — callers should fall back to the real populated lineup count, which already
+    /// accounts for Day 2+'s injected mutant/doppelganger slots.
+    ///
+    /// Override only for a day with hand-scripted lineup slots that are never actually handed off/
+    /// processed by the player (e.g. Day 1's Soldier, whose slot exists purely to trigger the mutant
+    /// attack cutscene) — without this, the Task Page total would count slots the player can never
+    /// complete.
+    /// </summary>
+    public virtual int SubjectsToProcessOverrideForDisplay => -1;
+
     // -------------------------------------------------------------------------
     // Day Schedule — Tasks
     // -------------------------------------------------------------------------
@@ -155,10 +169,33 @@ public abstract class DayBase : MonoBehaviour
     private TutorialObjectiveItem _autoSubjectCounterTask;
     private int _autoSubjectCounterProcessedCount;
 
+    /// <summary>
+    /// Actual quota shown in the "Process N subjects" objective text. Defaults to
+    /// <see cref="SuspectsToProcess"/> but is corrected to the real, fully-populated lineup
+    /// size (<see cref="DailySuspectManager.shiftSuspects"/>.Count — matching what
+    /// <see cref="ProcessResidentsTask"/> shows on the Task Page) once that lineup finishes
+    /// populating. The lineup can end up larger than <see cref="SuspectsToProcess"/> because
+    /// <see cref="DailySuspectManager"/> injects extra mutant-intruder and doppelganger slots
+    /// on top of the base quota — without this correction the objective list would keep
+    /// showing the pre-injection quota while the Task Page shows the post-injection total.
+    /// </summary>
+    private int _effectiveSuspectsToProcess;
+
     private void OnShiftStartShowSubjectCounter()
     {
         if (UseAutomaticSubjectCounterTask)
-            ShowAutomaticSubjectCounterTask();
+            StartCoroutine(ShowAutomaticSubjectCounterTaskAfterLineupPopulated());
+    }
+
+    /// <summary>
+    /// Waits one frame so <see cref="DailySuspectManager"/> has finished populating the day's
+    /// lineup (including any injected mutant/doppelganger slots) before reading its true size,
+    /// then shows the counter task with that corrected total.
+    /// </summary>
+    private IEnumerator ShowAutomaticSubjectCounterTaskAfterLineupPopulated()
+    {
+        yield return null;
+        ShowAutomaticSubjectCounterTask();
     }
 
     /// <summary>
@@ -169,7 +206,12 @@ public abstract class DayBase : MonoBehaviour
     protected void ShowAutomaticSubjectCounterTask()
     {
         if (_autoSubjectCounterTask != null) return;
-        if (_autoSubjectCounterProcessedCount >= SuspectsToProcess) return;
+
+        _effectiveSuspectsToProcess = DailySuspectManager.Instance != null && DailySuspectManager.Instance.shiftSuspects.Count > 0
+            ? DailySuspectManager.Instance.shiftSuspects.Count
+            : SuspectsToProcess;
+
+        if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess) return;
 
         _autoSubjectCounterTask = TutorialObjectiveList.Instance?.AddObjective(GetAutomaticSubjectCounterText());
         FolderController.OnFolderHandedOff += OnAutomaticSubjectCounterProcessed;
@@ -180,7 +222,7 @@ public abstract class DayBase : MonoBehaviour
         _autoSubjectCounterProcessedCount++;
         _autoSubjectCounterTask?.SetText(GetAutomaticSubjectCounterText());
 
-        if (_autoSubjectCounterProcessedCount >= SuspectsToProcess)
+        if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess)
             HideAutomaticSubjectCounterTask();
     }
 
@@ -200,7 +242,7 @@ public abstract class DayBase : MonoBehaviour
     }
 
     private string GetAutomaticSubjectCounterText() =>
-        $"Process {SuspectsToProcess} subjects {Mathf.Min(_autoSubjectCounterProcessedCount, SuspectsToProcess)}/{SuspectsToProcess}";
+        $"Process {_effectiveSuspectsToProcess} subjects {Mathf.Min(_autoSubjectCounterProcessedCount, _effectiveSuspectsToProcess)}/{_effectiveSuspectsToProcess}";
 
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses
