@@ -170,7 +170,7 @@ public class FaxMachine : NetworkBehaviour
 
     /// <summary>
     /// Despawns the previous day's fax paper if it's still sitting unpicked in the scene.
-    /// Clears its highlight/arrow and unsubscribes before the instance is despawned, mirroring
+    /// Clears its arrow and unsubscribes before the instance is despawned, mirroring
     /// <see cref="DailyNewspaperSpawnManager.DespawnPreviousNewspaper"/>.
     /// </summary>
     private void DespawnPreviousFax()
@@ -178,7 +178,6 @@ public class FaxMachine : NetworkBehaviour
         if (_activeFaxPickable != null)
         {
             _activeFaxPickable.OnPickedUpEvent -= HandleFaxPickedUpFirstTime;
-            _activeFaxPickable.SetForceHighlight(false);
         }
         _activeFaxPickable = null;
 
@@ -192,15 +191,14 @@ public class FaxMachine : NetworkBehaviour
     }
 
     /// <summary>
-    /// Highlights the freshly delivered fax and points the tutorial arrow at it until it's
-    /// picked up. The very first time any fax is ever grabbed, also shows the "Daily Fax"
-    /// tutorial overlay explaining what the fax is for.
+    /// Points the tutorial arrow at the freshly delivered fax until it's picked up. The very
+    /// first time any fax is ever grabbed, also shows the "Daily Fax" tutorial overlay
+    /// explaining what the fax is for.
     /// </summary>
     private void ShowFaxTutorial(PickableObject pickable)
     {
         if (pickable == null) return;
 
-        pickable.SetForceHighlight(true);
         ShowTutorialArrowUntilPickedUp(pickable);
 
         pickable.OnPickedUpEvent += HandleFaxPickedUpFirstTime;
@@ -211,7 +209,6 @@ public class FaxMachine : NetworkBehaviour
         if (_activeFaxPickable != null)
         {
             _activeFaxPickable.OnPickedUpEvent -= HandleFaxPickedUpFirstTime;
-            _activeFaxPickable.SetForceHighlight(false);
         }
 
         if (!_hasShownDailyFaxTutorial)

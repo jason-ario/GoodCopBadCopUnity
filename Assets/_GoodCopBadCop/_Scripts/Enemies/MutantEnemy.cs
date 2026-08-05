@@ -315,6 +315,15 @@ public class MutantEnemy : NetworkBehaviour
     public bool DiedPermanently { get; private set; }
 
     /// <summary>
+    /// True once this mutant has been activated (<see cref="InitialiseServer"/> has run and
+    /// <see cref="_isActive"/> is set), false while dormant. A <see cref="SuspectCharacter"/>'s
+    /// own <see cref="MutantEnemy"/> component stays false until it actually transforms — read
+    /// this to distinguish a genuine roaming/hostile mutant from a suspect that hasn't turned
+    /// yet. Server value, replicated to every client via NetworkVariable.
+    /// </summary>
+    public bool IsActive => _isActive.Value;
+
+    /// <summary>
     /// True when this mutant is outdoors, false when indoors. Controls which footstep clip set
     /// (<see cref="_outsideFootstepClips"/> vs <see cref="_insideFootstepClips"/>) is used.
     /// Mirrors <see cref="SuspectFootstepsAudio.IsOutside"/> — set externally if a mutant needs
@@ -529,7 +538,7 @@ public class MutantEnemy : NetworkBehaviour
             }
 
             bool wasChasing = _currentTarget != null;
-            _currentTarget = FindNearestLivingPlayer(ignoreDetectionRadius: _breachChargeMode);
+            _currentTarget = FindNearestTarget(ignoreDetectionRadius: _breachChargeMode);
 
             if (!wasChasing && _currentTarget != null)
                 OnAnyMutantSpottedPlayer?.Invoke();
@@ -1038,6 +1047,60 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// Finds the nearest valid target overall — a living player or a living guard soldier
+    /// (<see cref="SoldierMutantResponder"/>), whichever is closer. Guard soldiers are treated
+    /// exactly like players as attack targets: if a soldier is standing closer than every
+    /// player, the mutant chases and attacks the soldier instead.
+    /// </summary>
+    /// <param name="ignoreDetectionRadius">See <see cref="FindNearestLivingPlayer"/>.</param>
+    private Transform FindNearestTarget(bool ignoreDetectionRadius = false)
+    {
+        Transform nearestPlayer = FindNearestLivingPlayer(ignoreDetectionRadius);
+        Transform nearestSoldier = FindNearestLivingSoldier(ignoreDetectionRadius);
+
+        if (nearestPlayer == null)
+            return nearestSoldier;
+        if (nearestSoldier == null)
+            return nearestPlayer;
+
+        float sqrDistToPlayer = (nearestPlayer.position - transform.position).sqrMagnitude;
+        float sqrDistToSoldier = (nearestSoldier.position - transform.position).sqrMagnitude;
+
+        return sqrDistToSoldier < sqrDistToPlayer ? nearestSoldier : nearestPlayer;
+    }
+
+    /// <summary>
+    /// Finds the nearest living guard soldier (a <see cref="SoldierMutantResponder"/> that is
+    /// still alive) within detection radius. Mirrors <see cref="FindNearestLivingPlayer"/>.
+    /// </summary>
+    /// <param name="ignoreDetectionRadius">
+    /// When true, finds the globally nearest living soldier with no distance cap at all.
+    /// </param>
+    private Transform FindNearestLivingSoldier(bool ignoreDetectionRadius = false)
+    {
+        Transform nearest = null;
+        float nearestSqrDist = ignoreDetectionRadius
+            ? float.MaxValue
+            : data.detectionRadius * data.detectionRadius;
+
+        SoldierMutantResponder[] soldiers = FindObjectsByType<SoldierMutantResponder>(FindObjectsSortMode.None);
+        foreach (SoldierMutantResponder soldier in soldiers)
+        {
+            if (soldier == null || !soldier.IsAlive)
+                continue;
+
+            float sqrDist = (soldier.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist < nearestSqrDist)
+            {
+                nearestSqrDist = sqrDist;
+                nearest = soldier.transform;
+            }
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
     /// Finds the nearest player that is alive (PlayerHealth not dead) within detection radius.
     /// Iterates all connected NetworkClients so it works in multiplayer.
     /// Players who are inside a scripted dialogue cutscene are excluded — they cannot be
@@ -1218,15 +1281,25 @@ public class MutantEnemy : NetworkBehaviour
             return;
 
         PlayerHealth targetHealth = _currentTarget.GetComponent<PlayerHealth>();
-        if (targetHealth == null || targetHealth.IsDead)
-            return;
+        if (targetHealth != null)
+        {
+            if (targetHealth.IsDead)
+                return;
 
-        // Do not attack a player who has entered a cutscene since the last ChaseLoop tick
-        // (guards the window between FindNearestLivingPlayer clearing the target and the
-        // next retarget interval, since _currentTarget can briefly outlive the exclusion).
-        PlayerInstance targetPlayer = _currentTarget.GetComponent<PlayerInstance>();
-        if (targetPlayer != null && targetPlayer.IsInCutscene)
-            return;
+            // Do not attack a player who has entered a cutscene since the last ChaseLoop tick
+            // (guards the window between FindNearestTarget clearing the target and the
+            // next retarget interval, since _currentTarget can briefly outlive the exclusion).
+            PlayerInstance targetPlayer = _currentTarget.GetComponent<PlayerInstance>();
+            if (targetPlayer != null && targetPlayer.IsInCutscene)
+                return;
+        }
+        else
+        {
+            // Not a player — must be a guard soldier target (see FindNearestLivingSoldier).
+            SoldierMutantResponder targetSoldier = _currentTarget.GetComponent<SoldierMutantResponder>();
+            if (targetSoldier == null || !targetSoldier.IsAlive)
+                return;
+        }
 
         TriggerAttackAnimationClientRpc();
 

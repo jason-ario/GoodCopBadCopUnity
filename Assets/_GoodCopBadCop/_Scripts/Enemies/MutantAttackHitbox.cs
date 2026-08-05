@@ -68,25 +68,37 @@ public class MutantAttackHitbox : MonoBehaviour
             // Walk up to the root to find a tagged player object.
             Transform root = col.transform.root;
 
-            if (!root.CompareTag(playerTag))
-                continue;
+            if (root.CompareTag(playerTag))
+            {
+                PlayerHealth playerHealth = root.GetComponentInChildren<PlayerHealth>();
+                if (playerHealth == null || playerHealth.IsDead)
+                    continue;
 
-            PlayerHealth playerHealth = root.GetComponentInChildren<PlayerHealth>();
-            if (playerHealth == null || playerHealth.IsDead)
-                continue;
+                // Do not damage players who entered a cutscene after the attack was committed
+                // (guards DelayedHitScan coroutines that were already in-flight when the player
+                // entered dialogue mode — the attack animation fires but the hit is suppressed).
+                PlayerInstance playerInstance = root.GetComponent<PlayerInstance>();
+                if (playerInstance != null && playerInstance.IsInCutscene)
+                    continue;
 
-            // Do not damage players who entered a cutscene after the attack was committed
-            // (guards DelayedHitScan coroutines that were already in-flight when the player
-            // entered dialogue mode — the attack animation fires but the hit is suppressed).
-            PlayerInstance playerInstance = root.GetComponent<PlayerInstance>();
-            if (playerInstance != null && playerInstance.IsInCutscene)
-                continue;
+                playerHealth.TakeDamage(damage, EffectKeys.MutantMeleeDamage);
+                Debug.Log($"[MutantAttackHitbox] Hit player '{root.name}' via collider '{col.name}' for {damage} damage.", this);
 
-            playerHealth.TakeDamage(damage, EffectKeys.MutantMeleeDamage);
-            Debug.Log($"[MutantAttackHitbox] Hit player '{root.name}' via collider '{col.name}' for {damage} damage.", this);
+                // Only damage once per swing even if multiple colliders on same player.
+                break;
+            }
 
-            // Only damage once per swing even if multiple colliders on same player.
-            break;
+            // Not a tagged player — check for a guard soldier target instead, so mutants can
+            // melee down soldiers exactly like players.
+            SoldierMutantResponder soldier = root.GetComponentInChildren<SoldierMutantResponder>();
+            if (soldier != null && soldier.IsAlive)
+            {
+                soldier.TakeDamage(damage, col.ClosestPoint(transform.position));
+                Debug.Log($"[MutantAttackHitbox] Hit soldier '{root.name}' via collider '{col.name}' for {damage} damage.", this);
+
+                // Only damage once per swing even if multiple colliders on same soldier.
+                break;
+            }
         }
     }
 

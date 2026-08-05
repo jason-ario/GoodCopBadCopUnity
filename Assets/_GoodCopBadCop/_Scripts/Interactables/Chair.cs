@@ -11,6 +11,10 @@ public class Chair : Interactable
     [SerializeField] float sitDuration = .5f;
     public bool canMoveWhileSeated = false;
     public bool canRotateWhileSeated = false;
+    [Tooltip("If true, this chair (and anything parented to it) rotates along with the player while seated. " +
+             "If false, the player can still look/rotate in place (when canRotateWhileSeated is true) without " +
+             "spinning the chair/object itself.")]
+    public bool rotateSeatWithPlayer = true;
 
     private void Start()
     {
@@ -41,8 +45,22 @@ public class Chair : Interactable
 
     void OnSeated(Transform player)
     {
-        transform.parent = player.transform;
+        if (rotateSeatWithPlayer)
+        {
+            transform.parent = player.transform;
+        }
         player.GetComponent<PlayerMovementController>().SetCanLook(canRotateWhileSeated);
         player.GetComponent<PlayerMovementController>().SetCanMove(canMoveWhileSeated);
+    }
+
+    // Called when the player stands up. Only clears the parent if this chair was actually
+    // parented to the player while seated (rotateSeatWithPlayer) — otherwise it was never
+    // reparented and clearing it would incorrectly detach it from its original hierarchy.
+    public void OnStoodUp()
+    {
+        if (rotateSeatWithPlayer)
+        {
+            transform.parent = null;
+        }
     }
 }

@@ -1680,6 +1680,24 @@ public class SuspectCharacter : Interactable
             EnableJunkPickupClientRpc();
     }
 
+    /// <summary>
+    /// Kills this suspect immediately, bypassing the booth/interrogation-flow gate that
+    /// <see cref="TakeDamage"/> enforces via <c>_isAtBooth</c>. Used when a guard soldier
+    /// standing post (not part of the booth interrogation flow) is killed by a mutant —
+    /// see <c>SoldierMutantResponder</c>. Reuses the same death visuals as a normal kill
+    /// (blood explosion + Die animation) but does not fire <see cref="OnSuspectKilledByPlayer"/>,
+    /// since this isn't a player-scored kill. Server-only.
+    /// </summary>
+    public void KillAsGuard()
+    {
+        if (!IsServer || _isDead)
+            return;
+
+        _isDead = true;
+        DisableInteractionClientRpc();
+        GetShotClientRpc();
+    }
+
     /// <summary>Disables the interaction collider on all clients so the corpse cannot be interacted with.</summary>
     [ClientRpc]
     private void DisableInteractionClientRpc()

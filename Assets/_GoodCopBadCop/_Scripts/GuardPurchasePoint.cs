@@ -125,6 +125,20 @@ public class GuardPurchasePoint : Interactable
     private void OnUnlockedChanged(bool previousValue, bool newValue) => RefreshVisualState();
 
     /// <summary>
+    /// Called by the guard's own combat script (<c>SoldierMutantResponder</c>) once its death
+    /// visuals have finished playing after being killed by a mutant. Resets purchase and
+    /// arrival state so the purchase post reappears and a new guard can be bought again.
+    /// Server-only.
+    /// </summary>
+    public void NotifyGuardDied()
+    {
+        if (!IsServer) return;
+
+        _guardArrived.Value = false;
+        _guardPurchased.Value = false;
+    }
+
+    /// <summary>
     /// Applies the correct visibility for the sign/post/soldier children based on the current
     /// locked/purchased/arrived state:
     ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.

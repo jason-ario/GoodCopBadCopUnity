@@ -818,7 +818,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         UIController.Instance.HideBackButton();
 
         transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
-        chairSeatedAt.transform.parent = null;
+        chairSeatedAt.OnStoodUp();
         chairSeatedAt = null;
         
         SFXController.Instance.Play(standSound);
