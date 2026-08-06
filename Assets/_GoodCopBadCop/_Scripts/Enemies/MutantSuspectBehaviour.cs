@@ -333,10 +333,16 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         {
             if (_isDone) yield break;
 
-            // Shutter opened mid-bang — break through immediately.
+            // Shutter opened mid-bang — break through if the glass is already gone/smashed,
+            // otherwise the glass is still intact behind it so switch to attacking that instead
+            // of climbing straight through it.
             if (_shutterController != null && _shutterController.IsOpen)
             {
-                yield return StartCoroutine(ClimbThroughSequence());
+                var glass = BreakableGlassController.Instance;
+                if (glass == null || glass.IsSmashed)
+                    yield return StartCoroutine(ClimbThroughSequence());
+                else
+                    yield return StartCoroutine(GlassAttackSequence());
                 yield break;
             }
 

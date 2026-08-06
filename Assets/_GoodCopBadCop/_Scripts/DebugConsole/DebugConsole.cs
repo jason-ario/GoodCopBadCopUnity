@@ -817,11 +817,17 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
-    /// Skips to the start of Day 3 with the player positioned in front of the bunker,
-    /// matching the natural wake-up spawn before the player walks in to begin their shift.
+    /// Skips to the start of Day 3 with the player positioned inside the bunker with the
+    /// door closed, matching the natural end-of-InBetweenShiftSequence spawn before the
+    /// player walks out to begin their shift (mirrors <see cref="SkipToStartOfDay2"/>).
     /// JumpToDay is called first so the day NetworkVariable propagates to all clients
     /// before PlayShiftStartFanfare fires — this ensures the correct sky colour and
     /// Day 3 title card are shown (mirrors the SkipToDay / SkipToBoothReady pattern).
+    /// Using SkipToOutsideBunker here (teleporting the player straight past the door)
+    /// would silently skip Day 3's start sequence: Day_03's bunker-exit stinger and its
+    /// gore/blood/fence yard-cleanup objectives only reveal off BunkerDoorController's
+    /// OnDoorOpened event, which never fires unless the player actually opens the door
+    /// themselves after spawning inside.
     /// </summary>
     public void SkipToStartOfDay3()
     {
@@ -832,7 +838,7 @@ public class DebugConsole : MonoBehaviour
         }
 
         CampaignManager.Instance.JumpToDay(3);
-        ShiftManager.Instance.SkipToOutsideBunker();
+        ShiftManager.Instance.SkipToInsideBunker();
     }
 
     /// bypassing normal character spawning and playing the mocking sequence directly.

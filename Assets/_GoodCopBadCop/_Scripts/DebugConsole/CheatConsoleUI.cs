@@ -107,7 +107,7 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
-        _cheats.Add(("Skip to Day 3 — Start (In Front of Bunker)", () =>
+        _cheats.Add(("Skip to Day 3 — Start (Inside Bunker)", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToStartOfDay3());
             SetVisible(false);

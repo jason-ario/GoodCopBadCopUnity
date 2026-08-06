@@ -1817,6 +1817,17 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Keep MutantEnemy dormant (IsActive stays false) through the walk-in/bang-on-shutter
+        // phase — mirrors the deferred-activation pattern used for suspects that transform into
+        // mutants (see SuspectCharacter.BeginMutantBehavior). Without this, IsActive flips true
+        // the instant Spawn() runs (before BeginLineup's SuspendForLineup() call, which only stops
+        // the chase coroutine and never touches IsActive), so systems that gate on IsActive — e.g.
+        // SoldierMutantResponder — would treat this mutant as a live hostile target while it's
+        // still just walking up to and banging on the booth window. MutantSuspectBehaviour calls
+        // InitialiseServer() itself once the mutant actually breaks through (ClimbThroughSequence).
+        // Must be called before Spawn() — InitialiseServer() would otherwise run during it.
+        netObj.GetComponent<MutantEnemy>()?.DisableAutoInit();
+
         netObj.Spawn();
 
         MutantSuspectBehaviour behaviour = mutantObj.GetComponent<MutantSuspectBehaviour>();
