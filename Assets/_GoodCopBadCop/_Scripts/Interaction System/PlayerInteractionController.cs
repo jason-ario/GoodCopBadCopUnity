@@ -423,10 +423,16 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Performs the interact-layer raycast and returns the single closest collider hit along the
-    /// ray, resolving through <see cref="ResolveInteractable"/> only to decide whether to keep
-    /// looking — the ray simply stops at the first collider that resolves to an enabled
-    /// Interactable, without any distance-tie/sticky preference between candidates.
+    /// Performs the interact-layer raycast and returns the single closest collider the ray
+    /// is physically blocked by, resolving through <see cref="ResolveInteractable"/> to
+    /// decide whether to keep looking.
+    ///
+    /// The ray always stops at the first solid (non-trigger) collider it hits, exactly like a
+    /// real raycast would be blocked by physical geometry — regardless of whether an
+    /// Interactable is attached. It only ever continues past a hit when that collider is BOTH
+    /// a trigger AND has no Interactable attached (e.g. a decorative/overlap-only trigger
+    /// volume that isn't meant to intercept interaction) — that is the sole exception allowing
+    /// the ray to pass through to whatever is behind it.
     ///
     /// Previously this preferred a PickableObject within a "near-tie" distance window of the
     /// closest hit (to stabilize a pickup resting directly on top of another interactable, e.g. a
@@ -435,7 +441,8 @@ public class PlayerInteractionController : NetworkBehaviour
     /// sits closer along the ray than an item resting further inside/behind it, so it was
     /// incorrectly preferred over the item every time the two weren't within the tie window —
     /// e.g. you could no longer grab a second item out of an open supply box once a nearer item
-    /// had already been taken out. Simply honoring the nearest valid hit fixes that.
+    /// had already been taken out. Honoring the nearest blocking hit fixes that without needing
+    /// a tie window.
     /// </summary>
     private bool TryGetBestInteractHit(Ray ray, out RaycastHit bestHit)
     {
@@ -451,12 +458,30 @@ public class PlayerInteractionController : NetworkBehaviour
 
         for (int i = 0; i < hits.Length; i++)
         {
-            Interactable candidate = ResolveInteractable(hits[i].collider);
+            Collider collider = hits[i].collider;
+            Interactable candidate = ResolveInteractable(collider);
+
+            // An attached Interactable always stops the ray, whether the collider is a
+            // trigger or solid — this is a legitimate interaction target either way.
             if (candidate != null && candidate.enabled)
             {
                 bestHit = hits[i];
                 return true;
             }
+
+            // A solid (non-trigger) collider physically blocks the ray even with no
+            // Interactable attached (e.g. a desk surface or placement board) — the caller
+            // resolves no interactable for it and falls through to its own placement/aim
+            // handling, but the ray must not continue past solid geometry to whatever is
+            // standing behind it.
+            if (!collider.isTrigger)
+            {
+                bestHit = hits[i];
+                return true;
+            }
+
+            // Trigger collider with no Interactable attached: the sole case where the ray
+            // passes through to check what's behind it.
         }
 
         bestHit = hits[0];
