@@ -165,6 +165,7 @@ public class SwitchButton : Interactable
     private void HandleButtonPressServer()
     {
         if (!buttonReady || !powerOn || !ShiftManager.NextSuspectReadyForBell) return;
+        if (ShiftManager.Instance == null || !ShiftManager.Instance.shiftStarted.Value) return;
 
         SetReady(false);
         NotifyPressedClientRpc();
@@ -218,11 +219,17 @@ public class SwitchButton : Interactable
     /// every time a redundant SetReady(true) call/resync comes in — plays the blink cue directly
     /// from code instead of depending on an animation event inside the "Button Flashing" state,
     /// which is only reachable at all if the Animator actually transitions there.
+    ///
+    /// The switch can never visually/audibly show "ready" before the player has actually clocked
+    /// in for the shift (<see cref="ShiftManager.shiftStarted"/>), even if <paramref name="b"/>
+    /// or a stale <see cref="ShiftManager.NextSuspectReadyForBell"/> says otherwise — e.g. a
+    /// power-on recompute (see <see cref="PowerOn"/>) firing at level load, before clock-in.
     /// </summary>
     private void ApplyReady(bool b)
     {
-        bool isNowReady = powerOn && b;
-        bool wasReady = powerOn && buttonReady;
+        bool hasClockedIn = ShiftManager.Instance != null && ShiftManager.Instance.shiftStarted.Value;
+        bool isNowReady = powerOn && b && hasClockedIn;
+        bool wasReady = powerOn && buttonReady && hasClockedIn;
 
         buttonReady = b;
         anim.SetBool("Ready", isNowReady);

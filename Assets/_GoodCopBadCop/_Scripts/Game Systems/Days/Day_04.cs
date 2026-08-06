@@ -93,12 +93,14 @@ public class Day_04 : DayBase
             return;
         }
 
-        // unlocked: true — player keeps free movement while the announcement plays, matching
-        // the feel of an overhead PA cutting in rather than a face-to-face conversation.
+        // unlocked: false (default) — this plays as a proper scripted cutscene: the player is
+        // movement/camera-locked and the view cuts to the megaphone (via each node's "Megaphone"
+        // cameraTrigger, resolved by ScriptedDialogueRunner's camera registry), matching how
+        // other scripted dialogue/cutscene beats present themselves rather than an ambient PA
+        // bark the player can walk away from.
         ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
             _newVoiceAnnouncementDialogue,
             onComplete: null,
-            unlocked: true,
             speakerNameOverride: _newVoiceSpeakerName,
             speakerColorOverride: _newVoiceSpeakerColor,
             useAlternateVoice: true);

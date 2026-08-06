@@ -595,12 +595,20 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     // ── ClientRpcs ─────────────────────────────────────────────────────────────
 
-    /// <summary>Sets the Walking animator bool on all clients.</summary>
+    /// <summary>
+    /// Sets the Walking animator bool on all clients. Also drives the Speed float directly
+    /// (1 while walking, 0 when stopped) since MutantEnemy's own Speed sync is suspended for
+    /// the whole lineup/retreat sequence (SuspendForLineup / DOTween-driven walk-in) — without
+    /// this the locomotion blend tree has no Speed input and the walk-in plays as an idle pose.
+    /// </summary>
     [ClientRpc]
     private void SetWalkingClientRpc(bool walking)
     {
         if (_animator != null)
+        {
             _animator.SetBool("Walking", walking);
+            _animator.SetFloat("Speed", walking ? 1f : 0f);
+        }
     }
 
     /// <summary>Sets the climbing animator bool on all clients for the breakthrough sequence.</summary>
