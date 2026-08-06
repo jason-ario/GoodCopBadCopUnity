@@ -105,6 +105,10 @@ public class PlayerEquipmentController : NetworkBehaviour
         if (IsOwner && MaskOverlayController.Instance != null)
             MaskOverlayController.Instance.SetVisible(equipped);
 
+        // Drive the helper icon in the player HUD for the owner only.
+        if (IsOwner && PlayerUI.Instance != null)
+            PlayerUI.Instance.SetMaskHelperIconVisible(equipped);
+
         // RadiationMultiplier is a plain (non-networked) field read locally by every machine's
         // own PlayerRadiation instance — e.g. RadiationHotspot/OffTrailRadiation run unguarded on
         // every client and read whichever local copy they find. _isMaskEquipped is already

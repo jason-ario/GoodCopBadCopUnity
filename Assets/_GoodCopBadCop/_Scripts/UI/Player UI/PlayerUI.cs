@@ -19,8 +19,18 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private CheckpointIntegrityBar _checkpointIntegrityBar;
     public CheckpointIntegrityBar CheckpointIntegrityBar => _checkpointIntegrityBar;
 
+    [Tooltip("Helper icon shown while the local player is wearing the radiation mask.")]
+    [SerializeField] private GameObject _maskHelperIcon;
+
     private void Awake()
     {
         Instance = this;
+    }
+
+    /// <summary>Shows or hides the radiation mask helper icon.</summary>
+    public void SetMaskHelperIconVisible(bool visible)
+    {
+        if (_maskHelperIcon != null)
+            _maskHelperIcon.SetActive(visible);
     }
 }
