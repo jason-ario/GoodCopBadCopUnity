@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Server-authoritative spawner that periodically creates bursts of MutantEnemy instances
@@ -500,6 +501,14 @@ public class MutantSpawner : NetworkBehaviour
             );
 
             Vector3    spawnPos = center + offset;
+            // Snap onto the baked NavMesh before instantiating — packs are placed at a
+            // scripted destination (e.g. deep in the woods) rather than this spawner's own
+            // ambient box, so raw Instantiate() can land far enough off the NavMesh surface
+            // that NavMeshAgent never links to it. An agent stuck off-mesh silently skips its
+            // entire ChaseLoop (see MutantEnemy.ChaseLoop's isOnNavMesh guard), which looks
+            // exactly like a mutant that never reacts to a nearby player.
+            if (NavMesh.SamplePosition(spawnPos, out NavMeshHit navHit, 10f, NavMesh.AllAreas))
+                spawnPos = navHit.position;
             Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
             GameObject prefab   = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];

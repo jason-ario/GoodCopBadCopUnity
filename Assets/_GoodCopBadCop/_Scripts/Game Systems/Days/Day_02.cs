@@ -333,6 +333,7 @@ public class Day_02 : DayBase, IDailyTask
         _mutationTutorialFired = false;
 
         // Listen for each suspect's paperwork so we can detect the first with a mutation anomaly.
+        SuspectController.OnPaperworkSpawned -= OnPaperworkSpawned;
         SuspectController.OnPaperworkSpawned += OnPaperworkSpawned;
 
         // Killing is no longer tutorialized — unlock the red stamp the moment Day 2 begins,
@@ -360,13 +361,21 @@ public class Day_02 : DayBase, IDailyTask
             Debug.LogWarning("[Day_02] _vladCharacter (scene instance) not assigned — opening sequence will be skipped.", this);
 
         // Subscribe to ShiftManager so the opening sequence starts when the day officially begins.
+        // Defensively unsubscribe first — DayActivated can in principle run more than once for
+        // the same instance (e.g. checkpoint/scene reloads) without a matching DayDeactivated in
+        // between, and a duplicate subscription here would fire the post-shift sequence (and so
+        // the trail/dead-animal task, dialogue, and Ocho sighting) more than once per shift.
         if (ShiftManager.Instance != null)
+        {
+            ShiftManager.Instance.OnDayStart -= OnDay2Started;
             ShiftManager.Instance.OnDayStart += OnDay2Started;
+        }
 
         // Override the default "all suspects processed -> timecard machine activates
         // immediately" behaviour for Day 2: the instant the last suspect is processed
         // (Dusk), trigger the Vlad follow-the-trail sequence instead of letting the
         // timecard machine prime for clock-out right away.
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day2;
         ShiftManager.OnLastSuspectProcessed += OnAllSuspectsProcessed_Day2;
     }
 
@@ -1336,7 +1345,14 @@ public class Day_02 : DayBase, IDailyTask
         // Arm the giant-Ocho-in-the-woods sighting at the trail's destination — only ever
         // triggered while this Day 2 trail/dead-animal task is the active one (see
         // OchoInWoodsCutscene.TriggerTask / DayDeactivated's DebugReset cleanup below).
-        OchoInWoodsCutscene.Instance?.TriggerTask();
+        // NOTE: OchoInWoodsCutscene.Instance is assigned in Awake(), which only runs while its
+        // GameObject is active — the "---Ocho In Woods Cutscene" root must stay active in the
+        // scene at all times (only its "Ocho Final" child should ever be toggled) or this
+        // silently no-ops.
+        if (OchoInWoodsCutscene.Instance != null)
+            OchoInWoodsCutscene.Instance.TriggerTask();
+        else
+            Debug.LogWarning("[Day_02] OchoInWoodsCutscene.Instance is null — is the '---Ocho In Woods Cutscene' root GameObject active in the scene?", this);
 
         Debug.Log("[Day_02] Trail event activated.");
     }

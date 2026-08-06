@@ -233,6 +233,13 @@ public class MutantEnemy : NetworkBehaviour
     [Min(1f)]
     [SerializeField] private float fleeDespawnTimeout = 8f;
 
+    [Header("Friendly Fire")]
+    [Tooltip("When true, TakeDamage() is a no-op for this mutant — pistol shots, melee hits (shovel, " +
+             "hammer), shotgun pellets, flamethrower ticks, etc. all do nothing, regardless of whether " +
+             "this mutant is currently active/hostile. Use this on suspects that should never be harmed " +
+             "by player weapons — e.g. guard soldiers or story-critical suspects like Vlad.")]
+    [SerializeField] private bool _ignoreFriendlyFireDamage = false;
+
     [Header("Deferred Initialisation")]
     [Tooltip("When false, InitialiseServer() is NOT called automatically on OnNetworkSpawn. " +
              "Use this when the enemy lives on a SuspectCharacter prefab and should only activate " +
@@ -1437,6 +1444,7 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>
     /// Apply damage to this enemy. Call from the server (e.g. from a weapon script).
+    /// No-op entirely when <see cref="_ignoreFriendlyFireDamage"/> is set on this instance.
     /// </summary>
     /// <param name="amount">Damage to apply.</param>
     /// <param name="hitPoint">World-space point of impact used to position the hit particle.</param>
@@ -1453,7 +1461,7 @@ public class MutantEnemy : NetworkBehaviour
     /// </param>
     public void TakeDamage(float amount, Vector3 hitPoint, bool isFireDamage = false, Vector3? knockbackDirection = null)
     {
-        if (!IsServer || _isDead)
+        if (!IsServer || _isDead || _ignoreFriendlyFireDamage)
             return;
 
         _health -= amount;

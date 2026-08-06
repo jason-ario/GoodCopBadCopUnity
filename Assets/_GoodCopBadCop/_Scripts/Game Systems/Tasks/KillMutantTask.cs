@@ -6,9 +6,17 @@ using UnityEngine;
 ///
 /// Registered on all clients via <see cref="FollowTrailThreat._killMutantCount"/> NetworkVariable.
 /// The task description tracks how many enemies remain using the server-authoritative count that
-/// propagates via the NetworkVariable. Completion fires <see cref="OnKillMutantTaskCompleted"/>
-/// on the server (where kill events originate) and removes the task from all clients via the
-/// NetworkVariable dropping to zero.
+/// propagates via the NetworkVariable. Purely a HUD display object — kill tracking itself is done
+/// by <see cref="FollowTrailThreat"/>, which subscribes directly to the per-instance
+/// <see cref="MutantEnemy.OnRemovedFromPlay"/> event of exactly the mutants IT spawned for this
+/// pack (see <see cref="FollowTrailThreat.HandlePackMutantRemoved"/>). This class intentionally
+/// does NOT listen to the global <see cref="MutantEnemy.OnAnyMutantKilled"/> event — that fires
+/// for every mutant in the world (including the ambient population spawner), which would
+/// incorrectly count kills unrelated to this task toward its completion.
+/// Completion fires <see cref="OnKillMutantTaskCompleted"/> via <see cref="RaiseCompleted"/>,
+/// called by <see cref="FollowTrailThreat"/> once every pack mutant it spawned is dead.
+/// Day scripts (e.g. Day_02) subscribe to <see cref="OnKillMutantTaskCompleted"/> to advance the
+/// night phase.
 /// </summary>
 public class KillMutantTask : ISystemicThreat
 {
@@ -40,7 +48,7 @@ public class KillMutantTask : ISystemicThreat
 
     /// <summary>
     /// Creates a new instance with <paramref name="killCount"/> enemies to eliminate,
-    /// registers it with <see cref="TaskRegistry"/>, and subscribes to kill events.
+    /// registers it with <see cref="TaskRegistry"/>.
     /// If an instance is already active, updates its count instead of creating a duplicate.
     /// Called on all clients via the <see cref="FollowTrailThreat"/> NetworkVariable callback.
     /// </summary>
@@ -54,7 +62,6 @@ public class KillMutantTask : ISystemicThreat
 
         Current = new KillMutantTask { _killsRemaining = killCount };
         TaskRegistry.Instance.AddThreat(Current);
-        MutantEnemy.OnAnyMutantKilled += Current.OnMutantKilled;
         return Current;
     }
 
@@ -71,41 +78,24 @@ public class KillMutantTask : ISystemicThreat
     /// <summary>
     /// Removes the active instance from <see cref="TaskRegistry"/> and clears
     /// <see cref="Current"/>. Safe to call when no instance is active.
-    /// Does NOT fire <see cref="OnKillMutantTaskCompleted"/> — that fires only from
-    /// <see cref="OnMutantKilled"/> when the count legitimately reaches zero.
+    /// Does NOT fire <see cref="OnKillMutantTaskCompleted"/> — see <see cref="RaiseCompleted"/>.
     /// </summary>
     public static void CompleteAndRemove()
     {
         if (Current == null) return;
 
-        MutantEnemy.OnAnyMutantKilled -= Current.OnMutantKilled;
         TaskRegistry.Instance.RemoveThreat(Current);
         Current = null;
     }
 
-    // ── Kill handling (server-side only) ──────────────────────────────────────
-
-    private void OnMutantKilled()
+    /// <summary>
+    /// Fires <see cref="OnKillMutantTaskCompleted"/>. Called by <see cref="FollowTrailThreat"/>
+    /// (server-authoritative, since mutant deaths only ever resolve on the server) once every
+    /// mutant it spawned for the pack has been permanently killed.
+    /// </summary>
+    public static void RaiseCompleted()
     {
-        // MutantEnemy.Die() is server-authoritative, so this only ever fires on the server.
-        if (Current != this) return;
-
-        _killsRemaining = Mathf.Max(0, _killsRemaining - 1);
-
-        // Tell FollowTrailThreat to decrement its NetworkVariable so all clients
-        // update their task description immediately via OnKillMutantCountChanged.
-        FollowTrailThreat.Instance?.DecrementKillMutantCount();
-
-        if (_killsRemaining > 0)
-            return;
-
-        // All enemies dead — unsubscribe first to prevent re-entry.
-        MutantEnemy.OnAnyMutantKilled -= OnMutantKilled;
-
-        Debug.Log("[KillMutantTask] All mutants killed — task complete.");
-
-        // Fire completion event so day scripts can advance the night phase.
-        // The NetworkVariable hitting zero will call CompleteAndRemove() on all clients.
+        Debug.Log("[KillMutantTask] All pack mutants killed — task complete.");
         OnKillMutantTaskCompleted?.Invoke();
     }
 

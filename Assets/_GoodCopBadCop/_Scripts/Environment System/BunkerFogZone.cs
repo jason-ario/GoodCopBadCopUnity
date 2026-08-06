@@ -1,5 +1,6 @@
 using UnityEngine;
 using VContainer;
+using VolumetricFogAndMist2;
 
 namespace GoodCopBadCop.EnvironmentSystem
 {
@@ -23,6 +24,9 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Tooltip("Optional fog density override applied once fully inside. Set to a negative value to keep whatever density the current day/night preset already uses.")]
         [SerializeField] private float bunkerFogDensity = -1f;
 
+        [Tooltip("Optional Volumetric Fog And Mist 2 profile applied to the scene's VolumetricFog once fully inside this zone (e.g. a denser/darker interior look). Leave unassigned to keep whatever volumetric profile the current day/night preset already uses.")]
+        [SerializeField] private VolumetricFogProfile bunkerVolumetricFogProfile;
+
         [Tooltip("Seconds for the fog color/density to blend fully in or out when crossing the zone boundary.")]
         [SerializeField, Min(0.01f)] private float transitionSeconds = 1.5f;
 
@@ -30,15 +34,22 @@ namespace GoodCopBadCop.EnvironmentSystem
         [SerializeField] private Camera targetCamera;
 
         private IEnvironmentModel _model;
+        private VolumetricFog _volumetricFog;
         private BoxCollider _collider;
+
+        // Scratch instance used to blend between the preset's volumetric profile and bunkerVolumetricFogProfile
+        // without mutating either asset. Created lazily the first time it's needed.
+        private VolumetricFogProfile _lerpVolumetricProfile;
+        private bool _isOverridingVolumetricProfile;
 
         // 0 = fully outside (day/night preset owns the fog look), 1 = fully inside (bunkerFogColor).
         private float _blend;
 
         [Inject]
-        public void Construct(IEnvironmentModel model)
+        public void Construct(IEnvironmentModel model, VolumetricFog volumetricFog)
         {
             _model = model;
+            _volumetricFog = volumetricFog;
         }
 
         private void Awake()
@@ -70,15 +81,19 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         private void ApplyBlendedFog()
         {
-            // Fully outside and settled — leave RenderSettings entirely to EnvironmentRenderAdapter
-            // so day/night preset switches keep working normally.
+            EnvironmentPreset preset = _model != null ? _model.CurrentPreset.CurrentValue : null;
+
+            // Fully outside and settled — leave RenderSettings/VolumetricFog entirely to
+            // EnvironmentRenderAdapter so day/night preset switches keep working normally.
             if (_blend <= 0f)
+            {
+                RestoreVolumetricProfile(preset);
                 return;
+            }
 
             Color baseColor = RenderSettings.fogColor;
             float baseDensity = RenderSettings.fogDensity;
 
-            EnvironmentPreset preset = _model != null ? _model.CurrentPreset.CurrentValue : null;
             if (preset != null)
             {
                 baseColor = preset.fogColor;
@@ -89,6 +104,50 @@ namespace GoodCopBadCop.EnvironmentSystem
 
             if (bunkerFogDensity >= 0f)
                 RenderSettings.fogDensity = Mathf.Lerp(baseDensity, bunkerFogDensity, _blend);
+
+            ApplyBlendedVolumetricFog(preset);
+        }
+
+        private void ApplyBlendedVolumetricFog(EnvironmentPreset preset)
+        {
+            if (_volumetricFog == null || bunkerVolumetricFogProfile == null)
+                return;
+
+            VolumetricFogProfile baseProfile = preset != null ? preset.volumetricFogProfile : _volumetricFog.profile;
+            if (baseProfile == null)
+                return;
+
+            if (_lerpVolumetricProfile == null)
+                _lerpVolumetricProfile = ScriptableObject.CreateInstance<VolumetricFogProfile>();
+
+            _lerpVolumetricProfile.Lerp(baseProfile, bunkerVolumetricFogProfile, _blend);
+
+            _volumetricFog.profile = _lerpVolumetricProfile;
+            _volumetricFog.UpdateMaterialPropertiesNow();
+            _isOverridingVolumetricProfile = true;
+        }
+
+        private void RestoreVolumetricProfile(EnvironmentPreset preset)
+        {
+            if (!_isOverridingVolumetricProfile)
+                return;
+
+            if (_volumetricFog != null && preset != null)
+            {
+                _volumetricFog.profile = preset.volumetricFogProfile;
+                _volumetricFog.UpdateMaterialPropertiesNow();
+            }
+
+            _isOverridingVolumetricProfile = false;
+        }
+
+        private void OnDestroy()
+        {
+            if (_isOverridingVolumetricProfile)
+                RestoreVolumetricProfile(_model != null ? _model.CurrentPreset.CurrentValue : null);
+
+            if (_lerpVolumetricProfile != null)
+                Destroy(_lerpVolumetricProfile);
         }
 
 #if UNITY_EDITOR

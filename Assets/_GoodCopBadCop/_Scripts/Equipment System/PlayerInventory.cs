@@ -3,11 +3,14 @@ using UnityEngine;
 
 /// <summary>
 /// Two-slot hotbar inventory for the local player.
-/// Press 1/2 to equip the item in that slot.  Picking up an item fills the first free
-/// slot automatically; placing/dropping removes it.
+/// Press 1/2 to equip the item in that slot, or scroll the mouse wheel to cycle through
+/// held/carried items (including an empty "stowed" state). Picking up an item fills the
+/// first free slot automatically; placing/dropping removes it.
 ///
-/// When both slots are occupied, pressing the other slot's key stows the held item to
-/// <see cref="stowPoint"/> (hidden on body) and brings the stored item to hand.
+/// When both slots are occupied, pressing the other slot's key (or scrolling to it) stows
+/// the held item to <see cref="stowPoint"/> (hidden on body) and brings the stored item to
+/// hand. Scrolling past the last/first item cycles to the empty-hands state, which stows
+/// whatever is currently held.
 /// Requires <see cref="PlayerPickupController"/> on the same GameObject.
 /// </summary>
 [RequireComponent(typeof(PlayerPickupController))]
@@ -73,6 +76,45 @@ public class PlayerInventory : NetworkBehaviour
         if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
         if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
         if (Input.GetKeyDown(KeyCode.R)) TryReloadActiveWeapon();
+
+        float scroll = Input.mouseScrollDelta.y;
+        if (scroll > 0f) CycleActiveItem(1);
+        else if (scroll < 0f) CycleActiveItem(-1);
+    }
+
+    /// <summary>
+    /// Scroll-wheel item cycling. Builds the set of reachable states — empty hands plus any
+    /// occupied slot — and steps one entry forward/backward from whichever is currently active,
+    /// wrapping around. Moving onto the empty-hands state stows the held item; moving onto a
+    /// slot equips/swaps to it via <see cref="EquipSlot"/> (which already knows how to swap when
+    /// both slots are full).
+    /// </summary>
+    /// <param name="direction">+1 to scroll to the next item, -1 for the previous.</param>
+    private void CycleActiveItem(int direction)
+    {
+        if (!IsOwner) return;
+
+        // -1 represents the empty-hands state and is always a valid destination.
+        var states = new System.Collections.Generic.List<int> { -1 };
+        for (int i = 0; i < _slots.Length; i++)
+            if (_slots[i] != null) states.Add(i);
+
+        if (states.Count <= 1) return; // nothing to cycle to
+
+        int currentIndex = states.IndexOf(_activeSlot);
+        if (currentIndex < 0) currentIndex = 0;
+
+        int nextIndex = ((currentIndex + direction) % states.Count + states.Count) % states.Count;
+        int nextState = states[nextIndex];
+
+        if (nextState == -1)
+        {
+            if (_activeSlot >= 0) EquipSlot(_activeSlot); // pressing the active slot's key stows it
+        }
+        else
+        {
+            EquipSlot(nextState);
+        }
     }
 
     // ── Reloading ─────────────────────────────────────────────────────────────

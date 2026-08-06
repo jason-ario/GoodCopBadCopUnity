@@ -131,6 +131,19 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<MutantEnemy> _heldPackMutants = new();
     private Coroutine _packHoldReleaseCoroutine;
 
+    /// <summary>
+    /// Per-mutant death handlers for the currently-spawned pack, keyed by mutant so
+    /// <see cref="Cleanup"/> can unsubscribe stragglers if the day ends before the pack is
+    /// fully killed. Scopes kill tracking to exactly the mutants THIS threat spawned — see
+    /// <see cref="HandlePackMutantRemoved"/> — instead of the global
+    /// <see cref="MutantEnemy.OnAnyMutantKilled"/> event, which fires for every mutant in the
+    /// world (including the ambient population spawner) and would otherwise over-count.
+    /// </summary>
+    private readonly Dictionary<MutantEnemy, Action> _packKillHandlers = new();
+
+    /// <summary>Number of currently-tracked pack mutants still alive. Server only.</summary>
+    private int _packMutantsRemaining;
+
     /// <summary>The location that was last passed to SpawnEvent — used at destination discovery time.</summary>
     private FollowTrailLocation _currentLocation;
 
@@ -598,8 +611,58 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _heldPackMutants.Clear();
         _heldPackMutants.AddRange(mutants);
 
+        // Scope kill tracking to exactly these mutants — see _packKillHandlers.
+        ClearPackKillTracking();
+        _packMutantsRemaining = mutants.Count;
+        foreach (MutantEnemy mutant in mutants)
+        {
+            if (mutant == null) continue;
+
+            MutantEnemy capturedMutant = mutant;
+            Action handler = null;
+            handler = () => HandlePackMutantRemoved(capturedMutant, handler);
+
+            _packKillHandlers[capturedMutant] = handler;
+            capturedMutant.OnRemovedFromPlay += handler;
+        }
+
         if (_packHoldReleaseCoroutine != null) StopCoroutine(_packHoldReleaseCoroutine);
         _packHoldReleaseCoroutine = StartCoroutine(HoldPackUntilPlayerNear(_currentLocation.DestinationPoint));
+    }
+
+    /// <summary>
+    /// Called when a tracked pack mutant is removed from play (death or flee-despawn). Only
+    /// counts toward the kill task when <see cref="MutantEnemy.DiedPermanently"/> is true —
+    /// mutants that fled instead of dying, or mutants NOT spawned by this pack (e.g. the
+    /// ambient world population spawner), never affect this count. Server only.
+    /// </summary>
+    private void HandlePackMutantRemoved(MutantEnemy mutant, Action handler)
+    {
+        if (mutant != null && handler != null)
+            mutant.OnRemovedFromPlay -= handler;
+        if (mutant != null)
+            _packKillHandlers.Remove(mutant);
+
+        if (!IsServer) return;
+        if (mutant == null || !mutant.DiedPermanently) return;
+
+        _packMutantsRemaining = Mathf.Max(0, _packMutantsRemaining - 1);
+        DecrementKillMutantCount();
+
+        if (_packMutantsRemaining <= 0)
+            KillMutantTask.RaiseCompleted();
+    }
+
+    /// <summary>Unsubscribes every still-pending pack kill handler. Safe to call repeatedly.</summary>
+    private void ClearPackKillTracking()
+    {
+        foreach (var pair in _packKillHandlers)
+        {
+            if (pair.Key != null)
+                pair.Key.OnRemovedFromPlay -= pair.Value;
+        }
+        _packKillHandlers.Clear();
+        _packMutantsRemaining = 0;
     }
 
     /// <summary>
@@ -727,6 +790,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _packHoldReleaseCoroutine = null;
         }
         ReleaseHeldPack();
+
+        // Unsubscribe any still-pending pack kill handlers so mutants that outlive the event
+        // (day ends before the pack is fully killed) don't leak stale delegates.
+        ClearPackKillTracking();
 
         // Always clear the encounter listener — it may have been subscribed by SpawnEvent.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;

@@ -63,6 +63,9 @@ public class MutantBreachManager : NetworkBehaviour
     [Tooltip("Controls the red pulsing alarm lights on all clients.")]
     [SerializeField] private AlarmLightController alarmLights;
 
+    [Tooltip("Controls the full-screen red post-processing flash on all clients, synced to alarmLights' pulse.")]
+    [SerializeField] private PostProcessAlarmController alertVolume;
+
     [Tooltip("Looping alarm siren AudioSource. Assign a clip (e.g. Alarm v1) and leave it stopped by default.")]
     [SerializeField] private AudioSource alarmAudioSource;
 
@@ -450,6 +453,9 @@ public class MutantBreachManager : NetworkBehaviour
         if (alarmLights != null)
             alarmLights.StartAlarm();
 
+        if (alertVolume != null)
+            alertVolume.StartAlarm();
+
         if (alarmAudioSource != null)
         {
             alarmAudioSource.loop = true;
@@ -472,6 +478,9 @@ public class MutantBreachManager : NetworkBehaviour
 
         if (alarmLights != null)
             alarmLights.StopAlarm();
+
+        if (alertVolume != null)
+            alertVolume.StopAlarm();
 
         if (alarmAudioSource != null)
             alarmAudioSource.Stop();
