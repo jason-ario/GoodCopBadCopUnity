@@ -1,12 +1,15 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Handles the emote wheel flow for the local player.
 ///
-/// Pressing T opens the emote wheel (cursor shown, look unlocked).
-/// Moving the mouse highlights the nearest slot. Releasing T without
-/// clicking closes the wheel with no selection.
+/// Pressing T (or D-pad Up on a gamepad) opens the emote wheel (cursor shown, look unlocked).
+/// Moving the mouse highlights the nearest slot. Releasing the open input without
+/// clicking closes the wheel with no selection — unless the player is still actively
+/// pressing down on an emote button, in which case the close is deferred until that
+/// press finishes so it can't be yanked out from under them.
 ///
 /// When an emote is selected:
 ///  1. Upper-body layer (layer 3) is ramped to weight 1 so the emote
@@ -25,6 +28,7 @@ public class EmoteInputController : MonoBehaviour
 
     private bool      _wheelOpen       = false;
     private bool      _isEmoting       = false;
+    private bool      _closePending    = false;
     private Coroutine _emoteCoroutine;
 
     // ─── Unity lifecycle ────────────────────────────────────────────────────
@@ -58,11 +62,23 @@ public class EmoteInputController : MonoBehaviour
         if (_isEmoting) return;
         if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
-        if (Input.GetKeyDown(KeyCode.T))
+        bool openPressed  = Input.GetKeyDown(KeyCode.T) || (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false);
+        bool closePressed = Input.GetKeyUp(KeyCode.T)   || (Gamepad.current?.dpad.up.wasReleasedThisFrame ?? false);
+
+        if (openPressed)
             OpenWheel();
 
-        if (Input.GetKeyUp(KeyCode.T) && _wheelOpen)
-            CloseWheel(selectEmote: false);
+        if (closePressed && _wheelOpen)
+            RequestCloseWheel();
+
+        // If the close request came in while a slot was still being pressed, keep the wheel
+        // alive until that press resolves (either via a click that selects an emote, or a
+        // release/drag-off that cancels it) before actually hiding it.
+        if (_closePending && (EmoteWheelUI.Instance == null || !EmoteWheelUI.Instance.IsAnyButtonPressed))
+        {
+            _closePending = false;
+            if (_wheelOpen) CloseWheel(selectEmote: false);
+        }
     }
 
     // ─── Wheel open / close ─────────────────────────────────────────────────
@@ -74,6 +90,14 @@ public class EmoteInputController : MonoBehaviour
 
         UIController.Instance?.ShowCursor();
         EmoteWheelUI.Instance?.Show();
+    }
+
+    private void RequestCloseWheel()
+    {
+        if (EmoteWheelUI.Instance != null && EmoteWheelUI.Instance.IsAnyButtonPressed)
+            _closePending = true;
+        else
+            CloseWheel(selectEmote: false);
     }
 
     private void CloseWheel(bool selectEmote)
@@ -95,6 +119,7 @@ public class EmoteInputController : MonoBehaviour
         EmoteDefinition[] emotes = EmoteWheelUI.Instance.Emotes;
         if (index < 0 || index >= emotes.Length) return;
 
+        _closePending = false;
         CloseWheel(selectEmote: true);
         UIController.Instance?.HideCursor();
 

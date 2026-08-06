@@ -68,6 +68,10 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Bool parameter set to true whenever the agent is moving. Derived from the synced Speed value — no extra NetworkVariable required.")]
     [SerializeField] private string runningBoolName = "Running";
 
+    [Header("Ragdoll (optional)")]
+    [Tooltip("Ragdoll controller for this mutant's rig. Enabled (which also disables the Animator above) on a permanent death, so the corpse falls physically instead of playing a death animation.")]
+    [SerializeField] private RagdollController ragdollController;
+
     [Header("Look At (FLook Animator)")]
     [Tooltip("FIMSpace.FLook.FLookAnimator used to turn the head/spine toward the chased player. " +
              "If left empty, auto-assigned from a FLookAnimator found on this GameObject or its children.")]
@@ -1814,6 +1818,23 @@ public class MutantEnemy : NetworkBehaviour
         DisableLegsAnimators();
     }
 
+    /// <summary>
+    /// Switches this mutant's ragdoll on (rigidbodies dynamic, ragdoll colliders enabled) and
+    /// disables its Animator, via the assigned <see cref="ragdollController"/>. No-op if none
+    /// is assigned. See <see cref="RagdollController.EnableRagdoll"/>.
+    /// </summary>
+    private void EnableRagdoll()
+    {
+        if (ragdollController != null)
+            ragdollController.ActivateRagdoll();
+    }
+
+    [ClientRpc]
+    private void EnableRagdollClientRpc()
+    {
+        EnableRagdoll();
+    }
+
     [ClientRpc]
     private void SpawnGoreBurstClientRpc(Vector3[] positions, int[] prefabIndices, Vector3[] velocities)
     {
@@ -1922,6 +1943,13 @@ public class MutantEnemy : NetworkBehaviour
         // the death pose/ragdoll. Applied locally (server) and broadcast to all clients.
         DisableLegsAnimators();
         DisableLegsAnimatorsClientRpc();
+
+        // Enable ragdoll physics (and disable the Animator driving the rig) on death so the
+        // corpse falls naturally instead of playing a canned death animation. Applied locally
+        // (server) and broadcast to all clients. Runs after DisableColliders() above so the
+        // ragdoll's own colliders (disabled by that blanket pass) end up enabled again.
+        EnableRagdoll();
+        EnableRagdollClientRpc();
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {

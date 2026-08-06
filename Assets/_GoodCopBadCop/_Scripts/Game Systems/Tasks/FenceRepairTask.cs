@@ -120,6 +120,16 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Whether this task is currently active and should appear in the HUD task list.
+    /// Drives TaskRegistry registration on all clients, including late joiners. Mirrors the
+    /// pattern used by <see cref="CleanBloodTask"/> and <see cref="TakeOutTrashTask"/> — without
+    /// this, FenceRepairTask was never added to TaskRegistry at all, so it never showed up in
+    /// HUDTaskList/TutorialObjectiveList regardless of when it was triggered.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isActive = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     // Local flag propagated to all clients via MarkCompleteClientRpc.
     private bool _isComplete;
 
@@ -144,6 +154,12 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         base.OnNetworkSpawn();
         _targetFenceCount.OnValueChanged += OnProgressChangedInternal;
         _fencesRepaired.OnValueChanged   += OnProgressChangedInternal;
+        _isActive.OnValueChanged         += OnIsActiveChanged;
+
+        // Handle the initial value for late-joining clients: if the task was already active
+        // before this client connected, register it in TaskRegistry immediately.
+        if (_isActive.Value)
+            TaskRegistry.Instance?.AddThreat(this);
     }
 
     public override void OnNetworkDespawn()
@@ -151,6 +167,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         base.OnNetworkDespawn();
         _targetFenceCount.OnValueChanged -= OnProgressChangedInternal;
         _fencesRepaired.OnValueChanged   -= OnProgressChangedInternal;
+        _isActive.OnValueChanged         -= OnIsActiveChanged;
     }
 
     private void OnDestroy()
@@ -200,6 +217,15 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         }
 
         Debug.Log($"[FenceRepairTask] Task triggered: {count} fence segment(s) broken.");
+
+        _isActive.Value = true;
+
+        // Explicitly re-register on every client rather than relying solely on
+        // _isActive's OnValueChanged — if the task was already active this cycle (e.g. a
+        // debug re-trigger of Day 3), that NetworkVariable write is a no-op and
+        // OnIsActiveChanged never fires, silently dropping the task from the HUD. Mirrors
+        // the equivalent fix in TakeOutTrashTask / CleanBloodTask.
+        RegisterInTaskRegistryClientRpc();
     }
 
     // ── Repair flow ──────────────────────────────────────────────────────────
@@ -224,6 +250,9 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         ATM.Instance?.SpawnCoupons(_couponReward);
 
         MarkCompleteClientRpc();
+
+        // Hide from HUD once all fences are repaired.
+        _isActive.Value = false;
     }
 
     [ClientRpc]
@@ -232,6 +261,22 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _isComplete = true;
         TaskRegistry.Instance?.NotifyTaskStateChanged();
         OnAllFencesRepaired?.Invoke();
+    }
+
+    // ── Registry management ──────────────────────────────────────────────────
+
+    [ClientRpc]
+    private void RegisterInTaskRegistryClientRpc()
+    {
+        TaskRegistry.Instance?.AddThreat(this);
+    }
+
+    private void OnIsActiveChanged(bool previous, bool current)
+    {
+        if (current)
+            TaskRegistry.Instance?.AddThreat(this);
+        else
+            TaskRegistry.Instance?.RemoveThreat(this);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

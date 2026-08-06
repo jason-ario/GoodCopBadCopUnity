@@ -113,6 +113,17 @@ public class DebugConsole : MonoBehaviour
 
     private void Update()
     {
+        if (!GameSettings.Instance.DebugConsoleEnabled)
+        {
+            // Make sure we don't get stuck at fast timescale if disabled mid-hold.
+            if (_isFastForwarding)
+            {
+                _isFastForwarding = false;
+                Time.timeScale = 1f;
+            }
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.Alpha0))
         {
             GlobalHostVariables.Instance.AddMoney(1000);
@@ -238,9 +249,23 @@ public class DebugConsole : MonoBehaviour
 
     /// <summary>
     /// Executes <paramref name="onReady"/> immediately if the game is already running,
-    /// otherwise bootstraps a host session and defers the callback until
-    /// <see cref="GameManager.OnGameStart"/> fires and the player is fully spawned.
+    /// otherwise bootstraps a host session and defers the callback until the local player is
+    /// fully spawned.
     /// </summary>
+    /// <remarks>
+    /// This intentionally does NOT wait on <see cref="GameManager.OnGameStart"/>: that event is
+    /// only ever raised by <see cref="GameManager.TransitionToLobby"/>'s lobby-transition
+    /// coroutine (the normal main-menu "Play" flow calls both <c>TransitionToLobby()</c> and
+    /// <c>TryStartGame()</c> together). <see cref="GameManager.TryStartGame"/> alone — which is
+    /// all cheat/skip flows call — never raises it, so subscribing to it here previously left
+    /// <paramref name="onReady"/> waiting forever.
+    /// Instead this waits for the same signal <see cref="ShiftManager"/>'s own debug skip
+    /// sequences (<c>SkipToBoothReadySequence</c>, <c>SkipToInsideBunkerSequence</c>, etc.) rely
+    /// on: a live <see cref="PlayerInstance"/>/<see cref="PlayerSpawner"/> pair. Netcode spawns
+    /// the local player automatically shortly after <c>StartHost()</c> completes, independent of
+    /// <c>GameManager</c>'s own lobby-transition flow, so this is reliable even when
+    /// <c>TryStartGame(true)</c> is the only bootstrap call made.
+    /// </remarks>
     public async void EnsureGameStartedThen(Action onReady)
     {
         if (GameManager.Instance.HasGameStarted)
@@ -253,14 +278,13 @@ public class DebugConsole : MonoBehaviour
             return;
 
         GameManager.Instance.TryStartGame(true);
+        StartCoroutine(EnsureGameStartedThenWaitForPlayer(onReady));
+    }
 
-        UnityAction handler = null;
-        handler = () =>
-        {
-            GameManager.Instance.OnGameStart -= handler;
-            onReady();
-        };
-        GameManager.Instance.OnGameStart += handler;
+    private IEnumerator EnsureGameStartedThenWaitForPlayer(Action onReady)
+    {
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+        onReady();
     }
 
     /// <summary>
@@ -702,7 +726,14 @@ public class DebugConsole : MonoBehaviour
     /// matching the natural end-of-InBetweenShiftSequence spawn before the player walks out
     /// to begin their shift. JumpToDay is called first so the day NetworkVariable propagates
     /// to all clients before PlayShiftStartFanfare fires (mirrors the SkipToStartOfDay3 /
-    /// SkipToOutsideBunker pattern).
+    /// SkipToOutsideBunker pattern). Routed through <see cref="EnsureGameStartedThen"/> so
+    /// calling this cold from the main menu (no host/session running yet — the scene's
+    /// persistent NetworkObjects like TakeOutTrashTask/CleanBloodTask/FenceRepairTask haven't
+    /// finished spawning) waits for the game to fully start before jumping. Without this,
+    /// JumpToDay's DayActivated call can run each task's TriggerTask() before its NetworkObject
+    /// has spawned, which silently no-ops on the IsServer guard and leaves every objective
+    /// missing. If the game is already running (e.g. jumping here right after a previous day's
+    /// skip), EnsureGameStartedThen runs the jump immediately with no extra delay.
     /// </summary>
     public void SkipToStartOfDay2()
     {
@@ -712,8 +743,11 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        CampaignManager.Instance.JumpToDay(2);
-        ShiftManager.Instance.SkipToInsideBunker();
+        EnsureGameStartedThen(() =>
+        {
+            CampaignManager.Instance.JumpToDay(2);
+            ShiftManager.Instance.SkipToInsideBunker();
+        });
     }
 
     /// <summary>
@@ -828,6 +862,15 @@ public class DebugConsole : MonoBehaviour
     /// gore/blood/fence yard-cleanup objectives only reveal off BunkerDoorController's
     /// OnDoorOpened event, which never fires unless the player actually opens the door
     /// themselves after spawning inside.
+    ///
+    /// Routed through <see cref="EnsureGameStartedThen"/> — same reasoning as
+    /// <see cref="SkipToStartOfDay2"/>: calling this cold from the main menu, before the
+    /// scene's persistent NetworkObjects (TakeOutTrashTask/CleanBloodTask/FenceRepairTask)
+    /// have finished spawning, made JumpToDay's DayActivated call trigger each task before
+    /// its NetworkObject was ready, silently no-oping on the IsServer guard and leaving every
+    /// yard-cleanup objective (and clock-in) missing. Jumping through Day 2 first "worked"
+    /// only because it gave the NetworkObjects time to finish spawning before Day 3 was
+    /// triggered — not because Day 3 needed Day 2 at all.
     /// </summary>
     public void SkipToStartOfDay3()
     {
@@ -837,8 +880,11 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        CampaignManager.Instance.JumpToDay(3);
-        ShiftManager.Instance.SkipToInsideBunker();
+        EnsureGameStartedThen(() =>
+        {
+            CampaignManager.Instance.JumpToDay(3);
+            ShiftManager.Instance.SkipToInsideBunker();
+        });
     }
 
     /// bypassing normal character spawning and playing the mocking sequence directly.

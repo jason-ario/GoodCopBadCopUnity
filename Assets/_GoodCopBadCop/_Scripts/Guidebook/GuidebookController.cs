@@ -66,6 +66,12 @@ public class GuidebookController : MonoBehaviour
     {
         if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsLocalPlayer) return;
 
+        if (!GameSettings.Instance.GuidebookEnabled)
+        {
+            if (IsOpen) CloseGuidebook();
+            return;
+        }
+
         bool guidebookInput = Input.GetButtonDown(InputButton)
                               || (Gamepad.current?.selectButton.wasPressedThisFrame ?? false);
 

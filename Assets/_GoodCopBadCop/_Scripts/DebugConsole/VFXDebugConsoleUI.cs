@@ -62,6 +62,12 @@ public class VFXDebugConsoleUI : MonoBehaviour
 
     private void Update()
     {
+        if (!GameSettings.Instance.DebugConsoleEnabled)
+        {
+            if (_isVisible) SetVisible(false);
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.F11))
             SetVisible(!_isVisible);
     }

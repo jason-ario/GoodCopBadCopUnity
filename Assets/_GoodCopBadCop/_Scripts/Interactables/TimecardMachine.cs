@@ -114,6 +114,8 @@ public class TimecardMachine : Interactable
 
     private void OnShiftReady()
     {
+        Debug.Log($"[TimecardMachine] OnShiftReady fired. CurrentDay={ShiftManager.Instance?.CurrentDay ?? -1}.");
+
         if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
         EnableClockIn();
     }
@@ -295,6 +297,10 @@ public class TimecardMachine : Interactable
     /// </summary>
     private static void AddObjectiveIfNotDay1(ref TutorialObjectiveItem slot, string text)
     {
+        int day = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : -1;
+        Debug.Log($"[TimecardMachine] AddObjectiveIfNotDay1(\"{text}\") -- CurrentDay={day}, " +
+                  $"TutorialObjectiveList.Instance={(TutorialObjectiveList.Instance != null)}.");
+
         if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
         slot = TutorialObjectiveList.Instance?.AddObjective(text);
     }

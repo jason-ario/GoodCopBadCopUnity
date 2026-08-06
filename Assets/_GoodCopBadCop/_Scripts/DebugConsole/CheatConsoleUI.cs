@@ -49,6 +49,12 @@ public class CheatConsoleUI : MonoBehaviour
 
     private void Update()
     {
+        if (!GameSettings.Instance.DebugConsoleEnabled)
+        {
+            if (_isVisible) SetVisible(false);
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.F12))
             SetVisible(!_isVisible);
     }

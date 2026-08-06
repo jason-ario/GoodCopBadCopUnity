@@ -61,23 +61,15 @@ public class Day_03 : DayBase
     private bool _bunkerExitStingerPlayed;
 
     // -------------------------------------------------------------------------
-    // Inspector -- Yard Cleanup Objectives (gore, blood, fences)
+    // Inspector -- Yard Cleanup Objective Text
     // -------------------------------------------------------------------------
-
-    [Header("Day 3 -- Yard Cleanup Objectives")]
-    [Tooltip("Objective list text for the gore/corpse pickup task, shown once the player " +
-             "steps outside for the day.")]
-    [SerializeField] private string _taskTakeOutGoreText = "Take out the gore";
-
-    [Tooltip("Objective list text for the blood splatter cleanup task.")]
-    [SerializeField] private string _taskCleanBloodSplatterText = "Clean up the blood";
-
-    [Tooltip("Objective list text for the perimeter fence repair task.")]
-    [SerializeField] private string _taskFixFencesText = "Fix perimeter fences";
-
-    private TutorialObjectiveItem _taskTakeOutGore;
-    private TutorialObjectiveItem _taskCleanBloodSplatter;
-    private TutorialObjectiveItem _taskFixFences;
+    //
+    // NOTE: no hand-scripted objective rows are added by this script anymore.
+    // TakeOutTrashTask, CleanBloodTask, and FenceRepairTask are all ISystemicThreats, so
+    // HUDTaskList already adds/updates/removes their rows in TutorialObjectiveList
+    // automatically via the shared TaskRegistry the moment each is triggered below in
+    // DayActivated. Hand-scripting the same rows here (previously gated behind the bunker
+    // door opening) just duplicated every row.
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -90,9 +82,6 @@ public class Day_03 : DayBase
         // Drop any leftover subscriptions/handles from a previous activation (e.g. a debug
         // skip re-triggering Day 3) before arming everything fresh.
         UnsubscribeAll();
-        _taskTakeOutGore = null;
-        _taskCleanBloodSplatter = null;
-        _taskFixFences = null;
 
         // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
         // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
@@ -105,14 +94,23 @@ public class Day_03 : DayBase
         FenceRepairTask.Instance?.TriggerTask();
 
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
-        // bunker for Day 3 -- see OchoEatingVladCutscene for the full sequence.
+        // bunker for Day 3 -- see OchoEatingVladCutscene for the full sequence. TriggerTask()
+        // is a one-shot no-op while already armed/running (see its own doc comment), so a
+        // stale flag left over from an earlier activation this session (e.g. re-running the
+        // "Skip to Day 3" debug cheat, or genuinely revisiting Day 3) would silently prevent
+        // it from re-arming. DebugReset() clears that flag first so every DayActivated() call
+        // re-arms the cutscene fresh, matching the "drop leftover handles before arming
+        // everything fresh" contract already followed by the other Day 3 tasks above.
+        OchoEatingVladCutscene.Instance?.DebugReset();
         OchoEatingVladCutscene.Instance?.TriggerTask();
 
-        // Plays a one-shot stinger and reveals the yard-cleanup objective list the first time
-        // a player opens the bunker door and steps outside for Day 3. Reset per-day so a
-        // re-activation (e.g. debug skip) can replay it.
+        // Plays a one-shot stinger the first time a player opens the bunker door and steps
+        // outside for Day 3. Reset per-day so a re-activation (e.g. debug skip) can replay it.
         _bunkerExitStingerPlayed = false;
         BunkerDoorController.OnDoorOpened += OnBunkerDoorOpenedFirstTime;
+
+        Debug.Log("[Day_03] DayActivated -- subscribed to BunkerDoorController.OnDoorOpened. " +
+                  "Bunker-exit stinger will play once the player opens the bunker door.");
 
         // Skip the Day 3 mail delivery entirely -- no delivery, no crate, no "Sort the Mail"
         // task. The mechanic is already established on Day 2; Day 3 is already carrying the
@@ -137,20 +135,10 @@ public class Day_03 : DayBase
     private void UnsubscribeAll()
     {
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
-
-        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
-        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
-
-        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
-        if (CleanBloodTask.Instance != null)
-            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
-
-        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
-        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
     }
 
     // -------------------------------------------------------------------------
-    // Bunker exit stinger + yard cleanup objectives -- all clients
+    // Bunker exit stinger -- all clients
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -158,9 +146,15 @@ public class Day_03 : DayBase
     /// the bunker door swings open. Since the door is force-closed at the start of every day
     /// (see <see cref="ShiftManager.InBetweenShiftSequence"/> / <see cref="BunkerDoorController.OnDayChanged"/>),
     /// the first invocation each Day 3 always corresponds to the player's first exit of the day.
-    /// Plays the bunker-exit stinger and reveals the yard-cleanup objective list (gore, blood,
-    /// fences) in lockstep. Unsubscribes immediately so later door-opens that day (e.g. going
-    /// back in and out) stay silent.
+    /// Plays the bunker-exit stinger only. Unsubscribes immediately so later door-opens that
+    /// day (e.g. going back in and out) stay silent.
+    ///
+    /// No objective rows are added here — <see cref="TakeOutTrashTask"/>,
+    /// <see cref="CleanBloodTask"/>, and <see cref="FenceRepairTask"/> are all
+    /// <see cref="ISystemicThreat"/>s, so <see cref="HUDTaskList"/> already adds their rows to
+    /// <see cref="TutorialObjectiveList"/> automatically via the shared <see cref="TaskRegistry"/>
+    /// the moment they're triggered in <see cref="DayActivated"/> (day start). Adding them again
+    /// here on door-open duplicated every row.
     /// </summary>
     private void OnBunkerDoorOpenedFirstTime()
     {
@@ -173,135 +167,6 @@ public class Day_03 : DayBase
             Debug.LogWarning("[Day_03] _bunkerExitStinger is not assigned -- skipping stinger playback.");
         else
             SFXController.Instance?.Play(_bunkerExitStinger, _bunkerExitStingerVolume);
-
-        EnsureTakeOutGoreObjective();
-        EnsureCleanBloodSplatterObjective();
-        EnsureFixFencesObjective();
     }
-
-    // -------------------------------------------------------------------------
-    // Take Out Gore Objective
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Adds the "Take out the gore" objective if the day's gore/body-part junk hasn't already
-    /// been fully collected -- <see cref="TakeOutTrashTask"/>'s counts are already accurate by
-    /// the time the player walks outside, since it was triggered back in <see cref="DayActivated"/>.
-    /// No-op if there's nothing left to collect.
-    /// </summary>
-    private void EnsureTakeOutGoreObjective()
-    {
-        if (TakeOutTrashTask.Instance != null &&
-            TakeOutTrashTask.Instance.TotalCount > TakeOutTrashTask.Instance.DepositedCount)
-        {
-            _taskTakeOutGore = TutorialObjectiveList.Instance?.AddObjective(GetTakeOutGoreTaskText());
-
-            TakeOutTrashTask.OnProgressChanged   += OnTakeOutGoreProgressChanged;
-            TakeOutTrashTask.OnAllItemsDeposited += OnTakeOutGoreTaskComplete;
-        }
-    }
-
-    private void OnTakeOutGoreProgressChanged()
-    {
-        if (TakeOutTrashTask.Instance == null) return;
-        _taskTakeOutGore?.SetText(GetTakeOutGoreTaskText());
-    }
-
-    private void OnTakeOutGoreTaskComplete()
-    {
-        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
-        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
-
-        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskTakeOutGore, preHideDelay: 1.5f);
-        _taskTakeOutGore = null;
-    }
-
-    private string GetTakeOutGoreTaskText() =>
-        TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.TotalCount > 0
-            ? $"{_taskTakeOutGoreText} {TakeOutTrashTask.Instance.DepositedCount}/{TakeOutTrashTask.Instance.TotalCount}"
-            : _taskTakeOutGoreText;
-
-    // -------------------------------------------------------------------------
-    // Clean Blood Splatter Objective
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Adds the "Clean up the blood" objective if any blood splatters from the day's gore are
-    /// still unscrubbed -- <see cref="CleanBloodTask"/>'s counts are already accurate by the
-    /// time the player walks outside, since it was triggered back in <see cref="DayActivated"/>.
-    /// No-op if there's nothing left to scrub.
-    /// </summary>
-    private void EnsureCleanBloodSplatterObjective()
-    {
-        if (CleanBloodTask.Instance != null &&
-            CleanBloodTask.Instance.TotalCount > CleanBloodTask.Instance.ScrubbedCount)
-        {
-            _taskCleanBloodSplatter = TutorialObjectiveList.Instance?.AddObjective(GetCleanBloodSplatterTaskText());
-
-            CleanBloodTask.OnProgressChanged             += OnCleanBloodSplatterProgressChanged;
-            CleanBloodTask.Instance.OnDailyTaskCompleted += OnCleanBloodSplatterTaskComplete;
-        }
-    }
-
-    private void OnCleanBloodSplatterProgressChanged()
-    {
-        if (CleanBloodTask.Instance == null) return;
-        _taskCleanBloodSplatter?.SetText(GetCleanBloodSplatterTaskText());
-    }
-
-    private void OnCleanBloodSplatterTaskComplete()
-    {
-        if (CleanBloodTask.Instance != null)
-            CleanBloodTask.Instance.OnDailyTaskCompleted -= OnCleanBloodSplatterTaskComplete;
-        CleanBloodTask.OnProgressChanged -= OnCleanBloodSplatterProgressChanged;
-
-        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCleanBloodSplatter, preHideDelay: 1.5f);
-        _taskCleanBloodSplatter = null;
-    }
-
-    private string GetCleanBloodSplatterTaskText() =>
-        CleanBloodTask.Instance != null && CleanBloodTask.Instance.TotalCount > 0
-            ? $"{_taskCleanBloodSplatterText} {CleanBloodTask.Instance.ScrubbedCount}/{CleanBloodTask.Instance.TotalCount}"
-            : _taskCleanBloodSplatterText;
-
-    // -------------------------------------------------------------------------
-    // Fix Perimeter Fences Objective
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Adds the "Fix perimeter fences" objective if any fence segments broken this cycle are
-    /// still unrepaired -- <see cref="FenceRepairTask"/> was triggered back in
-    /// <see cref="DayActivated"/>, so its counts are already accurate by the time the player
-    /// walks outside. No-op if no fences came out damaged.
-    /// </summary>
-    private void EnsureFixFencesObjective()
-    {
-        if (FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0)
-        {
-            _taskFixFences = TutorialObjectiveList.Instance?.AddObjective(GetFixFencesTaskText());
-
-            FenceRepairTask.OnProgressChanged   += OnFixFencesProgressChanged;
-            FenceRepairTask.OnAllFencesRepaired += OnFixFencesTaskComplete;
-        }
-    }
-
-    private void OnFixFencesProgressChanged()
-    {
-        _taskFixFences?.SetText(GetFixFencesTaskText());
-    }
-
-    private void OnFixFencesTaskComplete()
-    {
-        FenceRepairTask.OnProgressChanged   -= OnFixFencesProgressChanged;
-        FenceRepairTask.OnAllFencesRepaired -= OnFixFencesTaskComplete;
-
-        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFixFences, preHideDelay: 1.5f);
-        _taskFixFences = null;
-    }
-
-    private string GetFixFencesTaskText() =>
-        FenceRepairTask.Instance != null && FenceRepairTask.Instance.TotalCount > 0
-            ? $"{_taskFixFencesText} {FenceRepairTask.Instance.RepairedCount}/{FenceRepairTask.Instance.TotalCount}"
-            : _taskFixFencesText;
 }
 

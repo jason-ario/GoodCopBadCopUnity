@@ -754,4 +754,28 @@ public class ExamPage : FolderItem
 
         base.Interact(player);
     }
+
+    /// <summary>
+    /// While filed in a folder, keeps the page's physical collider a trigger whenever it is
+    /// enabled (i.e. the folder is open) so the page doesn't collide with the folder body
+    /// itself and can still be lifted back out. When the folder is closed, FolderItem's guard
+    /// keeps this from re-enabling, and the base call below fully disables the collider.
+    /// Only the collider(s) on this root GameObject are affected — the child raycast marker
+    /// collider (<see cref="InteractableCollider"/> on "Plane.002") is already a permanent
+    /// trigger and is untouched here.
+    /// </summary>
+    public override void SetInteractable(bool value)
+    {
+        base.SetInteractable(value);
+
+        if (insideThisFolder == null) return;
+
+        bool blockedByFolder = value && (insideThisFolder.IsHeld || !insideThisFolder.IsOpen);
+        if (blockedByFolder) return;
+
+        foreach (Collider col in GetComponents<Collider>())
+        {
+            col.isTrigger = value;
+        }
+    }
 }
