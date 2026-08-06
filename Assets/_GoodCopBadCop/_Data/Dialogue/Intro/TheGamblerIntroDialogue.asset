@@ -14,45 +14,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "Heads or tails? Just \u2014 habit. I flip something whenever I\u2019m
-      standing still. Here are the papers. Bidzina Chkhonia. Mostly I play cards.
-      The Metropol, the back rooms, wherever I can find a clean table and honest
-      odds."
+    npcLine: Heads or tails? Just habit, I flip something whenever I'm standing
+      still. Here are the papers. Bidzina Chkhonia. Mostly I play cards.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "I\u2019ve been running the numbers on this checkpoint. The time variance on each pass is bigger than you\u2019d think. Somewhere between forty seconds and three minutes."
+    npcLine: I've been running the numbers on this checkpoint. The time variance
+      per pass is bigger than you'd think. Forty seconds to three minutes.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: You time this checkpoint?
-      npcResponse: "I time everything. Probability doesn\u2019t work without data. The checkpoint is actually one of the more consistent variables in my day right now."
+      npcResponse: I time everything. Probability doesn't work without data. This
+        is actually one of the more consistent variables in my day.
       animationTrigger: TalkLookAway
     - playerChoiceText: Do you play for a living?
-      npcResponse: "When the living holds still long enough to let me. Right now nothing holds still. The odds keep shifting. It\u2019s inconvenient."
+      npcResponse: When the living holds still long enough to let me. Right now
+        nothing holds still. The odds keep shifting.
       animationTrigger: TalkIdle
   - type: 0
-    npcLine: "I used to play at the Metropol most nights. That\u2019s closed now.
-      Found a private game in someone\u2019s basement \u2014 lower stakes, worse
-      lighting. There was a woman. She left when the odds stopped being fun for
-      her. You have a very readable face, officer."
+    npcLine: I used to play at the Metropol most nights. That's closed now. Found
+      a private game in someone's basement, lower stakes, worse lighting. You
+      have a very readable face, officer.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "I won\u2019t say which eye. But I\u2019d bet on it. My permit. August
-      expiry. I would bet on it being correct, but that seems like pushing my luck."
+    npcLine: I won't say which eye. But I'd bet on it. My permit, August expiry.
+      I'd bet on it being correct, but that's pushing my luck.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: I don't have tells.
-      npcResponse: "Everybody has tells. I\u2019ve spent twenty years reading them. It\u2019s not an insult. It\u2019s data."
+      npcResponse: Everybody has tells. I've spent twenty years reading them.
+        It's not an insult, it's data.
       animationTrigger: TalkIdle
     - playerChoiceText: Does that help at the card table?
-      npcResponse: "More than the cards, honestly. The cards are just mathematics. The people are where the game actually lives."
+      npcResponse: More than the cards, honestly. The cards are just mathematics.
+        The people are where the game lives.
       animationTrigger: TalkLookAway

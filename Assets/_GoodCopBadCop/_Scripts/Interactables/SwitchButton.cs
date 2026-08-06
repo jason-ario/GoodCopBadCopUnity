@@ -8,6 +8,11 @@ using UnityEngine;
 public class SwitchButton : Interactable
 {
     [SerializeField] private AudioSource buttonPressSound;
+
+    [Tooltip("Played whenever the button transitions into its ready/blinking state. Drives " +
+             "the blink cue explicitly from code so it never depends on the Animator's " +
+             "'Button Flashing' state (and its animation event) actually being reached.")]
+    [SerializeField] private AudioSource readyBlinkSound;
     [SerializeField] private Animator anim;
     [SerializeField] Transform ikTarget;
     [SerializeField] private CinemachineCamera _camera;
@@ -83,6 +88,14 @@ public class SwitchButton : Interactable
         if (IsServer)
         {
             SetReady(ShiftManager.NextSuspectReadyForBell);
+        }
+        else
+        {
+            // Non-server clients won't receive a fresh SetReadyClientRpc just from PowerOn
+            // firing locally, so re-apply the last known buttonReady state now — otherwise the
+            // Animator's "Ready" bool (and the blink it drives) stays stuck at whatever it was
+            // computed as while powerOn was false, until the next unrelated SetReady call.
+            ApplyReady(buttonReady);
         }
     }
 
@@ -184,8 +197,7 @@ public class SwitchButton : Interactable
     /// </summary>
     public void SetReady(bool b)
     {
-        buttonReady = b;
-        anim.SetBool("Ready", powerOn && b);
+        ApplyReady(b);
 
         if (IsServer)
         {
@@ -196,7 +208,28 @@ public class SwitchButton : Interactable
     [ClientRpc]
     private void SetReadyClientRpc(bool b)
     {
+        ApplyReady(b);
+    }
+
+    /// <summary>
+    /// Applies the ready state locally: syncs <see cref="buttonReady"/>, always (re)drives the
+    /// Animator's "Ready" bool on Button2 so the blink visual can never silently fall out of
+    /// sync with the underlying state, and — only on the false->true edge, so it doesn't replay
+    /// every time a redundant SetReady(true) call/resync comes in — plays the blink cue directly
+    /// from code instead of depending on an animation event inside the "Button Flashing" state,
+    /// which is only reachable at all if the Animator actually transitions there.
+    /// </summary>
+    private void ApplyReady(bool b)
+    {
+        bool isNowReady = powerOn && b;
+        bool wasReady = powerOn && buttonReady;
+
         buttonReady = b;
-        anim.SetBool("Ready", powerOn && b);
+        anim.SetBool("Ready", isNowReady);
+
+        if (isNowReady && !wasReady && readyBlinkSound != null)
+        {
+            readyBlinkSound.Play();
+        }
     }
 }

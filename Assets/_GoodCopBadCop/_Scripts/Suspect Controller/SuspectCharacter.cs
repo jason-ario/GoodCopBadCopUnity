@@ -574,6 +574,27 @@ public class SuspectCharacter : Interactable
         _navMoveCoroutine = StartCoroutine(NavigateToCoroutine(destination, onArrived));
     }
 
+    /// <summary>
+    /// Moves the character to <paramref name="destination"/> in a straight line via DOTween,
+    /// bypassing the NavMeshAgent entirely. Use this instead of <see cref="NavigateTo"/> when
+    /// NavMesh pathfinding is undesired (e.g. suspects walking up to the booth window), since
+    /// the tween gives a consistent, predictable arrival every time regardless of NavMesh state.
+    /// Cancels any in-progress movement before starting.
+    /// </summary>
+    /// <param name="destination">World-space destination.</param>
+    /// <param name="onArrived">Optional callback invoked on arrival.</param>
+    public void WalkTo(Vector3 destination, Action onArrived = null)
+    {
+        if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
+        _activeTween?.Kill();
+
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent != null && _navAgent.enabled)
+            _navAgent.enabled = false;
+
+        _navMoveCoroutine = StartCoroutine(WalkToCoroutine(destination, onArrived));
+    }
+
     /// <summary>Stops the current movement (NavMeshAgent path or DOTween) immediately.</summary>
     public void StopNavigation()
     {
@@ -922,14 +943,14 @@ public class SuspectCharacter : Interactable
         // Zero out procedural leg IK from the moment this suspect exists. The walk-in (and, for
         // full mutants, the later window climb-through) is driven by transform.DOMove tweens, not
         // real grounded locomotion — LegsAnimator's foot-planting logic fights that tweened motion
-        // and produces broken-looking walk/climb poses. We blend it back to full strength once the
-        // suspect actually arrives at the booth window (see SuspectController.ArrivedAtPosition)
-        // or, for a suspect that later transforms into a full mutant, once its window climb-through
-        // completes (see MutantSuspectBehaviour.ClimbThroughSequence). Setting the Blend field
-        // (rather than toggling 'enabled') is deliberate: LegsAnimator only calls its own
-        // Initialize() from Start()/OnEnable(), and disabling the component before its first
-        // Start() ever runs would permanently skip that initialization — Blend has no such
-        // lifecycle pitfall. This runs identically and locally on every peer, so no RPC is needed.
+        // and produces broken-looking walk/climb poses. Leg IK stays disabled for the rest of a
+        // normal suspect's time at the booth window — it is only ever blended back in for a full
+        // mutant's window climb-through, once that climb-through completes (see
+        // MutantSuspectBehaviour.ClimbThroughSequence). Setting the Blend field (rather than
+        // toggling 'enabled') is deliberate: LegsAnimator only calls its own Initialize() from
+        // Start()/OnEnable(), and disabling the component before its first Start() ever runs
+        // would permanently skip that initialization — Blend has no such lifecycle pitfall. This
+        // runs identically and locally on every peer, so no RPC is needed.
         SetLegsAnimatorsBlend(0f);
     }
 
@@ -948,10 +969,11 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
-    /// Restores full procedural leg IK on all clients. Call once this suspect has finished
-    /// arriving at the booth window (normal suspects/doppelgangers) — mutants restore it
-    /// themselves after their window climb-through instead (see
-    /// <see cref="MutantSuspectBehaviour"/>). Must be called on the server.
+    /// Restores full procedural leg IK on all clients. Not called for a normal suspect's booth
+    /// arrival (their leg IK stays disabled for the whole encounter — see the note in Awake()).
+    /// Available for scripted/special cases that explicitly need leg IK back (mutants restore it
+    /// themselves after their window climb-through instead — see <see cref="MutantSuspectBehaviour"/>).
+    /// Must be called on the server.
     /// </summary>
     public void RestoreLegsAnimators()
     {

@@ -6,7 +6,9 @@ using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// Drives a post-processing glitch volume (Interferences + Film Grain) whose effect
-/// scales smoothly with proximity to the nearest fully-mutated suspect.
+/// scales smoothly with proximity to the nearest fully-mutated suspect — or with how fast
+/// the local player's own radiation is currently climbing (see PlayerRadiation.RadiationRate).
+/// Whichever signal is stronger wins; both share the same fade/burst feedback below.
 ///
 /// The values authored on the volume profile are treated as maximums: at full proximity
 /// the profile values apply in full; further away they scale down to zero. Film grain
@@ -67,6 +69,15 @@ public class GlitchController : MonoBehaviour
 
     [Tooltip("Peak distortion amplitude injected during a burst (scaled further by current intensity).")]
     [SerializeField, Range(0f, 1f)] private float _glitchBurstIntensity = 0.5f;
+
+    // ── High-Velocity Irradiation ────────────────────────────────────────────
+
+    [Header("High-Velocity Irradiation")]
+    [Tooltip("Radiation gain rate (units/sec, see PlayerRadiation.RadiationRate) at which this signal starts contributing.")]
+    [SerializeField] private float _irradiationRateThreshold = 8f;
+
+    [Tooltip("Radiation gain rate (units/sec) at which this signal reaches full intensity.")]
+    [SerializeField] private float _irradiationRateMax = 25f;
 
     // ── Debug ─────────────────────────────────────────────────────────────────
 
@@ -229,6 +240,15 @@ public class GlitchController : MonoBehaviour
 
             float signal = SignalForDistance(Vector3.Distance(origin.position, suspect.transform.position));
             if (signal > maxSignal) maxSignal = signal;
+        }
+
+        // High-velocity irradiation — same glitch/film-grain/audio-burst feedback kicks in
+        // when the player's own radiation is climbing fast, independent of mutant proximity.
+        PlayerRadiation playerRadiation = PlayerInstance.Instance != null ? PlayerInstance.Instance.PlayerRadiation : null;
+        if (playerRadiation != null)
+        {
+            float rateSignal = Mathf.InverseLerp(_irradiationRateThreshold, _irradiationRateMax, playerRadiation.RadiationRate);
+            if (rateSignal > maxSignal) maxSignal = rateSignal;
         }
 
         return maxSignal;

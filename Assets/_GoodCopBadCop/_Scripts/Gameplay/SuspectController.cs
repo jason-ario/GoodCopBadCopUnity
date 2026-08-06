@@ -206,15 +206,15 @@ public class SuspectController : NetworkBehaviour
 
     [Header("Coupon Payouts")]
     [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
-    [SerializeField] int couponPerfectAnomaliesBonus = 5;
+    [SerializeField] int couponPerfectAnomaliesBonus = 2;
     [Tooltip("Maximum bonus coupons awarded when 100% of anomaly categories are identified. Scales linearly with percent caught (0% = 0 bonus, 100% = full bonus).")]
-    [SerializeField] int couponMaxPercentBonus = 25;
+    [SerializeField] int couponMaxPercentBonus = 8;
     [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
     /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
-    [SerializeField] int couponBaseReward = 10;
+    [SerializeField] int couponBaseReward = 3;
     [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
-    [SerializeField] int couponPerEvidenceItem = 3;
+    [SerializeField] int couponPerEvidenceItem = 1;
     
     private void Awake()
     {
@@ -604,7 +604,12 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.SetIsAtBooth(false);
 
         suspectCharacter.SetLocomotionState(true);
-        suspectCharacter.NavigateTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
+        // Walk straight to the booth stand position via DOTween rather than NavMeshAgent
+        // pathfinding — the tween arrival is consistent regardless of NavMesh state. The
+        // entrance gate (a separate GateController from gatePos/despawnPos below, which are
+        // the exit-leg waypoints used in PassSequence) auto-opens for an approaching suspect on
+        // its own via its proximity check, so no explicit Open/CloseGate call is needed here.
+        suspectCharacter.WalkTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
 
         // Notify all clients so they can show the booth-waiting notification if needed.
         NotifySuspectArrivingClientRpc();
@@ -674,9 +679,9 @@ public class SuspectController : NetworkBehaviour
         // Now standing at the window — shootable/woundable from here on.
         suspectCharacter.SetIsAtBooth(true);
 
-        // Walk-in is over — restore full procedural leg IK now that the suspect is done being
-        // tweened across the floor (see SuspectCharacter.Awake for why it was zeroed at spawn).
-        suspectCharacter.RestoreLegsAnimators();
+        // Leg animators (procedural IK) stay disabled here — they are only ever re-enabled for
+        // a full-mutant's window climb-through (see MutantSuspectBehaviour), never for a normal
+        // DOTween walk-in to the booth. See SuspectCharacter.Awake for why they start disabled.
 
         // Ensure all non-activated anomalies (including those from locked categories that
         // were skipped during the initial activation pass) have their shader state cleaned up.

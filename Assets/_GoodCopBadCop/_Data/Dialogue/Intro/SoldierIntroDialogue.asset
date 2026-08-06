@@ -14,36 +14,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "End of rotation. Papers. Standard transit through the civilian checkpoint.
-      I cross here twice a day, minimum."
+    npcLine: End of rotation. Papers. Standard transit through the civilian checkpoint.
+      I cross here twice a day, minimum.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "Extended patrol perimeter since the eastern incident. You should have the clearance on file."
+    npcLine: Extended patrol perimeter since the eastern incident. You should
+      have the clearance on file.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: What eastern incident?
-      npcResponse: Above your clearance level. Check with your commanding officer. Keep moving.
+      npcResponse: Above your clearance level. Check with your commanding officer.
+        Keep moving.
       animationTrigger: TalkIdle
     - playerChoiceText: Can I get your name for the record?
       npcResponse: No. You get the badge number. Same thing.
       animationTrigger: TalkLookAway
   - type: 0
-    npcLine: "Fifteen men in my unit. We rotate through the civilian sectors on
-      a twelve-hour cycle. This checkpoint runs slower than the eastern one \u2014
-      I have timed it. The processing window needs to be tighter."
+    npcLine: Fifteen men in my unit. We rotate through the civilian sectors on
+      a twelve-hour cycle. This checkpoint runs slower than the eastern one. The
+      window needs to be tighter.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "There\u2019s a difference between thorough and slow. You\u2019ll learn
-      it. Papers. Badge number is on the back of the security card. Don\u2019t
-      make me repeat this tomorrow."
+    npcLine: There's a difference between thorough and slow. You'll learn it.
+      Papers. Badge number's on the back of the card. Don't make me repeat this
+      tomorrow.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
@@ -52,5 +54,5 @@ MonoBehaviour:
       npcResponse: Then the procedure is inefficient. Write that down.
       animationTrigger: TalkLookAway
     - playerChoiceText: We're thorough here.
-      npcResponse: "I noticed. You\u2019ll get faster. Or you won\u2019t."
+      npcResponse: I noticed. You'll get faster. Or you won't.
       animationTrigger: TalkIdle

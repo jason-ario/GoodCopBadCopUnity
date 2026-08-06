@@ -19,10 +19,10 @@ public class ShiftPerformanceEvaluator : MonoBehaviour
     [SerializeField] private float _sampleIntervalSeconds = 15f;
 
     [Tooltip("Minimum coupons awarded even if threats were at maximum pressure all night.")]
-    [SerializeField] private int _minCouponReward = 5;
+    [SerializeField] private int _minCouponReward = 2;
 
     [Tooltip("Maximum coupons awarded for a perfect (zero-threat) night.")]
-    [SerializeField] private int _maxCouponReward = 30;
+    [SerializeField] private int _maxCouponReward = 10;
 
     /// <summary>Weighted average performance score from the last completed shift (0 = worst, 1 = best).</summary>
     public float LastShiftScore { get; private set; }

@@ -14,50 +14,46 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "New here? Good. I prefer checkpoints where the officer is still paying
-      attention. Dionise Chkonia \u2014 professor at the university, philosophy and
-      epistemology."
+    npcLine: New here? Good. I prefer a checkpoint where the officer still pays
+      attention. Dionise Chkonia, professor of philosophy.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "I've been cross-listing into ethics since the situation escalated. I'm
-      coming from the archives today, too \u2014 there are texts I want offsite before
-      the dust gets worse."
+    npcLine: I've been teaching ethics since things escalated. I'm also coming
+      from the archive today. There are texts worth saving before the dust gets worse.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: What kind of texts?
-      npcResponse: Primary sources. First editions that exist nowhere else. I'm not
-        prepared to let the next one disappear.
+      npcResponse: Primary sources. First editions that exist nowhere else. I won't
+        let the next one disappear.
       animationTrigger: TalkIdle
     - playerChoiceText: Is the dust getting worse?
-      npcResponse: Yes. I don't think the official picture is complete. I stopped
-        waiting for full disclosure some time ago.
+      npcResponse: Yes. I don't think we're getting the full picture. I stopped
+        waiting for one.
       animationTrigger: TalkLookDown
   - type: 0
-    npcLine: My students are anxious. When everything outside destabilizes, people
-      look for structure. I keep my lectures on schedule — routine is its own form
-      of reassurance.
+    npcLine: My students are anxious. When the world destabilizes, people look
+      for structure. I keep my lectures on schedule. Routine is its own reassurance.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "I have a wife and two children at home. We're managing, not comfortable
-      but not desperate. My papers \u2014 I check them every two weeks to avoid delays;
-      the permit runs through June."
+    npcLine: I have a wife and two children at home. We're managing. My papers
+      are current, I check them every two weeks.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: How are your children holding up?
-      npcResponse: Children adapt. What frightens them is watching us pretend we're
-        not frightened. So I stopped pretending.
+      npcResponse: Children adapt. What frightens them is watching us pretend we
+        aren't. So I stopped pretending.
       animationTrigger: TalkLookDown
     - playerChoiceText: You seem very calm about all of this.
-      npcResponse: Stoicism. The only rational response to what you cannot control.
-        Panic wastes energy where it does least good.
+      npcResponse: Stoicism. It's the only rational response to what you can't
+        control.
       animationTrigger: TalkIdle

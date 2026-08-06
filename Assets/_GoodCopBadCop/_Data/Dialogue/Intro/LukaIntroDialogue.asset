@@ -14,45 +14,48 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "Sorry \u2014 here\u2019s the form. I filled it out but I think I put
-      the wrong date on it. Luka Tsereteli. I\u2019m ten. I live upstairs, in Block
-      C. Fourth floor. With my mum."
+    npcLine: Sorry, here's the form. I think I put the wrong date on it. Luka
+      Tsereteli. I'm ten. I live upstairs in Block C, fourth floor, with my mum.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "School stopped two weeks ago. My teacher said it was temporary. She hasn\u2019t come back."
+    npcLine: School stopped two weeks ago. My teacher said it was temporary. She
+      hasn't come back.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: Is your school still open?
-      npcResponse: "No. They locked the gates. I waited outside for a while in case someone came. Nobody came."
+      npcResponse: No. They locked the gates. I waited outside for a while in
+        case someone came. Nobody came.
       animationTrigger: TalkLookDown
     - playerChoiceText: What year are you in?
-      npcResponse: "Fourth year. I was supposed to do my reading test this month. I practiced a lot for it."
+      npcResponse: Fourth year. I was supposed to do my reading test this month.
+        I practiced a lot for it.
       animationTrigger: TalkLookAway
   - type: 0
-    npcLine: "I live with my mum. My dad is in Varka for work. She keeps trying to
-      call him but the phones don\u2019t connect. I keep telling myself it\u2019s
-      going to be fine. I\u2019ve been saying that every morning. It helps for about
-      ten minutes."
+    npcLine: I live with my mum. My dad's in Varka for work. She keeps trying
+      to call him but the phones don't connect. I keep telling myself it's going
+      to be fine.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "My hands keep shaking and I can\u2019t tell if it\u2019s the cold or
-      something else. My papers. They're fine. I double-checked after the last
-      time I forgot them."
+    npcLine: My hands keep shaking and I can't tell if it's the cold or something
+      else. My papers are fine. I double-checked after the last time I forgot
+      them.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: Is there anything that helps?
-      npcResponse: Routine. Coming through here is part of it, weirdly. At least this part is predictable.
+      npcResponse: Routine. Coming through here is part of it, weirdly. At least
+        this part is predictable.
       animationTrigger: TalkIdle
     - playerChoiceText: You should try to sleep.
-      npcResponse: "I know. I just... can\u2019t make my brain quiet enough. I\u2019m working on it."
+      npcResponse: I know. I just can't make my brain quiet enough. I'm working
+        on it.
       animationTrigger: TalkLookDown

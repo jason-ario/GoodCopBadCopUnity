@@ -229,6 +229,12 @@ public class SoldierMutantResponder : NetworkBehaviour
             if (m == null || m == _selfMutantEnemy || m.IsDead || !m.IsActive)
                 continue;
 
+            // Mutants currently standing at the booth window are mid-interrogation (a scripted,
+            // contained encounter) — ignore them so soldiers don't rush the booth and interrupt it.
+            SuspectCharacter mutantSuspect = m.GetComponent<SuspectCharacter>();
+            if (mutantSuspect != null && mutantSuspect.IsAtBooth)
+                continue;
+
             float dist = Vector3.Distance(transform.position, m.transform.position);
             if (dist <= bestDist)
             {
@@ -244,10 +250,7 @@ public class SoldierMutantResponder : NetworkBehaviour
             if (_state == State.Pursuing || _state == State.Engaging)
             {
                 StopCombatRoutine();
-                _agent.stoppingDistance = 0.15f;
-                _agent.isStopped = false;
-                _agent.SetDestination(_postPosition);
-                _state = State.Returning;
+                BeginReturning();
             }
         }
         else if (_state == State.Idle || _state == State.Returning)
@@ -262,7 +265,7 @@ public class SoldierMutantResponder : NetworkBehaviour
     {
         if (_currentTarget == null)
         {
-            _state = State.Idle;
+            BeginReturning();
             return;
         }
 
@@ -284,7 +287,7 @@ public class SoldierMutantResponder : NetworkBehaviour
         if (_currentTarget == null || _currentTarget.IsDead)
         {
             StopCombatRoutine();
-            _state = State.Idle;
+            BeginReturning();
             return;
         }
 
@@ -297,6 +300,16 @@ public class SoldierMutantResponder : NetworkBehaviour
             _agent.isStopped = false;
             _state = State.Pursuing;
         }
+    }
+
+    /// <summary>Sends the agent back toward its original post position/rotation and enters State.Returning.</summary>
+    private void BeginReturning()
+    {
+        _currentTarget = null;
+        _agent.stoppingDistance = 0.15f;
+        _agent.isStopped = false;
+        _agent.SetDestination(_postPosition);
+        _state = State.Returning;
     }
 
     private void HandleReturning()

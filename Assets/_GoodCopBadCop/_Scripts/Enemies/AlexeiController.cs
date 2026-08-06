@@ -458,6 +458,13 @@ public class AlexeiController : NetworkBehaviour
         if (agent != null) agent.enabled = false;
         instance.transform.SetPositionAndRotation(_mutantSpawnPos.position, _mutantSpawnPos.rotation);
 
+        // Keep MutantEnemy dormant (IsActive stays false) through the fall/land/idle/roar entrance —
+        // mirrors the normal lineup-mutant pattern (SuspectController/SuspectCharacter) so other
+        // systems that gate on IsActive (e.g. SoldierMutantResponder) don't aggro on Alexei before
+        // MutantSuspectBehaviour.BeginAtStandPos() hands off real control via InitialiseServer().
+        // Must be called before Spawn() — InitialiseServer() would otherwise run during it.
+        mutantEnemy?.DisableAutoInit();
+
         netObj.Spawn(true);
 
         // Start the encounter music on all clients after a short delay.

@@ -68,9 +68,13 @@ public class ExamPage : FolderItem
 
     /// <summary>
     /// How long the checklist camera stays active after a checkbox state change.
-    /// Should cover the full X drawing animation length (~0.52 s) plus a small margin.
+    /// Must cover Checkbox.WaitAndShowCheckmark's 0.15 s delay before the checkmark GameObject
+    /// is even activated, PLUS the full "Cross Drawn In" Animator clip length (~0.5167 s) that
+    /// starts playing once it is — i.e. at least ~0.667 s end-to-end from the click — plus a
+    /// small margin so the last frames of the draw are never cut off (see Checkbox.cs and
+    /// X.controller's "Cross Drawn In" state).
     /// </summary>
-    [SerializeField] private float _drawAnimationDuration = 0.6f;
+    [SerializeField] private float _drawAnimationDuration = 0.85f;
 
     private static readonly int OverlayMapProperty = Shader.PropertyToID("_OverlayMap");
 

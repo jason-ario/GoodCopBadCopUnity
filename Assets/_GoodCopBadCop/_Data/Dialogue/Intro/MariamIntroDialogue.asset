@@ -15,8 +15,7 @@ MonoBehaviour:
   nodes:
   - type: 0
     npcLine: My documents. I organized them by date before I left, in case that
-      speeds things up. Miriam Beridze. Student. I'm training to become a doctor,
-      when all this is finished.
+      speeds things up. Mariam Beridze. Student, training to become a doctor.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -29,16 +28,23 @@ MonoBehaviour:
     choices:
     - playerChoiceText: Isn't that a lot to put on you?
       npcResponse: She doesn't think so. She thinks it's the minimum. I try not
-        to disagree with her math on that.
+        to disagree with her math.
       animationTrigger: TalkLookAway
     - playerChoiceText: That's a lot of trust in you.
       npcResponse: It isn't trust. It's a test. I don't fail tests.
       animationTrigger: TalkIdle
-  - type: 1
-    npcLine: I study anatomy in whatever time is left after schoolwork; most people
-      find it unpleasant, I find it honest. I have a younger sister at home. She
-      doesn't understand why I take all of this so seriously.
+  - type: 0
+    npcLine: I study anatomy in whatever time is left after schoolwork. Most people
+      find it unpleasant. I find it honest. I have a younger sister at home who
+      doesn't understand why I take this so seriously.
     animationTrigger: TalkLookDown
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    choices: []
+  - type: 1
+    npcLine: Here, everything should be correct. I don't like giving anyone a
+      reason to look twice.
+    animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     choices:
@@ -47,6 +53,5 @@ MonoBehaviour:
         It might as well be me.
       animationTrigger: TalkLookDown
     - playerChoiceText: Maybe she understands more than you think.
-      npcResponse: Maybe. I don't have time to find out today. Here — everything
-        should be correct. I don't like giving anyone a reason to look twice.
+      npcResponse: Maybe. I don't have time to find out today.
       animationTrigger: TalkIdle

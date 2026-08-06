@@ -14,45 +14,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: "You look nervous, officer. Relax. I\u2019m just a businessman coming
-      home. Vladimir Syrnikov. Import and logistics. You may have heard the name.
-      Many people have."
+    npcLine: You look nervous, officer. Relax. I'm just a businessman coming home.
+      Vladimir Syrnikov. Import and logistics. You may have heard the name.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "I own property in six districts. This one included. Which means, technically, you are standing in one of my doorways."
+    npcLine: I own property in six districts. This one included. Which means,
+      technically, you're standing in one of my doorways.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: This is a public checkpoint.
-      npcResponse: "Everything is someone\u2019s property, eventually. The city is reorganizing itself. I\u2019m paying attention."
+      npcResponse: Everything's someone's property eventually. The city is reorganizing
+        itself. I'm paying attention.
       animationTrigger: TalkIdle
     - playerChoiceText: I don't recognize your name.
-      npcResponse: "You will. Or someone who answers to me will introduce us properly. Either way \u2014 not a concern."
+      npcResponse: You will. Or someone who answers to me will introduce us properly.
+        Either way, not a concern.
       animationTrigger: TalkCocky
   - type: 0
-    npcLine: "I work out of the docks, primarily. Import, mostly \u2014 the nature
-      of the imports is not relevant to your paperwork. I have been through security
-      checks my entire career. You have a difficult job. It would be a shame if
-      something made it even harder for you."
+    npcLine: I work out of the docks, mostly import. The nature of the imports
+      isn't relevant to your paperwork. You have a difficult job. Shame if something
+      made it harder.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleText: 0
     choices: []
   - type: 1
-    npcLine: "Here are the papers. Make sure you don\u2019t smudge the ink. I\u2019m
-      a man who likes things clean. Permit runs to December. Everything in order.
-      It always is."
+    npcLine: Here are the papers. Don't smudge the ink, I'm a man who likes things
+      clean. Permit runs to December. Everything in order. It always is.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleText: 0
     choices:
     - playerChoiceText: I'll handle them carefully.
-      npcResponse: "Good. A man who respects documents respects the transaction. I appreciate that."
+      npcResponse: Good. A man who respects documents respects the transaction.
+        I appreciate that.
       animationTrigger: TalkIdle
     - playerChoiceText: I treat all documents the same.
-      npcResponse: "Of course. That\u2019s what you\u2019re supposed to say. We\u2019ll see what that costs you eventually."
+      npcResponse: Of course. That's what you're supposed to say. We'll see what
+        that costs you eventually.
       animationTrigger: TalkCocky
