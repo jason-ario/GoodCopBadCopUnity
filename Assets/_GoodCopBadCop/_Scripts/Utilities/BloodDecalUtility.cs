@@ -1,10 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// Shared helpers for placing blood-splatter decals on the ground. Decal prefabs (e.g. "Random
-/// Blood Splatter Variant") are authored so their local forward (+Z) axis is the face normal —
-/// <see cref="GetGroundDecalRotation"/> aligns that local forward axis with the surface normal
-/// and applies a random spin around it so repeated decals don't look identical.
+/// Shared helpers for placing blood-splatter decals on the ground. The decal prefab ("Random
+/// Blood Splatter Variant") is a flattened cube whose face normal — accounting for the mesh's
+/// own scale/rotation baked on its child — points along the prefab ROOT's local +X axis, not
+/// +Z (Instantiate(prefab, pos, rot) overwrites the root's rotation entirely, so only the
+/// child's fixed local rotation relative to the root matters). <see cref="GetGroundDecalRotation"/>
+/// aligns that local +X axis with the surface normal and applies a random spin around it so
+/// repeated decals don't look identical.
 /// </summary>
 public static class BloodDecalUtility
 {
@@ -16,8 +19,8 @@ public static class BloodDecalUtility
     {
         Vector3 normal = groundNormal.sqrMagnitude > 0.0001f ? groundNormal.normalized : Vector3.up;
 
-        Quaternion alignToNormal = Quaternion.FromToRotation(Vector3.forward, normal);
-        Quaternion spin = Quaternion.AngleAxis(Random.Range(0f, 360f), Vector3.forward);
+        Quaternion alignToNormal = Quaternion.FromToRotation(Vector3.right, normal);
+        Quaternion spin = Quaternion.AngleAxis(Random.Range(0f, 360f), Vector3.right);
         return alignToNormal * spin;
     }
 

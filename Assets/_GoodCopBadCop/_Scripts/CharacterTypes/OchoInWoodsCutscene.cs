@@ -161,6 +161,19 @@ public class OchoInWoodsCutscene : NetworkBehaviour
         if (_triggered) return;
         _triggered = true;
 
+        // Defensive safety net: this NetworkObject lives under CampaignManager's per-day
+        // folders, which are force-deactivated in CampaignManager.CollectDays() before the
+        // NetworkManager ever starts spawning scene objects. Netcode only auto-spawns scene
+        // NetworkObjects that are ACTIVE at that scan time, so this object can end up never
+        // spawned at all even after its day folder is reactivated later — silently breaking
+        // every ClientRpc below (Ocho would simply never appear). Spawn it here if needed.
+        if (NetworkObject != null && !NetworkObject.IsSpawned)
+        {
+            NetworkObject.Spawn(true);
+            Debug.LogWarning("[OchoInWoodsCutscene] NetworkObject was not spawned (likely deactivated " +
+                "before NetworkManager's scene scan) — spawning it now.", this);
+        }
+
         ShowOchoClientRpc();
         _monitorRoutine = StartCoroutine(MonitorProximity());
 

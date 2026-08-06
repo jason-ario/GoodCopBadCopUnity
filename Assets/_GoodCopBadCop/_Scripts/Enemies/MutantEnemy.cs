@@ -47,7 +47,13 @@ public class MutantEnemy : NetworkBehaviour
     /// <see cref="FollowTrailThreat"/> subscribes while the follow-trail task is active so that
     /// encountering a pack mutant early skips straight to the kill-mutants task.
     /// </summary>
-    public static event Action OnAnyMutantSpottedPlayer;
+    /// <summary>
+    /// Fired the first time ANY mutant anywhere in the world spots a player, passing the mutant
+    /// instance that did the spotting. Subscribers that care about a specific pack (e.g.
+    /// <see cref="FollowTrailThreat"/>) must check whether the passed mutant is one of theirs —
+    /// this fires for the ambient world-population spawner's mutants too, not just packs.
+    /// </summary>
+    public static event Action<MutantEnemy> OnAnyMutantSpottedPlayer;
 
     // ── Configuration ─────────────────────────────────────────────────────────
 
@@ -548,7 +554,7 @@ public class MutantEnemy : NetworkBehaviour
             _currentTarget = FindNearestTarget(ignoreDetectionRadius: _breachChargeMode);
 
             if (!wasChasing && _currentTarget != null)
-                OnAnyMutantSpottedPlayer?.Invoke();
+                OnAnyMutantSpottedPlayer?.Invoke(this);
 
             if (_currentTarget != null)
             {

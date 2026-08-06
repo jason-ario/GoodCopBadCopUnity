@@ -162,10 +162,6 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     // sets its own copy since OnFollowTrailActiveChanged already fires on every peer.
     private bool _hasShownFollowTrailTutorial;
 
-    // The tutorial objective-list row for this task, if currently showing. Local (non-networked);
-    // each client creates/removes its own row since OnFollowTrailActiveChanged fires on every peer.
-    private TutorialObjectiveItem _followTrailObjective;
-
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName        => _threatName;
@@ -249,6 +245,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (current)
         {
+            // Registering here is the ONLY place this task's HUD/objective-list row gets
+            // created — HUDTaskList bridges every TaskRegistry-registered ISystemicThreat into
+            // the tutorial objective list generically. Do NOT also call
+            // TutorialObjectiveList.AddObjective directly here — that previously created a
+            // second, duplicate row for the same task alongside HUDTaskList's row.
             TaskRegistry.Instance?.AddThreat(this);
 
             // Fires locally on every client (this NetworkVariable callback runs on ALL peers),
@@ -259,22 +260,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
                 _hasShownFollowTrailTutorial = true;
                 TutorialOverlay.Instance?.ShowFollowTrailTutorial();
             }
-
-            // Add the "Follow the trail" row to the tutorial objective list on every client.
-            _followTrailObjective = TutorialObjectiveList.Instance?.AddObjective(_threatName);
         }
         else
         {
             TaskRegistry.Instance?.RemoveThreat(this);
-
-            // Remove the row — this fires both when the destination is discovered (task
-            // resolved) and on day cleanup, so either way the row disappears in sync with
-            // the main HUD task.
-            if (_followTrailObjective != null)
-            {
-                TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_followTrailObjective, preHideDelay: 1f);
-                _followTrailObjective = null;
-            }
         }
     }
 
@@ -571,8 +560,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Spawn the enemy pack immediately so mutants are present from the moment the trail starts.
         SpawnPack();
 
-        // If a pack was configured, listen for the first player encounter so we can skip
-        // straight to the kill-mutants task without requiring the trail to be fully followed.
+        // If a pack was configured, listen for the first encounter between a PACK mutant (not
+        // any ambient mutant anywhere) and a player, so we can skip straight to the
+        // kill-mutants task without requiring the trail to be fully followed.
         if (_currentLocation.PackSize > 0)
             MutantEnemy.OnAnyMutantSpottedPlayer += OnPackMutantEncountered;
 
@@ -731,13 +721,16 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Server-only. Called when any mutant first spots a player while the follow-trail task is
-    /// still active. Ends the trail task immediately and activates the kill-mutants task, exactly
-    /// as if the destination had been reached — but without the coupon reward since the destination
-    /// itself was never investigated.
+    /// still active. Only reacts if <paramref name="spotter"/> is one of THIS pack's mutants —
+    /// see <see cref="_packKillHandlers"/> — so an unrelated ambient mutant elsewhere on the map
+    /// spotting a player never short-circuits the trail task. Ends the trail task immediately
+    /// and activates the kill-mutants task, exactly as if the destination had been reached — but
+    /// without the coupon reward since the destination itself was never investigated.
     /// </summary>
-    private void OnPackMutantEncountered()
+    private void OnPackMutantEncountered(MutantEnemy spotter)
     {
         if (!IsServer || _isDiscovered.Value || !_followTrailActive.Value) return;
+        if (spotter == null || !_packKillHandlers.ContainsKey(spotter)) return;
 
         // Unsubscribe immediately — only the first encounter matters.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
