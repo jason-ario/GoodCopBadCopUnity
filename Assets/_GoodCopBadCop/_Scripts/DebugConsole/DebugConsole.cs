@@ -851,6 +851,76 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Skips to Day 4 in the booth, immediately marks every suspect for the day as processed
+    /// (bypassing the normal lineup), then force-triggers Day 4's breach (the Ocho finale breach)
+    /// right away instead of waiting for <see cref="MutantBreachManager"/>'s normal random
+    /// scheduling delay — we're only skipping the suspect-processing grind, not the breach itself.
+    /// </summary>
+    public void SkipToEndOfDay4()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay4: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(4);
+        StartCoroutine(SkipToEndOfDay4AfterDelay());
+    }
+
+    private IEnumerator SkipToEndOfDay4AfterDelay()
+    {
+        // Wait one frame for Day_04 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_04.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay4: Day_04.Instance not found after SkipToDay(4).");
+            yield break;
+        }
+
+        // Put the start-shift gate in post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Start the shift with a huge first-arrival window — no suspects will arrive, so the
+        // normal "last suspect processed" path (SetNextSuspectReady exhausting the lineup) will
+        // never fire on its own.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
+
+        // Mark every suspect for the day as processed — this is "Dusk": it fires
+        // ShiftManager.OnLastSuspectProcessed and triggers the active day's (empty) PostShiftTasks,
+        // which resolves immediately and fires OnPostShiftTasksComplete. MutantBreachManager picks
+        // that up and starts its normal random-delay schedule for Day 4's breach.
+        ShiftManager.Instance?.MarkSuspectsComplete();
+
+        // We're only skipping the suspect-processing grind, not the breach itself — force it to
+        // fire right away instead of waiting out MutantBreachManager's normal scheduling delay.
+        // DebugForceTriggerBreach/TriggerBreach cancels that pending schedule and runs immediately,
+        // so this is safe to call the same frame MarkSuspectsComplete kicks the schedule off.
+        yield return null;
+
+        DayBase activeDay = CampaignManager.Instance.ActiveDay;
+        MutantBreachData dayBreachData = (activeDay != null && activeDay.PossibleBreaches != null && activeDay.PossibleBreaches.Length > 0)
+            ? activeDay.PossibleBreaches[0]
+            : null;
+
+        if (dayBreachData != null)
+        {
+            MutantBreachManager.Instance?.DebugForceTriggerBreach(dayBreachData);
+            Debug.Log($"[DebugConsole] Skipped to end of Day 4 — all suspects marked processed, '{dayBreachData.breachName}' breach triggered immediately.");
+        }
+        else
+        {
+            Debug.LogWarning("[DebugConsole] SkipToEndOfDay4: Day 4 has no PossibleBreaches configured — breach not triggered.");
+        }
+    }
+
+    /// <summary>
     /// Skips to the start of Day 3 with the player positioned inside the bunker with the
     /// door closed, matching the natural end-of-InBetweenShiftSequence spawn before the
     /// player walks out to begin their shift (mirrors <see cref="SkipToStartOfDay2"/>).

@@ -134,6 +134,39 @@ public class MutantBreachManager : NetworkBehaviour
         CancelSchedule();
     }
 
+    /// <summary>
+    /// True whenever today's mutant breach (if any) is still scheduled, actively running, or
+    /// about to be scheduled for the active day — i.e. whenever it's too soon for the player to
+    /// clock out. Checked by <see cref="ShiftManager.TryEnableClockOut"/>: it withholds the
+    /// timecard machine's clock-out while this is true, then re-checks once
+    /// <see cref="RunBreach"/> finishes via <see cref="ShiftManager.RecheckClockOutGate"/>.
+    /// Mirrors the exact same gating conditions as <see cref="TryScheduleBreachForToday"/>, so a
+    /// day that will never actually roll a breach (wrong day, flag off, no presets) never blocks
+    /// clock-out.
+    /// </summary>
+    public bool IsBreachPendingOrActiveForToday
+    {
+        get
+        {
+            if (_isBreachActive || _scheduleCoroutine != null || _breachCoroutine != null)
+                return true;
+
+            // Already resolved for today (or never will be) — nothing left to withhold clock-out for.
+            if (_hasTriggeredToday)
+                return false;
+
+            int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+            if (currentDay < firstActiveDay)
+                return false;
+
+            DayBase activeDay = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+            if (activeDay == null || !activeDay.HasMutantBreach)
+                return false;
+
+            return activeDay.PossibleBreaches != null && activeDay.PossibleBreaches.Length > 0;
+        }
+    }
+
     // ── Scheduling ─────────────────────────────────────────────────────────────
 
     private void OnDayChanged(int newDay)
@@ -309,6 +342,11 @@ public class MutantBreachManager : NetworkBehaviour
         _isBreachActive = false;
         _breachCoroutine = null;
         _activeBreachMutants.Clear();
+
+        // Let ShiftManager re-evaluate clock-out now that this breach is fully resolved — it may
+        // have been withheld solely because this breach was pending/active (see
+        // IsBreachPendingOrActiveForToday / ShiftManager.TryEnableClockOut).
+        ShiftManager.Instance?.RecheckClockOutGate();
     }
 
     /// <summary>
@@ -437,10 +475,17 @@ public class MutantBreachManager : NetworkBehaviour
         ShowThanksForPlayingScreenClientRpc();
     }
 
+    /// <summary>
+    /// Delay (seconds) between a mutant-breach-triggered demo end and the Thanks For Playing
+    /// panel actually appearing. The player is locked/invincible immediately so the beat lands
+    /// cleanly with no risk of a stray hit animation during the wait.
+    /// </summary>
+    private const float ThanksForPlayingRevealDelaySeconds = 5f;
+
     [ClientRpc]
     private void ShowThanksForPlayingScreenClientRpc()
     {
-        UIController.Instance?.ShowThanksForPlayingScreen();
+        UIController.Instance?.ShowThanksForPlayingScreenAfterDelay(ThanksForPlayingRevealDelaySeconds);
     }
 
     // ── Client FX ────────────────────────────────────────────────────────────

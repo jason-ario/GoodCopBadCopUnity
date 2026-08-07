@@ -489,9 +489,11 @@ public class MainMenuController : MonoBehaviour
     /// <summary>
     /// Starts the main menu's background music through <see cref="MusicManager"/> so it fades
     /// in and shares the same cross-fade/stop behaviour as the rest of the game's music.
-    /// Called on <see cref="Start"/> once the home screen is showing.
+    /// Called on <see cref="Start"/> once the home screen is showing, and also invoked
+    /// directly (e.g. by <see cref="UIController.ShowThanksForPlayingScreen"/>) whenever the
+    /// menu music needs to take over from in-game audio.
     /// </summary>
-    private void PlayMainMenuMusic()
+    public void PlayMainMenuMusic()
     {
         if (mainMenuMusicSource == null || mainMenuMusicSource.clip == null)
             return;

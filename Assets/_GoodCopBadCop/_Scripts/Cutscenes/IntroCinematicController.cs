@@ -38,7 +38,7 @@ public class IntroCinematicController : MonoBehaviour
         "Anything no longer human must be eliminated.",
         "You have been assigned to the checkpoint.",
         "Inspect everyone. Follow protocol. Protect the town.",
-        "And remember\u2014the mutations are learning how to hide."
+        "And remember, decisions have consequences..."
     };
 
     /// <summary>True once the intro cinematic has played for this application session.</summary>

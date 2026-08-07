@@ -20,14 +20,15 @@ public class DialogueChoice : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     }
 
     /// <summary>
-    /// Applies or clears the "pending pick" visual. Orange tint + checkmark prefix when picked;
-    /// restored to white with normal text when cleared.
+    /// Applies or clears the "pending pick" visual. Orange tint + underline when picked;
+    /// restored to white with normal text when cleared. Underline uses TMP rich text (&lt;u&gt;),
+    /// so it renders correctly regardless of font glyph support.
     /// </summary>
     public void SetPickedState(bool picked)
     {
         _isPicked = picked;
         choiceTextUI.color = picked ? PickedColor : Color.white;
-        choiceTextUI.text  = picked ? "✓ " + choiceText : choiceText;
+        choiceTextUI.text  = picked ? "<u>" + choiceText + "</u>" : choiceText;
     }
 
     /// <summary>

@@ -532,7 +532,9 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(normal);
+        // TODO: BloodDecalUtility.GetGroundDecalRotation(normal) was producing incorrect
+        // orientations on landing; forcing identity rotation for now until that's fixed.
+        Quaternion rotation = Quaternion.identity;
         SpawnPieceLandingEffectsClientRpc(position, rotation);
     }
 

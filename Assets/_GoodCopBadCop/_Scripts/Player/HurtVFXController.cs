@@ -98,13 +98,22 @@ public class HurtVFXController : NetworkBehaviour
             Debug.Log($"[HurtVFXController] Previewed damage feedback: {sourceLabel} ({damageAmount}).", this);
     }
 
-    /// <summary>Plays legacy hurt audio when the owner's health decreases.</summary>
+    /// <summary>
+    /// Plays legacy hurt audio when the owner's health decreases.
+    /// Radiation damage is applied every frame while over the damage threshold
+    /// (see PlayerRadiation.ApplyRadiationDamage), so playing this one-shot clip on
+    /// every tick makes it sound like it's spamming/looping. Radiation already has
+    /// its own dedicated screen/vignette feedback, so the hurt SFX is skipped for it.
+    /// </summary>
     private void HandleHealthChanged()
     {
         float currentHealth = _playerHealth.Health;
 
         if (currentHealth < _previousHealth && currentHealth > 0f)
-            PlayHurtAudio();
+        {
+            if (_playerHealth.LastHealthEffectKey != GoodCopBadCop.Effects.EffectKeys.RadiationTickDamage)
+                PlayHurtAudio();
+        }
 
         _previousHealth = currentHealth;
     }

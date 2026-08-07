@@ -36,20 +36,6 @@ public class EmoteWheelUI : MonoBehaviour
     /// <summary>Read-only access to the emote definitions so <see cref="EmoteInputController"/> can look up data.</summary>
     public EmoteDefinition[] Emotes => _emotes;
 
-    private int _pressedButtonCount;
-
-    /// <summary>True while any <see cref="EmoteButton"/> in the wheel is actively being pressed.
-    /// <see cref="EmoteInputController"/> uses this to avoid closing the wheel out from under a
-    /// press that hasn't finished yet (e.g. releasing the open key before releasing the mouse).</summary>
-    public bool IsAnyButtonPressed => _pressedButtonCount > 0;
-
-    /// <summary>Called by <see cref="EmoteButton"/> on press/release so the wheel can track whether
-    /// it is safe to close.</summary>
-    public void NotifyButtonPressState(bool isPressed)
-    {
-        _pressedButtonCount = Mathf.Max(0, _pressedButtonCount + (isPressed ? 1 : -1));
-    }
-
     // ─── Unity lifecycle ────────────────────────────────────────────────────
 
     private void Awake()

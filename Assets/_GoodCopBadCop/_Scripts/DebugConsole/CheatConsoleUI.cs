@@ -119,6 +119,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Skip to End of Day 4 — Before Mutant Breach", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay4());
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Free Play — Day 4 Booth", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlay());

@@ -227,17 +227,37 @@ public class ShiftManager : NetworkBehaviour
     {
         if (!IsServer || !_suspectsComplete || _pendingDailyTasks.Count > 0) return;
 
+        // End of the day's schedule — suspects processed AND every post-shift task complete.
+        // MutantBreachManager listens here to roll this day's breach event, if it has one. Fire
+        // this BEFORE the breach-pending check below so the roll (and its scheduling coroutine)
+        // actually happens — otherwise a pending breach would block this method from ever
+        // reaching the point that triggers it.
+        OnPostShiftTasksComplete?.Invoke();
+
+        // Withhold clock-out while today's mutant breach (if any) is scheduled/active — the
+        // player should only be able to clock out once there is no breach left to deal with.
+        // Re-evaluated via RecheckClockOutGate once MutantBreachManager resolves the breach.
+        if (MutantBreachManager.Instance != null && MutantBreachManager.Instance.IsBreachPendingOrActiveForToday)
+        {
+            Debug.Log("[ShiftManager] TryEnableClockOut: mutant breach pending/active — clock-out withheld.");
+            return;
+        }
+
         if (_timecardMachine != null)
             _timecardMachine.EnableClockOut();
 
         NotifyClockOutReadyClientRpc();
 
-        // End of the day's schedule — suspects processed AND every post-shift task complete.
-        // MutantBreachManager listens here to roll this day's breach event, if it has one.
-        OnPostShiftTasksComplete?.Invoke();
-
         Debug.Log("[ShiftManager] TryEnableClockOut: all tasks complete — timecard machine primed for clock-out.");
     }
+
+    /// <summary>
+    /// Re-evaluates clock-out readiness. Called by <see cref="MutantBreachManager"/> once a
+    /// breach it withheld clock-out for has fully resolved (see <see cref="TryEnableClockOut"/>'s
+    /// mutant-breach check), so the timecard machine can finally be primed if every other
+    /// condition is already satisfied.
+    /// </summary>
+    public void RecheckClockOutGate() => TryEnableClockOut();
 
     /// <summary>
     /// Fired on the server once every suspect has been processed AND every post-shift daily

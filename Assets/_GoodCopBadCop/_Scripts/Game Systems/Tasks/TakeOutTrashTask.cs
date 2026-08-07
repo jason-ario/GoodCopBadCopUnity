@@ -656,7 +656,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         GameObject prefab = _bloodDecalPrefabs[Random.Range(0, _bloodDecalPrefabs.Length)];
         if (prefab == null) return;
 
-        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(groundNormal);
+        // TODO: BloodDecalUtility.GetGroundDecalRotation(groundNormal) was producing incorrect
+        // orientations on landing; forcing identity rotation for now until that's fixed.
+        Quaternion rotation = Quaternion.identity;
         GameObject   decalGo = Instantiate(prefab, position, rotation);
         NetworkObject netObj = decalGo.GetComponent<NetworkObject>();
 

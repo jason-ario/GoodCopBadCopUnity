@@ -68,7 +68,9 @@ public class GoreLandingDecalSpawner : MonoBehaviour
         if (prefab == null)
             return;
 
-        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(normal);
+        // TODO: BloodDecalUtility.GetGroundDecalRotation(normal) was producing incorrect
+        // orientations on landing; forcing identity rotation for now until that's fixed.
+        Quaternion rotation = Quaternion.identity;
         GameObject decal = Instantiate(prefab, position, rotation);
 
         if (_decalLifetime > 0f)

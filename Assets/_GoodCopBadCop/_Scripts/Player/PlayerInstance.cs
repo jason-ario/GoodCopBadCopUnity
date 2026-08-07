@@ -60,6 +60,7 @@ public class PlayerInstance : NetworkBehaviour
     private PlayerInteractionController _playerInteractionController;
     private CharacterController _characterController;
     private PlayerCameraController _playerCameraController;
+    private Unity.Netcode.Components.NetworkTransform _networkTransform;
 
     public PlayerInteractionController PlayerInteractionController => _playerInteractionController;
     public PlayerRadiation PlayerRadiation { get; set; }
@@ -83,6 +84,7 @@ public class PlayerInstance : NetworkBehaviour
         _playerInteractionController = GetComponent<PlayerInteractionController>();
         _characterController = GetComponent<CharacterController>();
         _playerCameraController = GetComponent<PlayerCameraController>();
+        _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
         PlayerHealth = GetComponent<PlayerHealth>();
         PlayerRadiation = GetComponent<PlayerRadiation>();
         PlayerDrunkState = GetComponent<PlayerDrunkState>();
@@ -102,6 +104,36 @@ public class PlayerInstance : NetworkBehaviour
 
         if (IsLocalPlayer)
         {
+            // Owner-authoritative NetworkTransform: the object is instantiated by the server
+            // at the correct spawn point, and that position is applied to this client's local
+            // copy of the NetworkObject before this callback runs. However, the CharacterController
+            // (and NetworkTransform's own interpolator, primed on first tick) can occasionally
+            // "cold start" from the prefab's default local transform on a freshly-connected
+            // non-host client — most visibly for the second player joining right as the host
+            // starts the game. Force a clean re-sync here so the owner never renders/replicates
+            // from (0,0,0) instead of the intended spawn point.
+            if (_characterController != null)
+                _characterController.enabled = false;
+
+            try
+            {
+                // Teleport() throws if called before this NetworkObject's NetworkTransform has
+                // finished its own OnNetworkSpawn (CanCommitToTransform not yet true) — sibling
+                // NetworkBehaviours don't guarantee ordering, so guard against that here rather
+                // than letting an exception skip CharacterController re-enable and local-player setup below.
+                if (_networkTransform != null && _networkTransform.CanCommitToTransform)
+                    _networkTransform.Teleport(transform.position, transform.rotation, transform.localScale);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayerInstance] NetworkTransform re-sync teleport skipped: {e.Message}");
+            }
+            finally
+            {
+                if (_characterController != null)
+                    _characterController.enabled = true;
+            }
+
             _playerMovementController.CanControl = true;
             Instance = this;
 

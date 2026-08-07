@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Day 3 — gore/body-part yard cleanup + a scripted mutant breach that ends the demo.
+/// Day 3 — gore/body-part yard cleanup + a scripted mutant breach.
 ///
 /// At day start, spawns gore and body-part junk items across the yard's
 /// <see cref="TakeOutTrashTask"/> spawn zones (instead of standard trash), triggering the
@@ -12,15 +12,15 @@ using UnityEngine;
 /// The day's mail delivery ("Sort the mail" task) is skipped entirely for Day 3 (see
 /// <see cref="SortMailTask.SkipDeliveryForDay"/>) — no delivery, no crate, no sorting task —
 /// since the mechanic is already established on Day 2 and Day 3 is already carrying the
-/// gore/blood/fence cleanup plus the finale breach. The daily prohibited-goods roll still runs
-/// as normal; only the delivery/crate/task is suppressed.
+/// gore/blood/fence cleanup plus its own mutant breach. The daily prohibited-goods roll still
+/// runs as normal; only the delivery/crate/task is suppressed.
 ///
 /// Right after the last suspect for the day is processed, <see cref="MutantBreachManager"/>
 /// (driven by <see cref="DayBase.HasMutantBreach"/> / <see cref="DayBase.PossibleBreaches"/>)
-/// schedules and runs this day's mutant breach automatically. This is currently the demo's
-/// final scripted breach, so its assigned <see cref="MutantBreachData"/> preset should have
-/// <see cref="MutantBreachData.showThanksForPlayingOnClear"/> set — once every breach mutant
-/// is defeated, the campaign is marked complete and the Thanks For Playing screen is shown.
+/// schedules and runs this day's mutant breach automatically. This is a regular (non-finale)
+/// breach — Day 4's Ocho breach is the demo's actual final boss/ending, so Day 3's assigned
+/// <see cref="MutantBreachData"/> preset must NOT have <see cref="MutantBreachData.showThanksForPlayingOnClear"/>
+/// set, otherwise the campaign would end here before the player ever reaches Day 4.
 /// </summary>
 public class Day_03 : DayBase
 {

@@ -11,6 +11,12 @@ using UnityEngine;
 /// a non-event ("he was a contractor... convenient, while he lasted") and making it clear the
 /// player is now being watched more closely. The player is never told outright, but this is
 /// <see cref="OchoBoothEncounter">Ocho</see> impersonating a government official.
+///
+/// Day 4 is the demo's final boss/ending: right after the last suspect is processed,
+/// <see cref="MutantBreachManager"/> (driven by <see cref="DayBase.HasMutantBreach"/> /
+/// <see cref="DayBase.PossibleBreaches"/>, assigned the Ocho breach preset) schedules and runs
+/// the Ocho breach automatically. That preset has <see cref="MutantBreachData.showThanksForPlayingOnClear"/>
+/// set, so clearing it marks the campaign complete and shows the Thanks For Playing screen.
 /// </summary>
 public class Day_04 : DayBase
 {

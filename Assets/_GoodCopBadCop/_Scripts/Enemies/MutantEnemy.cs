@@ -88,6 +88,15 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Delay in seconds from the start of the attack animation to the melee impact frame.")]
     [SerializeField] private float attackHitDelay = 0.4f;
 
+    [Header("Second Attack Animation (optional)")]
+    [Tooltip("When enabled, the mutant randomly picks between the primary attack state (\"Mutant Attack\") " +
+             "and the second attack state below each time it attacks.")]
+    [SerializeField] private bool useSecondAttackAnimation = false;
+
+    [Tooltip("Animator state name to CrossFade into for the second attack animation. Only used when " +
+             "useSecondAttackAnimation is enabled.")]
+    [SerializeField] private string secondAttackStateName = "Mutant Attack 2";
+
     [Header("Door Interaction")]
     [Tooltip("Radius within which the mutant detects and forces open doors or gates blocking its NavMesh path.")]
     [SerializeField] private float doorDetectionRadius = 3f;
@@ -1372,7 +1381,11 @@ public class MutantEnemy : NetworkBehaviour
         {
             // Use CrossFade to authoritatively force the animator into the attack state.
             // This is more robust for networked one-shots than boolean parameters.
-            animator.CrossFade("Mutant Attack", 0.2f, 0, 0f);
+            string attackState = "Mutant Attack";
+            if (useSecondAttackAnimation && !string.IsNullOrEmpty(secondAttackStateName) && UnityEngine.Random.value < 0.5f)
+                attackState = secondAttackStateName;
+
+            animator.CrossFade(attackState, 0.2f, 0, 0f);
         }
     }
 
@@ -1701,7 +1714,9 @@ public class MutantEnemy : NetworkBehaviour
         if (prefab == null)
             return;
 
-        Quaternion rotation = BloodDecalUtility.GetGroundDecalRotation(groundNormal);
+        // TODO: BloodDecalUtility.GetGroundDecalRotation(groundNormal) was producing incorrect
+        // orientations on landing; forcing identity rotation for now until that's fixed.
+        Quaternion rotation = Quaternion.identity;
         GameObject decalGo = Instantiate(prefab, groundPoint, rotation);
         NetworkObject decalNetObj = decalGo.GetComponent<NetworkObject>();
 
@@ -1816,6 +1831,22 @@ public class MutantEnemy : NetworkBehaviour
     private void DisableLegsAnimatorsClientRpc()
     {
         DisableLegsAnimators();
+    }
+
+    /// <summary>
+    /// Disables this mutant's <see cref="lookAnimator"/> on death so it stops procedurally
+    /// turning the head/spine toward the (now irrelevant) chase target on a corpse.
+    /// </summary>
+    private void DisableLookAnimator()
+    {
+        if (lookAnimator != null)
+            lookAnimator.enabled = false;
+    }
+
+    [ClientRpc]
+    private void DisableLookAnimatorClientRpc()
+    {
+        DisableLookAnimator();
     }
 
     /// <summary>
@@ -1943,6 +1974,12 @@ public class MutantEnemy : NetworkBehaviour
         // the death pose/ragdoll. Applied locally (server) and broadcast to all clients.
         DisableLegsAnimators();
         DisableLegsAnimatorsClientRpc();
+
+        // Disable this mutant's FLookAnimator on death so it stops turning its head/spine
+        // toward the chase target once dead. Applied locally (server) and broadcast to all
+        // clients.
+        DisableLookAnimator();
+        DisableLookAnimatorClientRpc();
 
         // Enable ragdoll physics (and disable the Animator driving the rig) on death so the
         // corpse falls naturally instead of playing a canned death animation. Applied locally

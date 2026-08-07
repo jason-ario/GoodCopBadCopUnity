@@ -25,11 +25,18 @@ public class VomitAnomaly : VitalsAnomaly
     [Tooltip("Maximum number of vomit events during the window.")]
     [SerializeField] private int maxEvents = 2;
 
+    [Header("Animation")]
+    [Tooltip("Animator trigger fired on the suspect each time a vomit event plays.")]
+    [SerializeField] private string vomitAnimTrigger = "Vomit";
+
     private ParticleSystem[] _particles;
     private Coroutine _activeCoroutine;
+    private SuspectCharacter _suspect;
 
     private void Awake()
     {
+        _suspect = transform.root.GetComponent<SuspectCharacter>();
+
         if (vomitPrefab == null)
         {
             Debug.LogWarning($"[VomitAnomaly] vomitPrefab is not assigned on '{gameObject.name}'.", this);
@@ -102,6 +109,9 @@ public class VomitAnomaly : VitalsAnomaly
                     ps.Play();
                 }
             }
+
+            if (_suspect != null && !string.IsNullOrEmpty(vomitAnimTrigger))
+                _suspect.FireAnimatorTrigger(vomitAnimTrigger);
         }
 
         _activeCoroutine = null;
@@ -130,14 +140,16 @@ public class VomitAnomaly : VitalsAnomaly
     /// </summary>
     private void ParentToClosestBone()
     {
-        SuspectCharacter suspect = transform.root.GetComponent<SuspectCharacter>();
-        if (suspect == null)
+        if (_suspect == null)
+            _suspect = transform.root.GetComponent<SuspectCharacter>();
+
+        if (_suspect == null)
         {
             Debug.LogWarning("[VomitAnomaly] No SuspectCharacter found at hierarchy root.", this);
             return;
         }
 
-        Animator animator = suspect.animator;
+        Animator animator = _suspect.animator;
         if (animator == null)
         {
             Debug.LogWarning("[VomitAnomaly] SuspectCharacter has no Animator.", this);

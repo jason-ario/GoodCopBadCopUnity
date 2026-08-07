@@ -478,9 +478,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   vomitPrefab: {fileID: 4928382710320344539}
-  windowDuration: 60
+  windowDuration: 10
   minEvents: 1
-  maxEvents: 2
+  maxEvents: 10
 --- !u!1 &2740253640128778168
 GameObject:
   m_ObjectHideFlags: 0
@@ -1510,6 +1510,10 @@ MonoBehaviour:
       NameHash: 655049087
       Synchronize: 1
       ParameterType: 4
+    - name: Vomit
+      NameHash: -1318316133
+      Synchronize: 1
+      ParameterType: 9
   AnimatorParametersExpanded: 0
 --- !u!114 &1701216653970133219
 MonoBehaviour:
@@ -2044,6 +2048,7 @@ MonoBehaviour:
   attackBoolName: Attack
   deathBoolName: Death
   runningBoolName: Running
+  ragdollController: {fileID: 0}
   lookAnimator: {fileID: 0}
   lookAtRange: 12
   attackHitbox: {fileID: 5154884761875428213}
@@ -2096,6 +2101,7 @@ MonoBehaviour:
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
+  _ignoreFriendlyFireDamage: 0
   _autoInitialiseOnSpawn: 1
 --- !u!114 &8154835080764322672
 MonoBehaviour:

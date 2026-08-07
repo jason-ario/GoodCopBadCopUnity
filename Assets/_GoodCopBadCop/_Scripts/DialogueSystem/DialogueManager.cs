@@ -470,7 +470,14 @@ public class DialogueManager : NetworkBehaviour
 
         while (!_dialogueInputReceived)
         {
-            if (_waitingSubtitle != null && IsAdvanceInputPressed())
+            // During scripted dialogue, ScriptedDialogueRunner.Update() is the sole owner of
+            // raw input handling (skip-reveal-then-advance) and drives this routine indirectly
+            // via AdvanceDialogueServerRpc -> AdvanceDialogueClientRpc -> _dialogueInputReceived.
+            // Reading input here too caused a same-frame race: a single click that completed the
+            // typewriter reveal could also be read as the "prompt already active" advance input
+            // in this routine before ShowPromptAfterTypewriter's IsPromptActive update settled,
+            // skipping straight to the next line instead of just finishing the reveal.
+            if (!ScriptedDialogueRunner.IsScriptedModeActive && _waitingSubtitle != null && IsAdvanceInputPressed())
             {
                 if (!_waitingSubtitle.IsPromptActive)
                 {

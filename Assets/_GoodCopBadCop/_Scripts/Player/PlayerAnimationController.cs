@@ -338,6 +338,20 @@ public class PlayerAnimationController : NetworkBehaviour
     public void SetActiveForRagdoll(bool active) => _disabledForRagdoll = !active;
 
     /// <summary>
+    /// Freezes/unfreezes the body and arm animators in place by toggling their Unity 'enabled'
+    /// flag. Used for scripted moments (e.g. the Thanks For Playing end screen) where no
+    /// animation — including stray hit reactions — should play while the player is locked.
+    /// </summary>
+    public void SetAnimatorsEnabled(bool enabled)
+    {
+        if (bodyAnimator != null)
+            bodyAnimator.enabled = enabled;
+
+        if (armsAnimator != null)
+            armsAnimator.enabled = enabled;
+    }
+
+    /// <summary>
     /// Feeds all IK rig targets their current-frame world position and rotation.
     /// Must run in Update so Animation Rigging — which evaluates between Update and LateUpdate —
     /// solves the constraint against up-to-date data rather than the previous frame's values.

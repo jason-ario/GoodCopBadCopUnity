@@ -617,24 +617,71 @@ public class UIController : MonoBehaviour
     // ─── Thanks For Playing ───────────────────────────────────────────────────
 
     /// <summary>
+    /// Locks the local player's movement/interaction/look, freezes their animations, and marks
+    /// them invincible so no stray hit/damage animation can play. Idempotent — safe to call
+    /// repeatedly.
+    /// </summary>
+    private void LockPlayerForEndOfDemo()
+    {
+        if (PlayerInstance.Instance == null)
+            return;
+
+        PlayerInstance.Instance.CanControl = false;
+        PlayerInstance.Instance.PlayerInteractionController?.SetCanInteract(false, string.Empty);
+        PlayerInstance.Instance.GetComponent<PlayerMovementController>()?.SetCanLook(false);
+        PlayerInstance.Instance.GetComponent<PlayerAnimationController>()?.SetAnimatorsEnabled(false);
+
+        PlayerHealth playerHealth = PlayerInstance.Instance.GetComponent<PlayerHealth>();
+        if (playerHealth != null)
+            playerHealth.IsInvincible = true;
+
+        PlayerRadiation playerRadiation = PlayerInstance.Instance.GetComponent<PlayerRadiation>();
+        if (playerRadiation != null)
+            playerRadiation.IsInvincible = true;
+    }
+
+    /// <summary>
+    /// Waits <paramref name="delaySeconds"/> — with the player still fully in control — before
+    /// locking them and revealing the Thanks For Playing panel. Used when a mutant breach ends
+    /// the demo, so the moment lands after a beat instead of popping up (and freezing the
+    /// player) the instant the last mutant is resolved.
+    /// </summary>
+    public void ShowThanksForPlayingScreenAfterDelay(float delaySeconds = 5f)
+    {
+        StartCoroutine(ShowThanksForPlayingScreenAfterDelayRoutine(delaySeconds));
+    }
+
+    private IEnumerator ShowThanksForPlayingScreenAfterDelayRoutine(float delaySeconds)
+    {
+        yield return new WaitForSeconds(delaySeconds);
+        ShowThanksForPlayingScreen();
+    }
+
+    /// <summary>
     /// Shows the "Thanks for Playing the Demo" end screen.
-    /// Locks player movement, interaction, and look, and shows the cursor.
-    /// Called by <see cref="ShiftManager"/> after the final day's shift sequence completes.
+    /// Locks player movement, interaction, look, and hurt (invincible), shows the cursor, and
+    /// swaps the audio over to main menu music with the ambience faded out.
+    /// Called by <see cref="ShiftManager"/> after the final day's shift sequence completes, and
+    /// (after a delay) by <see cref="MutantBreachManager"/> when a finale breach ends the demo.
     /// </summary>
     public void ShowThanksForPlayingScreen()
     {
-        if (PlayerInstance.Instance != null)
-        {
-            PlayerInstance.Instance.CanControl = false;
-            PlayerInstance.Instance.PlayerInteractionController?.SetCanInteract(false, string.Empty);
-            PlayerInstance.Instance.GetComponent<PlayerMovementController>()?.SetCanLook(false);
-        }
+        LockPlayerForEndOfDemo();
 
         ShowCursor();
         playerUI.SetActive(false);
 
         if (_thanksForPlayingPanel != null)
             _thanksForPlayingPanel.SetActive(true);
+
+        if (MainMenuController.Instance != null)
+            MainMenuController.Instance.PlayMainMenuMusic();
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.FadeOutAmbientAudio();
+            AudioManager.Instance.SetRainAmbience(false);
+        }
     }
 
     /// <summary>Hides the thanks-for-playing screen.</summary>
