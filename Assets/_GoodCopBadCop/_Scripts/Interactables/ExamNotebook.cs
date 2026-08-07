@@ -922,6 +922,17 @@ public class ExamNotebook : PickableObject
         Debug.Log($"[ExamNotebook] RequestAddToFolderServerRpc: pageIndex={pageIndex} page={serverPage?.name ?? "NULL"} IsSpawned={serverPage?.NetworkObject?.IsSpawned} NetworkObjectId={serverPage?.NetworkObject?.NetworkObjectId}");
         folder.AddDocument(serverPage, playerPickupController, false);
 
+        // Mirrors FolderController.SyncDocumentAddedServerRpc's doc.SetInteractableNetworked(isOpen.Value)
+        // for idCard/application. Without this, exam pages filed via the notebook only ever got a
+        // raw, non-networked SetInteractable(true) call inside NotifyPagePlacedInFolderClientRpc below —
+        // that never touches _networkInteractableOverride, so the page silently stays on stale
+        // holder-based logic forever instead of the same override-driven path idCard/application use,
+        // and never gets picked up by a late-joining client (which only receives the current
+        // NetworkVariable state, not a one-off RPC that already fired). Routing through the networked
+        // override here is what actually makes RefreshDocumentInteractability's later re-enable (once
+        // the folder is set down and open) reach every client reliably, exactly like idCard/application.
+        serverPage.SetInteractableNetworked(folder.IsOpen);
+
         // PlacePageInSlotNetworked (called inside AddDocument) no longer sends PlaceInSlotClientRpc
         // via the page's NetworkObject because that RPC is silently dropped on non-host clients
         // when triggered through a server-side ServerRpc call chain. Broadcast the slot assignment
@@ -1006,9 +1017,29 @@ public class ExamNotebook : PickableObject
         Debug.Log($"[ExamNotebook] NotifyPagePlacedInFolderClientRpc: registering {page.name} → {folder.name}/{slot.name} on client {NetworkManager.Singleton.LocalClientId}");
         page.SetSocketFollow(slot);
 
-        // The page was kept non-interactable while bound to the notebook.
-        // Now that it's placed in the folder it should behave like a normal pickable object.
-        page.SetInteractable(true);
+        // FolderController.AddDocument (server-only) already set insideThisFolder via AddToFolder,
+        // but that call never reaches any client — this RPC is the only broadcast every client
+        // (including the server's own instance is already set, this is idempotent for it too)
+        // receives for exam pages. Without this, insideThisFolder stays null on every client,
+        // which mirrors what SyncDocumentAddedClientRpc already does for idCard/application:
+        // both insideThisFolder and folder.documents must be consistent on every machine, or
+        // SetInteractable's folder-guard and RemovePromFolder's later pickup path evaluate
+        // differently per machine — the root cause of pages being grabbable on some clients
+        // but stuck non-interactable (colliders never re-enabled) on others.
+        if (page is FolderItem folderItem)
+        {
+            folderItem.insideThisFolder = folder;
+            if (!folder.documents.Contains(page))
+                folder.documents.Add(page);
+        }
+
+        // Interactable state is already driven by the server via SetInteractableNetworked in
+        // RequestAddToFolderServerRpc (mirrors FolderController.SyncDocumentAddedServerRpc for
+        // idCard/application) — do NOT also call the local SetInteractable here. That raw call
+        // never touched _networkInteractableOverride, so it silently fought with — and could be
+        // immediately overwritten by, or itself stomp — the networked value depending on RPC vs.
+        // NetworkVariable arrival order, producing exactly the "sometimes grabbable, sometimes
+        // not" inconsistency reported.
 
         AnyPageFiled = true;
         OnAnyNotebookPageFiled?.Invoke();

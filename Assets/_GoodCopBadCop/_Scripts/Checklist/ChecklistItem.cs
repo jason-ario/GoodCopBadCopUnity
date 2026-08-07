@@ -171,9 +171,18 @@ public class ChecklistItem : MonoBehaviour
         OnAnyBoxChecked?.Invoke();
     }
 
-    /// <summary>Applies the authoritative checked state to the checkbox visual. Called by ExamPage.ApplyBitmask.</summary>
+    /// <summary>
+    /// Applies the authoritative checked state to the checkbox visual. Called by ExamPage.ApplyBitmask,
+    /// which re-applies EVERY item's state on the page whenever ANY single item's bitmask changes (since
+    /// the whole page shares one NetworkVariable). Guarded to only touch the checkbox when its state is
+    /// actually changing — otherwise every checkbox click would re-fire CheckVisual() on every other
+    /// already-checked item on the page too, replaying its draw animation, draw sound, and arm-IK
+    /// trigger, and restarting its WaitAndShowCheckmark coroutine, for no reason.
+    /// </summary>
     public void ApplyCheckedState(bool value)
     {
+        if (checkbox.IsChecked == value) return;
+
         if (value)
             checkbox.CheckVisual();
         else

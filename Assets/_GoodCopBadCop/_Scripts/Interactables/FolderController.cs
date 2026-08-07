@@ -1203,6 +1203,20 @@ public class FolderController : PickableObject
         if (doc == null || slotIndex < 0 || slotIndex >= examPageSlots.Length) return;
 
         doc.SetSocketFollow(examPageSlots[slotIndex]);
+
+        // AddDocument's direct-drop path only calls AddToFolder (which sets insideThisFolder)
+        // locally on whichever client physically dropped the page — every other client (and the
+        // server, if the dropper wasn't the host) never learns the association. Same gap as the
+        // notebook path fixed in ExamNotebook.NotifyPagePlacedInFolderClientRpc: without this,
+        // insideThisFolder is inconsistent across machines, so the SetInteractable folder-guard
+        // and RemovePromFolder evaluate differently per client — pages end up grabbable on some
+        // machines but permanently stuck non-interactable on others.
+        if (doc is FolderItem folderItem)
+        {
+            folderItem.insideThisFolder = this;
+            if (!documents.Contains(doc))
+                documents.Add(doc);
+        }
     }
 
     public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)

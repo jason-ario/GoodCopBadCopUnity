@@ -93,6 +93,25 @@ public class ExamPage : FolderItem
     /// </summary>
     private static readonly List<ExamPage> _activePages = new List<ExamPage>();
 
+    /// <summary>
+    /// The single page currently allowed to have its checklist camera open, or null if none.
+    /// Every checklist camera on every page culls by the SAME shared "HiddenUI" layer — a
+    /// page's own camera has no way to distinguish its own checklist items from a sibling's
+    /// except by that sibling's renderers being temporarily disabled (see BeginSnapshot below).
+    /// ExamNotebook.SnapshotAllPages already sequences captures within one notebook, but a page
+    /// already filed into a folder, or a page belonging to a completely different notebook, is
+    /// never part of that sequencing — and both stay "active" (isActiveAndEnabled) indefinitely
+    /// once filed, so they remain forever eligible to start their own capture at any time (e.g.
+    /// a bitmask replication, ExamNotebook.OnDayStarted's daily re-render, or another checkbox
+    /// click elsewhere). If two such unrelated pages' capture windows ever overlapped even
+    /// briefly, each one's camera could bake a few frames of the OTHER's checklist items into
+    /// its own RenderTexture — showing up as random parts of the page, or whole items, going
+    /// blank or wrong for a moment. This gate makes "only one page's checklist camera is ever
+    /// open at a time" a scene-wide invariant instead of a per-notebook one, closing that race
+    /// regardless of which two pages happen to collide.
+    /// </summary>
+    private static ExamPage _currentlyCapturing;
+
     /// <summary>True while this page's checklist camera is actively capturing a snapshot.</summary>
     private bool _isSnapshotting;
 
@@ -125,8 +144,19 @@ public class ExamPage : FolderItem
 
     protected override void Awake()
     {
-        base.Awake();
+        // MUST run before base.Awake(): Interactable.Awake() enables this object's HighlightEffect,
+        // which immediately scans _paperRenderer.sharedMaterials and caches whatever material is
+        // assigned at that moment as the "original" material to restore whenever highlighting turns
+        // off (e.g. Highlight(false) when a player stops hovering/holding this page — which is
+        // exactly what happens right after a page is filed into a folder). If SetupRenderTexture()
+        // ran after base.Awake(), HighlightEffect would cache the paper's plain default material
+        // (no RT bound yet), and every subsequent un-highlight would silently revert the renderer
+        // back to that stale cached material — wiping the checklist RenderTexture overlay and
+        // leaving the page looking blank, even though the RT itself still has the correct content.
+        // Running this first guarantees HighlightEffect only ever sees/caches the per-instance,
+        // RT-bound material, so restoring "the original" always restores the correct one.
         SetupRenderTexture();
+        base.Awake();
     }
 
     /// <summary>
@@ -348,6 +378,8 @@ public class ExamPage : FolderItem
         {
             StopCoroutine(_snapshotCoroutine);
             _snapshotCoroutine = null;
+            if (_currentlyCapturing == this)
+                _currentlyCapturing = null;
             EndSnapshot();
         }
 
@@ -356,11 +388,18 @@ public class ExamPage : FolderItem
 
     private System.Collections.IEnumerator SnapshotRoutine()
     {
+        // Wait for the scene-wide gate — see _currentlyCapturing's doc comment above.
+        while (_currentlyCapturing != null && _currentlyCapturing != this)
+            yield return null;
+
+        _currentlyCapturing = this;
         BeginSnapshot();
         _checklistCamera.gameObject.SetActive(true);
         yield return new WaitForSeconds(_drawAnimationDuration);
         EndSnapshot();
         _snapshotCoroutine = null;
+        if (_currentlyCapturing == this)
+            _currentlyCapturing = null;
     }
 
     /// <summary>
@@ -465,6 +504,8 @@ public class ExamPage : FolderItem
         if (_snapshotCoroutine != null)
         {
             _snapshotCoroutine = null;
+            if (_currentlyCapturing == this)
+                _currentlyCapturing = null;
             EndSnapshot();
         }
     }
