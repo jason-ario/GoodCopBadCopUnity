@@ -42,6 +42,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.InvertYAxisChanged.Subscribe(OnInvertYAxisChanged).AddTo(ref disposables);
             view.CrouchModeChanged.Subscribe(OnCrouchModeChanged).AddTo(ref disposables);
             view.SprintModeChanged.Subscribe(OnSprintModeChanged).AddTo(ref disposables);
+            view.MasterVolumeChanged.Subscribe(OnMasterVolumeChanged).AddTo(ref disposables);
+            view.MusicVolumeChanged.Subscribe(OnMusicVolumeChanged).AddTo(ref disposables);
+            view.SfxVolumeChanged.Subscribe(OnSfxVolumeChanged).AddTo(ref disposables);
+            view.VoiceVolumeChanged.Subscribe(OnVoiceVolumeChanged).AddTo(ref disposables);
             view.VoiceChatEnabledChanged.Subscribe(OnVoiceChatEnabledChanged).AddTo(ref disposables);
             view.VoiceChatMutedChanged.Subscribe(OnVoiceChatMutedChanged).AddTo(ref disposables);
             view.VoiceChatDeafenedChanged.Subscribe(OnVoiceChatDeafenedChanged).AddTo(ref disposables);
@@ -82,6 +86,22 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.SprintMode
                 .Subscribe(sprintMode => view.SetSprintModeValue((int)sprintMode))
+                .AddTo(ref disposables);
+
+            settingsModel.MasterVolume
+                .Subscribe(view.SetMasterVolumeValue)
+                .AddTo(ref disposables);
+
+            settingsModel.MusicVolume
+                .Subscribe(view.SetMusicVolumeValue)
+                .AddTo(ref disposables);
+
+            settingsModel.SfxVolume
+                .Subscribe(view.SetSfxVolumeValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceVolume
+                .Subscribe(view.SetVoiceVolumeValue)
                 .AddTo(ref disposables);
 
             settingsModel.VoiceChatEnabled
@@ -174,6 +194,26 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetSprintMode((EInputActivationMode)value);
+        }
+
+        private void OnMasterVolumeChanged(float value)
+        {
+            settingsService.SetMasterVolume(value);
+        }
+
+        private void OnMusicVolumeChanged(float value)
+        {
+            settingsService.SetMusicVolume(value);
+        }
+
+        private void OnSfxVolumeChanged(float value)
+        {
+            settingsService.SetSfxVolume(value);
+        }
+
+        private void OnVoiceVolumeChanged(float value)
+        {
+            settingsService.SetVoiceVolume(value);
         }
 
         private void OnVoiceChatEnabledChanged(bool isEnabled)

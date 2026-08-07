@@ -44,6 +44,15 @@ public class BlueVeinsAnomaly : PhysicalAnomaly
     private MaterialPropertyBlock _propertyBlock;
     private bool _isActive;
 
+    /// <summary>
+    /// True while this anomaly is active and at least one currently active UV light's cone
+    /// overlaps this character (approximated using the character root's position against each
+    /// light's range/cone-angle, mirroring the shader's per-light math). Used by tutorial gating
+    /// (e.g. Day 2's "reveal the veins" step) to detect when the player has shone the UV
+    /// flashlight on this suspect.
+    /// </summary>
+    public bool IsCurrentlyRevealed { get; private set; }
+
     private void OnEnable()
     {
         if (Application.isPlaying)
@@ -181,6 +190,8 @@ public class BlueVeinsAnomaly : PhysicalAnomaly
         List<UVLight> lights = UVLight.ActiveLights;
         int count = Mathf.Min(lights.Count, MaxLights);
 
+        bool revealed = false;
+
         for (int i = 0; i < count; i++)
         {
             UVLight light = lights[i];
@@ -190,7 +201,18 @@ public class BlueVeinsAnomaly : PhysicalAnomaly
             _positionBuffer[i]  = new Vector4(pos.x, pos.y, pos.z, light.Range);
             _directionBuffer[i] = new Vector4(dir.x, dir.y, dir.z, 0f);
             _paramsBuffer[i]    = new Vector4(Mathf.Cos(light.ConeHalfAngleDeg * Mathf.Deg2Rad), 0f, 0f, 0f);
+
+            Vector3 toSelf = transform.position - pos;
+            float dist = toSelf.magnitude;
+            if (dist <= light.Range)
+            {
+                float angle = Vector3.Angle(dir, toSelf.normalized);
+                if (angle <= light.ConeHalfAngleDeg)
+                    revealed = true;
+            }
         }
+
+        IsCurrentlyRevealed = _isActive && revealed;
 
         // Zero out any unused slots so stale data doesn't bleed through.
         for (int i = count; i < MaxLights; i++)

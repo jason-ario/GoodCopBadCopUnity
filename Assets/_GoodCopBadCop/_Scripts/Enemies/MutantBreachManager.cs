@@ -79,6 +79,12 @@ public class MutantBreachManager : NetworkBehaviour
     [Tooltip("Seconds to fade the breach music out over when the breach ends. Pass -1 to use MusicManager's default.")]
     [SerializeField] private float breachMusicFadeOutDuration = -1f;
 
+    [Tooltip("Every MutantBreachData asset used anywhere in the campaign, in a fixed order that must " +
+             "match on every client build. Required so remote clients can resolve which preset's " +
+             "breachMusicOverride to play from the index sent by TriggerBreachEffectsClientRpc — " +
+             "ScriptableObject references can't be sent directly over an RPC.")]
+    [SerializeField] private MutantBreachData[] allBreachPresets;
+
     [Header("Scheduling")]
     [Tooltip("Minimum seconds after the day's tasks are all complete before a breach can trigger.")]
     [SerializeField] private float minDelayAfterShiftStart = 10f;
@@ -305,7 +311,7 @@ public class MutantBreachManager : NetworkBehaviour
         _hasTriggeredToday = true;
 
         Debug.Log($"[MutantBreachManager] Breach triggered: '{data.breachName}' — {spawnQueue.Count} mutant(s).");
-        TriggerBreachEffectsClientRpc(data.notificationMessage, data.notificationHoldDuration);
+        TriggerBreachEffectsClientRpc(data.notificationMessage, data.notificationHoldDuration, IndexOfBreachPreset(data));
 
         yield return new WaitForSeconds(data.alarmLeadTimeSeconds);
 
@@ -490,8 +496,22 @@ public class MutantBreachManager : NetworkBehaviour
 
     // ── Client FX ────────────────────────────────────────────────────────────
 
+    /// <summary>Seconds to fade out whichever clip is currently playing via MusicManager for the active breach — cached at breach start so EndBreachEffectsClientRpc can match it (an override's fade-out differs from the manager default).</summary>
+    private float _activeBreachMusicFadeOutDuration = -1f;
+
+    /// <summary>
+    /// Looks up <paramref name="data"/>'s index within <see cref="allBreachPresets"/> so it can be
+    /// sent over TriggerBreachEffectsClientRpc — ScriptableObject references aren't RPC-serializable,
+    /// but every client shares the same project assets, so an index into an identically-ordered
+    /// array resolves back to the same asset on each client.
+    /// </summary>
+    private int IndexOfBreachPreset(MutantBreachData data)
+    {
+        return allBreachPresets != null ? Array.IndexOf(allBreachPresets, data) : -1;
+    }
+
     [ClientRpc]
-    private void TriggerBreachEffectsClientRpc(string message, float holdDuration)
+    private void TriggerBreachEffectsClientRpc(string message, float holdDuration, int breachPresetIndex)
     {
         OnBreachStartedAllClients?.Invoke();
 
@@ -507,8 +527,25 @@ public class MutantBreachManager : NetworkBehaviour
             alarmAudioSource.Play();
         }
 
-        if (breachMusic != null && MusicManager.Instance != null)
-            MusicManager.Instance.Play(breachMusic, true, breachMusicFadeInDuration);
+        MutantBreachData preset = (allBreachPresets != null && breachPresetIndex >= 0 && breachPresetIndex < allBreachPresets.Length)
+            ? allBreachPresets[breachPresetIndex]
+            : null;
+
+        AudioClip clipToPlay = breachMusic;
+        float fadeIn = breachMusicFadeInDuration;
+        float fadeOut = breachMusicFadeOutDuration;
+
+        if (preset != null && preset.breachMusicOverride != null)
+        {
+            clipToPlay = preset.breachMusicOverride;
+            fadeIn = preset.breachMusicFadeInDuration;
+            fadeOut = preset.breachMusicFadeOutDuration;
+        }
+
+        _activeBreachMusicFadeOutDuration = fadeOut;
+
+        if (clipToPlay != null && MusicManager.Instance != null)
+            MusicManager.Instance.Play(clipToPlay, true, fadeIn);
 
         if (PlayerTutorialUI.Instance != null)
             PlayerTutorialUI.Instance.Show(message, holdDuration);
@@ -530,7 +567,6 @@ public class MutantBreachManager : NetworkBehaviour
         if (alarmAudioSource != null)
             alarmAudioSource.Stop();
 
-        if (breachMusic != null && MusicManager.Instance != null)
-            MusicManager.Instance.FadeOut(breachMusicFadeOutDuration);
+        MusicManager.Instance?.FadeOut(_activeBreachMusicFadeOutDuration);
     }
 }

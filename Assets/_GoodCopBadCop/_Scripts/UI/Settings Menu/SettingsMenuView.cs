@@ -17,6 +17,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<bool> InvertYAxisChanged { get; }
         Observable<int> CrouchModeChanged { get; }
         Observable<int> SprintModeChanged { get; }
+        Observable<float> MasterVolumeChanged { get; }
+        Observable<float> MusicVolumeChanged { get; }
+        Observable<float> SfxVolumeChanged { get; }
+        Observable<float> VoiceVolumeChanged { get; }
         Observable<bool> VoiceChatEnabledChanged { get; }
         Observable<bool> VoiceChatMutedChanged { get; }
         Observable<bool> VoiceChatDeafenedChanged { get; }
@@ -35,6 +39,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetInvertYAxisValue(bool value);
         void SetCrouchModeValue(int value);
         void SetSprintModeValue(int value);
+        void SetMasterVolumeValue(float value);
+        void SetMusicVolumeValue(float value);
+        void SetSfxVolumeValue(float value);
+        void SetVoiceVolumeValue(float value);
         void SetVoiceChatEnabledValue(bool value);
         void SetVoiceChatMutedValue(bool value);
         void SetVoiceChatDeafenedValue(bool value);
@@ -283,6 +291,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> invertYAxisChanged = new();
         private readonly Subject<int> crouchModeChanged = new();
         private readonly Subject<int> sprintModeChanged = new();
+        private readonly Subject<float> masterVolumeChanged = new();
+        private readonly Subject<float> musicVolumeChanged = new();
+        private readonly Subject<float> sfxVolumeChanged = new();
+        private readonly Subject<float> voiceVolumeChanged = new();
         private readonly Subject<bool> voiceChatEnabledChanged = new();
         private readonly Subject<bool> voiceChatMutedChanged = new();
         private readonly Subject<bool> voiceChatDeafenedChanged = new();
@@ -301,6 +313,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> InvertYAxisChanged => invertYAxisChanged;
         public Observable<int> CrouchModeChanged => crouchModeChanged;
         public Observable<int> SprintModeChanged => sprintModeChanged;
+        public Observable<float> MasterVolumeChanged => masterVolumeChanged;
+        public Observable<float> MusicVolumeChanged => musicVolumeChanged;
+        public Observable<float> SfxVolumeChanged => sfxVolumeChanged;
+        public Observable<float> VoiceVolumeChanged => voiceVolumeChanged;
         public Observable<bool> VoiceChatEnabledChanged => voiceChatEnabledChanged;
         public Observable<bool> VoiceChatMutedChanged => voiceChatMutedChanged;
         public Observable<bool> VoiceChatDeafenedChanged => voiceChatDeafenedChanged;
@@ -412,6 +428,26 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetSprintModeValue(int value)
         {
             SetDropdownValue(sprintModeDropdown, value);
+        }
+
+        public void SetMasterVolumeValue(float value)
+        {
+            // No Master Volume slider exists in this legacy view; value is applied via SettingsApplier directly.
+        }
+
+        public void SetMusicVolumeValue(float value)
+        {
+            // No Music Volume slider exists in this legacy view; value is applied via SettingsApplier directly.
+        }
+
+        public void SetSfxVolumeValue(float value)
+        {
+            // No SFX Volume slider exists in this legacy view; value is applied via SettingsApplier directly.
+        }
+
+        public void SetVoiceVolumeValue(float value)
+        {
+            // No Voice Volume slider exists in this legacy view; value is applied via VoiceChatSettingsAdapter directly.
         }
 
         public void SetVoiceChatEnabledValue(bool value)

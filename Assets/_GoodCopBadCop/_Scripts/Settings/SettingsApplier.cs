@@ -33,6 +33,24 @@ namespace GoodCopBadCop.Settings
             model.FpsLimit
                 .Subscribe(_ => ApplyDisplaySettings())
                 .AddTo(ref disposables);
+
+            model.MasterVolume
+                .Subscribe(value => UnityEngine.AudioListener.volume = value / 100f)
+                .AddTo(ref disposables);
+
+            model.MusicVolume
+                .Subscribe(value => global::MusicManager.Instance?.SetVolumeScale(value / 100f))
+                .AddTo(ref disposables);
+
+            model.SfxVolume
+                .Subscribe(value =>
+                {
+                    if (global::SFXController.Instance != null)
+                    {
+                        global::SFXController.Instance.VolumeScale = value / 100f;
+                    }
+                })
+                .AddTo(ref disposables);
         }
 
         public void Dispose()

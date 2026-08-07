@@ -168,6 +168,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> invertYAxisChanged = new Subject<bool>();
         private readonly Subject<int> crouchModeChanged = new Subject<int>();
         private readonly Subject<int> sprintModeChanged = new Subject<int>();
+        private readonly Subject<float> masterVolumeChanged = new Subject<float>();
+        private readonly Subject<float> musicVolumeChanged = new Subject<float>();
+        private readonly Subject<float> sfxVolumeChanged = new Subject<float>();
+        private readonly Subject<float> voiceVolumeChanged = new Subject<float>();
         private readonly Subject<bool> voiceChatEnabledChanged = new Subject<bool>();
         private readonly Subject<bool> voiceChatMutedChanged = new Subject<bool>();
         private readonly Subject<bool> voiceChatDeafenedChanged = new Subject<bool>();
@@ -186,6 +190,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> InvertYAxisChanged { get { return invertYAxisChanged; } }
         public Observable<int> CrouchModeChanged { get { return crouchModeChanged; } }
         public Observable<int> SprintModeChanged { get { return sprintModeChanged; } }
+        public Observable<float> MasterVolumeChanged { get { return masterVolumeChanged; } }
+        public Observable<float> MusicVolumeChanged { get { return musicVolumeChanged; } }
+        public Observable<float> SfxVolumeChanged { get { return sfxVolumeChanged; } }
+        public Observable<float> VoiceVolumeChanged { get { return voiceVolumeChanged; } }
         public Observable<bool> VoiceChatEnabledChanged { get { return voiceChatEnabledChanged; } }
         public Observable<bool> VoiceChatMutedChanged { get { return voiceChatMutedChanged; } }
         public Observable<bool> VoiceChatDeafenedChanged { get { return voiceChatDeafenedChanged; } }
@@ -501,6 +509,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetInvertYAxisValue(bool value) { Controls[1].Index = value ? 1 : 0; RefreshActiveSetting("invert_y"); }
         public void SetCrouchModeValue(int value) { Controls[2].Index = value; RefreshActiveSetting("crouch_mode"); }
         public void SetSprintModeValue(int value) { Controls[3].Index = value; RefreshActiveSetting("sprint_mode"); }
+        public void SetMasterVolumeValue(float value) { Audio[0].Value = value; RefreshActiveSetting("master_volume"); }
+        public void SetMusicVolumeValue(float value) { Audio[1].Value = value; RefreshActiveSetting("music_volume"); }
+        public void SetSfxVolumeValue(float value) { Audio[2].Value = value; RefreshActiveSetting("sfx_volume"); }
+        public void SetVoiceVolumeValue(float value) { Audio[3].Value = value; RefreshActiveSetting("voice_volume"); }
         public void SetVoiceChatEnabledValue(bool value) { Audio[4].Index = value ? 1 : 0; RefreshActiveSetting("voice_chat_enabled"); }
         public void SetVoiceChatMutedValue(bool value) { Audio[6].Index = value ? 1 : 0; RefreshActiveSetting("microphone_muted"); }
         public void SetVoiceChatDeafenedValue(bool value) { Audio[7].Index = value ? 1 : 0; RefreshActiveSetting("voice_deafened"); }
@@ -679,6 +691,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "voice_input":
                 case "microphone_muted":
                 case "voice_deafened":
+                case "master_volume":
+                case "music_volume":
+                case "sfx_volume":
+                case "voice_volume":
                 case "mouse_sensitivity":
                 case "invert_y":
                 case "crouch_mode":
@@ -992,6 +1008,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "voice_input": voiceChatInputModeChanged.OnNext(setting.Index); break;
                 case "microphone_muted": voiceChatMutedChanged.OnNext(setting.Index == 1); break;
                 case "voice_deafened": voiceChatDeafenedChanged.OnNext(setting.Index == 1); break;
+                case "master_volume": masterVolumeChanged.OnNext(setting.Value); break;
+                case "music_volume": musicVolumeChanged.OnNext(setting.Value); break;
+                case "sfx_volume": sfxVolumeChanged.OnNext(setting.Value); break;
+                case "voice_volume": voiceVolumeChanged.OnNext(setting.Value); break;
                 case "mouse_sensitivity": mouseSensitivityChanged.OnNext(setting.Value); break;
                 case "invert_y": invertYAxisChanged.OnNext(setting.Index == 1); break;
                 case "crouch_mode": crouchModeChanged.OnNext(setting.Index); break;

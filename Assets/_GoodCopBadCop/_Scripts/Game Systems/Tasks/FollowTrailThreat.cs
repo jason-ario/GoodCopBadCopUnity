@@ -170,7 +170,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     public string ThreatDescription => _isDiscovered.Value
         ? "Trail investigated."
-        : (_networkThreatLevel.Value > 0 ? "Grotesque corpse found. Follow the residue." : "No active trail.");
+        : (_networkThreatLevel.Value > 0 ? string.Empty : "No active trail.");
 
     // ── IDailyTask ───────────────────────────────────────────────────────────
 

@@ -12,6 +12,10 @@ namespace GoodCopBadCop.Settings
         void SetInvertYAxis(bool isInverted);
         void SetCrouchMode(EInputActivationMode mode);
         void SetSprintMode(EInputActivationMode mode);
+        void SetMasterVolume(float value);
+        void SetMusicVolume(float value);
+        void SetSfxVolume(float value);
+        void SetVoiceVolume(float value);
         void SetVoiceChatEnabled(bool isEnabled);
         void SetVoiceChatMuted(bool isMuted);
         void SetVoiceChatDeafened(bool isDeafened);
@@ -25,6 +29,8 @@ namespace GoodCopBadCop.Settings
     {
         public const float MinimumMouseSensitivity = 1f;
         public const float MaximumMouseSensitivity = 100f;
+        public const float MinimumVolume = 0f;
+        public const float MaximumVolume = 100f;
 
         private readonly SettingsModel model;
 
@@ -84,6 +90,26 @@ namespace GoodCopBadCop.Settings
         public void SetSprintMode(EInputActivationMode mode)
         {
             model.SprintModeMutable.Value = mode;
+        }
+
+        public void SetMasterVolume(float value)
+        {
+            model.MasterVolumeMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
+        }
+
+        public void SetMusicVolume(float value)
+        {
+            model.MusicVolumeMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
+        }
+
+        public void SetSfxVolume(float value)
+        {
+            model.SfxVolumeMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
+        }
+
+        public void SetVoiceVolume(float value)
+        {
+            model.VoiceVolumeMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
         }
 
         public void SetVoiceChatEnabled(bool isEnabled)

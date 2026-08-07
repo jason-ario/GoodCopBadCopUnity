@@ -57,6 +57,18 @@ public class MutantBreachData : ScriptableObject
              "MutantBreachManager's configured aggro target, regardless of MutantEnemyData.aggroChance.")]
     public bool forceAggro = true;
 
+    [Header("Music Override")]
+    [Tooltip("Optional music track played through MusicManager while THIS breach preset is active, " +
+             "overriding MutantBreachManager's default breach music (e.g. a unique alarm song for a " +
+             "scripted/finale breach). Leave null to fall back to the manager's default breach music.")]
+    public AudioClip breachMusicOverride;
+
+    [Tooltip("Seconds to fade breachMusicOverride in over when the breach starts. Pass -1 to use MusicManager's default fade-in.")]
+    public float breachMusicFadeInDuration = -1f;
+
+    [Tooltip("Seconds to fade breachMusicOverride out over when the breach ends. Pass -1 to use MusicManager's default fade-out.")]
+    public float breachMusicFadeOutDuration = -1f;
+
     [Header("Campaign Finale")]
     [Tooltip("When true, the moment any mutant spawned by this breach begins fleeing instead of " +
              "dying (see MutantEnemy.fleeInsteadOfDie), the campaign is marked complete and the " +

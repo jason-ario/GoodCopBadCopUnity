@@ -54,6 +54,12 @@ public class TutorialObjectiveList : MonoBehaviour
     [Tooltip("Seconds to wait after triggering the hide animation before destroying all items.")]
     [SerializeField] private float hideAnimDuration = 0.8f;
 
+    [Header("Audio")]
+    [Tooltip("Played once via SFXController whenever a new objective row is added to the list.")]
+    [SerializeField] private AudioClip newTaskSound;
+    [Tooltip("Volume multiplier for newTaskSound (before global SFX volume scaling).")]
+    [SerializeField] private float newTaskSoundVolume = 1f;
+
     private bool _isShowing;
     private readonly List<TutorialObjectiveItem> _items = new();
     private Coroutine _clearCoroutine;
@@ -131,6 +137,9 @@ public class TutorialObjectiveList : MonoBehaviour
         Debug.Log($"[TutorialObjectiveList] Objective row created under '{taskListContainer.name}'. " +
                   $"_isShowing={_isShowing}, objectiveListRoot.activeInHierarchy={objectiveListRoot.activeInHierarchy}, " +
                   $"item.gameObject.activeInHierarchy={item.gameObject.activeInHierarchy}");
+
+        SFXController.Instance?.Play(newTaskSound, newTaskSoundVolume);
+
         return item;
     }
 

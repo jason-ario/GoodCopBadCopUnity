@@ -67,4 +67,39 @@ public class Day02NetworkSync : NetworkBehaviour
     {
         Day_02.Instance?.ShowMailSortingTutorialLocal();
     }
+
+    // ── Mutation / UV Light Tutorial Objectives ──────────────────────────────
+
+    /// <summary>
+    /// Adds a tutorial objective row (identified by <paramref name="taskId"/>) to every
+    /// connected client's <see cref="TutorialObjectiveList"/>. Server-only. Used by the Day 2
+    /// UV flashlight / mutation-exam tutorial so both players see the same objective rows.
+    /// </summary>
+    public void AddMutationTutorialObjective(int taskId, string text)
+    {
+        if (!IsServer) return;
+        AddMutationTutorialObjectiveClientRpc(taskId, text);
+    }
+
+    [ClientRpc]
+    private void AddMutationTutorialObjectiveClientRpc(int taskId, string text)
+    {
+        Day_02.Instance?.AddMutationTutorialObjectiveLocal(taskId, text);
+    }
+
+    /// <summary>
+    /// Completes and removes the tutorial objective row (identified by <paramref name="taskId"/>)
+    /// on every connected client. Server-only.
+    /// </summary>
+    public void CompleteMutationTutorialObjective(int taskId)
+    {
+        if (!IsServer) return;
+        CompleteMutationTutorialObjectiveClientRpc(taskId);
+    }
+
+    [ClientRpc]
+    private void CompleteMutationTutorialObjectiveClientRpc(int taskId)
+    {
+        Day_02.Instance?.CompleteMutationTutorialObjectiveLocal(taskId);
+    }
 }

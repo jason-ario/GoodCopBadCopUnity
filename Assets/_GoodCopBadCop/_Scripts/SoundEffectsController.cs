@@ -7,6 +7,12 @@ public class SFXController : MonoBehaviour
     public static SFXController Instance;
 
     private const float DefaultSpatialMaxDistance = 5f;
+    private const string SfxVolumeSettingsKey = "settings.audio.sfxVolume";
+
+    /// <summary>
+    /// Multiplier (0-1) applied to all SFX playback, driven by Settings > Audio > SFX Volume.
+    /// </summary>
+    public float VolumeScale { get; set; } = 1f;
 
     [Header("Audio Source")]
     [SerializeField] private AudioSource sfxSource;
@@ -24,6 +30,7 @@ public class SFXController : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        VolumeScale = PlayerPrefs.GetFloat(SfxVolumeSettingsKey, 80f) / 100f;
     }
 
     // -----------------------------
@@ -35,7 +42,7 @@ public class SFXController : MonoBehaviour
         if (!clip) return;
 
         sfxSource.pitch = pitch;
-        sfxSource.PlayOneShot(clip, volume);
+        sfxSource.PlayOneShot(clip, volume * VolumeScale);
     }
 
     /// <summary>
@@ -118,7 +125,7 @@ public class SFXController : MonoBehaviour
 
         AudioSource source = emitter.GetComponent<AudioSource>();
         source.clip = clip;
-        source.volume = volume;
+        source.volume = volume * VolumeScale;
         source.pitch = pitch;
 
         if (maxDistance > 0f)
@@ -131,7 +138,9 @@ public class SFXController : MonoBehaviour
     
     public void PlayCustomSFX(GameObject customSFXPrefab, AudioClip clip)
     {
-        Instantiate(customSFXPrefab, transform.position, transform.rotation).GetComponent<AudioSource>().PlayOneShot(clip);
+        AudioSource source = Instantiate(customSFXPrefab, transform.position, transform.rotation).GetComponent<AudioSource>();
+        source.volume *= VolumeScale;
+        source.PlayOneShot(clip);
     }
 
     // -----------------------------

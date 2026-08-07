@@ -1,4 +1,5 @@
 using System;
+using Dissonance;
 using GoodCopBadCop.Settings;
 using R3;
 using VContainer.Unity;
@@ -9,14 +10,17 @@ namespace GoodCopBadCop.VoiceChat
     {
         private readonly ISettingsModel settingsModel;
         private readonly IVoiceChatService voiceChatService;
+        private readonly IVoiceChatCommsRuntime commsRuntime;
         private DisposableBag disposables;
 
         public VoiceChatSettingsAdapter(
             ISettingsModel settingsModel,
-            IVoiceChatService voiceChatService)
+            IVoiceChatService voiceChatService,
+            IVoiceChatCommsRuntime commsRuntime)
         {
             this.settingsModel = settingsModel;
             this.voiceChatService = voiceChatService;
+            this.commsRuntime = commsRuntime;
         }
 
         public void Initialize()
@@ -43,6 +47,17 @@ namespace GoodCopBadCop.VoiceChat
 
             settingsModel.VoiceChatMicrophoneName
                 .Subscribe(voiceChatService.SetMicrophoneName)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceVolume
+                .Subscribe(value =>
+                {
+                    DissonanceComms comms = commsRuntime.Comms;
+                    if (comms != null)
+                    {
+                        comms.RemoteVoiceVolume = UnityEngine.Mathf.Clamp01(value / 100f);
+                    }
+                })
                 .AddTo(ref disposables);
         }
 

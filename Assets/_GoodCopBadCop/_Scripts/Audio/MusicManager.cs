@@ -17,6 +17,8 @@ public class MusicManager : MonoBehaviour
 {
     public static MusicManager Instance { get; private set; }
 
+    private const string MusicVolumeSettingsKey = "settings.audio.musicVolume";
+
     [Tooltip("Default duration in seconds for fade-in when calling Play() without an explicit fade.")]
     [SerializeField] private float _defaultFadeInDuration = 1f;
 
@@ -29,6 +31,7 @@ public class MusicManager : MonoBehaviour
     [SerializeField] private float defaultVolume = .5f;
 
     private AudioSource _source;
+    private float _volumeScale = 1f;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -47,6 +50,7 @@ public class MusicManager : MonoBehaviour
         _source.loop        = true;
         _source.playOnAwake = false;
         _source.spatialBlend = 0f; // Always 2-D / non-spatial.
+        _volumeScale = PlayerPrefs.GetFloat(MusicVolumeSettingsKey, 70f) / 100f;
     }
 
     private void OnDestroy()
@@ -55,6 +59,21 @@ public class MusicManager : MonoBehaviour
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets the volume multiplier (0-1) applied on top of <see cref="defaultVolume"/> / fade
+    /// targets, driven by Settings > Audio > Music Volume. Applies immediately if music is
+    /// currently playing (and not mid cross-fade-out).
+    /// </summary>
+    public void SetVolumeScale(float scale01)
+    {
+        _volumeScale = Mathf.Clamp01(scale01);
+
+        if (_source != null && _source.isPlaying && !DOTween.IsTweening(_source))
+        {
+            _source.volume = defaultVolume * _volumeScale;
+        }
+    }
 
     /// <summary>
     /// Plays <paramref name="clip"/> immediately, optionally fading in over
@@ -123,10 +142,10 @@ public class MusicManager : MonoBehaviour
     {
         _source.clip   = clip;
         _source.loop   = loop;
-        _source.volume = fadeIn > 0f ? 0f : defaultVolume;
+        _source.volume = fadeIn > 0f ? 0f : defaultVolume * _volumeScale;
         _source.Play();
 
         if (fadeIn > 0f)
-            _source.DOFade(1f, fadeIn);
+            _source.DOFade(defaultVolume * _volumeScale, fadeIn);
     }
 }

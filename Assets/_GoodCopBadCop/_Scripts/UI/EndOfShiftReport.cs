@@ -328,10 +328,10 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (netEarningsReveal != null)
         {
             yield return netEarningsReveal.RevealText(totalString);
-            netEarningsText.text = totalString + " <sprite=0>";
+            netEarningsText.text = totalString;
         }
         else if (netEarningsText != null)
-            netEarningsText.text = totalString + " <sprite=0>";
+            netEarningsText.text = totalString;
     }
 
     private string FormatValue(int amount, bool isPenalty)

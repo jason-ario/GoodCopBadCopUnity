@@ -16,9 +16,13 @@ using UnityEngine.Events;
 /// Use <see cref="SetAvailableServerRpc"/> from server-only code to broadcast the state change.
 ///
 /// The GameObject must also have a <see cref="NetworkObject"/> component.
+///
+/// Implements <see cref="IHeldItemPassthrough"/> so the purchase popup still opens even while
+/// the player is holding an item (e.g. a package or tool), instead of the held item silently
+/// swallowing the click/E-press.
 /// </summary>
 [RequireComponent(typeof(ShopItem))]
-public class WorldPurchaseActionInteractable : Interactable
+public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthrough
 {
     [Header("Zoom Camera")]
     [Tooltip("Optional CinemachineCamera that blends in to frame this object during purchase. Leave empty to skip.")]

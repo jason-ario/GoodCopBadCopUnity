@@ -64,6 +64,16 @@ public class SuspectController : NetworkBehaviour
     public static int ForceNextSuspectAnomalyCount = -1;
 
     /// <summary>
+    /// When non-null and non-empty, the next suspect to spawn is initialized with exactly these
+    /// anomaly type names (matched against each anomaly component's C# type name, e.g.
+    /// "BlueVeinsAnomaly"), bypassing <see cref="AnomalyUnlockManager"/> entirely. Every other
+    /// anomaly on the prefab is disabled. Takes priority over <see cref="ForceNextSuspectAnomalyCount"/>.
+    /// The flag is consumed and reset to null after use. Set by Day_02 to guarantee the first
+    /// Day 2 suspect exhibits Blue Veins for the UV flashlight tutorial.
+    /// </summary>
+    public static List<string> ForceNextSuspectAnomalyTypes = null;
+
+    /// <summary>
     /// When true, the next suspect to spawn is forced drunk regardless of their drunkChance.
     /// The flag is consumed and reset automatically by DrunkBehaviour.TryActivate().
     /// </summary>
@@ -165,6 +175,10 @@ public class SuspectController : NetworkBehaviour
     [Header("Mutant Intruder")]
     [Tooltip("Position on the player's side of the booth window. The mutant DOTweens here after a successful breakthrough.")]
     [SerializeField] private Transform climbThroughTargetPos;
+    [Tooltip("Alternate booth-window stand position for mutant intruders, set further back from the window than " +
+             "the regular suspect standPos so the mutant doesn't clip into the window while attacking the shutters. " +
+             "Falls back to standPos if unassigned.")]
+    [SerializeField] private Transform mutantBoothPos;
 
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
@@ -327,6 +341,12 @@ public class SuspectController : NetworkBehaviour
         {
             ForceNextSuspectClean = false;
             suspectCharacter.InitializeClean();
+        }
+        else if (ForceNextSuspectAnomalyTypes != null && ForceNextSuspectAnomalyTypes.Count > 0)
+        {
+            List<string> types = ForceNextSuspectAnomalyTypes;
+            ForceNextSuspectAnomalyTypes = null;
+            suspectCharacter.InitializeWithForcedAnomalyTypes(types);
         }
         else if (ForceNextSuspectAnomalyCount >= 0)
         {
@@ -1841,7 +1861,8 @@ public class SuspectController : NetworkBehaviour
         if (climbThroughTargetPos == null)
             Debug.LogWarning("[SuspectController] climbThroughTargetPos is not assigned — mutant breakthrough destination will be Vector3.zero.", this);
 
-        behaviour.BeginLineup(data, standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+        Transform mutantStandPos = mutantBoothPos != null ? mutantBoothPos : standPos;
+        behaviour.BeginLineup(data, mutantStandPos, despawnPos, climbThroughTargetPos, shutterController, this);
         _currentMutant = behaviour;
 
         // Reuse the existing booth-waiting notification so players are alerted.

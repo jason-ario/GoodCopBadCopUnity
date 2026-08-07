@@ -6,6 +6,21 @@ using UnityEngine;
 /// </summary>
 public class Flashlight : PickableObject
 {
+    /// <summary>
+    /// True while any Flashlight instance's replicated light state currently reports UV mode
+    /// active. Updated on every peer (server and clients) whenever any Flashlight's state
+    /// changes, since the underlying NetworkVariable is replicated. Used by tutorial gating
+    /// (e.g. Day 2's "switch to UV mode" step) to detect the initial state without needing to
+    /// wait for a fresh transition.
+    /// </summary>
+    public static bool AnyFlashlightInUVMode { get; private set; }
+
+    /// <summary>
+    /// Fired on every peer (server and clients) whenever any Flashlight's light state
+    /// transitions into UV mode (state 2). Used by tutorial gating.
+    /// </summary>
+    public static event System.Action OnAnyFlashlightSwitchedToUV;
+
     [SerializeField] GameObject flashlightLight;
     [SerializeField] GameObject uvLight;
     [SerializeField] AudioClip flashlightOnClip;
@@ -153,6 +168,16 @@ public class Flashlight : PickableObject
             audioSource.PlayOneShot(flashlightOffClip);
 
         ApplyLightState(current);
+
+        if (current == 2)
+        {
+            AnyFlashlightInUVMode = true;
+            OnAnyFlashlightSwitchedToUV?.Invoke();
+        }
+        else if (previous == 2)
+        {
+            AnyFlashlightInUVMode = false;
+        }
     }
 
     public override void OnStartUse()

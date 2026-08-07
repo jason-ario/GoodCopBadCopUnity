@@ -96,28 +96,6 @@ public class ExamPage : FolderItem
     /// <summary>True while this page's checklist camera is actively capturing a snapshot.</summary>
     private bool _isSnapshotting;
 
-    /// <summary>
-    /// BeginSnapshot never hides a peer that is mid-snapshot (so it doesn't blind that peer's own
-    /// capture), which means two overlapping captures would let one page bleed into another's
-    /// RenderTexture. Only pages belonging to the SAME notebook are ever physically stacked
-    /// closely enough to bleed into each other, so captures are serialized per notebook (keyed
-    /// by <see cref="SnapshotGroupKey"/>) rather than globally — a global lock would make an
-    /// unrelated notebook's in-progress capture (e.g. every active page in the scene refreshing
-    /// at once from AnomalyUnlockManager.OnAnomalyUnlocked) delay or skip this page's
-    /// checkbox-driven capture entirely. See SnapshotChecklist/SnapshotRoutine/ProcessSnapshotQueue.
-    /// </summary>
-    private static readonly Dictionary<object, ExamPage> _currentlySnapshottingByGroup = new Dictionary<object, ExamPage>();
-
-    /// <summary>Pages waiting for their group's slot in <see cref="_currentlySnapshottingByGroup"/> to free up.</summary>
-    private static readonly Dictionary<object, List<ExamPage>> _snapshotQueueByGroup = new Dictionary<object, List<ExamPage>>();
-
-    /// <summary>
-    /// The serialization group this page's captures compete within — the owning notebook, since
-    /// only sibling pages of the same notebook are ever close enough to bleed into each other's
-    /// checklist camera. Falls back to this page itself (a solo group) if it has no notebook yet.
-    /// </summary>
-    private object SnapshotGroupKey => (object)notebook ?? (object)this;
-
     /// <summary>Peers this page's current/most-recent snapshot has requested be hidden.</summary>
     private readonly List<ExamPage> _peersHiddenByThisSnapshot = new List<ExamPage>();
 
@@ -333,46 +311,44 @@ public class ExamPage : FolderItem
         _checklistItems = null;
     }
 
+    /// <summary>
+    /// Fires this page's capture immediately, restarting it if one is already in flight.
+    /// Used for checkbox clicks, where only the one currently-interactable page can ever be
+    /// clicked, so there is no sibling to overlap with. For whole-notebook batches (init,
+    /// pickup) ExamNotebook instead calls this once per page and polls <see cref="IsCapturing"/>
+    /// before moving to the next, so every page's capture is strictly sequenced and none can
+    /// overlap with a sibling's.
+    /// </summary>
     public void SnapshotChecklist()
     {
         if (_checklistCamera == null) return;
+        RestartCapture();
+    }
 
+    /// <summary>
+    /// True while this page's checklist camera has an open capture window. ExamNotebook polls
+    /// this (rather than yielding on the underlying Coroutine handle directly, which would hang
+    /// forever if this page were disabled mid-capture — Unity silently kills the coroutine
+    /// without ever resolving a handle someone else is yielding on) to know when it's safe to
+    /// start the next page's capture in a sequenced batch.
+    /// </summary>
+    public bool IsCapturing => _snapshotCoroutine != null;
+
+    /// <summary>
+    /// StopCoroutine aborts the coroutine immediately — any code after a "yield return"
+    /// (including the restore step that un-hides peers requested by BeginSnapshot) never runs.
+    /// EndSnapshot is called explicitly here so an interrupted capture can never permanently
+    /// strand a peer's checklist renderers in the hidden state. Every page calls this twice
+    /// during initialization (RefreshLockStates, then ApplyBitmask), so this interruption path
+    /// runs routinely, not just on edge cases.
+    /// </summary>
+    private void RestartCapture()
+    {
         if (_snapshotCoroutine != null)
         {
-            // This page already owns its group's capture slot — restart its own in-flight
-            // capture rather than re-queueing behind itself.
-            // StopCoroutine aborts the coroutine immediately — any code after a "yield return"
-            // (including the restore step that un-hides peers requested by BeginSnapshot) never
-            // runs. EndSnapshot is called explicitly here so an interrupted capture can never
-            // permanently strand a peer's checklist renderers in the hidden state. Every page
-            // calls SnapshotChecklist twice during initialization (RefreshLockStates, then
-            // ApplyBitmask), so this interruption path runs routinely, not just on edge cases.
             StopCoroutine(_snapshotCoroutine);
             _snapshotCoroutine = null;
             EndSnapshot();
-            _snapshotCoroutine = StartCoroutine(SnapshotRoutine());
-            return;
-        }
-
-        // Only one page per notebook (see SnapshotGroupKey) may have an open capture window at
-        // a time. If a sibling page is currently capturing, queue behind it instead of starting
-        // now — otherwise this page's camera would capture while that sibling's checklist items
-        // are still visible (BeginSnapshot never hides a mid-snapshot peer), bleeding that
-        // sibling's content into this page's RenderTexture. Whole-notebook init/pickup calls
-        // SnapshotChecklist on every page back-to-back in the same frame, so this race was
-        // routine, not an edge case.
-        object group = SnapshotGroupKey;
-        if (_currentlySnapshottingByGroup.TryGetValue(group, out ExamPage owner) && owner != null && owner != this)
-        {
-            if (!_snapshotQueueByGroup.TryGetValue(group, out List<ExamPage> queue))
-            {
-                queue = new List<ExamPage>();
-                _snapshotQueueByGroup[group] = queue;
-            }
-
-            if (!queue.Contains(this))
-                queue.Add(this);
-            return;
         }
 
         _snapshotCoroutine = StartCoroutine(SnapshotRoutine());
@@ -380,48 +356,11 @@ public class ExamPage : FolderItem
 
     private System.Collections.IEnumerator SnapshotRoutine()
     {
-        _currentlySnapshottingByGroup[SnapshotGroupKey] = this;
         BeginSnapshot();
         _checklistCamera.gameObject.SetActive(true);
         yield return new WaitForSeconds(_drawAnimationDuration);
         EndSnapshot();
         _snapshotCoroutine = null;
-        ReleaseSnapshotSlot();
-    }
-
-    /// <summary>
-    /// Frees this page's group's capture slot if it currently holds it, then starts the next
-    /// queued page's capture in that same group (if any). Called whenever this page's capture
-    /// ends, whether by finishing normally or being interrupted (OnDisable, or a restart in
-    /// SnapshotChecklist).
-    /// </summary>
-    private void ReleaseSnapshotSlot()
-    {
-        object group = SnapshotGroupKey;
-        if (_currentlySnapshottingByGroup.TryGetValue(group, out ExamPage owner) && owner == this)
-            _currentlySnapshottingByGroup.Remove(group);
-
-        ProcessSnapshotQueue(group);
-    }
-
-    /// <summary>Starts the next queued page's capture for this group, if the slot is free and anything is queued.</summary>
-    private static void ProcessSnapshotQueue(object group)
-    {
-        if (_currentlySnapshottingByGroup.ContainsKey(group)) return;
-        if (!_snapshotQueueByGroup.TryGetValue(group, out List<ExamPage> queue)) return;
-
-        while (queue.Count > 0)
-        {
-            ExamPage next = queue[0];
-            queue.RemoveAt(0);
-
-            // Skip pages that were disabled/destroyed while queued (e.g. ripped out, or the
-            // notebook was despawned) — nothing to capture, and starting it would throw.
-            if (next == null || !next.isActiveAndEnabled) continue;
-
-            next.SnapshotChecklist();
-            return;
-        }
     }
 
     /// <summary>
@@ -520,11 +459,6 @@ public class ExamPage : FolderItem
         AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
         _activePages.Remove(this);
 
-        // Never leave this page stranded in its group's queue — it can't capture while disabled.
-        object group = SnapshotGroupKey;
-        if (_snapshotQueueByGroup.TryGetValue(group, out List<ExamPage> queue))
-            queue.Remove(this);
-
         // If this page was mid-snapshot when disabled, release any peers it was hiding so they
         // don't get stranded. If other pages currently have THIS page hidden, leave that alone —
         // their own EndSnapshot will release it, and this page is inactive/invisible anyway.
@@ -532,13 +466,6 @@ public class ExamPage : FolderItem
         {
             _snapshotCoroutine = null;
             EndSnapshot();
-            ReleaseSnapshotSlot();
-        }
-        else if (_currentlySnapshottingByGroup.TryGetValue(group, out ExamPage owner) && owner == this)
-        {
-            // Defensive: should not normally happen (coroutine null implies the slot was already
-            // released), but guarantees the group's gate is never left pointing at a disabled page.
-            ReleaseSnapshotSlot();
         }
     }
 

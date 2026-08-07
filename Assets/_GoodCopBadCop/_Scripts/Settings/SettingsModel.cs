@@ -44,6 +44,10 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<bool> InvertYAxis { get; }
         ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode { get; }
         ReadOnlyReactiveProperty<EInputActivationMode> SprintMode { get; }
+        ReadOnlyReactiveProperty<float> MasterVolume { get; }
+        ReadOnlyReactiveProperty<float> MusicVolume { get; }
+        ReadOnlyReactiveProperty<float> SfxVolume { get; }
+        ReadOnlyReactiveProperty<float> VoiceVolume { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatEnabled { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatMuted { get; }
         ReadOnlyReactiveProperty<bool> VoiceChatDeafened { get; }
@@ -78,6 +82,18 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<EInputActivationMode> SprintModeMutable =
             new("settings.controls.sprintMode", EInputActivationMode.Hold);
 
+        public readonly PersistentReactiveProperty<float> MasterVolumeMutable =
+            new("settings.audio.masterVolume", 80f);
+
+        public readonly PersistentReactiveProperty<float> MusicVolumeMutable =
+            new("settings.audio.musicVolume", 70f);
+
+        public readonly PersistentReactiveProperty<float> SfxVolumeMutable =
+            new("settings.audio.sfxVolume", 80f);
+
+        public readonly PersistentReactiveProperty<float> VoiceVolumeMutable =
+            new("settings.audio.voiceVolume", 80f);
+
         public readonly PersistentReactiveProperty<bool> VoiceChatEnabledMutable =
             new("settings.voiceChat.enabled", true);
 
@@ -104,6 +120,10 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<bool> InvertYAxis => InvertYAxisMutable;
         public ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode => CrouchModeMutable;
         public ReadOnlyReactiveProperty<EInputActivationMode> SprintMode => SprintModeMutable;
+        public ReadOnlyReactiveProperty<float> MasterVolume => MasterVolumeMutable;
+        public ReadOnlyReactiveProperty<float> MusicVolume => MusicVolumeMutable;
+        public ReadOnlyReactiveProperty<float> SfxVolume => SfxVolumeMutable;
+        public ReadOnlyReactiveProperty<float> VoiceVolume => VoiceVolumeMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatEnabled => VoiceChatEnabledMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatMuted => VoiceChatMutedMutable;
         public ReadOnlyReactiveProperty<bool> VoiceChatDeafened => VoiceChatDeafenedMutable;
@@ -121,6 +141,10 @@ namespace GoodCopBadCop.Settings
             InvertYAxisMutable.Flush();
             CrouchModeMutable.Flush();
             SprintModeMutable.Flush();
+            MasterVolumeMutable.Flush();
+            MusicVolumeMutable.Flush();
+            SfxVolumeMutable.Flush();
+            VoiceVolumeMutable.Flush();
             VoiceChatEnabledMutable.Flush();
             VoiceChatMutedMutable.Flush();
             VoiceChatDeafenedMutable.Flush();
@@ -139,6 +163,10 @@ namespace GoodCopBadCop.Settings
             InvertYAxisMutable.Dispose();
             CrouchModeMutable.Dispose();
             SprintModeMutable.Dispose();
+            MasterVolumeMutable.Dispose();
+            MusicVolumeMutable.Dispose();
+            SfxVolumeMutable.Dispose();
+            VoiceVolumeMutable.Dispose();
             VoiceChatEnabledMutable.Dispose();
             VoiceChatMutedMutable.Dispose();
             VoiceChatDeafenedMutable.Dispose();

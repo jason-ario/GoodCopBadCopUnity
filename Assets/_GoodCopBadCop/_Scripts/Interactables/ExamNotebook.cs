@@ -260,15 +260,51 @@ public class ExamNotebook : PickableObject
         SnapshotAllPages();
     }
 
-    /// <summary>Triggers a fresh RT snapshot on every page that is still bound to this notebook.</summary>
+    /// <summary>Coroutine handle for <see cref="SnapshotAllPagesRoutine"/>, so a re-entrant call restarts cleanly.</summary>
+    private Coroutine _snapshotAllPagesCoroutine;
+
+    /// <summary>
+    /// Triggers a fresh RT snapshot on every page that is still bound to this notebook — one
+    /// page at a time, strictly sequenced. This notebook's pages share a single culling layer
+    /// and are physically stacked at the same socket, so a page's checklist camera can only ever
+    /// tell its own checklist items apart from a sibling's by that sibling being hidden while
+    /// captured (see ExamPage.BeginSnapshot) — which only works if captures never overlap.
+    /// Firing every page's capture in the same frame (the old behavior) let overlapping capture
+    /// windows bleed one page's content into another's, or into a page camera that hadn't
+    /// rendered yet, leaving it blank. Restarts if called again mid-sequence (e.g. picked up
+    /// again before the previous pass finished) rather than running two passes concurrently.
+    /// </summary>
     private void SnapshotAllPages()
     {
         if (pages == null) return;
-        foreach (var page in pages)
+
+        if (_snapshotAllPagesCoroutine != null)
+            StopCoroutine(_snapshotAllPagesCoroutine);
+
+        _snapshotAllPagesCoroutine = StartCoroutine(SnapshotAllPagesRoutine());
+    }
+
+    private IEnumerator SnapshotAllPagesRoutine()
+    {
+        if (pages != null)
         {
-            if (page != null && !page.isRippedOut)
+            foreach (var page in pages)
+            {
+                if (page == null || page.isRippedOut || !page.isActiveAndEnabled) continue;
+
                 page.SnapshotChecklist();
+
+                // Poll rather than yielding on the page's own Coroutine handle: if the page gets
+                // disabled mid-capture (ripped out, or hidden again), Unity silently kills that
+                // coroutine without ever resolving a handle someone else is yielding on — which
+                // would leave this sequence stuck waiting forever. isActiveAndEnabled naturally
+                // breaks the wait the instant that happens instead.
+                while (page != null && page.isActiveAndEnabled && page.IsCapturing)
+                    yield return null;
+            }
         }
+
+        _snapshotAllPagesCoroutine = null;
     }
 
     /// <summary>
@@ -445,6 +481,16 @@ public class ExamNotebook : PickableObject
 
         ApplyCurrentPage(_currentPage.Value);
         _currentPage.OnValueChanged += (_, newValue) => ApplyCurrentPage(newValue);
+
+        // The loop above already fired an immediate (possibly overlapping) capture per page via
+        // RefreshLockStates/ApplyBitmask. Follow up with one guaranteed-correct, strictly
+        // sequenced pass so every page's initial render is right regardless of what happened
+        // during that noisy synchronous setup — see SnapshotAllPages. Skipped for supply-box
+        // delivery: SetPagesActive(false) runs immediately after this method returns, so pages
+        // aren't visible yet anyway — OnPickedUpAllClients/OnPickedUp trigger the real pass once
+        // they're actually activated.
+        if (!IsInSupplyBox())
+            SnapshotAllPages();
     }
 
     /// <summary>

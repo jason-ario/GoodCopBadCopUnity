@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
@@ -83,6 +85,41 @@ public class Day_02 : DayBase, IDailyTask
 
     // Persistent flags for early-action guards (mirrors Day_01 pattern).
     private bool _notebookPageFiled;
+
+    // -------------------------------------------------------------------------
+    // UV Light / Mutation Tutorial — objective task list
+    // -------------------------------------------------------------------------
+
+    private const int TaskUVSwitchToUV  = 1;
+    private const int TaskUVRevealVeins = 2;
+    private const int TaskUVMarkExam    = 3;
+
+    private readonly Dictionary<int, TutorialObjectiveItem> _mutationTutorialObjectives = new();
+
+    /// <summary>
+    /// Runs locally on every client via <see cref="Day02NetworkSync.AddMutationTutorialObjectiveClientRpc"/>.
+    /// Adds the given tutorial objective row and remembers it by <paramref name="taskId"/> so it
+    /// can be completed later regardless of which peer's coroutine is driving the sequence.
+    /// </summary>
+    public void AddMutationTutorialObjectiveLocal(int taskId, string text)
+    {
+        TutorialObjectiveItem item = TutorialObjectiveList.Instance?.AddObjective(text);
+        if (item != null)
+            _mutationTutorialObjectives[taskId] = item;
+    }
+
+    /// <summary>
+    /// Runs locally on every client via <see cref="Day02NetworkSync.CompleteMutationTutorialObjectiveClientRpc"/>.
+    /// Completes and removes the objective row previously added for <paramref name="taskId"/>.
+    /// </summary>
+    public void CompleteMutationTutorialObjectiveLocal(int taskId)
+    {
+        if (_mutationTutorialObjectives.TryGetValue(taskId, out TutorialObjectiveItem item))
+        {
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(item, preHideDelay: 0.5f);
+            _mutationTutorialObjectives.Remove(taskId);
+        }
+    }
 
     [Header("Day 2 — Kill Stamp")]
     [Tooltip("The red (kill) ink stamp station — unlocked for interaction starting Day 2, same as the green and yellow stamps. Killing is no longer tutorialized; the player can use it whenever they judge a suspect warrants it.")]
@@ -342,9 +379,10 @@ public class Day_02 : DayBase, IDailyTask
         // judge a suspect warrants it.
         _redStampSlot?.SetSlotInteractable(true);
 
-        // Ensure the first booth suspect has at least one mutation anomaly for the tutorial.
+        // Ensure the first booth suspect has Blue Veins specifically, so the UV flashlight
+        // tutorial always has a subject to demonstrate on.
         if (NetworkManager.Singleton.IsServer)
-            SuspectController.ForceNextSuspectAnomalyCount = 1;
+            SuspectController.ForceNextSuspectAnomalyTypes = new List<string> { "BlueVeinsAnomaly" };
 
         // ── Opening Sequence Setup ──────────────────────────────────────────────
 
@@ -923,9 +961,13 @@ public class Day_02 : DayBase, IDailyTask
     {
         yield return new WaitForSeconds(4f);
 
-        yield return ShowAndWait("Mutations are catalogued separately. Use the Mutation Exam notebook to record them.");
+        yield return ShowAndWait("Some mutations are pretty obvious. Tentacles, lesions, stuff like that.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Pick up the Mutation Exam notebook and mark every mutation you find on this subject.");
+        yield return ShowAndWait("Some are more... subtle. For example the veins.");
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("If you switch the Flashlight to UV mode, you can see their veins can get all dilated. Give it a try.");
+
+        yield return UVLightRevealTutorialBeat();
 
         _mutationNotebook?.SetVisible(true);
         _mutationNotebook?.SetInteractableNetworked(true);
@@ -938,6 +980,47 @@ public class Day_02 : DayBase, IDailyTask
             ShowMutationNotebookMarker(false);
 
         yield return MutationCheckBeat();
+    }
+
+    // -------------------------------------------------------------------------
+    // UV light reveal beat — teaches switching the flashlight to UV mode and
+    // shining it on the suspect to reveal the Blue Veins anomaly.
+    // -------------------------------------------------------------------------
+
+    private IEnumerator UVLightRevealTutorialBeat()
+    {
+        // Task 1 — switch the flashlight to UV mode.
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVSwitchToUV, "Switch the Flashlight to UV mode");
+
+        bool switchedToUV = Flashlight.AnyFlashlightInUVMode;
+        Action onUVEntered = () => switchedToUV = true;
+        Flashlight.OnAnyFlashlightSwitchedToUV += onUVEntered;
+
+        yield return new WaitUntil(() => switchedToUV);
+
+        Flashlight.OnAnyFlashlightSwitchedToUV -= onUVEntered;
+        Day02NetworkSync.Instance?.CompleteMutationTutorialObjective(TaskUVSwitchToUV);
+
+        // Task 2 — shine the UV light on the subject until their veins are revealed.
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVRevealVeins, "Shine the UV light on the subject to reveal their veins");
+
+        BlueVeinsAnomaly veinsAnomaly = null;
+        yield return new WaitUntil(() => (veinsAnomaly = FindActiveBlueVeinsAnomaly()) != null);
+        yield return new WaitUntil(() => veinsAnomaly.IsCurrentlyRevealed);
+
+        Day02NetworkSync.Instance?.CompleteMutationTutorialObjective(TaskUVRevealVeins);
+    }
+
+    /// <summary>
+    /// Finds the currently active <see cref="BlueVeinsAnomaly"/> on the suspect standing in the
+    /// booth, if any. Used to gate the UV light reveal tutorial step.
+    /// </summary>
+    private BlueVeinsAnomaly FindActiveBlueVeinsAnomaly()
+    {
+        SuspectCharacter suspect = SuspectController.Instance?.CurrentSuspect;
+        if (suspect == null || suspect.AnomalyController == null) return null;
+
+        return suspect.AnomalyController.activeAnomalies.OfType<BlueVeinsAnomaly>().FirstOrDefault();
     }
 
     // -------------------------------------------------------------------------
@@ -954,12 +1037,17 @@ public class Day_02 : DayBase, IDailyTask
 
         yield return ShowAndWait("Tick the boxes for every mutation you can identify.");
 
+        // Task 3 — mark the revealed veins on the physical exam notebook.
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVMarkExam, "Mark the veins on the Physical Exam");
+
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;
 
         yield return new WaitUntil(() => anyBoxChecked);
 
         ExamNotebook.OnAnyCheckboxChecked -= onChecked;
+
+        Day02NetworkSync.Instance?.CompleteMutationTutorialObjective(TaskUVMarkExam);
 
         yield return MutationFileIntoBeat();
     }
@@ -984,9 +1072,11 @@ public class Day_02 : DayBase, IDailyTask
         ExamNotebook.OnAnyNotebookPageFiled -= OnNotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Mutations are catalogued separately from documentation anomalies. Each notebook type covers a different threat profile.");
+        yield return ShowAndWait("Some symptoms are more severe than others. Physical mutations count 2 points on the Disposition Chart.");
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Proceed with the remaining subjects. Stay vigilant.");
+        yield return ShowAndWait("The total points a subject has determines how far gone they are. And that determines your decision.");
+        yield return new WaitForSeconds(1f);
+        yield return ShowAndWait("I'll leave it to you to figure it out. Good luck.");
     }
 
     private void OnNotebookPageFiled()

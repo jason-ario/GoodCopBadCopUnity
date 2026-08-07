@@ -199,9 +199,13 @@ public abstract class DayBase : MonoBehaviour
     }
 
     /// <summary>
-    /// Shows the "Process N subjects" counter task and starts tracking hand-offs via
-    /// <see cref="FolderController.OnFolderHandedOff"/>. Safe to call multiple times — a no-op
-    /// if the task is already showing or the quota has already been met.
+    /// Shows the "Process N subjects" counter task and starts tracking resolutions via
+    /// <see cref="ShiftManager.OnSuspectProcessed"/> — which fires for every way a suspect can
+    /// be resolved (folder hand-off/pass, kill, or quarantine), not just folder hand-offs. This
+    /// keeps the counter in sync with the actual populated lineup size even when some slots are
+    /// resolved by combat (e.g. mutant intruders, doppelgangers) rather than a folder hand-off.
+    /// Safe to call multiple times — a no-op if the task is already showing or the quota has
+    /// already been met.
     /// </summary>
     protected void ShowAutomaticSubjectCounterTask()
     {
@@ -214,7 +218,7 @@ public abstract class DayBase : MonoBehaviour
         if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess) return;
 
         _autoSubjectCounterTask = TutorialObjectiveList.Instance?.AddObjective(GetAutomaticSubjectCounterText());
-        FolderController.OnFolderHandedOff += OnAutomaticSubjectCounterProcessed;
+        ShiftManager.OnSuspectProcessed += OnAutomaticSubjectCounterProcessed;
     }
 
     private void OnAutomaticSubjectCounterProcessed()
@@ -232,7 +236,7 @@ public abstract class DayBase : MonoBehaviour
     /// </summary>
     protected void HideAutomaticSubjectCounterTask()
     {
-        FolderController.OnFolderHandedOff -= OnAutomaticSubjectCounterProcessed;
+        ShiftManager.OnSuspectProcessed -= OnAutomaticSubjectCounterProcessed;
 
         if (_autoSubjectCounterTask != null)
         {
