@@ -91,11 +91,31 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         base.OnNetworkSpawn();
         _isDown.OnValueChanged += OnSwitchStateChanged;
         SnapHandleToState(_isDown.Value);
+
+        if (_fuseBoxController != null)
+        {
+            _fuseBoxController.OnFuseCountChanged += OnFuseCountChanged;
+            // Late-join / already-ready catch-up.
+            SetForceHighlight(_fuseBoxController.IsReady && !_isDown.Value);
+        }
     }
 
     public override void OnNetworkDespawn()
     {
         _isDown.OnValueChanged -= OnSwitchStateChanged;
+
+        if (_fuseBoxController != null)
+            _fuseBoxController.OnFuseCountChanged -= OnFuseCountChanged;
+    }
+
+    /// <summary>
+    /// Highlights the switch as soon as every fuse slot is filled, prompting the player to
+    /// flip it. Clears again if a fuse is removed before the switch is committed.
+    /// </summary>
+    private void OnFuseCountChanged(int filled, int total)
+    {
+        if (_isDown.Value) return; // Already flipped — nothing to prompt.
+        SetForceHighlight(_fuseBoxController != null && _fuseBoxController.IsReady);
     }
 
     private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
@@ -285,6 +305,9 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         bool newIsDown = _dragT >= 0.5f;
         _dragT = newIsDown ? 1f : 0f;
 
+        if (newIsDown)
+            SetForceHighlight(false);
+
         if (_handle != null)
         {
             _handle.DOLocalRotate(newIsDown ? _downRot : _upRot, _snapDuration)
@@ -366,6 +389,7 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
     {
         // Late-join catch-up.
         SnapHandleToState(newValue);
+        if (newValue) SetForceHighlight(false);
     }
 
     // ── Server utilities ──────────────────────────────────────────────────────
@@ -380,6 +404,7 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         if (!_isDown.Value) return;
         _isDown.Value = false;
         BroadcastSwitchStateClientRpc(false, ulong.MaxValue);
+        SetForceHighlight(_fuseBoxController != null && _fuseBoxController.IsReady);
     }
 
     /// <summary>Enables or disables player interaction. Server-only.</summary>

@@ -20,8 +20,12 @@ using UnityEngine;
 ///   - Assign the three child <see cref="FuseSlot"/> components to <see cref="_fuseSlots"/>.
 ///   - Assign the fuse-box status <see cref="Light"/> to <see cref="_statusLight"/>.
 ///   - Optionally tune <see cref="_readyColor"/> / <see cref="_notReadyColor"/>.
+///
+/// Implements <see cref="IHeldItemPassthrough"/> so the door can still be opened/closed
+/// while the player is holding an item (e.g. a fuse) — otherwise LMB/E would route to
+/// <c>TryItemUse</c> instead of toggling the door.
 /// </summary>
-public class FuseBoxPuzzleController : Interactable
+public class FuseBoxPuzzleController : Interactable, IHeldItemPassthrough
 {
     // ── Door ──────────────────────────────────────────────────────────────────
 
