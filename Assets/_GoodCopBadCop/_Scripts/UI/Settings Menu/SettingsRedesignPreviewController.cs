@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 
+using GoodCopBadCop.Input;
 using GoodCopBadCop.Settings;
 using System.Collections.Generic;
 using TMPro;
@@ -25,7 +26,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly Vector2 RowPosition = new Vector2(-371.25f, FirstRowY);
 
         private enum Tab { Gameplay, Graphics, Audio, Controls }
-        private enum Control { Dropdown, Slider }
+        private enum Control { Dropdown, Slider, Rebind }
 
         private sealed class Setting
         {
@@ -33,6 +34,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public readonly string Key;
             public readonly Control Control;
             public readonly string[] Options;
+            public readonly GameAction RebindAction;
             public int Index;
             public float Value;
             private readonly int defaultIndex;
@@ -57,16 +59,25 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 defaultValue = value;
             }
 
+            public Setting(string label, string key, GameAction rebindAction)
+            {
+                Label = label;
+                Key = key;
+                Control = Control.Rebind;
+                RebindAction = rebindAction;
+            }
+
             public void ResetToDefault()
             {
                 Index = defaultIndex;
                 Value = defaultValue;
+                if (Control == Control.Rebind) RebindableInput.ResetToDefault(RebindAction);
             }
 
             public string DisplayValue =>
-                Control == Control.Slider
-                    ? Value.ToString("0")
-                    : Options[Mathf.Clamp(Index, 0, Options.Length - 1)];
+                Control == Control.Slider ? Value.ToString("0") :
+                Control == Control.Rebind ? RebindableInput.GetDisplayName(RebindAction) :
+                Options[Mathf.Clamp(Index, 0, Options.Length - 1)];
         }
 
         private sealed class Row
@@ -121,10 +132,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Invert Y Axis", "invert_y", "Off", "On"),
             new Setting("Crouch Mode", "crouch_mode", "Hold", "Toggle"),
             new Setting("Sprint Mode", "sprint_mode", "Hold", "Toggle"),
-            new Setting("Move Forward", "move_forward", "W"),
-            new Setting("Move Backward", "move_backward", "S"),
-            new Setting("Jump", "jump", "Space"),
-            new Setting("Interact", "interact", "E")
+            new Setting("Interact", "interact", GameAction.Interact),
+            new Setting("Crouch", "crouch_key", GameAction.Crouch),
+            new Setting("Place Object", "place_object", GameAction.PlaceObject),
+            new Setting("Throw Object", "throw_object", GameAction.ThrowObject),
+            new Setting("Toggle Mask", "toggle_mask", GameAction.ToggleMask),
+            new Setting("Open Emotes", "open_emotes", GameAction.OpenEmotes)
         };
 
         private readonly List<Row> rows = new List<Row>();
@@ -199,6 +212,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private Row openDropdownRow;
         private int openDropdownIndex = -1;
         private Image arrowTemplate;
+        private int _awaitingRebindIndex = -1;
 
         private void Awake()
         {
@@ -217,13 +231,93 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private void Update()
         {
+            if (_awaitingRebindIndex >= 0)
+            {
+                CaptureRebindInput();
+                return;
+            }
+
             UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
             bool closePressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
 
-            if (closePressed || Input.GetKeyDown(KeyCode.Escape))
+            if (closePressed || UnityEngine.Input.GetKeyDown(KeyCode.Escape))
             {
                 RequestClose();
             }
+        }
+
+        private void BeginRebind(int index)
+        {
+            if (index >= activeSettings.Length || activeSettings[index].Control != Control.Rebind) return;
+            CloseDropdown();
+            _awaitingRebindIndex = index;
+            rows[index].Value.text = "Press any key/button…";
+        }
+
+        private void CaptureRebindInput()
+        {
+            if (_awaitingRebindIndex < 0 || _awaitingRebindIndex >= activeSettings.Length)
+            {
+                _awaitingRebindIndex = -1;
+                return;
+            }
+
+            Setting setting = activeSettings[_awaitingRebindIndex];
+
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
+            {
+                CancelRebind();
+                return;
+            }
+
+            if (UnityEngine.Input.GetMouseButtonDown(0)) { CompleteMouseRebind(setting, 0); return; }
+            if (UnityEngine.Input.GetMouseButtonDown(1)) { CompleteMouseRebind(setting, 1); return; }
+            if (UnityEngine.Input.GetMouseButtonDown(2)) { CompleteMouseRebind(setting, 2); return; }
+
+            foreach (KeyCode keyCode in Enum.GetValues(typeof(KeyCode)))
+            {
+                if (keyCode == KeyCode.Escape) continue;
+                if ((int)keyCode >= (int)KeyCode.Mouse0 && (int)keyCode <= (int)KeyCode.Mouse6) continue;
+                if (UnityEngine.Input.GetKeyDown(keyCode))
+                {
+                    CompleteKeyRebind(setting, keyCode);
+                    return;
+                }
+            }
+        }
+
+        private void CompleteKeyRebind(Setting setting, KeyCode keyCode)
+        {
+            if (RebindableInput.HasKeyBinding(setting.RebindAction))
+                RebindableInput.SetKey(setting.RebindAction, keyCode);
+            else if (RebindableInput.HasMouseBinding(setting.RebindAction))
+                return; // this action isn't keyboard-rebindable; ignore key presses.
+
+            FinishRebind();
+        }
+
+        private void CompleteMouseRebind(Setting setting, int button)
+        {
+            if (RebindableInput.HasMouseBinding(setting.RebindAction))
+                RebindableInput.SetMouseButton(setting.RebindAction, button);
+            else if (RebindableInput.HasKeyBinding(setting.RebindAction))
+                return; // this action isn't mouse-rebindable; ignore mouse clicks.
+
+            FinishRebind();
+        }
+
+        private void CancelRebind()
+        {
+            int index = _awaitingRebindIndex;
+            _awaitingRebindIndex = -1;
+            if (index >= 0 && index < rows.Count) BindRow(index);
+        }
+
+        private void FinishRebind()
+        {
+            int index = _awaitingRebindIndex;
+            _awaitingRebindIndex = -1;
+            if (index >= 0 && index < rows.Count) BindRow(index);
         }
 
         private void OnDisable()
@@ -500,9 +594,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             Setting setting = activeSettings[index];
             bool supported = IsSupported(setting);
             bool slider = setting.Control == Control.Slider;
+            bool rebind = setting.Control == Control.Rebind;
 
             row.Label.text = setting.Label;
-            row.Value.text = setting.DisplayValue;
+            row.Value.text = index == _awaitingRebindIndex ? "Press any key/button…" : setting.DisplayValue;
             EnsureRowVisuals(row, slider);
 
             if (row.Button != null)
@@ -514,11 +609,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 {
                     row.Button.onClick.AddListener(() => ToggleDropdown(index));
                 }
+                else if (supported && rebind)
+                {
+                    row.Button.onClick.AddListener(() => BeginRebind(index));
+                }
             }
 
             if (row.Arrow != null)
             {
-                row.Arrow.gameObject.SetActive(!slider);
+                row.Arrow.gameObject.SetActive(setting.Control == Control.Dropdown);
                 row.Arrow.color = new Color(1f, 1f, 1f, supported ? .5f : .18f);
             }
 
@@ -568,6 +667,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static bool IsSupported(Setting setting)
         {
+            if (setting.Control == Control.Rebind) return true;
+
             switch (setting.Key)
             {
                 case "display_mode":

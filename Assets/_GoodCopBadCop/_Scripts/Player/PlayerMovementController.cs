@@ -1,5 +1,6 @@
 using System;
 using DG.Tweening;
+using GoodCopBadCop.Input;
 using GoodCopBadCop.Settings;
 using Unity.Netcode;
 using UnityEngine;
@@ -735,7 +736,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         if (_crouchMode == EInputActivationMode.Toggle)
         {
-            if (Input.GetKeyDown(KeyCode.LeftControl) || gamepadCrouchDown)
+            if (RebindableInput.GetKeyDown(GameAction.Crouch) || gamepadCrouchDown)
             {
                 SetCrouching(!_isCrouching);
             }
@@ -743,7 +744,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             return;
         }
 
-        bool crouchHeld = Input.GetKey(KeyCode.LeftControl) || gamepadCrouchHeld;
+        bool crouchHeld = RebindableInput.GetKeyHeld(GameAction.Crouch) || gamepadCrouchHeld;
         if (crouchHeld && !_isCrouching)
             SetCrouching(true);
         else if (!crouchHeld && _isCrouching)

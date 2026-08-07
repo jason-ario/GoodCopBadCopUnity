@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -47,12 +48,12 @@ public class PlayerInteractionController : NetworkBehaviour
     // wasPressedThisFrame / isPressed / wasReleasedThisFrame digital events we need.
     private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
     private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
-    private bool RmbHeld => Input.GetMouseButton(1)     || (Gamepad.current?.leftTrigger.isPressed              ?? false);
-    private bool RmbUp   => Input.GetMouseButtonUp(1)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
-    private bool MmbDown => Input.GetMouseButtonDown(2) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
-    private bool MmbUp   => Input.GetMouseButtonUp(2)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
+    private bool RmbHeld => RebindableInput.GetMouseButtonHeld(GameAction.PlaceObject) || (Gamepad.current?.leftTrigger.isPressed              ?? false);
+    private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
+    private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
+    private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
     // E key — world interact / alternate interact. buttonWest maps to Xbox X / PlayStation Square.
-    private bool EKeyDown => Input.GetKeyDown(KeyCode.E) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
+    private bool EKeyDown => RebindableInput.GetKeyDown(GameAction.Interact) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
     public bool ReticleActive => reticleActive;

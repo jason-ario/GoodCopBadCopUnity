@@ -1,4 +1,5 @@
 using System.Collections;
+using GoodCopBadCop.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -61,7 +62,7 @@ public class EmoteInputController : MonoBehaviour
 
         // Opening requires a fresh press edge, so re-clicking an emote while the open input is
         // still physically held won't immediately reopen a wheel that was just closed.
-        bool openPressed = Input.GetKeyDown(KeyCode.T) || (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false);
+        bool openPressed = RebindableInput.GetKeyDown(GameAction.OpenEmotes) || (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false);
 
         // Closing is level-based (checked every frame against the *current* held state) rather
         // than edge-based. Open/close is 100% driven by whether the key is currently held — no
@@ -69,7 +70,7 @@ public class EmoteInputController : MonoBehaviour
         // also self-correcting: if a release edge is ever missed or a device (e.g. a
         // virtual/phantom gamepad) misbehaves, the wheel can't get permanently stuck open just
         // because a "key up"/"released" event never fired.
-        bool openHeld = Input.GetKey(KeyCode.T) || (Gamepad.current?.dpad.up.isPressed ?? false);
+        bool openHeld = RebindableInput.GetKeyHeld(GameAction.OpenEmotes) || (Gamepad.current?.dpad.up.isPressed ?? false);
 
         if (!_isEmoting && openPressed)
             OpenWheel();

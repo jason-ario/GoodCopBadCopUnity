@@ -1,3 +1,4 @@
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -78,7 +79,7 @@ public class PlayerEquipmentController : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (!_isMaskEquipped.Value) return;
-        if (Input.GetKeyDown(KeyCode.V))
+        if (RebindableInput.GetKeyDown(GameAction.ToggleMask))
             UnequipMask();
     }
 

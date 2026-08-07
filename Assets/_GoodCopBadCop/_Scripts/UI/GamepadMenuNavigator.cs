@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// Selects the first interactable button in <see cref="_buttons"/> only once the player
@@ -51,7 +52,8 @@ public class GamepadMenuNavigator : MonoBehaviour
         else if (mousePos != _lastMousePosition)
         {
             _lastMousePosition = mousePos;
-            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
+                !IsEditingInputField(EventSystem.current.currentSelectedGameObject))
                 EventSystem.current.SetSelectedGameObject(null);
             return;
         }
@@ -61,6 +63,21 @@ public class GamepadMenuNavigator : MonoBehaviour
 
         if (NavigationInputDetected())
             SelectFirst();
+    }
+
+    /// <summary>True if the given selection is an input field actively being edited (typing),
+    /// which should keep focus even while the mouse moves elsewhere.</summary>
+    private static bool IsEditingInputField(GameObject selected)
+    {
+        if (selected == null) return false;
+
+        TMP_InputField tmpField = selected.GetComponent<TMP_InputField>();
+        if (tmpField != null && tmpField.isFocused) return true;
+
+        InputField uiField = selected.GetComponent<InputField>();
+        if (uiField != null && uiField.isFocused) return true;
+
+        return false;
     }
 
     private bool NavigationInputDetected()

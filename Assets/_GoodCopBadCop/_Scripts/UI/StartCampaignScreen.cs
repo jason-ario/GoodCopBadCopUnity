@@ -32,6 +32,9 @@ public class StartCampaignScreen : MonoBehaviour
     [Header("Ready Up")]
     [SerializeField] private Button readyButton;
     [SerializeField] private TextMeshProUGUI readyButtonLabel;
+    [Tooltip("Checkmark sprite shown when readied up. Used instead of a text glyph since the " +
+        "button font doesn't include a checkmark character.")]
+    [SerializeField] private GameObject readyCheckmarkIcon;
 
     private bool _isMultiplayer;
     private bool _isReady;
@@ -116,7 +119,12 @@ public class StartCampaignScreen : MonoBehaviour
     private void UpdateReadyButtonLabel()
     {
         if (readyButtonLabel != null)
-            readyButtonLabel.text = _isReady ? "READY ✓" : "READY UP";
+            readyButtonLabel.text = _isReady ? "READY" : "READY UP";
+
+        // Checkmark is a sprite rather than a text glyph since the button font
+        // doesn't include a checkmark character.
+        if (readyCheckmarkIcon != null)
+            readyCheckmarkIcon.SetActive(_isReady);
     }
 
     /// <summary>Called by <see cref="PlayerReadyManager"/> when any player's ready state changes.</summary>
