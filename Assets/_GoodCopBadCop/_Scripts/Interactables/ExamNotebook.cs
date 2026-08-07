@@ -1035,11 +1035,19 @@ public class ExamNotebook : PickableObject
 
         // Interactable state is already driven by the server via SetInteractableNetworked in
         // RequestAddToFolderServerRpc (mirrors FolderController.SyncDocumentAddedServerRpc for
-        // idCard/application) — do NOT also call the local SetInteractable here. That raw call
-        // never touched _networkInteractableOverride, so it silently fought with — and could be
-        // immediately overwritten by, or itself stomp — the networked value depending on RPC vs.
-        // NetworkVariable arrival order, producing exactly the "sometimes grabbable, sometimes
-        // not" inconsistency reported.
+        // idCard/application) — do NOT independently compute a new interactable value here,
+        // that raw call never touched _networkInteractableOverride and would silently fight
+        // the networked value depending on RPC vs. NetworkVariable arrival order, producing
+        // exactly the "sometimes grabbable, sometimes not" inconsistency previously reported.
+        // However, SetSocketFollow above unconditionally disables physics colliders via
+        // PickableColliderController.SetHeld(), which runs after (and so can clobber) whatever
+        // the networked override already decided. Re-applying that SAME already-decided value
+        // (rather than computing an independent one) is safe here — see
+        // PickableObject.ApplyNetworkInteractableState.
+        if (page is FolderItem)
+        {
+            page.ApplyNetworkInteractableState();
+        }
 
         AnyPageFiled = true;
         OnAnyNotebookPageFiled?.Invoke();

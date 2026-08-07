@@ -1079,6 +1079,17 @@ public class FolderController : PickableObject
         Transform targetSlot = examPageSlots[slotIndex];
         ExamPage examPage = pickableObject.GetComponent<ExamPage>();
 
+        // Set the local folder association BEFORE any RPC that can trigger
+        // SetInteractableNetworked, mirroring the ID card / Application order in this same
+        // method (see the "ID card" and "Application" branches above, which call
+        // AddToFolder before their sync RPC). ExamPage.SetInteractable only converts this
+        // page's collider into a trigger when insideThisFolder is already non-null — if the
+        // server resolves SetInteractableNetworked before this local field is set, the
+        // ExamPage override's early-out leaves the base class's full collider disable in
+        // place permanently, i.e. the page's collider gets disabled instead of turned into
+        // a trigger.
+        examPage.AddToFolder(this);
+
         if (dropObject)
         {
             // Direct-drop path: called on the local client from InteractWithItem.
@@ -1099,8 +1110,6 @@ public class FolderController : PickableObject
             _queueSlots[slotIndex].Value = itemName;
             PlacePageInSlotNetworked(examPage, targetSlot);
         }
-
-        examPage.AddToFolder(this);
     }
 
     /// <summary>
@@ -1176,6 +1185,14 @@ public class FolderController : PickableObject
         if (!_serverDocuments.Contains(pageRef))
             _serverDocuments.Add(pageRef);
 
+        // Ensure the server's own authoritative instance already knows about the folder
+        // association before flipping the networked interactable state below — otherwise
+        // ExamPage.SetInteractable's insideThisFolder == null early-out (see AddToFolder call
+        // in AddDocument) leaves the server's copy of the page with its collider fully
+        // disabled instead of converted to a trigger.
+        if (examPage.insideThisFolder == null)
+            examPage.insideThisFolder = this;
+
         // Apply the folder's current open state so a page added to a closed folder is
         // immediately non-interactable on all clients, and one added to an open folder
         // remains interactable — matching the SyncDocumentAddedServerRpc behaviour for
@@ -1202,7 +1219,28 @@ public class FolderController : PickableObject
         PickableObject doc = netObj.GetComponent<PickableObject>();
         if (doc == null || slotIndex < 0 || slotIndex >= examPageSlots.Length) return;
 
+        // Set the folder association BEFORE SetSocketFollow so the association is already in
+        // place when we restore interactability afterward (see below).
+        if (doc is FolderItem folderItem)
+        {
+            folderItem.insideThisFolder = this;
+            if (!documents.Contains(doc))
+                documents.Add(doc);
+        }
+
         doc.SetSocketFollow(examPageSlots[slotIndex]);
+
+        // SetSocketFollow above unconditionally disables the document's physics colliders via
+        // PickableColliderController.SetHeld() (appropriate for slot-following generally), but
+        // this ClientRpc always arrives after RegisterExamPageInQueueServerRpc's earlier
+        // SetInteractableNetworked call above, so it wins and leaves the page's collider (and,
+        // for ExamPage, its InteractableCollider raycast marker) disabled regardless of the
+        // folder's actual open state. Re-apply the already-decided networked state here — the
+        // last step in this chain — so it isn't left clobbered by SetHeld().
+        if (doc is FolderItem)
+        {
+            doc.ApplyNetworkInteractableState();
+        }
 
         // AddDocument's direct-drop path only calls AddToFolder (which sets insideThisFolder)
         // locally on whichever client physically dropped the page — every other client (and the
@@ -1211,12 +1249,6 @@ public class FolderController : PickableObject
         // insideThisFolder is inconsistent across machines, so the SetInteractable folder-guard
         // and RemovePromFolder evaluate differently per client — pages end up grabbable on some
         // machines but permanently stuck non-interactable on others.
-        if (doc is FolderItem folderItem)
-        {
-            folderItem.insideThisFolder = this;
-            if (!documents.Contains(doc))
-                documents.Add(doc);
-        }
     }
 
     public void RemoveDocument(PickableObject pickableObject, PlayerPickupController player)
@@ -1283,6 +1315,14 @@ public class FolderController : PickableObject
 
         // Redirect the SocketFollow to the new slot — no list bookkeeping needed.
         doc.SetSocketFollow(examPageSlots[newSlotIndex]);
+
+        // Restore the correct interactable/collider state afterward — see the matching
+        // comment in SnapExamPageToSlotClientRpc for why SetSocketFollow's SetHeld() call
+        // must not be left as the last word on this document's collider state.
+        if (doc is FolderItem)
+        {
+            doc.ApplyNetworkInteractableState();
+        }
     }
 
     public void AddNotebookPaper(string itemName, PlayerPickupController player)

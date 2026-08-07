@@ -6,8 +6,19 @@ public class FolderItem : PickableObject
     public FolderController insideThisFolder;
 
     /// <summary>
+    /// Whether re-enabling should be blocked while the owning folder is currently held by a
+    /// player (in addition to always being blocked while the folder is closed). True for
+    /// ID card / Application (you should not be able to grab those out of a folder someone
+    /// is actively carrying), but overridden to false by <see cref="ExamPage"/>, which must
+    /// stay grabbable/interactable even while the folder is held — that's the normal flow of
+    /// carrying an open folder around while filing/rearranging exam pages in it.
+    /// </summary>
+    protected virtual bool BlockInteractableWhileFolderHeld => true;
+
+    /// <summary>
     /// Prevents the document from becoming interactable while it is inside a folder that
-    /// is either held by any player or currently closed. Documents should only be
+    /// is either held by any player (see <see cref="BlockInteractableWhileFolderHeld"/>) or
+    /// currently closed. Documents should only be
     /// interactable when the folder is open and not held.
     /// Every code path that tries to re-enable a document (e.g. the base-class
     /// OnHoldingClientChanged callback, or the holder-clear that fires when a notebook
@@ -15,8 +26,10 @@ public class FolderItem : PickableObject
     /// </summary>
     public override void SetInteractable(bool value)
     {
-        // Block re-enabling when inside a folder that is held OR closed.
-        if (value && insideThisFolder != null && (insideThisFolder.IsHeld || !insideThisFolder.IsOpen))
+        // Block re-enabling when inside a folder that is closed, or (for subclasses that
+        // opt in via BlockInteractableWhileFolderHeld) currently held.
+        if (value && insideThisFolder != null &&
+            ((BlockInteractableWhileFolderHeld && insideThisFolder.IsHeld) || !insideThisFolder.IsOpen))
             return;
 
         base.SetInteractable(value);

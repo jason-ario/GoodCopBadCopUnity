@@ -724,13 +724,23 @@ public class ExamPage : FolderItem
     }
 
     /// <summary>
-    /// While filed in a folder, keeps the page's physical collider a trigger whenever it is
-    /// enabled (i.e. the folder is open) so the page doesn't collide with the folder body
-    /// itself and can still be lifted back out. When the folder is closed, FolderItem's guard
-    /// keeps this from re-enabling, and the base call below fully disables the collider.
-    /// Only the collider(s) on this root GameObject are affected — the child raycast marker
-    /// collider (<see cref="InteractableCollider"/> on "Plane.002") is already a permanent
-    /// trigger and is untouched here.
+    /// Exam pages must stay grabbable/interactable even while the folder itself is being
+    /// carried — unlike ID card/Application, which intentionally lock while the folder is
+    /// held. Only a closed folder should block interaction (see FolderItem.SetInteractable).
+    /// </summary>
+    protected override bool BlockInteractableWhileFolderHeld => false;
+
+    /// <summary>
+    /// While filed in a folder, the page's physical collider must always stay enabled and
+    /// act as a trigger — regardless of the folder's held/open state or the interactable
+    /// value passed in — so the page never physically collides with the folder body and can
+    /// always be grabbed back out. FolderItem's base guard (called above) now only blocks
+    /// re-enabling while the folder is closed for exam pages (see
+    /// BlockInteractableWhileFolderHeld); when it does block, or when base.SetInteractable(false)
+    /// runs, this override still force-enables the physical collider AND the child
+    /// <see cref="InteractableCollider"/> raycast marker(s) unconditionally, so the page is
+    /// never left fully disabled/unraycastable the way it previously could be. The base call
+    /// above disables both when passed false — this restores them immediately after.
     /// </summary>
     public override void SetInteractable(bool value)
     {
@@ -738,12 +748,18 @@ public class ExamPage : FolderItem
 
         if (insideThisFolder == null) return;
 
-        bool blockedByFolder = value && (insideThisFolder.IsHeld || !insideThisFolder.IsOpen);
-        if (blockedByFolder) return;
-
         foreach (Collider col in GetComponents<Collider>())
         {
-            col.isTrigger = value;
+            col.enabled = true;
+            col.isTrigger = true;
+        }
+
+        foreach (InteractableCollider ic in GetComponentsInChildren<InteractableCollider>(true))
+        {
+            if (ic == null) continue;
+            ic.enabled = true;
+            Collider icCol = ic.GetComponent<Collider>();
+            if (icCol != null) icCol.enabled = true;
         }
     }
 }

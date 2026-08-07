@@ -132,14 +132,17 @@ MonoBehaviour:
   lightDiffusionPower: 32
   lightDiffusionIntensity: 4.42
   lightDiffusionNearDepthAtten: 0
+  lightDiffusionBackScatter: 0.3
+  diffusionFloor: 1
   receiveShadows: 1
   shadowIntensity: 0.5
   shadowCancellation: 0
   shadowMaxDistance: 250
   cookie: 0
-  distantFog: 0
-  distantFogStartDistance: 1000
-  distantFogDistanceDensity: 0.5
+  distantFog: 1
+  distantFogShowInEditMode: 1
+  distantFogStartDistance: 25
+  distantFogDistanceDensity: 0.1
   distantFogMaxHeight: 4000
   distantFogHeightDensity: 0.5
   distantFogColor: {r: 0.358, g: 0.358, b: 0.358, a: 1}
@@ -147,6 +150,7 @@ MonoBehaviour:
   distantFogRenderQueue: 2999
   distantFogBaseAltitude: 0
   distantFogSymmetrical: 0
+  distantFogTransparencySupport: 0
   distantFogNoise: 0
   distantFogNoiseTexture: {fileID: 11700000, guid: 950add8d241c6479bbab1f10e1035d60, type: 2}
   distantFogDistanceNoiseScale: 0.1

@@ -273,7 +273,17 @@ public class PickableObject : Interactable
     private void OnNetworkInteractableOverrideChanged(int previous, int current)
         => ApplyNetworkInteractableState();
 
-    private void ApplyNetworkInteractableState()
+    /// <summary>
+    /// Re-applies whatever interactable state is already authoritatively decided (the
+    /// networked tutorial/folder override if one is active, otherwise plain holder-based
+    /// logic) by calling <see cref="SetInteractable"/> again with that same resolved value.
+    /// Safe to call any time something else (e.g. <see cref="PickableColliderController.SetHeld"/>
+    /// via <see cref="SetSocketFollow"/>) may have subsequently clobbered collider/interactable
+    /// state out from under the already-decided value — this does not introduce a new or
+    /// different decision, so it cannot "fight" the networked state the way calling
+    /// <see cref="SetInteractable"/> with an independently-computed value could.
+    /// </summary>
+    public void ApplyNetworkInteractableState()
     {
         if (_networkInteractableOverride.Value != -1)
         {
@@ -561,6 +571,19 @@ public class PickableObject : Interactable
         {
             Debug.Log($"[PlaceInSlotClientRpc] SocketFollow {name} → slot={slot.name} on client {NetworkManager.Singleton.LocalClientId}");
             SetSocketFollow(slot);
+
+            // SetSocketFollow above unconditionally disables this object's physics colliders
+            // via PickableColliderController.SetHeld() (correct for most slotted items, which
+            // shouldn't physically collide while kinematically following a socket). But for
+            // FolderItems (ID card, Application, exam pages) this runs AFTER — and therefore
+            // wins over — whatever collider/interactable state was already authoritatively
+            // decided, since this ClientRpc always arrives at least one network tick later.
+            // Re-applying the already-decided state (not computing a new one) here is safe and
+            // cannot fight the networked override — see ApplyNetworkInteractableState.
+            if (this is FolderItem)
+            {
+                ApplyNetworkInteractableState();
+            }
         }
         else
         {

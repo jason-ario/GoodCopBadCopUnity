@@ -4758,7 +4758,7 @@ ParticleSystem:
     vectorLabel1_3: W
 --- !u!199 &212170755163452580
 ParticleSystemRenderer:
-  serializedVersion: 6
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -4804,6 +4804,7 @@ ParticleSystemRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_RenderMode: 4
   m_MeshDistribution: 0
   m_SortMode: 1
@@ -4835,7 +4836,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
-  m_MaskInteraction: 0
 --- !u!1 &3218592834760414693
 GameObject:
   m_ObjectHideFlags: 0
@@ -5000,7 +5000,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -5101599427372274831, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_StaticEditorFlags
-      value: 2147483647
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -4760178268328276535, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_ReceiveGI
@@ -5009,6 +5009,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_Name
       value: Tree3-1-Leaves
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1207447071179539930, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_ReceiveGI
@@ -5019,20 +5023,24 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4742473837712756890, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
+      propertyPath: m_LODs.Array.data[0].screenRelativeHeight
+      value: 0.9
+      objectReference: {fileID: 0}
+    - target: {fileID: 4742473837712756890, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_LODs.Array.data[1].screenRelativeHeight
-      value: 0.09906247
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 4742473837712756890, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_LODs.Array.data[2].screenRelativeHeight
-      value: 0.033489797
+      value: 0.02
       objectReference: {fileID: 0}
     - target: {fileID: 5563060761645880630, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_StaticEditorFlags
-      value: 2147483647
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8197692250012972414, guid: 73f533d9c0dd11940934ee9aba00335c, type: 3}
       propertyPath: m_StaticEditorFlags
-      value: 2147483647
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
