@@ -989,6 +989,22 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Immediately force-starts Day 3's post-shift power outage / fuse-box repair task,
+    /// bypassing the "_enablePostShiftPowerOutage" toggle and the last-suspect-processed gate.
+    /// Used by the F12 cheat console's "Trigger Day 3 Power Outage" button.
+    /// </summary>
+    public void TriggerDay3PowerOutage()
+    {
+        if (Day_03.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] TriggerDay3PowerOutage: Day_03.Instance not found — start Day 3 first (see 'Skip to Day 3').");
+            return;
+        }
+
+        Day_03.Instance.DebugTriggerPowerOutage();
+    }
+
+    /// <summary>
     /// Immediately force-triggers a mutant breach via <see cref="MutantBreachManager"/>,
     /// bypassing day gating, the once-per-day limit, and the random scheduling delay.
     /// Used by the F12 cheat console's "Trigger Mutant Breach" button.

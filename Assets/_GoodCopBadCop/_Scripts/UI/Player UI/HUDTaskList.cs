@@ -97,7 +97,7 @@ public class HUDTaskList : MonoBehaviour
     {
         bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
         return hasDescription
-            ? $"{threat.ThreatName} {threat.ThreatDescription}"
+            ? $"{threat.ThreatName}\n{threat.ThreatDescription}"
             : threat.ThreatName;
     }
 }

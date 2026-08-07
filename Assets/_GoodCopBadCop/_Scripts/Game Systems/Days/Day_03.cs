@@ -1,3 +1,5 @@
+using System;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -22,7 +24,7 @@ using UnityEngine;
 /// <see cref="MutantBreachData"/> preset must NOT have <see cref="MutantBreachData.showThanksForPlayingOnClear"/>
 /// set, otherwise the campaign would end here before the player ever reaches Day 4.
 /// </summary>
-public class Day_03 : DayBase
+public class Day_03 : DayBase, IDailyTask
 {
     // -------------------------------------------------------------------------
     // Singleton
@@ -36,6 +38,44 @@ public class Day_03 : DayBase
     {
         if (Instance == this) Instance = null;
         UnsubscribeAll();
+    }
+
+    // -------------------------------------------------------------------------
+    // IDailyTask — registers the post-shift power outage / fuse-box repair as a
+    // clock-out blocker the instant the last suspect for the day is processed
+    // (Dusk), mirroring Day_02's post-shift Vlad sequence. See
+    // OnAllSuspectsProcessed_Day3 for the trigger point.
+    // -------------------------------------------------------------------------
+
+    string IDailyTask.DailyTaskId => "Day3PowerOutageFuseBox";
+
+    /// <inheritdoc/>
+    public event Action OnDailyTaskCompleted;
+
+    /// <summary>
+    /// Starts the post-shift power outage: shows the "Restore Power" guidebook task
+    /// (directing the player to the power plant's fuse box) on every client, then — server-only —
+    /// cuts power via <see cref="ElectricityController.PowerOffFuseRequired"/>, which requires the
+    /// fuse-box puzzle (not the standard circuit box) to restore it. Resolves automatically via
+    /// <see cref="ElectricityController.OnPowerRestoredAllClients"/> once the player fixes the fuse box.
+    /// </summary>
+    void IDailyTask.TriggerDailyTask()
+    {
+        _powerOutageThreat = new RepairPowerThreat();
+        TaskRegistry.Instance?.AddThreat(_powerOutageThreat);
+
+        if (ElectricityController.Instance != null)
+            ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerOutageResolved;
+
+        if (!NetworkManager.Singleton.IsServer) return;
+
+        if (ElectricityController.Instance == null)
+        {
+            Debug.LogError("[Day_03] No ElectricityController.Instance found -- cannot start the post-shift power outage.");
+            return;
+        }
+
+        ElectricityController.Instance.PowerOffFuseRequired();
     }
 
     // -------------------------------------------------------------------------
@@ -59,6 +99,19 @@ public class Day_03 : DayBase
     [SerializeField] private float _bunkerExitStingerVolume = 1f;
 
     private bool _bunkerExitStingerPlayed;
+
+    // -------------------------------------------------------------------------
+    // Inspector — Post-Shift Power Outage (Fuse Box)
+    // -------------------------------------------------------------------------
+
+    [Header("Day 3 — Post-Shift Power Outage (Fuse Box)")]
+    [Tooltip("When true, the instant the last suspect for Day 3 is processed (Dusk), power goes " +
+             "out and the player is directed to the power plant's fuse box to restore it — clock-out " +
+             "stays locked until the fuse box is fixed. Uncheck to skip this entirely.")]
+    [SerializeField] private bool _enablePostShiftPowerOutage = false;
+
+    /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
+    private RepairPowerThreat _powerOutageThreat;
 
     // -------------------------------------------------------------------------
     // Inspector -- Yard Cleanup Objective Text
@@ -118,6 +171,11 @@ public class Day_03 : DayBase
         // CampaignManager's OnDayChanged fires. The daily prohibited-goods roll in
         // SortMailTask.OnDayChanged still runs as normal -- only the delivery is suppressed.
         SortMailTask.SkipDeliveryForDay = 3;
+
+        // Post-shift power outage — armed here (rather than at Dusk) so a re-activation (e.g.
+        // debug skip) always starts with a clean subscription, matching the pattern above.
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
+        ShiftManager.OnLastSuspectProcessed += OnAllSuspectsProcessed_Day3;
     }
 
     public override void DayDeactivated()
@@ -132,9 +190,87 @@ public class Day_03 : DayBase
     public override void NightPhaseStarted() => base.NightPhaseStarted();
     public override void DayCompleted()      => base.DayCompleted();
 
+    /// <summary>
+    /// Debug-only: force-starts the post-shift power outage / fuse-box sequence immediately,
+    /// bypassing <see cref="_enablePostShiftPowerOutage"/> and the "last suspect processed" gate.
+    /// Wired to the F12 cheat console's "Trigger Day 3 Power Outage" button for testing. Server-only.
+    /// </summary>
+    public void DebugTriggerPowerOutage()
+    {
+        if (!NetworkManager.Singleton.IsServer)
+        {
+            Debug.LogWarning("[Day_03] DebugTriggerPowerOutage: server-only -- run this on the host.");
+            return;
+        }
+
+        // Cancel the normal end-of-shift trigger so it doesn't fire a second, duplicate
+        // outage later this same shift if suspects are still being processed.
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
+
+        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        ((IDailyTask)this).TriggerDailyTask();
+
+        Debug.Log("[Day_03] DebugTriggerPowerOutage: power outage / fuse-box task force-started via cheat console.");
+    }
+
     private void UnsubscribeAll()
     {
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
+
+        if (ElectricityController.Instance != null)
+            ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
+    }
+
+    // -------------------------------------------------------------------------
+    // Post-shift power outage / fuse-box repair
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fired by <see cref="ShiftManager.OnLastSuspectProcessed"/> on every client the instant the
+    /// last suspect for the day is processed — before the timecard machine is ever primed for
+    /// clock-out. One-shot per shift; unsubscribes itself immediately. When
+    /// <see cref="_enablePostShiftPowerOutage"/> is disabled this is a no-op and the day proceeds
+    /// straight to clock-out as normal.
+    /// </summary>
+    private void OnAllSuspectsProcessed_Day3()
+    {
+        ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
+
+        if (!_enablePostShiftPowerOutage) return;
+
+        if (NetworkManager.Singleton.IsServer)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+
+        ((IDailyTask)this).TriggerDailyTask();
+    }
+
+    /// <summary>
+    /// Fired on every client via <see cref="ElectricityController.OnPowerRestoredAllClients"/> once
+    /// the fuse box is fixed and power comes back on. Resolves and clears the "Restore Power"
+    /// guidebook task, then — since this fires locally on the server too — notifies
+    /// <see cref="ShiftManager"/> that clock-out can proceed.
+    /// </summary>
+    private void OnPowerOutageResolved()
+    {
+        if (ElectricityController.Instance != null)
+            ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
+
+        if (_powerOutageThreat != null)
+        {
+            _powerOutageThreat.Resolve();
+            TaskRegistry.Instance?.RemoveThreat(_powerOutageThreat);
+            _powerOutageThreat = null;
+        }
+
+        // One-shot bottom-centre alert, reusing the same reveal-and-fade notification style as
+        // the "shipment is waiting at the gate" alert -- loop: false so it shows once and goes
+        // away for good rather than resurfacing. Runs on every client since this method already
+        // fires locally on each one via ElectricityController.OnPowerRestoredAllClients.
+        UIController.Instance?.ShowMailDeliveryNotification("Power Restored", loop: false);
+
+        Debug.Log("[Day_03] Post-shift power outage resolved -- fuse box repaired.");
+        OnDailyTaskCompleted?.Invoke();
     }
 
     // -------------------------------------------------------------------------

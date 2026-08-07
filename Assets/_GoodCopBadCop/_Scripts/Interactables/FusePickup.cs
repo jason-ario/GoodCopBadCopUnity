@@ -23,4 +23,28 @@ public class FusePickup : PickableObject
 
     /// <summary>The color identity of this fuse.</summary>
     public FuseColor FuseColor => _fuseColor;
+
+    /// <summary>
+    /// Force-highlights this fuse the moment it spawns (on every client) so players can spot
+    /// it around the power station, and clears the highlight the instant it is picked up.
+    /// </summary>
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        SetForceHighlight(true);
+        OnPickedUpNetworked += ClearHighlightOnPickedUp;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        OnPickedUpNetworked -= ClearHighlightOnPickedUp;
+        base.OnNetworkDespawn();
+    }
+
+    private void ClearHighlightOnPickedUp()
+    {
+        SetForceHighlight(false);
+        OnPickedUpNetworked -= ClearHighlightOnPickedUp;
+    }
 }

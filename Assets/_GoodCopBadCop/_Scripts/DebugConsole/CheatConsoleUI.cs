@@ -178,6 +178,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Trigger Day 3 Power Outage (Fuse Box)", () =>
+        {
+            DebugConsole.Instance.TriggerDay3PowerOutage();
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Trigger Mutant Breach", () =>
         {
             DebugConsole.Instance.DebugForceMutantBreach();

@@ -96,8 +96,8 @@ public class FuseSlot : Interactable, IHeldItemPassthrough
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
-    /// <summary>Always show the interact hint so the reticle gives feedback in both states.</summary>
-    public override bool ShowInteractHint => true;
+    /// <summary>Fuse slots don't show the reticle's key-icon + action-text hint on hover.</summary>
+    public override bool ShowInteractHint => false;
 
     /// <summary>
     /// Routes to insert or extract depending on slot state and what the player is holding:
