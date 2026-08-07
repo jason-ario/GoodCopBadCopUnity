@@ -28,6 +28,7 @@ public class Day_04 : DayBase
     {
         if (Instance == this) Instance = null;
         TimecardMachine.OnClockInServer -= OnPlayerClockedInServer;
+        MutantBreachManager.OnBreachStartedAllClients -= OnMutantBreachStarted;
     }
 
     // -------------------------------------------------------------------------
@@ -48,6 +49,17 @@ public class Day_04 : DayBase
     [SerializeField] private Color _newVoiceSpeakerColor = new Color(0.6f, 0.85f, 0.75f);
 
     // -------------------------------------------------------------------------
+    // Inspector — Breach Bark
+    // -------------------------------------------------------------------------
+
+    [Header("Day 4 — Breach Bark")]
+    [Tooltip("Creepy one-off line the new voice says over the megaphone the instant Day 4's " +
+             "breach alarm starts, played with the alternate voice so it's audibly distinct from " +
+             "Vlad's usual bark. Leave empty to skip.")]
+    [SerializeField] private string _breachStartBark =
+        "Oh, what's this? A little breach. Hehehehe...";
+
+    // -------------------------------------------------------------------------
     // DayBase Lifecycle
     // -------------------------------------------------------------------------
 
@@ -59,12 +71,18 @@ public class Day_04 : DayBase
         // used by Day_01's tutorial opening sequence, but here it announces the new megaphone
         // voice instead of a tutorial beat.
         TimecardMachine.OnClockInServer += OnPlayerClockedInServer;
+
+        // Fires on ALL clients the instant Day 4's breach alarm starts (see
+        // MutantBreachManager.OnBreachStartedAllClients) — only Day 4 reacts to it, since only
+        // Day_04 is subscribed while Day 4 is active.
+        MutantBreachManager.OnBreachStartedAllClients += OnMutantBreachStarted;
     }
 
     public override void DayDeactivated()
     {
         base.DayDeactivated();
         TimecardMachine.OnClockInServer -= OnPlayerClockedInServer;
+        MutantBreachManager.OnBreachStartedAllClients -= OnMutantBreachStarted;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -112,6 +130,24 @@ public class Day_04 : DayBase
             useAlternateVoice: true);
 
         Debug.Log("[Day_04] New voice megaphone announcement started.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Breach Bark
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="MutantBreachManager.OnBreachStartedAllClients"/> the
+    /// instant Day 4's breach alarm sounds. Plays a short, creepy one-off line over the megaphone
+    /// using the alternate voice — <see cref="MegaphoneDialogueManager.ShowDialogueSynced"/> is
+    /// itself server-gated, so calling it here on every client is safe (only the server's call
+    /// actually broadcasts).
+    /// </summary>
+    private void OnMutantBreachStarted()
+    {
+        if (string.IsNullOrEmpty(_breachStartBark)) return;
+
+        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_breachStartBark, useAlternateVoice: true);
     }
 
     // -------------------------------------------------------------------------

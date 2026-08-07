@@ -72,6 +72,13 @@ public class Day_02 : DayBase, IDailyTask
     [Tooltip("The Mutation Exam notebook — hidden until the tutorial beat.")]
     [SerializeField] private ExamNotebook _mutationNotebook;
 
+    [Header("Day 2 — UV Light / Mutation Tutorial Dialogue")]
+    [Tooltip("Scripted cutscene: 'Some mutations are obvious... veins... switch to UV mode' (3 lines).")]
+    [SerializeField] private ScriptedDialogue _mutationUVIntroDialogue;
+
+    [Tooltip("Scripted cutscene: Disposition Chart explanation — closing lines (3 lines).")]
+    [SerializeField] private ScriptedDialogue _mutationDispositionChartDialogue;
+
     [Header("Other Day Notebooks — Hidden During Day 2")]
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 2.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
@@ -961,11 +968,7 @@ public class Day_02 : DayBase, IDailyTask
     {
         yield return new WaitForSeconds(4f);
 
-        yield return ShowAndWait("Some mutations are pretty obvious. Tentacles, lesions, stuff like that.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Some are more... subtle. For example the veins.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("If you switch the Flashlight to UV mode, you can see their veins can get all dilated. Give it a try.");
+        yield return PlayMutationDialogue(_mutationUVIntroDialogue);
 
         yield return UVLightRevealTutorialBeat();
 
@@ -1072,11 +1075,7 @@ public class Day_02 : DayBase, IDailyTask
         ExamNotebook.OnAnyNotebookPageFiled -= OnNotebookPageFiled;
 
         yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("Some symptoms are more severe than others. Physical mutations count 2 points on the Disposition Chart.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("The total points a subject has determines how far gone they are. And that determines your decision.");
-        yield return new WaitForSeconds(1f);
-        yield return ShowAndWait("I'll leave it to you to figure it out. Good luck.");
+        yield return PlayMutationDialogue(_mutationDispositionChartDialogue);
     }
 
     private void OnNotebookPageFiled()
@@ -1161,6 +1160,29 @@ public class Day_02 : DayBase, IDailyTask
         MegaphoneDialogueManager.Instance.ShowDialogueSynced(line);
         yield return null;
         yield return new WaitUntil(() => !MegaphoneDialogueManager.Instance.IsSpeakingSynced);
+    }
+
+    /// <summary>
+    /// Plays a scripted megaphone dialogue cutscene (click-to-advance subtitles, synced to all
+    /// clients) for the Day 2 UV light / mutation exam tutorial. Runs "unlocked" so the player
+    /// keeps free movement/camera control while reading — matching the previous bark behaviour,
+    /// since these lines often instruct the player to go do something (switch the flashlight,
+    /// interact with the folder, etc.). Safe to call with a null dialogue asset (logs a warning
+    /// and returns immediately).
+    /// </summary>
+    private IEnumerator PlayMutationDialogue(ScriptedDialogue dialogue)
+    {
+        ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
+
+        if (runner == null || dialogue == null)
+        {
+            Debug.LogWarning("[Day_02] Mutation tutorial dialogue asset or ScriptedDialogueRunner missing — skipping cutscene beat.", this);
+            yield break;
+        }
+
+        bool done = false;
+        runner.PlayMegaphoneDialogue(dialogue, () => done = true, unlocked: true);
+        yield return new WaitUntil(() => done);
     }
 
     // =========================================================================

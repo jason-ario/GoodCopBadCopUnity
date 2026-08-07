@@ -339,12 +339,17 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// Use this from tutorial coroutines running on the server so the megaphone
     /// dialogue is synced between host and all clients. Ignored if already speaking.
     /// </summary>
-    public void ShowDialogueSynced(string text)
+    /// <param name="useAlternateVoice">
+    /// When true, audio is played from <see cref="AlternateVoiceClips"/> instead of the default
+    /// <see cref="AudioClips"/> — use for a one-off speaker distinct from the usual megaphone
+    /// voice (e.g. the unfamiliar Day 4+ voice).
+    /// </param>
+    public void ShowDialogueSynced(string text, bool useAlternateVoice = false)
     {
         if (!IsServer) return;
         if (disabled || _isSpeaking || _isSpeakingNetwork.Value) return;
         _isSpeakingNetwork.Value = true;
-        ShowDialogueSyncedClientRpc(text);
+        ShowDialogueSyncedClientRpc(text, useAlternateVoice);
     }
 
     /// <summary>
@@ -493,11 +498,11 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// visual/audio sequence independently in sync with the server's timing.
     /// </summary>
     [ClientRpc]
-    private void ShowDialogueSyncedClientRpc(string text)
+    private void ShowDialogueSyncedClientRpc(string text, bool useAlternateVoice)
     {
         // The server already started its own bark via the NetworkVariable flag write above;
         // do not double-start. The ClientRpc still reaches the server/host machine, so guard.
-        ShowDialogue(text);
+        ShowDialogue(text, useAlternateVoice);
     }
 
     /// <summary>
@@ -505,11 +510,16 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// as character dialogue). Ignored if already speaking.
     /// Audio is routed through DialogueManager for lip-sync and playback management.
     /// </summary>
-    public void ShowDialogue(string text)
+    /// <param name="useAlternateVoice">
+    /// When true, audio is played from <see cref="AlternateVoiceClips"/> instead of the default
+    /// <see cref="AudioClips"/> — use for a one-off speaker distinct from the usual megaphone
+    /// voice (e.g. the unfamiliar Day 4+ voice).
+    /// </param>
+    public void ShowDialogue(string text, bool useAlternateVoice = false)
     {
         if (disabled || _isSpeaking) return;
         DialogueHistoryManager.Log(DialogueHistoryManager.SpeakerType.Megaphone, "Megaphone", text);
-        StartCoroutine(ShowBarkSequence(text));
+        StartCoroutine(ShowBarkSequence(text, useAlternateVoice));
     }
 
     /// <summary>
@@ -553,7 +563,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     // Internal Coroutines
     // ---------------------------------------------------------------------------
 
-    private IEnumerator ShowBarkSequence(string text)
+    private IEnumerator ShowBarkSequence(string text, bool useAlternateVoice = false)
     {
         _isSpeaking = true;
 
@@ -571,7 +581,8 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         // Use the dedicated megaphone slot so that SayDialogueClientRpc (which calls
         // StopDialogueAudio on all clients) cannot cancel this bark mid-speech and
         // leave _isSpeaking stuck true.
-        DialogueManager.Instance.PlayMegaphoneAudio(text, _audioClips, _audioSource, OnSpeakingFinished);
+        AudioClip[] clips = useAlternateVoice ? AlternateVoiceClips : _audioClips;
+        DialogueManager.Instance.PlayMegaphoneAudio(text, clips, _audioSource, OnSpeakingFinished);
     }
 
     private void OnSpeakingFinished()

@@ -39,6 +39,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
            + "Stick left = CCW (unlocks door); stick right = CW.")]
     [SerializeField] private float _controllerRotateSpeed = 120f;
 
+    [Tooltip("Multiplier applied only to the wheel's visual spin rate (not the unlock progress or clamp logic). "
+           + "1 = matches input 1:1; lower values (e.g. 0.5) make the wheel feel heavier/more tactile.")]
+    [SerializeField] private float _visualRotationSpeedMultiplier = 0.5f;
+
     [Tooltip("Tracks occupancy of this door so it can be released when the view closes.")]
     [SerializeField] private DiegeticOccupancy _occupancy;
 
@@ -201,7 +205,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         // Rotate on the wheel's local Z axis. Per convention: negative Z = CCW.
         // Mouse CCW (positive delta) → negative Z change = CCW visual.
         Vector3 euler = _wheelTransform.localEulerAngles;
-        euler.z -= delta;
+        euler.z -= delta * _visualRotationSpeedMultiplier;
         _wheelTransform.localEulerAngles = euler;
 
         // ── Accumulate CCW for unlock ─────────────────────────────────────────

@@ -46,6 +46,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private ShopNotificationManager shopNotificationManager;
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
     [SerializeField] private BoothWaitingNotification mailDeliveryNotification;
+    [SerializeField] private BoothWaitingNotification radiationAlertNotification;
     [SerializeField] private DeathScreenUI deathScreenUI;
     [SerializeField] private GameObject _endDayPopup;
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
@@ -555,6 +556,26 @@ public class UIController : MonoBehaviour
     {
         if (mailDeliveryNotification != null)
             mailDeliveryNotification.Hide();
+    }
+
+    /// <summary>
+    /// Shows the bottom-centre "Radiation high. Take pills to reduce." alert, using the same
+    /// looping reveal-and-fade style as the "shipment is waiting at the gate" notification.
+    /// Call this only on the local client once radiation crosses the high threshold; it keeps
+    /// resurfacing until <see cref="HideRadiationAlert"/> is called (i.e. once radiation drops
+    /// back below the threshold).
+    /// </summary>
+    public void ShowRadiationAlert(string message = "Radiation high. Take pills to reduce.")
+    {
+        if (radiationAlertNotification != null)
+            radiationAlertNotification.Show(message, loop: true);
+    }
+
+    /// <summary>Hides the radiation alert notification.</summary>
+    public void HideRadiationAlert()
+    {
+        if (radiationAlertNotification != null)
+            radiationAlertNotification.Hide();
     }
 
     /// <summary>Shows the death screen after the given delay in seconds.</summary>
