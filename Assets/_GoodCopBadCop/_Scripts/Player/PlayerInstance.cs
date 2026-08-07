@@ -341,6 +341,8 @@ public class PlayerInstance : NetworkBehaviour
         SetCanMove(false);
         DisableReticle();
 
+        DropHeldItemOnDeath();
+
         if (deathCamera != null)
         {
             deathCamera.gameObject.SetActive(true);
@@ -357,6 +359,26 @@ public class PlayerInstance : NetworkBehaviour
             UIController.Instance?.ClosePlayerUI();
             UIController.Instance?.ShowDeathScreen(deathUIDelay);
         }
+    }
+
+    /// <summary>
+    /// Releases whatever item the player is holding when they die, unhooking it from the
+    /// character (parent constraint, holder/ownership state, equip containers — same as a
+    /// normal throw release) and giving it a small physics impulse so it tumbles to the
+    /// ground with its collider/rigidbody active, instead of floating in place attached to
+    /// the corpse. Leaves it fully interactable so other players can pick it up.
+    /// </summary>
+    private void DropHeldItemOnDeath()
+    {
+        if (PlayerPickupController == null || !PlayerPickupController.IsHoldingObject)
+            return;
+
+        PickableObject droppedItem = PlayerPickupController.ReleaseHeldObjectForThrow();
+        if (droppedItem == null)
+            return;
+
+        Vector3 velocity = (Vector3.up * 0.5f) + (transform.forward * 0.5f);
+        droppedItem.ThrowServerRpc(droppedItem.transform.position, velocity);
     }
 
     /// <summary>
