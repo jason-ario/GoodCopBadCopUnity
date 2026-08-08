@@ -33,8 +33,6 @@ public class HandOffPoint : PlacementBoard
 
     public override void OnPlaced(PickableObject pickableObject)
     {
-        base.OnPlaced(pickableObject);
-
         FolderController folderController = pickableObject.GetComponent<FolderController>();
         if (folderController == null) return;
 
@@ -47,7 +45,15 @@ public class HandOffPoint : PlacementBoard
         // up-to-date suspectCharacter reference, so the "is there a suspect at the window" guard
         // is enforced authoritatively in SuspectController.ExecuteVerdict instead.
 
+        // Gate BEFORE firing OnItemPlaced (via base.OnPlaced): tutorial/task listeners
+        // subscribe to PlacementBoard.OnItemPlaced on this board and treat any fire as
+        // "the folder was handed off", advancing the sequence. If an unstamped folder is
+        // placed here, we must not fire that event at all — otherwise placing the folder
+        // early (before stamping) incorrectly triggers the next tutorial step even though
+        // no verdict is ever delivered.
         if (!folderController.IsStamped) return;
+
+        base.OnPlaced(pickableObject);
 
         if (BlockVerdict)
         {

@@ -240,12 +240,32 @@ public class ExamNotebook : PickableObject
         // picks up this notebook (critical for notebooks delivered inside supply boxes whose
         // pages were deactivated at delivery time and whose RTs were never rendered).
         OnPickedUpNetworked += OnPickedUpAllClients;
+
+        // Subscribe so every client hides/shows the notebook's dynamically-spawned pages in
+        // sync with the notebook itself being stowed/unstowed. The notebook's own GameObject
+        // is deactivated on stow via the base class's OnStowedNetworked handling, but the
+        // pages are separate NetworkObjects and would otherwise stay visible, floating at
+        // the stow point, for every client (including the owner).
+        OnStowedNetworked += OnStowedAllClients;
+    }
+
+    /// <summary>
+    /// Fires on ALL clients via <see cref="PickableObject.OnStowedNetworked"/> whenever this
+    /// notebook's authoritative stowed state changes, keeping its pages' visibility in sync
+    /// with the notebook across every machine.
+    /// </summary>
+    private void OnStowedAllClients(bool stowed)
+    {
+        SetPagesActive(!stowed);
+        if (!stowed)
+            SnapshotAllPages();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         OnPickedUpNetworked -= OnPickedUpAllClients;
+        OnStowedNetworked   -= OnStowedAllClients;
     }
 
     /// <summary>
@@ -466,7 +486,7 @@ public class ExamNotebook : PickableObject
             pages[p].BuildChecklistFromCategory(categoryName);
             pages[p].InitializeChecklistIndices();
 
-            pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value);
+            pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value, captureSnapshot: false);
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
             {

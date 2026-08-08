@@ -1172,6 +1172,11 @@ public class PlayerPickupController : NetworkBehaviour
         // Give the item a chance to clean up its active state (e.g. turn off the flashlight).
         stowed.OnStowed();
 
+        // Tell the server to replicate the stowed (hidden) state to every client — otherwise
+        // only this owner's local deactivation below takes effect and remote players still
+        // see the item floating at the stow point.
+        stowed.RequestSetStowedNetworked(true);
+
         // Deactivate so nothing on the item runs while stashed.
         stowed.gameObject.SetActive(false);
 
@@ -1202,6 +1207,7 @@ public class PlayerPickupController : NetworkBehaviour
         if (item == null || _heldObject != null) return;
 
         // Re-activate and place at hand before the normal pickup flow runs.
+        item.RequestSetStowedNetworked(false);
         item.gameObject.SetActive(true);
         item.RemoveParent();
         item.transform.position = holdPoint.position;

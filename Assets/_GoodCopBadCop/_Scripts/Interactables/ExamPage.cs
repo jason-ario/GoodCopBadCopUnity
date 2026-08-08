@@ -386,11 +386,34 @@ public class ExamPage : FolderItem
         _snapshotCoroutine = StartCoroutine(SnapshotRoutine());
     }
 
+    /// <summary>
+    /// Safety ceiling for how long a page will wait on the scene-wide <see cref="_currentlyCapturing"/>
+    /// gate before forcing it clear. Comfortably longer than one full <see cref="_drawAnimationDuration"/>
+    /// cycle (the longest a well-behaved holder should ever hold the gate), so it never fires during
+    /// normal sequencing — only if a holder is stuck (e.g. despawned/destroyed without releasing, or a
+    /// multi-notebook/late-join race left the gate pointing at a page that will never call EndSnapshot).
+    /// Without this, one stuck holder silently deadlocks every checklist camera in the scene for that
+    /// client forever — matching reports of later pages never rendering and a player's own checkmark
+    /// draws skipping straight to the finished state (their camera opened too late or never, so only
+    /// the very last frame — or none at all — ever reached the RenderTexture).
+    /// </summary>
+    private const float _gateWaitTimeoutSeconds = 2f;
+
     private System.Collections.IEnumerator SnapshotRoutine()
     {
         // Wait for the scene-wide gate — see _currentlyCapturing's doc comment above.
+        float gateWaitElapsed = 0f;
         while (_currentlyCapturing != null && _currentlyCapturing != this)
+        {
+            gateWaitElapsed += Time.unscaledDeltaTime;
+            if (gateWaitElapsed >= _gateWaitTimeoutSeconds)
+            {
+                Debug.LogWarning($"[ExamPage] SnapshotRoutine: '{name}' timed out waiting on a stuck checklist capture gate held by '{(_currentlyCapturing != null ? _currentlyCapturing.name : "null")}' — forcing it clear so this page's capture can proceed.");
+                _currentlyCapturing = null;
+                break;
+            }
             yield return null;
+        }
 
         _currentlyCapturing = this;
         BeginSnapshot();
@@ -410,6 +433,44 @@ public class ExamPage : FolderItem
     /// </summary>
     private void BeginSnapshot()
     {
+        // Defensive self-heal: this page is about to render its OWN checklist items, so they must
+        // be visible to its own camera regardless of any prior state. If this page was ever hidden
+        // as a PEER by another page's capture (see RequestHideChecklistRenderers) and that hide was
+        // ever left unreleased — e.g. mismatched request/release pairing, or this page's GameObject
+        // was deactivated/reactivated while hidden (OnEnable never resets _hideRequestCount or
+        // restores cached renderer states) — its checklist item renderers would stay disabled
+        // forever with no other code path ever noticing, since BeginSnapshot only ever hides
+        // OTHER pages, never restores itself. That leaves a page whose checkbox states are all
+        // correctly applied (ApplyCheckedState still runs fine) but whose checklist camera is
+        // capturing nothing but disabled renderers — a blank RenderTexture with all the underlying
+        // data intact, matching reports of "the elements are there but the render is blank."
+        if (_hideRequestCount != 0)
+        {
+            Debug.LogWarning($"[ExamPage] BeginSnapshot: '{name}' had a stale hide count ({_hideRequestCount}) on itself right before capturing its own checklist — forcing it clear so its own items are visible to its own camera.");
+            _hideRequestCount = 0;
+            if (_checklistRenderersCache != null && _preHideRendererEnabledStates != null)
+            {
+                for (int i = 0; i < _checklistRenderersCache.Length; i++)
+                {
+                    if (_checklistRenderersCache[i] != null)
+                        _checklistRenderersCache[i].enabled = _preHideRendererEnabledStates[i];
+                }
+            }
+            _checklistRenderersCache = null;
+            _preHideRendererEnabledStates = null;
+        }
+        else if (checklistItemsParent != null)
+        {
+            // Even with a "clean" count of 0, be defensive about individual renderers that may
+            // have been left disabled by some other path — force every checklist renderer visible
+            // right before this page captures itself.
+            foreach (Renderer r in checklistItemsParent.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r != null && !r.enabled)
+                    r.enabled = true;
+            }
+        }
+
         _isSnapshotting = true;
         _peersHiddenByThisSnapshot.Clear();
 
@@ -421,6 +482,9 @@ public class ExamPage : FolderItem
             peer.RequestHideChecklistRenderers();
             _peersHiddenByThisSnapshot.Add(peer);
         }
+
+        int checklistItemCount = _checklistItems != null ? _checklistItems.Length : -1;
+        Debug.Log($"[ExamPage] BeginSnapshot: '{name}' capturing. activePages={_activePages.Count} peersHidden={_peersHiddenByThisSnapshot.Count} checklistItems={checklistItemCount} cameraEnabled={(_checklistCamera != null ? _checklistCamera.gameObject.activeSelf.ToString() : "null")} rt={(_renderTexture != null ? _renderTexture.GetEntityId().ToString() : "null")}");
     }
 
     /// <summary>
@@ -658,7 +722,19 @@ public class ExamPage : FolderItem
     /// Drives both the physical checkbox visuals and the camera-rendered visual items.
     /// Called by ExamNotebook whenever the server writes the NetworkVariable for this page.
     /// </summary>
-    public void ApplyBitmask(int bitmask)
+    /// <param name="captureSnapshot">
+    /// When false, skips the trailing <see cref="SnapshotChecklist"/> call. ExamNotebook's initial
+    /// setup applies every page's starting bitmask synchronously in the same frame — if each one
+    /// also fired its own capture, every page but the first would immediately queue on the
+    /// scene-wide <see cref="_currentlyCapturing"/> gate at once. On a client that queue can span
+    /// several frames of real network latency (unlike the host, where everything above resolves
+    /// same-frame), which was leaving later pages' captures stuck behind one another far longer
+    /// than intended and, on unlucky timing, behind a stale gate long enough to look permanently
+    /// blank. ExamNotebook.SnapshotAllPages already performs one guaranteed-correct, strictly
+    /// sequenced capture pass right after this seeding step — so the seed step itself only needs
+    /// to apply the checkbox states, not open any cameras.
+    /// </param>
+    public void ApplyBitmask(int bitmask, bool captureSnapshot = true)
     {
         for (int i = 0; i < _checklistItems.Length; i++)
         {
@@ -675,7 +751,8 @@ public class ExamPage : FolderItem
                 _visualItems[i].SetChecked(isChecked);
         }
 
-        SnapshotChecklist();
+        if (captureSnapshot)
+            SnapshotChecklist();
     }
 
     /// <summary>

@@ -67,6 +67,16 @@ public class PickableObject : Interactable
     /// undo the optimistic local pickup it performed when this fires.
     /// </summary>
     public event Action OnGrabRejected;
+
+    /// <summary>
+    /// Fired on ALL instances (clients AND server) whenever this object's authoritative
+    /// stowed state changes, driven by the server-authoritative <see cref="_isStowed"/>
+    /// NetworkVariable. Subclasses with extra parts that aren't plain child renderers
+    /// (e.g. <see cref="ExamNotebook"/>'s dynamically-spawned pages) should subscribe to
+    /// this to hide/show those parts in sync on every client, rather than relying on
+    /// <see cref="OnStowed"/>, which only runs on the local owner performing the stow.
+    /// </summary>
+    public event Action<bool> OnStowedNetworked;
     protected bool isUsing;
 
     /// <summary>
@@ -123,6 +133,17 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True while this object is stowed (hidden) at a player's hip anchor. Server-authoritative
+    /// so every client — not just the local owner performing the stow — hides/shows the
+    /// GameObject in sync. Without this, only the owner's local <c>SetActive(false)</c> call
+    /// took effect, leaving the item visibly floating at the stow point for other players.
+    /// </summary>
+    private NetworkVariable<bool> _isStowed = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     /// <summary>Returns true if any player is currently holding this object.</summary>
     public bool IsHeld => _holdingClientId.Value != ulong.MaxValue;
 
@@ -135,9 +156,13 @@ public class PickableObject : Interactable
         base.OnNetworkSpawn();
         _holdingClientId.OnValueChanged             += OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged += OnNetworkInteractableOverrideChanged;
+        _isStowed.OnValueChanged                    += OnIsStowedChanged;
 
         // Apply tutorial override first; fall back to holder-based logic if unset.
         ApplyNetworkInteractableState();
+
+        // Late-joining clients need to inherit the current stowed visibility too.
+        gameObject.SetActive(!_isStowed.Value);
 
         PickableObjectRegistry.Instance.Register(this);
     }
@@ -147,8 +172,33 @@ public class PickableObject : Interactable
         base.OnNetworkDespawn();
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
+        _isStowed.OnValueChanged                    -= OnIsStowedChanged;
 
         PickableObjectRegistry.Instance.Unregister(this);
+    }
+
+    /// <summary>
+    /// Applies the server-authoritative stowed state to this instance's GameObject on every
+    /// client, keeping remote players' view of the object in sync with the owner's.
+    /// </summary>
+    private void OnIsStowedChanged(bool previousValue, bool newValue)
+    {
+        gameObject.SetActive(!newValue);
+        OnStowedNetworked?.Invoke(newValue);
+    }
+
+    /// <summary>
+    /// Requests that the server mark this object stowed/unstowed so the visibility change
+    /// replicates to every client, not just the local optimistic change made by the owner
+    /// (see <see cref="PlayerPickupController.StowCurrentItemToPoint"/> /
+    /// <see cref="PlayerPickupController.UnstowItemToHand"/>).
+    /// </summary>
+    public void RequestSetStowedNetworked(bool stowed) => SetStowedServerRpc(stowed);
+
+    [ServerRpc]
+    private void SetStowedServerRpc(bool stowed)
+    {
+        _isStowed.Value = stowed;
     }
 
     /// <summary>
