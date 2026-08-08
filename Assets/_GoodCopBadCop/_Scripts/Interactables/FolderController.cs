@@ -1411,15 +1411,28 @@ public class FolderController : PickableObject
     /// NetworkVariable round-trip, nothing else in the pickup/collider systems can clobber or
     /// race this — see PickableColliderController's FolderItem exclusion for the one other
     /// system that used to fight this.
+    ///
+    /// Iterates <see cref="documents"/> rather than the private idCard/application fields or
+    /// <c>_examPageQueue</c> — the latter is populated only on the server (see its declaration
+    /// comment), so refreshing from it left every non-host client's exam pages permanently
+    /// un-refreshed. <c>documents</c> is the one collection every AddToFolder/ClientRpc path
+    /// (direct-drop, notebook, ID card, Application) actually populates on every machine.
     /// </summary>
     private void RefreshAllDocumentStates()
     {
-        idCard?.RefreshFolderState();
-        application?.RefreshFolderState();
+        if (documents == null) return;
 
-        foreach (ExamPage examPage in _examPageQueue)
+        foreach (PickableObject doc in documents)
         {
-            examPage?.RefreshFolderState();
+            if (doc is not FolderItem folderItem) continue;
+
+            // Defensive: this folder already considers doc filed (it's in `documents`), so
+            // make sure the document's own back-reference agrees, in case the specific RPC
+            // that would have set it was missed or arrived out of order on this client.
+            if (folderItem.insideThisFolder == null)
+                folderItem.insideThisFolder = this;
+
+            folderItem.RefreshFolderState();
         }
     }
 
