@@ -400,11 +400,25 @@ public class ShiftManager : NetworkBehaviour
         // waiting. An armed intercept (e.g. the Day 1 Soldier) must fire even if the
         // random-suspect list has fewer slots than the intercept's index.
         bool interceptPending = SuspectController.InterceptNextSuspectSpawn != null;
-        if (!interceptPending &&
-            SuspectController.Instance.SuspectIndex >= DailySuspectManager.Instance.shiftSuspects.Count - 1)
+
+        // Guard against ending the shift on a stale/unpopulated count. TotalSuspectsThisShift is
+        // the single source of truth for "how many suspects this shift" (DailySuspectManager); if
+        // the lineup hasn't finished populating yet, treat that as "not done" rather than risking
+        // an early end-of-shift on a mismatched or zeroed-out count.
+        DailySuspectManager suspectManager = DailySuspectManager.Instance;
+        bool lineupReady = suspectManager != null && suspectManager.IsLineupPopulated && suspectManager.TotalSuspectsThisShift > 0;
+
+        if (!interceptPending && lineupReady &&
+            SuspectController.Instance.SuspectIndex >= suspectManager.TotalSuspectsThisShift - 1)
         {
             HandleAllSuspectsProcessed();
             return;
+        }
+
+        if (!interceptPending && !lineupReady)
+        {
+            Debug.LogWarning("[ShiftManager] SetNextSuspectReady: lineup not yet populated (or reports 0 suspects) — " +
+                              "deferring end-of-shift check instead of ending early.");
         }
 
         if (PauseSuspectScheduling)

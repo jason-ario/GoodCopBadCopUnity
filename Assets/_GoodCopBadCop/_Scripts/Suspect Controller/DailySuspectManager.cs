@@ -18,6 +18,31 @@ public class DailySuspectManager : MonoBehaviour
 
     public static DailySuspectManager Instance;
 
+    /// <summary>
+    /// SINGLE SOURCE OF TRUTH for "how many suspects exist in today's shift". This is the fully
+    /// populated lineup size — base suspects PLUS every injected mutant intruder, doppelganger,
+    /// and full-mutant slot — i.e. <see cref="shiftSuspects"/>.Count once
+    /// <see cref="PopulateShiftCharacters"/> has finished running for the day.
+    ///
+    /// Every system that needs "how many suspects this shift" must read THIS property instead of
+    /// re-deriving its own count (e.g. from <see cref="DayBase.SuspectsToProcess"/>, which is only
+    /// the pre-injection draw request, not the final total). Consumers: the "Process N subjects"
+    /// objective counter (<see cref="DayBase"/>), the Task Page total (<see cref="ProcessResidentsTask"/>),
+    /// and the end-of-shift check (<see cref="ShiftManager.SetNextSuspectReady"/>). Keeping them all
+    /// on this one property is what prevents the displayed total and the actual end-of-shift count
+    /// from drifting apart. Day 1 is the sole exception — its fully scripted lineup and counter are
+    /// authored by hand and intentionally bypass this shared total.
+    /// Returns 0 before the lineup has been populated for the day.
+    /// </summary>
+    public int TotalSuspectsThisShift => shiftSuspects.Count;
+
+    /// <summary>
+    /// True once <see cref="PopulateShiftCharacters"/> has finished running for the current shift.
+    /// Callers should treat <see cref="TotalSuspectsThisShift"/> as not-yet-authoritative until this
+    /// is true, rather than falling back to a different, secondary count.
+    /// </summary>
+    public bool IsLineupPopulated { get; private set; }
+
     private readonly HashSet<int> _mutantSlotIndices = new HashSet<int>();
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
 
@@ -109,6 +134,7 @@ public class DailySuspectManager : MonoBehaviour
     {
         shiftSuspects.Clear();
         ResetSlotTracking();
+        IsLineupPopulated = false;
 
         if (PopulateSuspectOverride != null)
         {
@@ -119,6 +145,8 @@ public class DailySuspectManager : MonoBehaviour
             InjectDoppelgangerSlots();
             InjectForcedFullMutantSlots();
             InjectFullMutantSlots();
+            IsLineupPopulated = true;
+            Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift (override) = {TotalSuspectsThisShift}.");
             return;
         }
 
@@ -144,13 +172,20 @@ public class DailySuspectManager : MonoBehaviour
         InjectDoppelgangerSlots();
         InjectForcedFullMutantSlots();
         InjectFullMutantSlots();
+        IsLineupPopulated = true;
+        Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift = {TotalSuspectsThisShift} (base draw request was {suspectAmount}).");
     }
 
     /// <summary>
-    /// Returns how many suspects to draw for today's lineup. Uses the active day's
-    /// <see cref="DayBase.SuspectsToProcess"/> when configured (>0, the normal case — default 5).
-    /// Falls back to the legacy random <see cref="suspectsPerShift"/> range only when the active
-    /// day explicitly sets its suspect quota to 0.
+    /// Returns how many BASE suspects to draw for today's lineup, before any mutant/doppelganger/
+    /// full-mutant injection. Uses the active day's <see cref="DayBase.SuspectsToProcess"/> when
+    /// configured (>0, the normal case — default 5). Falls back to the legacy random
+    /// <see cref="suspectsPerShift"/> range only when the active day explicitly sets its suspect
+    /// quota to 0.
+    ///
+    /// This is a DRAW REQUEST only — NOT the shift's total suspect count. The final total (after
+    /// injection) is <see cref="TotalSuspectsThisShift"/>, the single source of truth every other
+    /// system (task display, objective counter, end-of-shift check) must read instead.
     /// </summary>
     private int GetSuspectAmountForToday()
     {

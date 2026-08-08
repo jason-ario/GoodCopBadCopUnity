@@ -52,6 +52,16 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Maximum number of trash items to spawn when TriggerTask is called (inclusive).")]
     [SerializeField] private int _maxSpawnCount = 12;
 
+    [Tooltip("Minimum number of gore/body-part items to spawn when TriggerTask is called with " +
+             "useGorePrefabs: true (inclusive). Independent of _minSpawnCount so gore-heavy days " +
+             "(e.g. Day 3) can spawn a different amount than standard trash days.")]
+    [SerializeField] private int _minGoreSpawnCount = 8;
+
+    [Tooltip("Maximum number of gore/body-part items to spawn when TriggerTask is called with " +
+             "useGorePrefabs: true (inclusive). Independent of _maxSpawnCount so gore-heavy days " +
+             "(e.g. Day 3) can spawn a different amount than standard trash days.")]
+    [SerializeField] private int _maxGoreSpawnCount = 12;
+
     [Tooltip("Pool of trash prefabs to pick from. All must be registered as Network Prefabs in the NetworkManager.")]
     [SerializeField] private GameObject[] _trashPrefabs;
 
@@ -349,7 +359,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
 
-        int spawnCount = Random.Range(_minSpawnCount, _maxSpawnCount + 1);
+        int spawnCount = useGorePrefabs
+            ? Random.Range(_minGoreSpawnCount, _maxGoreSpawnCount + 1)
+            : Random.Range(_minSpawnCount, _maxSpawnCount + 1);
         for (int i = 0; i < spawnCount; i++)
             SpawnSingleItem(prefabPool, spawnBloodDecal: useGorePrefabs);
 

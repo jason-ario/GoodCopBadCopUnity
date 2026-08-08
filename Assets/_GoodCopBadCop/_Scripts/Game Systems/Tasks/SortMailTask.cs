@@ -402,11 +402,21 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         int packageCount = Random.Range(_minPackageCount, _maxPackageCount + 1);
 
-        // Draw addressees from a shuffled pass over every eligible resident so each one gets at
-        // most one package before anyone gets a second — only reshuffling and starting a fresh
-        // pass once every resident has already received one. This prevents the same resident
-        // from being picked for multiple pieces of mail in a single delivery whenever there are
-        // at least as many residents as packages.
+        // Cap at the number of eligible residents: each resident has exactly one physical
+        // MailCubbySlot (see MailCubbyManager), so once a package has been correctly delivered
+        // there, that cubby is occupied and cannot accept a second package for the same resident.
+        // Without this cap, whenever packageCount exceeds addressPool.Count (guaranteed once
+        // _maxPackageCount > the live resident count, which only gets more likely as residents
+        // are killed off over the campaign) the draw below reshuffles into a second pass and can
+        // hand the same resident two packages in one delivery — the second one is then physically
+        // impossible to deliver correctly no matter where the player puts it. This was the
+        // "exactly one package never registers, even sorted correctly" bug.
+        packageCount = Mathf.Min(packageCount, addressPool.Count);
+
+        // Draw addressees from a single shuffled pass over every eligible resident so each one
+        // gets at most one package — packageCount is capped above at addressPool.Count so this
+        // pass never needs to wrap around and reshuffle (which would risk handing the same
+        // resident two packages — see the cap above).
         List<SuspectRecord> residentDrawOrder = new List<SuspectRecord>(addressPool);
         Shuffle(residentDrawOrder);
         int residentCursor = 0;

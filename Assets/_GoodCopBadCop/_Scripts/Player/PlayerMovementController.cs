@@ -81,6 +81,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private AudioClip landSound;
     [Tooltip("How many seconds before actual ground contact the land sound should play, predicted from the current fall speed and a lookahead ground scan.")]
     [SerializeField] private float landSoundAnticipation = 0.5f;
+    [Tooltip("Minimum downward speed (m/s) required before the land sound is allowed to play. Filters out the tiny, rapid grounded/ungrounded flickers caused by walking up or down stairs and slopes, which would otherwise re-trigger the sound every step.")]
+    [SerializeField] private float minFallSpeedForLandSound = 4f;
 
     private bool _wasGrounded;
     private bool _landSoundPlayedForCurrentFall;
@@ -371,8 +373,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         if (isGrounded)
         {
-            // Landing: transitioned from airborne to grounded while falling
-            if (!_wasGrounded && _verticalVelocity < 0f)
+            // Landing: transitioned from airborne to grounded while falling.
+            // Require a minimum fall speed so brief grounded/ungrounded flickers from
+            // walking up or down stairs/slopes (which barely change vertical velocity)
+            // don't repeatedly re-trigger the land sound.
+            if (!_wasGrounded && _verticalVelocity < -minFallSpeedForLandSound)
             {
                 // Fallback in case the predictive lookahead below never caught this fall
                 // (e.g. an uneven or steep surface the lookahead ray missed).
@@ -413,7 +418,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 if (_verticalVelocity < underwaterTerminalVelocity)
                     _verticalVelocity = underwaterTerminalVelocity;
             }
-            else if (!_landSoundPlayedForCurrentFall && _verticalVelocity < 0f)
+            else if (!_landSoundPlayedForCurrentFall && _verticalVelocity < -minFallSpeedForLandSound)
             {
                 // Predict how far the player will fall in the next landSoundAnticipation
                 // seconds (using basic kinematics under the current gravity) and scan that

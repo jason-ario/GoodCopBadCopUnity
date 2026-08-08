@@ -784,6 +784,11 @@ public class SuspectCharacter : Interactable
     private bool _suspectUpdateDisabled;
 
     [Header("Combat")]
+    [Tooltip("When enabled, this suspect completely ignores damage and shots from players: no hit " +
+             "reaction, no flee, no death. Use for background NPCs (e.g. guard soldiers, non-interactive " +
+             "story characters) that should never be affected by player weapons.")]
+    [SerializeField] private bool isImmuneToDamage;
+
     [Tooltip("Maximum health points. Reaching zero triggers the death animation.")]
     [SerializeField] private float maxHealth = 100f;
 
@@ -1654,7 +1659,7 @@ public class SuspectCharacter : Interactable
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || _isDead || _hasFled || !_isAtBooth)
+        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth)
             return;
 
         SpawnHitParticleClientRpc(hitPoint);
@@ -1767,7 +1772,7 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void GetShotServerRpc()
     {
-        if (_isDead || !_isAtBooth)
+        if (isImmuneToDamage || _isDead || !_isAtBooth)
             return;
 
         _isDead = true;

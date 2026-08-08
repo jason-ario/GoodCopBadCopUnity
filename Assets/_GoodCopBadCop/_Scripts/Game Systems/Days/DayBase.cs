@@ -35,8 +35,14 @@ public abstract class DayBase : MonoBehaviour
     public SuspectSet SuspectSet;
 
     [Tooltip("Number of suspects the player must process this shift. Read by DailySuspectManager " +
-             "when it randomly populates the day's lineup (ignored when SuspectSet above is assigned, " +
-             "since that fully authors its own lineup). Default 5.")]
+             "when it randomly draws the day's BASE lineup (ignored when SuspectSet above is assigned, " +
+             "since that fully authors its own lineup). Default 5.\n\n" +
+             "This is only a DRAW REQUEST, not the shift's final suspect total — DailySuspectManager " +
+             "can inject extra mutant/doppelganger/full-mutant slots on top of it. It is never read as " +
+             "a fallback total anywhere else; the single source of truth for \"how many suspects this " +
+             "shift\" is DailySuspectManager.TotalSuspectsThisShift, used by the objective counter below, " +
+             "the Task Page (ProcessResidentsTask), and ShiftManager's end-of-shift check. Day 1 is the " +
+             "sole exception (see SubjectsToProcessOverrideForDisplay and its own scripted counter).")]
     [Min(0)]
     public int SuspectsToProcess = 5;
 
@@ -170,14 +176,15 @@ public abstract class DayBase : MonoBehaviour
     private int _autoSubjectCounterProcessedCount;
 
     /// <summary>
-    /// Actual quota shown in the "Process N subjects" objective text. Defaults to
-    /// <see cref="SuspectsToProcess"/> but is corrected to the real, fully-populated lineup
-    /// size (<see cref="DailySuspectManager.shiftSuspects"/>.Count — matching what
-    /// <see cref="ProcessResidentsTask"/> shows on the Task Page) once that lineup finishes
-    /// populating. The lineup can end up larger than <see cref="SuspectsToProcess"/> because
-    /// <see cref="DailySuspectManager"/> injects extra mutant-intruder and doppelganger slots
-    /// on top of the base quota — without this correction the objective list would keep
-    /// showing the pre-injection quota while the Task Page shows the post-injection total.
+    /// Actual quota shown in the "Process N subjects" objective text. Always read from
+    /// <see cref="DailySuspectManager.TotalSuspectsThisShift"/> — the single source of truth for
+    /// "how many suspects this shift", also used by <see cref="ProcessResidentsTask"/>'s Task Page
+    /// total and <see cref="ShiftManager"/>'s end-of-shift check. This class does NOT fall back to
+    /// <see cref="SuspectsToProcess"/> here: that field is only the pre-injection draw request, and
+    /// using it as a stand-in total is exactly what let this objective's displayed quota drift from
+    /// the real end-of-shift count. Days that need a different displayed total than the actual
+    /// lineup size (e.g. Day 1) must not use this automatic counter at all — see
+    /// <see cref="UseAutomaticSubjectCounterTask"/> and <see cref="SubjectsToProcessOverrideForDisplay"/>.
     /// </summary>
     private int _effectiveSuspectsToProcess;
 
@@ -188,13 +195,23 @@ public abstract class DayBase : MonoBehaviour
     }
 
     /// <summary>
-    /// Waits one frame so <see cref="DailySuspectManager"/> has finished populating the day's
-    /// lineup (including any injected mutant/doppelganger slots) before reading its true size,
-    /// then shows the counter task with that corrected total.
+    /// Waits until <see cref="DailySuspectManager"/> reports the day's lineup as fully populated
+    /// (including any injected mutant/doppelganger slots) before reading its true size, then shows
+    /// the counter task with that corrected total. Polls rather than waiting a single fixed frame
+    /// so this stays correct even if population ever takes longer than one frame.
     /// </summary>
     private IEnumerator ShowAutomaticSubjectCounterTaskAfterLineupPopulated()
     {
-        yield return null;
+        float timeout = Time.unscaledTime + 5f;
+        while ((DailySuspectManager.Instance == null || !DailySuspectManager.Instance.IsLineupPopulated)
+               && Time.unscaledTime < timeout)
+        {
+            yield return null;
+        }
+
+        if (DailySuspectManager.Instance == null || !DailySuspectManager.Instance.IsLineupPopulated)
+            Debug.LogWarning("[DayBase] Subject counter: lineup never reported populated — showing counter anyway with best-known total.");
+
         ShowAutomaticSubjectCounterTask();
     }
 
@@ -211,9 +228,11 @@ public abstract class DayBase : MonoBehaviour
     {
         if (_autoSubjectCounterTask != null) return;
 
-        _effectiveSuspectsToProcess = DailySuspectManager.Instance != null && DailySuspectManager.Instance.shiftSuspects.Count > 0
-            ? DailySuspectManager.Instance.shiftSuspects.Count
-            : SuspectsToProcess;
+        _effectiveSuspectsToProcess = DailySuspectManager.Instance != null
+            ? DailySuspectManager.Instance.TotalSuspectsThisShift
+            : 0;
+
+        if (_effectiveSuspectsToProcess <= 0) return;
 
         if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess) return;
 

@@ -32,8 +32,9 @@ using Random = UnityEngine.Random;
 ///   - Assign every <see cref="MailCubbySlot"/> this manager should control to
 ///     <see cref="_mailCubbySlots"/> (they live as sibling top-level objects, not children).
 ///   - Call <see cref="AutoAssignRandomResidents"/> (right-click the component in the Inspector —
-///     server/host only — or leave <see cref="_assignOnAwake"/> enabled to run it automatically
-///     once this NetworkObject spawns on the server).
+///     works in Edit Mode too, applying directly to the scene with no networking involved — or
+///     leave <see cref="_assignOnDayStart"/> enabled to run it automatically every day at day
+///     start, on <see cref="CampaignManager.OnDayChanged"/>, server-only, while playing).
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class MailCubbyManager : NetworkBehaviour
@@ -44,8 +45,8 @@ public class MailCubbyManager : NetworkBehaviour
     [Tooltip("If true, only suspects with IsResident set are eligible for a cubby assignment.")]
     [SerializeField] private bool _residentsOnly = true;
 
-    [Tooltip("If true, automatically randomizes which cubbies are enabled and their assignments once when this NetworkObject spawns on the server.")]
-    [SerializeField] private bool _assignOnAwake = false;
+    [Tooltip("If true, automatically randomizes which cubbies are enabled and their assignments every day, on CampaignManager.OnDayChanged (server-only). Replaces the old assign-on-spawn behavior, which could run before other systems (e.g. the resident/suspect pool) were fully ready.")]
+    [SerializeField] private bool _assignOnDayStart = true;
 
     // Server-only cache of the last assignment broadcast, so late-joining clients (who connect
     // after AutoAssignRandomResidents already ran and its ClientRpc already went out) can be
@@ -89,18 +90,31 @@ public class MailCubbyManager : NetworkBehaviour
         if (IsServer)
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-
-            if (_assignOnAwake)
-                AutoAssignRandomResidents();
+            CampaignManager.OnDayChanged += OnDayChanged;
         }
     }
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer && NetworkManager.Singleton != null)
-            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        if (IsServer)
+        {
+            if (NetworkManager.Singleton != null)
+                NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            CampaignManager.OnDayChanged -= OnDayChanged;
+        }
 
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// Server-only. Re-shuffles the cubby layout every day (if <see cref="_assignOnDayStart"/> is
+    /// enabled), so residents are reassigned to fresh cubbies at day start rather than once on
+    /// spawn — see <see cref="_assignOnDayStart"/>.
+    /// </summary>
+    private void OnDayChanged(int day)
+    {
+        if (_assignOnDayStart)
+            AutoAssignRandomResidents();
     }
 
     /// <summary>
@@ -186,9 +200,14 @@ public class MailCubbyManager : NetworkBehaviour
     [ContextMenu("Auto-Assign Random Residents")]
     public void AutoAssignRandomResidents()
     {
-        if (!IsServer)
+        // In Play Mode this must be server-only — cubby assignments are authoritative and
+        // replicated to all clients via ApplyAssignmentClientRpc. In the Editor (not playing),
+        // there is no server/NetworkObject spawned yet (IsServer is meaningless), so the context
+        // menu entry is meant to run entirely locally instead — see EditorAssignRandomResidents,
+        // which applies the same shuffle directly to the scene without touching networking.
+        if (Application.isPlaying && !IsServer)
         {
-            Debug.LogWarning("[MailCubbyManager] AutoAssignRandomResidents is server-only — cubby assignments must be authoritative and replicated to all clients.", this);
+            Debug.LogWarning("[MailCubbyManager] AutoAssignRandomResidents is server-only in Play Mode — cubby assignments must be authoritative and replicated to all clients.", this);
             return;
         }
 
@@ -230,6 +249,22 @@ public class MailCubbyManager : NetworkBehaviour
         }
 
         ApplyAssignment(allSlots, activeFlags, residentAssignment);
+
+        if (!Application.isPlaying)
+        {
+            // Editor-only run (see the doc comment above): nothing is networked yet, so just
+            // apply locally to the scene objects — mark them dirty so the change is saved.
+#if UNITY_EDITOR
+            foreach (MailCubbySlot slot in allSlots)
+            {
+                if (slot != null)
+                    UnityEditor.EditorUtility.SetDirty(slot);
+            }
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            Debug.Log($"[MailCubbyManager] (Editor) Randomly enabled {activeCount}/{allSlots.Length} cubby slot(s) and assigned residents from a pool of {residentPoolIndices.Count}.");
+            return;
+        }
 
         // Cache so late-joining clients can be caught up individually via OnClientConnected.
         _lastActiveFlags = activeFlags;

@@ -167,9 +167,14 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
         yield return null;
 
         DayBase activeDay = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        // Day 1's SubjectsToProcessOverrideForDisplay is the sole exception to the shared total
+        // below — its lineup is hand-scripted and includes slots the player never actually
+        // processes. Every other day reads DailySuspectManager.TotalSuspectsThisShift, the single
+        // source of truth also used by DayBase's objective counter and ShiftManager's
+        // end-of-shift check, so this task's total can never drift from either of those.
         int total = activeDay != null && activeDay.SubjectsToProcessOverrideForDisplay >= 0
             ? activeDay.SubjectsToProcessOverrideForDisplay
-            : (DailySuspectManager.Instance != null ? DailySuspectManager.Instance.shiftSuspects.Count : 0);
+            : (DailySuspectManager.Instance != null ? DailySuspectManager.Instance.TotalSuspectsThisShift : 0);
         _processedCount.Value = 0;
         _totalCount.Value = total;
         _isActive.Value = total > 0;

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -28,8 +29,11 @@ public class ATM : NetworkBehaviour
     public bool IsPowered => _isPowered;
 
     [Header("Spawning")]
-    [Tooltip("Prefab that has a CouponPickup component and a NetworkObject. Spawned for each coupon unit.")]
+    [Tooltip("Prefab that has a CouponPickup component and a NetworkObject. Its CouponValue is the larger denomination (e.g. 5) used to make up most of a payout.")]
     [SerializeField] private GameObject _couponPickupPrefab;
+
+    [Tooltip("Prefab that has a CouponPickup component and a NetworkObject. Its CouponValue is the smaller denomination (e.g. 1) used to make up any remainder that the larger denomination can't cover exactly.")]
+    [SerializeField] private GameObject _couponPickupPrefabOnes;
 
     [Tooltip("First boundary of the spawn range. Coupons appear at a random position between this and Spawn Point B.")]
     [SerializeField] private Transform _couponSpawnPointA;
@@ -116,7 +120,8 @@ public class ATM : NetworkBehaviour
     /// at the spawn point. <paramref name="amount"/> is first scaled by the current
     /// Checkpoint Integrity Score (see <see cref="CheckpointIntegrityService"/>) — a dirty,
     /// trashed, or fence-damaged booth pays out less on every ATM transaction. The resulting
-    /// amount is divided by the individual coupon's value (rounded down, minimum 1). SERVER ONLY.
+    /// amount is broken down into a mix of coupon denominations (largest first, e.g. 5s then
+    /// 1s) so the physically spawned coupons sum exactly to the payout. SERVER ONLY.
     /// </summary>
     public void SpawnCoupons(int amount)
     {
@@ -133,15 +138,16 @@ public class ATM : NetworkBehaviour
             ? CheckpointIntegrityService.Instance.ApplyMultiplier(amount)
             : amount;
 
-        int couponValue = _couponPickupPrefab != null
-            ? (_couponPickupPrefab.GetComponent<CouponPickup>()?.CouponValue ?? 1)
-            : 1;
-
-        int count = Mathf.Max(1, adjustedAmount / couponValue);
+        List<GameObject> spawnQueue = BuildSpawnQueue(adjustedAmount);
+        if (spawnQueue.Count == 0)
+        {
+            Debug.LogError("[ATM] No coupon prefabs assigned in the Inspector — cannot dispense.");
+            return;
+        }
 
         PlayDispenseSound();
 
-        StartCoroutine(SpawnCouponsRoutine(count));
+        StartCoroutine(SpawnCouponsRoutine(spawnQueue));
         StartCoroutine(ShowPaymentDelayedRoutine(adjustedAmount));
     }
 
@@ -166,6 +172,49 @@ public class ATM : NetworkBehaviour
     }
 
     // ── Private ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Breaks <paramref name="amount"/> down into a greedy mix of the configured coupon
+    /// denominations (largest CouponValue first), returning the prefab to spawn for each
+    /// physical coupon, in spawn order. If the denominations can't reach the amount exactly
+    /// (e.g. only a 5-value prefab is assigned and the amount isn't a multiple of 5), any
+    /// remainder is made up using the smallest available denomination.
+    /// </summary>
+    private List<GameObject> BuildSpawnQueue(int amount)
+    {
+        var result = new List<GameObject>();
+
+        var denominations = new List<(GameObject prefab, int value)>();
+        foreach (GameObject prefab in new[] { _couponPickupPrefab, _couponPickupPrefabOnes })
+        {
+            if (prefab == null) continue;
+            CouponPickup pickup = prefab.GetComponent<CouponPickup>();
+            int value = pickup != null ? pickup.CouponValue : 1;
+            if (value > 0) denominations.Add((prefab, value));
+        }
+
+        if (denominations.Count == 0) return result;
+
+        denominations.Sort((a, b) => b.value.CompareTo(a.value));
+
+        int remaining = amount;
+        foreach ((GameObject prefab, int value) in denominations)
+        {
+            int count = remaining / value;
+            for (int i = 0; i < count; i++) result.Add(prefab);
+            remaining -= count * value;
+        }
+
+        // Ensure at least one coupon is spawned, and cover any leftover remainder,
+        // using the smallest configured denomination.
+        if (remaining > 0 || result.Count == 0)
+        {
+            (GameObject prefab, int value) smallest = denominations[denominations.Count - 1];
+            result.Add(smallest.prefab);
+        }
+
+        return result;
+    }
 
     private void PlayDispenseSound()
     {
@@ -207,14 +256,14 @@ public class ATM : NetworkBehaviour
             _screenController?.ShowPayment(amount);
     }
 
-    private IEnumerator SpawnCouponsRoutine(int amount)
+    private IEnumerator SpawnCouponsRoutine(List<GameObject> spawnQueue)
     {
         _activeSpawnCount++;
         if (_machineShake != null) _machineShake.enabled = true;
 
-        for (int i = 0; i < amount; i++)
+        for (int i = 0; i < spawnQueue.Count; i++)
         {
-            SpawnOneCoupon();
+            SpawnOneCoupon(spawnQueue[i]);
             yield return new WaitForSeconds(_spawnInterval);
         }
 
@@ -223,11 +272,11 @@ public class ATM : NetworkBehaviour
             _machineShake.enabled = false;
     }
 
-    private void SpawnOneCoupon()
+    private void SpawnOneCoupon(GameObject prefab)
     {
-        if (_couponPickupPrefab == null)
+        if (prefab == null)
         {
-            Debug.LogError("[ATM] _couponPickupPrefab is not assigned in the Inspector.");
+            Debug.LogError("[ATM] Attempted to spawn a null coupon prefab.");
             return;
         }
 
@@ -236,7 +285,7 @@ public class ATM : NetworkBehaviour
             : transform.position;
 
         Quaternion spawnRotation = _couponSpawnPointA.rotation;
-        GameObject spawned = Instantiate(_couponPickupPrefab, spawnPosition, spawnRotation);
+        GameObject spawned = Instantiate(prefab, spawnPosition, spawnRotation);
 
         PlayCouponSpawnSound(spawnPosition);
 

@@ -1376,7 +1376,7 @@ public class Day_01 : DayBase
 
         if (_taskGetChecklist != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskGetChecklist);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskGetChecklist, preHideDelay: 1.5f);
             _taskGetChecklist = null;
         }
 
@@ -1400,7 +1400,7 @@ public class Day_01 : DayBase
 
         if (_taskCheckDocumentation != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskCheckDocumentation);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCheckDocumentation, preHideDelay: 1.5f);
             _taskCheckDocumentation = null;
         }
 
@@ -1446,7 +1446,7 @@ public class Day_01 : DayBase
 
         if (_taskQuarantineStamp != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskQuarantineStamp);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskQuarantineStamp, preHideDelay: 1.5f);
             _taskQuarantineStamp = null;
         }
 
@@ -1541,7 +1541,7 @@ public class Day_01 : DayBase
 
         if (_taskFolder != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskFolder);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFolder, preHideDelay: 1.5f);
             _taskFolder = null;
         }
 
@@ -1584,7 +1584,7 @@ public class Day_01 : DayBase
 
         if (_taskFile != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskFile);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFile, preHideDelay: 1.5f);
             _taskFile = null;
         }
 
@@ -1638,7 +1638,7 @@ public class Day_01 : DayBase
 
         if (_taskStamp != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskStamp);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskStamp, preHideDelay: 1.5f);
             _taskStamp = null;
         }
 
@@ -1799,7 +1799,7 @@ public class Day_01 : DayBase
         if (TutorialMarkerManager.Instance != null && _markerATM != null)
             TutorialMarkerManager.Instance.Unmark(_markerATM);
 
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskCollectCoupons);
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCollectCoupons, preHideDelay: 1.5f);
         _taskCollectCoupons = null;
 
         // Server-only: immediately allow the player to call the next suspect — no further
@@ -2408,7 +2408,7 @@ public class Day_01 : DayBase
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
 
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskThrowTrash);
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskThrowTrash, preHideDelay: 1.5f);
         _taskThrowTrash = null;
 
         _trashTaskDone = true;
@@ -2421,7 +2421,7 @@ public class Day_01 : DayBase
             CleanGraffitiTask.Instance.OnDailyTaskCompleted -= OnGraffitiTaskComplete;
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
 
-        TutorialObjectiveList.Instance?.CompleteObjective(_taskCleanGraffiti);
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCleanGraffiti, preHideDelay: 1.5f);
         _taskCleanGraffiti = null;
 
         _graffitiTaskDone = true;
@@ -2770,7 +2770,7 @@ public class Day_01 : DayBase
 
         if (_taskRepelMutants != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskRepelMutants);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskRepelMutants, preHideDelay: 1.5f);
             _taskRepelMutants = null;
         }
 

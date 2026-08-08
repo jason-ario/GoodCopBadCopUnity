@@ -25,11 +25,11 @@ public class MutantIntruderData : ScriptableObject
     [Header("Shutter Bang")]
     [Tooltip("Number of times the mutant bangs on the closed shutter before giving up. Only used when canClimb is true.")]
     [Min(1)]
-    public int shutterBangCount = 5;
+    public int shutterBangCount = 9;
 
     [Tooltip("Seconds after which a non-climbing mutant loses interest and walks away. Only used when canClimb is false.")]
     [Min(1f)]
-    public float losesInterestAfterSeconds = 10f;
+    public float losesInterestAfterSeconds = 18f;
 
     [Tooltip("Seconds the Attack bool stays true during each shutter hit. Should be shorter than bangIntervalSeconds.")]
     [Min(0.1f)]

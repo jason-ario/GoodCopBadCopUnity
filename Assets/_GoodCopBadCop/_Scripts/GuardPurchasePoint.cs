@@ -130,7 +130,10 @@ public class GuardPurchasePoint : Interactable
     /// into a <see cref="TrashBag"/>) — not merely on death. Until this fires, the dead guard's
     /// body keeps occupying the soldier slot (still "arrived") so it stays visible and
     /// collectible; only once it's cleared away does the purchase post reappear and a new guard
-    /// become buyable. Server-only.
+    /// become buyable. Forces <see cref="_unlocked"/> to true so the post reappears even if this
+    /// point was never explicitly unlocked by a day script (e.g. a default guard placed directly
+    /// under a GuardPurchasePoint from Day 1) — a dead guard's slot must always become
+    /// re-purchasable, regardless of day-gating history. Server-only.
     /// </summary>
     public void NotifyGuardCorpseCollected()
     {
@@ -138,6 +141,7 @@ public class GuardPurchasePoint : Interactable
 
         _guardArrived.Value = false;
         _guardPurchased.Value = false;
+        _unlocked.Value = true;
     }
 
     /// <summary>
