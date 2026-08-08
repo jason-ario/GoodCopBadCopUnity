@@ -95,7 +95,7 @@ public class MailSortBin : Interactable
         // it's a server-authoritative NetworkVariable that hasn't round-tripped back yet.
         if (package.IsResolved) return;
 
-        package.RequestSortServerRpc((int)_binType, string.Empty);
+        package.RequestSortServerRpc((int)_binType, -1);
     }
 
     // ── Interact-based deposit (holding a MailPackageItem) ────────────────────

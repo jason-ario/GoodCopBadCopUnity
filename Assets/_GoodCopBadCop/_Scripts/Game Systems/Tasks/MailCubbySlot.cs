@@ -54,10 +54,25 @@ public class MailCubbySlot : MonoBehaviour
     /// <summary>The resident this physical cubby is currently labelled for.</summary>
     public SuspectData AssignedResident => _assignedResident;
 
-    /// <summary>The full name of the resident assigned to this cubby, matching the format used by <see cref="MailPackageItem.ResidentName"/>. Used for sort-matching — do not use this for display, see <see cref="AbbreviatedResidentName"/>.</summary>
+    /// <summary>The full name of the resident assigned to this cubby, matching the format used by <see cref="MailPackageItem.ResidentName"/>. Display/log purposes only — sort-matching uses <see cref="ResidentId"/> instead, since display names are fragile to compare (whitespace, casing, typos between a resident's display name and this cubby's label).</summary>
     public string ResidentName => _assignedResident != null
         ? $"{_assignedResident.FirstName} {_assignedResident.LastName}".Trim()
         : string.Empty;
+
+    /// <summary>
+    /// <see cref="AssignedResident"/>'s index within <see cref="MailCubbyManager"/>'s shared
+    /// resident pool, or -1 if unassigned/not found. Sort-matching
+    /// (<see cref="SortMailTask.EvaluateSort"/>) sends this index across the RPC boundary instead
+    /// of a display-name string, then resolves it back to the actual <see cref="SuspectData"/>
+    /// reference server-side via <see cref="MailCubbyManager.ResolveResident"/> and compares that
+    /// reference directly against <see cref="MailPackageItem.AssignedResident"/> — this avoids
+    /// ever comparing two independently-built name strings, which was fragile (whitespace/casing/
+    /// typo mismatches between a resident's display name and this cubby's label could silently
+    /// break sorting even when the actual resident assignment was correct).
+    /// </summary>
+    public int ResidentPoolIndex => MailCubbyManager.Instance != null
+        ? MailCubbyManager.Instance.GetResidentIndex(_assignedResident)
+        : -1;
 
     /// <summary>
     /// The resident's name abbreviated for the tape label, e.g. "Sandro P." instead of the full
@@ -198,18 +213,18 @@ public class MailCubbySlot : MonoBehaviour
         // under us. The eventual server confirmation
         // (MarkDelivered -> LockInteractableNetworked -> _networkInteractableOverride) is still
         // authoritative and applies the same lock networked, for every other client.
-        bool isCorrectResident = string.Equals(ResidentName?.Trim(), package.ResidentName?.Trim(), StringComparison.OrdinalIgnoreCase);
+        bool isCorrectResident = _assignedResident != null && _assignedResident == package.AssignedResident;
         if (isCorrectResident)
             package.LockInteractable();
 
         if (_placementSlot != null)
         {
             Transform snap = _placementSlot.SnapPoint;
-            package.RequestSortServerRpc((int)MailSortBinType.Delivery, ResidentName, true, snap.position, snap.rotation);
+            package.RequestSortServerRpc((int)MailSortBinType.Delivery, ResidentPoolIndex, true, snap.position, snap.rotation);
         }
         else
         {
-            package.RequestSortServerRpc((int)MailSortBinType.Delivery, ResidentName);
+            package.RequestSortServerRpc((int)MailSortBinType.Delivery, ResidentPoolIndex);
         }
     }
 }

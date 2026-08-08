@@ -309,6 +309,21 @@ public class MailCubbyManager : NetworkBehaviour
         }
     }
 
+    /// <summary>Returns the index of <paramref name="resident"/> within <see cref="_suspectPool"/>.suspects, or -1 if not found/null. Used to transmit a SuspectData reference across an RPC as a cheap index instead of a string — see <see cref="MailCubbySlot.ResidentPoolIndex"/> and <see cref="SortMailTask.EvaluateSort"/>, which resolves it back via <see cref="ResolveResident"/> and compares the actual SuspectData reference directly.</summary>
+    public int GetResidentIndex(SuspectData resident)
+    {
+        if (resident == null || _suspectPool == null || _suspectPool.suspects == null) return -1;
+        return _suspectPool.suspects.IndexOf(resident);
+    }
+
+    /// <summary>Resolves an index (as returned by <see cref="GetResidentIndex"/>) back to the actual <see cref="SuspectData"/> asset reference, or null if out of range.</summary>
+    public SuspectData ResolveResident(int index)
+    {
+        if (_suspectPool == null || _suspectPool.suspects == null) return null;
+        if (index < 0 || index >= _suspectPool.suspects.Count) return null;
+        return _suspectPool.suspects[index];
+    }
+
     /// <summary>Returns indices into <see cref="_suspectPool"/>.suspects for every eligible resident.</summary>
     private List<int> BuildResidentPoolIndices()
     {

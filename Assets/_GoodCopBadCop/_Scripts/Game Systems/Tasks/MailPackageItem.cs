@@ -45,6 +45,17 @@ public class MailPackageItem : PickableObject
     [Tooltip("Volume for _sortSuccessSfxClip.")]
     [SerializeField] private float _sortSuccessSfxVolume = 1f;
 
+    [Header("Addressee (set by SortMailTask.ServerInitialize at spawn time)")]
+    [Tooltip("The resident this package is actually addressed to. Assigned by the server at spawn " +
+        "time (see ServerInitialize) — visible/assignable here in the Inspector mainly for " +
+        "debugging/manual test packages. Sort-matching (SortMailTask.EvaluateSort) compares this " +
+        "SuspectData reference directly against the cubby's own MailCubbySlot.AssignedResident " +
+        "instead of comparing separately-built display-name strings, which was fragile.")]
+    [SerializeField] private SuspectData _assignedResident;
+
+    /// <summary>The resident this package is actually addressed to — compared directly (by reference) against <see cref="MailCubbySlot.AssignedResident"/> in <see cref="SortMailTask.EvaluateSort"/>.</summary>
+    public SuspectData AssignedResident => _assignedResident;
+
     // ── Networked data, set once by the server at spawn time via ServerInitialize ──────────────
 
     private readonly NetworkVariable<FixedString64Bytes> _residentName = new(
@@ -86,14 +97,20 @@ public class MailPackageItem : PickableObject
     /// Server-only. Assigns this package's addressee, goods category, and correct sorting bin.
     /// Call immediately after spawning, before the object is observed by clients if possible.
     /// </summary>
-    public void ServerInitialize(string residentName, string goodsLabel, MailSortBinType correctBin)
+    /// <param name="resident">
+    /// The addressee's <see cref="SuspectData"/> asset — stored directly as
+    /// <see cref="AssignedResident"/> and compared by reference against
+    /// <see cref="MailCubbySlot.AssignedResident"/> in <see cref="SortMailTask.EvaluateSort"/>.
+    /// </param>
+    public void ServerInitialize(SuspectData resident, string residentName, string goodsLabel, MailSortBinType correctBin)
     {
         if (!IsServer) return;
 
-        _residentName.Value = residentName;
-        _goodsLabel.Value   = goodsLabel;
-        _correctBin.Value   = (int)correctBin;
-        IsResolved          = false;
+        _assignedResident    = resident;
+        _residentName.Value  = residentName;
+        _goodsLabel.Value    = goodsLabel;
+        _correctBin.Value    = (int)correctBin;
+        IsResolved           = false;
 
         RefreshLabel();
     }
@@ -249,11 +266,14 @@ public class MailPackageItem : PickableObject
     /// owns <see cref="SortMailTask"/> and decides whether the placement was correct.
     /// </summary>
     /// <param name="binType">Which sorting outcome the package was dropped into.</param>
-    /// <param name="slotResidentName">
+    /// <param name="slotResidentPoolIndex">
     /// When <paramref name="binType"/> is <see cref="MailSortBinType.Delivery"/>, the resident
-    /// name assigned to the specific cubby slot the package was dropped into (see
-    /// <see cref="MailCubbySlot"/>). Ignored for Confiscate. Empty if dropped into a generic bin
-    /// rather than a labelled cubby.
+    /// pool index (<see cref="MailCubbySlot.ResidentPoolIndex"/>) of the resident assigned to the
+    /// specific cubby slot the package was dropped into. The server resolves this back to the
+    /// actual <see cref="SuspectData"/> reference (see <see cref="MailCubbyManager.ResolveResident"/>)
+    /// and compares it directly against <see cref="AssignedResident"/> — see
+    /// <see cref="SortMailTask.EvaluateSort"/>. Ignored for Confiscate. -1 if dropped into a
+    /// generic bin rather than a labelled cubby.
     /// </param>
     /// <param name="hasSnapPose">
     /// True if the caller (a <see cref="MailCubbySlot"/>) supplied a fixed placement pose this
@@ -262,9 +282,9 @@ public class MailPackageItem : PickableObject
     /// <see cref="MailSortBin"/> trigger drop, which just freezes the package wherever it landed.
     /// </param>
     [ServerRpc(RequireOwnership = false)]
-    public void RequestSortServerRpc(int binType, string slotResidentName = "", bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
+    public void RequestSortServerRpc(int binType, int slotResidentPoolIndex = -1, bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
-        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType, slotResidentName, hasSnapPose, snapPosition, snapRotation);
+        SortMailTask.Instance?.EvaluateSort(this, (MailSortBinType)binType, slotResidentPoolIndex, hasSnapPose, snapPosition, snapRotation);
     }
 
     /// <summary>

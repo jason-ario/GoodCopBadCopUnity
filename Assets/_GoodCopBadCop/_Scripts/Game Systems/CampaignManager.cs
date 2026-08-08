@@ -378,6 +378,10 @@ public class CampaignManager : NetworkBehaviour
         dayBase.DayActivated();
         OnDayChanged?.Invoke(day);
 
+        // Analytics: track when a day starts, e.g. "Day:Start:3".
+        GameAnalyticsSDK.GameAnalytics.NewDesignEvent($"Day:Start:{day}");
+        GameAnalyticsSDK.GameAnalytics.NewProgressionEvent(GameAnalyticsSDK.GAProgressionStatus.Start, $"Day{day}");
+
         // Fully heal and de-irradiate all players at the start of every new day.
         if (IsServer)
             ResetAllPlayersHealthAndRadiation();

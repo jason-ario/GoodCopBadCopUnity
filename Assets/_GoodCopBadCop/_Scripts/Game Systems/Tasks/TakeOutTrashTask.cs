@@ -406,11 +406,18 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         var refs = new List<NetworkObjectReference>(junkItems.Length);
         foreach (JunkItem junk in junkItems)
         {
-            // JunkItem components on living SuspectCharacters are kept disabled until death
-            // (see class doc comment) — FindObjectsInactive.Exclude only filters by GameObject
-            // active state, not component-enabled state, so skip disabled components here to
-            // avoid highlighting living suspects instead of actual junk.
-            if (!junk.enabled) continue;
+            // JunkItem components attached to a SuspectCharacter (e.g. the Alexei soldier
+            // body) are pre-attached in the Inspector with the component's own Unity
+            // 'enabled' flag left off and NEVER toggled at runtime (see JunkItem's class doc —
+            // toggling it live corrupts late-joining clients' Netcode sync). The real
+            // "has this corpse become collectible junk" signal is JunkItem.IsCollectible,
+            // flipped true by SuspectCharacter.EnableJunkPickup() on death. Gating on
+            // junk.enabled here previously skipped every suspect corpse (dead or alive), so
+            // a dead soldier's body was never force-highlighted. Skip only suspects that are
+            // still alive/non-collectible; standalone junk prefabs have no SuspectCharacter
+            // and are always eligible once spawned.
+            SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
+            if (suspect != null && !junk.IsCollectible.Value) continue;
 
             NetworkObject netObj = junk.NetworkObject;
             if (netObj != null && netObj.IsSpawned)
@@ -473,9 +480,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     private bool IsCountablePreExistingJunkItem(JunkItem junk)
     {
-        if (junk == null || !junk.enabled || !junk.gameObject.activeInHierarchy)
+        if (junk == null || !junk.gameObject.activeInHierarchy)
             return false;
 
+        // JunkItem components pre-attached to a SuspectCharacter (e.g. the Alexei soldier
+        // body) keep their own Unity 'enabled' flag off in the Inspector and it is never
+        // toggled at runtime (see JunkItem's class doc) — checking junk.enabled here would
+        // wrongly exclude every suspect corpse, dead or alive. IsCollectible is the real
+        // "has this corpse become collectible junk" signal, flipped true by
+        // SuspectCharacter.EnableJunkPickup() on death.
         SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
         if (suspect != null && !junk.IsCollectible.Value)
             return false;

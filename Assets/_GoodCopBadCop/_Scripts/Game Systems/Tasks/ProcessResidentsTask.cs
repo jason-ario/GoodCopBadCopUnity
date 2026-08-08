@@ -170,8 +170,9 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
         // Day 1's SubjectsToProcessOverrideForDisplay is the sole exception to the shared total
         // below — its lineup is hand-scripted and includes slots the player never actually
         // processes. Every other day reads DailySuspectManager.TotalSuspectsThisShift, the single
-        // source of truth also used by DayBase's objective counter and ShiftManager's
-        // end-of-shift check, so this task's total can never drift from either of those.
+        // source of truth also used by DayBase's objective counter — it deliberately EXCLUDES
+        // mutant intruder slots, which are a random combat threat and never a "suspect to
+        // process" (ShiftManager's end-of-shift check uses a separate, mutant-inclusive count).
         int total = activeDay != null && activeDay.SubjectsToProcessOverrideForDisplay >= 0
             ? activeDay.SubjectsToProcessOverrideForDisplay
             : (DailySuspectManager.Instance != null ? DailySuspectManager.Instance.TotalSuspectsThisShift : 0);

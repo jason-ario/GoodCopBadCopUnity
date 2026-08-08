@@ -19,22 +19,25 @@ public class DailySuspectManager : MonoBehaviour
     public static DailySuspectManager Instance;
 
     /// <summary>
-    /// SINGLE SOURCE OF TRUTH for "how many suspects exist in today's shift". This is the fully
-    /// populated lineup size — base suspects PLUS every injected mutant intruder, doppelganger,
-    /// and full-mutant slot — i.e. <see cref="shiftSuspects"/>.Count once
-    /// <see cref="PopulateShiftCharacters"/> has finished running for the day.
-    ///
-    /// Every system that needs "how many suspects this shift" must read THIS property instead of
-    /// re-deriving its own count (e.g. from <see cref="DayBase.SuspectsToProcess"/>, which is only
-    /// the pre-injection draw request, not the final total). Consumers: the "Process N subjects"
-    /// objective counter (<see cref="DayBase"/>), the Task Page total (<see cref="ProcessResidentsTask"/>),
-    /// and the end-of-shift check (<see cref="ShiftManager.SetNextSuspectReady"/>). Keeping them all
-    /// on this one property is what prevents the displayed total and the actual end-of-shift count
-    /// from drifting apart. Day 1 is the sole exception — its fully scripted lineup and counter are
-    /// authored by hand and intentionally bypass this shared total.
+    /// SINGLE SOURCE OF TRUTH for "how many suspects the player must process this shift" — the
+    /// number shown by the "Process N subjects" objective counter (<see cref="DayBase"/>) and the
+    /// Task Page total (<see cref="ProcessResidentsTask"/>). Deliberately EXCLUDES injected mutant
+    /// intruder slots (<see cref="_mutantSlotIndices"/>): mutants are a random combat threat added
+    /// on top of the shift, never a "suspect to process", and must never affect this total or the
+    /// displayed X/Y count. Doppelganger and full-mutant slots DO count — both stand in for a real
+    /// suspect and are resolved through the normal folder verdict flow.
     /// Returns 0 before the lineup has been populated for the day.
     /// </summary>
-    public int TotalSuspectsThisShift => shiftSuspects.Count;
+    public int TotalSuspectsThisShift => shiftSuspects.Count - _mutantSlotIndices.Count;
+
+    /// <summary>
+    /// Total occupied lineup slots this shift, INCLUDING injected mutant intruder slots. This is
+    /// the number of times the lineup actually has to advance before the shift can end — mutants
+    /// still occupy a real slot and must still be resolved (killed/fled/etc.) even though they are
+    /// excluded from <see cref="TotalSuspectsThisShift"/>. Used only by
+    /// <see cref="ShiftManager.SetNextSuspectReady"/> to know when the lineup is exhausted.
+    /// </summary>
+    public int TotalLineupSlotsThisShift => shiftSuspects.Count;
 
     /// <summary>
     /// True once <see cref="PopulateShiftCharacters"/> has finished running for the current shift.

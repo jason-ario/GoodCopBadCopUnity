@@ -1887,6 +1887,9 @@ public class SuspectController : NetworkBehaviour
                 netObj.Despawn();
         }
 
+        // Mutant intruder slots are excluded from the suspect total entirely (they're a random
+        // combat threat, not a "suspect to process") — do NOT fire OnSuspectProcessed here. This
+        // only advances the lineup slot count so the shift still ends at the right time.
         ShiftManager.Instance.SetNextSuspectReady();
     }
 

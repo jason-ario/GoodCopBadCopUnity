@@ -212,6 +212,22 @@ public class PlayerHealth : NetworkBehaviour
         {
             OnHealthChanged?.Invoke();
             OnDeath?.Invoke();
+
+            // Analytics: track player deaths — which day, and to what/whom (the effect key
+            // that dealt the killing blow, e.g. "MutantMeleeDamage", "RadiationTickDamage").
+            // Guarded by IsOwner so each death is only reported once, by the player who died,
+            // rather than by every remote client that also observes this NetworkVariable.
+            if (IsOwner)
+            {
+                int day = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+                string killer = LastHealthEffectKey;
+
+                GameAnalyticsSDK.GameAnalytics.NewDesignEvent($"Player:Death:{day}:{killer}");
+                GameAnalyticsSDK.GameAnalytics.NewProgressionEvent(
+                    GameAnalyticsSDK.GAProgressionStatus.Fail,
+                    $"Day{day}",
+                    killer);
+            }
         }
         else if (previousValue && !newValue)
         {

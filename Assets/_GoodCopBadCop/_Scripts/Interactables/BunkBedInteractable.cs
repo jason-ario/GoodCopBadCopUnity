@@ -282,6 +282,11 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
         OnSleepConfirmed?.Invoke();
 
+        // Analytics: track when a player uses the bunk bed to end the day, e.g. "BunkBed:Sleep:3".
+        int day = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
+        GameAnalyticsSDK.GameAnalytics.NewDesignEvent($"BunkBed:Sleep:{day}");
+        GameAnalyticsSDK.GameAnalytics.NewProgressionEvent(GameAnalyticsSDK.GAProgressionStatus.Complete, $"Day{day}");
+
         if (SFXController.Instance != null && _endDaySFX != null)
             SFXController.Instance.Play(_endDaySFX);
 

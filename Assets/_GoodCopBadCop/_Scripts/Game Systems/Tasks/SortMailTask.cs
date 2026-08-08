@@ -454,18 +454,25 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// package in place — locked and left sitting there (correct) — or bounces it back out
     /// (incorrect).
     ///
-    /// For <see cref="MailSortBinType.Delivery"/>, correctness additionally requires that
-    /// <paramref name="slotResidentName"/> (the resident assigned to the specific
-    /// <see cref="MailCubbySlot"/> the package was dropped into) matches the package's addressee —
+    /// For <see cref="MailSortBinType.Delivery"/>, correctness additionally requires that the
+    /// resident assigned to the specific <see cref="MailCubbySlot"/> the package was dropped into
+    /// (resolved from <paramref name="slotResidentPoolIndex"/> via
+    /// <see cref="MailCubbyManager.ResolveResident"/>) is the exact same <see cref="SuspectData"/>
+    /// reference as the package's addressee (<see cref="MailPackageItem.AssignedResident"/>) —
     /// dropping a deliverable package into the wrong resident's cubby is treated as incorrect,
-    /// even though the bin type matches.
+    /// even though the bin type matches. Matching is a direct object reference comparison, not a
+    /// display-name string comparison — both sides are ultimately drawn from the same
+    /// <see cref="SuspectSet"/> asset (see <see cref="SpawnSinglePackage"/> and
+    /// <see cref="MailCubbySlot.AssignedResident"/>), so comparing the actual SuspectData
+    /// reference sidesteps any whitespace/casing/typo mismatch that comparing two independently
+    /// built name strings could silently trip on.
     ///
     /// <paramref name="hasSnapPose"/>/<paramref name="snapPosition"/>/<paramref name="snapRotation"/>
     /// optionally carry a fixed placement pose (e.g. a cubby's <see cref="PlacementSlot"/>) so a
     /// correctly sorted package can be snapped exactly into place and have its throw momentum
     /// cleared — see <see cref="MailPackageItem.MarkDelivered"/>/<see cref="MailPackageItem.MarkConfiscated"/>.
     /// </summary>
-    public void EvaluateSort(MailPackageItem package, MailSortBinType binType, string slotResidentName = "",
+    public void EvaluateSort(MailPackageItem package, MailSortBinType binType, int slotResidentPoolIndex = -1,
         bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)
     {
         if (!IsServer) return;
@@ -478,9 +485,14 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (binType == MailSortBinType.Delivery)
             MailCubbyManager.Instance?.ClearAllHighlights();
 
+        SuspectData slotResident = binType == MailSortBinType.Delivery
+            ? MailCubbyManager.Instance?.ResolveResident(slotResidentPoolIndex)
+            : null;
+
         bool isCorrect = binType == MailSortBinType.Delivery
             ? package.CorrectBin == MailSortBinType.Delivery &&
-              string.Equals(slotResidentName?.Trim(), package.ResidentName?.Trim(), StringComparison.OrdinalIgnoreCase)
+              package.AssignedResident != null &&
+              slotResident == package.AssignedResident
             : package.CorrectBin == binType;
 
         if (isCorrect)
@@ -514,6 +526,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             if (away.sqrMagnitude < 0.01f) away = UnityEngine.Random.insideUnitSphere;
             package.RejectFromBin(away);
 
+            string slotResidentName = slotResident != null ? $"{slotResident.FirstName} {slotResident.LastName}".Trim() : "(none)";
             string reason = binType == MailSortBinType.Delivery && package.CorrectBin == MailSortBinType.Delivery
                 ? $"wrong cubby (dropped in '{slotResidentName}' cubby, belongs to '{package.ResidentName}')"
                 : $"dropped in {binType}, belongs in {package.CorrectBin}";
@@ -590,7 +603,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         netObj.Spawn(destroyWithScene: true);
-        package.ServerInitialize(residentName, goodsLabel, correctBin);
+        package.ServerInitialize(resident.SuspectData, residentName, goodsLabel, correctBin);
         _spawnedPackages.Add(netObj);
     }
 

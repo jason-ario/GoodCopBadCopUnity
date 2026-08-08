@@ -401,15 +401,18 @@ public class ShiftManager : NetworkBehaviour
         // random-suspect list has fewer slots than the intercept's index.
         bool interceptPending = SuspectController.InterceptNextSuspectSpawn != null;
 
-        // Guard against ending the shift on a stale/unpopulated count. TotalSuspectsThisShift is
-        // the single source of truth for "how many suspects this shift" (DailySuspectManager); if
-        // the lineup hasn't finished populating yet, treat that as "not done" rather than risking
-        // an early end-of-shift on a mismatched or zeroed-out count.
+        // Guard against ending the shift on a stale/unpopulated count. TotalLineupSlotsThisShift
+        // (DailySuspectManager) is the single source of truth for "how many lineup slots exist
+        // this shift" INCLUDING mutant intruder slots — mutants still occupy a real slot that must
+        // be resolved before the shift can end, even though they're excluded from the player-facing
+        // suspect total (DailySuspectManager.TotalSuspectsThisShift). If the lineup hasn't finished
+        // populating yet, treat that as "not done" rather than risking an early end-of-shift on a
+        // mismatched or zeroed-out count.
         DailySuspectManager suspectManager = DailySuspectManager.Instance;
-        bool lineupReady = suspectManager != null && suspectManager.IsLineupPopulated && suspectManager.TotalSuspectsThisShift > 0;
+        bool lineupReady = suspectManager != null && suspectManager.IsLineupPopulated && suspectManager.TotalLineupSlotsThisShift > 0;
 
         if (!interceptPending && lineupReady &&
-            SuspectController.Instance.SuspectIndex >= suspectManager.TotalSuspectsThisShift - 1)
+            SuspectController.Instance.SuspectIndex >= suspectManager.TotalLineupSlotsThisShift - 1)
         {
             HandleAllSuspectsProcessed();
             return;

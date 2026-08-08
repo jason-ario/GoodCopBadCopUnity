@@ -179,7 +179,10 @@ public abstract class DayBase : MonoBehaviour
     /// Actual quota shown in the "Process N subjects" objective text. Always read from
     /// <see cref="DailySuspectManager.TotalSuspectsThisShift"/> — the single source of truth for
     /// "how many suspects this shift", also used by <see cref="ProcessResidentsTask"/>'s Task Page
-    /// total and <see cref="ShiftManager"/>'s end-of-shift check. This class does NOT fall back to
+    /// total. That property deliberately EXCLUDES injected mutant intruder slots — mutants are a
+    /// random combat threat, never a "suspect to process", and must never affect this count (they
+    /// still occupy a lineup slot and still gate the actual end-of-shift, just via a separate,
+    /// mutant-inclusive count in <see cref="ShiftManager"/>). This class does NOT fall back to
     /// <see cref="SuspectsToProcess"/> here: that field is only the pre-injection draw request, and
     /// using it as a stand-in total is exactly what let this objective's displayed quota drift from
     /// the real end-of-shift count. Days that need a different displayed total than the actual
