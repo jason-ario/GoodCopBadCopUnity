@@ -922,16 +922,12 @@ public class ExamNotebook : PickableObject
         Debug.Log($"[ExamNotebook] RequestAddToFolderServerRpc: pageIndex={pageIndex} page={serverPage?.name ?? "NULL"} IsSpawned={serverPage?.NetworkObject?.IsSpawned} NetworkObjectId={serverPage?.NetworkObject?.NetworkObjectId}");
         folder.AddDocument(serverPage, playerPickupController, false);
 
-        // Mirrors FolderController.SyncDocumentAddedServerRpc's doc.SetInteractableNetworked(isOpen.Value)
-        // for idCard/application. Without this, exam pages filed via the notebook only ever got a
-        // raw, non-networked SetInteractable(true) call inside NotifyPagePlacedInFolderClientRpc below —
-        // that never touches _networkInteractableOverride, so the page silently stays on stale
-        // holder-based logic forever instead of the same override-driven path idCard/application use,
-        // and never gets picked up by a late-joining client (which only receives the current
-        // NetworkVariable state, not a one-off RPC that already fired). Routing through the networked
-        // override here is what actually makes RefreshDocumentInteractability's later re-enable (once
-        // the folder is set down and open) reach every client reliably, exactly like idCard/application.
-        serverPage.SetInteractableNetworked(folder.IsOpen);
+        // Mirrors FolderController.SyncDocumentAddedServerRpc's doc.SetInteractableNetworked(...)
+        // for idCard/application, so a late-joining client still resolves the correct state.
+        // Also refresh the server's own live collider/interactable state directly and
+        // immediately via FolderItem.RefreshFolderState — the single source of truth.
+        serverPage.SetInteractableNetworked(folder.IsOpen && !folder.IsHeld);
+        serverPage.RefreshFolderState();
 
         // PlacePageInSlotNetworked (called inside AddDocument) no longer sends PlaceInSlotClientRpc
         // via the page's NetworkObject because that RPC is silently dropped on non-host clients
@@ -1033,20 +1029,15 @@ public class ExamNotebook : PickableObject
                 folder.documents.Add(page);
         }
 
-        // Interactable state is already driven by the server via SetInteractableNetworked in
-        // RequestAddToFolderServerRpc (mirrors FolderController.SyncDocumentAddedServerRpc for
-        // idCard/application) — do NOT independently compute a new interactable value here,
-        // that raw call never touched _networkInteractableOverride and would silently fight
-        // the networked value depending on RPC vs. NetworkVariable arrival order, producing
-        // exactly the "sometimes grabbable, sometimes not" inconsistency previously reported.
-        // However, SetSocketFollow above unconditionally disables physics colliders via
-        // PickableColliderController.SetHeld(), which runs after (and so can clobber) whatever
-        // the networked override already decided. Re-applying that SAME already-decided value
-        // (rather than computing an independent one) is safe here — see
-        // PickableObject.ApplyNetworkInteractableState.
-        if (page is FolderItem)
+        // insideThisFolder/documents are now consistent on this client (set just above), so
+        // refresh this page's collider/interactable state directly from the folder's live
+        // open/held state — see FolderItem.RefreshFolderState, the single source of truth.
+        // SetSocketFollow above unconditionally disables physics colliders via
+        // PickableColliderController.SetHeld(), which runs before this and would otherwise be
+        // left as the last word on the page's collider state.
+        if (page is FolderItem folderItemToRefresh)
         {
-            page.ApplyNetworkInteractableState();
+            folderItemToRefresh.RefreshFolderState();
         }
 
         AnyPageFiled = true;

@@ -6,40 +6,59 @@ public class FolderItem : PickableObject
     public FolderController insideThisFolder;
 
     /// <summary>
-    /// Whether re-enabling should be blocked while the owning folder is currently held by a
-    /// player (in addition to always being blocked while the folder is closed). True for
-    /// ID card / Application (you should not be able to grab those out of a folder someone
-    /// is actively carrying), but overridden to false by <see cref="ExamPage"/>, which must
-    /// stay grabbable/interactable even while the folder is held — that's the normal flow of
-    /// carrying an open folder around while filing/rearranging exam pages in it.
-    /// </summary>
-    protected virtual bool BlockInteractableWhileFolderHeld => true;
-
-    /// <summary>
-    /// Prevents the document from becoming interactable while it is inside a folder that
-    /// is either held by any player (see <see cref="BlockInteractableWhileFolderHeld"/>) or
-    /// currently closed. Documents should only be
-    /// interactable when the folder is open and not held.
+    /// Prevents the document from becoming interactable unless it is inside a folder that is
+    /// both open AND not currently held by any player. Filed documents (ID card, Application,
+    /// exam pages) should only ever be grabbable when the folder holding them has been placed
+    /// down and opened — never while someone is carrying the folder around, open or not.
     /// Every code path that tries to re-enable a document (e.g. the base-class
     /// OnHoldingClientChanged callback, or the holder-clear that fires when a notebook
     /// releases a page) goes through this method, so a single guard here is sufficient.
+    /// This only governs the base class's raycast-interaction markers (e.g. an exam page's
+    /// InteractableCollider) — the document's own physical root collider(s) are governed
+    /// separately and directly by <see cref="RefreshFolderState"/>, which is the single
+    /// source of truth FolderController calls for every add/open/close/hold/drop event.
     /// </summary>
     public override void SetInteractable(bool value)
     {
-        // Block re-enabling when inside a folder that is closed, or (for subclasses that
-        // opt in via BlockInteractableWhileFolderHeld) currently held.
+        // Block re-enabling unless inside a folder that is both open and not held.
         if (value && insideThisFolder != null &&
-            ((BlockInteractableWhileFolderHeld && insideThisFolder.IsHeld) || !insideThisFolder.IsOpen))
+            (!insideThisFolder.IsOpen || insideThisFolder.IsHeld))
             return;
 
         base.SetInteractable(value);
+    }
+
+    /// <summary>
+    /// The single, simple rule for a filed document's own root physical collider(s) and its
+    /// raycast-interaction state, recomputed fresh from the folder's current live state:
+    /// • Folder open AND not held  → collider(s) enabled as triggers (grabbable, never
+    ///   physically shoves the carrying player or collides with the folder body).
+    /// • Folder closed, OR held    → collider(s) disabled entirely (can't block raycasts
+    ///   aimed at a closed folder, can't physically collide with anything while carried).
+    /// Called directly by FolderController whenever a document is added, or the folder's
+    /// open/closed or held/dropped state changes — no separate NetworkVariable round-trip
+    /// or indirection, so there is nothing else that can clobber or race this state.
+    /// </summary>
+    public void RefreshFolderState()
+    {
+        if (insideThisFolder == null) return;
+
+        bool interactable = insideThisFolder.IsOpen && !insideThisFolder.IsHeld;
+
+        foreach (Collider col in GetComponents<Collider>())
+        {
+            col.isTrigger = true;
+            col.enabled = interactable;
+        }
+
+        SetInteractable(interactable);
     }
 
     public virtual void AddToFolder(FolderController folder)
     {
         insideThisFolder = folder;
         folder.documents.Add(this);
-        SetInteractable(folder.IsOpen);
+        RefreshFolderState();
     }
     
     public virtual void RemovePromFolder()

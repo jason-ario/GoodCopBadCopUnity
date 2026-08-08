@@ -235,16 +235,29 @@ public class PickableObject : Interactable
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
-        // Update trigger state on all clients, independent of the interactable lock.
-        if (current != ulong.MaxValue)
-            _colliderController?.SetHeld();
-        else
-            _colliderController?.SetReleased();
+        // Update trigger state on all clients, independent of the interactable lock — except
+        // for a filed FolderItem (ID card, Application, exam page), whose root collider is
+        // solely owned and driven by FolderController/FolderItem.RefreshFolderState based on
+        // the folder's open/held state, not this document's own held state. Running this
+        // unconditionally here raced with (and could clobber) that decision the instant a
+        // document's own IsHeld flips to false on being dropped into the folder.
+        FolderItem fi = this as FolderItem;
+        bool isFiledFolderItem = fi != null && fi.insideThisFolder != null;
+        if (!isFiledFolderItem)
+        {
+            if (current != ulong.MaxValue)
+                _colliderController?.SetHeld();
+            else
+                _colliderController?.SetReleased();
+        }
 
         if (_interactableLocked) return;
         // Only apply holder-based logic when no tutorial override is active.
         if (_networkInteractableOverride.Value == -1)
             SetInteractable(current == ulong.MaxValue);
+
+        if (isFiledFolderItem)
+            fi.RefreshFolderState();
 
         // Notify all instances (including server) when this object transitions to being held.
         if (previous == ulong.MaxValue && current != ulong.MaxValue)
@@ -578,11 +591,18 @@ public class PickableObject : Interactable
             // FolderItems (ID card, Application, exam pages) this runs AFTER — and therefore
             // wins over — whatever collider/interactable state was already authoritatively
             // decided, since this ClientRpc always arrives at least one network tick later.
-            // Re-applying the already-decided state (not computing a new one) here is safe and
-            // cannot fight the networked override — see ApplyNetworkInteractableState.
-            if (this is FolderItem)
+            // Refresh directly from the folder's live open/held state — the single source of
+            // truth — rather than the separate networked override, which can be stale or
+            // never have been told about this folder association yet.
+            if (this is FolderItem folderItem)
             {
-                ApplyNetworkInteractableState();
+                // insideThisFolder may not be set yet on this client (e.g. it wasn't the one
+                // that physically filed the document) — RefreshFolderState is a no-op without
+                // it, so ensure the association exists before refreshing.
+                if (folderItem.insideThisFolder == null)
+                    folderItem.insideThisFolder = folder;
+
+                folderItem.RefreshFolderState();
             }
         }
         else

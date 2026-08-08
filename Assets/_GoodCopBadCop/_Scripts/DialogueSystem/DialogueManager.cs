@@ -146,7 +146,7 @@ public class DialogueManager : NetworkBehaviour
         if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
         if (audioSource == null) { onComplete?.Invoke(); return; }
         
-        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete, isMutant));
+        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete, isMutant, isMegaphone: false));
     }
 
     /// <summary>
@@ -176,10 +176,10 @@ public class DialogueManager : NetworkBehaviour
         {
             _megaphoneAudioCoroutine = null;
             onComplete?.Invoke();
-        }, isMutant: false));
+        }, isMutant: false, isMegaphone: true));
     }
 
-    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null, bool isMutant = false)
+    IEnumerator PlayDialogueAudio(string dialogue, AudioSource audioSource, AudioClip[] audioClips, UnityAction onComplete = null, bool isMutant = false, bool isMegaphone = false)
     {
         // Reset pitch before starting. A previous coroutine stopped mid-shift would leave
         // the AudioSource in a dirty state; reading it as basePitch would compound the shift
@@ -188,7 +188,10 @@ public class DialogueManager : NetworkBehaviour
         float basePitch = 1f;
 
         // Track the active source so StopDialogueAudio / megaphone stop can call Stop() on it.
-        bool isMegaphone = _megaphoneAudioCoroutine != null && onComplete != null;
+        // isMegaphone is passed explicitly by the caller (PlayMegaphoneAudio vs. PlayDialogueAudio)
+        // rather than inferred from coincidental state — inferring it from whether
+        // _megaphoneAudioCoroutine happened to be non-null caused suspect dialogue audio to be
+        // mistaken for megaphone audio (and vice versa) whenever both were in flight together.
         if (isMegaphone)
             _activeMegaphoneSource = audioSource;
         else

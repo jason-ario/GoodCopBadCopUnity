@@ -1458,7 +1458,7 @@ public class Day_01 : DayBase
 
         // Hide the task list, then show the accuracy-payout overlay.
         // ReshowSubjectCounter runs after the player closes the overlay.
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowAccuracyPayoutOverlay);
+        HideObjectiveListThenRun(1.5f, ShowAccuracyPayoutOverlay);
 
         Debug.Log("[Day_01] Quarantine tutorial complete — folder handed off.");
     }
@@ -1839,7 +1839,7 @@ public class Day_01 : DayBase
 
         // Pass ShowSubjectCounterTask as the onComplete callback so the counter appears
         // the moment the list finishes its close animation — no separate timer needed.
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: ShowSubjectCounterTask);
+        HideObjectiveListThenRun(1.5f, ShowSubjectCounterTask);
 
         Debug.Log("[Day_01] Button pressed — ATM task list dismissed, subject counter will appear after close animation.");
     }
@@ -2426,7 +2426,40 @@ public class Day_01 : DayBase
 
         MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_preBreachClockOutFakeoutBark);
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: BeginMutantBreachSequence);
+        // Hide the objective list panel (cosmetic only — safe if interrupted), but drive the
+        // actual breach trigger from a coroutine owned by Day_01 itself rather than as
+        // HideAndClear's onComplete callback. TutorialObjectiveList lives under Player HUD
+        // ("/---UI Controller/Player HUD/Tutorial Overlay"), which UIController.ClosePlayerUI()
+        // (called the instant ANY dialogue opens, e.g. talking to Vlad) deactivates — killing any
+        // in-flight coroutine on that hierarchy, including HideAndClear's delayed onComplete.
+        // That silently dropped the scripted first breach entirely if the player opened dialogue
+        // during the 1.5s window. See HideObjectiveListThenRun.
+        HideObjectiveListThenRun(1.5f, BeginMutantBreachSequence);
+    }
+
+    /// <summary>
+    /// Hides the shared <see cref="TutorialObjectiveList"/> panel and, after
+    /// <paramref name="delay"/> seconds, invokes <paramref name="onComplete"/> — mirroring
+    /// <see cref="TutorialObjectiveList.HideAndClear"/>'s own preHideDelay/onComplete pattern,
+    /// but running the delay/callback on THIS (Day_01) MonoBehaviour instead of on
+    /// TutorialObjectiveList. TutorialObjectiveList lives under Player HUD
+    /// ("/---UI Controller/Player HUD/Tutorial Overlay"), which UIController.ClosePlayerUI()
+    /// deactivates the instant any dialogue opens (SuspectWorldDialogue, ScriptedDialogueRunner).
+    /// Deactivating a GameObject kills any coroutine running on it, so passing onComplete
+    /// directly into HideAndClear would silently drop callbacks that fire critical game logic
+    /// (e.g. triggering the first mutant breach) if the player talked to an NPC during the
+    /// preHideDelay window. Purely cosmetic hides can still call HideAndClear directly.
+    /// </summary>
+    private void HideObjectiveListThenRun(float delay, System.Action onComplete)
+    {
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: delay);
+        StartCoroutine(DelayedInvoke(delay, onComplete));
+    }
+
+    private IEnumerator DelayedInvoke(float delay, System.Action onComplete)
+    {
+        yield return new WaitForSeconds(delay);
+        onComplete?.Invoke();
     }
 
     private string GetTrashTaskText(int deposited, int total) =>
@@ -2484,7 +2517,7 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskClockOut);
         _taskClockOut = null;
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: WaitForShiftEndThenOpenBunker);
+        HideObjectiveListThenRun(1.5f, WaitForShiftEndThenOpenBunker);
     }
 
     /// <summary>

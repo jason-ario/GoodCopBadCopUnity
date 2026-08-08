@@ -270,18 +270,16 @@ public class FolderController : PickableObject
         AudioClip clip = newVal ? folderOpenClip : folderCloseClip;
         SFXController.Instance.PlayAtPosition(clip, transform.position);
 
-        // Only update document interactability when the folder is NOT being held.
-        // While held, OnHeldStateChanged manages it once the folder is actually released.
-        if (IsHeld) return;
+        // Documents (ID card, Application, exam pages) have their own root collider(s) and
+        // raycast-interaction state refreshed directly and immediately here — see
+        // FolderItem.RefreshFolderState for the single simple rule this applies.
+        RefreshAllDocumentStates();
 
-        // Use the networked path on the server so the NetworkVariable override is cleared.
-        // The local SetInteractable is insufficient here — it is overridden by
-        // ApplyNetworkInteractableState on any client where _networkInteractableOverride != -1
-        // (e.g. a tutorial-locked document that was filed while the folder was closed).
-        // Routing through the server ensures the NetworkVariable update reaches every client.
+        // Still push the networked override on the server so the state persists correctly
+        // for late-joiners (see SetInteractableNetworked).
         if (IsServer)
         {
-            RefreshDocumentInteractability(newVal);
+            PushDocumentInteractabilityNetworked(newVal && !IsHeld);
         }
     }
 
@@ -594,8 +592,9 @@ public class FolderController : PickableObject
         if (isOpen.Value)
         {
             player.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
-            if(idCard != null){ idCard.SetInteractable(false); }
-            if(application != null){ application.SetInteractable(false); }
+            // Documents lock the instant the folder becomes held — handled by
+            // OnHeldStateChanged once the networked holder state actually updates,
+            // not here (see OnHeldStateChanged / ApplyDocumentInteractability).
         }
     }
 
@@ -629,10 +628,10 @@ public class FolderController : PickableObject
             PickableObject doc = netObj.GetComponent<PickableObject>();
             if (doc != null)
             {
-                // Clear the tutorial override — OnIsOpenChanged will immediately re-apply the
-                // correct state via SetInteractableNetworked when the folder next opens or closes.
-                // Apply the current open state right now so clients see the correct state immediately.
-                doc.SetInteractableNetworked(isOpen.Value);
+                // Clear the tutorial override — the direct RefreshFolderState call below sets
+                // the correct collider/interactable state immediately, on the server, right now.
+                doc.SetInteractableNetworked(isOpen.Value && !IsHeld);
+                (doc as FolderItem)?.RefreshFolderState();
 
                 // Only fire OnDocumentAdded for non-host filers — the host already fired it
                 // locally in AddDocument, so re-firing here would double-count in the tutorial.
@@ -655,11 +654,9 @@ public class FolderController : PickableObject
 
     /// <summary>
     /// Received on every client except the one that originally filed the document.
-    /// Resolves the local reference and registers the folder association so that
-    /// RemovePromFolder / document-removal logic works on this client too.
-    /// Interactable state is already driven by the server via SetInteractableNetworked in
-    /// SyncDocumentAddedServerRpc — we must NOT call local SetInteractable here because
-    /// it fights with the NetworkVariable override and produces different results per client.
+    /// Resolves the local reference and registers the folder association, then refreshes this
+    /// document's own collider/interactable state directly and immediately via
+    /// FolderItem.RefreshFolderState — the single source of truth, safe to call on any client.
     /// </summary>
     [ClientRpc]
     private void SyncDocumentAddedClientRpc(NetworkObjectReference documentRef, string itemName, ClientRpcParams clientParams = default)
@@ -676,6 +673,7 @@ public class FolderController : PickableObject
             {
                 idCard.insideThisFolder = this;
                 documents.Add(idCard);
+                idCard.RefreshFolderState();
             }
             OnDocumentAdded?.Invoke(doc);
         }
@@ -687,6 +685,7 @@ public class FolderController : PickableObject
             {
                 application.insideThisFolder = this;
                 documents.Add(application);
+                application.RefreshFolderState();
             }
             OnDocumentAdded?.Invoke(doc);
         }
@@ -1193,11 +1192,13 @@ public class FolderController : PickableObject
         if (examPage.insideThisFolder == null)
             examPage.insideThisFolder = this;
 
-        // Apply the folder's current open state so a page added to a closed folder is
-        // immediately non-interactable on all clients, and one added to an open folder
-        // remains interactable — matching the SyncDocumentAddedServerRpc behaviour for
-        // idCard and application.
-        examPage.SetInteractableNetworked(isOpen.Value);
+        // Apply the folder's current open+held state so a page added to a closed or held
+        // folder is immediately non-interactable on all clients, and one added to an open,
+        // unheld folder remains interactable — matching the SyncDocumentAddedServerRpc
+        // behaviour for idCard and application. RefreshFolderState recomputes live from
+        // insideThisFolder, so this server instance is guaranteed correct.
+        examPage.SetInteractableNetworked(isOpen.Value && !IsHeld);
+        examPage.RefreshFolderState();
 
         // Correct every client's visual placement to the authoritative slot in case the
         // dropping client's optimistic guess (used for the immediate player.DropObject call)
@@ -1233,14 +1234,11 @@ public class FolderController : PickableObject
         // SetSocketFollow above unconditionally disables the document's physics colliders via
         // PickableColliderController.SetHeld() (appropriate for slot-following generally), but
         // this ClientRpc always arrives after RegisterExamPageInQueueServerRpc's earlier
-        // SetInteractableNetworked call above, so it wins and leaves the page's collider (and,
-        // for ExamPage, its InteractableCollider raycast marker) disabled regardless of the
-        // folder's actual open state. Re-apply the already-decided networked state here — the
-        // last step in this chain — so it isn't left clobbered by SetHeld().
-        if (doc is FolderItem)
-        {
-            doc.ApplyNetworkInteractableState();
-        }
+        // SetInteractableNetworked call above, so it wins and leaves the page's collider (and
+        // its InteractableCollider raycast marker) disabled regardless of the folder's actual
+        // open state. Re-apply the folder's live state directly here — the last step in this
+        // chain — so it isn't left clobbered by SetHeld().
+        (doc as FolderItem)?.RefreshFolderState();
 
         // AddDocument's direct-drop path only calls AddToFolder (which sets insideThisFolder)
         // locally on whichever client physically dropped the page — every other client (and the
@@ -1319,10 +1317,7 @@ public class FolderController : PickableObject
         // Restore the correct interactable/collider state afterward — see the matching
         // comment in SnapExamPageToSlotClientRpc for why SetSocketFollow's SetHeld() call
         // must not be left as the last word on this document's collider state.
-        if (doc is FolderItem)
-        {
-            doc.ApplyNetworkInteractableState();
-        }
+        (doc as FolderItem)?.RefreshFolderState();
     }
 
     public void AddNotebookPaper(string itemName, PlayerPickupController player)
@@ -1370,22 +1365,71 @@ public class FolderController : PickableObject
     /// on the dropping client) could check IsHeld before ReleaseHolderServerRpc's effect on
     /// _holdingClientId had actually propagated, permanently leaving filed documents
     /// non-interactable even after the folder was placed down and open.
+    /// Documents should only ever be interactable while the folder is both open AND not held,
+    /// so every held-state transition (pickup or release) recomputes and applies that combined
+    /// state — locking immediately on pickup, and unlocking only if the folder is also open
+    /// on release.
     /// </summary>
     protected override void OnHeldStateChanged(bool isHeld)
     {
-        if (!IsServer) return;
-        if (isHeld) return;
-        if (!isOpen.Value) return;
+        // isOpen.Value is already correctly synced locally on every client at this point
+        // (this callback only fires once _holdingClientId itself has finished syncing), so
+        // refresh every document's collider/interactable state directly and immediately here.
+        RefreshAllDocumentStates();
 
-        RefreshDocumentInteractability(true);
+        if (IsServer)
+        {
+            PushDocumentInteractabilityNetworked(isOpen.Value && !isHeld);
+        }
+    }
+
+    /// <summary>
+    /// Continuously self-corrects every filed document's collider/interactable state every
+    /// frame, straight from this folder's live open/held state. This is intentionally
+    /// belt-and-suspenders on top of the explicit RefreshAllDocumentStates() calls in
+    /// OnIsOpenChanged/OnHeldStateChanged/document-filing: those cover every known event, but
+    /// several other systems (SetSocketFollow's SetHeld(), the folder's own
+    /// PickableColliderController, a document's own held-state callback) have repeatedly been
+    /// found to clobber a document's collider state after the "correct" event already applied
+    /// it, via timing/ordering this class does not control. Since RefreshFolderState is a
+    /// cheap, pure function of live state (a handful of Collider field writes, no allocations
+    /// once JIT-inlined), running it every frame guarantees the visible state is never wrong
+    /// for more than one frame, no matter what else touches these colliders in between.
+    /// </summary>
+    private void Update()
+    {
+        RefreshAllDocumentStates();
+    }
+
+    /// <summary>
+    /// The single place that refreshes every filed document's own root physical collider(s)
+    /// and raycast-interaction state, straight from the folder's current live open/held state.
+    /// See <see cref="FolderItem.RefreshFolderState"/> for the exact rule applied per document.
+    /// Call this — not any cached "interactable" bool — from every event that could change a
+    /// document's correct state: filing it, opening/closing the folder, or picking up/dropping
+    /// the folder. Because each document recomputes from live state rather than a separate
+    /// NetworkVariable round-trip, nothing else in the pickup/collider systems can clobber or
+    /// race this — see PickableColliderController's FolderItem exclusion for the one other
+    /// system that used to fight this.
+    /// </summary>
+    private void RefreshAllDocumentStates()
+    {
+        idCard?.RefreshFolderState();
+        application?.RefreshFolderState();
+
+        foreach (ExamPage examPage in _examPageQueue)
+        {
+            examPage?.RefreshFolderState();
+        }
     }
 
     /// <summary>
     /// Server-only: pushes the given interactable state to the ID card, application, and every
-    /// queued exam page via the networked path so the change reaches every client and clears
-    /// any stale tutorial override.
+    /// queued exam page via the networked path so the state persists correctly for late-joiners
+    /// and clears any stale tutorial override. Does not replace <see cref="ApplyDocumentInteractability"/>
+    /// — that call already applied the visible state immediately on every client.
     /// </summary>
-    private void RefreshDocumentInteractability(bool interactable)
+    private void PushDocumentInteractabilityNetworked(bool interactable)
     {
         if (idCard != null)       idCard.SetInteractableNetworked(interactable);
         if (application != null)  application.SetInteractableNetworked(interactable);

@@ -25,16 +25,30 @@ public class PickableColliderController : MonoBehaviour
 {
     private Collider[] _physicsColliders;
 
+    // Null when this controller belongs to the folder itself; non-null when it belongs to a
+    // document (ID card, Application, exam page) picked up on its own outside a folder.
+    private FolderItem _ownFolderItem;
+
     private void Awake()
     {
+        _ownFolderItem = GetComponent<FolderItem>();
+
         // Collect every collider that is NOT an InteractableCollider raycast marker and NOT
         // a click-detection trigger (IClickable on the same GameObject).
         // Colliders on IClickable objects must stay enabled while held so the ClickDetector
         // can still raycast through them; they don't cause physical obstruction because they
         // are already triggers and don't interact with geometry.
+        // When this controller belongs to the folder itself (_ownFolderItem == null), skip any
+        // collider belonging to a filed FolderItem (ID card, Application, exam pages): those
+        // are parented under the folder while filed, so a naive GetComponentsInChildren scan
+        // here would otherwise pick them up and force-solidify them whenever the folder is
+        // held/released — clobbering the open/closed/held state FolderController manages
+        // directly. A document's own controller must still manage its own root collider when
+        // picked up standalone, so this exclusion only ever applies to the folder's controller.
         _physicsColliders = GetComponentsInChildren<Collider>(true)
             .Where(c => c.GetComponent<InteractableCollider>() == null
-                     && c.GetComponent<IClickable>() == null)
+                     && c.GetComponent<IClickable>() == null
+                     && (_ownFolderItem != null || c.GetComponentInParent<FolderItem>() == null))
             .ToArray();
 
         // Ensure solid state at spawn regardless of prefab-default trigger settings.
@@ -70,6 +84,9 @@ public class PickableColliderController : MonoBehaviour
             if (col == null) continue;
             if (col.GetComponent<InteractableCollider>() != null) continue;
             if (col.GetComponent<IClickable>() != null) continue;
+            // Skip filed documents' colliders when this is the folder's own controller —
+            // see the exclusion note in Awake above.
+            if (_ownFolderItem == null && col.GetComponentInParent<FolderItem>() != null) continue;
             col.enabled = true;
             col.isTrigger = false;
         }
