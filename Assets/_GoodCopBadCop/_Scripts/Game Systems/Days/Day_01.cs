@@ -150,7 +150,7 @@ public class Day_01 : DayBase
 
     [Tooltip("Number of documentation anomalies to force-activate on the random quarantine tutorial suspect (index 2) for the Day 1 tutorial. Matches the '2 symptoms = Quarantine' threshold.")]
     [FormerlySerializedAs("_ivanDocumentationAnomalyCount")]
-    [SerializeField] private int _quarantineDocumentationAnomalyCount = 2;
+    [SerializeField] private int _quarantineDocumentationAnomalyCount = 5;
 
     [Tooltip("Task text shown while the player needs to get a documentation checklist.")]
     [SerializeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
@@ -485,6 +485,17 @@ public class Day_01 : DayBase
     private bool _goreResolved;
     private bool _bloodResolved;
 
+    // Guards OnMutantBreachCleared against running more than once per breach — e.g. if
+    // MutantBreachManager.OnBreachClearedAllClients ever fires twice for one breach, or this
+    // handler ends up subscribed more than once (DayActivated re-subscribing without a matching
+    // DayDeactivated unsubscribe first). Without this, a duplicate call re-runs
+    // BeginPostBreachFenceCheck, and since EnsureCleanBloodSplatterObjective/EnsureTakeOutGoreObjective
+    // are only guarded against re-adding a row while the FIRST run's row is still tracked (not
+    // against BeginPostBreachFenceCheck itself re-running), a second pass that lands after the
+    // first row already completed and cleared would add a second, genuinely simultaneous-looking
+    // "Clean up the blood"/"Take out the gore" row. Reset when the next breach starts.
+    private bool _breachClearedHandled;
+
     // Both the trash and graffiti objectives are added to the same shared
     // TutorialObjectiveList around the same time (see OnTrashTaskReadySync).
     // These flags gate HideAndClear so the whole list isn't cleared out from
@@ -532,6 +543,8 @@ public class Day_01 : DayBase
         // DayDeactivated/OnDestroy so Day 2+ get these tasks' rows from the generic bridge again.
         if (TakeOutTrashTask.Instance != null) TakeOutTrashTask.Instance.HasCustomTutorialRow = true;
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = true;
+        if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = true;
+        if (CleanBloodTask.Instance != null) CleanBloodTask.Instance.HasCustomTutorialRow = true;
 
         // Reset the clock-in tutorial arrow to hidden — OnDayStarted shows it once the
         // Day number pop-up plays.
@@ -746,10 +759,12 @@ public class Day_01 : DayBase
         _taskTakeOutGore = null;
         _taskCleanBloodSplatter = null;
 
-        // Release the trash/graffiti objectives so Day 2+ get their rows from the generic
-        // HUDTaskList/TaskRegistry bridge again (see HasCustomTutorialRow, set in DayActivated).
+        // Release the trash/graffiti/fence/blood objectives so Day 2+ get their rows from the
+        // generic HUDTaskList/TaskRegistry bridge again (see HasCustomTutorialRow, set in DayActivated).
         if (TakeOutTrashTask.Instance != null) TakeOutTrashTask.Instance.HasCustomTutorialRow = false;
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = false;
+        if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = false;
+        if (CleanBloodTask.Instance != null) CleanBloodTask.Instance.HasCustomTutorialRow = false;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -843,10 +858,12 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnTrashBagGrabbedAllClients    -= OnTrashBagGrabbedSync;
         TrashBagPicker.OnBagDispensedLocally            -= OnTrashBagDispensedLocal;
 
-        // Safety net: release the trash/graffiti objectives if this component is destroyed
-        // mid-day without DayDeactivated running first (see DayActivated/DayDeactivated).
+        // Safety net: release the trash/graffiti/fence/blood objectives if this component is
+        // destroyed mid-day without DayDeactivated running first (see DayActivated/DayDeactivated).
         if (TakeOutTrashTask.Instance != null) TakeOutTrashTask.Instance.HasCustomTutorialRow = false;
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = false;
+        if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = false;
+        if (CleanBloodTask.Instance != null) CleanBloodTask.Instance.HasCustomTutorialRow = false;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -2660,6 +2677,7 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnMutantBreachStarted()
     {
+        _breachClearedHandled = false;
         StartCoroutine(MutantBreachWarningSequence());
     }
 
@@ -2741,6 +2759,10 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnMutantBreachCleared()
     {
+        // One-shot guard — see _breachClearedHandled's doc comment for why this matters.
+        if (_breachClearedHandled) return;
+        _breachClearedHandled = true;
+
         // Safety net in case a shovel was never picked up during the fight — each one already
         // clears itself immediately on pickup via OnBreachShovel1PickedUp/2PickedUp.
         DisarmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);

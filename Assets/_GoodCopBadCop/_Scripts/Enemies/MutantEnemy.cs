@@ -97,6 +97,18 @@ public class MutantEnemy : NetworkBehaviour
              "useSecondAttackAnimation is enabled.")]
     [SerializeField] private string secondAttackStateName = "Mutant Attack 2";
 
+    [Header("Hit / Knockback Animation (optional)")]
+    [Tooltip("When enabled, fires hitTriggerName on the Animator whenever this mutant survives a " +
+             "knockback-carrying hit. Leave disabled for mutants whose rig/controller has no hit-reaction " +
+             "state set up.")]
+    [SerializeField] private bool enableHitAnimation = false;
+
+    [Tooltip("Animator trigger parameter name fired for the hit/knockback reaction. Using a trigger (rather " +
+             "than CrossFade) lets the Animator Controller's own transitions decide how/when to blend into " +
+             "it, so it doesn't stomp whatever state (attack, locomotion, etc.) is currently playing. Only " +
+             "used when enableHitAnimation is enabled.")]
+    [SerializeField] private string hitTriggerName = "Hit";
+
     [Header("Door Interaction")]
     [Tooltip("Radius within which the mutant detects and forces open doors or gates blocking its NavMesh path.")]
     [SerializeField] private float doorDetectionRadius = 3f;
@@ -584,7 +596,8 @@ public class MutantEnemy : NetworkBehaviour
 
                     if (_fenceTarget != null && _fenceTarget.IsSpawned && !_fenceTarget.IsPassableByMutant)
                     {
-                        _agent.isStopped = false;
+                        if (_knockbackCoroutine == null)
+                            _agent.isStopped = false;
                         _agent.stoppingDistance = data.fenceStopDistance;
                         SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
 
@@ -651,7 +664,8 @@ public class MutantEnemy : NetworkBehaviour
                         // surface) rather than the general-purpose stoppingDistance, so the mutant
                         // closes in all the way to melee range instead of stopping at the same
                         // distance it would use for chasing a player or bashing a door.
-                        _agent.isStopped = false;
+                        if (_knockbackCoroutine == null)
+                            _agent.isStopped = false;
                         _agent.stoppingDistance = data.fenceStopDistance;
                         SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
 
@@ -660,7 +674,8 @@ public class MutantEnemy : NetworkBehaviour
                     }
                     else if (_doorTarget != null)
                     {
-                        _agent.isStopped = false;
+                        if (_knockbackCoroutine == null)
+                            _agent.isStopped = false;
                         _agent.stoppingDistance = data.stoppingDistance;
                         SetAgentDestination(_doorTarget.transform.position, _doorTarget);
 
@@ -670,7 +685,8 @@ public class MutantEnemy : NetworkBehaviour
                     }
                     else
                     {
-                        _agent.isStopped = false;
+                        if (_knockbackCoroutine == null)
+                            _agent.isStopped = false;
                         _agent.stoppingDistance = data.stoppingDistance;
                         SetAgentDestination(aggroTarget.position, aggroTarget);
 
@@ -997,7 +1013,8 @@ public class MutantEnemy : NetworkBehaviour
             {
                 // Fence broken — resume navigation toward the aggro target immediately.
                 _fenceTarget = null;
-                _agent.isStopped = false;
+                if (_knockbackCoroutine == null)
+                    _agent.isStopped = false;
                 _agent.stoppingDistance = data.stoppingDistance;
                 InvalidateDestination();
                 _agent.SetDestination(aggroTarget.position);
@@ -1331,8 +1348,13 @@ public class MutantEnemy : NetworkBehaviour
 
         // Freeze movement for the swing's windup so the mutant plants its feet and actually
         // swings instead of continuing to slide toward the player mid-animation. DelayedHitScan
-        // releases the lock once the swing connects.
-        _agent.isStopped = true;
+        // releases the lock once the swing connects. Skip this while a knockback shove is in
+        // progress — KnockbackCoroutine already owns isStopped for its duration, and letting the
+        // attack windup and the knockback fight over it is what let attacks silently cancel
+        // knockback (isStopped flips back to false mid-shove, letting the agent's autopilot
+        // immediately override the manual Move() displacement).
+        if (_knockbackCoroutine == null)
+            _agent.isStopped = true;
 
         // Schedule the sphere-cast to fire at the melee impact frame on the server.
         StartCoroutine(DelayedHitScan(data.damagePerHit));
@@ -1365,7 +1387,9 @@ public class MutantEnemy : NetworkBehaviour
     {
         yield return new WaitForSeconds(attackHitDelay);
 
-        if (!_isDead)
+        // Don't resume movement if a knockback shove started mid-windup (or is still running) —
+        // KnockbackCoroutine is responsible for clearing isStopped itself once the shove finishes.
+        if (!_isDead && _knockbackCoroutine == null)
             _agent.isStopped = false;
 
         if (_isDead || attackHitbox == null)
@@ -1386,6 +1410,18 @@ public class MutantEnemy : NetworkBehaviour
                 attackState = secondAttackStateName;
 
             animator.CrossFade(attackState, 0.2f, 0, 0f);
+        }
+    }
+
+    [ClientRpc]
+    private void TriggerHitAnimationClientRpc()
+    {
+        if (animator != null && !string.IsNullOrEmpty(hitTriggerName))
+        {
+            // A trigger (rather than CrossFade) so the Animator Controller's own transitions decide
+            // how/when to blend into the reaction, instead of forcibly overriding whatever state
+            // (attack windup, locomotion, etc.) is currently playing.
+            animator.SetTrigger(hitTriggerName);
         }
     }
 
@@ -1508,7 +1544,12 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         if (knockbackDirection.HasValue)
+        {
+            if (enableHitAnimation)
+                TriggerHitAnimationClientRpc();
+
             ApplyKnockback(knockbackDirection.Value);
+        }
     }
 
     /// <summary>

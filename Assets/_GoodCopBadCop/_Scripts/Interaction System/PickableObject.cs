@@ -525,8 +525,18 @@ public class PickableObject : Interactable
     [ServerRpc(RequireOwnership = false)]
     public void DespawnServerRpc()
     {
+        OnBeforeDespawnServer();
         NetworkHelper.Despawn(NetworkObject);
     }
+
+    /// <summary>
+    /// Server-only extension point invoked right before this object is despawned via
+    /// <see cref="DespawnServerRpc"/>. Override to despawn any additional NetworkObjects that
+    /// are logically part of this item but aren't its children (e.g. <see cref="ExamNotebook"/>'s
+    /// dynamically-spawned pages) — otherwise they'd be orphaned in the scene after this object
+    /// is destroyed. Only ever invoked on the server.
+    /// </summary>
+    protected virtual void OnBeforeDespawnServer() { }
 
     /// <summary>
     /// Places this object into a slot that is a child of another NetworkObject (e.g. a folder slot).

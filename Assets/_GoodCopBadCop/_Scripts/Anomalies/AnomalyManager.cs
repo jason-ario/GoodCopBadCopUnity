@@ -33,6 +33,18 @@ public class AnomalyManager : MonoBehaviour
     [Tooltip("Points spent from the suspect's mutation score budget for each active Vitals anomaly.")]
     [SerializeField] private int _vitalsPoints = 1;
 
+    [Header("Global Tuning")]
+    [Tooltip("Multiplies every suspect's daily infection score increase in SuspectRunRecords.AdvanceDayInfection(). " +
+             "1 = normal speed, 2 = anomalies progress twice as fast, 0.5 = half as fast. Useful for tuning how many " +
+             "days it takes suspects to reach higher anomaly counts (e.g. a 'too far gone' state).")]
+    [SerializeField] private float _infectionProgressionMultiplier = 1f;
+
+    /// <summary>
+    /// Multiplier applied to each suspect's daily infection score increase. Never negative —
+    /// use 0 to freeze infection progression entirely without touching per-suspect data.
+    /// </summary>
+    public float InfectionProgressionMultiplier => Mathf.Max(0f, _infectionProgressionMultiplier);
+
     private void Awake()
     {
         Instance = this;

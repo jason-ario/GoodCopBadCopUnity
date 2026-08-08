@@ -852,6 +852,9 @@ public class SuspectCharacter : Interactable
     /// </summary>
     private JunkItem _junkItem;
 
+    /// <summary>The optional JunkItem on this GameObject, if any — see <see cref="_junkItem"/>.</summary>
+    public JunkItem JunkItem => _junkItem;
+
     /// <summary>Raised on the server when the suspect is killed by a player melee hit.</summary>
     public static event Action<SuspectCharacter> OnSuspectKilledByPlayer;
 
@@ -1699,7 +1702,7 @@ public class SuspectCharacter : Interactable
 
         // If this suspect has a JunkItem, re-enable the body as collectible trash.
         if (_junkItem != null)
-            EnableJunkPickupClientRpc();
+            EnableJunkPickup();
     }
 
     /// <summary>

@@ -563,7 +563,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
 
         Debug.Log("[TakeOutTrashTask] All items deposited — task complete.");
-        ATM.Instance?.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
 
         // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
         _isActive.Value = false;

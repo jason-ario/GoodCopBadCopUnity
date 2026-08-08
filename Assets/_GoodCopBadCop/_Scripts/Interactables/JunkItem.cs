@@ -50,6 +50,19 @@ public class JunkItem : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// When true (default), collecting this item destroys its NetworkObject outright. Set false
+    /// in the Inspector for junk that lives on a GameObject meant to be reused later (e.g. a
+    /// guard corpse occupying a GuardPurchasePoint's reusable soldier slot) — collection then
+    /// only flips <see cref="IsCollectible"/> back to false instead of destroying anything,
+    /// leaving the owning script (via <see cref="OnCollected"/>) responsible for hiding/resetting
+    /// the GameObject so it can be brought back for a future spawn.
+    /// </summary>
+    [Tooltip("When true (default), collecting this junk item destroys its NetworkObject. Set " +
+             "false for junk on a reusable GameObject (e.g. a guard corpse) — collection just " +
+             "flips IsCollectible off instead, leaving cleanup/reuse to the owning script.")]
+    [SerializeField] private bool _destroyOnCollect = true;
+
     /// <summary>Server-only. Marks this body as collectible junk (or clears it). Does not touch
     /// this component's Unity 'enabled' flag — see <see cref="IsCollectible"/>.</summary>
     public void SetCollectible(bool collectible)
@@ -127,7 +140,14 @@ public class JunkItem : Interactable
         // "ghost" entry for the last item of any run (nothing ever prunes it again), which
         // keeps ThreatLevel (and therefore CheckpointIntegrityService's score) from ever
         // fully reaching 0/100% even once everything visible has been cleaned up.
-        NetworkObject.Despawn(destroy: true);
+        //
+        // _destroyOnCollect is false for junk on a reusable GameObject (e.g. a guard corpse) —
+        // those are left spawned and alive, just no longer collectible; OnCollected below is
+        // responsible for hiding/resetting them for reuse.
+        if (_destroyOnCollect)
+            NetworkObject.Despawn(destroy: true);
+        else
+            IsCollectible.Value = false;
 
         OnCollected?.Invoke();
         OnAnyJunkItemCollected?.Invoke();

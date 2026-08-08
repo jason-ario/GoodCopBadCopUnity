@@ -173,7 +173,8 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
             _isComplete = true;
             IsTaskActive = false;
 
-            ATM.Instance?.SpawnCoupons(_couponReward);
+            // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+            // ATM.Instance?.SpawnCoupons(_couponReward);
 
             if (BetweenShiftTaskManager.Instance != null)
                 BetweenShiftTaskManager.Instance.NotifyTaskComplete(this);

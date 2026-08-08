@@ -125,12 +125,14 @@ public class GuardPurchasePoint : Interactable
     private void OnUnlockedChanged(bool previousValue, bool newValue) => RefreshVisualState();
 
     /// <summary>
-    /// Called by the guard's own combat script (<c>SoldierMutantResponder</c>) once its death
-    /// visuals have finished playing after being killed by a mutant. Resets purchase and
-    /// arrival state so the purchase post reappears and a new guard can be bought again.
-    /// Server-only.
+    /// Called by the guard's own combat script (<c>SoldierMutantResponder</c>) once its corpse
+    /// has actually been picked up and thrown away as trash (a <see cref="JunkItem"/> collected
+    /// into a <see cref="TrashBag"/>) — not merely on death. Until this fires, the dead guard's
+    /// body keeps occupying the soldier slot (still "arrived") so it stays visible and
+    /// collectible; only once it's cleared away does the purchase post reappear and a new guard
+    /// become buyable. Server-only.
     /// </summary>
-    public void NotifyGuardDied()
+    public void NotifyGuardCorpseCollected()
     {
         if (!IsServer) return;
 

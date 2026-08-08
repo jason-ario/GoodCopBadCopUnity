@@ -634,8 +634,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _taskActive = false;
 
         Debug.Log("[SortMailTask] All packages sorted — task complete.");
-        if (ATM.Instance != null)
-            ATM.Instance.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // if (ATM.Instance != null)
+        //     ATM.Instance.SpawnCoupons(_couponReward);
 
         OnDailyTaskCompleted?.Invoke();
 

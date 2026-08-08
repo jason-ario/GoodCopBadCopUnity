@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 294880131773821281}
   - component: {fileID: 5557211591669604828}
   - component: {fileID: 3149917725858278854}
+  - component: {fileID: 40872834581346769}
   m_Layer: 0
   m_Name: Door Wheel Knob
   m_TagString: Untagged
@@ -50,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1196857653
+  GlobalObjectIdHash: 4195475427
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -83,15 +84,18 @@ MonoBehaviour:
   _wheelTransform: {fileID: 2928473651588713513}
   _wheelCollider: {fileID: 5088345309896298051}
   _bunkerDoor: {fileID: 0}
-  _rotationsToUnlock: 3
+  _networkSync: {fileID: 40872834581346769}
+  _rotationsToUnlock: 5
   _maxClockwiseDegrees: 90
   _sensitivity: 1
   _controllerRotateSpeed: 120
+  _visualRotationSpeedMultiplier: 0.3
   _occupancy: {fileID: 0}
   _spinAudioSource: {fileID: 3149917725858278854}
   _spinLoopSound: {fileID: 8300000, guid: 3488453b10b2ab846be4116baf37816e, type: 3}
   _spinAudioVelocityThreshold: 0.1
   _openImpulseSource: {fileID: 0}
+  _closeDelayAfterUnlock: 0.2
 --- !u!114 &5557211591669604828
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -460,6 +464,20 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &40872834581346769
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2589525709235492499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aac2a61a6dd2e6743bc413c97b8751cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DoorWheelNetworkSync
+  ShowTopMostFoldoutHeaderGroup: 1
+  _wheelTransform: {fileID: 2928473651588713513}
 --- !u!1 &2992742788365174694
 GameObject:
   m_ObjectHideFlags: 0

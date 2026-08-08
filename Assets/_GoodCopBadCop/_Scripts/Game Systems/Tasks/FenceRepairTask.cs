@@ -13,10 +13,9 @@ using Random = UnityEngine.Random;
 /// fences immediately rather than damaging them one at a time on a timer.
 ///
 /// When triggered on the server:
-///   1. Heals all fences back to their healthy state.
-///   2. Picks a random count (within BrokenFenceCount range) of fences to break.
-///   3. Assigns each a random damage level (within DamageRange).
-///   4. Subscribes to OnFullyRepaired on every broken fence.
+///   1. Picks a random count (within BrokenFenceCount range) of fences to break.
+///   2. Assigns each a random damage level (within DamageRange).
+///   3. Subscribes to OnFullyRepaired on every broken fence.
 ///
 /// Players repair fences by hitting them with HammerPickable. When all broken fences are
 /// repaired, the task is marked complete, the coupon reward is granted, and
@@ -102,6 +101,15 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// <inheritdoc/>
     public string ThreatDescription => TaskDescription;
 
+    /// <summary>
+    /// Set by a day script (e.g. Day 1) while it is showing its own hand-scripted tutorial row
+    /// for this task (see Day_01.EnsureFixFencesObjective). While true, HUDTaskList's generic
+    /// TaskRegistry bridge skips adding its own row, preventing a duplicate "Fix Perimeter
+    /// Fences" entry in the tutorial objective list. Mirrors the pattern used by
+    /// <see cref="TakeOutTrashTask"/> and <see cref="CleanGraffitiTask"/>.
+    /// </summary>
+    public bool HasCustomTutorialRow { get; set; }
+
     /// <summary>No-op — this task is manually triggered (e.g. a scripted day beat), not by the night phase.</summary>
     public void BeginNightPhase() { }
 
@@ -180,7 +188,9 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Resets all fences to healthy, then randomly breaks a subset at varied damage levels.
+    /// Randomly breaks a subset of fences at varied damage levels, on top of whatever state
+    /// they're already in. Never heals fences directly — repair only ever happens via
+    /// <see cref="HammerPickable"/> hits on <see cref="PerimiterFence"/>.
     /// Server-only — safe to call from any client, but only the server performs the
     /// authoritative break logic (replicated to clients via the NetworkVariables above).
     /// </summary>
@@ -192,7 +202,6 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _fencesRepaired.Value = 0;
 
         UnsubscribeFromAllBrokenFences();
-        HealAllFences();
 
         _brokenFences.Clear();
 
@@ -247,7 +256,8 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         if (_fencesRepaired.Value < _targetFenceCount.Value) return;
 
         // All broken fences have been repaired — complete the task.
-        ATM.Instance?.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
 
         MarkCompleteClientRpc();
 
@@ -280,18 +290,6 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    /// <summary>Restores all scene fences to their healthy state (damage level 0).</summary>
-    private void HealAllFences()
-    {
-        if (_allFences == null) return;
-
-        foreach (PerimiterFence fence in _allFences)
-        {
-            if (fence != null)
-                fence.SetDamageLevelServer(0);
-        }
-    }
 
     /// <summary>Removes HandleFenceRepaired subscriptions from all previously broken fences.</summary>
     private void UnsubscribeFromAllBrokenFences()

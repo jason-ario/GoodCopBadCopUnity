@@ -261,6 +261,31 @@ public class ExamNotebook : PickableObject
             SnapshotAllPages();
     }
 
+    /// <summary>
+    /// Despawns this notebook's dynamically-spawned pages on the server before the notebook
+    /// itself is despawned (e.g. thrown in the trash). Pages are separate NetworkObjects, not
+    /// children of the notebook, so the default despawn would otherwise leave them orphaned
+    /// in the scene for every client. Only despawns pages still actually bound to this
+    /// notebook — pages that have been ripped out or filed into a folder are independent
+    /// objects at that point and must survive the notebook's destruction.
+    /// </summary>
+    protected override void OnBeforeDespawnServer()
+    {
+        base.OnBeforeDespawnServer();
+
+        if (pages == null) return;
+
+        foreach (var page in pages)
+        {
+            if (page == null) continue;
+            // insideThisFolder is set server-side by RequestAddToFolderServerRpc → AddToFolder,
+            // so it's reliable here even though it's not itself a NetworkVariable.
+            if (page.isRippedOut || page.insideThisFolder != null) continue;
+
+            NetworkHelper.Despawn(page.NetworkObject);
+        }
+    }
+
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();

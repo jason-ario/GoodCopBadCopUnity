@@ -71,10 +71,14 @@ public class SoldierMutantResponder : NetworkBehaviour
     [Tooltip("Health this soldier has against mutant attacks (separate from the interrogation-flow health on SuspectCharacter, which is gated to the booth).")]
     [SerializeField] private float _maxHealth = 100f;
 
-    [Tooltip("Seconds to wait after death (letting the blood/death animation play) before notifying " +
-             "the Guard Purchase Point so the guard can be re-purchased. No-op if this soldier isn't " +
-             "a child of a GuardPurchasePoint.")]
-    [SerializeField] private float _deathNotifyDelay = 3f;
+    [Header("Guard Purchase Point")]
+    [Tooltip("Explicit link to this guard's associated GuardPurchasePoint, for guards that are NOT " +
+             "children of a GuardPurchasePoint (e.g. a default standing guard present from Day 1). " +
+             "Once this guard's corpse is collected as trash, that purchase point is unlocked (even " +
+             "if no day script has unlocked it yet) so it can be bought as a replacement. Leave " +
+             "empty for guards that already live under a GuardPurchasePoint — " +
+             "GetComponentInParent<GuardPurchasePoint>() is used automatically in that case.")]
+    [SerializeField] private GuardPurchasePoint _associatedPurchasePoint;
 
     private float _health;
 
@@ -141,8 +145,7 @@ public class SoldierMutantResponder : NetworkBehaviour
     /// <summary>
     /// Damages this soldier exactly like a mutant's attack on the player. Server-only.
     /// Kills the soldier (reusing <see cref="SuspectCharacter.KillAsGuard"/> for death visuals)
-    /// once health reaches zero, then notifies its Guard Purchase Point (if any) so the post
-    /// can be re-purchased.
+    /// once health reaches zero, then turns the corpse into collectible trash.
     /// </summary>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
@@ -155,6 +158,12 @@ public class SoldierMutantResponder : NetworkBehaviour
             Die();
     }
 
+    /// <summary>
+    /// Plays death visuals and turns the corpse into a collectible <see cref="JunkItem"/> (just
+    /// like a player-killed suspect or a dead mutant) instead of despawning automatically. The
+    /// body stays put — still occupying its GuardPurchasePoint slot, if any — until a player
+    /// actually picks it up with a TrashBag; see <see cref="HandleCorpseCollected"/>.
+    /// </summary>
     private void Die()
     {
         StopCombatRoutine();
@@ -166,16 +175,38 @@ public class SoldierMutantResponder : NetworkBehaviour
         }
 
         _suspect.KillAsGuard();
+        _suspect.EnableJunkPickup();
 
-        StartCoroutine(NotifyPurchasePointAfterDelay());
+        JunkItem junkItem = _suspect.JunkItem;
+        if (junkItem != null)
+            junkItem.OnCollected = HandleCorpseCollected;
+        else
+            Debug.LogWarning("[SoldierMutantResponder] No JunkItem on this guard's SuspectCharacter " +
+                "— corpse will not be collectible as trash.", this);
     }
 
-    private IEnumerator NotifyPurchasePointAfterDelay()
+    /// <summary>
+    /// Fired once this guard's corpse has actually been thrown away in a TrashBag. If this
+    /// guard lives under a GuardPurchasePoint (its soldier slot), that point is notified so the
+    /// slot frees up and the purchase post reappears — the slot itself is reused, so it must NOT
+    /// be destroyed (see <see cref="JunkItem"/>'s _destroyOnCollect). Otherwise (a standalone
+    /// default guard) this guard's own GameObject is hidden directly, and its optional
+    /// <see cref="_associatedPurchasePoint"/> is unlocked so it can be bought as a replacement —
+    /// even if no day script has ever unlocked it before (e.g. a Day 1 default guard).
+    /// </summary>
+    private void HandleCorpseCollected()
     {
-        yield return new WaitForSeconds(_deathNotifyDelay);
+        GuardPurchasePoint parentPoint = GetComponentInParent<GuardPurchasePoint>();
+        if (parentPoint != null)
+        {
+            parentPoint.NotifyGuardCorpseCollected();
+            return;
+        }
 
-        GuardPurchasePoint purchasePoint = GetComponentInParent<GuardPurchasePoint>();
-        purchasePoint?.NotifyGuardDied();
+        gameObject.SetActive(false);
+
+        if (_associatedPurchasePoint != null)
+            _associatedPurchasePoint.SetUnlocked(true);
     }
 
     private void Update()

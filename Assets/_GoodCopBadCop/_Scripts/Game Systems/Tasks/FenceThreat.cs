@@ -112,18 +112,30 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Heals all fences, then starts periodic damage if the current day meets the threshold.
-    /// SERVER ONLY.
+    /// Re-syncs damage tracking to whatever state the fences are actually in (no forced heal —
+    /// fences only ever change health via hammer repair or mutant damage), then starts periodic
+    /// damage if the current day meets the threshold. SERVER ONLY.
     /// </summary>
     public void BeginNightPhase()
     {
         if (!IsServer) return;
 
         UnsubscribeFromDamagedFences();
-        HealAllFences();
         _damagedFences.Clear();
-        _damagedFenceCount        = 0;
-        _networkThreatLevel.Value = 0f;
+
+        if (_allFences != null)
+        {
+            foreach (PerimiterFence fence in _allFences)
+            {
+                if (fence == null || !fence.IsBroken) continue;
+
+                fence.OnFullyRepaired += HandleFenceRepaired;
+                _damagedFences.Add(fence);
+            }
+        }
+
+        _damagedFenceCount = _damagedFences.Count;
+        UpdateThreatLevel();
 
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
 
@@ -221,17 +233,6 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void HealAllFences()
-    {
-        if (_allFences == null) return;
-
-        foreach (PerimiterFence fence in _allFences)
-        {
-            if (fence != null)
-                fence.SetDamageLevelServer(0);
-        }
-    }
 
     private void UnsubscribeFromDamagedFences()
     {

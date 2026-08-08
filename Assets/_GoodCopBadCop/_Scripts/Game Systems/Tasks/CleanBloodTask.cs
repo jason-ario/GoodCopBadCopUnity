@@ -80,6 +80,21 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Set by a day script (e.g. Day_01, in <c>DayActivated</c>/<c>DayDeactivated</c>) for the
+    /// entire duration it will show its OWN hand-scripted TutorialObjectiveList row for this
+    /// task — e.g. Day 1's post-breach "Clean up the blood" objective added in
+    /// <c>Day_01.EnsureCleanBloodSplatterObjective</c>. Set it well before any blood can possibly
+    /// be registered (activation time, not trigger time) so <see cref="HUDTaskList"/> never has
+    /// a chance to add its own generic bridged row first — that race would leave a stale
+    /// duplicate row behind even after this flag is later set. While true, HUDTaskList skips this
+    /// threat entirely, mirroring the same exclusion already used for
+    /// <see cref="TakeOutTrashTask"/>, <see cref="CleanGraffitiTask"/>, and
+    /// <see cref="FenceRepairTask"/>. Days that don't hand-manage this task (e.g. Day 2+) leave
+    /// this false and get the task's row purely from the generic HUDTaskList/TaskRegistry bridge.
+    /// </summary>
+    public bool HasCustomTutorialRow { get; set; }
+
     public string ThreatName  => _taskName;
     public float  ScoreWeight => 1f;
 
@@ -302,11 +317,15 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isComplete = true;
         _taskActive = false;
 
-        ATM.Instance?.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
 
         MarkCompleteClientRpc();
 
-        // Hide from HUD once all splatters are clean.
+        // Hide from HUD once all splatters are clean. Registering a fresh batch of blood later
+        // (e.g. a second source dropping splatters after this batch is already clean) correctly
+        // re-adds this as a new task via ActivateDynamically — that's a genuinely new cleanup job,
+        // not a duplicate of this one.
         _isActive.Value = false;
 
         Debug.Log("[CleanBloodTask] All blood splatters scrubbed — task complete.");

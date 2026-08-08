@@ -101,10 +101,12 @@ public class ShiftPerformanceEvaluator : MonoBehaviour
 
         int coupons = Mathf.RoundToInt(Mathf.Lerp(_minCouponReward, _maxCouponReward, LastShiftScore));
 
-        if (ATM.Instance != null)
-            ATM.Instance.SpawnCoupons(coupons);
-        else
-            Debug.LogWarning("[ShiftPerformanceEvaluator] ATM.Instance is null — coupons not dispensed.");
+        // Tasks/threat management no longer pays coupons — players are only paid for processing
+        // suspects (see SuspectController.PayOutResults). Score is still tracked for logging.
+        // if (ATM.Instance != null)
+        //     ATM.Instance.SpawnCoupons(coupons);
+        // else
+        //     Debug.LogWarning("[ShiftPerformanceEvaluator] ATM.Instance is null — coupons not dispensed.");
 
         Debug.Log($"[ShiftPerformanceEvaluator] Shift score: {LastShiftScore:P0}. Performance bonus: {coupons} coupons.");
     }

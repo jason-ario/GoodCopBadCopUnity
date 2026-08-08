@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -22,6 +23,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     [Tooltip("The BunkerDoorController to call Open() on when the door is unlocked.")]
     [SerializeField] private BunkerDoorController _bunkerDoor;
+
+    [Tooltip("Replicates this wheel's spin across the network so other players see it turn. " +
+             "Optional — if unassigned, rotation stays purely local to this client.")]
+    [SerializeField] private DoorWheelNetworkSync _networkSync;
 
     [Header("Rotation Limits")]
     [Tooltip("Number of full CCW rotations required to unlock the door.")]
@@ -59,10 +64,18 @@ public class DoorWheelDiegeticController : DiegeticViewController
     [Tooltip("Cinemachine impulse fired when the wheel is fully spun and the door unlocks.")]
     [SerializeField] private CinemachineImpulseSource _openImpulseSource;
 
+    [Tooltip("Delay (seconds) after the wheel finishes spinning before the view closes and " +
+             "player look control is restored. Lets the player's mouse motion settle so the " +
+             "camera doesn't jolt from residual spin input when control hands back.")]
+    [SerializeField] private float _closeDelayAfterUnlock = 1f;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     /// <summary>True while the player is holding LMB and dragging the wheel.</summary>
     private bool _isDragging;
+
+    /// <summary>True once the wheel has fully unlocked and the view is waiting to close.</summary>
+    private bool _closing;
 
     /// <summary>Screen-space angle (degrees) of the mouse relative to the wheel centre on the previous frame.</summary>
     private float _lastMouseAngle;
@@ -78,8 +91,9 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     // ─── DiegeticViewController overrides ────────────────────────────────────
 
-    /// <summary>Suppress the camera pan while the player is actively dragging the wheel.</summary>
-    protected override bool SuppressCameraMovement => _isDragging;
+    /// <summary>Suppress the camera pan while the player is actively dragging the wheel,
+    /// and while waiting for the post-unlock close delay to elapse.</summary>
+    protected override bool SuppressCameraMovement => _isDragging || _closing;
 
     private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
     private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
@@ -105,6 +119,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         _accumulatedRotation = 0f;
         _totalCCWDegrees     = 0f;
         _isDragging          = false;
+        _closing             = false;
 
         if (_wheelCollider != null)
             _wheelCollider.enabled = true;
@@ -114,6 +129,8 @@ public class DoorWheelDiegeticController : DiegeticViewController
     {
         SetDragging(false);
         _occupancy?.Release();
+        _closing = false;
+        StopAllCoroutines();
 
         if (_wheelCollider != null)
             _wheelCollider.enabled = false;
@@ -121,6 +138,9 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     protected override void OnUpdate()
     {
+        // Waiting out the post-unlock delay: ignore all further input until we close.
+        if (_closing) return;
+
         // If the door was opened by another means while this view is active, exit cleanly.
         if (_bunkerDoor != null && _bunkerDoor.IsOpen)
         {
@@ -208,6 +228,9 @@ public class DoorWheelDiegeticController : DiegeticViewController
         euler.z -= delta * _visualRotationSpeedMultiplier;
         _wheelTransform.localEulerAngles = euler;
 
+        // Broadcast the new angle so other clients see the wheel spin too.
+        _networkSync?.PublishWheelZRotation(euler.z);
+
         // ── Accumulate CCW for unlock ─────────────────────────────────────────
 
         if (delta > 0f)
@@ -227,6 +250,9 @@ public class DoorWheelDiegeticController : DiegeticViewController
     private void SetDragging(bool dragging)
     {
         _isDragging = dragging;
+
+        if (_networkSync != null)
+            _networkSync.IsLocalAuthority = dragging;
 
         if (!dragging)
             UpdateSpinAudio(0f);
@@ -279,10 +305,23 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     private void TriggerDoorOpen()
     {
+        if (_closing) return;
+
         _openImpulseSource?.GenerateImpulse();
 
-        // Exit the view first so the camera transition feels responsive.
-        Close();
+        // Stop responding to further drag input immediately, but keep the view open
+        // (and camera pan frozen) for a moment so the player's mouse motion from
+        // spinning the wheel settles before look control hands back — avoids a
+        // camera jolt from residual spin input on the frame control is restored.
+        SetDragging(false);
+        _closing = true;
         _bunkerDoor?.Open();
+        StartCoroutine(CloseAfterDelay());
+    }
+
+    private IEnumerator CloseAfterDelay()
+    {
+        yield return new WaitForSeconds(_closeDelayAfterUnlock);
+        Close();
     }
 }

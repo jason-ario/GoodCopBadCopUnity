@@ -421,7 +421,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Notify DailyTaskScheduler that this task has been completed so it can
         // unlock the task for future days (when UnlockOnFirstCompletion is enabled).
-        ATM.Instance?.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
         OnDailyTaskCompleted?.Invoke();
 
         Debug.Log($"[FollowTrailThreat] Destination discovered. Pack size: {packSize}.");

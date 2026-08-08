@@ -255,7 +255,8 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _isComplete = true;
 
-        ATM.Instance?.SpawnCoupons(_couponReward);
+        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
 
         MarkCompleteClientRpc();
 

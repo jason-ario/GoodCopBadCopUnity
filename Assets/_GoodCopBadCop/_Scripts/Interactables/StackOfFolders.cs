@@ -23,6 +23,12 @@ public class StackOfFolders : Interactable
     /// </summary>
     public void SetInteractable(bool value)
     {
+        // Guard: DayActivated can be called before NGO spawns scene NetworkObjects
+        // (e.g. during a debug skip). Writing to the NetworkVariable before this object has
+        // spawned is silently dropped by Netcode without erroring, which left this stack
+        // stuck in whatever state it last held — mirrors the same guard on InkStamp.SetSlotInteractable.
+        if (!IsSpawned) return;
+
         if (IsServer)
             _isInteractable.Value = value;
         else

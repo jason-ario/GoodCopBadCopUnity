@@ -401,9 +401,11 @@ public class SuspectRunRecords : MonoBehaviour
             else
             {
                 Vector2Int range = record.SuspectData.dailyInfectionProgression;
-                int increase = UnityEngine.Random.Range(range.x, range.y + 1);
+                int baseIncrease = UnityEngine.Random.Range(range.x, range.y + 1);
+                float multiplier = AnomalyManager.Instance != null ? AnomalyManager.Instance.InfectionProgressionMultiplier : 1f;
+                int increase = Mathf.RoundToInt(baseIncrease * multiplier);
                 record.infectionScore = Mathf.Clamp(record.infectionScore + increase, 0, 100);
-                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
+                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {multiplier:F2}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
             }
         }
 

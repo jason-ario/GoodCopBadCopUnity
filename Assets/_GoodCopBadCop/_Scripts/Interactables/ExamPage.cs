@@ -22,20 +22,17 @@ public class ExamPage : FolderItem
     /// <summary>Parent transform new checklist items are instantiated under (the page's "Exam Notebook Contents" child).</summary>
     [SerializeField] private Transform checklistItemsParent;
 
-    /// <summary>Local position of the first (bottom-most) checklist item slot.</summary>
+    /// <summary>Local position of the first (top-most) checklist item slot, just below the header.</summary>
     [SerializeField] private Vector3 checklistItemStartLocalPosition = new Vector3(-0.016f, -0.478f, 0.019f);
 
-    /// <summary>Vertical distance in local space between consecutive checklist item slots.</summary>
+    /// <summary>Distance in local space, per slot, moving from one checklist item to the next one down the page.</summary>
     [SerializeField] private float checklistItemSpacingY = 0.1397143f;
 
     /// <summary>
     /// Total number of printed checklist lines on the page artwork (the largest anomaly
     /// category size across the progression asset — currently Documentation/Vitals/Behavior/
-    /// Supernatural all have 7). Used to compute a fixed top-of-page anchor so the checklist
-    /// always starts right below the header and grows downward, regardless of how many
-    /// anomalies the current category actually has (e.g. Physical's 5). Without this, pages
-    /// with fewer anomalies than the max would anchor to the bottom-most printed line instead
-    /// and leave a gap under the header.
+    /// Supernatural all have 7). No longer used to compute slot positions (items now fill
+    /// straight down from checklistItemStartLocalPosition), but kept for reference/tooling.
     /// </summary>
     [SerializeField] private int checklistTotalSlotCount = 7;
 
@@ -142,6 +139,19 @@ public class ExamPage : FolderItem
     private bool _checklistInteractable;
     // ─────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Master switch for the RenderTexture-camera compositing system. When true (default,
+    /// existing behavior), checklist items live on a hidden culling layer and are only ever
+    /// seen through <see cref="_checklistCamera"/>'s capture baked into the paper's overlay
+    /// material — the whole Snapshot/BeginSnapshot/live-capture machinery in this file. When
+    /// false, none of that runs: checklist items are left on their own prefab-authored layer so
+    /// they render directly and normally in the world (a simple always-visible "canvas" of
+    /// checklist items), and every capture/snapshot call in this file becomes a no-op. Flip this
+    /// off to bypass the RT system entirely while a simpler direct-render setup is configured
+    /// by hand on the prefab.
+    /// </summary>
+    [SerializeField] private bool _useRenderTextureSystem = true;
+
     protected override void Awake()
     {
         // MUST run before base.Awake(): Interactable.Awake() enables this object's HighlightEffect,
@@ -155,7 +165,8 @@ public class ExamPage : FolderItem
         // leaving the page looking blank, even though the RT itself still has the correct content.
         // Running this first guarantees HighlightEffect only ever sees/caches the per-instance,
         // RT-bound material, so restoring "the original" always restores the correct one.
-        SetupRenderTexture();
+        if (_useRenderTextureSystem)
+            SetupRenderTexture();
         base.Awake();
     }
 
@@ -302,18 +313,21 @@ public class ExamPage : FolderItem
         {
             ChecklistItem item = Instantiate(checklistItemPrefab, parent);
             item.name = $"Checklist Item {i}";
-            item.gameObject.layer = parent.gameObject.layer;
+            // Only force onto the checklist camera's hidden culling layer when the RenderTexture
+            // system is actually in use — with it disabled, items should stay on whatever layer
+            // they're authored with on the prefab so they render directly and normally.
+            if (_useRenderTextureSystem)
+                item.gameObject.layer = parent.gameObject.layer;
 
-            // checklistItemStartLocalPosition is the bottom-most printed line, shared by every
-            // page regardless of category. To make the checklist always start right below the
-            // header (instead of bottom-anchoring and leaving a gap under the header for
-            // categories with fewer than checklistTotalSlotCount anomalies), compute the fixed
-            // top-most slot and fill downward from there: the first anomaly (i == 0) goes in
-            // the top-most slot, and each subsequent anomaly moves one slot down toward the
-            // bottom of the page.
-            int slotFromTop = checklistTotalSlotCount - 1 - i;
+            // checklistItemStartLocalPosition is the top-most printed line, shared by every
+            // page regardless of category. Fill downward from there so the checklist always
+            // starts right below the header (instead of bottom-anchoring and leaving a gap
+            // under the header for categories with fewer than checklistTotalSlotCount
+            // anomalies): the first anomaly (i == 0) goes in the top-most slot, and each
+            // subsequent anomaly moves one slot down toward the bottom of the page, leaving
+            // any unused slots empty at the bottom.
             Transform t = item.transform;
-            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, slotFromTop * checklistItemSpacingY, 0f);
+            t.localPosition = checklistItemStartLocalPosition + new Vector3(0f, i * checklistItemSpacingY, 0f);
             t.localRotation = Quaternion.Euler(checklistItemLocalRotationEuler);
             t.localScale = checklistItemLocalScale;
 
@@ -325,6 +339,12 @@ public class ExamPage : FolderItem
 
         CacheVisualItems();
         CacheOriginalItemPositions();
+
+        // Render immediately once the checklist is populated, rather than waiting for the first
+        // bitmask apply/interaction — otherwise a freshly spawned page can sit with a stale/blank
+        // RenderTexture (whatever it had before ClearChecklistItems ran) until something else
+        // happens to trigger a capture.
+        SnapshotChecklist();
     }
 
     /// <summary>Destroys any checklist items previously spawned by BuildChecklistFromCategory.</summary>
@@ -351,7 +371,12 @@ public class ExamPage : FolderItem
     /// </summary>
     public void SnapshotChecklist()
     {
+        if (!_useRenderTextureSystem) return;
         if (_checklistCamera == null) return;
+        // While this page is the live/active page a player is currently using, its camera is
+        // already continuously open (see BeginLiveRender) — every frame already reflects the
+        // latest state, so a one-shot burst capture would just fight the live loop for the gate.
+        if (_liveCaptureRequested) return;
         RestartCapture();
     }
 
@@ -384,6 +409,81 @@ public class ExamPage : FolderItem
         }
 
         _snapshotCoroutine = StartCoroutine(SnapshotRoutine());
+    }
+
+    /// <summary>True while a player is actively using this page (see SetChecklistInteractable), keeping its checklist camera continuously open instead of a fixed-duration burst.</summary>
+    private bool _liveCaptureRequested;
+    private Coroutine _liveCaptureCoroutine;
+
+    /// <summary>
+    /// Keeps this page's checklist camera open indefinitely rather than for a fixed duration —
+    /// used whenever a player has this page's notebook open on this page, since that is exactly
+    /// when checkbox state can change (draws, ticks) and every change needs to reach the
+    /// RenderTexture live, not just whatever the fixed _drawAnimationDuration window happened to
+    /// catch. Safe to call repeatedly; a no-op while already live.
+    /// </summary>
+    private void BeginLiveRender()
+    {
+        if (!_useRenderTextureSystem) return;
+        if (_checklistCamera == null || _liveCaptureRequested) return;
+        _liveCaptureRequested = true;
+
+        // A one-shot burst capture may already be mid-flight (e.g. from a bitmask update that
+        // landed the instant before this page became the active page) — stop it cleanly so it
+        // doesn't fight the live loop for the gate/peer-hide state.
+        if (_snapshotCoroutine != null)
+        {
+            StopCoroutine(_snapshotCoroutine);
+            _snapshotCoroutine = null;
+            if (_currentlyCapturing == this)
+                _currentlyCapturing = null;
+            EndSnapshot();
+        }
+
+        _liveCaptureCoroutine = StartCoroutine(LiveCaptureRoutine());
+    }
+
+    /// <summary>Stops continuous live capture started by BeginLiveRender. Safe to call even if not currently live.</summary>
+    private void EndLiveRender()
+    {
+        _liveCaptureRequested = false;
+
+        if (_liveCaptureCoroutine != null)
+        {
+            StopCoroutine(_liveCaptureCoroutine);
+            _liveCaptureCoroutine = null;
+            if (_currentlyCapturing == this)
+                _currentlyCapturing = null;
+            EndSnapshot();
+        }
+    }
+
+    private System.Collections.IEnumerator LiveCaptureRoutine()
+    {
+        float gateWaitElapsed = 0f;
+        while (_currentlyCapturing != null && _currentlyCapturing != this)
+        {
+            gateWaitElapsed += Time.unscaledDeltaTime;
+            if (gateWaitElapsed >= _gateWaitTimeoutSeconds)
+            {
+                Debug.LogWarning($"[ExamPage] LiveCaptureRoutine: '{name}' timed out waiting on a stuck checklist capture gate held by '{(_currentlyCapturing != null ? _currentlyCapturing.name : "null")}' — forcing it clear so this page's live capture can start.");
+                _currentlyCapturing = null;
+                break;
+            }
+            yield return null;
+        }
+
+        _currentlyCapturing = this;
+        BeginSnapshot();
+        _checklistCamera.gameObject.SetActive(true);
+
+        while (_liveCaptureRequested)
+            yield return null;
+
+        EndSnapshot();
+        _liveCaptureCoroutine = null;
+        if (_currentlyCapturing == this)
+            _currentlyCapturing = null;
     }
 
     /// <summary>
@@ -568,6 +668,15 @@ public class ExamPage : FolderItem
         if (_snapshotCoroutine != null)
         {
             _snapshotCoroutine = null;
+            if (_currentlyCapturing == this)
+                _currentlyCapturing = null;
+            EndSnapshot();
+        }
+
+        if (_liveCaptureCoroutine != null)
+        {
+            _liveCaptureRequested = false;
+            _liveCaptureCoroutine = null;
             if (_currentlyCapturing == this)
                 _currentlyCapturing = null;
             EndSnapshot();
@@ -772,6 +881,14 @@ public class ExamPage : FolderItem
     public void SetChecklistInteractable(bool b)
     {
         _checklistInteractable = b;
+
+        // A player has this page open/active on this notebook exactly while it's interactable —
+        // keep the checklist camera continuously rendering for that whole window so every
+        // checkbox change (drawing, ticking) reaches the RenderTexture live rather than relying
+        // on a fixed-duration burst per change, which is what made rendering inconsistent under
+        // real network timing.
+        if (b) BeginLiveRender(); else EndLiveRender();
+
         if (_checklistItems == null) return;
 
         foreach (ChecklistItem item in _checklistItems)
