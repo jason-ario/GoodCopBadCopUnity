@@ -53,13 +53,116 @@ public class Day_03 : DayBase, IDailyTask
     public event Action OnDailyTaskCompleted;
 
     /// <summary>
-    /// Starts the post-shift power outage: shows the "Restore Power" guidebook task
-    /// (directing the player to the power plant's fuse box) on every client, then — server-only —
-    /// cuts power via <see cref="ElectricityController.PowerOffFuseRequired"/>, which requires the
-    /// fuse-box puzzle (not the standard circuit box) to restore it. Resolves automatically via
-    /// <see cref="ElectricityController.OnPowerRestoredAllClients"/> once the player fixes the fuse box.
+    /// Starts the post-shift power outage the instant the last suspect is processed: cuts power
+    /// immediately (server-only, via <see cref="ElectricityController.PowerOffFuseRequired"/>,
+    /// see <see cref="CutPowerServer"/>), then after <see cref="_powerOutageCallDelaySeconds"/>
+    /// rings HQ's call about it (via <see cref="Telephone.TriggerScriptedCall"/>), showing the
+    /// "Answer the Phone" guidebook task on every client. Answering swaps that for the
+    /// "Restore Power" task — see <see cref="OnPowerOutageCallAnsweredAllClients"/> — which
+    /// resolves automatically via <see cref="ElectricityController.OnPowerRestoredAllClients"/>
+    /// once the player fixes the fuse box. The fuse-box puzzle (not the standard circuit box) is
+    /// required to restore power regardless of whether the call has been answered yet.
     /// </summary>
     void IDailyTask.TriggerDailyTask()
+    {
+        CutPowerServer();
+        StartCoroutine(RingPowerOutageCallAfterDelay());
+    }
+
+    /// <summary>
+    /// Waits <see cref="_powerOutageCallDelaySeconds"/> after the power has already gone out,
+    /// then rings HQ's call about it and shows the "Answer the Phone" guidebook task on every
+    /// client. Only rings on the server (<see cref="Telephone.TriggerScriptedCall"/> is a
+    /// server-only no-op on clients); the "Answer the Phone" task itself is added locally on
+    /// every client so it always shows regardless of host/client role.
+    /// </summary>
+    private System.Collections.IEnumerator RingPowerOutageCallAfterDelay()
+    {
+        yield return new WaitForSeconds(_powerOutageCallDelaySeconds);
+
+        _answerPhoneThreat = new AnswerPhoneThreat();
+        TaskRegistry.Instance?.AddThreat(_answerPhoneThreat);
+
+        Telephone.OnScriptedCallAnsweredAllClients += OnPowerOutageCallAnsweredAllClients;
+
+        if (Telephone.Instance == null)
+        {
+            Debug.LogWarning("[Day_03] No Telephone.Instance found -- skipping the HQ call and delivering the Restore Power task directly.");
+            Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
+            OnPowerOutageCallAnsweredAllClients();
+            OnPowerOutageDialogueComplete();
+            yield break;
+        }
+
+        if (!NetworkManager.Singleton.IsServer) yield break;
+
+        Telephone.Instance.TriggerScriptedCall(OnPowerOutageCallAnsweredServer);
+    }
+
+    /// <summary>
+    /// Fired on every client via <see cref="Telephone.OnScriptedCallAnsweredAllClients"/> the
+    /// instant the HQ power-outage call is answered. Only clears the "Answer the Phone" task —
+    /// the "Restore Power" task isn't granted until the HQ dialogue itself finishes, see
+    /// <see cref="OnPowerOutageDialogueComplete"/>. One-shot; unsubscribes itself immediately.
+    /// </summary>
+    private void OnPowerOutageCallAnsweredAllClients()
+    {
+        Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
+
+        if (_answerPhoneThreat != null)
+        {
+            TaskRegistry.Instance?.RemoveThreat(_answerPhoneThreat);
+            _answerPhoneThreat = null;
+        }
+    }
+
+    /// <summary>
+    /// Server-only. Passed as the <c>onAnswered</c> callback to <see cref="Telephone.TriggerScriptedCall"/>,
+    /// which only ever invokes it on the server. Waits for the phone-grab animation to finish
+    /// (per <see cref="Telephone.TriggerScriptedCall"/>'s own doc comment) before locking the
+    /// player into <see cref="_powerOutageCallDialogue"/>.
+    /// </summary>
+    private void OnPowerOutageCallAnsweredServer()
+    {
+        StartCoroutine(PlayPowerOutageDialogueAfterGrab());
+    }
+
+    private System.Collections.IEnumerator PlayPowerOutageDialogueAfterGrab()
+    {
+        // Block manual hang-up the instant the call is answered — covers both this grab-animation
+        // wait and the dialogue itself. Cleared automatically by HangUpCurrentCaller() once the
+        // dialogue completes (see OnPowerOutageDialogueComplete).
+        Telephone.Instance?.SetHangUpLocked(true);
+
+        // Let the phone-grab-to-ear animation finish before locking the player into the
+        // scripted dialogue — mirrors TriggerScriptedCall's own doc comment guidance.
+        yield return new WaitForSeconds(2f);
+
+        if (ScriptedDialogueRunner.Instance == null || _powerOutageCallDialogue == null)
+        {
+            Debug.LogWarning("[Day_03] Missing ScriptedDialogueRunner.Instance or _powerOutageCallDialogue -- granting the Restore Power task directly.");
+            OnPowerOutageDialogueComplete();
+            yield break;
+        }
+
+        ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
+            _powerOutageCallDialogue,
+            onComplete: OnPowerOutageDialogueComplete,
+            unlocked: true,
+            speakerNameOverride: "HQ",
+            speakerColorOverride: _powerOutageCallSpeakerColor,
+            useAlternateVoice: true,
+            useTelephoneAudioSource: true);
+    }
+
+    /// <summary>
+    /// Server-only (fires from the same server-only chain as <see cref="PlayPowerOutageDialogueAfterGrab"/>).
+    /// Called once the HQ power-outage dialogue finishes (or immediately as a fallback if the
+    /// dialogue couldn't be played). Grants the "Restore Power" guidebook task and starts
+    /// listening for the fuse box to be fixed, then auto-hangs-up the phone so the player isn't
+    /// stuck holding the handset.
+    /// </summary>
+    private void OnPowerOutageDialogueComplete()
     {
         _powerOutageThreat = new RepairPowerThreat();
         TaskRegistry.Instance?.AddThreat(_powerOutageThreat);
@@ -67,6 +170,18 @@ public class Day_03 : DayBase, IDailyTask
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerOutageResolved;
 
+        Telephone.Instance?.HangUpCurrentCaller();
+
+        Debug.Log("[Day_03] HQ power-outage dialogue complete -- Restore Power task granted, hanging up.");
+    }
+
+    /// <summary>
+    /// Server-only. Cuts power via <see cref="ElectricityController.PowerOffFuseRequired"/> the
+    /// instant the last suspect for the day is processed — called directly from
+    /// <see cref="IDailyTask.TriggerDailyTask"/>, before the HQ call ever rings.
+    /// </summary>
+    private void CutPowerServer()
+    {
         if (!NetworkManager.Singleton.IsServer) return;
 
         if (ElectricityController.Instance == null)
@@ -110,8 +225,23 @@ public class Day_03 : DayBase, IDailyTask
              "stays locked until the fuse box is fixed. Uncheck to skip this entirely.")]
     [SerializeField] private bool _enablePostShiftPowerOutage = false;
 
+    [Tooltip("Seconds between the power actually going out and HQ's call ringing about it.")]
+    [SerializeField] private float _powerOutageCallDelaySeconds = 5f;
+
+    [Tooltip("Scripted dialogue played over the phone once the HQ power-outage call is answered. " +
+             "The player is locked (movement + camera) for its duration, same as a normal scripted " +
+             "dialogue, and cannot hang up until it finishes. Assign 'Day03PowerOutageCallDialogue'.")]
+    [SerializeField] private ScriptedDialogue _powerOutageCallDialogue;
+
+    [Tooltip("Subtitle name colour for the HQ power-outage call, matching the alternate-voice " +
+             "convention used by Day 4's new voice announcement.")]
+    [SerializeField] private Color _powerOutageCallSpeakerColor = new Color(0.85f, 0.05f, 0.05f);
+
     /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
     private RepairPowerThreat _powerOutageThreat;
+
+    /// <summary>Runtime "Answer the Phone" guidebook task, created only while HQ's call is ringing.</summary>
+    private AnswerPhoneThreat _answerPhoneThreat;
 
     // -------------------------------------------------------------------------
     // Inspector -- Yard Cleanup Objective Text
@@ -193,7 +323,9 @@ public class Day_03 : DayBase, IDailyTask
     /// <summary>
     /// Debug-only: force-starts the post-shift power outage / fuse-box sequence immediately,
     /// bypassing <see cref="_enablePostShiftPowerOutage"/> and the "last suspect processed" gate.
-    /// Wired to the F12 cheat console's "Trigger Day 3 Power Outage" button for testing. Server-only.
+    /// Still rings HQ's call first — this only skips ahead to the point where the phone starts
+    /// ringing, not past the answer step. Wired to the F12 cheat console's "Trigger Day 3 Power
+    /// Outage" button for testing. Server-only.
     /// </summary>
     public void DebugTriggerPowerOutage()
     {
@@ -217,6 +349,7 @@ public class Day_03 : DayBase, IDailyTask
     {
         BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
+        Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
 
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;

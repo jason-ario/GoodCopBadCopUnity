@@ -143,6 +143,13 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0.1f)]
     [SerializeField] private float goreMaxFallDistance = 15f;
 
+    [Tooltip("Seconds after a cosmetic gore piece becomes active before its Rigidbody is switched " +
+             "to kinematic (perf optimization — once it's popped/fallen/settled there's no gameplay " +
+             "reason left to keep simulating it). Networked JunkItem gore is unaffected; its " +
+             "kinematic state is already managed by Netcode's NetworkRigidbody.")]
+    [Min(0f)]
+    [SerializeField] private float goreKinematicDelay = 2f;
+
     [Tooltip("Blood decal prefabs spawned on the ground where a cosmetic gore piece lands (i.e. one that landed outside the Trash Task's yard). Purely cosmetic/local — leave empty to disable landing decals.")]
     [SerializeField] private GameObject[] bloodDecalPrefabs;
 
@@ -1615,6 +1622,9 @@ public class MutantEnemy : NetworkBehaviour
     /// Instantiates the prefab, spawns it as a real NetworkObject (so it replicates to every
     /// client like any other <see cref="JunkItem"/>), enables its (pre-attached, disabled)
     /// <see cref="JunkItem"/> component, and registers it with <see cref="TakeOutTrashTask"/>.
+    /// Simulates the same pop/drop physics as the cosmetic pieces (see <see cref="SpawnGorePiece"/>)
+    /// and switches to kinematic a few seconds later via <see cref="GoreKinematicSettler"/> once it's
+    /// had time to land and settle.
     ///
     /// Requires the gore prefab to already have a NetworkObject (registered as a Network Prefab
     /// in the NetworkManager) and a disabled <see cref="JunkItem"/> component, matching the same
@@ -1670,6 +1680,12 @@ public class MutantEnemy : NetworkBehaviour
         // if it ever drops too far below its launch height it is despawned immediately so it
         // can never soft-lock the player by being both required and unreachable.
         StartCoroutine(MonitorGoreJunkItem(netObj, rb, position.y - goreMaxFallDistance));
+
+        // Perf optimization: once it's had a couple of seconds to pop/fall/land, stop simulating
+        // it (same as the cosmetic pieces — see GoreKinematicSettler). This runs independently of
+        // the settle watchdog above, which still needs to observe the piece while it's dynamic.
+        GoreKinematicSettler kinematicSettler = piece.AddComponent<GoreKinematicSettler>();
+        kinematicSettler.Initialize(rb, goreKinematicDelay);
 
         return true;
     }
@@ -1938,6 +1954,9 @@ public class MutantEnemy : NetworkBehaviour
 
         GoreFallSafety fallSafety = piece.AddComponent<GoreFallSafety>();
         fallSafety.Initialize(position.y - goreMaxFallDistance);
+
+        GoreKinematicSettler kinematicSettler = piece.AddComponent<GoreKinematicSettler>();
+        kinematicSettler.Initialize(rb, goreKinematicDelay);
 
         Destroy(piece, goreLifetime);
     }

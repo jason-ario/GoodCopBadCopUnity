@@ -1289,9 +1289,27 @@ public class SuspectCharacter : Interactable
         if (currentDay > 0 && record.lastDayShown == currentDay)
             return;
 
+        bool isFirstAppearance = record.daysShown == 0;
+
         record.daysShown++;
         if (currentDay > 0)
             record.lastDayShown = currentDay;
+
+        // First time this suspect is ever shown: if the campaign has already advanced past day 1,
+        // bump their starting mutation score up to reflect the "unseen backlog" of days that passed
+        // while the player wasn't looking — without making them as advanced as a suspect who was
+        // actually seen and progressed day over day (that path never hits this branch again since
+        // isFirstAppearance is only true once).
+        if (isFirstAppearance && currentDay > 0 && AnomalyManager.Instance != null && !record.IsFullyMutated)
+        {
+            int tieredStartingScore = AnomalyManager.Instance.GetNeverSeenStartingScore(currentDay);
+            if (tieredStartingScore > record.infectionScore)
+            {
+                Debug.Log($"[SuspectCharacter] '{record.SuspectData?.name}' first seen on day {currentDay} — " +
+                          $"tiered starting score {record.infectionScore} -> {tieredStartingScore}.");
+                record.infectionScore = tieredStartingScore;
+            }
+        }
 
         if (SuspectRunRecords.Instance != null && SaveDataManager.Instance != null)
             SuspectRunRecords.Instance.SaveRecords();

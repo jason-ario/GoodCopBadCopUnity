@@ -921,6 +921,60 @@ public class DebugConsole : MonoBehaviour
     }
 
     /// <summary>
+    /// Skips to Day 3 with the player standing inside the booth and every suspect for the
+    /// day already marked processed — matching the moment right after a normal playthrough
+    /// would have booked the last Day 3 suspect and the shift flipped to PostShift (Dusk).
+    /// Mirrors <see cref="SkipToEndOfDay2"/>/<see cref="SkipToEndOfDay4"/>, but uses
+    /// <see cref="SkipToDay"/> (which calls <see cref="ShiftManager.SkipToBoothReady"/>) instead
+    /// of <see cref="ShiftManager.SkipToInsideBunker"/>, since the target here is "in the booth",
+    /// not "at the start of the day inside the bunker".
+    /// </summary>
+    public void SkipToDay3PostShiftBooth()
+    {
+        if (CampaignManager.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay3PostShiftBooth: CampaignManager not available — start the game first.");
+            return;
+        }
+
+        SkipToDay(3);
+        StartCoroutine(SkipToDay3PostShiftBoothAfterDelay());
+    }
+
+    private IEnumerator SkipToDay3PostShiftBoothAfterDelay()
+    {
+        // Wait one frame for Day_03 to activate and subscribe its events.
+        yield return null;
+
+        if (Day_03.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToDay3PostShiftBooth: Day_03.Instance not found after SkipToDay(3).");
+            yield break;
+        }
+
+        // Put the start-shift gate in post-intro state so interactions toggle it correctly.
+        _startShiftGate?.ForceIntroComplete();
+
+        // Start the shift with a huge first-arrival window — no suspects will arrive, so the
+        // normal "last suspect processed" path (SetNextSuspectReady exhausting the lineup) will
+        // never fire on its own.
+        ShiftManager.OverrideFirstArrivalInterval = new Vector2(9999f, 9999f);
+        ShiftManager.Instance?.TryStartShift();
+
+        // Wait two frames for the shift ClientRpc and shiftStarted NetworkVariable to propagate.
+        yield return null;
+        yield return null;
+
+        // Mark every suspect for the day as processed. This fires ShiftManager.OnLastSuspectProcessed,
+        // flips CurrentPhase to PostShift, saves the dusk checkpoint, and triggers Day 3's
+        // post-shift tasks (fuse box power outage etc.) — the same "Dusk" entry point the real
+        // lineup uses once the last suspect is booked.
+        ShiftManager.Instance?.MarkSuspectsComplete();
+
+        Debug.Log("[DebugConsole] Skipped to Day 3 — player in booth, all suspects marked processed (post-shift/Dusk).");
+    }
+
+    /// <summary>
     /// Skips to the start of Day 3 with the player positioned inside the bunker with the
     /// door closed, matching the natural end-of-InBetweenShiftSequence spawn before the
     /// player walks out to begin their shift (mirrors <see cref="SkipToStartOfDay2"/>).

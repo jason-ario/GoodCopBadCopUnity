@@ -48,68 +48,34 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private TutorialObjectiveItem _goToBedObjective;
 
     /// <summary>
-    /// True only once <see cref="ShiftManager.OnShiftEnd"/> has fired for the current day.
-    /// <see cref="ShiftManager.shiftStarted"/> is <c>false</c> both "before the shift has
-    /// started" and "after the shift has ended", so it cannot distinguish those two cases on
-    /// its own. Without this flag, the brief window at the start of a new day — after
-    /// <see cref="ShiftManager.OnDayStart"/> resets <c>shiftStarted</c> to false but before the
-    /// player has started the next shift, and while no tasks are registered yet — would make
-    /// <see cref="AllTasksComplete"/> report true and let the bed be used to "end the day" again
-    /// immediately. Reset to false whenever a new day/shift begins.
+    /// True once the player has punched out at the <see cref="TimecardMachine"/> for the
+    /// current day. This is the single source of truth for "the day's work is done" — clocking
+    /// out already implies every gating task (suspects processed, pending daily tasks, mutant
+    /// breach) has been satisfied, since <see cref="ShiftManager"/> only arms the timecard
+    /// machine's clock-out punch once all of that is true (see
+    /// <see cref="ShiftManager.RecheckClockOutGate"/>/<c>TryEnableClockOut</c>). Reset to false
+    /// whenever a new day/shift begins.
     /// </summary>
-    private bool _shiftEndedThisCycle;
+    private bool _clockedOutThisCycle;
 
     /// <summary>
     /// Debug/tutorial escape hatch. When true, <see cref="CanSleep"/> always returns true,
-    /// bypassing <see cref="_shiftEndedThisCycle"/>, <see cref="ShiftManager.shiftStarted"/>, and
-    /// <see cref="AllTasksComplete"/> entirely. Set by <see cref="Day_01"/> while its "go to bed"
-    /// tutorial marker is active — by the time that marker shows, Day 1's own tutorial gating
-    /// (clock-out already succeeded, bunker door already opened) has already proven the day is
-    /// genuinely done, so sleeping should never be blocked here even if one of the normal
-    /// conditions above is out of sync (e.g. after a debug skip that bypasses part of the
-    /// normal shift-end bookkeeping). Reset to false once sleep is confirmed or the marker
-    /// is dismissed.
+    /// bypassing <see cref="_clockedOutThisCycle"/> entirely. Set by <see cref="Day_01"/> while
+    /// its "go to bed" tutorial marker is active — by the time that marker shows, Day 1's own
+    /// tutorial gating (clock-out already succeeded, bunker door already opened) has already
+    /// proven the day is genuinely done, so sleeping should never be blocked here even if
+    /// <see cref="_clockedOutThisCycle"/> is out of sync (e.g. after a debug skip that bypasses
+    /// part of the normal clock-out bookkeeping). Reset to false once sleep is confirmed or the
+    /// marker is dismissed.
     /// </summary>
     public static bool ForceAllowSleep = false;
 
     /// <summary>
-    /// Returns true when the shift has ended AND all completable tasks are finished.
-    /// Reads <see cref="ShiftManager.shiftStarted"/> directly — a <see cref="NetworkVariable{T}"/>
-    /// set by <see cref="ShiftManager.EndShift"/> — so it is always reliable regardless of local
-    /// event subscription state.
+    /// Returns true once the player has clocked out for the day. Clocking out is already
+    /// gated by <see cref="ShiftManager"/> on every other end-of-day requirement, so no
+    /// additional task check is needed here.
     /// </summary>
-    private bool CanSleep =>
-        ForceAllowSleep
-        || (_shiftEndedThisCycle
-            && ShiftManager.Instance != null
-            && !ShiftManager.Instance.shiftStarted.Value
-            && AllTasksComplete());
-
-    /// <summary>
-    /// Returns true when every <see cref="IBetweenShiftTask"/> registered in the
-    /// <see cref="TaskRegistry"/> reports <c>IsComplete</c>.
-    /// Navigation-only entries such as <see cref="GoToBunkerTask"/> are excluded.
-    /// Returns true when no completable tasks are present (e.g. early in the night phase).
-    /// </summary>
-    private bool AllTasksComplete()
-    {
-        if (TaskRegistry.Instance == null) return true;
-
-        foreach (ISystemicThreat threat in TaskRegistry.Instance.Threats)
-        {
-            if (threat is GoToBunkerTask) continue;
-
-#pragma warning disable CS0618
-            if (threat is IBetweenShiftTask task && !task.IsComplete)
-            {
-                Debug.Log($"[BunkBedInteractable] AllTasksComplete: blocked by incomplete task '{threat.ThreatName}' ({threat.GetType().Name}).");
-                return false;
-            }
-#pragma warning restore CS0618
-        }
-
-        return true;
-    }
+    private bool CanSleep => ForceAllowSleep || _clockedOutThisCycle;
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -136,6 +102,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
             ShiftManager.Instance.OnDayStart   += HandleDayStart;
         }
 
+        TimecardMachine.OnClockOutAllClients += HandleClockedOut;
+
         // Keep the interact label in sync whenever task state changes.
         TaskRegistry.OnTaskListChanged  += UpdateInteractText;
         TaskRegistry.OnTaskStateChanged += UpdateInteractText;
@@ -152,40 +120,42 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
             ShiftManager.Instance.OnDayStart   -= HandleDayStart;
         }
 
+        TimecardMachine.OnClockOutAllClients -= HandleClockedOut;
+
         TaskRegistry.OnTaskListChanged  -= UpdateInteractText;
         TaskRegistry.OnTaskStateChanged -= UpdateInteractText;
     }
 
     // ─── Event handlers ──────────────────────────────────────────────────────
 
-    /// <summary>Queues the go-to-bed task on the HUD and refreshes the hover label when the shift ends.</summary>
-    private void HandleShiftEnd()
+    /// <summary>Marks the day's work done the instant the clock-out punch lands — see <see cref="CanSleep"/>.</summary>
+    private void HandleClockedOut()
     {
-        _shiftEndedThisCycle = true;
-        GoToBunkerTask.CreateAndRegister();
+        _clockedOutThisCycle = true;
         UpdateInteractText();
-        Debug.Log("[BunkBedInteractable] HandleShiftEnd — _shiftEndedThisCycle=true.");
+        Debug.Log("[BunkBedInteractable] HandleClockedOut — _clockedOutThisCycle=true.");
     }
 
-    /// <summary>Resets the hover label when a new shift begins and cleans up any leftover go-to-bed task.</summary>
+    /// <summary>Queues the go-to-bed task on the HUD once the shift ends.</summary>
+    private void HandleShiftEnd()
+    {
+        GoToBunkerTask.CreateAndRegister();
+        UpdateInteractText();
+    }
+
+    /// <summary>Resets clocked-out state when a new shift begins and cleans up any leftover go-to-bed task.</summary>
     private void HandleShiftStart()
     {
-        _shiftEndedThisCycle = false;
+        _clockedOutThisCycle = false;
         GoToBunkerTask.CompleteAndRemove();
         interactText = InteractTextNotReady;
         _goToBedObjective = null;
     }
 
-    /// <summary>
-    /// Resets the end-of-day flag as soon as a new day begins — this fires before the next
-    /// shift officially starts, closing the window where <see cref="ShiftManager.shiftStarted"/>
-    /// is still false (carried over from the previous day's end) and no tasks have been
-    /// registered yet for the new day, which would otherwise make <see cref="CanSleep"/>
-    /// incorrectly report true.
-    /// </summary>
+    /// <summary>Resets clocked-out state as soon as a new day begins, before the next shift starts.</summary>
     private void HandleDayStart()
     {
-        _shiftEndedThisCycle = false;
+        _clockedOutThisCycle = false;
         interactText = InteractTextNotReady;
         _goToBedObjective = null;
     }
@@ -239,9 +209,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
 
         bool canSleep = CanSleep;
         Debug.Log($"[BunkBedInteractable] OpenBedView — CanSleep={canSleep}, ForceAllowSleep={ForceAllowSleep}, " +
-                   $"_shiftEndedThisCycle={_shiftEndedThisCycle}, " +
-                   $"shiftStarted.Value={(ShiftManager.Instance != null ? ShiftManager.Instance.shiftStarted.Value : (bool?)null)}, " +
-                   $"AllTasksComplete={AllTasksComplete()}.");
+                   $"_clockedOutThisCycle={_clockedOutThisCycle}.");
 
         if (canSleep)
             UIController.Instance.OpenEndDayPopup(OnConfirmEndDay, OnCancelEndDay);

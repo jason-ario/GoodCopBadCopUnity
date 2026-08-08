@@ -44,6 +44,16 @@ public class Telephone : Interactable
     [SerializeField] private AudioSource _ringAudioSource;
     [Tooltip("AudioSource used to play the HQ voice line when the call is answered.")]
     [SerializeField] private AudioSource _voiceAudioSource;
+
+    /// <summary>
+    /// The AudioSource used to play HQ voice lines through the phone handset, already carrying
+    /// the "old phone" filter chain (low/high-pass + light distortion) on its GameObject.
+    /// Exposed so other systems (e.g. <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/>'s
+    /// <c>audioSourceOverride</c>) can route their own dialogue audio through the phone instead
+    /// of the world megaphone.
+    /// </summary>
+    public AudioSource VoiceAudioSource => _voiceAudioSource;
+
     [Tooltip("Speaker name displayed in the subtitle bar during the voice line.")]
     [SerializeField] private string _hqSpeakerName = "HQ";
     [Tooltip("Animator driving the phone ringing animation. Optional.")]
@@ -398,17 +408,27 @@ public class Telephone : Interactable
     /// <summary>
     /// Plays the grab animation, then streams the HQ voice line before returning
     /// control to the player. The player manually puts the phone down when done.
+    /// For scripted calls (<paramref name="taskIndex"/> == -2) the camera stays in the
+    /// player's normal first-person view instead of cutting to the phone-ear close-up, and
+    /// movement stays locked for the whole call — the caller's own <see cref="ScriptedDialogueRunner"/>
+    /// sequence handles subtitle/voice presentation and calls <see cref="HangUpCurrentCaller"/>
+    /// once it finishes.
     /// </summary>
     private IEnumerator AnswerCallSequence(PlayerInteractionController player, int taskIndex)
     {
+        bool moveCamera = taskIndex != -2;
+
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
         player.playerAnimationController.LeftArmIKTarget = _ikTarget;
 
-        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
-        player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
+        if (moveCamera)
+        {
+            player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
+            player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
+        }
         player.playerAnimationController.EnableLeftArmMask();
         player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
         player.playerAnimationController.SetAnimBool("HoldingPhone", true);
@@ -420,12 +440,19 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.25f);
 
-        player.playerMovementController.ResetCameraPos(false, .25f);
+        if (moveCamera)
+            player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
         player.playerAnimationController.LeftArmIKTarget = null;
-        player.playerMovementController.SetCanControl(true);
+
+        // Scripted calls (e.g. Day 3's HQ power-outage call) keep movement locked for the whole
+        // conversation — the player stands still holding the phone but keeps free look (no
+        // cutscene camera takeover). Control is restored when the phone is hung up, in
+        // PutPhoneDownSequence, once the caller's own dialogue sequence has finished.
+        if (taskIndex != -2)
+            player.playerMovementController.SetCanControl(true);
 
         // Stream HQ voice line.
         if (taskIndex >= 0 && _availableTasks != null && taskIndex < _availableTasks.Length
@@ -451,13 +478,12 @@ public class Telephone : Interactable
                     _debugVoiceLine, _debugVoiceAudioClips, _voiceAudioSource);
             }
         }
-        // taskIndex == -2: scripted call — voice/subtitles handled by ScriptedDialogueRunner.
-        // Show only a hang-up back button so the player can put the phone down when done.
-        if (taskIndex == -2)
-        {
-            ulong localClientId = NetworkManager.Singleton.LocalClientId;
-            UIController.Instance?.ShowBackButton(() => HangUp(localClientId));
-        }
+        // taskIndex == -2: scripted call — voice/subtitles are handled externally by the
+        // caller's own scripted dialogue sequence (see Telephone.TriggerScriptedCall's doc
+        // comment) via ScriptedDialogueRunner.PlayMegaphoneDialogue(unlocked: true), which keeps
+        // the player's own free-look camera instead of cutting to a cutscene cam. Movement stays
+        // locked (see above) until the caller calls HangUpCurrentCaller() when that dialogue
+        // finishes — no back button needed here.
     }
 
     private void StopRingEffects()
@@ -486,6 +512,36 @@ public class Telephone : Interactable
         RequestPutDownServerRpc(clientId);
     }
 
+    /// <summary>
+    /// Server-only. Hangs up the phone on behalf of whichever client is currently holding it.
+    /// Used to auto-put-down the handset once a scripted call's own dialogue has finished (e.g.
+    /// Day 3's power-outage call) without requiring the player to interact again. No-op if the
+    /// phone isn't currently grabbed. Always clears <see cref="_hangUpLocked"/> first so the
+    /// system's own auto-hangup is never blocked by a lock it (or its caller) set earlier.
+    /// </summary>
+    public void HangUpCurrentCaller()
+    {
+        if (!IsServer || !_isGrabbed.Value) return;
+        _hangUpLocked = false;
+        RequestPutDownServerRpc(_grabbingClientId.Value);
+    }
+
+    // Server-only: true while manual hang-up (via Interact) should be ignored — e.g. while a
+    // scripted call's own dialogue is still playing. Set/cleared via SetHangUpLocked.
+    private bool _hangUpLocked = false;
+
+    /// <summary>
+    /// Server-only. Blocks or unblocks manual hang-up (pressing E on the phone) while a scripted
+    /// call's own dialogue sequence is in progress — e.g. Day 3's HQ power-outage call, so the
+    /// player can't put the phone down early and skip the rest of the conversation. Does not
+    /// affect <see cref="HangUpCurrentCaller"/>, which always clears the lock itself first.
+    /// </summary>
+    public void SetHangUpLocked(bool locked)
+    {
+        if (!IsServer) return;
+        _hangUpLocked = locked;
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void RequestGrabServerRpc(ulong clientId)
     {
@@ -501,6 +557,12 @@ public class Telephone : Interactable
     private void RequestPutDownServerRpc(ulong clientId)
     {
         if (!_isGrabbed.Value || _grabbingClientId.Value != clientId) return;
+
+        if (_hangUpLocked)
+        {
+            Debug.Log("[Telephone] RequestPutDownServerRpc: hang-up blocked -- scripted call dialogue still in progress.");
+            return;
+        }
 
         _isGrabbed.Value = false;
         _grabbingClientId.Value = ulong.MaxValue;

@@ -512,6 +512,16 @@ public class ShiftManager : NetworkBehaviour
 
         HandleAllSuspectsProcessed();
 
+        // This path re-uses shiftStarted/OnShiftStart purely for internal bookkeeping (populating
+        // the suspect lineup, etc.) — it does NOT represent a real new shift, so it must not leave
+        // the day permanently "mid-shift". Without this, shiftStarted.Value stays true and
+        // BunkBedInteractable._shiftEndedThisCycle stays false (reset by OnShiftStart above) for
+        // the rest of the day, since the real EndShift()/OnShiftEnd that normally re-arms the bed
+        // already ran before this death retry and never runs again. Restore both flags here so the
+        // bunk bed correctly reports "ready" once every remaining post-shift task is finished.
+        shiftStarted.Value = false;
+        SignalShiftEndClientRpc();
+
         Debug.Log("[ShiftManager] RestartIntoPostShiftPhase — resumed directly at Dusk after a death retry.");
     }
 

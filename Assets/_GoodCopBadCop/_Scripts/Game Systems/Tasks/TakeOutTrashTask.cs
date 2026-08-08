@@ -93,6 +93,14 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Extra height added above the raycast hit point so items sit on the surface rather than clipping into it.")]
     [SerializeField] private float _spawnHeightOffset = 0.05f;
 
+    [Tooltip("Seconds after a gore/body-part item spawns before its Rigidbody is switched to " +
+             "kinematic (perf optimization — same as MutantEnemy's death gore bursts; see " +
+             "GoreKinematicSettler). It briefly simulates physics so it settles naturally onto " +
+             "the ground before locking in place. Only applies to items spawned with " +
+             "useGorePrefabs: true.")]
+    [Min(0f)]
+    [SerializeField] private float _goreKinematicDelay = 2f;
+
     // ── Networked state ──────────────────────────────────────────────────────
 
     private readonly NetworkVariable<float> _networkThreatLevel = new(
@@ -661,7 +669,29 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _spawnedItems.Add(netObj);
 
         if (spawnBloodDecal)
+        {
             SpawnBloodDecal(spawnPos, groundNormal);
+            ApplyGoreDropPhysics(itemGo);
+        }
+    }
+
+    /// <summary>
+    /// Sets up a spawned gore/body-part item (see <see cref="SpawnSingleItem"/>'s
+    /// <c>spawnBloodDecal</c>/useGorePrefabs path) to briefly simulate physics — same as
+    /// <c>MutantEnemy</c>'s death gore bursts — so it settles naturally onto the ground, then
+    /// switches its Rigidbody to kinematic a few seconds later via
+    /// <see cref="GoreKinematicSettler"/> once it's had time to land and rest.
+    /// </summary>
+    private void ApplyGoreDropPhysics(GameObject piece)
+    {
+        Rigidbody rb = piece.GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = piece.AddComponent<Rigidbody>();
+
+        rb.isKinematic = false;
+
+        GoreKinematicSettler settler = piece.AddComponent<GoreKinematicSettler>();
+        settler.Initialize(rb, _goreKinematicDelay);
     }
 
     /// <summary>

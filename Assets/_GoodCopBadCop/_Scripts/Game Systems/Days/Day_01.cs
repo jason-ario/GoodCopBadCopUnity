@@ -572,7 +572,8 @@ public class Day_01 : DayBase
         _biologicalNotebook?.SetVisible(false);
         _biologicalNotebook?.SetInteractableNetworked(false);
 
-        // The hammer isn't introduced until Day 3's "Fix Perimeter Fences" tutorial.
+        // The hammer isn't introduced until the post-breach "Fix Perimeter Fences" tutorial
+        // later this shift (see ShowHammerTutorial) — stays non-interactable until then.
         _hammer?.SetInteractableNetworked(false);
 
         // The checkpoint shovels stay non-interactable until the first mutant breach begins —
@@ -2621,9 +2622,8 @@ public class Day_01 : DayBase
         // By the time this marker shows, clock-out has already succeeded and the bunker door
         // has already opened — Day 1's own tutorial gating has already proven the day is done.
         // Force the bed to allow sleeping regardless of BunkBedInteractable's own normal gating
-        // (shift-ended flag, ShiftManager.shiftStarted, AllTasksComplete), which can fall out of
-        // sync with Day 1's scripted flow on certain paths (e.g. a debug skip that bypasses part
-        // of the normal shift-end bookkeeping).
+        // (its clocked-out flag), which can fall out of sync with Day 1's scripted flow on
+        // certain paths (e.g. a debug skip that bypasses part of the normal clock-out bookkeeping).
         BunkBedInteractable.ForceAllowSleep = true;
 
         BunkBedInteractable.OnSleepConfirmed += OnGoToBedSleepConfirmed;

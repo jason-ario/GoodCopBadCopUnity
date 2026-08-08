@@ -18,8 +18,11 @@ public class TimecardMachine : Interactable
 {
     /// <summary>
     /// Fired on the server the moment a clock-out punch is accepted.
-    /// Subscribe to drive day-specific reactions (e.g. Day 3 power outage) that
-    /// should feel like a direct consequence of the player clocking out.
+    /// Currently unused — day-specific post-shift reactions (e.g. Day 3's power outage) are
+    /// driven off <see cref="ShiftManager.OnLastSuspectProcessed"/> (Dusk) instead, so they
+    /// happen the instant the last suspect is processed rather than waiting for the player to
+    /// walk over and clock out. Kept available for any future reaction that should genuinely
+    /// wait for the clock-out punch itself.
     /// </summary>
     public static event Action OnClockOutServer;
 

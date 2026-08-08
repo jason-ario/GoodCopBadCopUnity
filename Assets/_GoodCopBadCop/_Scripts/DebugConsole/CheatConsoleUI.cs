@@ -119,6 +119,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Skip to Day 3 — In Booth, All Suspects Processed", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay3PostShiftBooth());
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Skip to End of Day 4 — Before Mutant Breach", () =>
         {
             DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay4());

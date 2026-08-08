@@ -45,6 +45,38 @@ public class AnomalyManager : MonoBehaviour
     /// </summary>
     public float InfectionProgressionMultiplier => Mathf.Max(0f, _infectionProgressionMultiplier);
 
+    [Header("Never-Seen Suspect Tiered Starting Score")]
+    [Tooltip("Starting mutation score granted to a suspect the very first time they're shown to the " +
+             "player on campaign day 1 (i.e. no backlog days have elapsed). Later, never-seen-before " +
+             "suspects get more than this — see NeverSeenScorePerDay below.")]
+    [SerializeField] private int _neverSeenBaseStartingScore = 0;
+
+    [Tooltip("Extra starting mutation score points added for every campaign day that has elapsed " +
+             "before a suspect's first-ever appearance. E.g. with a value of 3, a suspect never seen " +
+             "until day 4 starts with roughly BaseStartingScore + 3*(4-1) points instead of 0 — showcasing " +
+             "more advanced physical mutations later in the run without making them as far along as a " +
+             "suspect who has actually been seen and progressed day over day.")]
+    [SerializeField] private int _neverSeenScorePerDay = 3;
+
+    [Tooltip("Hard cap on the tiered starting score a never-seen-before suspect can receive, no matter " +
+              "how late in the campaign their first appearance happens. Keeps late-game 'first sightings' " +
+              "from starting as advanced as suspects who have been quarantined and let go multiple times.")]
+    [SerializeField] private int _neverSeenMaxStartingScore = 40;
+
+    /// <summary>
+    /// Computes the tiered starting mutation score for a suspect who has never been shown to the
+    /// player before, based on how many campaign days have already elapsed. Day 1 first-appearances
+    /// get <see cref="_neverSeenBaseStartingScore"/>; each additional elapsed day adds
+    /// <see cref="_neverSeenScorePerDay"/> more, up to <see cref="_neverSeenMaxStartingScore"/>.
+    /// </summary>
+    /// <param name="currentDay">The 1-based campaign day of the suspect's first appearance.</param>
+    public int GetNeverSeenStartingScore(int currentDay)
+    {
+        int elapsedDays = Mathf.Max(0, currentDay - 1);
+        int tieredScore = _neverSeenBaseStartingScore + (_neverSeenScorePerDay * elapsedDays);
+        return Mathf.Clamp(tieredScore, _neverSeenBaseStartingScore, Mathf.Max(_neverSeenBaseStartingScore, _neverSeenMaxStartingScore));
+    }
+
     private void Awake()
     {
         Instance = this;

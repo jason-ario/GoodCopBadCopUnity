@@ -354,13 +354,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// instead of the default <see cref="MegaphoneDialogueManager.AudioClips"/>, so the one-off
     /// speaker sounds distinct from the usual megaphone voice.
     /// </param>
+    /// <param name="useTelephoneAudioSource">
+    /// When true, dialogue audio plays through <see cref="Telephone.VoiceAudioSource"/> (the
+    /// phone handset speaker, which already carries an "old phone" filter chain) instead of
+    /// <see cref="MegaphoneDialogueManager.MegaphoneAudioSource"/> (the world megaphone). Use
+    /// for HQ calls answered over the phone rather than an in-world PA announcement. Resolved
+    /// locally on each client via <see cref="Telephone.Instance"/> — no live reference is sent
+    /// over the network.
+    /// </param>
     public void PlayMegaphoneDialogue(
         ScriptedDialogue dialogue,
         Action onComplete = null,
         bool unlocked = false,
         string speakerNameOverride = null,
         Color? speakerColorOverride = null,
-        bool useAlternateVoice = false)
+        bool useAlternateVoice = false,
+        bool useTelephoneAudioSource = false)
     {
         if (!IsServer) return;
 
@@ -374,7 +383,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         string speakerName = string.IsNullOrEmpty(speakerNameOverride) ? _megaphoneSpeakerName : speakerNameOverride;
         Color speakerColor = speakerColorOverride ?? _megaphoneSpeakerColor;
 
-        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice));
+        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource));
     }
 
     // -------------------------------------------------------------------------
@@ -937,7 +946,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool unlocked,
         string speakerName,
         Color speakerColor,
-        bool useAlternateVoice)
+        bool useAlternateVoice,
+        bool useTelephoneAudioSource = false)
     {
         // When unlocked, the player is already free (caller called ExitScriptedMode first).
         // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
@@ -957,7 +967,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
             SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
             SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
-            yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine, speakerName, speakerColor, useAlternateVoice));
+            yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource));
             SetSpeakerSpeakingClientRpc(false);
         }
 
@@ -968,11 +978,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Debug.Log("[ScriptedDialogueRunner] Megaphone dialogue complete.");
     }
 
-    private IEnumerator SayMegaphoneLineAndWait(string text, string speakerName, Color speakerColor, bool useAlternateVoice)
+    private IEnumerator SayMegaphoneLineAndWait(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false)
     {
         _awaitingScriptedInput = true;
         SetAwaitingInputClientRpc(true);
-        SayMegaphoneLineClientRpc(text, speakerName, speakerColor, useAlternateVoice);
+        SayMegaphoneLineClientRpc(text, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource);
         yield return StartCoroutine(WaitForScriptedAdvance());
         SetAwaitingInputClientRpc(false);
         _awaitingScriptedInput = false;
@@ -980,19 +990,25 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     /// <summary>
     /// Displays a subtitle line using the given megaphone speaker identity and plays its audio
-    /// through <see cref="MegaphoneDialogueManager"/>. Uses the standard dialogue audio slot
-    /// so the player clicking to advance stops the audio, matching character dialogue behaviour.
+    /// through <see cref="MegaphoneDialogueManager"/> (or, when <paramref name="useTelephoneAudioSource"/>
+    /// is set, through <see cref="Telephone.VoiceAudioSource"/> instead — e.g. for HQ calls
+    /// answered over the phone). Uses the standard dialogue audio slot so the player clicking to
+    /// advance stops the audio, matching character dialogue behaviour.
     /// </summary>
     [ClientRpc]
-    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice)
+    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false)
     {
         var mgr = MegaphoneDialogueManager.Instance;
         AudioClip[] clips = mgr != null
             ? (useAlternateVoice ? mgr.AlternateVoiceClips : mgr.AudioClips)
             : System.Array.Empty<AudioClip>();
-        AudioSource source = mgr != null ? mgr.MegaphoneAudioSource : null;
 
-        mgr?.SetSpeakerSpeaking(true);
+        AudioSource source = useTelephoneAudioSource
+            ? Telephone.Instance?.VoiceAudioSource
+            : (mgr != null ? mgr.MegaphoneAudioSource : null);
+
+        if (!useTelephoneAudioSource)
+            mgr?.SetSpeakerSpeaking(true);
 
         DialogueManager.Instance.SpawnSubtitles(text, speakerName, speakerColor,
             isPlayer: false, clearHistory: false, waitForInput: true);

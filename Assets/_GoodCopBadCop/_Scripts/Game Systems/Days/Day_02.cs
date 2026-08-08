@@ -83,8 +83,8 @@ public class Day_02 : DayBase, IDailyTask
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 2.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
-    [Tooltip("The Hammer used to fix perimeter fences — not introduced until Day 3, so it must " +
-             "stay non-interactable through Day 2.")]
+    [Tooltip("The Hammer used to fix perimeter fences — already unlocked during Day 1's post-breach " +
+             "tutorial, so it stays interactable through Day 2 onward.")]
     [SerializeField] private PickableObject _hammer;
 
     // Whether the mutation notebook tutorial beat has already fired this shift.
@@ -371,8 +371,9 @@ public class Day_02 : DayBase, IDailyTask
         _biologicalNotebook?.SetVisible(false);
         _biologicalNotebook?.SetInteractableNetworked(false);
 
-        // The hammer isn't introduced until Day 3's "Fix Perimeter Fences" tutorial.
-        _hammer?.SetInteractableNetworked(false);
+        // The hammer was already unlocked during Day 1's post-breach fence-repair tutorial —
+        // keep it interactable through Day 2 onward.
+        _hammer?.SetInteractableNetworked(true);
 
         _mutationTutorialFired = false;
 
