@@ -91,22 +91,25 @@ public class TimecardMachine : Interactable
     // Cached from the Inspector-assigned interactText so we can restore it after clock-in.
     private string _clockOutInteractText;
 
-    protected override void Awake()
+    public override void OnNetworkSpawn()
     {
-        base.Awake();
+        base.OnNetworkSpawn();
+        _clockOutInteractText = interactText;
+
         // Days other than Day 1 have no scripted opening sequence, so nothing else ever
         // arms clock-in for them — arm it here the instant the shift is reset and ready.
         // Day 1 keeps driving its own EnableClockIn() call from Day_01.OnDayStarted (its
         // tutorial arrow / shutter sequence needs to be wired up first); this handler simply
         // no-ops on Day 1 so the two paths never conflict.
+        //
+        // Subscribed here (OnNetworkSpawn) rather than Awake: Awake() execution order across
+        // different components is not guaranteed, so if this ran before ShiftManager.Awake()
+        // set ShiftManager.Instance, the subscription would silently never happen — leaving
+        // clock-in permanently unable to re-arm itself past Day 1 for that whole session.
+        // OnNetworkSpawn always runs after every scene object's Awake() has completed, so
+        // ShiftManager.Instance is guaranteed to be ready here.
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftReady += OnShiftReady;
-    }
-
-    public override void OnNetworkSpawn()
-    {
-        base.OnNetworkSpawn();
-        _clockOutInteractText = interactText;
     }
 
     public override void OnNetworkDespawn()

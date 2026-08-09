@@ -659,6 +659,13 @@ public class Day_01 : DayBase
         if (ShutterController.Instance != null)
             ShutterController.Instance.ShutterLockedOpen = false;
 
+        // Safety net: the lever is only ever locked for the brief window while Vlad first
+        // approaches on Day 1 (see Day1OpeningSequence), and should already be unlocked by
+        // DeliverDeferredVerdict well before Day 1 ends. Force it unlocked here too so no day
+        // after Day 1 can ever inherit a stuck non-interactable lever.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            _lever?.SetInteractable(true);
+
         // Restore normal suspect arrival timing for subsequent days.
         ShiftManager.OverrideSuspectArrivalInterval = null;
 
@@ -3237,12 +3244,18 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Force-unlocks every Day 1 tutorial-gated interactable (stack of folders, documentation
-    /// exam pile, stamp slots) without touching anything else in Day 1's opening sequence.
+    /// exam pile, stamp slots, lever) without touching anything else in Day 1's opening sequence.
     /// <see cref="DayActivated"/> only runs while Day 1 itself is the active day, so a save
     /// resumed on Day 2+ never locks these in the first place — this exists purely as an
     /// explicit safety net so a resumed save is guaranteed to have them unlocked regardless of
     /// any leftover state. Called by <see cref="ShiftManager.ResumeSavedDay"/>. Server-only;
     /// each setter propagates its own state to clients via NetworkVariable.
+    ///
+    /// The lever is included here because <see cref="Day1OpeningSequence"/> locks it while Vlad
+    /// first approaches the window (see <see cref="_lever"/>.SetInteractable(false) there) and
+    /// only unlocks it once Vlad's green-stamp verdict is delivered (<see cref="DeliverDeferredVerdict"/>).
+    /// If a save is ever captured mid-lock (or on any day after Day 1), this guarantees the lever
+    /// is never permanently stuck non-interactable — it should always be usable on Day 2+.
     /// </summary>
     public void ForceUnlockTutorialItems()
     {
@@ -3253,8 +3266,9 @@ public class Day_01 : DayBase
         _greenStampSlot?.SetSlotInteractable(true);
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);
+        _lever?.SetInteractable(true);
 
-        Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items unlocked for a resumed save past Day 1.");
+        Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items (incl. lever) unlocked for a resumed save past Day 1.");
     }
 
     // -------------------------------------------------------------------------

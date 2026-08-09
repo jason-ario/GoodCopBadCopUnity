@@ -183,7 +183,6 @@ public class MailCubbySlot : MonoBehaviour
     {
         if (placedObject is not MailPackageItem package) return;
         if (package.IsResolved) return;
-        if (_lockerDoor != null && !_lockerDoor.IsOpen) return; // door's own collider normally blocks entry — this is just a backstop
 
         // Optimistically lock the package out of being picked back up the instant it lands in
         // its addressee's cubby, instead of waiting for the RequestSortServerRpc round trip to

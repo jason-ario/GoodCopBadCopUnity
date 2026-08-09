@@ -46,17 +46,37 @@ public class MailPackageItem : PickableObject
     [SerializeField] private float _sortSuccessSfxVolume = 1f;
 
     [Header("Addressee (set by SortMailTask.ServerInitialize at spawn time)")]
-    [Tooltip("The resident this package is actually addressed to. Assigned by the server at spawn " +
-        "time (see ServerInitialize) — visible/assignable here in the Inspector mainly for " +
-        "debugging/manual test packages. Sort-matching (SortMailTask.EvaluateSort) compares this " +
-        "SuspectData reference directly against the cubby's own MailCubbySlot.AssignedResident " +
-        "instead of comparing separately-built display-name strings, which was fragile.")]
-    [SerializeField] private SuspectData _assignedResident;
+    [Tooltip("Inspector-only debug display of the resident this package is addressed to — read-only at runtime; the authoritative value is the replicated _residentPoolIndex below. Not used for sort-matching directly.")]
+    [SerializeField] private SuspectData _assignedResidentDebugView;
 
-    /// <summary>The resident this package is actually addressed to — compared directly (by reference) against <see cref="MailCubbySlot.AssignedResident"/> in <see cref="SortMailTask.EvaluateSort"/>.</summary>
-    public SuspectData AssignedResident => _assignedResident;
+    /// <summary>
+    /// The resident this package is actually addressed to, resolved from the replicated
+    /// <see cref="_residentPoolIndex"/> via <see cref="MailCubbyManager.ResolveResident"/> — this
+    /// resolves correctly on every client (not just the server), because the index itself is a
+    /// networked value. Compared directly (by reference) against
+    /// <see cref="MailCubbySlot.AssignedResident"/>, both server-side in
+    /// <see cref="SortMailTask.EvaluateSort"/> and client-side (optimistically) in
+    /// <see cref="MailCubbySlot.HandleItemPlaced"/>.
+    ///
+    /// IMPORTANT: this must be resolved from a *networked* value, not a plain
+    /// server-only field — a plain field reads back null/default on every client that isn't the
+    /// server, silently breaking <see cref="MailCubbySlot.HandleItemPlaced"/>'s optimistic
+    /// <see cref="LockInteractable"/> call (since its correctness check would always be false)
+    /// and reopening the "grab it back out before the server lock lands" race for exactly the
+    /// clients that need it most. That was the cause of the intermittent "random box doesn't
+    /// register" regression.
+    /// </summary>
+    public SuspectData AssignedResident => MailCubbyManager.Instance != null
+        ? MailCubbyManager.Instance.ResolveResident(_residentPoolIndex.Value)
+        : null;
 
     // ── Networked data, set once by the server at spawn time via ServerInitialize ──────────────
+
+    /// <summary>Index of <see cref="AssignedResident"/> within <see cref="MailCubbyManager"/>'s shared resident pool. Replicated so every client (not just the server) can resolve the real SuspectData reference — see <see cref="AssignedResident"/>.</summary>
+    private readonly NetworkVariable<int> _residentPoolIndex = new(
+        -1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private readonly NetworkVariable<FixedString64Bytes> _residentName = new(
         default,
@@ -98,19 +118,22 @@ public class MailPackageItem : PickableObject
     /// Call immediately after spawning, before the object is observed by clients if possible.
     /// </summary>
     /// <param name="resident">
-    /// The addressee's <see cref="SuspectData"/> asset — stored directly as
-    /// <see cref="AssignedResident"/> and compared by reference against
-    /// <see cref="MailCubbySlot.AssignedResident"/> in <see cref="SortMailTask.EvaluateSort"/>.
+    /// The addressee's <see cref="SuspectData"/> asset. Its index within
+    /// <see cref="MailCubbyManager"/>'s shared resident pool is stored as the replicated
+    /// <see cref="_residentPoolIndex"/> and resolved back to the real reference via
+    /// <see cref="AssignedResident"/> on every client — see that property's doc comment for why
+    /// this must go through a networked value rather than a plain field.
     /// </param>
     public void ServerInitialize(SuspectData resident, string residentName, string goodsLabel, MailSortBinType correctBin)
     {
         if (!IsServer) return;
 
-        _assignedResident    = resident;
-        _residentName.Value  = residentName;
-        _goodsLabel.Value    = goodsLabel;
-        _correctBin.Value    = (int)correctBin;
-        IsResolved           = false;
+        _assignedResidentDebugView = resident;
+        _residentPoolIndex.Value   = MailCubbyManager.Instance != null ? MailCubbyManager.Instance.GetResidentIndex(resident) : -1;
+        _residentName.Value        = residentName;
+        _goodsLabel.Value          = goodsLabel;
+        _correctBin.Value          = (int)correctBin;
+        IsResolved                 = false;
 
         RefreshLabel();
     }

@@ -182,6 +182,19 @@ public class TutorialObjectiveList : MonoBehaviour
         _isShowing = false;
 
         if (_clearCoroutine != null) StopCoroutine(_clearCoroutine);
+
+        // If this object (or a parent) has been deactivated out from under us — e.g. a
+        // ClientRpc firing on a client where the tutorial overlay isn't currently active —
+        // Unity can't run a coroutine on it. Skip straight to the end state synchronously.
+        if (!gameObject.activeInHierarchy)
+        {
+            objectiveListRoot.SetActive(false);
+            ClearAllItems();
+            _clearCoroutine = null;
+            onComplete?.Invoke();
+            return;
+        }
+
         _clearCoroutine = StartCoroutine(HideAndClearRoutine(preHideDelay, onComplete));
     }
 
@@ -200,6 +213,15 @@ public class TutorialObjectiveList : MonoBehaviour
         if (item == null) return;
 
         item.MarkComplete();
+
+        if (!gameObject.activeInHierarchy)
+        {
+            _items.Remove(item);
+            Destroy(item.gameObject);
+            onComplete?.Invoke();
+            return;
+        }
+
         StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
     }
 
