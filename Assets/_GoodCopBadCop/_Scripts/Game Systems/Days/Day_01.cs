@@ -3244,7 +3244,7 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Force-unlocks every Day 1 tutorial-gated interactable (stack of folders, documentation
-    /// exam pile, stamp slots, lever) without touching anything else in Day 1's opening sequence.
+    /// exam pile, stamp slots, lever, hammer) without touching anything else in Day 1's opening sequence.
     /// <see cref="DayActivated"/> only runs while Day 1 itself is the active day, so a save
     /// resumed on Day 2+ never locks these in the first place — this exists purely as an
     /// explicit safety net so a resumed save is guaranteed to have them unlocked regardless of
@@ -3268,7 +3268,14 @@ public class Day_01 : DayBase
         _redStampSlot?.SetSlotInteractable(true);
         _lever?.SetInteractable(true);
 
-        Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items (incl. lever) unlocked for a resumed save past Day 1.");
+        // The hammer is locked in DayActivated (_hammer?.SetInteractableNetworked(false)) until
+        // the post-breach "Fix Perimeter Fences" tutorial unlocks it later on Day 1 — see
+        // ShowHammerTutorial. That unlock only ever runs while Day 1 is active, so a save
+        // resumed on Day 2+ (where Day 1 never activates) would otherwise leave the hammer
+        // permanently non-interactable. Force it unlocked here too.
+        _hammer?.SetInteractableNetworked(true);
+
+        Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items (incl. lever and hammer) unlocked for a resumed save past Day 1.");
     }
 
     // -------------------------------------------------------------------------

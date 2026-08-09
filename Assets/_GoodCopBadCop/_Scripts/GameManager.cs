@@ -359,6 +359,24 @@ public class GameManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Public wrapper around <see cref="SpawnAllPlayersAtLobby"/> for callers that need to
+    /// guarantee every connected client has a spawned player without running the full
+    /// lobby-transition coroutine (<see cref="TransitionToLobby"/>) — namely resuming a save
+    /// past Day 1, where <see cref="ShiftManager.ResumeSavedDay"/> repositions the player from
+    /// this lobby spawn straight into the bunker instead. Without an explicit spawn here, a
+    /// client whose connection was deferred while <see cref="IsTransitioningToLobby"/> was true
+    /// (see <see cref="LobbyManager.OnClientConnected"/>'s last branch) would never get a
+    /// player object at all if <see cref="TransitionToLobby"/> is skipped. Safe to call even if
+    /// some clients already have a player object — <see cref="PlayerSpawner"/> skips duplicates.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnAllPlayersForResumedDay()
+    {
+        if (!IsServer) return;
+        SpawnAllPlayersAtLobby();
+    }
+
+    /// <summary>
     /// Teleports all connected players from the lobby to their gameplay spawn points.
     /// Called after the intro cutscene begins so players land at the booth for Day 1.
     /// SERVER ONLY.

@@ -374,6 +374,11 @@ public class MainMenuController : MonoBehaviour
                     // Not going through the lobby transition — clear the flag it would
                     // otherwise have cleared itself once players were spawned there.
                     GameManager.Instance.CancelLobbyTransition();
+
+                    // TransitionToLobby (skipped below) is normally what spawns every connected
+                    // client. Spawn them explicitly instead; ResumeSavedDay repositions everyone
+                    // from here straight into the bunker.
+                    GameManager.Instance.SpawnAllPlayersForResumedDay();
                     ShiftManager.Instance.ResumeSavedDay();
                 }
                 else
@@ -594,6 +599,7 @@ public class MainMenuController : MonoBehaviour
         if (resumingPastDay1)
         {
             GameManager.Instance.CancelLobbyTransition();
+            GameManager.Instance.SpawnAllPlayersForResumedDay();
             ShiftManager.Instance.ResumeSavedDay();
         }
         else

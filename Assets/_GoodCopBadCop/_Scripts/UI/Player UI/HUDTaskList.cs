@@ -11,6 +11,18 @@ public class HUDTaskList : MonoBehaviour
 {
     private readonly Dictionary<ISystemicThreat, TutorialObjectiveItem> _rows = new();
 
+    /// <summary>
+    /// Public re-sync entry point. Tasks triggered before this HUD element ever became enabled
+    /// (e.g. <see cref="Day_03"/>'s trash/blood tasks, which <see cref="CampaignManager.ApplyDay"/>
+    /// activates the moment <see cref="GameManager.TryStartGame"/> runs on a resumed save — well
+    /// before <see cref="ShiftManager.ResumeSavedDay"/> shows the player UI) are already sitting
+    /// in <see cref="TaskRegistry"/> by the time this fires, but <see cref="OnEnable"/>'s one-shot
+    /// <see cref="Rebuild"/> call only catches them if this component happens to enable after
+    /// they're registered. Call this explicitly after such a resume to force a fresh sync instead
+    /// of relying on that ordering.
+    /// </summary>
+    public void ForceRebuild() => Rebuild();
+
     private void OnEnable()
     {
         TaskRegistry.OnTaskListChanged += Rebuild;

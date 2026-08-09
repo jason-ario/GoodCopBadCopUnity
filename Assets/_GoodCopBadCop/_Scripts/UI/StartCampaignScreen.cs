@@ -24,6 +24,10 @@ public class StartCampaignScreen : MonoBehaviour
     [SerializeField] private TextMeshProUGUI inviteCodeText;
     [SerializeField] private GameObject inviteCodeSection;
     [SerializeField] private Button copyInviteCodeButton;
+    [Tooltip("Shows \"New Game - Day 1\" for a fresh slot or \"Continue - Day N\" for a slot " +
+             "already in progress. Was previously left as static placeholder text (\"New Game - " +
+             "Day 0\") and never updated to reflect the actual chosen save slot.")]
+    [SerializeField] private TextMeshProUGUI dayNumberText;
 
     [Header("Host Controls")]
     [SerializeField] private Button startButton;
@@ -141,8 +145,26 @@ public class StartCampaignScreen : MonoBehaviour
     // UI Refresh
     // ---------------------------------------------------------------------------
 
+    /// <summary>
+    /// Reflects the active save slot's actual state instead of the static placeholder text
+    /// left on the prefab. A never-started slot's <see cref="SaveSlot.CurrentDay"/> is 0, so
+    /// clamp to 1 the same way <see cref="CampaignManager.StartCampaign"/> does.
+    /// </summary>
+    private void RefreshDayNumberText()
+    {
+        if (dayNumberText == null) return;
+
+        SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
+        int displayDay = Mathf.Max(1, slot?.CurrentDay ?? 0);
+        bool isNewGame = slot == null || !slot.IsOccupied;
+
+        dayNumberText.text = isNewGame ? $"New Game - Day {displayDay}" : $"Continue - Day {displayDay}";
+    }
+
     private void RefreshUI()
     {
+        RefreshDayNumberText();
+
         // Determine who is in the lobby right now.
         var members = LobbyManager.Instance.GetMembersSnapshot();
         bool isHost = LobbyManager.Instance.IsHost;
@@ -280,14 +302,41 @@ public class StartCampaignScreen : MonoBehaviour
     /// lobby, switches cameras, then starts the campaign — all via ClientRpc broadcasts, so
     /// every currently connected client (including anyone who joined while ready-ing up)
     /// transitions into gameplay at the same time as the host.
+    ///
+    /// A save already past Day 1 skips the lobby-outside spawn, the Start Shift Gate's Day 1
+    /// onboarding (start-shift screen + intro cutscene), and the main menu's intro cinematic
+    /// entirely — the player is dropped straight into the bunker as if resuming mid-campaign.
+    /// Mirrors <see cref="MainMenuController.ContinueGame"/>; this is the path actually used
+    /// when a save is chosen from the campaign slot-selection screen (see
+    /// <see cref="CampaignScreenController.OnSlotChosen"/> → <see cref="MainMenuController.StartNewGame"/>
+    /// → this pre-game lobby screen), so it needs the same day-aware branch.
     /// </summary>
     public void StartGame()
     {
         // Commit the slot to disk now that the player has confirmed they want to play.
         SaveDataManager.Instance.InitialiseActiveSlot();
 
-        GameManager.Instance.TransitionToLobby();
+        bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+
         GameManager.Instance.TryStartGame();
+
+        if (resumingPastDay1)
+        {
+            // Not going through the lobby transition — clear the flag it would otherwise
+            // have cleared itself once players were spawned there.
+            GameManager.Instance.CancelLobbyTransition();
+
+            // TransitionToLobby (skipped below) is normally what spawns every connected
+            // client — without it, a client whose connection was deferred while still on this
+            // pre-game screen would never get a player object. Spawn them explicitly; ResumeSavedDay
+            // repositions everyone from here straight into the bunker.
+            GameManager.Instance.SpawnAllPlayersForResumedDay();
+            ShiftManager.Instance.ResumeSavedDay();
+        }
+        else
+        {
+            GameManager.Instance.TransitionToLobby();
+        }
     }
 
     /// <summary>

@@ -227,8 +227,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         if (_triggered) return;
         _triggered = true;
 
-        if (_ochoGameObjectToDeactivate != null)
-            _ochoGameObjectToDeactivate.SetActive(true);
+        ActivateOchoClientRpc();
 
         SpawnNetworkedVladPieces();
         PlayEatingLoopClientRpc();
@@ -303,6 +302,21 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     }
 
     // ── Client RPCs (also execute locally on the host) ───────────────────────
+
+    /// <summary>
+    /// Activates <see cref="_ochoGameObjectToDeactivate"/> on every client (including the host).
+    /// Previously this was done directly in <see cref="TriggerTask"/>, which only ran on the
+    /// server and so never activated the GameObject on non-host clients -- if it started
+    /// deactivated in the scene, Ocho/the whole cutscene would never appear for them.
+    /// </summary>
+    [ClientRpc]
+    private void ActivateOchoClientRpc() => LocalActivateOcho();
+
+    private void LocalActivateOcho()
+    {
+        if (_ochoGameObjectToDeactivate != null)
+            _ochoGameObjectToDeactivate.SetActive(true);
+    }
 
     [ClientRpc]
     private void PlayEatingLoopClientRpc() => LocalPlayEatingLoop();

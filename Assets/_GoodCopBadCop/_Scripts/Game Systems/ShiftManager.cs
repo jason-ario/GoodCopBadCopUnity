@@ -1652,6 +1652,10 @@ public class ShiftManager : NetworkBehaviour
         // matching InBetweenShiftSequence's natural day-transition behaviour.
         _bunkerDoorController?.Reset();
 
+        // Safety net: explicitly flip every Start Shift Gate into post-intro mode rather than
+        // relying solely on OnShiftReady's event ordering (mirrors DebugConsole's day-skip commands).
+        ForceCompleteAllStartShiftGates();
+
         UIController.Instance.ShowPlayerUI();
         EnablePlayerControl();
         GameManager.Instance.OnGameStart?.Invoke();
@@ -1666,10 +1670,11 @@ public class ShiftManager : NetworkBehaviour
     /// the intro cutscene — see <see cref="GateStartShiftController"/>), and the main menu's
     /// intro cinematic entirely: the player is dropped straight into the bunker as if resuming
     /// mid-campaign. Also restores every pickable object's saved transform and force-unlocks the
-    /// Day 1 tutorial-only interactables (stack of folders, stamp slots) so they behave normally
-    /// even though Day 1 itself never activates for a resumed day. Firing <see cref="OnShiftReady"/>
-    /// below also flips every <see cref="GateStartShiftController"/>'s intro-complete flag, so
-    /// gate interactions just open/close the gate instead of opening the start-shift screen.
+    /// Day 1 tutorial-only interactables (stack of folders, stamp slots, hammer) so they behave
+    /// normally even though Day 1 itself never activates for a resumed day. The Start Shift
+    /// Gate's intro-complete flag is also explicitly force-completed here (not just left to
+    /// <see cref="OnShiftReady"/>'s event ordering), so gate interactions just open/close the
+    /// gate instead of opening the start-shift screen.
     /// Called by <see cref="MainMenuController.ContinueGame"/> in place of
     /// <see cref="GameManager.TransitionToLobby"/> whenever the active save slot's day is
     /// greater than 1. Server initiates; every step below runs identically on every connected
@@ -1724,10 +1729,27 @@ public class ShiftManager : NetworkBehaviour
         // Force the bunker door closed, matching the natural start-of-day state.
         _bunkerDoorController?.Reset();
 
+        // Safety net: explicitly flip every Start Shift Gate into post-intro mode rather than
+        // relying solely on OnShiftReady's event ordering (mirrors DebugConsole's day-skip commands).
+        ForceCompleteAllStartShiftGates();
+
         if (IsServer)
         {
             RestorePickablesFromSave();
             Day_01.Instance?.ForceUnlockTutorialItems();
+
+            // CampaignManager.StartCampaign() already restores the coupon total from the active
+            // slot, but that only runs once, right as TryStartGame's RPC fires — before this
+            // sequence even starts waiting on PlayerInstance. Restore it again here explicitly
+            // as a safety net (mirrors RestorePickablesFromSave above) so a resumed save is
+            // guaranteed to show the correct cash regardless of that earlier timing.
+            GlobalHostVariables.Instance?.SetMoney(SaveDataManager.Instance.CurrentCash);
+
+            // Day 2's tool locker is normally unlocked mid-sequence by Vlad — that sequence only
+            // ever runs while Day 2 itself is active, so a save resumed on Day 2+ needs it
+            // force-unlocked here too.
+            if (_currentDay >= 2)
+                Day_02.Instance?.ForceUnlockToolLocker();
         }
 
         UIController.Instance.ShowPlayerUI();
@@ -1737,7 +1759,26 @@ public class ShiftManager : NetworkBehaviour
         OnDayStart?.Invoke();
         PlayShiftStartFanfare();
 
+        // Tasks triggered by the resumed day's DayActivated() (e.g. Day 3's trash/blood tasks)
+        // fired well before this HUD element was shown — force a fresh sync with TaskRegistry
+        // now instead of relying on OnEnable's one-shot Rebuild catching them.
+        FindObjectOfType<HUDTaskList>(true)?.ForceRebuild();
+
         Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} inside the bunker.");
+    }
+
+    /// <summary>
+    /// Explicitly force-completes every <see cref="GateStartShiftController"/> in the scene so
+    /// interacting with any of them toggles the gate open/closed instead of opening the
+    /// start-shift screen. Used as a safety net on skip/resume paths instead of relying purely
+    /// on <see cref="OnShiftReady"/>'s subscriber-ordering to flip each gate's intro-complete
+    /// flag — mirrors the same safety net already used by <see cref="DebugConsole"/>'s
+    /// day-skip commands.
+    /// </summary>
+    private void ForceCompleteAllStartShiftGates()
+    {
+        foreach (GateStartShiftController gate in FindObjectsOfType<GateStartShiftController>(true))
+            gate.ForceIntroComplete();
     }
 
     /// <summary>

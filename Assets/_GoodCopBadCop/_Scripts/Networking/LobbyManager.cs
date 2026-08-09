@@ -12,6 +12,13 @@ public class LobbyManager : MonoBehaviour
 {
     public static LobbyManager Instance;
 
+    /// <summary>
+    /// True while the local player is voluntarily leaving the session (e.g. returning to the
+    /// main menu, quitting). Connection-loss handling should ignore NetworkManager disconnect
+    /// callbacks while this is true, since the disconnect was requested, not accidental.
+    /// </summary>
+    public static bool IsIntentionalDisconnect { get; private set; }
+
     public Lobby CurrentLobby { get; private set; }
 
     public event Action OnLobbyUpdated;
@@ -571,25 +578,34 @@ public class LobbyManager : MonoBehaviour
 
     public async Task ExitLobbyAsync()
     {
-        inviteOverlayWasOpenedByUs = false;
-        CurrentJoinCode = null;
+        IsIntentionalDisconnect = true;
 
-        if (CurrentLobby.Id != 0)
+        try
         {
-            CurrentLobby.Leave();
-            CurrentLobby = default;
-        }
+            inviteOverlayWasOpenedByUs = false;
+            CurrentJoinCode = null;
 
-        NetworkManager networkManager = NetworkManager.Singleton;
-        if (networkManager != null &&
-            (networkManager.IsListening || networkManager.IsHost || networkManager.IsServer || networkManager.IsClient || networkManager.ShutdownInProgress))
+            if (CurrentLobby.Id != 0)
+            {
+                CurrentLobby.Leave();
+                CurrentLobby = default;
+            }
+
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager != null &&
+                (networkManager.IsListening || networkManager.IsHost || networkManager.IsServer || networkManager.IsClient || networkManager.ShutdownInProgress))
+            {
+                networkManager.Shutdown();
+                await WaitForNetworkShutdownAsync(networkManager);
+                networkManager.NetworkConfig?.NetworkTransport?.Shutdown();
+            }
+
+            OnLobbyUpdated?.Invoke();
+        }
+        finally
         {
-            networkManager.Shutdown();
-            await WaitForNetworkShutdownAsync(networkManager);
-            networkManager.NetworkConfig?.NetworkTransport?.Shutdown();
+            IsIntentionalDisconnect = false;
         }
-
-        OnLobbyUpdated?.Invoke();
     }
 
     private static async Task WaitForNetworkShutdownAsync(NetworkManager networkManager)

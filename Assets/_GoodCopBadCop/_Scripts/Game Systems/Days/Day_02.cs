@@ -545,6 +545,24 @@ public class Day_02 : DayBase, IDailyTask
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Force-unlocks the tool locker padlock without touching anything else in Day 2's opening
+    /// sequence. Vlad normally unlocks it mid-walkthrough (see <see cref="_toolLockerLock"/>'s
+    /// doc comment and the Vlad waypoint sequence), but that only ever runs while Day 2 itself
+    /// is the active day — a save resumed on Day 3+ never activates Day 2, so the locker would
+    /// otherwise stay padlocked forever. Called by <see cref="ShiftManager.ResumeSavedDay"/>
+    /// whenever the resumed day is 2 or later. Server-only; the lock's own setter propagates
+    /// its state to clients via NetworkVariable.
+    /// </summary>
+    public void ForceUnlockToolLocker()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        _toolLockerLock?.ForceUnlock();
+
+        Debug.Log("[Day_02] ForceUnlockToolLocker: tool locker unlocked for a resumed save past Day 2.");
+    }
+
+    /// <summary>
     /// Suppresses the Day 2 opening Vlad sequence so it can be skipped by the F12 cheat menu.
     /// Also unlocks the tool locker (which Vlad would normally unlock mid-sequence) to keep
     /// game state consistent. Server-only; call before TryStartShift.

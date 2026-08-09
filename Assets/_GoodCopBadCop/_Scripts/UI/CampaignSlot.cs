@@ -69,8 +69,11 @@ public class CampaignSlot : MonoBehaviour, IPointerEnterHandler
         }
 
         slotNameText.text = slot.SlotName;
-        dayNumberText.text = $"Day {slot.CurrentDay + 1}";
-        cashAmountText.text = $"${slot.TotalCashEarned:N0}";
+        // CurrentDay is 0 for a fresh, never-started slot and otherwise already the 1-indexed
+        // day the player is on (matches CampaignManager.StartCampaign's own Mathf.Max(1, ...)
+        // clamp) — do not add 1 here, that double-counts and shows one day ahead of reality.
+        dayNumberText.text = $"Day {Mathf.Max(1, slot.CurrentDay)}";
+        cashAmountText.text = $"{slot.TotalCashEarned:N0}";
         lastSavedText.text = slot.LastSaved != default
             ? slot.LastSaved.ToLocalTime().ToString("MMM d, yyyy")
             : string.Empty;
