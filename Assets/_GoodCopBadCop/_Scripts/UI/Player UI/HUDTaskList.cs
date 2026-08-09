@@ -48,7 +48,7 @@ public class HUDTaskList : MonoBehaviour
             // whenever a day script (e.g. Day 1) is showing its own hand-scripted tutorial row for
             // them — see HasCustomTutorialRow. Without this, Day 1 duplicates each objective: one
             // row from Day_01's tutorial choreography and a second from this generic registry
-            // bridge (e.g. "Clean Blood / Scrub blood: 0/4" next to "Clean up the blood 0/4").
+            // bridge (e.g. "Clean Blood: 0/4" next to "Clean up the blood 0/4").
             if (threat is TakeOutTrashTask trashTask && trashTask.HasCustomTutorialRow) continue;
             if (threat is CleanGraffitiTask graffitiTask && graffitiTask.HasCustomTutorialRow) continue;
             if (threat is FenceRepairTask fenceTask && fenceTask.HasCustomTutorialRow) continue;
@@ -100,7 +100,7 @@ public class HUDTaskList : MonoBehaviour
     {
         bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
         return hasDescription
-            ? $"{threat.ThreatName}\n{threat.ThreatDescription}"
+            ? $"{threat.ThreatName}: {threat.ThreatDescription}"
             : threat.ThreatName;
     }
 }

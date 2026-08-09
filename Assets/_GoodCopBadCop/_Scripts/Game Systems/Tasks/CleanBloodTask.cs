@@ -106,7 +106,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isComplete
             ? $"All {_totalCount.Value} splatter(s) scrubbed!"
             : _totalCount.Value > 0
-                ? $"Scrub blood: {_scrubbed.Value}/{_totalCount.Value}"
+                ? $"{_scrubbed.Value}/{_totalCount.Value}"
                 : string.Empty;
 
     /// <summary>No-op — this task is triggered explicitly on Day 3, not by the night phase.</summary>

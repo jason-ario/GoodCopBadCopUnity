@@ -74,7 +74,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     public string TaskDescription =>
         _isComplete
             ? "All fence segments repaired!"
-            : $"{_taskName} {RepairedCount}/{TotalCount}";
+            : $"{RepairedCount}/{TotalCount}";
 
     /// <summary>Fired on every client whenever the repaired/total counts change.</summary>
     public static event Action OnProgressChanged;

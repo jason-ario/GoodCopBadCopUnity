@@ -111,6 +111,20 @@ public class SuspectCharacter : Interactable
              "burning to death is the only way to permanently kill a fully-mutated resident.")]
     [SerializeField] private SetOnFire _setOnFire;
 
+    /// <summary>
+    /// The <see cref="NetworkAnimator"/> that syncs the Base Version's <see cref="Animator"/>. Cached on
+    /// first use via <see cref="GetComponent{T}"/> on this root GameObject. Disabled whenever the
+    /// Mutated Version's own <see cref="NetworkAnimator"/> takes over, so only one NetworkAnimator is
+    /// ever actively replicating state for this suspect at a time.
+    /// </summary>
+    private Unity.Netcode.Components.NetworkAnimator _baseNetworkAnimator;
+
+    /// <summary>
+    /// The <see cref="NetworkAnimator"/> that syncs the Mutated Version's <see cref="Animator"/>. Found
+    /// inside <see cref="_mutatedVersion"/> the first time <see cref="AssignMutatedAnimator"/> runs.
+    /// </summary>
+    private Unity.Netcode.Components.NetworkAnimator _mutantNetworkAnimator;
+
     // Booth references injected by SuspectController at spawn time for the window-breach phase.
     private Transform _fullMutantStandPos;
     private Transform _fullMutantDespawnPos;
@@ -170,6 +184,19 @@ public class SuspectCharacter : Interactable
         _mutantEnemy?.SetAnimator(mutantAnim);
         _mutantSuspectBehaviour?.SetAnimator(mutantAnim);
         _setOnFire?.SetAnimator(mutantAnim);
+
+        // Hand NetworkAnimator authority over to the mutant mesh's own NetworkAnimator (added
+        // to the Mutated Version's Animator GameObject) and disable the Base Version's, so only
+        // one NetworkAnimator ever replicates state for this suspect at a time. Each version's
+        // Animator lives on a different GameObject/mesh, and NetworkAnimator caches its target
+        // Animator at spawn — it cannot be retargeted onto a different Animator instance at
+        // runtime, so each version needs (and already has, per-prefab) its own NetworkAnimator.
+        _baseNetworkAnimator ??= GetComponent<Unity.Netcode.Components.NetworkAnimator>();
+        _mutantNetworkAnimator ??= _mutatedVersion.GetComponentInChildren<Unity.Netcode.Components.NetworkAnimator>(true);
+
+        if (_baseNetworkAnimator != null) _baseNetworkAnimator.enabled = false;
+        if (_mutantNetworkAnimator != null) _mutantNetworkAnimator.enabled = true;
+        else Debug.LogWarning($"[SuspectCharacter] '{name}' Mutated Version has no NetworkAnimator — mutant animation state will not replicate over the network.", this);
 
         // Remap the FLookAnimator bone chain to the mutant skeleton so look-at tracking
         // follows the mutant head instead of the now-disabled civilian bones.

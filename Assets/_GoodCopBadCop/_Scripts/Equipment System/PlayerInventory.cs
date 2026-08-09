@@ -41,6 +41,16 @@ public class PlayerInventory : NetworkBehaviour
     public PickableObject GetItemInSlot(int index) =>
         (index >= 0 && index < _slots.Length) ? _slots[index] : null;
 
+    /// <summary>
+    /// True if both hotbar slots are occupied and <paramref name="obj"/> isn't already tracked
+    /// in one of them (i.e. picking it up would need a free slot that doesn't exist). Used by
+    /// <see cref="PlayerPickupController.PickUpObject"/> to block new pickups when full, while
+    /// still allowing re-equipping an already-owned stowed item (e.g. via
+    /// <see cref="PlayerPickupController.UnstowItemToHand"/>).
+    /// </summary>
+    public bool IsFullFor(PickableObject obj) =>
+        SlotOf(obj) < 0 && FreeSlot() < 0;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private void Awake() => _pickup = GetComponent<PlayerPickupController>();

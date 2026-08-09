@@ -42,6 +42,7 @@ public class PlayerPickupController : NetworkBehaviour
     private PlayerAnimationController _playerAnimationController;
     public PlayerAnimationController PlayerAnimationController => _playerAnimationController;
     private PlayerInteractionController _playerInteractionController;
+    private PlayerInventory _playerInventory;
     
     [SerializeField] ObjectContainer[] objectContainers;
     [FormerlySerializedAs("camObjectContainer")] [FormerlySerializedAs("objectContainerToUse")] 
@@ -109,6 +110,7 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObjectRef.OnValueChanged += OnHeldObjectRefChanged;
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerInteractionController = gameObject.GetComponent<PlayerInteractionController>();
+        _playerInventory = GetComponent<PlayerInventory>();
     }
 
     public override void OnNetworkSpawn()
@@ -580,10 +582,15 @@ public class PlayerPickupController : NetworkBehaviour
     {
         if (HeldObject != null)
         {
-            // Hands are full: drop the currently held item the same way it's released on
-            // death (release + small physics throw) so the new item can be picked up
-            // instead of silently doing nothing.
-            DropHeldObjectForPickupSwap();
+            return;
+        }
+
+        // Block picking up a brand-new item when the two-slot inventory is already full (both
+        // slots occupied, e.g. one held/one stowed, or both stowed with empty hands). Re-equipping
+        // an item already tracked in a slot (UnstowItemToHand) is still allowed.
+        if (_playerInventory != null && _playerInventory.IsFullFor(pickableObject))
+        {
+            return;
         }
 
         // Extra guard on top of the collider-based optimistic lock below: if the network state
@@ -824,23 +831,6 @@ public class PlayerPickupController : NetworkBehaviour
         ObjectPlacer.Instance.DeactivatePlacer();
 
         return released;
-    }
-
-    /// <summary>
-    /// Releases whatever item is currently held (e.g. because the player is picking up a new
-    /// item while their hands are already full), unhooking it from the character and giving it
-    /// a small physics impulse so it tumbles to the ground with its collider/rigidbody active.
-    /// Mirrors <see cref="PlayerInstance.DropHeldItemOnDeath"/>.
-    /// </summary>
-    private void DropHeldObjectForPickupSwap()
-    {
-        if (_heldObject == null) return;
-
-        PickableObject droppedItem = ReleaseHeldObjectForThrow();
-        if (droppedItem == null) return;
-
-        Vector3 velocity = (Vector3.up * 0.5f) + (transform.forward * 0.5f);
-        droppedItem.ThrowServerRpc(droppedItem.transform.position, velocity);
     }
 
     /// <summary>
