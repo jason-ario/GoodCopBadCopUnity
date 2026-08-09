@@ -2881,9 +2881,10 @@ public class Day_01 : DayBase
     /// re-activated by that junk the instant it's spawned/enabled (see
     /// <see cref="TakeOutTrashTask.RegisterExternalJunkItem"/>), so its counts are already
     /// accurate by the time the breach clears. Unlike the beginning-of-day trash task (see
-    /// <see cref="OnTrashBagGrabbedSync"/>), gore pieces are NOT force-highlighted — the player
-    /// is expected to spot them on their own after the breach. No-op (immediately resolved) if
-    /// there's nothing left to collect.
+    /// <see cref="OnTrashBagGrabbedSync"/>), gore pieces are strewn across a large area by the
+    /// breach fight, so every uncollected piece is force-highlighted (mirrors that same
+    /// beginning-of-day highlight) rather than leaving the player to spot them on their own.
+    /// No-op (immediately resolved) if there's nothing left to collect.
     /// </summary>
     private void EnsureTakeOutGoreObjective()
     {
@@ -2894,6 +2895,8 @@ public class Day_01 : DayBase
 
             TakeOutTrashTask.OnProgressChanged   += OnTakeOutGoreProgressChanged;
             TakeOutTrashTask.OnAllItemsDeposited += OnTakeOutGoreTaskComplete;
+
+            TakeOutTrashTask.Instance.HighlightAllItemsForTutorial(includeSuspects: false);
         }
         else
         {

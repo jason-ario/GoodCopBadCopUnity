@@ -1622,9 +1622,10 @@ public class MutantEnemy : NetworkBehaviour
     /// Instantiates the prefab, spawns it as a real NetworkObject (so it replicates to every
     /// client like any other <see cref="JunkItem"/>), enables its (pre-attached, disabled)
     /// <see cref="JunkItem"/> component, and registers it with <see cref="TakeOutTrashTask"/>.
-    /// Simulates the same pop/drop physics as the cosmetic pieces (see <see cref="SpawnGorePiece"/>)
-    /// and switches to kinematic a few seconds later via <see cref="GoreKinematicSettler"/> once it's
-    /// had time to land and settle.
+    /// Rigidbody stays dynamic for as long as it counts toward the yard task — see
+    /// <see cref="MonitorGoreJunkItem"/>, which only switches it to kinematic once it settles
+    /// outside every yard SpawnZone (at which point it no longer counts and there's no reason
+    /// to keep simulating it).
     ///
     /// Requires the gore prefab to already have a NetworkObject (registered as a Network Prefab
     /// in the NetworkManager) and a disabled <see cref="JunkItem"/> component, matching the same
@@ -1681,12 +1682,6 @@ public class MutantEnemy : NetworkBehaviour
         // can never soft-lock the player by being both required and unreachable.
         StartCoroutine(MonitorGoreJunkItem(netObj, rb, position.y - goreMaxFallDistance));
 
-        // Perf optimization: once it's had a couple of seconds to pop/fall/land, stop simulating
-        // it (same as the cosmetic pieces — see GoreKinematicSettler). This runs independently of
-        // the settle watchdog above, which still needs to observe the piece while it's dynamic.
-        GoreKinematicSettler kinematicSettler = piece.AddComponent<GoreKinematicSettler>();
-        kinematicSettler.Initialize(rb, goreKinematicDelay);
-
         return true;
     }
 
@@ -1698,7 +1693,10 @@ public class MutantEnemy : NetworkBehaviour
     /// player by staying required-but-unreachable). Otherwise, once its Rigidbody settles (or a
     /// timeout elapses), it is unregistered — but NOT despawned, remaining physically collectible
     /// as a bonus — if its final resting position ended up outside every configured yard
-    /// SpawnZone. No-op once the item is collected (despawned) before either check fires.
+    /// SpawnZone; only in that case is its Rigidbody switched to kinematic (perf optimization —
+    /// it's no longer required, so there's no reason to keep simulating it). A piece that
+    /// settles inside the yard stays dynamic for as long as it's tracked by the task. No-op once
+    /// the item is collected (despawned) before either check fires.
     /// </summary>
     private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
     {
@@ -1736,7 +1734,16 @@ public class MutantEnemy : NetworkBehaviour
             yield break;
 
         if (TakeOutTrashTask.Instance != null && !TakeOutTrashTask.Instance.IsPositionInYard(netObj.transform.position))
+        {
             TakeOutTrashTask.Instance.UnregisterExternalJunkItem(netObj);
+
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                rb.isKinematic = true;
+            }
+        }
     }
 
     /// <summary>
@@ -2088,11 +2095,42 @@ public class MutantEnemy : NetworkBehaviour
         if (corpseJunkItem == null)
             return;
 
+        StartCoroutine(EnableCorpseJunkPickupAfterSettle());
+    }
+
+    /// <summary>
+    /// Waits for the just-activated ragdoll to come to rest (or a timeout) before deciding
+    /// whether this corpse counts toward the Trash Task, then judges it by
+    /// <see cref="corpseJunkItem"/>'s own settled position rather than the mutant root's
+    /// <c>transform.position</c> — called the instant ragdoll physics is enabled (before
+    /// Physics has even simulated a single step), the root can end up far from where the body
+    /// actually flops to rest, especially for a mutant that dies straddling the yard boundary.
+    /// Checking the stale root position let a corpse get counted (and reticle-highlighted as
+    /// required junk) while its real, settled interaction collider ended up outside the yard —
+    /// and out of the task's actual reach — which could soft-lock the "take out the gore" task on
+    /// an uncollectible-but-required item. Using the same settled position for both the
+    /// interactability check and the yard-count registration keeps the two always in agreement.
+    /// </summary>
+    private IEnumerator EnableCorpseJunkPickupAfterSettle()
+    {
+        const float settleTimeout = 5f;
+        float elapsed = 0f;
+
+        Rigidbody corpseRb = corpseJunkItem.GetComponent<Rigidbody>();
+        if (corpseRb == null)
+            corpseRb = corpseJunkItem.GetComponentInParent<Rigidbody>();
+
+        while (corpseRb != null && !corpseRb.IsSleeping() && elapsed < settleTimeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
         // Outside the yard, this corpse never counts toward the Trash Task, so leave the
         // JunkItem disabled entirely rather than enabling it as uncounted, still-interactable
         // junk — this keeps it out of reticle highlighting/interaction.
-        if (TakeOutTrashTask.Instance == null || !TakeOutTrashTask.Instance.IsPositionInYard(transform.position))
-            return;
+        if (TakeOutTrashTask.Instance == null || !TakeOutTrashTask.Instance.IsPositionInYard(corpseJunkItem.transform.position))
+            yield break;
 
         // Apply immediately on the server so TakeOutTrashTask's FindObjectsByType scan (run
         // from RegisterExternalJunkItem's dynamic activation, or a later TriggerTask/

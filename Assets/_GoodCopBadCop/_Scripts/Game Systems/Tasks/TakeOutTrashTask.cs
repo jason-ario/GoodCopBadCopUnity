@@ -285,7 +285,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// already be in the world — e.g. a soldier body left at the end of Day 1's shift.
     /// Server-only.
     /// </summary>
-    public void ActivateForExistingItems()
+    /// <param name="includeSuspects">
+    /// When false, skips every JunkItem attached to a SuspectCharacter — used when this is
+    /// triggered by mutant gore/corpse registration (see <see cref="RegisterExternalJunkItem"/>)
+    /// so NPC bodies tracked by their own separate systems aren't swept into a gore-only task.
+    /// </param>
+    public void ActivateForExistingItems(bool includeSuspects = true)
     {
         if (!IsServer) return;
         if (_taskActive) return;
@@ -294,7 +299,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         int count = 0;
         foreach (JunkItem j in existingJunk)
         {
-            if (IsCountablePreExistingJunkItem(j))
+            if (IsCountablePreExistingJunkItem(j, includeSuspects))
                 count++;
         }
 
@@ -361,7 +366,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         int preExistingCount = 0;
         foreach (JunkItem j in existingJunk)
         {
-            if (IsCountablePreExistingJunkItem(j))
+            // Suspect NPC bodies (e.g. the Day 1 soldier, Vlad) are tracked by their own
+            // separate systems and shouldn't be swept into the mutant-breach gore task's
+            // total just because they happen to be lying uncollected inside the yard.
+            if (IsCountablePreExistingJunkItem(j, includeSuspects: !useGorePrefabs))
                 preExistingCount++;
         }
 
@@ -400,13 +408,19 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Tutorial-only helper: turns on the persistent outline highlight for every currently
-    /// active <see cref="JunkItem"/> (freshly spawned or pre-existing, e.g. the soldier body)
-    /// on every client. Intended to be called once, right after <see cref="TriggerTask"/>,
-    /// for the Day 1 trash task tutorial so the player can immediately spot every piece of
-    /// trash. Does not affect later/other triggers of this same shared task instance —
-    /// callers must invoke this explicitly. Server-only.
+    /// active, actually-collectible <see cref="JunkItem"/> (freshly spawned or pre-existing,
+    /// e.g. the soldier body) on every client. Intended to be called once, right after
+    /// <see cref="TriggerTask"/>, so the player can immediately spot every piece of trash/gore.
+    /// Does not affect later/other triggers of this same shared task instance — callers must
+    /// invoke this explicitly. Server-only.
     /// </summary>
-    public void HighlightAllItemsForTutorial()
+    /// <param name="includeSuspects">
+    /// When false, skips every JunkItem attached to a <see cref="SuspectCharacter"/> (e.g. the
+    /// Day 1 soldier body, or Vlad) entirely — used for the mutant-breach gore highlight, since
+    /// those NPCs' bodies belong to their own separate tasks/systems and shouldn't be swept
+    /// into a highlight pass meant only for mutant gore/corpses.
+    /// </param>
+    public void HighlightAllItemsForTutorial(bool includeSuspects = true)
     {
         if (!IsServer) return;
 
@@ -414,18 +428,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         var refs = new List<NetworkObjectReference>(junkItems.Length);
         foreach (JunkItem junk in junkItems)
         {
-            // JunkItem components attached to a SuspectCharacter (e.g. the Alexei soldier
-            // body) are pre-attached in the Inspector with the component's own Unity
-            // 'enabled' flag left off and NEVER toggled at runtime (see JunkItem's class doc —
-            // toggling it live corrupts late-joining clients' Netcode sync). The real
-            // "has this corpse become collectible junk" signal is JunkItem.IsCollectible,
-            // flipped true by SuspectCharacter.EnableJunkPickup() on death. Gating on
-            // junk.enabled here previously skipped every suspect corpse (dead or alive), so
-            // a dead soldier's body was never force-highlighted. Skip only suspects that are
-            // still alive/non-collectible; standalone junk prefabs have no SuspectCharacter
-            // and are always eligible once spawned.
-            SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
-            if (suspect != null && !junk.IsCollectible.Value) continue;
+            if (!IsCountablePreExistingJunkItem(junk, includeSuspects))
+                continue;
 
             NetworkObject netObj = junk.NetworkObject;
             if (netObj != null && netObj.IsSpawned)
@@ -473,7 +477,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>
     /// Returns true when <paramref name="junk"/> should count toward this task's pre-existing
     /// scene sweep (<see cref="ActivateForExistingItems"/>/<see cref="TriggerTask"/>). Filters
-    /// out two false-positive cases that previously inflated the task's denominator:
+    /// out three false-positive cases that previously inflated the task's denominator:
     ///
     /// 1. Mutant bodies/gore that landed (or later rolled/settled) outside every configured
     ///    yard <see cref="SpawnZone"/> — dynamically-spawned gore already excludes these via
@@ -485,8 +489,22 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     ///    (see <see cref="JunkItem"/>'s class doc) — only <see cref="JunkItem.IsCollectible"/>
     ///    flips true once <see cref="SuspectCharacter.EnableJunkPickup"/> runs on death. Skip
     ///    any JunkItem still attached to a live suspect so alive characters are never counted.
+    /// 3. Any JunkItem whose own Unity 'enabled' flag is off — e.g. a killed mutant's
+    ///    pre-attached-but-disabled <c>corpseJunkItem</c>/gore chunk that <c>MutantEnemy</c>
+    ///    deliberately left disabled because it settled outside the yard (see
+    ///    <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>). Without this check, a scan
+    ///    could highlight/count a corpse straddling the yard boundary while its own
+    ///    interactability decision — made from the same settled position — left it
+    ///    non-interactable, producing an uncollectible "phantom" required item. This check is
+    ///    skipped for suspects, whose 'enabled' flag is deliberately never toggled (see #2).
     /// </summary>
-    private bool IsCountablePreExistingJunkItem(JunkItem junk)
+    /// <param name="includeSuspects">
+    /// When false, any JunkItem attached to a <see cref="SuspectCharacter"/> is excluded
+    /// entirely, regardless of collectibility — used by the mutant-breach gore task/highlight
+    /// so NPC bodies (e.g. the Day 1 soldier, Vlad) — tracked by their own separate systems —
+    /// are never swept into a count/highlight meant only for mutant gore/corpses.
+    /// </param>
+    private bool IsCountablePreExistingJunkItem(JunkItem junk, bool includeSuspects = true)
     {
         if (junk == null || !junk.gameObject.activeInHierarchy)
             return false;
@@ -498,8 +516,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // "has this corpse become collectible junk" signal, flipped true by
         // SuspectCharacter.EnableJunkPickup() on death.
         SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
-        if (suspect != null && !junk.IsCollectible.Value)
+        if (suspect != null)
+        {
+            if (!includeSuspects) return false;
+            if (!junk.IsCollectible.Value) return false;
+        }
+        else if (!junk.enabled)
+        {
             return false;
+        }
 
         return IsPositionInYard(junk.transform.position);
     }
@@ -526,8 +551,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!_taskActive)
         {
             // No active trash task — dynamically trigger one for whatever junk is already
-            // active in the scene, which by now includes netObj itself.
-            ActivateForExistingItems();
+            // active in the scene, which by now includes netObj itself. This path is only
+            // ever reached by mutant gore/corpse registration, so exclude suspect NPC bodies
+            // (e.g. the Day 1 soldier, Vlad) from being swept in alongside it.
+            ActivateForExistingItems(includeSuspects: false);
             return;
         }
 
