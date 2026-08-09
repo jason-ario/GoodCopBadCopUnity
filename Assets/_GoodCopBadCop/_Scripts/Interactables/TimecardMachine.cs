@@ -47,6 +47,17 @@ public class TimecardMachine : Interactable
     /// </summary>
     public static event Action OnClockOutAllClients;
 
+    /// <summary>
+    /// Ground-truth, always-current record of whether the player has punched the clock-out
+    /// card for the current shift cycle. Unlike subscribing to <see cref="OnClockOutAllClients"/>
+    /// (a fire-once event that a late subscriber can simply miss — e.g. an object that
+    /// (re)spawns or resubscribes after the punch already landed), this flag can always be
+    /// read directly to answer "has the player clocked out yet?" with no risk of desync.
+    /// Set true the instant the clock-out punch animation fires on each client, reset false by
+    /// <see cref="Reset"/> at the start of each new shift.
+    /// </summary>
+    public static bool HasClockedOutThisCycle { get; private set; }
+
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
@@ -256,6 +267,7 @@ public class TimecardMachine : Interactable
         SetLightReady(false);
         _clockInObjective  = null;
         _clockOutObjective = null;
+        HasClockedOutThisCycle = false;
     }
 
     [ClientRpc]
@@ -275,6 +287,10 @@ public class TimecardMachine : Interactable
         _clockOutReady = false;
         SetLightReady(false);
         CompleteObjective(ref _clockOutObjective);
+
+        // Ground truth: the punch has landed on this client, full stop. Set this before firing
+        // OnClockOutAllClients so anything reacting to the event can also safely read this flag.
+        HasClockedOutThisCycle = true;
 
         // Silence the fanfare immediately so the power-cut feels like a direct consequence.
         if (_fanfareSource != null)

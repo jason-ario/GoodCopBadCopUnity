@@ -64,6 +64,17 @@ public class TutorialObjectiveList : MonoBehaviour
     private readonly List<TutorialObjectiveItem> _items = new();
     private Coroutine _clearCoroutine;
 
+    /// <summary>
+    /// Items whose <see cref="RemoveObjectiveRoutine"/> is currently mid-flight (marked complete,
+    /// waiting out <c>preHideDelay</c> before the row is actually destroyed). Unity silently kills
+    /// running coroutines the instant their host GameObject is deactivated — if that happens while
+    /// one of these routines is mid-delay (e.g. a scene/UI toggle during a day transition), the
+    /// item would otherwise be stranded forever showing its strike-through with no further event
+    /// ever removing it. <see cref="OnDisable"/> force-finishes anything still pending here so a
+    /// completed task can never linger on screen indefinitely.
+    /// </summary>
+    private readonly List<TutorialObjectiveItem> _pendingCompletedRemovals = new();
+
     // ── Unity Lifecycle ─────────────────────────────────────────────────
 
     private void Awake()
@@ -74,6 +85,21 @@ public class TutorialObjectiveList : MonoBehaviour
             return;
         }
         Instance = this;
+    }
+
+    private void OnDisable()
+    {
+        // Coroutines don't survive their host being disabled — finish any pending
+        // completed-row removals immediately rather than leaving them stuck crossed-out.
+        if (_pendingCompletedRemovals.Count == 0) return;
+
+        foreach (TutorialObjectiveItem item in _pendingCompletedRemovals)
+        {
+            if (item == null) continue;
+            _items.Remove(item);
+            Destroy(item.gameObject);
+        }
+        _pendingCompletedRemovals.Clear();
     }
 
     private void OnDestroy()
@@ -223,6 +249,7 @@ public class TutorialObjectiveList : MonoBehaviour
         }
 
         StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
+        _pendingCompletedRemovals.Add(item);
     }
 
     // ── Private ─────────────────────────────────────────────────────────
@@ -232,6 +259,7 @@ public class TutorialObjectiveList : MonoBehaviour
         if (preHideDelay > 0f)
             yield return new WaitForSeconds(preHideDelay);
 
+        _pendingCompletedRemovals.Remove(item);
         _items.Remove(item);
         if (item != null)
             Destroy(item.gameObject);
@@ -288,6 +316,7 @@ public class TutorialObjectiveList : MonoBehaviour
                 Destroy(item.gameObject);
         }
         _items.Clear();
+        _pendingCompletedRemovals.Clear();
 
         // Also destroy any children not tracked in _items (e.g. design-time placeholders).
         if (taskListContainer == null) return;

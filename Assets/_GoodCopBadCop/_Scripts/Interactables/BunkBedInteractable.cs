@@ -73,9 +73,14 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     /// <summary>
     /// Returns true once the player has clocked out for the day. Clocking out is already
     /// gated by <see cref="ShiftManager"/> on every other end-of-day requirement, so no
-    /// additional task check is needed here.
+    /// additional task check is needed here. Reads <see cref="TimecardMachine.HasClockedOutThisCycle"/>
+    /// directly (rather than relying solely on the cached <see cref="_clockedOutThisCycle"/> flag
+    /// flipped by the <see cref="TimecardMachine.OnClockOutAllClients"/> event) so a clocked-out
+    /// player can NEVER be blocked from sleeping even if this object missed that event —
+    /// e.g. a subscription-order race, a respawned bed object, or any other desync between the
+    /// event firing and this component being ready to receive it.
     /// </summary>
-    private bool CanSleep => ForceAllowSleep || _clockedOutThisCycle;
+    private bool CanSleep => ForceAllowSleep || _clockedOutThisCycle || TimecardMachine.HasClockedOutThisCycle;
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────
 
