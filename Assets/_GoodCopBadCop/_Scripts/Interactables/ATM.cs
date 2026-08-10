@@ -218,13 +218,16 @@ public class ATM : NetworkBehaviour
 
     private void PlayDispenseSound()
     {
-        if (_dispenseSfx == null || SFXController.Instance == null) return;
+        if (_dispenseSfx == null) return;
 
-        SFXController.Instance.PlayAtPosition(
-            _dispenseSfx,
-            transform.position,
-            maxDistance: _dispenseSfxMaxDistance
-        );
+        if (IsNetworked)
+            PlayDispenseSoundClientRpc();
+        else
+            SFXController.Instance?.PlayAtPosition(
+                _dispenseSfx,
+                transform.position,
+                maxDistance: _dispenseSfxMaxDistance
+            );
     }
 
     /// <summary>
@@ -232,13 +235,16 @@ public class ATM : NetworkBehaviour
     /// </summary>
     private void PlayCouponSpawnSound(Vector3 position)
     {
-        if (_couponSpawnSfx == null || SFXController.Instance == null) return;
+        if (_couponSpawnSfx == null) return;
 
-        SFXController.Instance.PlayAtPosition(
-            _couponSpawnSfx,
-            position,
-            maxDistance: _couponSpawnSfxMaxDistance
-        );
+        if (IsNetworked)
+            PlayCouponSpawnSoundClientRpc(position);
+        else
+            SFXController.Instance?.PlayAtPosition(
+                _couponSpawnSfx,
+                position,
+                maxDistance: _couponSpawnSfxMaxDistance
+            );
     }
 
     /// <summary>
@@ -325,5 +331,34 @@ public class ATM : NetworkBehaviour
     private void ShowPaymentClientRpc(int amount)
     {
         _screenController?.ShowPayment(amount);
+    }
+
+    /// <summary>
+    /// Tells every client (including host) to play the ATM dispense sound. Called by the
+    /// server so the sound is heard by all players, not just the one running the server.
+    /// </summary>
+    [ClientRpc]
+    private void PlayDispenseSoundClientRpc()
+    {
+        SFXController.Instance?.PlayAtPosition(
+            _dispenseSfx,
+            transform.position,
+            maxDistance: _dispenseSfxMaxDistance
+        );
+    }
+
+    /// <summary>
+    /// Tells every client (including host) to play the per-coupon ejection sound at
+    /// <paramref name="position"/>. Called by the server for each coupon spawned so the
+    /// sound is heard by all players, not just the one running the server.
+    /// </summary>
+    [ClientRpc]
+    private void PlayCouponSpawnSoundClientRpc(Vector3 position)
+    {
+        SFXController.Instance?.PlayAtPosition(
+            _couponSpawnSfx,
+            position,
+            maxDistance: _couponSpawnSfxMaxDistance
+        );
     }
 }

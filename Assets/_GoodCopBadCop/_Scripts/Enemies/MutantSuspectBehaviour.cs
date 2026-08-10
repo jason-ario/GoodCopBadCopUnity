@@ -133,6 +133,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _shutterController = shutterController;
         _controller = controller;
 
+        SubscribeLineupDeathSafetyNet();
+
         // Suspend the chase loop before it gets a chance to run (it defers one frame),
         // so MutantSuspectBehaviour has exclusive control during the lineup sequence.
         _mutantEnemy?.SuspendForLineup();
@@ -154,6 +156,45 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         SetLegsAnimatorsBlendClientRpc(0f);
 
         StartCoroutine(LineupSequence());
+    }
+
+    /// <summary>
+    /// Safety net for a mutant killed (or that flees) while still under
+    /// MutantSuspectBehaviour's control — i.e. any time before it climbs through and hands
+    /// off to MutantEnemy. Without this, killing a mutant mid-walk-in or mid-attack (e.g.
+    /// while it's banging on the shutter) would fire MutantEnemy.OnRemovedFromPlay with no
+    /// listener attached (ClimbThroughSequence only subscribes its own breakthrough handler
+    /// *after* a successful climb-through), so the lineup slot would never be released and
+    /// the next-suspect bell/button would stay dead forever.
+    /// Unsubscribed once the mutant either breaks through (ClimbThroughSequence takes over
+    /// with its own brokeThrough:true handler) or the sequence finishes normally, so it never
+    /// double-fires OnMutantIntruderComplete.
+    /// </summary>
+    private void SubscribeLineupDeathSafetyNet()
+    {
+        if (_mutantEnemy == null) return;
+        _mutantEnemy.OnRemovedFromPlay -= HandleRemovedFromPlayDuringLineup;
+        _mutantEnemy.OnRemovedFromPlay += HandleRemovedFromPlayDuringLineup;
+    }
+
+    private void UnsubscribeLineupDeathSafetyNet()
+    {
+        if (_mutantEnemy == null) return;
+        _mutantEnemy.OnRemovedFromPlay -= HandleRemovedFromPlayDuringLineup;
+    }
+
+    private void HandleRemovedFromPlayDuringLineup()
+    {
+        // Already handled via a normal completion path (give-up/retreat/despawn) or via the
+        // breakthrough-specific handler in ClimbThroughSequence — nothing to do.
+        if (_isDone) return;
+
+        _isDone = true;
+        _activeTween?.Kill();
+        StopAllCoroutines();
+
+        _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
+        OnSequenceComplete?.Invoke(false);
     }
 
     // ── Coroutines ─────────────────────────────────────────────────────────────
@@ -267,8 +308,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             _mutantEnemy.SetForceAggro(true);
             _mutantEnemy.InitialiseServer();
 
-            // Defer the lineup slot release until the mutant is removed from play (fled or died),
-            // so the next suspect only queues once this one is truly out of the scene.
+            // Swap the lineup death safety net for the breakthrough-specific handler — from
+            // here on the mutant is loose in the player area, so removal counts as brokeThrough.
+            UnsubscribeLineupDeathSafetyNet();
             _mutantEnemy.OnRemovedFromPlay += () =>
             {
                 _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
@@ -300,6 +342,11 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             // Release the lineup slot right away — this mutant stays at the window as a persistent threat
             // while the rest of the shift continues normally.
             _controller?.OnMutantIntruderComplete(this, brokeThrough: false, staysAtWindow: true);
+
+            // The slot is released for good at this point — unsubscribe the lineup death safety
+            // net so a later kill/despawn doesn't call OnMutantIntruderComplete a second time
+            // (which would try to despawn this mutant and re-arm the bell again).
+            UnsubscribeLineupDeathSafetyNet();
 
             // Attack the window until the loses-interest timer expires.
             float endTime = Time.time + _data.losesInterestAfterSeconds;
@@ -541,6 +588,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _climbThroughTargetPos = climbThroughTargetPos;
         _shutterController = shutterController;
         _controller = controller;
+
+        SubscribeLineupDeathSafetyNet();
 
         _mutantEnemy?.SuspendForLineup();
 

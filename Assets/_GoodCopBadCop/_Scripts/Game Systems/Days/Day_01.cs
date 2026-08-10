@@ -43,12 +43,14 @@ public class Day_01 : DayBase
     protected override bool UseAutomaticSubjectCounterTask => false;
 
     /// <summary>
-    /// Day 1's real "subjects processed" total is Vlad (hand-scripted tutorial, credited up
-    /// front in <see cref="ShowSubjectCounterTask"/>) plus the 3 regular suspects tracked by
-    /// <see cref="OnSubjectProcessed"/> — 4 total. The lineup itself has a 5th populated slot
-    /// (the Soldier) purely to trigger the mutant-attack cutscene; he never hands off a folder
-    /// and is never "processed", so the Task Page total must exclude him too — see
-    /// <see cref="ProcessResidentsTask"/>.
+    /// Day 1's real "subjects processed" total is just the 3 regular suspects tracked by
+    /// <see cref="OnSubjectProcessed"/> (indices 1-3). Vlad (index 0) is a hand-scripted tutorial
+    /// suspect the player already finished processing before this counter ever appears, so he is
+    /// not counted here — showing him as an already-completed "1/4" the moment the counter shows
+    /// up reads as one subject that's never actually processed by the player. The lineup itself
+    /// has a 5th populated slot (the Soldier) purely to trigger the mutant-attack cutscene; he
+    /// never hands off a folder and is never "processed" either, so the Task Page total must
+    /// exclude him too — see <see cref="ProcessResidentsTask"/>.
     /// </summary>
     public override int SubjectsToProcessOverrideForDisplay => SubjectsToProcess;
 
@@ -504,17 +506,18 @@ public class Day_01 : DayBase
     private bool _graffitiTaskDone;
 
     // "Process N subjects" counter task — shown after Vlad's tutorial sequence ends.
-    // Vlad himself is credited immediately (see ShowSubjectCounterTask) since the player just
-    // finished fully processing his folder by hand — he simply isn't tracked via the same
-    // OnFolderHandedOff subscription used for the rest, because that subscription doesn't
-    // start until after his tutorial completes. OnSubjectProcessed then counts hand-offs for
-    // suspect indices 1-3 only (see its index < 1 guard): index 1 (random civilian), index 2
-    // (documentation-anomaly/quarantine suspect), and index 3 (random civilian). The Soldier
-    // (index 4) never hands off a folder (ForceNextSuspectNoPaperwork — see
-    // ActivateAndStartSoldierDialogue) and immediately hands control to the scripted
-    // mutant-attack/end-of-shift sequence, so he is never counted as a processed subject —
-    // 4 (Vlad + 3) is the maximum this counter can ever reach on Day 1.
-    private const int SubjectsToProcess = 4;
+    // Vlad himself is NOT counted (see ShowSubjectCounterTask) — the player already finished
+    // processing his folder by hand before this counter even appears, so crediting him here
+    // would show a subject as "already processed" that the player never saw counted. He also
+    // simply isn't tracked via the same OnFolderHandedOff subscription used for the rest,
+    // because that subscription doesn't start until after his tutorial completes.
+    // OnSubjectProcessed then counts hand-offs for suspect indices 1-3 only (see its
+    // index < 1 guard): index 1 (random civilian), index 2 (documentation-anomaly/quarantine
+    // suspect), and index 3 (random civilian). The Soldier (index 4) never hands off a folder
+    // (ForceNextSuspectNoPaperwork — see ActivateAndStartSoldierDialogue) and immediately hands
+    // control to the scripted mutant-attack/end-of-shift sequence, so he is never counted as a
+    // processed subject — 3 is the maximum this counter can ever reach on Day 1.
+    private const int SubjectsToProcess = 3;
     private int _subjectProcessedCount;
     private TutorialObjectiveItem _taskSubjectCount;
 
@@ -1871,13 +1874,13 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Called once the delay has elapsed. Shows the "Process N subjects" counter
-    /// task and subscribes to subsequent folder hand-offs to update it. Starts at 1/4 —
-    /// Vlad, whose folder the player just finished processing by hand, is credited
-    /// immediately since <see cref="OnSubjectProcessed"/> only tracks hand-offs from here on.
+    /// task and subscribes to subsequent folder hand-offs to update it. Starts at 0/3 —
+    /// Vlad is not counted here since he's a hand-scripted tutorial suspect the player already
+    /// finished processing before this counter appears; see <see cref="OnSubjectProcessed"/>.
     /// </summary>
     private void ShowSubjectCounterTask()
     {
-        _subjectProcessedCount = 1; // Vlad already processed.
+        _subjectProcessedCount = 0;
         _taskSubjectCount = TutorialObjectiveList.Instance?.AddObjective(GetSubjectCountText());
         FolderController.OnFolderHandedOff += OnSubjectProcessed;
     }

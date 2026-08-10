@@ -98,7 +98,6 @@ public class Day_02 : DayBase, IDailyTask
     // -------------------------------------------------------------------------
 
     private const int TaskUVSwitchToUV  = 1;
-    private const int TaskUVRevealVeins = 2;
     private const int TaskUVMarkExam    = 3;
 
     private readonly Dictionary<int, TutorialObjectiveItem> _mutationTutorialObjectives = new();
@@ -1023,26 +1022,13 @@ public class Day_02 : DayBase, IDailyTask
         Flashlight.OnAnyFlashlightSwitchedToUV -= onUVEntered;
         Day02NetworkSync.Instance?.CompleteMutationTutorialObjective(TaskUVSwitchToUV);
 
-        // Task 2 — shine the UV light on the subject until their veins are revealed.
-        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVRevealVeins, "Shine the UV light on the subject to reveal their veins");
-
-        BlueVeinsAnomaly veinsAnomaly = null;
-        yield return new WaitUntil(() => (veinsAnomaly = FindActiveBlueVeinsAnomaly()) != null);
-        yield return new WaitUntil(() => veinsAnomaly.IsCurrentlyRevealed);
-
-        Day02NetworkSync.Instance?.CompleteMutationTutorialObjective(TaskUVRevealVeins);
-    }
-
-    /// <summary>
-    /// Finds the currently active <see cref="BlueVeinsAnomaly"/> on the suspect standing in the
-    /// booth, if any. Used to gate the UV light reveal tutorial step.
-    /// </summary>
-    private BlueVeinsAnomaly FindActiveBlueVeinsAnomaly()
-    {
-        SuspectCharacter suspect = SuspectController.Instance?.CurrentSuspect;
-        if (suspect == null || suspect.AnomalyController == null) return null;
-
-        return suspect.AnomalyController.activeAnomalies.OfType<BlueVeinsAnomaly>().FirstOrDefault();
+        // Shine the UV light on the subject to reveal their veins — this is a guided flavor
+        // beat only, NOT a registered/tracked tutorial objective. UV vein reveal detection
+        // isn't consistent enough to safely gate progression on, so we no longer add a
+        // tutorial objective for it or block waiting on BlueVeinsAnomaly.IsCurrentlyRevealed.
+        // The player is free to continue into the notebook/checklist beats regardless of
+        // whether the veins were actually revealed under UV.
+        yield return new WaitForSeconds(1.5f);
     }
 
     // -------------------------------------------------------------------------

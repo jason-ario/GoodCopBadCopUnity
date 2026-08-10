@@ -266,10 +266,15 @@ public class SuspectController : NetworkBehaviour
             ForceNextSuspectMutant = false;
             if (dailySuspectManager.TryGetRandomMutant(out MutantSuspectBehaviour forcedPrefab, out MutantIntruderData forcedData))
             {
-                SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, forcedPrefab, forcedData);
-                yield break;
+                if (SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, forcedPrefab, forcedData))
+                    yield break;
+
+                Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: forced mutant spawn failed — falling back to the normal retry loop below.");
             }
-            Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: no mutant available in pool — falling back to normal suspect.");
+            else
+            {
+                Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: no mutant available in pool — falling back to normal suspect.");
+            }
         }
 
         // Check for a scripted event intercept (e.g. Alexei on Day 1).
@@ -283,24 +288,57 @@ public class SuspectController : NetworkBehaviour
             yield break;
         }
 
-        if (dailySuspectManager.IsMutantSlot(suspectIndex.Value, out MutantSuspectBehaviour mutantPrefab, out MutantIntruderData mutantData))
-            SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, mutantPrefab, mutantData);
-        else if (dailySuspectManager.IsDoppelgangerSlot(suspectIndex.Value, out DoppelgangerData doppelgangerData))
-            SpawnDoppelgangerServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation, doppelgangerData);
-        else
-            SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
+        // Keep trying subsequent lineup slots if a spawn attempt fails for any reason (bad data,
+        // missing prefab/NetworkObject, etc.) instead of silently dead-ending the shift — the game
+        // flow depends on suspects being processed, so a single bad slot must never permanently
+        // block the booth. Bounded by the remaining lineup slots so we can't spin forever.
+        int maxAttempts = Mathf.Max(1, dailySuspectManager.TotalLineupSlotsThisShift - suspectIndex.Value + 1);
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            bool spawned;
+            if (dailySuspectManager.IsMutantSlot(suspectIndex.Value, out MutantSuspectBehaviour mutantPrefab, out MutantIntruderData mutantData))
+                spawned = SpawnMutantIntruderServer(spawnPos.position, spawnPos.rotation, mutantPrefab, mutantData);
+            else if (dailySuspectManager.IsDoppelgangerSlot(suspectIndex.Value, out DoppelgangerData doppelgangerData))
+                spawned = SpawnDoppelgangerServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation, doppelgangerData);
+            else
+                spawned = SpawnSuspectServer(suspectIndex.Value, spawnPos.position, spawnPos.rotation);
+
+            if (spawned)
+                yield break;
+
+            if (suspectIndex.Value >= dailySuspectManager.TotalLineupSlotsThisShift - 1)
+            {
+                Debug.LogWarning("[SuspectController] Spawn attempt failed on the last lineup slot — treating the shift's suspects as processed instead of blocking the booth.");
+                ShiftManager.Instance?.MarkSuspectsComplete();
+                yield break;
+            }
+
+            Debug.LogWarning($"[SuspectController] Spawn attempt failed at lineup index {suspectIndex.Value} — retrying with the next suspect instead of blocking the booth.");
+            suspectIndex.Value += 1;
+        }
+
+        Debug.LogError("[SuspectController] Exhausted all retry attempts without spawning a suspect — marking the shift's suspects as processed so the game can continue.");
+        ShiftManager.Instance?.MarkSuspectsComplete();
     }
 
     [SerializeField] private DailySuspectManager dailySuspectManager;
-    private void SpawnSuspectServer(int lineupIndex, Vector3 position, Quaternion rotation)
+    /// <summary>Returns true if a suspect was successfully spawned for this lineup slot.</summary>
+    private bool SpawnSuspectServer(int lineupIndex, Vector3 position, Quaternion rotation)
     {
-        if (!IsServer) return;
+        if (!IsServer) return false;
+
+        if (lineupIndex < 0 || lineupIndex >= dailySuspectManager.shiftSuspects.Count)
+        {
+            Debug.LogError($"[SuspectController] SpawnSuspectServer: lineupIndex {lineupIndex} is out of range " +
+                            $"(shiftSuspects.Count = {dailySuspectManager.shiftSuspects.Count}).");
+            return false;
+        }
 
         SuspectData suspectData = dailySuspectManager.shiftSuspects[lineupIndex];
         if (suspectData == null)
         {
             Debug.LogError($"[SuspectController] Null SuspectData at lineup index {lineupIndex} — expected a mutant slot branch.");
-            return;
+            return false;
         }
 
         SuspectCharacter suspectPrefab = suspectData.CharacterPrefab;
@@ -308,7 +346,7 @@ public class SuspectController : NetworkBehaviour
         if (suspectPrefab == null)
         {
             Debug.LogError($"Could not resolve suspect prefab from SuspectRecord at lineup index {lineupIndex}.");
-            return;
+            return false;
         }
 
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
@@ -319,7 +357,7 @@ public class SuspectController : NetworkBehaviour
         {
             Debug.LogError($"Spawned suspect prefab '{spawnedSuspect.name}' is missing a NetworkObject.");
             Destroy(spawnedSuspect);
-            return;
+            return false;
         }
 
         // Pre-check full-mutant state BEFORE Spawn() so MutantEnemy.OnNetworkSpawn never
@@ -388,6 +426,7 @@ public class SuspectController : NetworkBehaviour
 
         TryInitializeCurrentSuspect();
         AssignReferencesClientRpc(netObj.NetworkObjectId);
+        return true;
     }
 
     /// <summary>
@@ -521,9 +560,9 @@ public class SuspectController : NetworkBehaviour
     /// <see cref="SuspectCharacter.InitializeAsDoppelganger"/>. The prefab is the same
     /// as a normal civilian — doppelganger identity is carried by the DoppelgangerData.
     /// </summary>
-    private void SpawnDoppelgangerServer(int lineupIndex, Vector3 position, Quaternion rotation, DoppelgangerData doppelgangerData)
+    private bool SpawnDoppelgangerServer(int lineupIndex, Vector3 position, Quaternion rotation, DoppelgangerData doppelgangerData)
     {
-        if (!IsServer) return;
+        if (!IsServer) return false;
 
         SuspectData targetData = doppelgangerData.targetSuspect;
         SuspectCharacter suspectPrefab = targetData.CharacterPrefab;
@@ -531,7 +570,7 @@ public class SuspectController : NetworkBehaviour
         if (suspectPrefab == null)
         {
             Debug.LogError($"[SuspectController] DoppelgangerData '{doppelgangerData.name}' targetSuspect has no CharacterPrefab — cannot spawn doppelganger at lineup index {lineupIndex}.");
-            return;
+            return false;
         }
 
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
@@ -542,7 +581,7 @@ public class SuspectController : NetworkBehaviour
         {
             Debug.LogError($"[SuspectController] Doppelganger prefab '{spawnedSuspect.name}' is missing a NetworkObject.");
             Destroy(spawnedSuspect);
-            return;
+            return false;
         }
 
         netObj.Spawn();
@@ -555,6 +594,7 @@ public class SuspectController : NetworkBehaviour
 
         TryInitializeCurrentSuspect();
         AssignReferencesClientRpc(netObj.NetworkObjectId);
+        return true;
     }
 
     public void InjectLegacyDependencies(GameObject root)
@@ -1820,9 +1860,9 @@ public class SuspectController : NetworkBehaviour
     /// Spawns a mutant from the lineup pool and starts its booth-approach sequence.
     /// Called on the server when the current lineup slot is a mutant slot.
     /// </summary>
-    private void SpawnMutantIntruderServer(Vector3 position, Quaternion rotation, MutantSuspectBehaviour prefab, MutantIntruderData data)
+    private bool SpawnMutantIntruderServer(Vector3 position, Quaternion rotation, MutantSuspectBehaviour prefab, MutantIntruderData data)
     {
-        if (!IsServer) return;
+        if (!IsServer) return false;
 
         // Clear any leftover suspect reference so verdict/interact code sees null for this slot.
         suspectCharacter = null;
@@ -1834,7 +1874,7 @@ public class SuspectController : NetworkBehaviour
         {
             Debug.LogError("[SuspectController] Mutant intruder prefab is missing a NetworkObject — aborting spawn.");
             Destroy(mutantObj);
-            return;
+            return false;
         }
 
         // Keep MutantEnemy dormant (IsActive stays false) through the walk-in/bang-on-shutter
@@ -1855,7 +1895,7 @@ public class SuspectController : NetworkBehaviour
         {
             Debug.LogError("[SuspectController] Mutant intruder prefab is missing MutantSuspectBehaviour — aborting.");
             netObj.Despawn();
-            return;
+            return false;
         }
 
         if (climbThroughTargetPos == null)
@@ -1867,6 +1907,7 @@ public class SuspectController : NetworkBehaviour
 
         // Reuse the existing booth-waiting notification so players are alerted.
         NotifySuspectArrivingClientRpc();
+        return true;
     }
 
     /// <summary>
