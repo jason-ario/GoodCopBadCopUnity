@@ -215,6 +215,12 @@ public class DebugConsole : MonoBehaviour
             ForceAlexeiSequenceOnNextSuspect();
         }
 
+        // M — make the next eligible civilian suspect use the full-mutant booth flow.
+        if (Input.GetKeyDown(KeyCode.M))
+        {
+            ForceNextSuspectFullMutant();
+        }
+
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
@@ -1024,6 +1030,25 @@ public class DebugConsole : MonoBehaviour
 
         SuspectController.InterceptNextSuspectSpawn = () => SoldierMockingController.Instance.BeginSequence();
         Debug.Log("[DebugConsole] Soldier mocking event will intercept the next suspect spawn slot (F11).");
+    }
+
+    /// <summary>
+    /// Arms the existing one-shot full-mutant override for the next regular or doppelganger
+    /// suspect spawned by the host. The lineup, infection records, and day progression are left
+    /// unchanged; this is intentionally a visual/encounter-flow debug override only.
+    /// Mutant-intruder and scripted-intercept slots do not use SuspectCharacter's full-mutant
+    /// booth flow, so the override remains armed until the next eligible civilian spawn.
+    /// </summary>
+    public void ForceNextSuspectFullMutant()
+    {
+        if (ShiftManager.Instance == null || !ShiftManager.Instance.IsServer)
+        {
+            Debug.LogWarning("[DebugConsole] ForceNextSuspectFullMutant: run this cheat on the host after the shift has started.");
+            return;
+        }
+
+        SuspectController.ForceNextSuspectAsFullMutant = true;
+        Debug.Log("[DebugConsole] Next eligible civilian suspect is armed to spawn as a full mutant (M).");
     }
 
     /// <summary>

@@ -44,6 +44,12 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Number of coupons the ATM dispenses when all blood has been scrubbed.")]
     [SerializeField] private int _couponReward = 10;
 
+    [Tooltip("Forgiveness buffer: this many splatters are allowed to remain unscrubbed and the " +
+             "task still completes. Helps when the last splatter or two is hard to spot/reach. " +
+             "0 = must scrub every splatter. Never reduces the requirement below 1 splatter " +
+             "(as long as at least one was registered).")]
+    [SerializeField] private int _completionBuffer = 1;
+
     [Header("Daily Task")]
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool, if this task is ever added to it.")]
     [SerializeField] private string _dailyTaskId = "CleanBlood";
@@ -98,15 +104,24 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public string ThreatName  => _taskName;
     public float  ScoreWeight => 1f;
 
-    public float ThreatLevel => _totalCount.Value > 0
-        ? 1f - Mathf.Clamp01((float)_scrubbed.Value / _totalCount.Value)
+    /// <summary>
+    /// Number of splatters that must actually be scrubbed to complete the task this cycle —
+    /// the registered total minus <see cref="_completionBuffer"/>, floored at 1 splatter as long
+    /// as at least one was ever registered.
+    /// </summary>
+    public int RequiredCount => _totalCount.Value > 0
+        ? Mathf.Max(_totalCount.Value - _completionBuffer, 1)
+        : 0;
+
+    public float ThreatLevel => RequiredCount > 0
+        ? 1f - Mathf.Clamp01((float)_scrubbed.Value / RequiredCount)
         : 0f;
 
     public string ThreatDescription =>
         _isComplete
             ? $"All {_totalCount.Value} splatter(s) scrubbed!"
             : _totalCount.Value > 0
-                ? $"{_scrubbed.Value}/{_totalCount.Value}"
+                ? $"{Mathf.Min(_scrubbed.Value, RequiredCount)}/{RequiredCount}"
                 : string.Empty;
 
     /// <summary>No-op — this task is triggered explicitly on Day 3, not by the night phase.</summary>
@@ -312,7 +327,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
-        if (_scrubbed.Value < _totalCount.Value) return;
+        if (_scrubbed.Value < RequiredCount) return;
 
         _isComplete = true;
         _taskActive = false;

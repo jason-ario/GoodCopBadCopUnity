@@ -584,10 +584,26 @@ public class SuspectController : NetworkBehaviour
             return false;
         }
 
+        if (ForceNextSuspectAsFullMutant)
+            spawnedSuspect.GetComponent<MutantEnemy>()?.DisableAutoInit();
+
         netObj.Spawn();
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
         suspectCharacter.InitializeAsDoppelganger(doppelgangerData);
+
+        if (ForceNextSuspectAsFullMutant)
+        {
+            ForceNextSuspectAsFullMutant = false;
+            _currentSuspectIsFullMutant = true;
+            suspectCharacter.ActivateFullMutantForm();
+            suspectCharacter.SetupFullMutantWindowBreach(
+                standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+        }
+        else
+        {
+            _currentSuspectIsFullMutant = false;
+        }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
         _currentSuspectInitialized = false;

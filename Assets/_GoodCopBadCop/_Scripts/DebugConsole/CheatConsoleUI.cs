@@ -190,6 +190,12 @@ public class CheatConsoleUI : MonoBehaviour
             SetVisible(false);
         }));
 
+        _cheats.Add(("Force Next Civilian Suspect — Full Mutant (M)", () =>
+        {
+            DebugConsole.Instance.EnsureGameStartedThen(DebugConsole.Instance.ForceNextSuspectFullMutant);
+            SetVisible(false);
+        }));
+
         _cheats.Add(("Trigger Mutant Breach", () =>
         {
             DebugConsole.Instance.DebugForceMutantBreach();

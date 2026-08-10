@@ -1122,7 +1122,7 @@ public class Day_02 : DayBase, IDailyTask
         // suspect count — without this, his intercept would consume the "next" slot a real
         // suspect was going to occupy, shortening the day by one suspect and ending the shift
         // (Dusk) early. See DailySuspectManager.AddBonusLineupSlot for the full explanation.
-        DailySuspectManager.Instance?.AddBonusLineupSlot();
+        //DailySuspectManager.Instance?.AddBonusLineupSlot();
 
         SuspectController.InterceptNextSuspectSpawn = () =>
         {
