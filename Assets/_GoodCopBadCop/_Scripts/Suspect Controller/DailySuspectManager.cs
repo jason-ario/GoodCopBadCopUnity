@@ -28,7 +28,7 @@ public class DailySuspectManager : MonoBehaviour
     /// suspect and are resolved through the normal folder verdict flow.
     /// Returns 0 before the lineup has been populated for the day.
     /// </summary>
-    public int TotalSuspectsThisShift => shiftSuspects.Count - _mutantSlotIndices.Count;
+    public int TotalSuspectsThisShift => shiftSuspects.Count - _mutantSlotIndices.Count - _bonusSlotIndices.Count;
 
     /// <summary>
     /// Total occupied lineup slots this shift, INCLUDING injected mutant intruder slots. This is
@@ -48,6 +48,37 @@ public class DailySuspectManager : MonoBehaviour
 
     private readonly HashSet<int> _mutantSlotIndices = new HashSet<int>();
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
+
+    /// <summary>
+    /// Tracks which lineup slot indices were appended by <see cref="AddBonusLineupSlot"/> — extra
+    /// scripted encounters (e.g. Ocho's booth ambush) squeezed into the lineup on top of the
+    /// day's normal suspect count. Excluded from <see cref="TotalSuspectsThisShift"/> (the
+    /// player-facing "process N subjects" total) for the same reason mutant slots are: they're
+    /// not one of the day's real suspects to process. Still counted in
+    /// <see cref="TotalLineupSlotsThisShift"/> so the shift correctly waits for them to resolve
+    /// before ending.
+    /// </summary>
+    private readonly HashSet<int> _bonusSlotIndices = new HashSet<int>();
+
+    /// <summary>
+    /// Appends one extra lineup slot on top of the day's normally-populated suspect count, for a
+    /// scripted encounter that gets spliced into the lineup at runtime via
+    /// <see cref="SuspectController.InterceptNextSuspectSpawn"/> (e.g. Ocho's booth ambush,
+    /// armed by <see cref="Day_02.ArmOchoBoothEncounter"/>). Without this, the intercept would
+    /// consume the "next" slot that a real suspect was otherwise going to occupy — shortening the
+    /// day's real suspect count by one and ending the shift (Dusk) a suspect early. The appended
+    /// slot holds a null placeholder (never actually spawned — the intercept short-circuits before
+    /// any lineup entry is read) and is excluded from <see cref="TotalSuspectsThisShift"/> exactly
+    /// like a mutant slot.
+    /// </summary>
+    public void AddBonusLineupSlot()
+    {
+        int slotIndex = shiftSuspects.Count;
+        shiftSuspects.Add(null);
+        _bonusSlotIndices.Add(slotIndex);
+        Debug.Log($"[DailySuspectManager] AddBonusLineupSlot: appended bonus slot at index {slotIndex} — " +
+                   $"TotalLineupSlotsThisShift now {TotalLineupSlotsThisShift}, TotalSuspectsThisShift stays {TotalSuspectsThisShift}.");
+    }
 
     /// <summary>
     /// Tracks which lineup slot indices belong to full-mutant civilians — either freshly

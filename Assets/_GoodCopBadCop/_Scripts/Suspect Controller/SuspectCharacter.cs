@@ -1697,28 +1697,20 @@ public class SuspectCharacter : Interactable
     /// <summary>
     /// Applies damage to this suspect. Server-only. Triggers a hit reaction and,
     /// when health reaches zero, plays the death animation on all clients.
-    /// Non-mutant suspects don't use <see cref="_health"/> at all — instead they absorb damage
-    /// into <see cref="_woundedHealth"/> and flee once it's depleted (see <see cref="FleeFromWounds"/>).
+    /// No-op entirely while this suspect has not yet transitioned into a full mutant
+    /// (<see cref="_isMutant"/> false) — hitting a non-mutant suspect has zero gameplay effect:
+    /// no damage, no hit reaction, no flee. The previous "wounded flee" hit registry for
+    /// pre-mutation suspects has been removed.
     /// </summary>
     /// <param name="amount">Damage points to subtract.</param>
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth)
+        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth || !_isMutant)
             return;
 
         SpawnHitParticleClientRpc(hitPoint);
         OnHit?.Invoke();
-
-        if (!_isMutant)
-        {
-            _woundedHealth -= amount;
-
-            if (_woundedHealth <= 0f)
-                FleeFromWounds();
-
-            return;
-        }
 
         _health -= amount;
 

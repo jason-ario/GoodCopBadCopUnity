@@ -1062,7 +1062,7 @@ public class FolderController : PickableObject
         // --- Exam pages: queue logic ---
         bool isExamPage = itemName is
             "Behavior Exam Page" or "Mutation Exam Page" or "Supernatural Exam Page" or
-            "Documentation Exam Page" or "Biological Exam Page";
+            "Documentation Exam Page" or "Biological Exam Page" or "Vitals Exam Page";
 
         if (!isExamPage) return;
 
@@ -1339,6 +1339,11 @@ public class FolderController : PickableObject
         }
         
         if (itemName == "Biological Exam Notebook")
+        {
+            player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
+        }
+
+        if (itemName == "Vitals Exam Notebook")
         {
             player.HeldObject.GetComponent<ExamNotebook>().AddToFolder(this);
         }

@@ -1642,9 +1642,18 @@ public class SuspectController : NetworkBehaviour
             if (populationService != null)
                 SaveDataManager.Instance?.SavePopulation(populationService.ToSaveData());
 
-            if (!_hasEverKilled)
+            // Guarded by BOTH the in-memory static (fast-path within this session) and the
+            // save-file-persisted flag (SaveDataManager.HasEverKilledSuspect) — the static alone
+            // would re-arm Ocho's booth encounter every time the player reloads a save that
+            // already had a kill recorded, since statics reset on domain reload/app restart.
+            bool alreadyKilledBefore = _hasEverKilled ||
+                (SaveDataManager.Instance != null && SaveDataManager.Instance.HasEverKilledSuspect);
+
+            if (!alreadyKilledBefore)
             {
                 _hasEverKilled = true;
+                if (SaveDataManager.Instance != null)
+                    SaveDataManager.Instance.HasEverKilledSuspect = true;
                 OnFirstKillEver?.Invoke();
             }
         }

@@ -39,6 +39,23 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
+    /// True once the player has ever killed a suspect on this save slot, across all sessions.
+    /// Guards <see cref="SuspectController.OnFirstKillEver"/> so Ocho's booth encounter (see
+    /// <see cref="Day_02.ArmOchoBoothEncounter"/>) can only ever be armed once per save file —
+    /// unlike a plain in-memory static flag, this survives quitting and reloading the same slot.
+    /// </summary>
+    public bool HasEverKilledSuspect
+    {
+        get => ActiveSlot?.HasEverKilledSuspect ?? false;
+        set
+        {
+            if (ActiveSlot == null) return;
+            ActiveSlot.HasEverKilledSuspect = value;
+            Save();
+        }
+    }
+
+    /// <summary>
     /// Cash total as of the active slot's last Dusk checkpoint (see
     /// <see cref="SaveDuskCheckpoint"/>). Setting this persists immediately.
     /// </summary>
@@ -691,6 +708,12 @@ public class SaveSlot
     /// Causes Day 1 to skip all tutorial gating on subsequent runs.
     /// </summary>
     public bool Day1TutorialComplete;
+
+    /// <summary>
+    /// True once the player has ever killed a suspect on this save slot, across all sessions.
+    /// See <see cref="SaveDataManager.HasEverKilledSuspect"/> for the guarded wrapper.
+    /// </summary>
+    public bool HasEverKilledSuspect;
 
     /// <summary>
     /// Names of shop items unlocked through gameplay progression.

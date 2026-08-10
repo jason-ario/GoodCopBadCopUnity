@@ -392,6 +392,12 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer && day != 1)
             DespawnDay1Soldier();
 
+        // Vlad's persistent scene character is only needed for Day 1 (tutorial arrival, spawned
+        // separately via prefab) and Day 2 (tool locker / out-back sequences, using this scene
+        // instance). From Day 3 onward he must never appear again.
+        if (IsServer && day > 2)
+            DespawnDay2Vlad();
+
         Debug.Log($"[CampaignManager] Day {day} applied.");
     }
 
@@ -413,6 +419,26 @@ public class CampaignManager : NetworkBehaviour
         {
             netObj.Despawn(true);
             Debug.Log("[CampaignManager] Day 1 Soldier despawned — no longer Day 1.");
+        }
+    }
+
+    /// <summary>
+    /// Server-only. Despawns and destroys Day 2's persistent scene-placed Vlad
+    /// (<see cref="Day_02.VladCharacter"/>) if he is still spawned. He normally rests at the
+    /// "Vlad In Yard" waypoint after his Day 2 sequences instead of despawning, so without this
+    /// call he would keep appearing on every subsequent day. No-op if Day 2 was never
+    /// instantiated, the reference wasn't assigned, or he's already gone.
+    /// </summary>
+    private void DespawnDay2Vlad()
+    {
+        SuspectCharacter vlad = Day_02.Instance != null ? Day_02.Instance.VladCharacter : null;
+        if (vlad == null) return;
+
+        NetworkObject netObj = vlad.GetComponent<NetworkObject>();
+        if (netObj != null && netObj.IsSpawned)
+        {
+            netObj.Despawn(true);
+            Debug.Log("[CampaignManager] Day 2 Vlad despawned — Day 3 or later.");
         }
     }
 

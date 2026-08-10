@@ -280,7 +280,7 @@ public class OchoBoothEncounter : NetworkBehaviour
         yield return new WaitForSeconds(_jumpscareZoomDuration);
 
         Debug.Log($"[OchoBoothEncounter] Verdict was {attemptedStamp} — running the power outage sequence.");
-        RedStampSequence(controller);
+        RedStampSequence();
     }
 
     private string GetReactionLine(StampContainer.StampType stamp)
@@ -326,7 +326,7 @@ public class OchoBoothEncounter : NetworkBehaviour
         _spotted = true;
     }
 
-    private void RedStampSequence(SuspectController controller)
+    private void RedStampSequence()
     {
         Debug.Log($"[OchoBoothEncounter] RedStampSequence: ElectricityController.Instance={(ElectricityController.Instance != null ? "found" : "NULL")}.");
 
@@ -340,9 +340,15 @@ public class OchoBoothEncounter : NetworkBehaviour
 
         ShowElectricalPanelTutorialClientRpc();
 
-        // Ocho is already gone (vanished after the stinger) — the encounter's visual beat is
-        // complete, he just disappears into the dark for good.
-        controller.DespawnSuspectWithoutVerdict(_self);
+        // NOTE: Ocho is NOT despawned here even though he's already invisible (vanished after
+        // the stinger). Despawning immediately would destroy this GameObject/component right
+        // now — but OnPowerRestored (below) and the PowerRestoredBarkSequence coroutine it
+        // kicks off (which is what actually calls ShiftManager.SetNextSuspectReady() to re-arm
+        // the Call Suspect Button) run on THIS component later, whenever the player eventually
+        // fixes the panel. An immediate despawn destroys the GameObject the instant power cuts,
+        // so that later StartCoroutine call silently fails on the destroyed object and the
+        // switch never re-arms. Despawning is deferred to the end of PowerRestoredBarkSequence
+        // instead, once SetNextSuspectReady() has actually run.
     }
 
     /// <summary>
@@ -376,6 +382,13 @@ public class OchoBoothEncounter : NetworkBehaviour
         yield return new WaitForSeconds(_finalDelayBeforeNextSuspect);
 
         ShiftManager.Instance.SetNextSuspectReady();
+
+        // Ocho has been invisible since the stinger/vanish beat — now that the button has been
+        // re-armed, it's safe to actually despawn him and clean up his booth visit. Doing this
+        // here (rather than immediately when the power cut out) keeps this component alive long
+        // enough for OnPowerRestored/PowerRestoredBarkSequence to actually run when the player
+        // eventually restores power — see RedStampSequence for the full explanation.
+        SuspectController.Instance?.DespawnSuspectWithoutVerdict(_self);
     }
 
     // ── Client-visible effects ──────────────────────────────────────────────

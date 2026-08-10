@@ -161,6 +161,13 @@ public class Day_02 : DayBase, IDailyTask
              "walked through the tool locker walkthrough, then settled back in the yard.")]
     [SerializeField] private SuspectCharacter _vladCharacter;
 
+    /// <summary>
+    /// Exposes the persistent scene-placed Vlad so <see cref="CampaignManager"/> can despawn him
+    /// once Day 3 or later becomes active — he's only ever needed for Day 1 and Day 2. See
+    /// <see cref="CampaignManager.ApplyDay"/>.
+    /// </summary>
+    public SuspectCharacter VladCharacter => _vladCharacter;
+
     // Vlad instance currently being driven through a scripted sequence. Points at _vladCharacter
     // while a sequence is active; null when Vlad isn't mid-sequence. Never destroyed — he's a
     // persistent scene character, not a runtime-spawned instance.
@@ -1110,6 +1117,12 @@ public class Day_02 : DayBase, IDailyTask
             Debug.LogWarning("[Day_02] ArmOchoBoothEncounter: _ochoBoothEncounterPrefab is not assigned — skipping.");
             return;
         }
+
+        // Ocho is an extra scripted encounter spliced into the lineup on top of the day's normal
+        // suspect count — without this, his intercept would consume the "next" slot a real
+        // suspect was going to occupy, shortening the day by one suspect and ending the shift
+        // (Dusk) early. See DailySuspectManager.AddBonusLineupSlot for the full explanation.
+        DailySuspectManager.Instance?.AddBonusLineupSlot();
 
         SuspectController.InterceptNextSuspectSpawn = () =>
         {
