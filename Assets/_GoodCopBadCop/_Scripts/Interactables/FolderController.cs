@@ -385,7 +385,7 @@ public class FolderController : PickableObject
             Debug.Log("Already Stamped");
         }
 
-        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Supernatural Exam Page" or "Biological Exam Page" )
+        if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Supernatural Exam Page" or "Biological Exam Page" or "Vitals Exam Page" )
         {
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
@@ -396,7 +396,7 @@ public class FolderController : PickableObject
             AddDocument(heldItem, playerInteractionController.pickupController, true);
         }
 
-        if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Supernatural Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook")
+        if (heldItem.ItemData.name is "Documentation Exam Notebook" or "Supernatural Exam Notebook" or "Behavior Exam Notebook" or "Mutation Exam Notebook" or "Biological Exam Notebook" or "Vitals Exam Notebook")
         {
             Debug.Log($"[FolderController] Notebook interaction on client {NetworkManager.Singleton.LocalClientId}: held={heldItem.ItemData.name}, hasPage={HasNotebookPage(heldItem.ItemData.name)}");
             if (HasNotebookPage(heldItem.ItemData.name) == false)
@@ -425,6 +425,7 @@ public class FolderController : PickableObject
             "Supernatural Exam Notebook"    => "Supernatural Exam Page",
             "Documentation Exam Notebook"  => "Documentation Exam Page",
             "Biological Exam Notebook"     => "Biological Exam Page",
+            "Vitals Exam Notebook"         => "Vitals Exam Page",
             _                              => null,
         };
 
