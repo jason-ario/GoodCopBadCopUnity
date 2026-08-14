@@ -15,7 +15,7 @@ using UnityEngine;
 ///      broadcasts the encoded photo bytes to every client so all players see the same image,
 ///      DOTweens it to <see cref="_photoFinalPoint"/>, then locks it to the camera via
 ///      <see cref="PickableObject.SetSocketFollowWithLocalOffset"/>.
-///   4. Q inside camera mode → exit camera mode.
+///   4. Escape inside camera mode → exit camera mode.
 ///   5. Drop the camera.
 ///   6. E near the placed camera → extract the polaroid into the player's hands
 ///      (clears socket follow, routes the already-spawned object directly to the player).
@@ -71,7 +71,7 @@ public class CameraPickup : PickableObject
 
     private const string UsingToolBool = "UsingTool";
     private const string InteractTextDefault = "Camera";
-    private const string InteractTextHasPhoto = "Camera (E: Extract Photo)";
+    private const string InteractTextHasPhoto = "to grab photo";
 
     /// <summary>
     /// Brief window after entering camera mode during which LMB does not fire the shutter,
@@ -88,6 +88,7 @@ public class CameraPickup : PickableObject
     private float _cameraModeEnterTime;
     private bool _isAnimatingPhoto;
     private PlayerInteractionController _interactionController;
+    private PlayerInstance _cutscenePlayer;
 
     /// <summary>
     /// NetworkObjectId of the currently attached polaroid (0 = none).
@@ -97,6 +98,9 @@ public class CameraPickup : PickableObject
         0UL,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+
+    /// <summary>Shows the E-key reticle hint while a polaroid is available to collect.</summary>
+    public override bool ShowInteractHint => _netPolaroidId.Value != 0UL;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -125,6 +129,7 @@ public class CameraPickup : PickableObject
     {
         base.OnNetworkDespawn();
         _netPolaroidId.OnValueChanged -= OnNetPolaroidIdChanged;
+        UnsubscribeFromCutsceneState();
     }
 
     private void Update()
@@ -136,12 +141,6 @@ public class CameraPickup : PickableObject
         // Guard: don't take a photo on the same frame we entered camera mode
         bool cooldownElapsed = Time.time >= _cameraModeEnterTime + CameraModeCooldown;
         if (!cooldownElapsed) return;
-
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
-            ExitCameraMode();
-            return;
-        }
 
         // Handle shutter (LMB) manually because InteractionController is disabled in this mode.
         // We check GetMouseButtonDown(0) directly here.
@@ -167,7 +166,7 @@ public class CameraPickup : PickableObject
         EnterCameraMode();
     }
 
-    /// <summary>Overridden so mouse-up does not exit camera mode. Only Q exits.</summary>
+    /// <summary>Overridden so mouse-up does not exit camera mode; the Back control handles manual exit.</summary>
     public override void OnStopUse()
     {
         if (_inCameraMode) return;
@@ -192,12 +191,37 @@ public class CameraPickup : PickableObject
 
         _interactionController ??= playerPickupController.GetComponent<PlayerInteractionController>();
         _interactionController?.SetSuspectCamMode(true);
+        SubscribeToCutsceneState();
+        UIController.Instance?.ShowBackButton(ExitCameraMode);
     }
+
+    private void SubscribeToCutsceneState()
+    {
+        _cutscenePlayer = PlayerInstance.Instance;
+        if (_cutscenePlayer != null)
+            _cutscenePlayer.OnCutsceneStateChanged += HandleCutsceneStateChanged;
+    }
+
+    private void UnsubscribeFromCutsceneState()
+    {
+        if (_cutscenePlayer != null)
+            _cutscenePlayer.OnCutsceneStateChanged -= HandleCutsceneStateChanged;
+
+        _cutscenePlayer = null;
+    }
+
+    private void HandleCutsceneStateChanged(bool isInCutscene)
+    {
+        if (isInCutscene && _inCameraMode)
+            ExitCameraMode();
+    }
+
 
     private void ExitCameraMode()
     {
         _inCameraMode = false;
         isUsing = false;
+        UnsubscribeFromCutsceneState();
 
         if (_viewfinderCamera != null)
             _viewfinderCamera.gameObject.SetActive(false);
@@ -207,6 +231,8 @@ public class CameraPickup : PickableObject
 
         if (playerPickupController != null)
             playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolBool, false);
+
+        UIController.Instance?.HideBackButton();
 
         // Defer re-enabling interaction by one frame.
         // If we restore _canInteract immediately, PlayerInteractionController.Update() may
@@ -219,7 +245,8 @@ public class CameraPickup : PickableObject
     private IEnumerator RestoreInteractionNextFrame()
     {
         yield return null;
-        _interactionController?.SetSuspectCamMode(false);
+        if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsInCutscene)
+            _interactionController?.SetSuspectCamMode(false);
     }
 
     // ── Equip / Unequip ───────────────────────────────────────────────────────

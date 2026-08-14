@@ -126,6 +126,10 @@ public class UIController : MonoBehaviour
         // is active and interactable right now, let it own Escape instead of also pausing.
         bool escapePausePressed = Input.GetButtonDown("Pause")
                                    && !KeyBackButtonActivator.AnyEscapeBackButtonInteractable;
+        if (KeyBackButtonActivator.EscapeBackButtonPressedThisFrame)
+            escapePausePressed = false;
+
+
         bool pauseInput = escapePausePressed
                           || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
         if (pauseInput)
@@ -143,6 +147,12 @@ public class UIController : MonoBehaviour
         if(PlayerInstance.Instance.CanControl == false) return;
     }
     
+    private void LateUpdate()
+    {
+        KeyBackButtonActivator.ClearEscapeBackButtonPressedThisFrame();
+    }
+
+
     public void OpenLevelSelectUI()
     {
         levelSelectUI.SetActive(true);

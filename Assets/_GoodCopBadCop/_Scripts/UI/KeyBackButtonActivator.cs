@@ -41,6 +41,14 @@ public class KeyBackButtonActivator : MonoBehaviour
     /// </summary>
     public static bool AnyEscapeBackButtonInteractable { get; private set; }
 
+    /// <summary>True only for the frame in which an Escape-bound Back button handled Escape.</summary>
+    public static bool EscapeBackButtonPressedThisFrame { get; private set; }
+
+    public static void ClearEscapeBackButtonPressedThisFrame()
+    {
+        EscapeBackButtonPressedThisFrame = false;
+    }
+
     private void Awake()
     {
         _button = GetComponent<Button>();
@@ -61,6 +69,9 @@ public class KeyBackButtonActivator : MonoBehaviour
     private void Update()
     {
         if (!(Keyboard.current?[_key].wasPressedThisFrame ?? false)) return;
+
+        if (_key == Key.Escape && _button != null && _button.isActiveAndEnabled && _button.interactable)
+            EscapeBackButtonPressedThisFrame = true;
 
         InvokeButton();
         if (_partner != null)

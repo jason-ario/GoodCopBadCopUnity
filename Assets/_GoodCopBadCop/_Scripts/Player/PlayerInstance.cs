@@ -13,6 +13,9 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     public static event Action OnLocalPlayerSpawned;
 
+    /// <summary>Fired on the local player when scripted cutscene state changes.</summary>
+    public event Action<bool> OnCutsceneStateChanged;
+
     [SerializeField] private GameObject playerLight;
     [SerializeField] private GameObject nameTag;
 
@@ -204,6 +207,7 @@ public class PlayerInstance : NetworkBehaviour
     public void SetIsInCutscene(bool value)
     {
         _isInCutscene.Value = value;
+        OnCutsceneStateChanged?.Invoke(value);
     }
 
     /// <summary>

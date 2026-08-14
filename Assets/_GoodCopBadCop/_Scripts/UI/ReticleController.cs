@@ -1,3 +1,4 @@
+using GoodCopBadCop.Input;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,8 +21,31 @@ public class ReticleController : MonoBehaviour
     [Tooltip("The GameObject wrapping the key icon (child 'Button Tooltip').")]
     [SerializeField] private GameObject _hintKeyIcon;
 
+    [Tooltip("Image that displays the keyboard or controller hint icon.")]
+    [SerializeField] private Image _hintKeyImage;
+
+    [Tooltip("Hint icon used while keyboard or mouse is the active input device.")]
+    [SerializeField] private Sprite _keyboardHintSprite;
+
+    [Tooltip("Hint icon used while a controller is the active input device.")]
+    [SerializeField] private Sprite _gamepadHintSprite;
+
     private bool canInteract = false;
     private bool isTooFar = false;
+
+    private void OnEnable()
+    {
+        ActiveInputDeviceTracker.EnsureSubscribed();
+        ActiveInputDeviceTracker.DeviceChanged += OnInputDeviceChanged;
+        RefreshHintIcon();
+    }
+
+    private void OnDisable()
+    {
+        ActiveInputDeviceTracker.DeviceChanged -= OnInputDeviceChanged;
+    }
+
+    private void OnInputDeviceChanged(bool isGamepad) => RefreshHintIcon();
 
     void Update()
     {
@@ -104,5 +128,17 @@ public class ReticleController : MonoBehaviour
 
         if (_hintKeyIcon != null)
             _hintKeyIcon.SetActive(visible);
+
+        if (visible)
+            RefreshHintIcon();
+    }
+
+    private void RefreshHintIcon()
+    {
+        if (_hintKeyImage == null) return;
+
+        Sprite icon = ActiveInputDeviceTracker.IsGamepad ? _gamepadHintSprite : _keyboardHintSprite;
+        if (icon != null)
+            _hintKeyImage.sprite = icon;
     }
 }

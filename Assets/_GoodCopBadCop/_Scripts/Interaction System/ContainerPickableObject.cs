@@ -95,8 +95,8 @@ public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
     /// </summary>
     protected abstract string BuildInteractText(int itemsRemaining);
 
-    /// <summary>Always shows the extract hint (key icon + action text) while this container is targeted.</summary>
-    public override bool ShowInteractHint => true;
+    /// <summary>Shows the E-key extract hint only while the container still has an item to give.</summary>
+    public override bool ShowInteractHint => !IsEmpty;
 
     // ── Interaction ───────────────────────────────────────────────────────────
 

@@ -13,6 +13,9 @@ public class SupplyBox : PickableObject
     [SerializeField] private AudioClip _closeClip;
     bool isOpen = false;
 
+    /// <summary>Shows the E-key reticle hint only while the box can be opened.</summary>
+    public override bool ShowInteractHint => !isOpen;
+
     private static readonly int BoxOpenHash = Animator.StringToHash("BoxOpen");
 
     /// <summary>
@@ -98,7 +101,7 @@ public class SupplyBox : PickableObject
     private void UpdateInteractText()
     {
         if (!isOpen)
-            interactText = "Open Box [E]";
+            interactText = "to open";
         else
             interactText = canPickUp ? "Close Box [E] | Pick Up [LMB]" : "Close Box [E]";
     }
