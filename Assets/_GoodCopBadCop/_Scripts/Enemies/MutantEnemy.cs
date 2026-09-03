@@ -1609,7 +1609,7 @@ public class MutantEnemy : NetworkBehaviour
 
             SpawnGoreBloodDecal(position);
 
-            if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(position)
+            if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.CountsTowardCleanup(position)
                 && SpawnGoreJunkItem(position, prefabIndex, velocity))
             {
                 continue;
@@ -1698,12 +1698,13 @@ public class MutantEnemy : NetworkBehaviour
     /// below <paramref name="minY"/> (e.g. it clipped through the floor and is falling forever,
     /// out of reach — this piece is unregistered from the task first so it never soft-locks the
     /// player by staying required-but-unreachable). Otherwise, once its Rigidbody settles (or a
-    /// timeout elapses), it is unregistered — but NOT despawned, remaining physically collectible
-    /// as a bonus — if its final resting position ended up outside every configured yard
-    /// SpawnZone; only in that case is its Rigidbody switched to kinematic (perf optimization —
-    /// it's no longer required, so there's no reason to keep simulating it). A piece that
-    /// settles inside the yard stays dynamic for as long as it's tracked by the task. No-op once
-    /// the item is collected (despawned) before either check fires.
+    /// timeout elapses), a piece whose final resting position is outside the
+    /// <see cref="CheckpointCleanupArea"/> is unregistered — which also rules it out of the cleanup
+    /// entirely (see <see cref="TakeOutTrashTask.UnregisterExternalJunkItem"/>), leaving it as inert
+    /// scenery: not counted, not interactable, not highlighted. Its Rigidbody is switched to
+    /// kinematic at the same time, since nothing about it matters any more. A piece that settles
+    /// inside the region stays dynamic and tracked. No-op once the item is collected (despawned)
+    /// before either check fires.
     /// </summary>
     private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
     {
@@ -1740,7 +1741,7 @@ public class MutantEnemy : NetworkBehaviour
         if (netObj == null || !netObj.IsSpawned)
             yield break;
 
-        if (TakeOutTrashTask.Instance != null && !TakeOutTrashTask.Instance.IsPositionInYard(netObj.transform.position))
+        if (TakeOutTrashTask.Instance != null && !TakeOutTrashTask.Instance.CountsTowardCleanup(netObj.transform.position))
         {
             TakeOutTrashTask.Instance.UnregisterExternalJunkItem(netObj);
 
@@ -1756,15 +1757,12 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
     /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
-    /// ground. Mirrors <see cref="SpawnGoreJunkItem"/>'s yard-bounds rule for the gore piece
-    /// itself: a splatter that lands inside the Trash Task's yard is registered with
-    /// <see cref="CleanBloodTask"/> via <see cref="CleanBloodTask.RegisterBloodSplatter"/> so it
-    /// counts toward the post-breach clean-up objective and blocks clock-out until scrubbed;
-    /// a splatter outside the yard (e.g. from a checkpoint breach fight) is purely cosmetic and
-    /// registered via <see cref="CleanBloodTask.RegisterTransientBloodSplatter"/> instead, so it
-    /// never blocks clock-out and just despawns the next time a day starts. Called for every gore
-    /// piece in a death burst (see <see cref="SpawnGoreBurst"/>). No-op when
-    /// <see cref="yardBloodDecalPrefabs"/> is empty.
+    /// ground. Every splatter is handed to <see cref="CleanBloodTask.RegisterBloodSplatter"/>
+    /// regardless of where it landed — that task decides by position whether the splatter is
+    /// REQUIRED (inside the checkpoint) or merely credited as a bonus when mopped (outside it), the
+    /// same counted-vs-collectible split used for the corpse itself in
+    /// <see cref="EnableCorpseJunkPickupAfterSettle"/>. Called for every gore piece in a death burst
+    /// (see <see cref="SpawnGoreBurst"/>). No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
     private void SpawnGoreBloodDecal(Vector3 originPosition)
     {
@@ -1800,14 +1798,11 @@ public class MutantEnemy : NetworkBehaviour
 
         decalNetObj.Spawn(destroyWithScene: true);
 
-        // Only count this splatter toward the mop task if it landed inside the yard — mirrors
-        // SpawnGoreJunkItem's bounds check for the gore piece it belongs to. Splatters outside
-        // the yard (e.g. a checkpoint breach fight) are cosmetic-only and just despawn on their
-        // own the next day, same as out-of-yard gore never becoming a collectible JunkItem.
-        if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsPositionInYard(originPosition))
-            CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
-        else
-            CleanBloodTask.Instance?.RegisterTransientBloodSplatter(decalNetObj);
+        // Always register with the mop task, wherever it landed — CleanBloodTask makes the
+        // counted-vs-bonus decision by position itself (splatters outside the checkpoint are
+        // mop-able and credit when scrubbed, they're just never required). Pre-filtering here is
+        // what left blood beyond the fence crediting nothing at all when a player mopped it.
+        CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
     }
@@ -2081,21 +2076,16 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Enables this corpse as a collectible <see cref="JunkItem"/> so it can always be picked up
-    /// by a player holding a TrashBag. Called on a permanent death when <see cref="deathBehaviour"/>
+    /// Enables this corpse as a collectible <see cref="JunkItem"/> so it can be picked up by a player
+    /// holding a TrashBag. Called on a permanent death when <see cref="deathBehaviour"/>
     /// is <see cref="DeathBehaviour.PlayAnimation"/> (the corpse persists in the scene instead of
     /// despawning immediately). No-op if <see cref="corpseJunkItem"/> isn't assigned. Mirrors
     /// <c>SuspectCharacter.EnableJunkPickup</c>/<c>ApplyJunkPickupState</c> for a body that becomes
     /// pickable trash once its owner is confirmed dead.
     ///
-    /// Only enabled — and therefore only interactable/highlightable with the reticle at all —
-    /// when this corpse died inside one of the task's yard <see cref="SpawnZone"/>s (mirroring
-    /// <see cref="SpawnGoreJunkItem"/>'s same in-yard check for gore pieces), since only those
-    /// corpses register with <see cref="TakeOutTrashTask"/> and count toward the trash/gore task
-    /// total and <see cref="CheckpointIntegrityService"/>'s score. A body that dies outside the
-    /// yard (e.g. a breach mutant killed mid-chase away from the trash zones) doesn't count
-    /// toward the task or score, so its <see cref="JunkItem"/> component is left disabled and it
-    /// stays a non-interactable corpse.
+    /// Only bodies that come to rest inside the <see cref="CheckpointCleanupArea"/> become
+    /// collectible — see <see cref="EnableCorpseJunkPickupAfterSettle"/>. A body outside it stays an
+    /// inert prop: not interactable, not highlighted, not counted.
     /// </summary>
     private void EnableCorpseJunkPickup()
     {
@@ -2106,17 +2096,20 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Waits for the just-activated ragdoll to come to rest (or a timeout) before deciding
-    /// whether this corpse counts toward the Trash Task, then judges it by
-    /// <see cref="corpseJunkItem"/>'s own settled position rather than the mutant root's
-    /// <c>transform.position</c> — called the instant ragdoll physics is enabled (before
-    /// Physics has even simulated a single step), the root can end up far from where the body
-    /// actually flops to rest, especially for a mutant that dies straddling the yard boundary.
-    /// Checking the stale root position let a corpse get counted (and reticle-highlighted as
-    /// required junk) while its real, settled interaction collider ended up outside the yard —
-    /// and out of the task's actual reach — which could soft-lock the "take out the gore" task on
-    /// an uncollectible-but-required item. Using the same settled position for both the
-    /// interactability check and the yard-count registration keeps the two always in agreement.
+    /// Waits for the just-activated ragdoll to come to rest (or a timeout) before deciding whether
+    /// this corpse is part of the checkpoint cleanup, then judges it by <see cref="corpseJunkItem"/>'s
+    /// own settled position rather than the mutant root's <c>transform.position</c> — called the
+    /// instant ragdoll physics is enabled (before Physics has even simulated a single step), the
+    /// root can end up far from where the body actually flops to rest, especially for a mutant that
+    /// dies straddling the checkpoint boundary.
+    ///
+    /// Collectibility and countability are ONE decision, made here: a corpse inside the
+    /// <see cref="CheckpointCleanupArea"/> is made interactable (and therefore highlighted by
+    /// <see cref="JunkPickupHighlightService"/>) and registered with the task; a corpse outside it is
+    /// left entirely alone — <see cref="JunkItem"/> and interaction collider stay disabled, so it is
+    /// scenery. The region is authored wider than the item spawn zones precisely so that "inside the
+    /// fence" and "counts" agree with what the player perceives; anything beyond it is deliberately
+    /// out of scope for cleanup rather than an uncounted bonus.
     /// </summary>
     private IEnumerator EnableCorpseJunkPickupAfterSettle()
     {
@@ -2133,15 +2126,24 @@ public class MutantEnemy : NetworkBehaviour
             yield return null;
         }
 
-        // Outside the yard, this corpse never counts toward the Trash Task, so leave the
-        // JunkItem disabled entirely rather than enabling it as uncounted, still-interactable
-        // junk — this keeps it out of reticle highlighting/interaction.
-        if (TakeOutTrashTask.Instance == null || !TakeOutTrashTask.Instance.IsPositionInYard(corpseJunkItem.transform.position))
+        // Fail open when there's no task in the scene at all: without a region to test against,
+        // treat the body as ordinary collectible gore rather than silently making corpses inert.
+        if (TakeOutTrashTask.Instance == null)
+        {
+            ApplyCorpseJunkPickupState();
+            EnableCorpseJunkPickupClientRpc();
             yield break;
+        }
 
-        // Apply immediately on the server so TakeOutTrashTask's FindObjectsByType scan (run
-        // from RegisterExternalJunkItem's dynamic activation, or a later TriggerTask/
-        // ActivateForExistingItems) counts this corpse as a pre-existing JunkItem right away.
+        if (!TakeOutTrashTask.Instance.CountsTowardCleanup(corpseJunkItem.transform.position))
+        {
+            Debug.Log($"[MutantEnemy] '{name}' came to rest outside the checkpoint cleanup area — " +
+                      "corpse left as scenery: not collectible, not highlighted, not counted.");
+            yield break;
+        }
+
+        // Interactable (and highlighted) and counted, together, from the same settled position — so
+        // the two can never disagree.
         ApplyCorpseJunkPickupState();
         EnableCorpseJunkPickupClientRpc();
 

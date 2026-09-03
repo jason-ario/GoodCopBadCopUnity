@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -17,10 +18,16 @@ using UnityEngine;
 /// <see cref="IDailyTask"/> so it blocks clock-out via <see cref="ShiftManager.RegisterPendingDailyTask"/>
 /// until every registered splatter has been scrubbed — same as <see cref="TakeOutTrashTask"/>.
 ///
-/// Blood dropped ambiently by mutant gore during a breach does NOT go through this scripted
-/// mop task — <see cref="MutantEnemy"/> feeds those splatters through
-/// <see cref="RegisterTransientBloodSplatter"/> instead, which never blocks clock-out and simply
-/// despawns them the next time a day starts (see <see cref="DespawnTransientSplattersOnDayStart"/>).
+/// Every splatter handed to <see cref="RegisterBloodSplatter"/> is mop-able and always credits when
+/// scrubbed. Position decides only whether it is REQUIRED: splatters inside the
+/// <see cref="CheckpointCleanupArea"/> count toward the total and block clock-out, while splatters
+/// outside it are credited as a bonus at scrub time (+1 total, +1 scrubbed) so the work registers in
+/// the HUD without ever being required. <see cref="RegisterTransientBloodSplatter"/> remains for blood
+/// that is purely cosmetic by design.
+///
+/// A periodic reconcile sweep (<see cref="ReconcileSplatters"/>) drops any counted splatter that has
+/// been destroyed by another system or has ended up outside the region, so the total can never
+/// require blood that isn't there — the failure mode behind "I cleaned it all and it never registered".
 ///
 /// Scene setup:
 ///   - NetworkObject on this GameObject (in-scene placed — no prefab registration needed).
@@ -54,6 +61,19 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool, if this task is ever added to it.")]
     [SerializeField] private string _dailyTaskId = "CleanBlood";
 
+    [Header("Cleanup Region")]
+    [Tooltip("Region that decides which splatters COUNT toward this task. Leave empty to use " +
+             "CheckpointCleanupArea.Instance (and, failing that, TakeOutTrashTask's own test). " +
+             "Blood outside it is still fully mop-able and still credits when scrubbed — it just " +
+             "can never be required.")]
+    [SerializeField] private CheckpointCleanupArea _cleanupArea;
+
+    [Tooltip("Seconds between server-side sweeps that drop splatters which no longer exist, or " +
+             "have ended up outside the cleanup region, from the required total. This is what stops " +
+             "a destroyed/stranded splatter from holding the task at 4/5 with no blood in sight. " +
+             "0 disables the sweep.")]
+    [SerializeField] private float _reconcileInterval = 2f;
+
     // ── Networked state ──────────────────────────────────────────────────────
 
     private readonly NetworkVariable<int> _scrubbed = new(
@@ -75,6 +95,24 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedSplatters = new();
     private bool _taskActive;
     private bool _isComplete;
+
+    /// <summary>
+    /// Splatters that landed OUTSIDE the cleanup region. Fully mop-able and wired to the scrub
+    /// callback like any other, but never added to <see cref="_totalCount"/> — instead, scrubbing one
+    /// credits +1 total AND +1 scrubbed at that moment (see <see cref="OnBonusBloodScrubbed"/>), so
+    /// the player's work visibly registers in the HUD without ever changing how much is still
+    /// required inside the checkpoint. Mirrors <see cref="TakeOutTrashTask"/>'s bonus junk handling.
+    /// </summary>
+    private readonly List<NetworkObject> _bonusSplatters = new();
+
+    /// <summary>
+    /// True once at least one COUNTED splatter has been registered this run. Guards the reconcile
+    /// sweep from "completing" a freshly-triggered task that hasn't been handed any blood yet
+    /// (total 0, scrubbed 0 would otherwise satisfy the completion test immediately).
+    /// </summary>
+    private bool _hasRegisteredThisRun;
+
+    private Coroutine _reconcileRoutine;
 
     /// <summary>
     /// Blood splatters registered via <see cref="RegisterTransientBloodSplatter"/> — dropped
@@ -218,10 +256,13 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _taskActive  = true;
         _isComplete  = false;
+        _hasRegisteredThisRun = false;
         _scrubbed.Value    = 0;
         _totalCount.Value  = 0;
 
         _isActive.Value = true;
+
+        EnsureReconcileRoutine();
 
         // Explicitly re-register on every client rather than relying solely on
         // _isActive's OnValueChanged — if the task was already active this cycle, that
@@ -239,13 +280,22 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>
     /// Registers an externally-spawned blood splatter's NetworkObject with this task — called
     /// by <see cref="TakeOutTrashTask"/> immediately after it spawns a blood decal alongside a
-    /// gore piece, or by <see cref="MutantEnemy"/> when a gore piece it dropped lands inside the
-    /// yard during a mutant breach. Routes the splatter's <see cref="GraffitiInteractable.OnScrubCompleted"/>
-    /// callback to this task and counts it toward the total.
+    /// gore piece, or by <see cref="MutantEnemy"/> for every gore piece dropped during a breach.
+    /// Routes the splatter's <see cref="GraffitiInteractable.OnScrubCompleted"/> callback to this
+    /// task so mopping it always registers somewhere.
     ///
-    /// If no blood-cleanup task is currently active, this dynamically activates one (rather than
-    /// silently dropping the splatter) so any blood spawned outside a scripted TriggerTask() call
-    /// (e.g. a Day 1 mutant breach) still has to be scrubbed before clocking out.
+    /// Whether it COUNTS is decided here, by position (see <see cref="CountsTowardCleanup"/>):
+    ///   - Inside the cleanup region — counted toward <see cref="_totalCount"/> and required before
+    ///     clock-out, exactly as before.
+    ///   - Outside it — tracked as a bonus splatter instead: still mop-able, and scrubbing it
+    ///     credits +1 total/+1 scrubbed so it visibly registers, but it is never required and can
+    ///     never block completion. Callers must NOT pre-filter by position; this is the one decision
+    ///     point, mirroring how out-of-region mutant corpses are handled.
+    ///
+    /// If no blood-cleanup task is currently active, a COUNTED splatter dynamically activates one
+    /// (rather than being silently dropped) so blood spawned outside a scripted TriggerTask() call
+    /// (e.g. a Day 1 mutant breach) still has to be scrubbed before clocking out. A bonus splatter
+    /// never activates the task on its own — out-of-region blood alone is not a job.
     ///
     /// No-op if the splatter has no <see cref="GraffitiInteractable"/> (a purely cosmetic decal
     /// variant with nothing to mop). Server-only.
@@ -257,13 +307,85 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         GraffitiInteractable interactable = netObj.GetComponent<GraffitiInteractable>();
         if (interactable == null) return;
 
+        if (!CountsTowardCleanup(netObj.transform.position))
+        {
+            // Hook the callback even with no task running: GraffitiInteractable falls back to
+            // GraffitiThreat.OnGraffitiScrubbed when OnScrubCompleted is null, so an unhooked blood
+            // splatter would credit the *graffiti* task when mopped.
+            interactable.OnScrubCompleted = () => OnBonusBloodScrubbed(netObj);
+            _bonusSplatters.Add(netObj);
+
+            // Still swept on the next day start like any other out-of-region blood, so it can't
+            // accumulate across days.
+            _transientSplatters.Add(netObj);
+
+            Debug.Log($"[CleanBloodTask] Splatter '{netObj.name}' landed outside the checkpoint " +
+                      "cleanup area — mop-able and credited as a bonus when scrubbed, but not required.");
+            return;
+        }
+
         if (!_taskActive)
             ActivateDynamically();
 
-        interactable.OnScrubCompleted = OnBloodScrubbed;
+        _hasRegisteredThisRun = true;
+
+        interactable.OnScrubCompleted = () => OnBloodScrubbed(netObj);
 
         _spawnedSplatters.Add(netObj);
         _totalCount.Value++;
+
+        EnsureReconcileRoutine();
+    }
+
+    /// <summary>
+    /// Removes <paramref name="netObj"/> from this task's tracking and, if it was a counted
+    /// splatter, drops it from the required total (never below the number already scrubbed), then
+    /// re-evaluates completion.
+    ///
+    /// Must be called by anything that destroys a registered blood decal WITHOUT it being scrubbed —
+    /// notably <see cref="TakeOutTrashTask.DespawnExistingItems"/>, which wipes its own decals when
+    /// its task is re-triggered. Without this the total kept counting decals that no longer existed,
+    /// leaving the task permanently short (e.g. 4/5) with no blood anywhere in the yard: the exact
+    /// "I cleaned it all and it never registered" report. Server-only.
+    /// </summary>
+    public void UnregisterBloodSplatter(NetworkObject netObj)
+    {
+        if (!IsServer || netObj == null) return;
+
+        bool wasBonus = _bonusSplatters.Remove(netObj);
+        if (!_spawnedSplatters.Remove(netObj))
+        {
+            if (wasBonus) _transientSplatters.Remove(netObj);
+            return;
+        }
+
+        _totalCount.Value = Mathf.Max(_scrubbed.Value, _totalCount.Value - 1);
+
+        Debug.Log($"[CleanBloodTask] Splatter '{netObj.name}' unregistered without being scrubbed — " +
+                  $"new total {_totalCount.Value}.");
+
+        TryCompleteTask();
+    }
+
+    /// <summary>
+    /// Does a splatter at <paramref name="worldPosition"/> count toward this task? Prefers the
+    /// scene's <see cref="CheckpointCleanupArea"/>, then <see cref="TakeOutTrashTask"/>'s equivalent
+    /// test, and finally fails OPEN (counts it) when neither exists — matching the pre-region
+    /// behaviour where everything handed to this task counted, so a scene without a region authored
+    /// can't silently stop requiring blood.
+    /// </summary>
+    private bool CountsTowardCleanup(Vector3 worldPosition)
+    {
+        if (_cleanupArea == null)
+            _cleanupArea = CheckpointCleanupArea.Instance;
+
+        if (_cleanupArea != null && _cleanupArea.HasRegions)
+            return _cleanupArea.Contains(worldPosition);
+
+        if (TakeOutTrashTask.Instance != null)
+            return TakeOutTrashTask.Instance.CountsTowardCleanup(worldPosition);
+
+        return true;
     }
 
     /// <summary>
@@ -282,19 +404,30 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
+        EnsureReconcileRoutine();
+
         Debug.Log("[CleanBloodTask] Dynamically activated — a blood splatter was registered with no active task.");
     }
 
     /// <summary>
     /// Registers an externally-spawned blood splatter that should NOT count toward a mop task
-    /// or block clock-out — used by <see cref="MutantEnemy"/> for blood dropped ambiently by
-    /// mutant gore during a breach. Tracked only so it can be swept away automatically the next
-    /// time a day starts (see <see cref="DespawnTransientSplattersOnDayStart"/>); players are
-    /// free to mop it up early for the visual, but it's never required. Server-only.
+    /// or block clock-out — purely cosmetic blood. Tracked only so it can be swept away automatically
+    /// the next time a day starts (see <see cref="DespawnTransientSplattersOnDayStart"/>); players are
+    /// free to mop it up early for the visual, but it's never required.
+    ///
+    /// Prefer <see cref="RegisterBloodSplatter"/> for anything gameplay-spawned — it makes the
+    /// counted/bonus decision by position instead of the caller having to. Server-only.
     /// </summary>
     public void RegisterTransientBloodSplatter(NetworkObject netObj)
     {
         if (!IsServer || netObj == null) return;
+
+        // Claim the scrub callback even though nothing is counted: GraffitiInteractable falls back to
+        // GraffitiThreat.OnGraffitiScrubbed when OnScrubCompleted is null, so mopping an unhooked
+        // blood splatter would silently credit the *graffiti* task instead.
+        GraffitiInteractable interactable = netObj.GetComponent<GraffitiInteractable>();
+        if (interactable != null)
+            interactable.OnScrubCompleted = () => _transientSplatters.Remove(netObj);
 
         _transientSplatters.Add(netObj);
     }
@@ -317,16 +450,62 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Scrub callback (called by GraffitiInteractable on the server) ─────────
 
     /// <summary>
-    /// Called by a registered splatter's <see cref="GraffitiInteractable"/> on the server once
-    /// it has been fully scrubbed. Increments progress and completes the task once every
-    /// splatter registered this cycle has been cleaned.
+    /// Called by a registered splatter's <see cref="GraffitiInteractable"/> on the server once it has
+    /// been fully scrubbed. Credits the scrub and re-evaluates completion.
+    ///
+    /// The scrub is credited even after the task has already completed. <see cref="_completionBuffer"/>
+    /// means the task finishes with a splatter or two still on the ground, and swallowing those scrubs
+    /// (as this used to) is precisely what made players report that cleaning blood "didn't register" —
+    /// they mopped a splatter they could plainly see and nothing moved. Only the completion
+    /// side-effects are one-shot.
     /// </summary>
-    private void OnBloodScrubbed()
+    private void OnBloodScrubbed(NetworkObject netObj)
     {
-        if (!IsServer || _isComplete) return;
+        if (!IsServer) return;
+
+        // Drop tracking BEFORE the splatter despawns, so the reconcile sweep can't also treat it as
+        // a destroyed-without-scrubbing splatter and decrement the total for it a second time.
+        _spawnedSplatters.Remove(netObj);
 
         _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
+        TryCompleteTask();
+    }
+
+    /// <summary>
+    /// Scrub callback for a splatter outside the cleanup region (see <see cref="_bonusSplatters"/>).
+    /// Raises BOTH the total and the scrubbed count by one, so the extra work shows up in the HUD
+    /// readout ("3/5" becomes "4/6") while leaving the amount still outstanding inside the checkpoint
+    /// unchanged — it can never be required, and can never block or shortcut completion.
+    /// No-op when no task has ever run, in which case the splatter is purely cosmetic.
+    /// </summary>
+    private void OnBonusBloodScrubbed(NetworkObject netObj)
+    {
+        if (!IsServer) return;
+
+        _bonusSplatters.Remove(netObj);
+        _transientSplatters.Remove(netObj);
+
+        if (!_taskActive && !_isComplete) return;
+
+        _totalCount.Value++;
+        _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
+
+        Debug.Log("[CleanBloodTask] Bonus splatter from outside the checkpoint scrubbed — " +
+                  $"credited as {_scrubbed.Value}/{_totalCount.Value}.");
+
+        TryCompleteTask();
+    }
+
+    /// <summary>
+    /// Completes the task if everything still required has been scrubbed. Safe to call after any
+    /// change to the scrubbed count or the total (a scrub, an unregister, a reconcile sweep) — the
+    /// task can only complete once per run, and never before a counted splatter has been registered.
+    /// </summary>
+    private void TryCompleteTask()
+    {
+        if (!IsServer || _isComplete || !_taskActive) return;
+        if (!_hasRegisteredThisRun) return;
         if (_scrubbed.Value < RequiredCount) return;
 
         _isComplete = true;
@@ -343,7 +522,80 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // not a duplicate of this one.
         _isActive.Value = false;
 
-        Debug.Log("[CleanBloodTask] All blood splatters scrubbed — task complete.");
+        Debug.Log($"[CleanBloodTask] All required blood scrubbed ({_scrubbed.Value}/{RequiredCount}) — task complete.");
+    }
+
+    // ── Reconciliation ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Starts the periodic server-side reconcile sweep if it isn't already running.
+    /// </summary>
+    private void EnsureReconcileRoutine()
+    {
+        if (!IsServer || _reconcileRoutine != null || _reconcileInterval <= 0f) return;
+
+        _reconcileRoutine = StartCoroutine(ReconcileRoutine());
+    }
+
+    private IEnumerator ReconcileRoutine()
+    {
+        while (_taskActive)
+        {
+            yield return new WaitForSeconds(_reconcileInterval);
+            ReconcileSplatters();
+        }
+
+        _reconcileRoutine = null;
+    }
+
+    /// <summary>
+    /// Drops from the required total any counted splatter that can no longer be scrubbed, then
+    /// re-checks completion. Two cases, both of which used to strand the task at e.g. 4/5 with
+    /// nothing left to mop — the "it looked complete but never registered" reports:
+    ///
+    /// 1. The splatter no longer exists. Blood decals are destroyed by systems that don't own this
+    ///    task (<see cref="TakeOutTrashTask.DespawnExistingItems"/> on a re-trigger, scene teardown,
+    ///    a despawned parent), and the total kept requiring them forever.
+    /// 2. The splatter is no longer inside the cleanup region — e.g. it was authored/spawned on a
+    ///    surface that later moved, or the region was retuned mid-run. It stays on the ground and
+    ///    stays mop-able; it simply stops being required.
+    ///
+    /// Scrubbed splatters are deliberately untouched: <see cref="OnBloodScrubbed"/> removes them from
+    /// tracking before they despawn, so case 1 can never double-count a legitimate scrub and complete
+    /// the task early. Server-only.
+    /// </summary>
+    private void ReconcileSplatters()
+    {
+        if (!IsServer) return;
+
+        // Bonus splatters count for nothing until scrubbed — just drop dead references.
+        _bonusSplatters.RemoveAll(n => n == null || !n.IsSpawned);
+        _transientSplatters.RemoveAll(n => n == null || !n.IsSpawned);
+
+        // RemoveAll (not Remove) because a destroyed NetworkObject can't be reliably matched by
+        // reference in a list — same reason TakeOutTrashTask.PruneCollectedItems does it this way.
+        int vanished = _spawnedSplatters.RemoveAll(n => n == null || !n.IsSpawned);
+        if (vanished > 0)
+        {
+            _totalCount.Value = Mathf.Max(_scrubbed.Value, _totalCount.Value - vanished);
+
+            Debug.LogWarning($"[CleanBloodTask] {vanished} tracked splatter(s) no longer exist and " +
+                             "were never scrubbed — dropped from the total so they can't block " +
+                             $"completion. New total {_totalCount.Value}.");
+        }
+
+        // Snapshot: UnregisterBloodSplatter mutates the list.
+        var tracked = new List<NetworkObject>(_spawnedSplatters);
+        foreach (NetworkObject netObj in tracked)
+        {
+            if (CountsTowardCleanup(netObj.transform.position)) continue;
+
+            Debug.LogWarning($"[CleanBloodTask] Tracked splatter '{netObj.name}' is outside the " +
+                             "checkpoint cleanup area — unregistering it so it can't block completion.");
+            UnregisterBloodSplatter(netObj);
+        }
+
+        TryCompleteTask();
     }
 
     [ClientRpc]

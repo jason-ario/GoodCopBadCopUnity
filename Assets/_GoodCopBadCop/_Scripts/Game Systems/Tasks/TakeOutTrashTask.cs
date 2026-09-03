@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -21,7 +22,14 @@ using Random = UnityEngine.Random;
 ///   - NetworkObject on this GameObject.
 ///   - Assign _trashPrefabs (all registered in NetworkManager's prefab list).
 ///   - Assign _goreJunkPrefabs (gore/body-part variants, also registered as Network Prefabs)
-///     for days that dress the yard with gore instead of standard junk.
+///     for days that dress the yard with gore instead of standard junk. Because these spawn
+///     with a live Rigidbody and physically settle, each one MUST have a single root Rigidbody
+///     plus NetworkTransform and NetworkRigidbody (UseRigidBodyForMotion +
+///     AutoUpdateKinematicState) so the server's simulation is the only authority and every
+///     client sees the same resting pose. Without them each peer simulates its own copy and
+///     players end up looking at gore that isn't where — or isn't visible at all — for others.
+///     Do not give these prefabs nested Rigidbodies/joints (ragdolls): only the root transform
+///     is replicated, so child bodies would drift away from it independently on every client.
 ///   - Assign _bloodDecalPrefabs (flat ground-decal prefabs, also registered as Network
 ///     Prefabs) to have a blood splatter spawned under each gore item when useGorePrefabs
 ///     is true. Optional — leave empty to disable. Prefabs with a GraffitiInteractable
@@ -87,19 +95,33 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("One or more zones in which items are randomly placed.")]
     [SerializeField] private SpawnZone[] _spawnZones;
 
+    [Header("Cleanup Region")]
+    [Tooltip("Compound-collider region defining the checkpoint for SCORING purposes — what counts " +
+             "toward this task's total. Authored independently of (and normally much wider than) " +
+             "the spawn zones above, which only describe where items are randomly placed. Leave " +
+             "unassigned to auto-resolve CheckpointCleanupArea.Instance; if no area exists at all, " +
+             "the spawn zones are used as a legacy fallback.")]
+    [SerializeField] private CheckpointCleanupArea _cleanupArea;
+
     [Tooltip("Layer(s) the downward raycast hits to land items on the ground.")]
     [SerializeField] private LayerMask _groundLayer;
 
     [Tooltip("Extra height added above the raycast hit point so items sit on the surface rather than clipping into it.")]
     [SerializeField] private float _spawnHeightOffset = 0.05f;
 
-    [Tooltip("Seconds after a gore/body-part item spawns before its Rigidbody is switched to " +
-             "kinematic (perf optimization — same as MutantEnemy's death gore bursts; see " +
-             "GoreKinematicSettler). It briefly simulates physics so it settles naturally onto " +
-             "the ground before locking in place. Only applies to items spawned with " +
+    [Tooltip("Maximum seconds the server waits for a spawned gore/body-part item's Rigidbody to " +
+             "fall asleep before treating it as settled and running its final in-yard bounds " +
+             "check (see MonitorGoreJunkItem). Only applies to items spawned with " +
              "useGorePrefabs: true.")]
     [Min(0f)]
-    [SerializeField] private float _goreKinematicDelay = 2f;
+    [SerializeField] private float _goreSettleTimeout = 5f;
+
+    [Tooltip("How far below its spawn height a gore/body-part item may fall before the server " +
+             "treats it as having clipped through the world and despawns it (after removing it " +
+             "from the task total, so it can never leave the objective at e.g. 12/13 with an " +
+             "unreachable item still required). Mirrors MutantEnemy's goreMaxFallDistance.")]
+    [Min(0f)]
+    [SerializeField] private float _goreMaxFallDistance = 15f;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -138,6 +160,38 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedItems = new();
     private readonly List<NetworkObject> _spawnedDecals = new();
     private bool _taskActive;
+
+    /// <summary>
+    /// Pre-existing scene <see cref="JunkItem"/>s counted into <see cref="_totalCount"/> by
+    /// <see cref="ActivateForExistingItems"/>/<see cref="TriggerTask"/> (e.g. the Day 1 soldier
+    /// body). Tracked separately from <see cref="_spawnedItems"/> because those are despawned
+    /// wholesale by <see cref="DespawnExistingItems"/> on the next trigger and these must not be —
+    /// they belong to the scene/other systems, not to this task.
+    ///
+    /// Needed so <see cref="OnJunkItemCollected"/> can tell a COUNTED item from an UNCOUNTED
+    /// bonus one; without it, collecting the soldier body would be mistaken for a bonus pickup and
+    /// wrongly inflate the total (see <see cref="OnTrashBagDeposited"/>).
+    /// </summary>
+    private readonly List<NetworkObject> _countedExistingItems = new();
+
+    /// <summary>
+    /// Number of junk items collected into bags this run that were NOT part of this task's counted
+    /// total.
+    ///
+    /// Gore and corpses outside the <see cref="CheckpointCleanupArea"/> can no longer produce these:
+    /// countability and interactability are one rule again, so anything outside the region is inert
+    /// scenery (see <see cref="UnregisterExternalJunkItem"/> and
+    /// <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>). What remains are pickups belonging to
+    /// OTHER systems — booth-mess junk, a reusable guard corpse — collected into a bag while this task
+    /// happens to be running.
+    ///
+    /// This is a safety valve, not a feature: without it, a bag containing junk this task never
+    /// counted would push <see cref="_depositedCount"/> toward a <see cref="_totalCount"/> it didn't
+    /// earn and complete the task early (or have the deposit silently swallowed by the clamp).
+    /// Reconciling at DEPOSIT time by incrementing both counters together (+1/+1) keeps the readout
+    /// honest without moving the goalpost.
+    /// </summary>
+    private int _pendingBonusCollected;
 
     /// <summary>
     /// Set by a day script (e.g. Day_01, in <c>DayActivated</c>/<c>DayDeactivated</c>) for the
@@ -295,13 +349,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
         if (_taskActive) return;
 
-        var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        int count = 0;
-        foreach (JunkItem j in existingJunk)
-        {
-            if (IsCountablePreExistingJunkItem(j, includeSuspects))
-                count++;
-        }
+        int count = CollectCountablePreExistingItems(includeSuspects);
 
         if (count == 0)
         {
@@ -312,6 +360,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _taskActive = true;
         _depositedCount.Value = 0;
         _totalCount.Value = count;
+        _pendingBonusCollected = 0;
 
         UpdateThreatLevel();
 
@@ -357,21 +406,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         DespawnExistingItems();
         _taskActive = true;
         _depositedCount.Value = 0;
+        _pendingBonusCollected = 0;
 
         // Count pre-existing JunkItems in the scene BEFORE spawning (e.g. soldier body).
-        // Uses FindObjectsInactive.Include so disabled-component JunkItems on active GameObjects
-        // are found, then filters to those that are actually enabled, active in the hierarchy,
-        // inside the yard's spawn bounds, and not still attached to a living suspect.
-        var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        int preExistingCount = 0;
-        foreach (JunkItem j in existingJunk)
-        {
-            // Suspect NPC bodies (e.g. the Day 1 soldier, Vlad) are tracked by their own
-            // separate systems and shouldn't be swept into the mutant-breach gore task's
-            // total just because they happen to be lying uncollected inside the yard.
-            if (IsCountablePreExistingJunkItem(j, includeSuspects: !useGorePrefabs))
-                preExistingCount++;
-        }
+        // Suspect NPC bodies (e.g. the Day 1 soldier, Vlad) are tracked by their own separate
+        // systems and shouldn't be swept into the mutant-breach gore task's total just because
+        // they happen to be lying uncollected inside the checkpoint.
+        int preExistingCount = CollectCountablePreExistingItems(includeSuspects: !useGorePrefabs);
 
         GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
 
@@ -455,12 +496,57 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Returns true when <paramref name="worldPosition"/> falls within any of this task's
-    /// configured yard <see cref="SpawnZone"/>s. Used by external systems (e.g. gore chunks
-    /// dropped by killed <see cref="MutantEnemy"/> instances) to decide whether something they
-    /// spawn should count toward this task instead of just being cosmetic debris.
+    /// Resolves the checkpoint cleanup region, falling back to
+    /// <see cref="CheckpointCleanupArea.Instance"/> when the Inspector reference is unassigned.
+    /// Resolved lazily rather than in Awake because component Awake order isn't guaranteed.
     /// </summary>
-    public bool IsPositionInYard(Vector3 worldPosition)
+    private CheckpointCleanupArea CleanupArea
+    {
+        get
+        {
+            if (_cleanupArea == null)
+                _cleanupArea = CheckpointCleanupArea.Instance;
+
+            return _cleanupArea;
+        }
+    }
+
+    /// <summary>
+    /// THE authoritative "does this position count toward checkpoint cleanup?" test — used by
+    /// every external system that spawns something scorable (gore chunks and corpses from a killed
+    /// <see cref="MutantEnemy"/>, blood splatters, stray junk) to decide whether it should be
+    /// added to this task's total and factored into the Checkpoint Integrity Score, or left as
+    /// purely cosmetic, uncounted debris.
+    ///
+    /// Delegates to the <see cref="CheckpointCleanupArea"/> — a compound collider region tracing
+    /// the inside of the fence — and only falls back to the <see cref="_spawnZones"/> when no such
+    /// area exists in the scene. The zones are a poor stand-in for this: they describe where the
+    /// task RANDOMLY PLACES items, so they are deliberately tight and flat and cover far less
+    /// ground than the fenced checkpoint the player perceives. Using them as the countability test
+    /// is what made bodies that died well inside the fence — but a few metres off a spawn zone —
+    /// silently stop counting.
+    ///
+    /// Note this answers "does it COUNT", not "can it be picked up". Interactability is no longer
+    /// gated on it: see <see cref="_pendingBonusCollected"/> and
+    /// <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>.
+    /// </summary>
+    public bool CountsTowardCleanup(Vector3 worldPosition)
+    {
+        CheckpointCleanupArea area = CleanupArea;
+
+        if (area != null && area.HasRegions)
+            return area.Contains(worldPosition);
+
+        return IsPositionInSpawnZones(worldPosition);
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="worldPosition"/> falls within any of this task's
+    /// configured item-placement <see cref="SpawnZone"/>s. This is the literal spawn footprint —
+    /// for "does this count toward cleanup", use <see cref="CountsTowardCleanup"/> instead, which
+    /// only falls back to this when no <see cref="CheckpointCleanupArea"/> is present.
+    /// </summary>
+    public bool IsPositionInSpawnZones(Vector3 worldPosition)
     {
         if (_spawnZones == null)
             return false;
@@ -479,24 +565,24 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// scene sweep (<see cref="ActivateForExistingItems"/>/<see cref="TriggerTask"/>). Filters
     /// out three false-positive cases that previously inflated the task's denominator:
     ///
-    /// 1. Mutant bodies/gore that landed (or later rolled/settled) outside every configured
-    ///    yard <see cref="SpawnZone"/> — dynamically-spawned gore already excludes these via
+    /// 1. Mutant bodies/gore that landed (or later rolled/settled) outside the
+    ///    <see cref="CheckpointCleanupArea"/> — dynamically-spawned gore already excludes these via
     ///    <see cref="UnregisterExternalJunkItem"/>, but that unregister only removes tracking;
     ///    the JunkItem component stays enabled on an active GameObject, so a later blanket
-    ///    scan would otherwise sweep it back in. Checked via <see cref="IsPositionInYard"/>.
+    ///    scan would otherwise sweep it back in. Checked via <see cref="CountsTowardCleanup"/>.
+    ///    This is now the ONLY thing keeping an out-of-region corpse out of the denominator —
+    ///    such corpses are deliberately left enabled and collectible (see
+    ///    <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>), they simply don't count.
     /// 2. Living <see cref="SuspectCharacter"/>s. JunkItem components pre-attached to a suspect
     ///    start non-collectible and are Unity-'enabled' the whole time the suspect is alive
     ///    (see <see cref="JunkItem"/>'s class doc) — only <see cref="JunkItem.IsCollectible"/>
     ///    flips true once <see cref="SuspectCharacter.EnableJunkPickup"/> runs on death. Skip
     ///    any JunkItem still attached to a live suspect so alive characters are never counted.
-    /// 3. Any JunkItem whose own Unity 'enabled' flag is off — e.g. a killed mutant's
-    ///    pre-attached-but-disabled <c>corpseJunkItem</c>/gore chunk that <c>MutantEnemy</c>
-    ///    deliberately left disabled because it settled outside the yard (see
-    ///    <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>). Without this check, a scan
-    ///    could highlight/count a corpse straddling the yard boundary while its own
-    ///    interactability decision — made from the same settled position — left it
-    ///    non-interactable, producing an uncollectible "phantom" required item. This check is
-    ///    skipped for suspects, whose 'enabled' flag is deliberately never toggled (see #2).
+    /// 3. Any JunkItem that isn't currently collectible — a gore chunk that was never activated as
+    ///    collectible junk, or one that has been ruled out of the cleanup because it came to rest
+    ///    outside the region (<see cref="JunkItem.IsCleanupEligible"/>). Delegated to
+    ///    <see cref="JunkItem.CanBeCollected"/>, the same predicate that drives interactability and
+    ///    the findability glow, so the sweep can never count something the player can't touch.
     /// </summary>
     /// <param name="includeSuspects">
     /// When false, any JunkItem attached to a <see cref="SuspectCharacter"/> is excluded
@@ -506,27 +592,61 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </param>
     private bool IsCountablePreExistingJunkItem(JunkItem junk, bool includeSuspects = true)
     {
-        if (junk == null || !junk.gameObject.activeInHierarchy)
+        if (junk == null)
             return false;
 
-        // JunkItem components pre-attached to a SuspectCharacter (e.g. the Alexei soldier
-        // body) keep their own Unity 'enabled' flag off in the Inspector and it is never
-        // toggled at runtime (see JunkItem's class doc) — checking junk.enabled here would
-        // wrongly exclude every suspect corpse, dead or alive. IsCollectible is the real
-        // "has this corpse become collectible junk" signal, flipped true by
-        // SuspectCharacter.EnableJunkPickup() on death.
-        SuspectCharacter suspect = junk.GetComponent<SuspectCharacter>();
-        if (suspect != null)
-        {
-            if (!includeSuspects) return false;
-            if (!junk.IsCollectible.Value) return false;
-        }
-        else if (!junk.enabled)
-        {
+        if (!includeSuspects && junk.GetComponent<SuspectCharacter>() != null)
             return false;
+
+        // Covers all of the above: activeInHierarchy, the suspect-only IsCollectible rule (a
+        // suspect's own Unity 'enabled' flag is deliberately never toggled — see JunkItem's class
+        // doc — so testing it here would wrongly exclude every suspect corpse, dead or alive), the
+        // plain 'enabled' rule for everything else, and the IsCleanupEligible veto.
+        if (!junk.CanBeCollected)
+            return false;
+
+        return CountsTowardCleanup(junk.transform.position);
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="_countedExistingItems"/> from every <see cref="JunkItem"/> already in
+    /// the scene that passes <see cref="IsCountablePreExistingJunkItem"/>, and returns how many
+    /// there were. Uses FindObjectsInactive.Include so disabled-component JunkItems on active
+    /// GameObjects are found, then filters to those that are actually enabled, active in the
+    /// hierarchy, inside the checkpoint cleanup region, and not still attached to a living suspect.
+    ///
+    /// Recording the identities (not just the count) is what lets
+    /// <see cref="OnJunkItemCollected"/> distinguish a counted pickup from an uncounted bonus one.
+    /// Server-only.
+    /// </summary>
+    private int CollectCountablePreExistingItems(bool includeSuspects)
+    {
+        _countedExistingItems.Clear();
+
+        var existingJunk = FindObjectsByType<JunkItem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (JunkItem j in existingJunk)
+        {
+            if (!IsCountablePreExistingJunkItem(j, includeSuspects))
+                continue;
+
+            NetworkObject netObj = j.NetworkObject;
+            if (netObj != null && !_countedExistingItems.Contains(netObj))
+                _countedExistingItems.Add(netObj);
         }
 
-        return IsPositionInYard(junk.transform.position);
+        return _countedExistingItems.Count;
+    }
+
+    /// <summary>
+    /// True when <paramref name="netObj"/> is part of this run's counted total — either an item
+    /// this task spawned/registered (<see cref="_spawnedItems"/>) or a pre-existing scene item
+    /// swept in by <see cref="CollectCountablePreExistingItems"/>. Anything else that gets
+    /// collected is an out-of-region bonus pickup (see <see cref="_pendingBonusCollected"/>).
+    /// </summary>
+    private bool IsCountedItem(NetworkObject netObj)
+    {
+        return netObj != null
+            && (_spawnedItems.Contains(netObj) || _countedExistingItems.Contains(netObj));
     }
 
     /// <summary>
@@ -566,23 +686,35 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>
     /// Removes a previously-registered external <see cref="JunkItem"/> from this task's total —
     /// used when a gore chunk registered via <see cref="RegisterExternalJunkItem"/> (based on
-    /// its initial in-yard launch position) later comes to rest outside every configured
-    /// <see cref="SpawnZone"/> once physics settles (e.g. it rolled or bounced past the yard
-    /// boundary). Decrements the total so the task no longer requires collecting it and
-    /// completes the task if it was the last outstanding item. The item itself is left alone —
-    /// still physically collectible as a bonus, just no longer counted or required. No-op if
-    /// the item was never tracked (e.g. already collected). Server-only.
+    /// its initial in-region launch position) later comes to rest outside the
+    /// <see cref="CheckpointCleanupArea"/> once physics settles (e.g. it rolled or bounced past
+    /// the fence line). Decrements the total so the task no longer requires collecting it and
+    /// completes the task if it was the last outstanding item.
+    ///
+    /// The item is also ruled out of the cleanup entirely via
+    /// <see cref="JunkItem.SetCleanupEligible"/>: leaving the checkpoint means it stops being
+    /// interactable and stops being highlighted, not merely uncounted. Countability and
+    /// interactability are one rule — inside the region it is collectible gore, outside it is
+    /// scenery — so the player is never shown an affordance that doesn't contribute to anything.
+    /// No-op if the item was never tracked (e.g. already collected). Server-only.
     /// </summary>
     public void UnregisterExternalJunkItem(NetworkObject netObj)
     {
         if (!IsServer || netObj == null) return;
-        if (!_spawnedItems.Remove(netObj)) return;
+
+        // Non-short-circuiting '|' so the item is removed from BOTH tracking lists.
+        bool wasTracked = _spawnedItems.Remove(netObj) | _countedExistingItems.Remove(netObj);
+        if (!wasTracked) return;
+
+        JunkItem junk = netObj.GetComponent<JunkItem>();
+        if (junk != null)
+            junk.SetCleanupEligible(false);
 
         _totalCount.Value = Mathf.Max(_depositedCount.Value, _totalCount.Value - 1);
         UpdateThreatLevel();
 
-        Debug.Log($"[TakeOutTrashTask] External junk item landed outside the yard — unregistered. " +
-                  $"New total {_totalCount.Value}.");
+        Debug.Log($"[TakeOutTrashTask] External junk item is resting outside the checkpoint — " +
+                  $"unregistered and made inert. New total {_totalCount.Value}.");
 
         if (_taskActive && _depositedCount.Value >= _totalCount.Value)
             CompleteTask();
@@ -595,9 +727,31 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Increments the deposited count by the number of junk items the bag contained.
     /// When all items are deposited, fires <see cref="OnAllItemsDeposited"/> and removes
     /// the task from the HUD on all clients.
+    ///
+    /// Bonus reconciliation: any items in this bag that were collected from OUTSIDE the
+    /// <see cref="CheckpointCleanupArea"/> (see <see cref="_pendingBonusCollected"/>) are added to
+    /// BOTH <see cref="_totalCount"/> and <see cref="_depositedCount"/>, so the player's extra
+    /// work shows up in the HUD readout ("3/5" becomes "4/6") while leaving the amount still
+    /// outstanding inside the checkpoint completely unchanged. This is what makes out-of-region
+    /// corpses safe to pick up: they can never be required, and they can never block completion.
     /// </summary>
     private void OnTrashBagDeposited(int junkCount)
     {
+        // Drop anything that has ended up outside the checkpoint before evaluating completion, so a
+        // stranded piece can never hold the objective at e.g. 12/13 (see ReconcileOutOfYardItems).
+        ReconcileOutOfYardItems();
+
+        int bonus = Mathf.Clamp(_pendingBonusCollected, 0, junkCount);
+        if (bonus > 0)
+        {
+            _pendingBonusCollected -= bonus;
+            _totalCount.Value += bonus;
+
+            Debug.Log($"[TakeOutTrashTask] {bonus} bonus item(s) from outside the checkpoint " +
+                      $"deposited — total raised to {_totalCount.Value} so they credit without " +
+                      "changing what's still required inside.");
+        }
+
         _depositedCount.Value = Mathf.Min(_depositedCount.Value + junkCount, _totalCount.Value);
         Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited. " +
                   $"Total deposited: {_depositedCount.Value}/{_totalCount.Value}");
@@ -619,6 +773,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!_taskActive) return;
 
         _taskActive = false;
+        _pendingBonusCollected = 0;
+        _countedExistingItems.Clear();
         JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
 
@@ -658,14 +814,35 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         TaskRegistry.Instance?.AddThreat(this);
     }
 
-    private void OnJunkItemCollected()
+    /// <summary>
+    /// Fires on the server each time any <see cref="JunkItem"/> is collected into a bag.
+    /// Classifies the pickup: an item that belongs to this run's counted total is simply pruned
+    /// from tracking, while anything else is an out-of-region bonus pickup (a mutant corpse or
+    /// gore chunk from beyond the fence) and is banked in <see cref="_pendingBonusCollected"/> so
+    /// <see cref="OnTrashBagDeposited"/> can credit it without moving the goalpost.
+    /// </summary>
+    private void OnJunkItemCollected(JunkItem junk)
     {
         if (!IsServer) return;
+
+        NetworkObject netObj = junk != null ? junk.NetworkObject : null;
+        bool wasCounted = IsCountedItem(netObj);
+
+        if (!wasCounted)
+            _pendingBonusCollected++;
+        else
+            // Drop it from pre-existing tracking explicitly: a counted item whose JunkItem has
+            // _destroyOnCollect = false (e.g. a reusable guard corpse) stays spawned after
+            // collection, so PruneCollectedItems' IsSpawned sweep would never remove it and a
+            // later re-collection of the same object would be double-counted as counted again.
+            _countedExistingItems.Remove(netObj);
 
         PruneCollectedItems();
         UpdateThreatLevel();
 
-        Debug.Log($"[TakeOutTrashTask] Item collected into bag — remaining spawned items: {_spawnedItems.Count}");
+        Debug.Log($"[TakeOutTrashTask] Item collected into bag " +
+                  $"({(wasCounted ? "counted" : "bonus — outside the checkpoint")}) — " +
+                  $"remaining tracked items: {_spawnedItems.Count}");
     }
 
     private void SpawnSingleItem(GameObject[] prefabPool, bool spawnBloodDecal)
@@ -698,27 +875,145 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (spawnBloodDecal)
         {
             SpawnBloodDecal(spawnPos, groundNormal);
-            ApplyGoreDropPhysics(itemGo);
+            BeginGoreSettleWatchdog(itemGo, spawnPos);
         }
     }
 
     /// <summary>
-    /// Sets up a spawned gore/body-part item (see <see cref="SpawnSingleItem"/>'s
-    /// <c>spawnBloodDecal</c>/useGorePrefabs path) to briefly simulate physics — same as
-    /// <c>MutantEnemy</c>'s death gore bursts — so it settles naturally onto the ground, then
-    /// switches its Rigidbody to kinematic a few seconds later via
-    /// <see cref="GoreKinematicSettler"/> once it's had time to land and rest.
+    /// Starts the server-side settle watchdog for a freshly-spawned gore/body-part item (see
+    /// <see cref="SpawnSingleItem"/>'s <c>spawnBloodDecal</c>/useGorePrefabs path).
+    ///
+    /// Deliberately does NOT add a <see cref="GoreKinematicSettler"/>: that helper is documented
+    /// as cosmetic/local-only and explicitly not for networked gore, because a networked gore
+    /// piece's kinematic state is owned by Netcode's <c>NetworkRigidbody</c>
+    /// (AutoUpdateKinematicState keeps every non-authority copy kinematic and transform-driven).
+    /// Adding it here previously froze the piece on the server alone while every client kept
+    /// simulating its own Rigidbody forever — with no NetworkTransform on the prefabs at the
+    /// time, each peer's copy settled somewhere different, so a piece visible to one player was
+    /// under the floor or behind a prop for another. The prefabs now carry NetworkTransform +
+    /// NetworkRigidbody, so the server's simulation is the only one that counts and every client
+    /// receives the same resting pose.
     /// </summary>
-    private void ApplyGoreDropPhysics(GameObject piece)
+    private void BeginGoreSettleWatchdog(GameObject piece, Vector3 spawnPos)
     {
+        NetworkObject netObj = piece.GetComponent<NetworkObject>();
+        if (netObj == null) return;
+
         Rigidbody rb = piece.GetComponent<Rigidbody>();
         if (rb == null)
-            rb = piece.AddComponent<Rigidbody>();
+        {
+            Debug.LogWarning($"[TakeOutTrashTask] Gore prefab '{piece.name}' has no Rigidbody — it " +
+                             "cannot settle or be watchdogged. Add a Rigidbody (plus NetworkTransform " +
+                             "and NetworkRigidbody) to the prefab root.");
+            return;
+        }
 
+        // The server is the authority, so it is the peer that actually simulates the drop.
         rb.isKinematic = false;
 
-        GoreKinematicSettler settler = piece.AddComponent<GoreKinematicSettler>();
-        settler.Initialize(rb, _goreKinematicDelay);
+        StartCoroutine(MonitorGoreJunkItem(netObj, rb, spawnPos.y - _goreMaxFallDistance));
+    }
+
+    /// <summary>
+    /// Server-only watchdog for a networked gore <see cref="JunkItem"/> spawned by this task.
+    /// Mirrors <c>MutantEnemy.MonitorGoreJunkItem</c>, which this task previously lacked entirely —
+    /// the missing guard is why a gore run could strand the objective at e.g. 12/13 forever: a
+    /// piece that tunnelled through the yard floor or rolled outside every
+    /// <see cref="SpawnZone"/> stayed permanently required, and <see cref="CompleteTask"/> only
+    /// fires once <c>_depositedCount >= _totalCount</c>.
+    ///
+    /// Every frame: if the piece has fallen below <paramref name="minY"/> it is unregistered from
+    /// the task and despawned outright, so it can never be both required and unreachable. Once
+    /// its Rigidbody settles (or <see cref="_goreSettleTimeout"/> elapses), a piece resting
+    /// outside the <see cref="CheckpointCleanupArea"/> is unregistered — which also rules it out of
+    /// the cleanup entirely (not counted, not interactable, not highlighted; see
+    /// <see cref="UnregisterExternalJunkItem"/>) — and switched to kinematic, since it no longer
+    /// counts and there's no reason to keep simulating it. A piece that settles inside the region
+    /// stays dynamic and tracked. No-op once the item is collected (despawned) before either check
+    /// fires.
+    /// </summary>
+    private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
+    {
+        float elapsed = 0f;
+        bool settled = false;
+
+        while (true)
+        {
+            if (netObj == null || !netObj.IsSpawned)
+                yield break;
+
+            if (netObj.transform.position.y < minY)
+            {
+                Debug.LogWarning($"[TakeOutTrashTask] Gore item '{netObj.name}' fell out of the world — " +
+                                 "unregistering and despawning it so it can't block task completion.");
+                UnregisterExternalJunkItem(netObj);
+                netObj.Despawn(destroy: true);
+                yield break;
+            }
+
+            if (rb == null || rb.IsSleeping() || elapsed >= _goreSettleTimeout)
+            {
+                settled = true;
+            }
+            else
+            {
+                elapsed += Time.deltaTime;
+            }
+
+            if (settled)
+                break;
+
+            yield return null;
+        }
+
+        if (netObj == null || !netObj.IsSpawned)
+            yield break;
+
+        if (CountsTowardCleanup(netObj.transform.position))
+            yield break;
+
+        UnregisterExternalJunkItem(netObj);
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+    }
+
+    /// <summary>
+    /// Safety net for gore/junk that left the checkpoint AFTER its
+    /// <see cref="MonitorGoreJunkItem"/> settle check already passed — e.g. a piece a player kicked
+    /// over the fence, a body dragged out of the gate, or one that was stranded by an older build
+    /// that shipped without the watchdog. Any tracked item that is still spawned but now resting
+    /// outside the <see cref="CheckpointCleanupArea"/> is unregistered so it stops being required.
+    ///
+    /// Deliberately ignores items that are null/despawned: a collected item is despawned and its
+    /// contribution is already accounted for by the bag's deposit count, so decrementing
+    /// <see cref="_totalCount"/> for it would double-count and complete the task early.
+    /// Server-only.
+    /// </summary>
+    private void ReconcileOutOfYardItems()
+    {
+        if (!IsServer) return;
+
+        // Snapshot both lists: UnregisterExternalJunkItem mutates them.
+        var tracked = new List<NetworkObject>(_spawnedItems);
+        tracked.AddRange(_countedExistingItems);
+
+        foreach (NetworkObject netObj in tracked)
+        {
+            if (netObj == null || !netObj.IsSpawned)
+                continue;
+
+            if (CountsTowardCleanup(netObj.transform.position))
+                continue;
+
+            Debug.LogWarning($"[TakeOutTrashTask] Tracked item '{netObj.name}' is resting outside " +
+                             "the checkpoint — unregistering it so it can't block task completion.");
+            UnregisterExternalJunkItem(netObj);
+        }
     }
 
     /// <summary>
@@ -775,6 +1070,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void PruneCollectedItems()
     {
         _spawnedItems.RemoveAll(n => n == null || !n.IsSpawned);
+        _countedExistingItems.RemoveAll(n => n == null || !n.IsSpawned);
     }
 
     private void UpdateThreatLevel()
@@ -796,6 +1092,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         foreach (NetworkObject netObj in _spawnedDecals)
         {
+            // Tell the mop task first: these decals were registered with CleanBloodTask and count
+            // toward its total, so destroying them silently left that task requiring blood that no
+            // longer existed — permanently stuck at e.g. 4/5 with a spotless yard.
+            CleanBloodTask.Instance?.UnregisterBloodSplatter(netObj);
+
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn(destroy: true);
         }

@@ -243,7 +243,7 @@ public class PlayerInteractionController : NetworkBehaviour
             if (placementBoard == null)
                 placementBoard = FindNearbyPlacementBoard(hit.point);
 
-            if (interactable != null && interactable.enabled)
+            if (interactable != null && interactable.IsInteractable)
             {
                 // Aiming at a genuine Interactable (e.g. a locker door leaf) always wins over any
                 // stale placement ghost left active from aiming at a nearby PlacementSlot/board
@@ -444,6 +444,13 @@ public class PlayerInteractionController : NetworkBehaviour
     /// e.g. you could no longer grab a second item out of an open supply box once a nearer item
     /// had already been taken out. Honoring the nearest blocking hit fixes that without needing
     /// a tie window.
+    ///
+    /// One deliberate exception to "solid geometry blocks the ray": the perimeter fence, which the
+    /// ray may cross to reach collectible junk on the far side (see <see cref="AllowsJunkPassthrough"/>).
+    /// Mutants die wherever they're shot — frequently just outside the fence — and their corpses are
+    /// collectible (they credit as bonus junk, see <c>TakeOutTrashTask</c>), but the fence's own
+    /// collider swallowed the interaction ray, so a body a metre away through the chain-link was
+    /// visibly glowing and completely untouchable.
     /// </summary>
     private bool TryGetBestInteractHit(Ray ray, out RaycastHit bestHit)
     {
@@ -457,6 +464,14 @@ public class PlayerInteractionController : NetworkBehaviour
 
         Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
+        bool junkPassthroughAllowed = AllowsJunkPassthrough();
+
+        // Set once the ray has been let through the fence. From that point on it may only resolve to
+        // collectible junk; anything else means the fence is the real answer, so we fall back to the
+        // fence hit and every other system (placement, aim, tooltips) behaves exactly as before.
+        bool crossedFence = false;
+        RaycastHit fenceHit = default;
+
         for (int i = 0; i < hits.Length; i++)
         {
             Collider collider = hits[i].collider;
@@ -464,8 +479,14 @@ public class PlayerInteractionController : NetworkBehaviour
 
             // An attached Interactable always stops the ray, whether the collider is a
             // trigger or solid — this is a legitimate interaction target either way.
-            if (candidate != null && candidate.enabled)
+            if (candidate != null && candidate.IsInteractable)
             {
+                if (crossedFence && !IsPassthroughEligibleJunk(candidate))
+                {
+                    bestHit = fenceHit;
+                    return true;
+                }
+
                 bestHit = hits[i];
                 return true;
             }
@@ -477,7 +498,14 @@ public class PlayerInteractionController : NetworkBehaviour
             // standing behind it.
             if (!collider.isTrigger)
             {
-                bestHit = hits[i];
+                if (!crossedFence && junkPassthroughAllowed && IsPerimeterFence(collider))
+                {
+                    crossedFence = true;
+                    fenceHit = hits[i];
+                    continue;
+                }
+
+                bestHit = crossedFence ? fenceHit : hits[i];
                 return true;
             }
 
@@ -485,8 +513,42 @@ public class PlayerInteractionController : NetworkBehaviour
             // passes through to check what's behind it.
         }
 
-        bestHit = hits[0];
+        bestHit = crossedFence ? fenceHit : hits[0];
         return true;
+    }
+
+    /// <summary>
+    /// Whether the interaction ray is currently permitted to cross the perimeter fence.
+    ///
+    /// Gated on holding a trash bag: reaching through a solid fence is a targeted concession to
+    /// clean-up (junk outside the fence is collectible but unreachable), so it is only granted while
+    /// the player is actually equipped to clean up. Every other interaction — and the fence's own
+    /// hammer repair, which doesn't use this ray — keeps treating it as the solid obstacle it is.
+    /// Bag fullness is intentionally not checked; a full bag still shows the prompt, exactly as it
+    /// does for junk on this side of the fence.
+    /// </summary>
+    private bool AllowsJunkPassthrough()
+    {
+        return _playerPickupController != null && _playerPickupController.HeldObject is TrashBag;
+    }
+
+    /// <summary>
+    /// True when <paramref name="collider"/> belongs to a <see cref="PerimiterFence"/> — checked on
+    /// parents too, since damage-state meshes carry their own colliders on child objects.
+    /// </summary>
+    private static bool IsPerimeterFence(Collider collider)
+    {
+        return collider.GetComponentInParent<PerimiterFence>() != null;
+    }
+
+    /// <summary>
+    /// The only thing allowed to be interacted with through the fence: junk that is genuinely
+    /// collectible right now. Anything else behind the fence (another player, a mutant, world
+    /// geometry) must stay unreachable.
+    /// </summary>
+    private static bool IsPassthroughEligibleJunk(Interactable candidate)
+    {
+        return candidate is JunkItem junk && junk.CanBeCollected;
     }
 
     /// <summary>
@@ -662,7 +724,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         // No valid interactable under the cursor (e.g. hovering a placement board) —
         // fall through to using the held item in place, same as when nothing is hit.
-        if (interactable == null || !interactable.enabled)
+        if (interactable == null || !interactable.IsInteractable)
         {
             _playerPickupController.TryUseObject();
             return;
@@ -708,7 +770,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
-        if (interactable == null || !interactable.enabled) return;
+        if (interactable == null || !interactable.IsInteractable) return;
 
         if (alternate)
             interactable.InteractAlternate(this);
