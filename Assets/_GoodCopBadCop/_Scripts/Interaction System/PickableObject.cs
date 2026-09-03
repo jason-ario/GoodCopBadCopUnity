@@ -207,16 +207,22 @@ public class PickableObject : Interactable
     /// reload, so the full hierarchy path is a reliable deterministic key (NetworkObject's
     /// GlobalObjectIdHash is internal and, for runtime-spawned prefab instances, shared across
     /// every copy — unsuitable for telling multiple placed pickables of the same prefab apart).
+    ///
+    /// Computed once and cached: some pickables really are reparented at runtime (folder /
+    /// notebook / socket slots use NetworkObject.TrySetParent), which changed the path and made
+    /// the id captured at save time differ from the one this object registered with — so
+    /// <see cref="PickableObjectRegistry.RestoreAll"/> silently skipped it.
     /// </summary>
-    public string SaveId
+    public string SaveId => _cachedSaveId ??= BuildHierarchyPath();
+
+    private string _cachedSaveId;
+
+    private string BuildHierarchyPath()
     {
-        get
-        {
-            var path = name;
-            for (Transform t = transform.parent; t != null; t = t.parent)
-                path = t.name + "/" + path;
-            return path;
-        }
+        var path = name;
+        for (Transform t = transform.parent; t != null; t = t.parent)
+            path = t.name + "/" + path;
+        return path;
     }
 
     /// <summary>Captures this object's current position/rotation for checkpoint saving.</summary>
@@ -462,6 +468,56 @@ public class PickableObject : Interactable
     public void ReleaseHolderServerRpc()
     {
         _holdingClientId.Value = ulong.MaxValue;
+    }
+
+    /// <summary>
+    /// The client currently registered as holding this object, or <see cref="ulong.MaxValue"/>
+    /// when free. Note that a stowed item deliberately keeps its holder registration so another
+    /// player can't grab it out of someone's inventory — see
+    /// <see cref="PlayerPickupController.StowCurrentItemToPoint"/>.
+    /// </summary>
+    public ulong HolderClientId => _holdingClientId.Value;
+
+    /// <summary>
+    /// Server-only rescue path used when a holder vanishes without dropping its items (quit,
+    /// crash, timeout) — see <see cref="PickableObjectRegistry"/>'s disconnect sweep. A client
+    /// that disappears can no longer deliver <see cref="ReleaseHolderServerRpc"/> /
+    /// <see cref="DropServerRpc"/>, which would otherwise leave the object hidden
+    /// (<c>_isStowed</c> stuck true) and/or permanently locked to a client id that will never
+    /// come back, making it unpickable for everyone. Frees the holder, clears the stowed flag so
+    /// every client re-activates the GameObject, and re-broadcasts the drop transform.
+    /// </summary>
+    public void ForceReleaseToWorldServer()
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] ForceReleaseToWorldServer called on non-server for {name}; ignoring.");
+            return;
+        }
+
+        // Clear the hidden state first so the object is visible/active again on every client.
+        if (_isStowed.Value) _isStowed.Value = false;
+        gameObject.SetActive(true);
+
+        _holdingClientId.Value = ulong.MaxValue;
+
+        RemoveParent();
+        ClearSocketFollow();
+
+        Vector3 position = transform.position;
+        Quaternion rotation = transform.rotation;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        if (NetworkObject.OwnerClientId != NetworkManager.ServerClientId)
+            NetworkObject.RemoveOwnership();
+
+        SetInteractable(true);
+
+        // Reuses the normal free-drop broadcast so clients position the object before NT
+        // re-enables, exactly as they would for a player-initiated drop.
+        DropBroadcastClientRpc(position, rotation);
     }
 
     /// <summary>

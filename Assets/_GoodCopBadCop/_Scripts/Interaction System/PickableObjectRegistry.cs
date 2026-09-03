@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -47,6 +48,7 @@ public class PickableObjectRegistry : MonoBehaviour
 
     private void OnDestroy()
     {
+        UnsubscribeFromDisconnects();
         if (_instance == this) _instance = null;
     }
 
@@ -55,6 +57,11 @@ public class PickableObjectRegistry : MonoBehaviour
     {
         if (pickable == null || string.IsNullOrEmpty(pickable.SaveId)) return;
         _pickables[pickable.SaveId] = pickable;
+
+        // Hook the disconnect sweep here rather than in Awake: this registry self-instantiates
+        // before NetworkManager.Singleton necessarily exists, whereas a pickable registering
+        // always means the network session is up.
+        SubscribeToDisconnects();
     }
 
     /// <summary>Unregisters a pickable, e.g. when it despawns.</summary>
@@ -98,5 +105,58 @@ public class PickableObjectRegistry : MonoBehaviour
         }
 
         Debug.Log($"[PickableObjectRegistry] Restored {restoredCount}/{data.Length} pickable object(s) from checkpoint.");
+    }
+
+    // ── Disconnect rescue ─────────────────────────────────────────────────────
+
+    private bool _subscribedToDisconnects;
+
+    private void SubscribeToDisconnects()
+    {
+        if (_subscribedToDisconnects) return;
+
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return;
+
+        nm.OnClientDisconnectCallback += OnClientDisconnected;
+        _subscribedToDisconnects = true;
+    }
+
+    private void UnsubscribeFromDisconnects()
+    {
+        if (!_subscribedToDisconnects) return;
+
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm != null) nm.OnClientDisconnectCallback -= OnClientDisconnected;
+        _subscribedToDisconnects = false;
+    }
+
+    /// <summary>
+    /// Server-side rescue for items a leaving player was carrying. A disconnecting client can no
+    /// longer deliver its own release/drop ServerRpcs (the ones
+    /// <see cref="PlayerInventory.OnNetworkDespawn"/> attempts), so anything it held or had
+    /// stowed stayed pinned to a client id that never returns — invisible if stowed, and
+    /// unpickable either way. Hand every such item back to the world instead.
+    /// </summary>
+    private void OnClientDisconnected(ulong clientId)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return;
+
+        // The host also receives this callback for its own shutdown; nothing to rescue then.
+        if (clientId == nm.LocalClientId) return;
+
+        int releasedCount = 0;
+        foreach (PickableObject pickable in new List<PickableObject>(_pickables.Values))
+        {
+            if (pickable == null || !pickable.IsSpawned) continue;
+            if (pickable.HolderClientId != clientId) continue;
+
+            pickable.ForceReleaseToWorldServer();
+            releasedCount++;
+        }
+
+        if (releasedCount > 0)
+            Debug.Log($"[PickableObjectRegistry] Released {releasedCount} item(s) back to the world after client {clientId} disconnected.");
     }
 }

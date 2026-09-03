@@ -287,6 +287,11 @@ public class PlayerInventory : NetworkBehaviour
 
         if (_stowed[index])
         {
+            // Clear the server-authoritative stowed flag BEFORE the local SetActive(true).
+            // Without this the item stayed hidden (_isStowed == true) on the host and every
+            // remote client — and since it is no longer tracked in any inventory, nothing
+            // would ever unstow it again, so the item was lost for good.
+            item.RequestSetStowedNetworked(false);
             item.gameObject.SetActive(true);
             item.RemoveParent();
             item.ReleaseHolderServerRpc();
