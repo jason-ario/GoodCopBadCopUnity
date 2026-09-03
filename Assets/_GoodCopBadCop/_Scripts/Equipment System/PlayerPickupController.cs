@@ -1170,6 +1170,11 @@ public class PlayerPickupController : NetworkBehaviour
     {
         if (_heldObject == null) return null;
 
+        // Items flagged canBeStowed == false (e.g. the supply box) can never go on the body.
+        // PlayerInventory already locks the hotbar while one is held; this is the last-line guard
+        // so any other caller can't silently make the item vanish onto the stow point.
+        if (_heldObject.ItemData != null && !_heldObject.ItemData.canBeStowed) return null;
+
         PickableObject stowed = _heldObject;
         pickUpCooldownComplete = false;
         DisableArmIKs();

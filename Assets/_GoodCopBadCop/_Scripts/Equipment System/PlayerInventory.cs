@@ -27,9 +27,28 @@ public class PlayerInventory : NetworkBehaviour
 
     private int _activeSlot = -1;   // -1 = hand empty
 
+    /// <summary>
+    /// The currently held item when that item is flagged <c>canBeStowed == false</c> (e.g. the
+    /// supply box). Such items are deliberately NOT tracked in <see cref="_slots"/> — they occupy
+    /// no hotbar slot and never appear in the HUD — but while one is carried the whole hotbar is
+    /// locked (see <see cref="IsCarryingUnstowable"/>): the player must place or drop it to free
+    /// their hands.
+    /// </summary>
+    private PickableObject _unstowableHeld;
+
     // ── Public surface ────────────────────────────────────────────────────────
 
     public int ActiveSlot => _activeSlot;
+
+    /// <summary>
+    /// True while a non-stowable item is in hand. Hotbar keys, scroll cycling and slot swapping
+    /// are all disabled in this state, because honouring them would require stowing the item.
+    /// </summary>
+    public bool IsCarryingUnstowable => _unstowableHeld != null;
+
+    /// <summary>Non-stowable items are carried outside the hotbar entirely.</summary>
+    private static bool IsStowable(PickableObject obj) =>
+        obj == null || obj.ItemData == null || obj.ItemData.canBeStowed;
 
     /// <summary>Fired when a slot's item reference changes. <c>item</c> is <c>null</c> when cleared.</summary>
     public event System.Action<int, PickableObject> OnSlotChanged;
@@ -47,9 +66,10 @@ public class PlayerInventory : NetworkBehaviour
     /// <see cref="PlayerPickupController.PickUpObject"/> to block new pickups when full, while
     /// still allowing re-equipping an already-owned stowed item (e.g. via
     /// <see cref="PlayerPickupController.UnstowItemToHand"/>).
+    /// Non-stowable items never consume a slot, so a full inventory never blocks them.
     /// </summary>
     public bool IsFullFor(PickableObject obj) =>
-        SlotOf(obj) < 0 && FreeSlot() < 0;
+        IsStowable(obj) && SlotOf(obj) < 0 && FreeSlot() < 0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -103,6 +123,9 @@ public class PlayerInventory : NetworkBehaviour
     private void CycleActiveItem(int direction)
     {
         if (!IsOwner) return;
+
+        // A non-stowable item in hand locks the hotbar — the player has to put it down.
+        if (IsCarryingUnstowable) return;
 
         // -1 represents the empty-hands state and is always a valid destination.
         var states = new System.Collections.Generic.List<int> { -1 };
@@ -167,6 +190,15 @@ public class PlayerInventory : NetworkBehaviour
     {
         if (obj != null)
         {
+            // Non-stowable items bypass the hotbar entirely: no slot is consumed, no HUD icon is
+            // shown, and _activeSlot stays -1 so nothing can be cycled/swapped while it is held.
+            if (!IsStowable(obj))
+            {
+                _unstowableHeld = obj;
+                SetActiveSlot(-1);
+                return;
+            }
+
             // Already tracked — this fires when UnstowItemToHand calls PickUpObject.
             int existing = SlotOf(obj);
             if (existing >= 0)
@@ -193,6 +225,14 @@ public class PlayerInventory : NetworkBehaviour
         }
         else
         {
+            // A non-stowable item left the hand (placed or dropped) — it owns no slot, so there is
+            // nothing to clear beyond releasing the hotbar lock.
+            if (_unstowableHeld != null)
+            {
+                _unstowableHeld = null;
+                return;
+            }
+
             // Hand became empty via normal drop or place (not a stow operation).
             if (_activeSlot >= 0 && !_stowed[_activeSlot])
             {
@@ -212,6 +252,10 @@ public class PlayerInventory : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (slotIndex < 0 || slotIndex >= 2) return;
+
+        // A non-stowable item in hand locks the hotbar — equipping anything else would require
+        // stowing it, which it does not support. The player must place or drop it first.
+        if (IsCarryingUnstowable) return;
 
         PickableObject target = _slots[slotIndex];
         if (target == null) return;   // empty slot — nothing to do

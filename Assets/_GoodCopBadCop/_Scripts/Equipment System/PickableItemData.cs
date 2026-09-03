@@ -10,6 +10,12 @@ public class PickableItemData : ScriptableObject
     [Tooltip("When false, this item cannot be charged/thrown via ThrowController (e.g. stamps). Held/placed normally as usual.")]
     public bool canBeThrown = true;
 
+    [Tooltip("When false, this item can never be stowed on the body and does NOT occupy an inventory " +
+             "hotbar slot (e.g. the supply box). It can be picked up even with a full inventory, but " +
+             "while carried the hotbar keys and scroll wheel are locked out — the only way to get it " +
+             "out of your hands is to place or drop it.")]
+    public bool canBeStowed = true;
+
     public enum Hand
     {
         Left,
