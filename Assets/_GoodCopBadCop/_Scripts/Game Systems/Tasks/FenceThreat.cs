@@ -1,18 +1,23 @@
 using System.Collections;
-using System.Collections.Generic;
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
 
 /// <summary>
 /// Systemic threat: perimeter fence segments periodically take damage during the night.
-/// Replaces FenceRepairTask — fences are damaged continuously on a day-intensity scaled timer
-/// rather than as a one-time batch at phase start.
+/// Fences are damaged continuously on a day-intensity scaled timer rather than as a one-time
+/// batch at phase start.
 ///
 /// Activates after <see cref="_firstActiveDay"/>. Fence damage persists into the day shift as
 /// a tangible consequence of poor management the previous night.
 ///
 /// Players reduce threat by repairing fences with a HammerPickable (via PerimiterFence).
 /// Threat level equals damaged fence count divided by total fence count.
+///
+/// Like <see cref="FenceRepairTask"/>, the damaged count is <em>recounted</em> from live fence
+/// state on every authoritative change rather than incremented/decremented — an incremental
+/// tally drifts permanently out of true the first time an event is missed or a fence changes
+/// state through a path the threat isn't watching. Both the count and the threat level are
+/// replicated so the host and every client report the same numbers.
 ///
 /// Scene setup:
 ///   - NetworkObject on this GameObject.
@@ -65,11 +70,19 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Replicated damaged-segment count. Previously a plain server-side int, which meant every
+    /// client's guidebook row read "Damaged segments: 0/n" regardless of the real state.
+    /// </summary>
+    private readonly NetworkVariable<int> _damagedFenceCount = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // ── Local state ──────────────────────────────────────────────────────────
 
-    private int _damagedFenceCount;
-    private readonly List<PerimiterFence> _damagedFences = new();
     private Coroutine _damageCoroutine;
+    private bool _observing;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
@@ -78,7 +91,7 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     public float  ThreatLevel       => _networkThreatLevel.Value;
 
     public string ThreatDescription =>
-        $"Damaged segments: {_damagedFenceCount}/{(_allFences != null ? _allFences.Length : 0)}";
+        $"Damaged segments: {_damagedFenceCount.Value}/{(_allFences != null ? _allFences.Length : 0)}";
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -96,12 +109,20 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        // Watch every fence for the whole session so the replicated count is correct even outside
+        // the night phase (mutant breaches damage fences during the day too).
+        if (IsServer)
+        {
+            StartObservingFences();
+            Recount();
+        }
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        UnsubscribeFromDamagedFences();
+        StopObservingFences();
     }
 
     private void OnDestroy()
@@ -120,22 +141,8 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     {
         if (!IsServer) return;
 
-        UnsubscribeFromDamagedFences();
-        _damagedFences.Clear();
-
-        if (_allFences != null)
-        {
-            foreach (PerimiterFence fence in _allFences)
-            {
-                if (fence == null || !fence.IsBroken) continue;
-
-                fence.OnFullyRepaired += HandleFenceRepaired;
-                _damagedFences.Add(fence);
-            }
-        }
-
-        _damagedFenceCount = _damagedFences.Count;
-        UpdateThreatLevel();
+        StartObservingFences();
+        Recount();
 
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
 
@@ -164,19 +171,54 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
         }
     }
 
-    // ── Repair callback ───────────────────────────────────────────────────────
+    // ── Fence observation ─────────────────────────────────────────────────────
 
-    private void HandleFenceRepaired(PerimiterFence fence)
+    private void StartObservingFences()
     {
-        Debug.Assert(IsServer, "[FenceThreat] HandleFenceRepaired called on non-server.");
+        if (_observing || _allFences == null) return;
 
-        fence.OnFullyRepaired -= HandleFenceRepaired;
-        _damagedFences.Remove(fence);
-        _damagedFenceCount = Mathf.Max(0, _damagedFenceCount - 1);
+        foreach (PerimiterFence fence in _allFences)
+        {
+            if (fence != null)
+                fence.OnDamageStateChangedServer += HandleFenceStateChanged;
+        }
 
-        UpdateThreatLevel();
+        _observing = true;
+    }
 
-        Debug.Log($"[FenceThreat] Fence repaired. Damaged: {_damagedFenceCount}/{(_allFences?.Length ?? 0)}");
+    private void StopObservingFences()
+    {
+        if (!_observing || _allFences == null) return;
+
+        foreach (PerimiterFence fence in _allFences)
+        {
+            if (fence != null)
+                fence.OnDamageStateChangedServer -= HandleFenceStateChanged;
+        }
+
+        _observing = false;
+    }
+
+    private void HandleFenceStateChanged(PerimiterFence fence) => Recount();
+
+    /// <summary>Recounts visibly damaged segments from live fence state. Server-only.</summary>
+    private void Recount()
+    {
+        if (!IsServer) return;
+
+        int total   = _allFences != null ? _allFences.Length : 0;
+        int damaged = 0;
+
+        if (_allFences != null)
+        {
+            foreach (PerimiterFence fence in _allFences)
+            {
+                if (fence != null && fence.IsBroken) damaged++;
+            }
+        }
+
+        _damagedFenceCount.Value  = damaged;
+        _networkThreatLevel.Value = total > 0 ? Mathf.Clamp01((float)damaged / total) : 0f;
     }
 
     // ── Damage loop ───────────────────────────────────────────────────────────
@@ -204,11 +246,11 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     {
         if (_allFences == null || _allFences.Length == 0) return;
 
-        // Collect undamaged fences.
-        List<PerimiterFence> candidates = new();
+        // Collect intact fences.
+        var candidates = new System.Collections.Generic.List<PerimiterFence>();
         foreach (PerimiterFence fence in _allFences)
         {
-            if (fence != null && !_damagedFences.Contains(fence))
+            if (fence != null && fence.IsSpawned && !fence.IsBroken)
                 candidates.Add(fence);
         }
 
@@ -217,39 +259,21 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
         PerimiterFence target = candidates[Random.Range(0, candidates.Count)];
 
         int maxAllowed  = target.MaxDamageLevel;
-        int damageMin   = Mathf.Min(_damageRange.x, maxAllowed);
-        int damageMax   = Mathf.Min(_damageRange.y, maxAllowed);
+        int damageMin   = Mathf.Clamp(_damageRange.x, 1, Mathf.Max(1, maxAllowed));
+        int damageMax   = Mathf.Clamp(_damageRange.y, damageMin, Mathf.Max(1, maxAllowed));
         int damageLevel = Random.Range(damageMin, damageMax + 1);
 
-        target.SetDamageLevelServer(damageLevel);
-        target.OnFullyRepaired += HandleFenceRepaired;
+        // Raise damage only — never heal a segment mutants already hit harder.
+        target.EnsureMinimumDamageLevelServer(damageLevel);
 
-        _damagedFences.Add(target);
-        _damagedFenceCount++;
+        // Recount runs via HandleFenceStateChanged, but call it explicitly in case the level was
+        // already at or below the fence's current damage (no state change fired).
+        Recount();
 
-        UpdateThreatLevel();
-
-        Debug.Log($"[FenceThreat] Fence damaged at level {damageLevel}. Damaged: {_damagedFenceCount}/{(_allFences?.Length ?? 0)}");
+        Debug.Log($"[FenceThreat] Fence damaged at level {damageLevel}. Damaged: {_damagedFenceCount.Value}/{_allFences.Length}");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void UnsubscribeFromDamagedFences()
-    {
-        foreach (PerimiterFence fence in _damagedFences)
-        {
-            if (fence != null)
-                fence.OnFullyRepaired -= HandleFenceRepaired;
-        }
-    }
-
-    private void UpdateThreatLevel()
-    {
-        int total = _allFences != null ? _allFences.Length : 1;
-        _networkThreatLevel.Value = total > 0
-            ? Mathf.Clamp01((float)_damagedFenceCount / total)
-            : 0f;
-    }
 
     private float GetDayIntensity()
     {

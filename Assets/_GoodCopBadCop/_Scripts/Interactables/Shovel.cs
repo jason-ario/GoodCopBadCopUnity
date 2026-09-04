@@ -41,7 +41,11 @@ public class Shovel : PickableObject
     private bool _isAttacking;
     private bool _bufferedAttack;
     private float _attackEndTime;
+    private Coroutine _attackRoutine;
     private MeleeWeaponDurability _durability;
+
+    /// <summary>Extra grace on top of the swing cooldown before a lingering swing is treated as stale.</summary>
+    private const float STALE_SWING_GRACE = 1f;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -84,6 +88,18 @@ public class Shovel : PickableObject
     {
         base.OnStartUse();
 
+        // Failsafe: _isAttacking is cleared at the end of AttackRoutine, but that coroutine is
+        // destroyed without finishing whenever this GameObject is deactivated mid-swing (stowing
+        // the shovel to the inventory, a scene/day transition, despawn of a parent). The latch
+        // then stayed true forever and every later click was swallowed by the guard below —
+        // the shovel looked broken until it was dropped and picked back up. If the swing window
+        // has clearly expired, the swing is stale: reset and continue.
+        if (_isAttacking && Time.time > _attackEndTime + STALE_SWING_GRACE)
+        {
+            Debug.LogWarning("[Shovel] Recovering from a stale swing state (attack coroutine was interrupted).", this);
+            ClearSwingState();
+        }
+
         if (_isAttacking)
         {
             // Buffer the input if we're within the buffer window of the cooldown ending.
@@ -93,7 +109,33 @@ public class Shovel : PickableObject
             return;
         }
 
-        StartCoroutine(AttackRoutine());
+        _attackRoutine = StartCoroutine(AttackRoutine());
+    }
+
+    /// <summary>
+    /// Failsafe hook from <see cref="PickableObject"/>: wipes the swing latches and the swing
+    /// animator bool so an interrupted swing can never leave the shovel permanently unusable.
+    /// </summary>
+    public override void ForceClearUseState()
+    {
+        base.ForceClearUseState();
+        ClearSwingState();
+    }
+
+    private void ClearSwingState()
+    {
+        if (_attackRoutine != null)
+        {
+            StopCoroutine(_attackRoutine);
+            _attackRoutine = null;
+        }
+
+        _isAttacking = false;
+        _bufferedAttack = false;
+        _attackEndTime = 0f;
+
+        if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
+            playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
     }
 
     // ── Private ────────────────────────────────────────────────────────────────
@@ -128,11 +170,12 @@ public class Shovel : PickableObject
             playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
 
         _isAttacking = false;
+        _attackRoutine = null;
 
         if (_bufferedAttack)
         {
             _bufferedAttack = false;
-            StartCoroutine(AttackRoutine());
+            _attackRoutine = StartCoroutine(AttackRoutine());
         }
     }
 

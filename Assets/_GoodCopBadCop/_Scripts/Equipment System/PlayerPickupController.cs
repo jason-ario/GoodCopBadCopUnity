@@ -72,7 +72,34 @@ public class PlayerPickupController : NetworkBehaviour
         NetworkVariableWritePermission.Owner);
 
     private float pickUpUseCooldownTimer = .2f;
-    private bool pickUpCooldownComplete = false;
+
+    /// <summary>
+    /// Time.time after which the currently held item is allowed to be used.
+    /// Deliberately a timestamp instead of the old bool latch that was flipped by a
+    /// <c>PickUpCoolDown()</c> coroutine: that coroutine was silently killed whenever this
+    /// component or the player GameObject was disabled (cutscene, respawn, spectate, scene
+    /// transition) or whenever a stow/drop wrote the latch false after it had already run.
+    /// The latch then stayed false forever, so <see cref="TryUseObject"/> ignored every click
+    /// and the held tool (flashlight, shovel, ...) looked broken until the player dropped it
+    /// and picked it back up — which restarted the coroutine. A timestamp cannot get stuck.
+    /// </summary>
+    private float _useAllowedTime;
+
+    /// <summary>True once the post-pickup use cooldown has elapsed.</summary>
+    private bool PickUpCooldownComplete => Time.time >= _useAllowedTime;
+
+    /// <summary>
+    /// Seconds the held item may report <see cref="PickableObject.IsBeingUsed"/> while the use
+    /// button is NOT held before <see cref="EnforceUseReleaseFailsafe"/> force-stops it.
+    /// Long enough that timed one-shot uses (pill bottle, vaccine, camera) finish normally.
+    /// </summary>
+    private const float STUCK_USE_TIMEOUT = 3f;
+
+    /// <summary>Time.time when the held item was first seen "in use" with the button released.</summary>
+    private float _stuckUseSince = -1f;
+
+    /// <summary>Throttle for the ownership re-assert in <see cref="TryUseObject"/>.</summary>
+    private float _nextOwnershipReassertTime;
 
     public UnityAction OnPlaceObject;
 
@@ -231,6 +258,20 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        // Runs BEFORE any gating early-return below: a "currently in use" latch must never be
+        // able to survive the button being released, even when pickup/place input is locked
+        // (notebook draw mode, dialogue, cutscene) or the item was deactivated mid-use.
+        EnforceUseReleaseFailsafe();
+
+        // Releasing the use button must always be delivered, regardless of the pickup cooldown.
+        // Previously this was gated behind the cooldown latch, so a click that ended inside the
+        // cooldown window (or while the latch was stuck) never called OnStopUse and left the
+        // item's isUsing flag true — permanently blocking every tool that guards on it.
+        if (HeldObject != null && LmbUp)
+        {
+            StopUsingObject();
+        }
+
         if(CanPickUpAndPlace == false) return;
 
         if (HeldObject != null)
@@ -255,12 +296,39 @@ public class PlayerPickupController : NetworkBehaviour
                     DropObject();
                 }
             }
-            
-            if (LmbUp && pickUpCooldownComplete)
-            {
-                StopUsingObject();
-            }
         }
+    }
+
+    /// <summary>
+    /// Self-healing watchdog for a stuck use state. If the held item still reports itself as
+    /// being used while the use button has been released for longer than
+    /// <see cref="STUCK_USE_TIMEOUT"/>, the stop-use signal was lost (input gated that frame,
+    /// pause, focus loss, item deactivated by a stow which killed its coroutine, ...). Force the
+    /// item back to an idle state so it stays usable instead of requiring a drop + re-pickup.
+    /// </summary>
+    private void EnforceUseReleaseFailsafe()
+    {
+        if (_heldObject == null || !_heldObject.IsBeingUsed || LmbHeld)
+        {
+            _stuckUseSince = -1f;
+            return;
+        }
+
+        if (_stuckUseSince < 0f)
+        {
+            _stuckUseSince = Time.time;
+            return;
+        }
+
+        if (Time.time - _stuckUseSince < STUCK_USE_TIMEOUT) return;
+
+        Debug.LogWarning($"[PlayerPickupController] Held item '{_heldObject.name}' was still flagged " +
+                         $"as in-use {STUCK_USE_TIMEOUT}s after the use button was released. " +
+                         "Force-clearing its use state so it stays usable.", _heldObject);
+
+        _stuckUseSince = -1f;
+        StopUsingObject();
+        _heldObject.ForceClearUseState();
     }
 
     private void LateUpdate()
@@ -297,7 +365,20 @@ public class PlayerPickupController : NetworkBehaviour
     {
         if (Input.GetMouseButtonDown(1)) return;
         if (HeldObject == null) return;
-        if(pickUpCooldownComplete == false) return;
+        if (PickUpCooldownComplete == false) return;
+
+        // Failsafe: an item whose NetworkObject ownership drifted away from us (ownership race
+        // with another player's rejected grab, host migration, forced release) can no longer
+        // drive its owner-authoritative state, which makes it look dead in hand. Re-assert the
+        // claim (throttled) — the server re-confirms us as holder since we already are one.
+        if (!_heldObject.IsOwner && Time.time >= _nextOwnershipReassertTime)
+        {
+            _nextOwnershipReassertTime = Time.time + 0.5f;
+            Debug.LogWarning($"[PlayerPickupController] Held item '{_heldObject.name}' is not owned " +
+                             "by this client; re-requesting ownership.", _heldObject);
+            _heldObject.RequestOwnershipServerRpc();
+        }
+
         _heldObject.OnStartUse();
         
         RequestBodyUseServerRpc();
@@ -336,6 +417,8 @@ public class PlayerPickupController : NetworkBehaviour
 
     void StopUsingObject()
     {
+        _stuckUseSince = -1f;
+
         if(_heldObject != null)
         {
             _heldObject.OnStopUse();
@@ -719,7 +802,10 @@ public class PlayerPickupController : NetworkBehaviour
         NetworkTransform nt = pickableObject.GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = false;
 
-        StartCoroutine(PickUpCoolDown());
+        // Timestamp-based cooldown: see _useAllowedTime. Never use a coroutine for this — it is
+        // killed if this component/GameObject is disabled before it completes, which used to
+        // leave the item permanently unusable while held.
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
     }
 
     /// <summary>
@@ -777,11 +863,6 @@ public class PlayerPickupController : NetworkBehaviour
         rejected.SetInteractable(!rejected.IsHeld);
     }
     
-    IEnumerator PickUpCoolDown()
-    {
-        yield return new WaitForSeconds(pickUpUseCooldownTimer);
-        pickUpCooldownComplete = true;
-    }
 
     /// <summary>
     /// Releases the held object from the player's hand for a throw animation without
@@ -797,7 +878,7 @@ public class PlayerPickupController : NetworkBehaviour
         PickableObject released = _heldObject;
 
         OnPlaceObject?.Invoke();
-        pickUpCooldownComplete = false;
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
 
         DisableArmIKs();
 
@@ -844,7 +925,7 @@ public class PlayerPickupController : NetworkBehaviour
         if (_heldObject == null) return;
 
         OnPlaceObject?.Invoke();
-        pickUpCooldownComplete = false;
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
 
         DisableArmIKs();
 
@@ -868,7 +949,7 @@ public class PlayerPickupController : NetworkBehaviour
     public void DropObject(Transform dropPoint = null)
     {
         OnPlaceObject?.Invoke();
-        pickUpCooldownComplete = false;
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
 
         if (_heldObject == null)
         {
@@ -1176,13 +1257,19 @@ public class PlayerPickupController : NetworkBehaviour
         if (_heldObject.ItemData != null && !_heldObject.ItemData.canBeStowed) return null;
 
         PickableObject stowed = _heldObject;
-        pickUpCooldownComplete = false;
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
         DisableArmIKs();
 
         // Re-seat at stow point so it re-activates at the right position.
         stowed.RemoveParent();
         stowed.transform.position = stowPoint.position;
         stowed.transform.rotation = stowPoint.rotation;
+
+        // Deactivating the GameObject below kills every coroutine running on it without giving
+        // it a chance to finish, so any in-progress use must be torn down cleanly first —
+        // otherwise the item's internal "busy" latches (isUsing, swing state, anim bools) stay
+        // set and the tool refuses to work when it is unstowed back into the hand.
+        stowed.AbortUse();
 
         // Give the item a chance to clean up its active state (e.g. turn off the flashlight).
         stowed.OnStowed();
@@ -1281,7 +1368,7 @@ public class PlayerPickupController : NetworkBehaviour
         _playerAnimationController.DisableRightArmMask();
         ObjectPlacer.Instance.DeactivatePlacer();
         OnPlaceObject?.Invoke();
-        pickUpCooldownComplete = false;
+        _useAllowedTime = Time.time + pickUpUseCooldownTimer;
 
         heldObject.DespawnServerRpc();
     }

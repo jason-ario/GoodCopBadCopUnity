@@ -56,7 +56,11 @@ public class HammerPickable : PickableObject
     private bool _isAttacking;
     private bool _bufferedAttack;
     private float _attackEndTime;
+    private Coroutine _attackRoutine;
     private MeleeWeaponDurability _durability;
+
+    /// <summary>Extra grace on top of the swing cooldown before a lingering swing is treated as stale.</summary>
+    private const float STALE_SWING_GRACE = 1f;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -104,6 +108,16 @@ public class HammerPickable : PickableObject
     {
         base.OnStartUse();
 
+        // Failsafe: AttackRoutine clears _isAttacking at its end, but the coroutine is destroyed
+        // without finishing if this GameObject is deactivated mid-swing (stow to inventory, day
+        // transition, despawn). The latch then blocked every later swing until the hammer was
+        // dropped and re-picked-up. Treat an expired swing window as stale and recover.
+        if (_isAttacking && Time.time > _attackEndTime + STALE_SWING_GRACE)
+        {
+            Debug.LogWarning("[HammerPickable] Recovering from a stale swing state (attack coroutine was interrupted).", this);
+            ClearSwingState();
+        }
+
         if (_isAttacking)
         {
             // Buffer the input if we're within the buffer window of the cooldown ending.
@@ -113,7 +127,33 @@ public class HammerPickable : PickableObject
             return;
         }
 
-        StartCoroutine(AttackRoutine());
+        _attackRoutine = StartCoroutine(AttackRoutine());
+    }
+
+    /// <summary>
+    /// Failsafe hook from <see cref="PickableObject"/>: wipes the swing latches and the swing
+    /// animator bool so an interrupted swing can never leave the hammer permanently unusable.
+    /// </summary>
+    public override void ForceClearUseState()
+    {
+        base.ForceClearUseState();
+        ClearSwingState();
+    }
+
+    private void ClearSwingState()
+    {
+        if (_attackRoutine != null)
+        {
+            StopCoroutine(_attackRoutine);
+            _attackRoutine = null;
+        }
+
+        _isAttacking = false;
+        _bufferedAttack = false;
+        _attackEndTime = 0f;
+
+        if (!string.IsNullOrEmpty(_swingAnimBool) && playerPickupController != null)
+            playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
     }
 
     // ── Private ────────────────────────────────────────────────────────────────
@@ -158,32 +198,62 @@ public class HammerPickable : PickableObject
             playerPickupController.PlayerAnimationController.SetAnimBool(_swingAnimBool, false);
 
         _isAttacking = false;
+        _attackRoutine = null;
 
         if (_bufferedAttack)
         {
             _bufferedAttack = false;
-            StartCoroutine(AttackRoutine());
+            _attackRoutine = StartCoroutine(AttackRoutine());
         }
     }
 
     /// <summary>
-    /// Owner-side OverlapSphere that finds the nearest broken PerimiterFence and sends a
-    /// single repair hit via ServerRpc. Does not interact with enemies.
+    /// Owner-side OverlapSphere that finds the nearest PerimiterFence and sends a single repair
+    /// hit via ServerRpc. Does not interact with enemies.
+    ///
+    /// Two deliberate details:
+    ///   - It picks the <em>nearest</em> segment rather than whichever collider the physics query
+    ///     happened to return first, so a swing always lands on the fence the player is standing at.
+    ///   - It never refuses to send the RPC based on this client's own view of the fence's health.
+    ///     The old code skipped any fence whose replicated <c>IsBroken</c> read false locally,
+    ///     which meant a client with a stale/unsynchronised health value simply could not repair
+    ///     a fence the host could. The server re-validates in <c>HitWithHammerServerRpc</c> and
+    ///     ignores hits on intact segments, so sending unconditionally is free and authoritative.
     /// </summary>
     private void TryHitFence(Vector3 origin)
     {
         Collider[] hits = Physics.OverlapSphere(origin, _fenceHitRadius, _fenceLayerMask);
+
+        PerimiterFence nearest = null;
+        PerimiterFence nearestBroken = null;
+        float nearestSqr = float.MaxValue;
+        float nearestBrokenSqr = float.MaxValue;
 
         foreach (Collider col in hits)
         {
             PerimiterFence fence = col.GetComponent<PerimiterFence>()
                                 ?? col.GetComponentInParent<PerimiterFence>();
 
-            if (fence == null || !fence.IsBroken) continue;
+            if (fence == null || !fence.IsSpawned) continue;
 
-            fence.HitWithHammerServerRpc();
-            return; // One fence hit per swing.
+            float sqr = (col.ClosestPoint(origin) - origin).sqrMagnitude;
+
+            if (sqr < nearestSqr)
+            {
+                nearestSqr = sqr;
+                nearest = fence;
+            }
+
+            if (fence.IsBroken && sqr < nearestBrokenSqr)
+            {
+                nearestBrokenSqr = sqr;
+                nearestBroken = fence;
+            }
         }
+
+        // Prefer a segment this client already knows is damaged; otherwise let the server decide.
+        PerimiterFence target = nearestBroken ?? nearest;
+        target?.HitWithHammerServerRpc();
     }
 
     // ── Hitbox callbacks ───────────────────────────────────────────────────────

@@ -114,6 +114,30 @@ public class Mop : PickableObject
 
     // ── Scrub loop ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Failsafe hook from <see cref="PickableObject"/>. <see cref="ScrubRoutine"/> loops on
+    /// <c>isUsing</c> and is destroyed outright if this GameObject is deactivated mid-scrub
+    /// (stow to inventory, day transition), so its trailing cleanup never runs. Tear the scrub
+    /// down here so the mop always comes back to hand in a clean, usable state.
+    /// </summary>
+    public override void ForceClearUseState()
+    {
+        base.ForceClearUseState();
+
+        if (_scrubRoutine != null)
+        {
+            StopCoroutine(_scrubRoutine);
+            _scrubRoutine = null;
+        }
+
+        _scrubParticles?.Stop();
+        _scrubAudio?.Stop();
+        NotifyStopScrubbing();
+
+        if (playerPickupController != null)
+            playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolAnimBool, false);
+    }
+
     private IEnumerator ScrubRoutine()
     {
         while (isUsing)

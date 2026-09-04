@@ -5,30 +5,43 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 
 /// <summary>
-/// One-shot task: repair a randomly selected set of broken perimeter fence segments.
+/// One-shot task: repair every broken perimeter fence segment.
 ///
 /// Unlike <see cref="FenceThreat"/> (a continuous night-phase systemic threat active from
-/// Day <c>_firstActiveDay</c> onward), this task is manually triggered — e.g. once at the start
-/// of Day 3 as a scripted tutorial beat (see <see cref="Day_03"/>) — and breaks a batch of
-/// fences immediately rather than damaging them one at a time on a timer.
+/// Day <c>_firstActiveDay</c> onward), this task is manually triggered — e.g. after Day 1's
+/// mutant breach or as a scripted Day 3 tutorial beat — and breaks a batch of fences
+/// immediately rather than damaging them one at a time on a timer.
 ///
-/// When triggered on the server:
-///   1. Picks a random count (within BrokenFenceCount range) of fences to break.
-///   2. Assigns each a random damage level (within DamageRange).
-///   3. Subscribes to OnFullyRepaired on every broken fence.
+/// ── Progress model ────────────────────────────────────────────────────────────
+/// Progress is <em>derived</em>, never incremented. On every authoritative fence state change
+/// the server recounts how many tracked segments are pristine
+/// (<see cref="PerimiterFence.IsRepaired"/>) and writes that count to a NetworkVariable.
 ///
-/// Players repair fences by hitting them with HammerPickable. When all broken fences are
-/// repaired, the task is marked complete, the coupon reward is granted, and
-/// <see cref="OnAllFencesRepaired"/> fires so subscribers (e.g. Day_03's tutorial objective
-/// list entry) can react.
+/// The previous implementation incremented a counter from the one-shot
+/// <see cref="PerimiterFence.OnFullyRepaired"/> event and set the target to the number of
+/// fences it *intended* to break. Any missed event, any segment that ended up not actually
+/// damaged, and any segment a mutant had already destroyed left the counter permanently one
+/// or more short — the reported "14/15 with nothing broken left to repair". A derived count
+/// cannot drift: it is recomputed from live fence state, so it is always exactly right and
+/// self-heals.
+///
+/// The tracked set is also every fence that is <em>currently</em> broken, not just the random
+/// subset this task rolled. Fences smashed by mutants during the breach (or while the task is
+/// already running) are picked up automatically, so repairing them counts toward the objective
+/// instead of being invisible to it.
+///
+/// ── Networking ────────────────────────────────────────────────────────────────
+/// Counts, active state, and completion all live in NetworkVariables, so the host, every
+/// connected client, and any late joiner read identical values. Completion is announced off
+/// <see cref="_isComplete"/>'s change callback rather than a ClientRpc, so a client that was
+/// not connected when the last fence was fixed still observes the correct final state.
 ///
 /// Scene setup:
 ///   - Add a NetworkObject component to this GameObject.
 ///   - Assign all PerimiterFence instances present in the scene to _allFences.
 ///
 /// Also implements <see cref="ISystemicThreat"/> so <see cref="CheckpointIntegrityService"/>
-/// can factor broken/unrepaired fence segments into the Checkpoint Integrity Score, alongside
-/// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>.
+/// can factor broken/unrepaired fence segments into the Checkpoint Integrity Score.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
@@ -62,7 +75,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     public int CouponReward => _couponReward;
 
     /// <summary>True once every broken fence from the most recent trigger has been repaired.</summary>
-    public bool IsComplete => _isComplete;
+    public bool IsComplete => _isComplete.Value;
 
     /// <summary>Number of fences repaired so far this round.</summary>
     public int RepairedCount => _fencesRepaired.Value;
@@ -72,7 +85,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
     /// <summary>Dynamic description updated as fences are repaired.</summary>
     public string TaskDescription =>
-        _isComplete
+        IsComplete
             ? "All fence segments repaired!"
             : $"{RepairedCount}/{TotalCount}";
 
@@ -92,8 +105,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
     /// <summary>
     /// Fraction of this round's broken fences still unrepaired (0 = all repaired/no fences
-    /// currently broken, 1 = none repaired yet). Mirrors the pattern used by
-    /// <see cref="CleanGraffitiTask"/> and <see cref="TakeOutTrashTask"/>.
+    /// currently broken, 1 = none repaired yet).
     /// </summary>
     public float ThreatLevel =>
         TotalCount > 0 ? 1f - Mathf.Clamp01((float)RepairedCount / TotalCount) : 0f;
@@ -105,8 +117,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// Set by a day script (e.g. Day 1) while it is showing its own hand-scripted tutorial row
     /// for this task (see Day_01.EnsureFixFencesObjective). While true, HUDTaskList's generic
     /// TaskRegistry bridge skips adding its own row, preventing a duplicate "Fix Perimeter
-    /// Fences" entry in the tutorial objective list. Mirrors the pattern used by
-    /// <see cref="TakeOutTrashTask"/> and <see cref="CleanGraffitiTask"/>.
+    /// Fences" entry in the tutorial objective list.
     /// </summary>
     public bool HasCustomTutorialRow { get; set; }
 
@@ -118,31 +129,36 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
     // ── Networked state ──────────────────────────────────────────────────────
 
-    private NetworkVariable<int> _targetFenceCount = new NetworkVariable<int>(
+    private readonly NetworkVariable<int> _targetFenceCount = new NetworkVariable<int>(
         0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    private NetworkVariable<int> _fencesRepaired = new NetworkVariable<int>(
+    private readonly NetworkVariable<int> _fencesRepaired = new NetworkVariable<int>(
         0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
     /// <summary>
     /// Whether this task is currently active and should appear in the HUD task list.
-    /// Drives TaskRegistry registration on all clients, including late joiners. Mirrors the
-    /// pattern used by <see cref="CleanBloodTask"/> and <see cref="TakeOutTrashTask"/> — without
-    /// this, FenceRepairTask was never added to TaskRegistry at all, so it never showed up in
-    /// HUDTaskList/TutorialObjectiveList regardless of when it was triggered.
+    /// Drives TaskRegistry registration on all clients, including late joiners.
     /// </summary>
     private readonly NetworkVariable<bool> _isActive = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // Local flag propagated to all clients via MarkCompleteClientRpc.
-    private bool _isComplete;
+    /// <summary>
+    /// Replicated completion latch. Networked (rather than a local bool set by a ClientRpc) so a
+    /// client that connects after the final repair still reports the task complete instead of
+    /// showing a permanently stalled "n/n" row.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isComplete = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // Server-only: which fences were broken this round (for cleanup on the next trigger).
-    private readonly List<PerimiterFence> _brokenFences = new();
+    // Server-only: the fences this round's objective is counting.
+    private readonly List<PerimiterFence> _trackedFences = new();
+
+    // Server-only: fences we currently hold an OnDamageStateChangedServer subscription on.
+    private readonly HashSet<PerimiterFence> _observedFences = new();
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -163,20 +179,12 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _targetFenceCount.OnValueChanged += OnProgressChangedInternal;
         _fencesRepaired.OnValueChanged   += OnProgressChangedInternal;
         _isActive.OnValueChanged         += OnIsActiveChanged;
+        _isComplete.OnValueChanged       += OnIsCompleteChanged;
 
         // Handle the initial value for late-joining clients: if the task was already active
         // before this client connected, register it in TaskRegistry immediately.
         if (_isActive.Value)
             TaskRegistry.Instance?.AddThreat(this);
-
-        // _isComplete is otherwise only ever set by MarkCompleteClientRpc, which a client that
-        // joined after the last fence was repaired never received — leaving it reporting "2/2"
-        // instead of "All fence segments repaired!" and IsComplete false to any day script that
-        // asks. The replicated counts already say everything needed, so derive it here. Clients
-        // only: on the server this flag is authoritative run state owned by TriggerTask.
-        if (!IsServer)
-            _isComplete = _targetFenceCount.Value > 0 &&
-                          _fencesRepaired.Value >= _targetFenceCount.Value;
     }
 
     public override void OnNetworkDespawn()
@@ -185,6 +193,9 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _targetFenceCount.OnValueChanged -= OnProgressChangedInternal;
         _fencesRepaired.OnValueChanged   -= OnProgressChangedInternal;
         _isActive.OnValueChanged         -= OnIsActiveChanged;
+        _isComplete.OnValueChanged       -= OnIsCompleteChanged;
+
+        if (IsServer) StopObservingFences();
     }
 
     private void OnDestroy()
@@ -197,9 +208,10 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Randomly breaks a subset of fences at varied damage levels, on top of whatever state
-    /// they're already in. Never heals fences directly — repair only ever happens via
-    /// <see cref="HammerPickable"/> hits on <see cref="PerimiterFence"/>.
+    /// Randomly damages a subset of fences on top of whatever state they're already in, then
+    /// starts tracking every currently broken segment. Never heals fences — damage is only ever
+    /// raised (see <see cref="PerimiterFence.EnsureMinimumDamageLevelServer"/>) and repair only
+    /// ever happens via <see cref="HammerPickable"/> hits.
     /// Server-only — safe to call from any client, but only the server performs the
     /// authoritative break logic (replicated to clients via the NetworkVariables above).
     /// </summary>
@@ -207,16 +219,13 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     {
         if (!IsServer) return;
 
-        _isComplete = false;
+        StopObservingFences();
+        _trackedFences.Clear();
+
+        _isComplete.Value     = false;
         _fencesRepaired.Value = 0;
 
-        UnsubscribeFromAllBrokenFences();
-
-        _brokenFences.Clear();
-
         int count = PickBrokenFenceCount();
-        _targetFenceCount.Value = count;
-
         PerimiterFence[] shuffled = ShuffleCopy(_allFences);
 
         for (int i = 0; i < count && i < shuffled.Length; i++)
@@ -224,62 +233,99 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
             PerimiterFence fence = shuffled[i];
             if (fence == null) continue;
 
-            int maxAllowed = fence.MaxDamageLevel;
-            int damageMin  = Mathf.Min(_damageRange.x, maxAllowed);
-            int damageMax  = Mathf.Min(_damageRange.y, maxAllowed);
+            int maxAllowed  = fence.MaxDamageLevel;
+            int damageMin   = Mathf.Clamp(_damageRange.x, 1, Mathf.Max(1, maxAllowed));
+            int damageMax   = Mathf.Clamp(_damageRange.y, damageMin, Mathf.Max(1, maxAllowed));
             int damageLevel = Random.Range(damageMin, damageMax + 1);
 
-            fence.SetDamageLevelServer(damageLevel);
-            fence.OnFullyRepaired += HandleFenceRepaired;
-            _brokenFences.Add(fence);
+            // Raise damage only — a fence a mutant already smashed to rubble must not be healed
+            // back up to the rolled level (which is what the old absolute SetDamageLevelServer
+            // call did).
+            fence.EnsureMinimumDamageLevelServer(damageLevel);
         }
 
-        Debug.Log($"[FenceRepairTask] Task triggered: {count} fence segment(s) broken.");
+        // Track every segment that is actually broken right now — including ones mutants
+        // destroyed during the breach — so the objective total matches what the players can see,
+        // and repairing any of them counts.
+        StartObservingFences();
+        RebuildTrackedFences();
 
-        _isActive.Value = true;
+        Debug.Log($"[FenceRepairTask] Task triggered: {_trackedFences.Count} broken fence segment(s) tracked " +
+                  $"(rolled {count}).");
+
+        _isActive.Value = _trackedFences.Count > 0;
 
         // Explicitly re-register on every client rather than relying solely on
         // _isActive's OnValueChanged — if the task was already active this cycle (e.g. a
         // debug re-trigger of Day 3), that NetworkVariable write is a no-op and
-        // OnIsActiveChanged never fires, silently dropping the task from the HUD. Mirrors
-        // the equivalent fix in TakeOutTrashTask / CleanBloodTask.
-        RegisterInTaskRegistryClientRpc();
+        // OnIsActiveChanged never fires, silently dropping the task from the HUD.
+        if (_isActive.Value)
+            RegisterInTaskRegistryClientRpc();
+
+        // A trigger that broke nothing is immediately satisfied.
+        RecomputeProgress();
     }
 
     // ── Repair flow ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Called on the server when a fence's damage reaches 0.
-    /// Increments the repair counter and completes the task when all fences are fixed.
+    /// Server-side callback fired for every authoritative fence health change while this task is
+    /// running. Newly broken segments join the tracked set; progress is then recomputed from
+    /// scratch, which is what makes the counter impossible to stall.
     /// </summary>
-    private void HandleFenceRepaired(PerimiterFence fence)
+    private void HandleFenceStateChanged(PerimiterFence fence)
     {
-        Debug.Assert(IsServer, "[FenceRepairTask] HandleFenceRepaired called on non-server.");
+        if (!IsServer || _isComplete.Value) return;
 
-        fence.OnFullyRepaired -= HandleFenceRepaired;
+        if (fence != null && fence.IsBroken && !_trackedFences.Contains(fence))
+            _trackedFences.Add(fence);
 
-        _fencesRepaired.Value = Mathf.Clamp(_fencesRepaired.Value + 1, 0, _targetFenceCount.Value);
-
-        Debug.Log($"[FenceRepairTask] Fence repaired ({_fencesRepaired.Value}/{_targetFenceCount.Value}).");
-
-        if (_fencesRepaired.Value < _targetFenceCount.Value) return;
-
-        // All broken fences have been repaired — complete the task.
-        // Tasks no longer pay coupons — players are only paid for processing suspects (see SuspectController.PayOutResults).
-        // ATM.Instance?.SpawnCoupons(_couponReward);
-
-        MarkCompleteClientRpc();
-
-        // Hide from HUD once all fences are repaired.
-        _isActive.Value = false;
+        RecomputeProgress();
     }
 
-    [ClientRpc]
-    private void MarkCompleteClientRpc()
+    /// <summary>
+    /// Recounts repaired/total from live fence state and completes the task when nothing tracked
+    /// is broken any more. Server-only.
+    /// </summary>
+    private void RecomputeProgress()
     {
-        _isComplete = true;
+        if (!IsServer || _isComplete.Value) return;
+
+        _trackedFences.RemoveAll(f => f == null);
+
+        int total    = _trackedFences.Count;
+        int repaired = 0;
+
+        for (int i = 0; i < _trackedFences.Count; i++)
+        {
+            if (_trackedFences[i].IsRepaired) repaired++;
+        }
+
+        _targetFenceCount.Value = total;
+        _fencesRepaired.Value   = Mathf.Clamp(repaired, 0, total);
+
+        if (total <= 0 || repaired < total) return;
+
+        // Every tracked segment is pristine — latch completion.
+        // Tasks no longer pay coupons — players are only paid for processing suspects
+        // (see SuspectController.PayOutResults).
+        // ATM.Instance?.SpawnCoupons(_couponReward);
+
+        StopObservingFences();
+
+        _isComplete.Value = true;   // → OnIsCompleteChanged on every peer, host included.
+        _isActive.Value   = false;  // Hide from HUD once all fences are repaired.
+
+        Debug.Log($"[FenceRepairTask] All {total} tracked fence segment(s) repaired — task complete.");
+    }
+
+    /// <summary>Runs on every peer (including the host) when the replicated completion latch flips.</summary>
+    private void OnIsCompleteChanged(bool previous, bool current)
+    {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
-        OnAllFencesRepaired?.Invoke();
+
+        if (current && !previous)
+            OnAllFencesRepaired?.Invoke();
     }
 
     // ── Registry management ──────────────────────────────────────────────────
@@ -300,13 +346,43 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>Removes HandleFenceRepaired subscriptions from all previously broken fences.</summary>
-    private void UnsubscribeFromAllBrokenFences()
+    /// <summary>
+    /// Subscribes to state changes on EVERY fence (not only the ones this task broke) so a
+    /// segment that mutants destroy mid-task still enters the objective, and repairing it counts.
+    /// Server-only.
+    /// </summary>
+    private void StartObservingFences()
     {
-        foreach (PerimiterFence fence in _brokenFences)
+        if (_allFences == null) return;
+
+        foreach (PerimiterFence fence in _allFences)
+        {
+            if (fence == null || !_observedFences.Add(fence)) continue;
+            fence.OnDamageStateChangedServer += HandleFenceStateChanged;
+        }
+    }
+
+    private void StopObservingFences()
+    {
+        foreach (PerimiterFence fence in _observedFences)
         {
             if (fence != null)
-                fence.OnFullyRepaired -= HandleFenceRepaired;
+                fence.OnDamageStateChangedServer -= HandleFenceStateChanged;
+        }
+        _observedFences.Clear();
+    }
+
+    /// <summary>Rebuilds the tracked set from whichever fences are currently broken. Server-only.</summary>
+    private void RebuildTrackedFences()
+    {
+        _trackedFences.Clear();
+
+        if (_allFences == null) return;
+
+        foreach (PerimiterFence fence in _allFences)
+        {
+            if (fence != null && fence.IsBroken && !_trackedFences.Contains(fence))
+                _trackedFences.Add(fence);
         }
     }
 
@@ -333,6 +409,8 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// <summary>Returns a Fisher-Yates shuffled copy of the source array.</summary>
     private static T[] ShuffleCopy<T>(T[] source)
     {
+        if (source == null) return Array.Empty<T>();
+
         T[] copy = (T[])source.Clone();
         for (int i = copy.Length - 1; i > 0; i--)
         {

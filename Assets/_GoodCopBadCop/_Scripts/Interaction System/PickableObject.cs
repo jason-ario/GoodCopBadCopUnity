@@ -183,6 +183,10 @@ public class PickableObject : Interactable
     /// </summary>
     private void OnIsStowedChanged(bool previousValue, bool newValue)
     {
+        // Deactivating kills any coroutine mid-flight on every peer, so drop the busy latches
+        // here as well as in the owner's stow path — otherwise the item comes back "busy".
+        if (newValue) ForceClearUseState();
+
         gameObject.SetActive(!newValue);
         OnStowedNetworked?.Invoke(newValue);
     }
@@ -962,6 +966,11 @@ public class PickableObject : Interactable
     public virtual void OnEquipped(PlayerPickupController player)
     {
         SetInteractable(false);
+
+        // Guarantee a clean slate: an item can arrive back in a hand carrying a stale busy latch
+        // from a previous use that was interrupted (deactivated while stowed, dropped mid-swing,
+        // stop-use lost while input was gated). Without this the item would be dead on arrival.
+        ForceClearUseState();
         // Re-enable physics colliders as triggers so the held object passes through
         // world geometry without blocking. SetInteractable disabled them; we restore
         // them here as triggers so they still detect overlaps but don't physically block.
@@ -1104,6 +1113,47 @@ public class PickableObject : Interactable
     public virtual void OnStopUse()
     {
         isUsing = false;
+    }
+
+    /// <summary>
+    /// Failsafe: silently clears every "currently busy / in use" latch on this item without
+    /// firing gameplay side effects or RPCs. Safe to call at any time, including on a
+    /// deactivated or despawning object.
+    ///
+    /// Exists because latches guarded by coroutines are lost whenever the GameObject is
+    /// deactivated (a stow calls <c>SetActive(false)</c>, which kills running coroutines mid-way
+    /// so the code that would have cleared the latch never runs) or whenever a stop-use signal
+    /// is dropped because input was gated that frame. The item then stayed "busy" forever and
+    /// ignored all further use input until it was dropped and picked up again.
+    ///
+    /// Subclasses that track their own busy state (swing cooldowns, use routines, animator
+    /// bools) MUST override this and reset that state too, calling base first.
+    /// </summary>
+    public virtual void ForceClearUseState()
+    {
+        isUsing = false;
+    }
+
+    /// <summary>
+    /// Gracefully ends an in-progress use (running <see cref="OnStopUse"/> so effects, particles
+    /// and animator bools are torn down properly) and then hard-clears any residual latch via
+    /// <see cref="ForceClearUseState"/>. Used by the stow path and the stuck-use watchdog.
+    /// </summary>
+    public void AbortUse()
+    {
+        if (isUsing)
+        {
+            try
+            {
+                OnStopUse();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PickableObject] OnStopUse threw while aborting use on {name}: {e}", this);
+            }
+        }
+
+        ForceClearUseState();
     }
 
     public void OnDroppedFromBody()

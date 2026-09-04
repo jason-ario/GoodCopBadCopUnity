@@ -13,6 +13,30 @@ using DG.Tweening;
 ///   Index 2: Mostly damaged  (≥ 25 %)
 ///   Index 3: Critical — NavMeshObstacle disabled, mutants can pass through  (&lt; 25 %)
 ///
+/// ── Networking contract ───────────────────────────────────────────────────────
+/// <see cref="_health"/> is the ONE source of truth for every peer. Every derived
+/// question — the visible mesh, "does this need repair?", "can a mutant walk through?",
+/// and <see cref="FenceRepairTask"/>'s progress counter — is computed from it, so the
+/// host and every client always agree.
+///
+/// Two things guarantee that agreement:
+///   1. <see cref="_health"/> starts at <see cref="UninitializedHealth"/> (-1) rather than 0.
+///      Previously it defaulted to 0, which reads as "totally destroyed" — any client that
+///      rendered before the replicated value landed showed every fence in its most broken
+///      state while the host showed them pristine. -1 is treated as "healthy until told
+///      otherwise" (see <see cref="CurrentHealth"/>), so an unsynchronised fence can never
+///      render the wrong state.
+///   2. Clients explicitly pull the authoritative value on spawn via
+///      <see cref="RequestStateSyncServerRpc"/>, so a missed/late NetworkVariable snapshot
+///      still self-corrects instead of leaving the segment stuck at the wrong visual.
+///
+/// "Needs repair" is deliberately defined as <em>damage state > 0</em>
+/// (see <see cref="IsBroken"/>) and NOT as <c>health &lt; maxHealth</c>. A fence chipped to
+/// 80 % health still renders the pristine index-0 mesh, so counting it as broken produced
+/// objectives that could never be finished ("14/15 repaired" with no visibly broken fence
+/// left to hit). Repair snaps health back to exactly <see cref="_maxHealth"/> the moment the
+/// fence re-enters state 0, keeping "state 0" and "full health" the same thing.
+///
 /// Prefab setup:
 ///   - NetworkObject on this GameObject.
 ///   - NavMeshObstacle on this GameObject (carving disabled — this obstacle only pushes
@@ -25,6 +49,9 @@ using DG.Tweening;
 [RequireComponent(typeof(NetworkObject))]
 public class PerimiterFence : NetworkBehaviour
 {
+    /// <summary>Sentinel meaning "the server has not written a health value yet".</summary>
+    private const float UninitializedHealth = -1f;
+
     // ── Configuration ─────────────────────────────────────────────────────────
 
     [Header("Damage State Meshes")]
@@ -58,16 +85,24 @@ public class PerimiterFence : NetworkBehaviour
 
     /// <summary>
     /// Current health. Authoritative on server, replicated to all clients.
-    /// Starts at 0 and is set to <see cref="_maxHealth"/> in <see cref="OnNetworkSpawn"/>.
+    /// Starts at <see cref="UninitializedHealth"/> and is set to <see cref="_maxHealth"/> in
+    /// <see cref="OnNetworkSpawn"/>. See the class summary for why the sentinel matters.
     /// </summary>
-    private NetworkVariable<float> _health = new NetworkVariable<float>(
-        0f,
+    private readonly NetworkVariable<float> _health = new NetworkVariable<float>(
+        UninitializedHealth,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
     // ── Local state ────────────────────────────────────────────────────────────
 
     private NavMeshObstacle _navMeshObstacle;
+
+    /// <summary>
+    /// Value delivered by <see cref="SyncStateClientRpc"/>. Only consulted while
+    /// <see cref="_health"/> is still un-replicated, as a safety net against a
+    /// NetworkVariable snapshot that arrives after this client's OnNetworkSpawn.
+    /// </summary>
+    private float _fallbackHealth = UninitializedHealth;
 
     /// <summary>
     /// The currently active entry from <see cref="_damageStateMeshRoots"/>, kept up to date by
@@ -77,28 +112,53 @@ public class PerimiterFence : NetworkBehaviour
     /// </summary>
     private GameObject _activeMeshRoot;
 
+    /// <summary>Last damage state actually pushed to the meshes; -1 = nothing applied yet.</summary>
+    private int _appliedState = -1;
+
     /// <summary>Prevents audio from playing during initial spawn synchronisation.</summary>
     private bool _initialized;
 
     // ── Properties ─────────────────────────────────────────────────────────────
 
-    /// <summary>True when this fence segment has taken any damage.</summary>
-    public bool IsBroken => _health.Value < _maxHealth;
+    /// <summary>
+    /// Health as every peer should read it. An un-replicated fence reports full health rather
+    /// than 0 so it can never briefly render as destroyed on a client (see class summary).
+    /// </summary>
+    public float CurrentHealth
+    {
+        get
+        {
+            if (_health.Value >= 0f) return _health.Value;
+            if (_fallbackHealth >= 0f) return _fallbackHealth;
+            return _maxHealth;
+        }
+    }
 
-    /// <summary>True when this fence is at full health.</summary>
-    public bool IsRepaired => _health.Value >= _maxHealth;
+    /// <summary>Maximum health of this segment.</summary>
+    public float MaxHealth => _maxHealth;
+
+    /// <summary>Current visual damage state index (0 = pristine, <see cref="MaxDamageLevel"/> = ruined).</summary>
+    public int DamageState => GetDamageState(CurrentHealth);
+
+    /// <summary>
+    /// True when this fence is <em>visibly</em> damaged and therefore worth hitting with a hammer.
+    /// Derived from the damage state (not raw health) so what the objective counts is exactly what
+    /// the player can see and repair on every client. See class summary.
+    /// </summary>
+    public bool IsBroken => DamageState > 0;
+
+    /// <summary>True when this fence is in its pristine visual state.</summary>
+    public bool IsRepaired => DamageState == 0;
 
     /// <summary>
     /// True when this fence is in its most-damaged state and mutants can walk through it.
-    /// Health-based so this works whether or not a NavMeshObstacle is present on the prefab.
     /// By default, mutants can pass through once health drops below 25 %.
     /// </summary>
-    public bool IsPassableByMutant => _health.Value < (_maxHealth * 0.25f);
+    public bool IsPassableByMutant => DamageState >= MaxDamageLevel;
 
     /// <summary>
     /// The highest valid integer damage level, derived from the number of mesh root entries.
     /// A fence with four mesh roots supports levels 0–3.
-    /// Kept for backward-compatibility with <see cref="FenceRepairTask"/>.
     /// </summary>
     public int MaxDamageLevel => _damageStateMeshRoots != null
         ? Mathf.Max(0, _damageStateMeshRoots.Length - 1)
@@ -107,10 +167,18 @@ public class PerimiterFence : NetworkBehaviour
     // ── Events ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Raised on the server when a player's hammer hits restore this fence to full health.
-    /// <see cref="FenceRepairTask"/> subscribes to this to track task progress.
+    /// Raised on the server when a player's hammer hits restore this fence to its pristine state.
     /// </summary>
     public event Action<PerimiterFence> OnFullyRepaired;
+
+    /// <summary>
+    /// Raised on the server after <em>any</em> authoritative health change (repair, mutant hit, or
+    /// a scripted <see cref="SetDamageLevelServer"/> call). <see cref="FenceRepairTask"/> and
+    /// <see cref="FenceThreat"/> listen to this and recompute their counters from live fence state
+    /// instead of incrementing a counter off the one-shot <see cref="OnFullyRepaired"/> event —
+    /// an increment that drifts permanently out of sync the moment a single event is missed.
+    /// </summary>
+    public event Action<PerimiterFence> OnDamageStateChangedServer;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -125,14 +193,21 @@ public class PerimiterFence : NetworkBehaviour
 
         _health.OnValueChanged += OnHealthChanged;
 
-        // Server initialises health to full on first spawn.
-        // Subsequent SetDamageLevelServer calls (from FenceRepairTask) override this.
-        if (IsServer && _health.Value == 0f)
+        // Server initialises health to full the first time this segment ever spawns. The sentinel
+        // check means a fence that legitimately sits at 0 health is no longer silently healed
+        // back to full on re-spawn (the old `_health.Value == 0f` test could not tell
+        // "destroyed" apart from "never initialised").
+        if (IsServer && _health.Value < 0f)
             _health.Value = _maxHealth;
 
         // Apply the current state immediately. OnValueChanged does not fire for initial values
         // on clients that join after the fence has already been synchronised.
-        ApplyHealthState(_health.Value);
+        ApplyHealthState(CurrentHealth, force: true);
+
+        // Belt-and-braces: explicitly pull the authoritative health so a client whose
+        // NetworkVariable snapshot was late or dropped still converges on the host's state.
+        if (IsClient && !IsServer)
+            RequestStateSyncServerRpc();
 
         _initialized = true;
     }
@@ -142,21 +217,52 @@ public class PerimiterFence : NetworkBehaviour
         base.OnNetworkDespawn();
         _health.OnValueChanged -= OnHealthChanged;
         _initialized = false;
+        _fallbackHealth = UninitializedHealth;
+    }
+
+    // ── Explicit client resync ─────────────────────────────────────────────────
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestStateSyncServerRpc(ServerRpcParams rpcParams = default)
+    {
+        SyncStateClientRpc(_health.Value, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { rpcParams.Receive.SenderClientId }
+            }
+        });
+    }
+
+    [ClientRpc]
+    private void SyncStateClientRpc(float health, ClientRpcParams rpcParams = default)
+    {
+        _fallbackHealth = health;
+
+        // Deliberately bypasses OnHealthChanged so this corrective resync never plays
+        // repair/hit audio on a client that simply joined late.
+        ApplyHealthState(CurrentHealth, force: true);
     }
 
     // ── Health state ───────────────────────────────────────────────────────────
 
     private void OnHealthChanged(float previous, float current)
     {
-        ApplyHealthState(current);
+        // Once the real value replicates, the fallback is obsolete.
+        _fallbackHealth = UninitializedHealth;
+
+        ApplyHealthState(current, force: true);
 
         if (!_initialized || _audioSource == null) return;
+
+        // Ignore the initial sentinel → full-health write; it is initialisation, not a repair.
+        if (previous < 0f) return;
 
         if (current >= _maxHealth && _repairCompleteSound != null)
             _audioSource.PlayOneShot(_repairCompleteSound);
         else if (current > previous && _hammerHitSound != null)
             _audioSource.PlayOneShot(_hammerHitSound);
-        // Mutant hit sound is broadcast separately via PlayMutantHitSoundClientRpc.
+        // Mutant hit sound is broadcast separately via PlayMutantHitFeedbackClientRpc.
     }
 
     /// <summary>
@@ -166,9 +272,13 @@ public class PerimiterFence : NetworkBehaviour
     /// fully broken, and so the hammer's hit collider (used to detect repair hits) keeps
     /// registering hits at the most-damaged state.
     /// </summary>
-    private void ApplyHealthState(float health)
+    private void ApplyHealthState(float health, bool force = false)
     {
         int state = GetDamageState(health);
+
+        if (!force && state == _appliedState) return;
+
+        _appliedState = state;
         ApplyDamageVisuals(state);
         ApplyNavMeshObstacleState(state);
     }
@@ -184,7 +294,7 @@ public class PerimiterFence : NetworkBehaviour
         if (_maxHealth <= 0f || _damageThresholds == null || _damageThresholds.Length == 0)
             return 0;
 
-        float pct = (health / _maxHealth) * 100f;
+        float pct = (Mathf.Max(0f, health) / _maxHealth) * 100f;
 
         for (int i = 0; i < _damageThresholds.Length; i++)
         {
@@ -194,6 +304,28 @@ public class PerimiterFence : NetworkBehaviour
 
         // Below all thresholds → worst (passable) state.
         return _damageThresholds.Length;
+    }
+
+    /// <summary>
+    /// Lowest health value that still maps to damage state <paramref name="level"/>.
+    /// Used by <see cref="SetDamageLevelServer"/> so a requested level always lands squarely
+    /// inside its visual band rather than on a threshold boundary.
+    /// </summary>
+    private float HealthForDamageLevel(int level)
+    {
+        if (_damageThresholds == null || _damageThresholds.Length == 0 || level <= 0)
+            return _maxHealth;
+
+        int index = Mathf.Clamp(level, 0, _damageThresholds.Length);
+
+        // Level i is the band [thresholds[i], thresholds[i-1]); sit in the middle of it.
+        float upper = index - 1 >= 0 && index - 1 < _damageThresholds.Length
+            ? _damageThresholds[index - 1]
+            : 100f;
+        float lower = index < _damageThresholds.Length ? _damageThresholds[index] : 0f;
+
+        float pct = index >= _damageThresholds.Length ? 0f : (lower + upper) * 0.5f;
+        return Mathf.Clamp(_maxHealth * pct * 0.01f, 0f, _maxHealth);
     }
 
     private void ApplyDamageVisuals(int state)
@@ -208,7 +340,7 @@ public class PerimiterFence : NetworkBehaviour
 
         // Track the currently visible mesh root so hit-feedback can shake it instead of the
         // root transform (which carries the NavMeshObstacle — see PlayMutantHitFeedbackClientRpc).
-        _activeMeshRoot = (_damageStateMeshRoots != null && state >= 0 && state < _damageStateMeshRoots.Length)
+        _activeMeshRoot = (state >= 0 && state < _damageStateMeshRoots.Length)
             ? _damageStateMeshRoots[state]
             : null;
     }
@@ -237,33 +369,77 @@ public class PerimiterFence : NetworkBehaviour
 
     /// <summary>
     /// Sets this fence to a specific integer damage level. 0 = fully repaired; higher = more broken.
-    /// Called by <see cref="FenceRepairTask"/> at the start of each night phase. Server-only.
-    /// Maps level 0 → full health and <see cref="MaxDamageLevel"/> → 0 health linearly.
+    /// Server-only. Health is placed in the middle of the target level's visual band so the
+    /// requested level and the rendered mesh always agree.
     /// </summary>
     /// <param name="level">Target damage level. Clamped to 0–<see cref="MaxDamageLevel"/>.</param>
     public void SetDamageLevelServer(int level)
     {
-        Debug.Assert(IsServer, "[PerimiterFence] SetDamageLevelServer must be called on the server.");
+        if (!IsServer)
+        {
+            Debug.LogWarning("[PerimiterFence] SetDamageLevelServer must be called on the server.", this);
+            return;
+        }
 
         int clamped = Mathf.Clamp(level, 0, MaxDamageLevel);
-        float t = MaxDamageLevel > 0 ? 1f - (float)clamped / MaxDamageLevel : 1f;
-        _health.Value = Mathf.Clamp(t * _maxHealth, 0f, _maxHealth);
+        SetHealthServer(HealthForDamageLevel(clamped));
+    }
+
+    /// <summary>
+    /// Damages this fence to at least <paramref name="level"/>, never healing it.
+    /// <see cref="FenceRepairTask"/>/<see cref="FenceThreat"/> use this when breaking a batch of
+    /// fences: the previous <see cref="SetDamageLevelServer"/> call wrote an absolute health value,
+    /// so a segment a mutant had already smashed to rubble was silently <em>healed</em> back up to
+    /// the randomly rolled level. Server-only.
+    /// </summary>
+    public void EnsureMinimumDamageLevelServer(int level)
+    {
+        if (!IsServer) return;
+
+        int clamped = Mathf.Clamp(level, 0, MaxDamageLevel);
+        if (clamped <= DamageState) return;
+
+        SetHealthServer(HealthForDamageLevel(clamped));
+    }
+
+    /// <summary>Writes health authoritatively and notifies server-side listeners. Server-only.</summary>
+    private void SetHealthServer(float health)
+    {
+        float clamped = Mathf.Clamp(health, 0f, _maxHealth);
+        if (Mathf.Approximately(_health.Value, clamped)) return;
+
+        bool wasBroken = IsBroken;
+        _health.Value = clamped;
+
+        OnDamageStateChangedServer?.Invoke(this);
+
+        if (wasBroken && IsRepaired)
+            OnFullyRepaired?.Invoke(this);
     }
 
     /// <summary>
     /// Registers a single hammer hit, restoring health by <see cref="_hammerRepairAmount"/>.
-    /// Raises <see cref="OnFullyRepaired"/> when health returns to maximum.
-    /// Safe to call from any client — ownership is not required.
+    /// Raises <see cref="OnFullyRepaired"/> when the fence returns to its pristine state.
+    /// Safe to call from any client — ownership is not required, and the client does NOT need to
+    /// have an up-to-date view of the fence's health: the server is the sole arbiter of whether
+    /// the hit does anything. That is what stopped repair from working for non-host players
+    /// whose replicated health was stale.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void HitWithHammerServerRpc()
     {
-        if (IsRepaired) return;
+        if (!IsBroken) return;
 
-        _health.Value = Mathf.Min(_maxHealth, _health.Value + _hammerRepairAmount);
+        float target = Mathf.Min(_maxHealth, CurrentHealth + Mathf.Max(1f, _hammerRepairAmount));
 
-        if (_health.Value >= _maxHealth)
-            OnFullyRepaired?.Invoke(this);
+        // Keep the invariant "damage state 0 == exactly full health". Without this a hit that
+        // lands anywhere in the 75–99 % band renders the pristine mesh while still reporting
+        // health < max, which is how the objective ended up stuck one fence short with nothing
+        // visibly broken left to hit.
+        if (GetDamageState(target) == 0)
+            target = _maxHealth;
+
+        SetHealthServer(target);
     }
 
     /// <summary>
@@ -275,13 +451,17 @@ public class PerimiterFence : NetworkBehaviour
     /// <param name="hitPosition">World-space contact point used to place the hit particle.</param>
     public void TakeMutantHitServer(float damage, Vector3 hitPosition)
     {
-        Debug.Assert(IsServer, "[PerimiterFence] TakeMutantHitServer must be called on the server.");
+        if (!IsServer)
+        {
+            Debug.LogWarning("[PerimiterFence] TakeMutantHitServer must be called on the server.", this);
+            return;
+        }
 
         PlayMutantHitFeedbackClientRpc(hitPosition);
 
-        if (_health.Value <= 0f) return;
+        if (CurrentHealth <= 0f) return;
 
-        _health.Value = Mathf.Max(0f, _health.Value - damage);
+        SetHealthServer(CurrentHealth - damage);
     }
 
     [ClientRpc]
