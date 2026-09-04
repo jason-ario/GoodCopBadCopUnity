@@ -128,6 +128,22 @@ public class DeliveryTruckController : NetworkBehaviour
     private Quaternion _crateRestRotation;
     private Sequence _driveSequence;
 
+    /// <summary>
+    /// True while the delivery crate is sitting at its resting spot on the ground, i.e. from the
+    /// moment it finishes tumbling off the roof until <see cref="DeactivateCrate"/> clears it at the
+    /// start of the next day.
+    ///
+    /// Unlike the truck itself — a transient cutscene prop — the dropped crate is persistent world
+    /// state that outlives the sequence by a whole in-game day, so it cannot be left to the
+    /// <see cref="ReleaseCrateClientRpc"/> that animates the drop: an RPC reaches only the clients
+    /// connected when it is sent, so anyone joining after the delivery saw no crate at the drop-off
+    /// point at all while everyone else did. Replicated so late joiners can place it directly.
+    /// </summary>
+    private readonly NetworkVariable<bool> _crateDropped = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -150,11 +166,43 @@ public class DeliveryTruckController : NetworkBehaviour
         }
         if (crateParentConstraint != null)
             crateParentConstraint.constraintActive = false;
+
+        _crateDropped.OnValueChanged += OnCrateDroppedChanged;
+
+        // Late joiner: a crate dropped before this client connected is already on the ground for
+        // everyone else, so place it straight at its resting spot instead of playing the tumble.
+        if (_crateDropped.Value)
+            PlaceCrateAtRest();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+
+        _crateDropped.OnValueChanged -= OnCrateDroppedChanged;
+    }
+
+    /// <summary>
+    /// Clears the crate when the server retires it. A newly-dropped crate is deliberately NOT
+    /// handled here — <see cref="ReleaseCrateClientRpc"/> already animates that transition for every
+    /// connected client, and late joiners are covered by <see cref="OnNetworkSpawn"/>.
+    /// </summary>
+    private void OnCrateDroppedChanged(bool previous, bool current)
+    {
+        if (!current && deliveryCrate != null)
+            deliveryCrate.gameObject.SetActive(false);
+    }
+
+    /// <summary>Snaps the crate to its authored resting transform and shows it, with no animation.</summary>
+    private void PlaceCrateAtRest()
+    {
+        if (deliveryCrate == null) return;
+
+        if (crateParentConstraint != null)
+            crateParentConstraint.constraintActive = false;
+
+        deliveryCrate.SetPositionAndRotation(_crateRestPosition, _crateRestRotation);
+        deliveryCrate.gameObject.SetActive(true);
     }
 
     // -------------------------------------------------------------------------
@@ -171,7 +219,7 @@ public class DeliveryTruckController : NetworkBehaviour
     public void DeactivateCrate()
     {
         if (!IsServer) return;
-        DeactivateCrateClientRpc();
+        _crateDropped.Value = false;
     }
 
     /// <summary>
@@ -232,6 +280,10 @@ public class DeliveryTruckController : NetworkBehaviour
         // Truck has arrived at pointC — release the crate and let it tumble down onto its resting spot.
         ReleaseCrateClientRpc();
         yield return new WaitForSeconds(crateTumbleDuration);
+
+        // The crate has landed and now stays put until the next day — record it so clients that
+        // connect later still see it (see _crateDropped).
+        _crateDropped.Value = true;
 
         // Crate has settled — this is the moment the mail delivery spawns.
         SortMailTask.Instance?.TriggerTask();
@@ -347,18 +399,6 @@ public class DeliveryTruckController : NetworkBehaviour
         if (truckAudioSource != null)
             truckAudioSource.Stop();
         SetVisualActive(false);
-    }
-
-    /// <summary>
-    /// Hides the delivery crate that was left sitting at its resting spot from a previous
-    /// delivery. Reactivated (and repositioned on the roof) the next time
-    /// <see cref="MountCrateOnRoof"/> runs.
-    /// </summary>
-    [ClientRpc]
-    private void DeactivateCrateClientRpc()
-    {
-        if (deliveryCrate != null)
-            deliveryCrate.gameObject.SetActive(false);
     }
 
     /// <summary>

@@ -85,6 +85,29 @@ public class JunkItem : Interactable
     }
 
     /// <summary>
+    /// Server-authoritative tutorial call-out glow, driven by
+    /// <see cref="TakeOutTrashTask.HighlightAllItemsForTutorial"/>.
+    ///
+    /// A NetworkVariable for the same reason as <see cref="IsCollectible"/>: this used to be pushed
+    /// as a one-shot ClientRpc carrying a list of item references, which reaches only the clients
+    /// connected at that instant. A player who joined mid-tutorial saw none of the call-out glow and
+    /// had no way to find the junk the objective was asking for. Replication also fixes the
+    /// narrower ordering bug in the old approach — junk spawned *after* the broadcast never lit up,
+    /// because nothing re-sent it.
+    /// </summary>
+    public readonly NetworkVariable<bool> TutorialHighlight = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Server-only. Turns the tutorial call-out glow on or off for every peer.</summary>
+    public void SetTutorialHighlight(bool highlight)
+    {
+        if (!IsServer) return;
+        TutorialHighlight.Value = highlight;
+    }
+
+    /// <summary>
     /// When true (default), collecting this item destroys its NetworkObject outright. Set false
     /// in the Inspector for junk that lives on a GameObject meant to be reused later (e.g. a
     /// guard corpse occupying a GuardPurchasePoint's reusable soldier slot) — collection then
@@ -179,6 +202,12 @@ public class JunkItem : Interactable
         // that rolled out of the cleanup area and has been ruled out of it.
         IsCollectible.OnValueChanged += OnIsCollectibleChanged;
         IsCleanupEligible.OnValueChanged += OnIsCollectibleChanged;
+        TutorialHighlight.OnValueChanged += OnTutorialHighlightChanged;
+
+        // Apply the current value for late joiners — an item already called out by the tutorial
+        // must light up for a client that connects after the call-out was issued.
+        if (TutorialHighlight.Value)
+            SetForceHighlight(true, HighlightHold.Tutorial);
 
         JunkPickupHighlightService.Register(this);
     }
@@ -189,8 +218,14 @@ public class JunkItem : Interactable
 
         IsCollectible.OnValueChanged -= OnIsCollectibleChanged;
         IsCleanupEligible.OnValueChanged -= OnIsCollectibleChanged;
+        TutorialHighlight.OnValueChanged -= OnTutorialHighlightChanged;
 
         JunkPickupHighlightService.Unregister(this);
+    }
+
+    private void OnTutorialHighlightChanged(bool previous, bool current)
+    {
+        SetForceHighlight(current, HighlightHold.Tutorial);
     }
 
     /// <summary>

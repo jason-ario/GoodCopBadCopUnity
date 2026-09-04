@@ -120,12 +120,38 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Replicated world positions of the trail's UV-visible blood particles, written by the server
+    /// in <see cref="SpawnEvent"/> and mirrored into local <see cref="_spawnedTrailParticles"/>
+    /// instances by every peer.
+    ///
+    /// The particles themselves are deliberately NOT NetworkObjects (<c>Invisible Blood.prefab</c>
+    /// carries no NetworkObject — it is pure VFX, and spawning ~dozens of NetworkObjects per trail
+    /// would be wasteful), so their existence has to be replicated as data instead. This used to be
+    /// a plain <c>ClientRpc</c>, which only ever reaches the clients connected at the moment it is
+    /// sent: a player who joined after the trail spawned saw no trail at all under the UV light and
+    /// could not complete the task. A server-write NetworkList is delivered in full to late joiners
+    /// as part of ordinary spawn synchronization, which an RPC can never guarantee — the same
+    /// reasoning behind <c>NetworkedDrawableLine</c>'s stroke list.
+    /// </summary>
+    private readonly NetworkList<Vector3> _trailParticlePositions = new(
+        new List<Vector3>(),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // ── Local state ──────────────────────────────────────────────────────────
 
     private GameObject _spawnedCorpse;
     private GameObject _spawnedDestination;
+
+    /// <summary>Local (non-networked) VFX instances mirroring <see cref="_trailParticlePositions"/>. Exists on every peer.</summary>
     private readonly List<GameObject> _spawnedTrailParticles = new();
-    private readonly List<GameObject> _spawnedBloodSplatters = new();
+
+    /// <summary>
+    /// End-of-trail blood decals spawned by the server. Server-only bookkeeping: these ARE
+    /// NetworkObjects, so clients receive and destroy their copies through replication.
+    /// </summary>
+    private readonly List<NetworkObject> _spawnedBloodSplatters = new();
 
     /// <summary>Pack mutants currently held frozen at the destination — see <see cref="_packHoldReleaseRadius"/>.</summary>
     private readonly List<MutantEnemy> _heldPackMutants = new();
@@ -212,11 +238,17 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _meetVladActive.OnValueChanged    += OnMeetVladActiveChanged;
         _followTrailActive.OnValueChanged += OnFollowTrailActiveChanged;
         _killMutantCount.OnValueChanged   += OnKillMutantCountChanged;
+        _trailParticlePositions.OnListChanged += OnTrailParticlePositionsChanged;
 
         // Apply initial values for late-joining clients so they see any already-active tasks.
         if (_meetVladActive.Value)         MeetVladOutBackTask.CreateAndRegister();
         if (_followTrailActive.Value)      TaskRegistry.Instance?.AddThreat(this);
         if (_killMutantCount.Value > 0)    KillMutantTask.CreateAndRegister(_killMutantCount.Value);
+
+        // Build the trail VFX for whatever is already on the list. On the server/host this is
+        // empty at spawn time; on a late-joining client it is the full trail of an event that
+        // spawned before the client connected, which is exactly the case the old ClientRpc missed.
+        RebuildTrailParticles();
     }
 
     public override void OnNetworkDespawn()
@@ -226,6 +258,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _meetVladActive.OnValueChanged    -= OnMeetVladActiveChanged;
         _followTrailActive.OnValueChanged -= OnFollowTrailActiveChanged;
         _killMutantCount.OnValueChanged   -= OnKillMutantCountChanged;
+        _trailParticlePositions.OnListChanged -= OnTrailParticlePositionsChanged;
+
+        // The replicated list is gone, so the local VFX mirroring it must go too — otherwise
+        // a client that disconnects mid-event leaves the trail floating in its scene.
+        DestroyLocalTrailParticles();
     }
 
     private void OnDestroy()
@@ -539,7 +576,14 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             for (int i = 0; i < spawnPositions.Count; i++)
                 spawnPositions[i] = SnapToTerrain(spawnPositions[i], _trailGroundOffset);
             Debug.Log($"[FollowTrailThreat] Spawning {spawnPositions.Count} trail particles.", this);
-            SpawnTrailParticlesClientRpc(spawnPositions.ToArray());
+
+            // Publish to the replicated list rather than firing a ClientRpc: every connected peer
+            // builds its VFX from the OnListChanged callback, and any client that joins later
+            // receives the whole list at spawn time and builds the trail then. See
+            // _trailParticlePositions.
+            _trailParticlePositions.Clear();
+            foreach (Vector3 position in spawnPositions)
+                _trailParticlePositions.Add(position);
 
             // Mark this trail as a temporary safe corridor so players following it don't take
             // off-trail radiation. Removed the following day (or on the next re-trigger) via Cleanup().
@@ -818,22 +862,24 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             _spawnedDestination = null;
         }
 
-        // Trail particles and blood splatters are local instances on each client — clean up via ClientRpc.
-        if (IsSpawned)
+        // Trail particles are local VFX mirroring _trailParticlePositions — clearing the replicated
+        // list tears them down on every peer (including anyone who joins afterward, who now receives
+        // an empty list instead of a stale trail). The end-of-trail splatters are real spawned
+        // NetworkObjects, so despawning them on the server removes each client's copy too.
+        if (IsServer)
         {
-            CleanupTrailParticlesClientRpc();
-            CleanupBloodSplattersClientRpc();
-        }
-        else
-        {
-            foreach (GameObject trail in _spawnedTrailParticles)
-                if (trail != null) Destroy(trail);
-            _spawnedTrailParticles.Clear();
+            if (IsSpawned) _trailParticlePositions.Clear();
 
-            foreach (GameObject splatter in _spawnedBloodSplatters)
-                if (splatter != null) Destroy(splatter);
+            foreach (NetworkObject splatter in _spawnedBloodSplatters)
+                if (splatter != null && splatter.IsSpawned) splatter.Despawn(true);
+
             _spawnedBloodSplatters.Clear();
         }
+
+        // A clear on an unspawned list raises no callback, and a client running Cleanup locally never
+        // writes to the list at all — so tear the local VFX down directly in both cases.
+        if (!IsServer || !IsSpawned)
+            DestroyLocalTrailParticles();
     }
 
     private Vector3 SnapToTerrain(Vector3 position, float yOffset)
@@ -853,66 +899,90 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Scatters <see cref="_endBloodSplatterCount"/> cosmetic ground blood-splatter decals within
     /// <see cref="_endBloodSplatterRadius"/> of <paramref name="destination"/>, snapped to terrain.
     /// No-op if no prefabs are assigned or the destination is unassigned. Server only.
+    ///
+    /// The splatter prefabs carry a NetworkObject (they are the same decals
+    /// <see cref="TakeOutTrashTask"/> spawns), so they are spawned server-side and replicated like
+    /// the corpse and destination props above. They used to be plain-<c>Instantiate</c>d on every
+    /// peer from a ClientRpc, which produced an *unspawned* NetworkObject on each client — inert as
+    /// far as Netcode is concerned, invisible to late joiners, and a second, conflicting authority
+    /// path for a prefab the server already knows how to spawn.
     /// </summary>
     private void SpawnEndBloodSplatters(Transform destination)
     {
+        if (!IsServer) return;
         if (_endBloodSplatterPrefabs == null || _endBloodSplatterPrefabs.Length == 0) return;
         if (destination == null || _endBloodSplatterCount <= 0) return;
 
-        Vector3[] positions = new Vector3[_endBloodSplatterCount];
-        int[] prefabIndices  = new int[_endBloodSplatterCount];
-
         for (int i = 0; i < _endBloodSplatterCount; i++)
         {
-            Vector2 offset2D = UnityEngine.Random.insideUnitCircle * _endBloodSplatterRadius;
-            Vector3 rawPos = destination.position + new Vector3(offset2D.x, 0f, offset2D.y);
-            positions[i]      = SnapToTerrain(rawPos, _endBloodSplatterGroundOffset);
-            prefabIndices[i]  = UnityEngine.Random.Range(0, _endBloodSplatterPrefabs.Length);
-        }
-
-        SpawnBloodSplattersClientRpc(positions, prefabIndices);
-    }
-
-    [ClientRpc]
-    private void SpawnBloodSplattersClientRpc(Vector3[] positions, int[] prefabIndices)
-    {
-        for (int i = 0; i < positions.Length; i++)
-        {
-            int prefabIndex = prefabIndices[i];
-            if (prefabIndex < 0 || prefabIndex >= _endBloodSplatterPrefabs.Length) continue;
-
-            GameObject prefab = _endBloodSplatterPrefabs[prefabIndex];
+            GameObject prefab = _endBloodSplatterPrefabs[UnityEngine.Random.Range(0, _endBloodSplatterPrefabs.Length)];
             if (prefab == null) continue;
 
-            Quaternion rot = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
-            GameObject splatter = Instantiate(prefab, positions[i], rot);
-            _spawnedBloodSplatters.Add(splatter);
+            Vector2 offset2D = UnityEngine.Random.insideUnitCircle * _endBloodSplatterRadius;
+            Vector3 rawPos   = destination.position + new Vector3(offset2D.x, 0f, offset2D.y);
+            Vector3 position = SnapToTerrain(rawPos, _endBloodSplatterGroundOffset);
+            Quaternion rot   = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
+
+            GameObject splatter = Instantiate(prefab, position, rot);
+
+            if (!splatter.TryGetComponent(out NetworkObject netObj))
+            {
+                Debug.LogWarning($"[FollowTrailThreat] End-of-trail splatter prefab '{prefab.name}' has no " +
+                                 "NetworkObject — it cannot be replicated. Destroying the local instance.", this);
+                Destroy(splatter);
+                continue;
+            }
+
+            netObj.Spawn(true);
+            _spawnedBloodSplatters.Add(netObj);
         }
     }
 
-    [ClientRpc]
-    private void CleanupBloodSplattersClientRpc()
-    {
-        foreach (GameObject splatter in _spawnedBloodSplatters)
-            if (splatter != null) Destroy(splatter);
-        _spawnedBloodSplatters.Clear();
-    }
+    // ── Trail particle replication ────────────────────────────────────────────
 
-    [ClientRpc]
-    private void SpawnTrailParticlesClientRpc(Vector3[] positions)
+    /// <summary>
+    /// Mirrors <see cref="_trailParticlePositions"/> into local VFX instances. Runs on every peer.
+    /// Appends for a single Add so the common case (the server writing one position per entry) stays
+    /// linear, and falls back to a full rebuild for bulk/structural changes.
+    /// </summary>
+    private void OnTrailParticlePositionsChanged(NetworkListEvent<Vector3> changeEvent)
     {
-        foreach (Vector3 pos in positions)
+        switch (changeEvent.Type)
         {
-            GameObject trail = Instantiate(_trailParticlesPrefab, pos, Quaternion.identity);
-            _spawnedTrailParticles.Add(trail);
+            case NetworkListEvent<Vector3>.EventType.Add:
+                SpawnLocalTrailParticle(changeEvent.Value);
+                break;
+
+            case NetworkListEvent<Vector3>.EventType.Clear:
+                DestroyLocalTrailParticles();
+                break;
+
+            default:
+                RebuildTrailParticles();
+                break;
         }
     }
 
-    [ClientRpc]
-    private void CleanupTrailParticlesClientRpc()
+    private void RebuildTrailParticles()
+    {
+        DestroyLocalTrailParticles();
+
+        foreach (Vector3 position in _trailParticlePositions)
+            SpawnLocalTrailParticle(position);
+    }
+
+    private void SpawnLocalTrailParticle(Vector3 position)
+    {
+        if (_trailParticlesPrefab == null) return;
+
+        _spawnedTrailParticles.Add(Instantiate(_trailParticlesPrefab, position, Quaternion.identity));
+    }
+
+    private void DestroyLocalTrailParticles()
     {
         foreach (GameObject trail in _spawnedTrailParticles)
             if (trail != null) Destroy(trail);
+
         _spawnedTrailParticles.Clear();
     }
 }

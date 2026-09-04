@@ -118,14 +118,17 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         base.OnNetworkSpawn();
         _isActive.OnValueChanged += OnActiveChanged;
 
-        if (_isActive.Value && _boothMessRoot != null)
-            _boothMessRoot.SetActive(true);
+        // Handle the initial value for late-joining clients: if the booth cleanup was already
+        // running before this client connected, register it in TaskRegistry and show the mess.
+        ApplyActiveState(_isActive.Value);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _isActive.OnValueChanged -= OnActiveChanged;
+
+        TaskRegistry.Instance?.RemoveThreat(this);
     }
 
     private void OnDestroy()
@@ -146,15 +149,17 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (_boothMessRoot != null)
             _boothMessRoot.SetActive(true);
 
-        _isActive.Value = true;
-
         DespawnExistingSplatters();
         DespawnExistingJunk();
         SpawnAllSplatters();
         SpawnAllJunk();
 
         UpdateThreatLevel();
-        RegisterClientRpc();
+
+        // Set last: flipping _isActive is what registers the task in the HUD on every peer
+        // (see OnActiveChanged), so the remaining-blood/junk counts must already be correct or the
+        // freshly-added row would render "nothing left to clean" for a frame.
+        _isActive.Value = true;
 
         Debug.Log($"[CleanBoothMessTask] Task triggered. {_networkRemainingBlood.Value} splatter(s), {_networkRemainingJunk.Value} junk item(s) spawned.");
     }
@@ -188,8 +193,9 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (_networkRemainingBlood.Value > 0 || _networkRemainingJunk.Value > 0) return;
 
         _networkThreatLevel.Value = 0f;
+
+        // Unregisters on every peer via OnActiveChanged, including anyone who joins later.
         _isActive.Value = false;
-        UnregisterClientRpc();
 
         Debug.Log("[CleanBoothMessTask] Booth fully cleaned — task complete.");
     }
@@ -317,22 +323,32 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
 
     // ── Client sync ──────────────────────────────────────────────────────────
 
-    [ClientRpc]
-    private void RegisterClientRpc()
-    {
-        TaskRegistry.Instance?.AddThreat(this);
-    }
-
-    [ClientRpc]
-    private void UnregisterClientRpc()
-    {
-        TaskRegistry.Instance?.RemoveThreat(this);
-    }
-
+    /// <summary>
+    /// Mirrors <see cref="_isActive"/> into the HUD task list and the booth mess visuals on every
+    /// peer. Registration is driven purely by this replicated flag — deliberately NOT by a
+    /// ClientRpc pair, which is what this task used to do and which silently skipped anyone who
+    /// joined mid-cleanup: an RPC only reaches the clients connected at the instant it is sent, so
+    /// a late joiner got no "clean the booth" row at all. Reading <see cref="_isActive"/> in
+    /// <see cref="OnNetworkSpawn"/> plus reacting here covers both cases from one source of truth,
+    /// matching every sibling task (TakeOutTrashTask, CleanBloodTask, FenceRepairTask, ...).
+    /// </summary>
     private void OnActiveChanged(bool previous, bool current)
     {
+        ApplyActiveState(current);
+    }
+
+    private void ApplyActiveState(bool active)
+    {
+        if (active)
+            TaskRegistry.Instance?.AddThreat(this);
+        else
+            TaskRegistry.Instance?.RemoveThreat(this);
+
+        // The server drives _boothMessRoot directly in TriggerTask so it is already correct there;
+        // remote clients follow the replicated flag. Applied in both directions so a client that
+        // joins with the task inactive hides a booth mess left enabled in the authored scene.
         if (!IsServer && _boothMessRoot != null)
-            _boothMessRoot.SetActive(current);
+            _boothMessRoot.SetActive(active);
     }
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────

@@ -35,7 +35,23 @@ public static class JunkPickupHighlightService
     /// gore chunk, mutant corpses, suspect bodies), and several of them are only ever spawned at
     /// runtime — one shared lookup keeps them consistent with zero per-prefab authoring.
     /// </summary>
-    private const string ProfileResourcePath = "Highlight/Junk Collectible";
+    /// <remarks>
+    /// This is a plain string lookup with no compile-time or asset-reference safety net: renaming the
+    /// asset in the Project window silently breaks it, and the only symptom is every collectible item
+    /// quietly falling back to the sharp white hover style (which is exactly what happened once). So
+    /// the exact paths are tried first, and a folder scan matching <see cref="ProfileNameFragment"/>
+    /// is used as a backstop — any future rename that keeps "Junk Collectible" in the name keeps
+    /// working.
+    /// </remarks>
+    private static readonly string[] ProfileResourcePaths =
+    {
+        "Highlight/Junk Collectible - Highlight",
+        "Highlight/Junk Collectible",
+    };
+
+    /// <summary>Folder scanned, and name fragment matched, when neither exact path resolves.</summary>
+    private const string ProfileResourceFolder = "Highlight";
+    private const string ProfileNameFragment = "Junk Collectible";
 
     private static HighlightProfile _collectibleProfile;
     private static bool _profileLoadAttempted;
@@ -52,13 +68,37 @@ public static class JunkPickupHighlightService
             if (_profileLoadAttempted) return _collectibleProfile;
 
             _profileLoadAttempted = true;
-            _collectibleProfile = Resources.Load<HighlightProfile>(ProfileResourcePath);
+
+            foreach (string path in ProfileResourcePaths)
+            {
+                _collectibleProfile = Resources.Load<HighlightProfile>(path);
+                if (_collectibleProfile != null) break;
+            }
 
             if (_collectibleProfile == null)
             {
-                Debug.LogWarning($"[JunkPickupHighlightService] No HighlightProfile at " +
-                                 $"Resources/{ProfileResourcePath} — collectible junk will glow with " +
-                                 "its default (hover) highlight style instead of the softer amber one.");
+                // Backstop: find it by name fragment so a rename can't silently kill the glow.
+                foreach (HighlightProfile candidate in Resources.LoadAll<HighlightProfile>(ProfileResourceFolder))
+                {
+                    if (candidate == null || !candidate.name.Contains(ProfileNameFragment)) continue;
+
+                    _collectibleProfile = candidate;
+                    Debug.Log($"[JunkPickupHighlightService] Collectible-junk profile found as " +
+                              $"'{candidate.name}' by folder scan rather than at its expected path — " +
+                              "the asset has been renamed. Still working, but update " +
+                              "ProfileResourcePaths to keep the fast path.");
+                    break;
+                }
+            }
+
+            if (_collectibleProfile == null)
+            {
+                Debug.LogWarning("[JunkPickupHighlightService] No HighlightProfile found at any of " +
+                                 $"Resources/{string.Join(", Resources/", ProfileResourcePaths)}, and " +
+                                 $"none in Resources/{ProfileResourceFolder} whose name contains " +
+                                 $"'{ProfileNameFragment}' — collectible junk, gore and mutant corpses " +
+                                 "will all glow with their default (white hover) style instead of the " +
+                                 "softer amber one.");
             }
 
             return _collectibleProfile;

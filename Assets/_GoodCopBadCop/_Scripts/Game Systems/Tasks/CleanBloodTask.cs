@@ -216,6 +216,14 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (_isActive.Value)
             TaskRegistry.Instance?.AddThreat(this);
 
+        // _isComplete is otherwise only ever set by MarkCompleteClientRpc, which a client that
+        // joined after the last splatter was scrubbed never received — leaving its HUD row showing
+        // a stale "3/3" instead of the completed description. Derive it from the replicated counts
+        // instead. Guarded to clients: on the server _isComplete is authoritative run state that
+        // also gates re-completion (see TryCompleteTask), and must not be inferred from counts.
+        if (!IsServer)
+            _isComplete = RequiredCount > 0 && _scrubbed.Value >= RequiredCount;
+
         // Server-only: any breach-dropped blood splatters registered via
         // RegisterTransientBloodSplatter get swept away the next time a day starts, regardless
         // of whether anyone mopped them up.

@@ -94,6 +94,9 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// <summary>True while the reticle is on this object (see <see cref="Highlight"/>).</summary>
     private bool _hovered;
 
+    /// <summary>Keeps the missing-authored-profile warning to one line per object.</summary>
+    private bool _warnedMissingDefaultProfile;
+
     /// <summary>
     /// Optional alternate style used while the highlight is being HELD on by a non-hover source
     /// (see <see cref="HighlightHold"/>) and the player is not actually aiming at the object.
@@ -262,7 +265,24 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         if (highlightEffect == null) return;
 
         HighlightProfile holdProfile = ForceHighlightProfile;
-        if (holdProfile == null || _defaultProfile == null) return;
+        if (holdProfile == null) return;
+
+        if (_defaultProfile == null)
+        {
+            // Nothing to swap back to on hover, so the object is left on its inline settings. Say so
+            // once: the visible symptom is an item glowing with the wrong style for no stated reason,
+            // which is otherwise indistinguishable from the hold profile failing to load.
+            if (!_warnedMissingDefaultProfile)
+            {
+                _warnedMissingDefaultProfile = true;
+                Debug.LogWarning($"[Interactable] '{name}' wants the '{holdProfile.name}' hold highlight " +
+                                 "profile but its HighlightEffect has no profile assigned in the " +
+                                 "Inspector, so the swap is skipped (there would be no authored style " +
+                                 "to restore on hover). Assign the shared highlight profile to fix.", this);
+            }
+
+            return;
+        }
 
         bool useHoldProfile = !_hovered && _highlightHolds != HighlightHold.None;
         HighlightProfile desired = useHoldProfile ? holdProfile : _defaultProfile;

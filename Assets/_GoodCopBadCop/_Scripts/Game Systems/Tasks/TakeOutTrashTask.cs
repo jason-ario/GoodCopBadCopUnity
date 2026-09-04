@@ -466,7 +466,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
 
         var junkItems = FindObjectsByType<JunkItem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        var refs = new List<NetworkObjectReference>(junkItems.Length);
         foreach (JunkItem junk in junkItems)
         {
             if (!IsCountablePreExistingJunkItem(junk, includeSuspects))
@@ -474,24 +473,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
             NetworkObject netObj = junk.NetworkObject;
             if (netObj != null && netObj.IsSpawned)
-                refs.Add(netObj);
-        }
-
-        if (refs.Count == 0) return;
-
-        HighlightItemsClientRpc(refs.ToArray());
-    }
-
-    [ClientRpc]
-    private void HighlightItemsClientRpc(NetworkObjectReference[] itemRefs)
-    {
-        foreach (NetworkObjectReference itemRef in itemRefs)
-        {
-            if (itemRef.TryGet(out NetworkObject netObj))
-            {
-                JunkItem junk = netObj.GetComponent<JunkItem>();
-                junk?.SetForceHighlight(true);
-            }
+                junk.SetTutorialHighlight(true);
         }
     }
 

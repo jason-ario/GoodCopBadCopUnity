@@ -11,11 +11,15 @@ using UnityEngine.Events;
 /// Requires a <see cref="ShopItem"/> component on the same GameObject to supply the display
 /// name and price shown in the shared purchase popup. Does NOT use the ShopItem's pickable data.
 ///
-/// Availability is controlled by <see cref="SetAvailable"/>. Call it from within an already-
-/// synchronised context (e.g. inside a ClientRpc or from code that runs on all clients).
-/// Use <see cref="SetAvailableServerRpc"/> from server-only code to broadcast the state change.
+/// Availability is server-authoritative and replicated via a NetworkVariable, so it is identical on
+/// every peer including late joiners. Call <see cref="SetAvailable"/> from the server (or from an
+/// already-synchronised context such as inside a ClientRpc); <see cref="SetAvailableServerRpc"/>
+/// routes a request from a client to the server.
 ///
-/// The GameObject must also have a <see cref="NetworkObject"/> component.
+/// The GameObject must also have a <see cref="NetworkObject"/> component. Note that an interactable
+/// authored inactive in the scene has no spawned NetworkObject until the server explicitly spawns it
+/// (see BreakableGlassController.ShowRepairInteractable), which is why availability is also mirrored
+/// locally in <see cref="_availableLocal"/>.
 ///
 /// Implements <see cref="IHeldItemPassthrough"/> so the purchase popup still opens even while
 /// the player is holding an item (e.g. a package or tool), instead of the held item silently
@@ -51,6 +55,36 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
     private PlayerInteractionController _currentPlayer;
     private bool _popupOpen;
 
+    // ─── Networked state ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-authoritative visibility of this interactable. Replicated so that a client can never
+    /// end up with the object active while another has it hidden (the reported Purchase Glass bug):
+    /// availability used to be driven only by ClientRpcs, which are dropped for peers that are not
+    /// connected yet and are never replayed for late joiners.
+    /// </summary>
+    private readonly NetworkVariable<bool> _netAvailable = new NetworkVariable<bool>(
+        true,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Server-authoritative "this persistent purchase has already been made". Only meaningful when
+    /// <see cref="_persistentUnlockId"/> is set. Replicated so the host's save file is the single
+    /// source of truth — previously every peer read its OWN save, so two players with different
+    /// local saves would disagree about which purchases had been unlocked.
+    /// </summary>
+    private readonly NetworkVariable<bool> _netPurchased = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Local mirror of <see cref="_netAvailable"/>, valid before/without a live session.</summary>
+    private bool _availableLocal = true;
+
+    /// <summary>Guards the persistent-unlock replay so its effect is only invoked once.</summary>
+    private bool _persistentUnlockReplayed;
+
     // ─── Constants ─────────────────────────────────────────────────────────────
 
     private const string PurchaseSuccessMessage = "Done!";
@@ -69,19 +103,80 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
         ApplySavedUnlockState();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        _netAvailable.OnValueChanged += HandleNetAvailableChanged;
+        _netPurchased.OnValueChanged += HandleNetPurchasedChanged;
+
+        if (IsServer)
+        {
+            // The host publishes its own state as the authority for everyone.
+            _netPurchased.Value = HasPersistentUnlockInSave();
+            _netAvailable.Value = _availableLocal;
+        }
+        else
+        {
+            // Adopt the host's state, including for a late joiner that missed every RPC.
+            if (_netPurchased.Value)
+                ReplayPersistentUnlock();
+
+            ApplyAvailableLocal(_netAvailable.Value);
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _netAvailable.OnValueChanged -= HandleNetAvailableChanged;
+        _netPurchased.OnValueChanged -= HandleNetPurchasedChanged;
+    }
+
+    private void HandleNetAvailableChanged(bool previous, bool current) => ApplyAvailableLocal(current);
+
+    private void HandleNetPurchasedChanged(bool previous, bool current)
+    {
+        if (current) ReplayPersistentUnlock();
+    }
+
     // ─── Persistence ────────────────────────────────────────────────────────────
 
     /// <summary>
     /// If <see cref="_persistentUnlockId"/> was already purchased in a previous session, replays the
-    /// purchase effect immediately (without charging) and hides this interactable. Runs locally on
-    /// every peer from each client's own save data, mirroring how <see cref="SetAvailable"/> and
-    /// <see cref="_onPurchaseConfirmed"/> are otherwise applied as direct, non-RPC local calls.
+    /// purchase effect immediately (without charging) and hides this interactable.
+    ///
+    /// Only the authority (host, or offline play) reads the save here. Connected clients deliberately
+    /// skip it and instead adopt <see cref="_netPurchased"/> in <see cref="OnNetworkSpawn"/>, so a
+    /// client whose local save disagrees with the host's can no longer show a different world state.
     /// </summary>
     private void ApplySavedUnlockState()
     {
         if (string.IsNullOrEmpty(_persistentUnlockId)) return;
-        if (SaveDataManager.Instance == null || !SaveDataManager.Instance.IsWorldObjectUnlocked(_persistentUnlockId))
-            return;
+
+        var nm = NetworkManager.Singleton;
+        bool isAuthority = nm == null || !nm.IsListening || nm.IsServer;
+        if (!isAuthority) return;
+
+        if (!HasPersistentUnlockInSave()) return;
+
+        ReplayPersistentUnlock();
+    }
+
+    /// <summary>True when this interactable has a persistent ID that is already unlocked in the local save.</summary>
+    private bool HasPersistentUnlockInSave()
+    {
+        return !string.IsNullOrEmpty(_persistentUnlockId) &&
+               SaveDataManager.Instance != null &&
+               SaveDataManager.Instance.IsWorldObjectUnlocked(_persistentUnlockId);
+    }
+
+    /// <summary>
+    /// Re-applies an already-completed persistent purchase: fires the effect and hides the stand.
+    /// Idempotent — unlike a repeatable purchase (e.g. the glass repair, which has no persistent ID)
+    /// a persistent unlock must only ever be replayed once per session.
+    /// </summary>
+    private void ReplayPersistentUnlock()
+    {
+        if (_persistentUnlockReplayed) return;
+        _persistentUnlockReplayed = true;
 
         _onPurchaseConfirmed?.Invoke();
         SetAvailable(false);
@@ -200,6 +295,15 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
     {
         // Runs only on the server — the correct, authoritative place to persist the unlock.
         PersistUnlock();
+
+        // Record the purchase authoritatively so a late joiner gets it too, not just the clients
+        // that happen to be connected right now.
+        if (!string.IsNullOrEmpty(_persistentUnlockId))
+        {
+            _persistentUnlockReplayed = true;
+            _netPurchased.Value = true;
+        }
+
         ExecutePurchaseClientRpc();
     }
 
@@ -209,19 +313,37 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
     [ClientRpc]
     private void ExecutePurchaseClientRpc()
     {
+        // A persistent purchase must not be replayed again from _netPurchased later this session.
+        if (!string.IsNullOrEmpty(_persistentUnlockId))
+            _persistentUnlockReplayed = true;
+
         _onPurchaseConfirmed?.Invoke();
         SetAvailable(false);
     }
 
     /// <summary>
-    /// Shows or hides this interactable on the local client.
-    /// Safe to call from any already-synchronised context such as inside a ClientRpc
-    /// or from code that is already guaranteed to run on all peers.
+    /// Shows or hides this interactable. On the server this also writes the replicated availability
+    /// so every client — current and future — converges on the same state; on a client it applies
+    /// locally and is superseded by the server's value if the two ever disagree.
     /// </summary>
     public void SetAvailable(bool available)
     {
+        // Write the replicated value BEFORE deactivating, so the change is queued while this
+        // behaviour's GameObject is still active.
+        if (IsSpawned && IsServer && _netAvailable.Value != available)
+            _netAvailable.Value = available;
+
+        ApplyAvailableLocal(available);
+    }
+
+    /// <summary>Applies availability to the local instance only, without touching networked state.</summary>
+    private void ApplyAvailableLocal(bool available)
+    {
+        _availableLocal = available;
         _shopItem?.SetAvailable(available);
-        gameObject.SetActive(available);
+
+        if (gameObject.activeSelf != available)
+            gameObject.SetActive(available);
     }
 
     /// <summary>
@@ -229,10 +351,7 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
     /// Use this from server-only code when the change does not originate inside a ClientRpc.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void SetAvailableServerRpc(bool available) => SetAvailableClientRpc(available);
-
-    [ClientRpc]
-    private void SetAvailableClientRpc(bool available) => SetAvailable(available);
+    public void SetAvailableServerRpc(bool available) => SetAvailable(available);
 
     // ─── Camera framing ─────────────────────────────────────────────────────────
 

@@ -391,6 +391,35 @@ public class SaveDataManager : MonoBehaviour
     public bool IsGlassSmashed => ActiveSlot?.IsGlassSmashed ?? false;
 
     /// <summary>
+    /// Saved cumulative hit count on the booth glass ("how broken it is") for the active slot.
+    /// Falls back to the legacy <see cref="IsGlassSmashed"/> flag for saves written before the
+    /// hit count was persisted, so an old save that recorded a smash still restores as smashed.
+    /// </summary>
+    public int GlassHits
+    {
+        get
+        {
+            if (ActiveSlot == null) return 0;
+            if (ActiveSlot.GlassHits > 0) return ActiveSlot.GlassHits;
+            return ActiveSlot.IsGlassSmashed ? int.MaxValue : 0;
+        }
+    }
+
+    /// <summary>
+    /// Records the booth glass damage state in the active slot and persists to disk.
+    /// Server/host authoritative — clients must never call this, since the host's value is the
+    /// one replicated to everyone via <see cref="GlobalHostVariables.glassHits"/>.
+    /// </summary>
+    public void SetGlassState(int hits, bool smashed)
+    {
+        if (ActiveSlot == null) return;
+        ActiveSlot.GlassHits = Mathf.Max(0, hits);
+        ActiveSlot.IsGlassSmashed = smashed;
+        Save();
+        Debug.Log($"[SaveDataManager] Glass state saved: hits={ActiveSlot.GlassHits}, smashed={smashed}.");
+    }
+
+    /// <summary>
     /// Records the booth glass smashed/restored state in the active slot and persists to disk.
     /// Only the host writes to disk; clients update in-memory state only.
     /// </summary>
@@ -762,6 +791,13 @@ public class SaveSlot
     /// Persisted so the broken state survives across play sessions.
     /// </summary>
     public bool IsGlassSmashed;
+
+    /// <summary>
+    /// Cumulative hits taken by the booth window glass, i.e. how broken it currently is.
+    /// Persisted alongside <see cref="IsGlassSmashed"/> so partial crack damage survives a
+    /// session instead of silently resetting to pristine.
+    /// </summary>
+    public int GlassHits;
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

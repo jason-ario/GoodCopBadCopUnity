@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8e9253636bf2648bd813257f451f8486, type: 3}
-  m_Name: Junk Collectible
+  m_Name: Junk Collectible - Highlight
   m_EditorClassIdentifier: HighlightPlus.Runtime::HighlightPlus.HighlightProfile
   effectGroup: 0
   effectGroupLayer:
@@ -50,7 +50,7 @@ MonoBehaviour:
   overlayPatternSize: 0.15
   overlayPatternSoftness: 0.02
   overlayPatternRotation: 0
-  outline: 1
+  outline: 0.7
   outlineColor: {r: 1, g: 0.68, b: 0.24, a: 0.38}
   outlineColorStyle: 0
   outlineGradient:
@@ -85,7 +85,7 @@ MonoBehaviour:
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
   outlineBlurPasses: 1
-  outlineWidth: 0.1
+  outlineWidth: 0.05
   outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
@@ -127,7 +127,19 @@ MonoBehaviour:
   glowVisibility: 0
   glowBlendMode: 0
   glowBlendPasses: 1
-  glowPasses: []
+  glowPasses:
+  - offset: 4
+    alpha: 0.1
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 3
+    alpha: 0.2
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 2
+    alpha: 0.3
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 1
+    alpha: 0.4
+    color: {r: 0.64, g: 1, b: 0, a: 1}
   glowMaskMode: 0
   glowPixelation: 0
   innerGlow: 0
@@ -188,7 +200,7 @@ MonoBehaviour:
   labelText: Label
   labelTextSize: 14
   labelColor: {r: 1, g: 1, b: 1, a: 1}
-  labelPrefab: {fileID: 0}
+  labelPrefab: {fileID: 7963606135631250497, guid: 933a5612c43104c29af0a700ea5fa149, type: 3}
   labelVerticalOffset: 0
   labelViewportOffset: {x: 0, y: 0}
   labelLineLength: 200

@@ -168,6 +168,15 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         // before this client connected, register it in TaskRegistry immediately.
         if (_isActive.Value)
             TaskRegistry.Instance?.AddThreat(this);
+
+        // _isComplete is otherwise only ever set by MarkCompleteClientRpc, which a client that
+        // joined after the last fence was repaired never received — leaving it reporting "2/2"
+        // instead of "All fence segments repaired!" and IsComplete false to any day script that
+        // asks. The replicated counts already say everything needed, so derive it here. Clients
+        // only: on the server this flag is authoritative run state owned by TriggerTask.
+        if (!IsServer)
+            _isComplete = _targetFenceCount.Value > 0 &&
+                          _fencesRepaired.Value >= _targetFenceCount.Value;
     }
 
     public override void OnNetworkDespawn()
