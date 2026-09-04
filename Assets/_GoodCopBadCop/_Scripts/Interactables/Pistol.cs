@@ -158,7 +158,68 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         PlayerMovementController movement = playerPickupController.GetComponent<PlayerMovementController>();
         movement?.ApplyRecoil();
 
-        FireServerRpc(cam.transform.position, cam.transform.forward);
+        // Client-authoritative hitscan: the raycast runs here, against the world exactly as this
+        // player sees it down their own sights. The server used to re-raycast from the reported
+        // origin, which meant a shot at a moving mutant was tested against a position the target had
+        // already left — the shot looked like a hit locally and did nothing. See FireServerRpc.
+        FireHit hit = ResolveShot(cam.transform.position, cam.transform.forward);
+        FireServerRpc(cam.transform.forward, (byte)hit.Kind, hit.TargetRef, hit.Point);
+    }
+
+    /// <summary>What a locally-resolved shot connected with. Sent to the server as a byte.</summary>
+    private enum ShotKind : byte
+    {
+        None    = 0,
+        Mutant  = 1,
+        Player  = 2,
+        Glass   = 3,
+    }
+
+    private readonly struct FireHit
+    {
+        public readonly ShotKind Kind;
+        public readonly NetworkObjectReference TargetRef;
+        public readonly Vector3 Point;
+
+        public FireHit(ShotKind kind, NetworkObjectReference targetRef, Vector3 point)
+        {
+            Kind      = kind;
+            TargetRef = targetRef;
+            Point     = point;
+        }
+    }
+
+    /// <summary>
+    /// Runs the hitscan locally on the shooter's machine and classifies what it struck, in the same
+    /// priority order the server used to: mutant > fellow player > breakable glass.
+    /// </summary>
+    private FireHit ResolveShot(Vector3 rayOrigin, Vector3 rayDirection)
+    {
+        if (!Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, _bulletRange))
+            return new FireHit(ShotKind.None, default, rayOrigin);
+
+        MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+        if (enemy != null && enemy.NetworkObject != null)
+            return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);
+
+        ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
+        if (hit.collider.transform.root.CompareTag("Player"))
+        {
+            NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
+            PlayerHealth playerHealth  = hit.collider.GetComponentInParent<PlayerHealth>();
+
+            // Skip the shooter's own body so hitting yourself never registers damage.
+            if (playerNetObj != null && playerHealth != null && playerNetObj.OwnerClientId != localClientId)
+                return new FireHit(ShotKind.Player, new NetworkObjectReference(playerNetObj), hit.point);
+
+            return new FireHit(ShotKind.None, default, hit.point);
+        }
+
+        BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
+        if (glass != null && !glass.IsSmashed)
+            return new FireHit(ShotKind.Glass, default, hit.point);
+
+        return new FireHit(ShotKind.None, default, hit.point);
     }
 
     /// <summary>
@@ -202,12 +263,17 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 
     /// <summary>
     /// Server-side: validates the sender is the current holder and has rounds remaining,
-    /// decrements <see cref="_roundsRemaining"/>, performs a hitscan against enemies,
-    /// then relays shoot VFX to all other clients.
+    /// decrements <see cref="_roundsRemaining"/>, applies the hit the CLIENT resolved (see
+    /// <see cref="ResolveShot"/>), then relays shoot VFX to all other clients.
+    /// The server no longer re-raycasts: it trusts what the shooter's own machine says it hit, so a
+    /// shot that visibly connected can never be thrown away because the target had already moved on
+    /// the server. Damage/health/death remain server-owned, and the sanity bound below rejects
+    /// impossible reports.
     /// RequireOwnership = false because ownership transfer may still be in flight when the RPC lands.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void FireServerRpc(Vector3 rayOrigin, Vector3 rayDirection, ServerRpcParams rpcParams = default)
+    private void FireServerRpc(Vector3 rayDirection, byte shotKind, NetworkObjectReference targetRef,
+        Vector3 hitPoint, ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
 
@@ -228,34 +294,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 
         _roundsRemaining.Value--;
 
-        // Hitscan — raycast from the camera position in the aim direction.
-        if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, _bulletRange))
-        {
-            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null)
-            {
-                enemy.TakeDamage(_damage, hit.point, knockbackDirection: rayDirection);
-            }
-            else if (TryDamagePlayer(hit.collider, clientId, _damage))
-            {
-                // Friendly-fire hit landed — handled inside TryDamagePlayer.
-            }
-            else
-            {
-                // Check for breakable glass — register the hit server-side and broadcast visuals
-                // to all clients via ClientRpc, mirroring MutantSuspectBehaviour's glass pattern.
-                BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
-                if (glass != null && !glass.IsSmashed)
-                {
-                    int newHits = glass.RegisterHit();
-                    Debug.Log($"[Pistol] Shot breakable glass at {hit.point}. Hits={newHits}");
-                    if (glass.IsSmashed)
-                        PistolSmashGlassClientRpc();
-                    else
-                        PistolUpdateGlassClientRpc(newHits);
-                }
-            }
-        }
+        ApplyShot((ShotKind)shotKind, targetRef, hitPoint, rayDirection, clientId);
 
         // Relay VFX to every other connected client; shooter already played it locally.
         List<ulong> others = new List<ulong>();
@@ -275,28 +314,59 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     }
 
     /// <summary>
-    /// Checks whether <paramref name="hitCollider"/> belongs to a fellow player and, if so,
-    /// applies friendly-fire damage. Skips the shooter's own player (via <see cref="NetworkObject.OwnerClientId"/>)
-    /// so hitting yourself never registers damage.
+    /// Applies the consequence of a client-resolved shot. Server only.
     /// </summary>
-    /// <returns><see langword="true"/> if a fellow player was found and damaged.</returns>
-    private static bool TryDamagePlayer(Collider hitCollider, ulong shooterClientId, float damage)
+    private void ApplyShot(ShotKind kind, NetworkObjectReference targetRef, Vector3 hitPoint,
+        Vector3 rayDirection, ulong shooterClientId)
     {
-        Transform root = hitCollider.transform.root;
-        if (!root.CompareTag("Player"))
-            return false;
+        if (kind == ShotKind.None) return;
 
-        NetworkObject playerNetObj = hitCollider.GetComponentInParent<NetworkObject>();
-        if (playerNetObj != null && playerNetObj.OwnerClientId == shooterClientId)
-            return false;
+        if (kind == ShotKind.Glass)
+        {
+            BreakableGlassController glass = BreakableGlassController.Instance;
+            if (glass == null || glass.IsSmashed) return;
 
-        PlayerHealth playerHealth = hitCollider.GetComponentInParent<PlayerHealth>();
-        if (playerHealth == null)
-            return false;
+            int newHits = glass.RegisterHit();
+            Debug.Log($"[Pistol] Client {shooterClientId} shot breakable glass at {hitPoint}. Hits={newHits}");
 
-        playerHealth.TakeDamage(damage, EffectKeys.FriendlyGunshotDamage);
-        return true;
+            if (glass.IsSmashed) PistolSmashGlassClientRpc();
+            else                 PistolUpdateGlassClientRpc(newHits);
+            return;
+        }
+
+        if (!targetRef.TryGet(out NetworkObject targetObj) || targetObj == null)
+            return; // Target despawned between the shot and this message.
+
+        // Sanity bound, NOT a hit test — rejects a report that could only come from a bug.
+        if (Vector3.Distance(targetObj.transform.position, hitPoint) > MaxReportedHitDistance)
+        {
+            Debug.LogWarning($"[Pistol] Discarding shot report from client {shooterClientId} — reported hit point is far from '{targetObj.name}'.");
+            return;
+        }
+
+        if (kind == ShotKind.Mutant)
+        {
+            MutantEnemy enemy = targetObj.GetComponent<MutantEnemy>() ?? targetObj.GetComponentInChildren<MutantEnemy>();
+            enemy?.TakeDamage(_damage, hitPoint, knockbackDirection: rayDirection);
+            return;
+        }
+
+        if (kind == ShotKind.Player)
+        {
+            // Never let a shot hurt the shooter, whatever the client claims.
+            if (targetObj.OwnerClientId == shooterClientId) return;
+
+            PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
+            playerHealth?.TakeDamage(_damage, EffectKeys.FriendlyGunshotDamage);
+        }
     }
+
+    /// <summary>
+    /// Sanity limit (metres) between the hit point a client reported and the target it claims to have
+    /// hit. Generous on purpose — it exists to reject impossible reports, never to re-litigate a
+    /// legitimate shot.
+    /// </summary>
+    private const float MaxReportedHitDistance = 6f;
 
     /// <summary>
     /// Received by all clients when a pistol shot lands an intermediate hit on the glass.

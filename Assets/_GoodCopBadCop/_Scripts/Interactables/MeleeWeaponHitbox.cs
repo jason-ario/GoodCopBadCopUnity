@@ -7,11 +7,19 @@ using UnityEngine;
 /// <summary>
 /// Performs an OverlapSphere at the attack point and damages any enemy or fellow player found
 /// within range (friendly fire enabled). Attach to an AttackPoint child of the melee weapon prefab.
-/// Call <see cref="PerformHitScan"/> from the weapon owner's client; the server validates
-/// and applies damage, then notifies the owner via <see cref="OnHit"/> or
-/// <see cref="OnEnvironmentHit"/> depending on what was struck.
-/// Optionally assign <see cref="_hitEffectPrefab"/> and <see cref="_environmentHitEffectPrefab"/>
-/// to spawn a particle effect at the exact world-space hit position on the owning client.
+///
+/// HIT DETECTION IS CLIENT-AUTHORITATIVE. <see cref="PerformHitScan"/> runs the overlap on the
+/// swinging player's own machine, against the world exactly as that player sees it, and reports the
+/// resolved target to the server via <see cref="ReportHitServerRpc"/>. The server then applies the
+/// consequences (damage, glass hits) to whatever the client says it struck — it does NOT re-run the
+/// geometry test.
+///
+/// Why: the scan used to run server-side against the position the client *reported* its weapon at.
+/// The server's copy of a charging mutant has already moved by the time that message lands, so a
+/// remote player's swing that visibly connected on their screen frequently missed, while the host —
+/// scanned locally with zero delay — never lost a hit. Damage, health and death stay authoritative
+/// on the server, but WHAT was hit is decided where the player actually swung, so a swing that
+/// connects on screen always connects, and impact feedback is instant with no round trip.
 /// </summary>
 public class MeleeWeaponHitbox : NetworkBehaviour
 {
@@ -29,6 +37,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     [SerializeField] private ParticleSystem _environmentHitEffectPrefab;
 
     private const string PlayerTag = "Player";
+
+    /// <summary>
+    /// Sanity limit (metres) between the hit point the client reported and the target it claims to
+    /// have hit, checked server-side. Client-resolved hits are trusted, but not blindly: this
+    /// rejects a report that could only come from a bug or tampering, without ever second-guessing a
+    /// legitimate swing (it is several times <see cref="hitRadius"/>).
+    /// </summary>
+    private const float MaxReportedHitDistance = 5f;
 
 
     // Events
@@ -51,6 +67,17 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     /// <summary>Colliders belonging to this weapon's own hierarchy, populated on Start.</summary>
     private readonly HashSet<Collider> _ownColliders = new HashSet<Collider>();
 
+    /// <summary>What a locally-resolved swing connected with. Sent to the server as a byte.</summary>
+    private enum HitKind : byte
+    {
+        None        = 0,
+        Environment = 1,
+        Mutant      = 2,
+        Suspect     = 3,
+        Player      = 4,
+        Glass       = 5,
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -69,38 +96,55 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     // Public API
 
     /// <summary>
-    /// Called on the local client (or server). Forwards the overlap check to the server
-    /// using the current world position of the attack point. When already on the server
-    /// (host player), the scan runs immediately without a network round-trip.
+    /// Called on the swinging player's machine (client or host). Resolves the hit locally against
+    /// what that player sees, plays impact feedback immediately, and reports the result to the
+    /// server so it can apply the damage.
     /// </summary>
     public void PerformHitScan(float damage)
     {
+        Vector3 attackOrigin = transform.position;
+
+        HitKind kind = ResolveLocalHit(attackOrigin, out NetworkBehaviour target, out Vector3 hitPoint);
+
+        // Immediate local feedback — no round trip, so the swing reads as connecting the instant it
+        // does on this player's screen.
+        if (kind == HitKind.Environment)
+        {
+            SpawnHitEffect(_environmentHitEffectPrefab, hitPoint);
+            OnEnvironmentHit?.Invoke();
+        }
+        else if (kind != HitKind.None)
+        {
+            SpawnHitEffect(_hitEffectPrefab, hitPoint);
+            OnHit?.Invoke();
+        }
+
+        if (kind == HitKind.None || kind == HitKind.Environment)
+            return;
+
+        NetworkObjectReference targetRef = target != null && target.NetworkObject != null
+            ? new NetworkObjectReference(target.NetworkObject)
+            : default;
+
         if (IsServer)
-        {
-            // Host player: skip the RPC and run directly, targeting the host's own client ID.
-            PerformHitScanInternal(transform.position, damage, OwnerClientId);
-        }
+            ApplyHit(kind, targetRef, attackOrigin, hitPoint, damage, OwnerClientId);
         else
-        {
-            PerformHitScanServerRpc(transform.position, damage);
-        }
+            ReportHitServerRpc((byte)kind, targetRef, attackOrigin, hitPoint, damage);
     }
 
 
-    // Server
-
-    [ServerRpc(RequireOwnership = false)]
-    private void PerformHitScanServerRpc(Vector3 attackOrigin, float damage, ServerRpcParams rpcParams = default)
-    {
-        PerformHitScanInternal(attackOrigin, damage, rpcParams.Receive.SenderClientId);
-    }
+    // Local resolution (runs on the swinging player's machine)
 
     /// <summary>
-    /// Runs the OverlapSphere hit scan on the server. Called either directly for host players
-    /// or via <see cref="PerformHitScanServerRpc"/> for remote clients.
+    /// Runs the OverlapSphere locally and returns the first meaningful thing the swing connected
+    /// with, in the original priority order: fellow player > breakable glass > mutant > suspect >
+    /// plain geometry.
     /// </summary>
-    private void PerformHitScanInternal(Vector3 attackOrigin, float damage, ulong senderClientId)
+    private HitKind ResolveLocalHit(Vector3 attackOrigin, out NetworkBehaviour target, out Vector3 hitPoint)
     {
+        target   = null;
+        hitPoint = attackOrigin;
+
         int hitCount = Physics.OverlapSphereNonAlloc(
             attackOrigin,
             hitRadius,
@@ -108,15 +152,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             Physics.AllLayers,
             QueryTriggerInteraction.Collide);
 
-        Debug.Log($"[MeleeWeaponHitbox] OverlapSphere at {attackOrigin} radius={hitRadius} - {hitCount} colliders. Sender={senderClientId}", this);
-
-        ClientRpcParams ownerParams = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new[] { senderClientId }
-            }
-        };
+        ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
 
         bool anyNonSelfHit = false;
         Vector3 firstNonSelfHitPosition = attackOrigin;
@@ -138,18 +174,16 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             {
                 // Skip the player who is swinging this weapon.
                 NetworkObject playerNetObj = col.GetComponentInParent<NetworkObject>();
-                if (playerNetObj != null && playerNetObj.OwnerClientId == senderClientId)
+                if (playerNetObj != null && playerNetObj.OwnerClientId == localClientId)
                     continue;
 
                 PlayerHealth playerHealth = col.GetComponentInParent<PlayerHealth>();
                 if (playerHealth == null)
                     continue;
 
-                anyNonSelfHit = true;
-                playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage);
-                Debug.Log($"[MeleeWeaponHitbox] Friendly fire: hit player '{root.name}' for {damage} damage.", this);
-                NotifyHitClientRpc(col.ClosestPoint(attackOrigin), ownerParams);
-                return;
+                target   = playerHealth;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Player;
             }
 
             // Track the closest surface point of the first non-self, non-weapon, non-trigger
@@ -165,20 +199,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
-            // Check for breakable glass — registers the hit server-side then broadcasts visuals
-            // to all clients via ClientRpc, mirroring MutantSuspectBehaviour's glass attack pattern.
+            // Breakable glass is a plain MonoBehaviour singleton, so there is no NetworkObject to
+            // send — the server resolves it through BreakableGlassController.Instance, exactly as
+            // the existing visual ClientRpcs below already do.
             BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
             if (glass != null && !glass.IsSmashed)
             {
-                int newHits = glass.RegisterHit();
-                Vector3 glassHitPos = col.ClosestPoint(attackOrigin);
-                Debug.Log($"[MeleeWeaponHitbox] Hit breakable glass at {glassHitPos}. Hits={newHits}", this);
-                if (glass.IsSmashed)
-                    SmashGlassClientRpc();
-                else
-                    UpdateGlassClientRpc(newHits);
-                NotifyHitClientRpc(glassHitPos, ownerParams);
-                return;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Glass;
             }
 
             // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter - no tag dependency.
@@ -190,26 +218,123 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             if (enemy != null)
             {
-                Vector3 enemyHitPosition = col.ClosestPoint(attackOrigin);
-                Vector3 knockbackDirection = enemyHitPosition - attackOrigin;
-                enemy.TakeDamage(damage, enemyHitPosition, knockbackDirection: knockbackDirection);
-                Debug.Log($"[MeleeWeaponHitbox] Hit enemy '{enemy.name}' via '{col.name}' for {damage} damage.", this);
-                NotifyHitClientRpc(enemyHitPosition, ownerParams);
-                return;
+                target   = enemy;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Mutant;
             }
 
             if (!suspect.IsDead)
             {
-                Vector3 suspectHitPosition = col.ClosestPoint(attackOrigin);
-                suspect.TakeDamage(damage, suspectHitPosition);
-                Debug.Log($"[MeleeWeaponHitbox] Hit suspect '{suspect.name}' via '{col.name}' for {damage} damage.", this);
-                NotifyHitClientRpc(suspectHitPosition, ownerParams);
-                return;
+                target   = suspect;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Suspect;
             }
         }
 
         if (anyNonSelfHit)
-            NotifyEnvironmentHitClientRpc(firstNonSelfHitPosition, ownerParams);
+        {
+            hitPoint = firstNonSelfHitPosition;
+            return HitKind.Environment;
+        }
+
+        return HitKind.None;
+    }
+
+
+    // Server
+
+    /// <summary>
+    /// Applies a hit the swinging client already resolved. RequireOwnership = false because
+    /// ownership transfer may still be in flight when the RPC lands.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportHitServerRpc(byte kind, NetworkObjectReference targetRef, Vector3 attackOrigin,
+        Vector3 hitPoint, float damage, ServerRpcParams rpcParams = default)
+    {
+        ApplyHit((HitKind)kind, targetRef, attackOrigin, hitPoint, damage, rpcParams.Receive.SenderClientId);
+    }
+
+    /// <summary>
+    /// Server-side consequence of a client-resolved hit. Trusts WHAT was hit; still owns the damage,
+    /// health and death rules, and never lets a swing hurt the player who threw it.
+    /// </summary>
+    private void ApplyHit(HitKind kind, NetworkObjectReference targetRef, Vector3 attackOrigin,
+        Vector3 hitPoint, float damage, ulong senderClientId)
+    {
+        if (!IsServer) return;
+
+        if (kind == HitKind.Glass)
+        {
+            BreakableGlassController glass = BreakableGlassController.Instance;
+            if (glass == null || glass.IsSmashed) return;
+
+            int newHits = glass.RegisterHit();
+            Debug.Log($"[MeleeWeaponHitbox] Client {senderClientId} hit breakable glass at {hitPoint}. Hits={newHits}", this);
+
+            if (glass.IsSmashed) SmashGlassClientRpc();
+            else                 UpdateGlassClientRpc(newHits);
+            return;
+        }
+
+        if (!targetRef.TryGet(out NetworkObject targetObj) || targetObj == null)
+        {
+            // The target despawned between the client's swing and this message — nothing to hurt.
+            return;
+        }
+
+        // Sanity bound, NOT a hit test: rejects impossible reports without re-validating the swing.
+        float distance = Vector3.Distance(targetObj.transform.position, hitPoint);
+        if (distance > MaxReportedHitDistance)
+        {
+            Debug.LogWarning($"[MeleeWeaponHitbox] Discarding hit report from client {senderClientId} — reported hit point is {distance:F1}m from '{targetObj.name}'.", this);
+            return;
+        }
+
+        switch (kind)
+        {
+            case HitKind.Mutant:
+            {
+                MutantEnemy enemy = FindOn<MutantEnemy>(targetObj);
+                if (enemy == null) return;
+
+                // Knockback direction comes from the swing the CLIENT reported, so the shove always
+                // matches the angle the player actually struck from.
+                Vector3 knockbackDirection = hitPoint - attackOrigin;
+                enemy.TakeDamage(damage, hitPoint, knockbackDirection: knockbackDirection);
+                Debug.Log($"[MeleeWeaponHitbox] Client {senderClientId} hit enemy '{enemy.name}' for {damage} damage.", this);
+                break;
+            }
+
+            case HitKind.Suspect:
+            {
+                SuspectCharacter suspect = FindOn<SuspectCharacter>(targetObj);
+                if (suspect == null || suspect.IsDead) return;
+
+                suspect.TakeDamage(damage, hitPoint);
+                Debug.Log($"[MeleeWeaponHitbox] Client {senderClientId} hit suspect '{suspect.name}' for {damage} damage.", this);
+                break;
+            }
+
+            case HitKind.Player:
+            {
+                // Never let a swing hurt the player who threw it, whatever the client claims.
+                if (targetObj.OwnerClientId == senderClientId) return;
+
+                PlayerHealth playerHealth = FindOn<PlayerHealth>(targetObj);
+                if (playerHealth == null) return;
+
+                playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage);
+                Debug.Log($"[MeleeWeaponHitbox] Friendly fire: client {senderClientId} hit player '{targetObj.name}' for {damage} damage.", this);
+                break;
+            }
+        }
+    }
+
+    /// <summary>Resolves a component on a reported target, tolerating it living on a child of the NetworkObject.</summary>
+    private static T FindOn<T>(NetworkObject netObj) where T : Component
+    {
+        T component = netObj.GetComponent<T>();
+        return component != null ? component : netObj.GetComponentInChildren<T>();
     }
 
 
@@ -233,20 +358,6 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     private void SmashGlassClientRpc()
     {
         BreakableGlassController.Instance?.ApplySmash();
-    }
-
-    [ClientRpc]
-    private void NotifyHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
-    {
-        SpawnHitEffect(_hitEffectPrefab, hitPosition);
-        OnHit?.Invoke();
-    }
-
-    [ClientRpc]
-    private void NotifyEnvironmentHitClientRpc(Vector3 hitPosition, ClientRpcParams clientRpcParams = default)
-    {
-        SpawnHitEffect(_environmentHitEffectPrefab, hitPosition);
-        OnEnvironmentHit?.Invoke();
     }
 
 

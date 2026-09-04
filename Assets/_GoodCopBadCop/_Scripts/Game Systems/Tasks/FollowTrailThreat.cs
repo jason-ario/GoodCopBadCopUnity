@@ -170,6 +170,33 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>Number of currently-tracked pack mutants still alive. Server only.</summary>
     private int _packMutantsRemaining;
 
+    /// <summary>
+    /// Server only. True once <see cref="OnPackSpawned"/> has run for the current pack, i.e.
+    /// <see cref="_packMutantsRemaining"/> is meaningful. The pack spawns staggered over several
+    /// seconds (see <c>MutantSpawner.SpawnPackAtCoroutine</c>), so the destination can be reached
+    /// before the callback lands.
+    /// </summary>
+    private bool _packSpawnComplete;
+
+    /// <summary>
+    /// Server only. True once <see cref="ActivateKillTask"/> has published the kill count to all
+    /// clients. Kills that land before this (the pack is spawned at trail START, but the HUD task
+    /// only activates on destination discovery / first encounter) used to call
+    /// <see cref="DecrementKillMutantCount"/> against a count of 0 — clamped away and then
+    /// overwritten with the full PackSize, so those kills were permanently lost from the HUD and
+    /// the count could never reach 0.
+    /// </summary>
+    private bool _killTaskActivated;
+
+    /// <summary>
+    /// Server only. Set when the pack is wiped out BEFORE the kill task activates, so
+    /// <see cref="KillMutantTask.RaiseCompleted"/> can be deferred until after the day script has
+    /// had its chance to subscribe (Day_02 subscribes from inside
+    /// <see cref="OnDestinationDiscoveredOverride"/>, which runs after <see cref="ActivateKillTask"/>).
+    /// Raising it early meant nobody was listening and the night phase never advanced.
+    /// </summary>
+    private bool _packKillCompletionPending;
+
     /// <summary>The location that was last passed to SpawnEvent — used at destination discovery time.</summary>
     private FollowTrailLocation _currentLocation;
 
@@ -243,7 +270,12 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Apply initial values for late-joining clients so they see any already-active tasks.
         if (_meetVladActive.Value)         MeetVladOutBackTask.CreateAndRegister();
         if (_followTrailActive.Value)      TaskRegistry.Instance?.AddThreat(this);
+
+        // KillMutantTask.Current is a static that survives leaving/rejoining a session, so an
+        // inactive count must actively clear it — otherwise a stale instance from a previous
+        // session blocks the next one from ever registering a row.
         if (_killMutantCount.Value > 0)    KillMutantTask.CreateAndRegister(_killMutantCount.Value);
+        else                               KillMutantTask.CompleteAndRemove();
 
         // Build the trail VFX for whatever is already on the list. On the server/host this is
         // empty at spawn time; on a late-joining client it is the full trail of an event that
@@ -263,6 +295,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // The replicated list is gone, so the local VFX mirroring it must go too — otherwise
         // a client that disconnects mid-event leaves the trail floating in its scene.
         DestroyLocalTrailParticles();
+
+        // Same reasoning for the kill task: its static Current would otherwise outlive this
+        // session and keep the next one from registering a fresh row (see KillMutantTask).
+        KillMutantTask.CompleteAndRemove();
+        _killTaskActivated = false;
     }
 
     private void OnDestroy()
@@ -306,10 +343,12 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private void OnKillMutantCountChanged(int previous, int current)
     {
-        if (current > 0 && previous == 0)
-            KillMutantTask.CreateAndRegister(current);   // task becomes active
-        else if (current > 0)
-            KillMutantTask.UpdateCount(current);          // mid-combat count update for description
+        // Deliberately NOT branching on `previous` any more: a peer that misses the 0 -> N edge
+        // (late joiner, or a TaskRegistry that wasn't ready yet) would take the UpdateCount branch
+        // forever and never get a row, making every kill look like it wasn't counted.
+        // CreateAndRegister both creates and updates, and is idempotent.
+        if (current > 0)
+            KillMutantTask.CreateAndRegister(current);
         else
             KillMutantTask.CompleteAndRemove();           // all dead — remove task from HUD
     }
@@ -343,7 +382,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void SetKillMutantActive(bool active)
     {
         if (!IsServer) return;
-        if (!active) _killMutantCount.Value = 0;
+        if (!active)
+        {
+            _killTaskActivated     = false;
+            _killMutantCount.Value = 0;
+        }
     }
 
     /// <summary>
@@ -354,13 +397,27 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
         _killMutantCount.Value = Mathf.Max(0, count);
+        _killTaskActivated     = _killMutantCount.Value > 0;
     }
 
     /// <summary>
-    /// Decrements the kill count by one. Called by <see cref="KillMutantTask"/> on the server
-    /// each time an enemy is killed. When the count reaches zero the kill task is removed on
-    /// all clients automatically via the NetworkVariable callback.
-    /// Server only.
+    /// Republishes the replicated kill count from the server's authoritative
+    /// <see cref="_packMutantsRemaining"/>. Preferred over a blind decrement: the two used to be
+    /// tracked independently, so any kill the count missed (one landing before the task activated,
+    /// or a pack that spawned fewer mutants than PackSize because a prefab was misconfigured) left
+    /// the HUD permanently out of step with reality and unable to reach 0.
+    /// Server only; no-op until <see cref="ActivateKillTask"/> has run.
+    /// </summary>
+    private void PublishPackKillCount()
+    {
+        if (!IsServer || !_killTaskActivated) return;
+        _killMutantCount.Value = Mathf.Max(0, _packMutantsRemaining);
+    }
+
+    /// <summary>
+    /// Decrements the kill count by one. Kept for external callers; internal pack tracking uses
+    /// <see cref="PublishPackKillCount"/> instead so the replicated count can never drift from the
+    /// server's own remaining-mutant tally. Server only.
     /// </summary>
     public void DecrementKillMutantCount()
     {
@@ -462,6 +519,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // ATM.Instance?.SpawnCoupons(_couponReward);
         OnDailyTaskCompleted?.Invoke();
 
+        // Only now that the day script / default handler is subscribed is it safe to raise a
+        // completion that already happened (whole pack killed before the destination was reached).
+        FlushPendingPackKillCompletion();
+
         Debug.Log($"[FollowTrailThreat] Destination discovered. Pack size: {packSize}.");
     }
 
@@ -520,6 +581,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _meetVladActive.Value    = false;
         _followTrailActive.Value = false;
         _killMutantCount.Value   = 0;
+        _killTaskActivated       = false;
 
         if (CampaignManager.Instance?.ActiveDay == null || !CampaignManager.Instance.ActiveDay.CanFollowTrailEvent)
         {
@@ -648,10 +710,20 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Scope kill tracking to exactly these mutants — see _packKillHandlers.
         ClearPackKillTracking();
-        _packMutantsRemaining = mutants.Count;
+        _packSpawnComplete = true;
+
         foreach (MutantEnemy mutant in mutants)
         {
             if (mutant == null) continue;
+
+            // A mutant that already died during the staggered spawn has ALREADY fired
+            // OnRemovedFromPlay, so subscribing now would never fire again and the task would hang
+            // forever waiting on a corpse. Don't count it as remaining either.
+            if (mutant.IsDead)
+            {
+                Debug.Log($"[FollowTrailThreat] Pack mutant '{mutant.name}' was already dead when the pack finished spawning — not tracked.", this);
+                continue;
+            }
 
             MutantEnemy capturedMutant = mutant;
             Action handler = null;
@@ -661,31 +733,76 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             capturedMutant.OnRemovedFromPlay += handler;
         }
 
+        _packMutantsRemaining = _packKillHandlers.Count;
+
+        // Keep the HUD in step if the task activated before the pack finished spawning, and resolve
+        // the pathological case where the whole pack is already gone by now.
+        PublishPackKillCount();
+        if (_packMutantsRemaining <= 0)
+            CompletePackKills();
+
         if (_packHoldReleaseCoroutine != null) StopCoroutine(_packHoldReleaseCoroutine);
         _packHoldReleaseCoroutine = StartCoroutine(HoldPackUntilPlayerNear(_currentLocation.DestinationPoint));
     }
 
     /// <summary>
-    /// Called when a tracked pack mutant is removed from play (death or flee-despawn). Only
-    /// counts toward the kill task when <see cref="MutantEnemy.DiedPermanently"/> is true —
-    /// mutants that fled instead of dying, or mutants NOT spawned by this pack (e.g. the
-    /// ambient world population spawner), never affect this count. Server only.
+    /// Called when a tracked pack mutant is removed from play (death or flee-despawn). Both count
+    /// as resolved: a flee-despawned mutant is gone from the scene for good, and refusing to count
+    /// it (as this used to, via <see cref="MutantEnemy.DiedPermanently"/>) left the objective stuck
+    /// on a mutant that no longer existed, so it could never complete. Mutants NOT spawned by this
+    /// pack (e.g. the ambient world population spawner) are never tracked here in the first place.
+    /// Server only.
     /// </summary>
     private void HandlePackMutantRemoved(MutantEnemy mutant, Action handler)
     {
         if (mutant != null && handler != null)
             mutant.OnRemovedFromPlay -= handler;
-        if (mutant != null)
-            _packKillHandlers.Remove(mutant);
 
-        if (!IsServer) return;
-        if (mutant == null || !mutant.DiedPermanently) return;
+        // Only a mutant this pack was actually tracking may decrement the count — guards against a
+        // duplicate invocation double-counting one kill.
+        bool wasTracked = mutant != null && _packKillHandlers.Remove(mutant);
+        if (!IsServer || !wasTracked) return;
+
+        if (mutant != null && !mutant.DiedPermanently)
+            Debug.Log($"[FollowTrailThreat] Pack mutant '{mutant.name}' left play by fleeing — counting it as resolved so the kill task can complete.", this);
 
         _packMutantsRemaining = Mathf.Max(0, _packMutantsRemaining - 1);
-        DecrementKillMutantCount();
+        PublishPackKillCount();
 
         if (_packMutantsRemaining <= 0)
-            KillMutantTask.RaiseCompleted();
+            CompletePackKills();
+    }
+
+    /// <summary>
+    /// Raises <see cref="KillMutantTask.RaiseCompleted"/>, or defers it when the kill task hasn't
+    /// been activated yet — see <see cref="_packKillCompletionPending"/>. Server only.
+    /// </summary>
+    private void CompletePackKills()
+    {
+        if (!IsServer) return;
+
+        if (!_killTaskActivated)
+        {
+            _packKillCompletionPending = true;
+            Debug.Log("[FollowTrailThreat] Whole pack was wiped out before the kill task activated — deferring completion until listeners are subscribed.", this);
+            return;
+        }
+
+        _packKillCompletionPending = false;
+        KillMutantTask.RaiseCompleted();
+    }
+
+    /// <summary>
+    /// Raises a completion that was deferred by <see cref="CompletePackKills"/>. Called at the end
+    /// of destination discovery, i.e. after the day script (or this threat's own default handler)
+    /// has subscribed to <see cref="KillMutantTask.OnKillMutantTaskCompleted"/>. Server only.
+    /// </summary>
+    private void FlushPendingPackKillCompletion()
+    {
+        if (!IsServer || !_packKillCompletionPending) return;
+
+        _packKillCompletionPending = false;
+        KillMutantTask.RaiseCompleted();
     }
 
     /// <summary>Unsubscribes every still-pending pack kill handler. Safe to call repeatedly.</summary>
@@ -697,7 +814,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
                 pair.Key.OnRemovedFromPlay -= pair.Value;
         }
         _packKillHandlers.Clear();
-        _packMutantsRemaining = 0;
+        _packMutantsRemaining      = 0;
+        _packSpawnComplete         = false;
+        _packKillCompletionPending = false;
     }
 
     /// <summary>
@@ -756,12 +875,20 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>
     /// Activates the kill-mutant task on all clients by setting <see cref="_killMutantCount"/>.
     /// Called once the destination is discovered so the HUD task registers at trail completion.
+    ///
+    /// Publishes the server's live <see cref="_packMutantsRemaining"/> rather than the configured
+    /// PackSize whenever the pack has finished spawning, so mutants killed between trail start and
+    /// destination discovery are already accounted for instead of being resurrected in the HUD.
     /// Server only.
     /// </summary>
     private void ActivateKillTask()
     {
-        if (_currentLocation.PackSize <= 0) return;
-        _killMutantCount.Value = _currentLocation.PackSize;
+        if (!IsServer || _currentLocation.PackSize <= 0) return;
+
+        _killTaskActivated = true;
+        _killMutantCount.Value = _packSpawnComplete
+            ? Mathf.Max(0, _packMutantsRemaining)
+            : _currentLocation.PackSize;
     }
 
     /// <summary>
@@ -809,6 +936,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Mark the daily task complete so DailyTaskScheduler can unlock it for future days.
         OnDailyTaskCompleted?.Invoke();
 
+        // See OnDestinationDiscovered — raise any completion that landed before listeners existed.
+        FlushPendingPackKillCompletion();
+
         Debug.Log("[FollowTrailThreat] Pack mutant encountered before destination — skipping to kill-mutants task.", this);
     }
 
@@ -832,6 +962,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Unsubscribe any still-pending pack kill handlers so mutants that outlive the event
         // (day ends before the pack is fully killed) don't leak stale delegates.
         ClearPackKillTracking();
+        _killTaskActivated = false;
 
         // Always clear the encounter listener — it may have been subscribed by SpawnEvent.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
@@ -848,6 +979,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             _isDiscovered.Value       = false;
             _networkThreatLevel.Value = 0f;
+
+            // Drop any leftover kill count so the previous event's row can't linger into the next
+            // one (Cleanup runs at the head of every TriggerTrailEvent, not just at day start).
+            _killMutantCount.Value    = 0;
         }
 
         if (_spawnedCorpse != null)

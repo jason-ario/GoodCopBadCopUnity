@@ -462,6 +462,16 @@ public class Day_01 : DayBase
     // Active mutant-breach tutorial task, shown while the first breach's mutants are still alive.
     private TutorialObjectiveItem _taskRepelMutants;
 
+    // Latest remaining/total breach mutant counts received from MutantBreachManager, cached so a
+    // count that arrives BEFORE the "Repel the mutants" row exists isn't silently dropped.
+    // The row is only created part-way through MutantBreachWarningSequence (after two megaphone
+    // barks), which can easily land after the first kill on a short alarm lead time — previously
+    // OnMutantBreachCountChanged just early-returned on a null row, and because the manager only
+    // reports on CHANGE, that kill never showed up until the next one (or never, if it was the
+    // last). -1 means "nothing received yet".
+    private int _lastBreachRemaining = -1;
+    private int _lastBreachTotal;
+
     // Blocks ShiftManager.TryEnableClockOut() until the first breach (and any resulting
     // fence-repair follow-up) has fully resolved. Registered at DayActivated, completed by
     // CompleteMutantBreachGateAndAdvance().
@@ -587,6 +597,14 @@ public class Day_01 : DayBase
         MutantBreachManager.OnBreachStartedAllClients      += OnMutantBreachStarted;
         MutantBreachManager.OnBreachCountChangedAllClients += OnMutantBreachCountChanged;
         MutantBreachManager.OnBreachClearedAllClients      += OnMutantBreachCleared;
+
+        // Late joiner / re-activation safety net: OnBreachStartedAllClients is a one-shot ClientRpc
+        // notification, so a client that connected after the alarm already sounded never gets it and
+        // would sit through the whole fight with no "Repel the mutants" row (and therefore no kill
+        // count). MutantBreachManager.IsBreachRunning is replicated, so it is safe to rebuild the row
+        // from it here.
+        if (MutantBreachManager.Instance != null && MutantBreachManager.Instance.IsBreachRunning)
+            EnsureRepelMutantsObjective();
 
         // Blocks the timecard machine from unlocking until the first breach (and any resulting
         // fence-repair follow-up) has fully resolved, even though trash/graffiti — the only other
@@ -767,6 +785,9 @@ public class Day_01 : DayBase
         _breachGateTask?.Complete();
         _breachGateTask = null;
         _taskFixFences = null;
+        _taskRepelMutants = null;
+        _lastBreachRemaining = -1;
+        _lastBreachTotal = 0;
         _taskTakeOutGore = null;
         _taskCleanBloodSplatter = null;
 
@@ -2688,6 +2709,8 @@ public class Day_01 : DayBase
     private void OnMutantBreachStarted()
     {
         _breachClearedHandled = false;
+        _lastBreachRemaining  = -1;
+        _lastBreachTotal      = 0;
         StartCoroutine(MutantBreachWarningSequence());
     }
 
@@ -2699,7 +2722,7 @@ public class Day_01 : DayBase
 
         TutorialOverlay.Instance?.ShowMutantBreachTutorial();
 
-        _taskRepelMutants = TutorialObjectiveList.Instance?.AddObjective(_taskRepelMutantsText);
+        EnsureRepelMutantsObjective();
 
         yield return new WaitForSeconds(_breachShovelUnlockDelay);
 
@@ -2708,6 +2731,30 @@ public class Day_01 : DayBase
         // arrowed until it is individually picked up (see OnBreachShovel1PickedUp/2PickedUp).
         ArmBreachShovel(_breachShovel1, OnBreachShovel1PickedUp);
         ArmBreachShovel(_breachShovel2, OnBreachShovel2PickedUp);
+    }
+
+    /// <summary>
+    /// Creates the "Repel the mutants" objective row (once) and immediately paints it with the
+    /// authoritative count. Pulls the current remaining/total straight off
+    /// <see cref="MutantBreachManager"/> when no count has been pushed yet, so the row is never
+    /// left showing a bare label — this also covers a client that joined mid-breach and therefore
+    /// never received the earlier count notifications.
+    /// </summary>
+    private void EnsureRepelMutantsObjective()
+    {
+        if (_breachClearedHandled) return;
+
+        if (_taskRepelMutants == null)
+            _taskRepelMutants = TutorialObjectiveList.Instance?.AddObjective(_taskRepelMutantsText);
+
+        if (_lastBreachRemaining < 0 && MutantBreachManager.Instance != null &&
+            MutantBreachManager.Instance.BreachTotal > 0)
+        {
+            _lastBreachRemaining = MutantBreachManager.Instance.BreachRemaining;
+            _lastBreachTotal     = MutantBreachManager.Instance.BreachTotal;
+        }
+
+        ApplyRepelMutantsText();
     }
 
     /// <summary>Unlocks, force-highlights, and arrows a single checkpoint shovel, then wires it to clear itself the instant it's picked up.</summary>
@@ -2753,11 +2800,22 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnMutantBreachCountChanged(int remaining, int total)
     {
-        if (_taskRepelMutants == null) return;
+        _lastBreachRemaining = remaining;
+        _lastBreachTotal     = total;
 
-        int defeated = total - remaining;
-        _taskRepelMutants.SetText(remaining > 0
-            ? $"{_taskRepelMutantsText} ({defeated}/{total})"
+        // The row may not exist yet (see _lastBreachRemaining) — the cached values above are
+        // replayed by EnsureRepelMutantsObjective the moment it is created.
+        ApplyRepelMutantsText();
+    }
+
+    /// <summary>Paints the cached remaining/total onto the "Repel the mutants" row. No-ops until both the row and a count exist.</summary>
+    private void ApplyRepelMutantsText()
+    {
+        if (_taskRepelMutants == null || _lastBreachRemaining < 0 || _lastBreachTotal <= 0) return;
+
+        int defeated = Mathf.Clamp(_lastBreachTotal - _lastBreachRemaining, 0, _lastBreachTotal);
+        _taskRepelMutants.SetText(_lastBreachRemaining > 0
+            ? $"{_taskRepelMutantsText} ({defeated}/{_lastBreachTotal})"
             : $"{_taskRepelMutantsText} — all clear!");
     }
 

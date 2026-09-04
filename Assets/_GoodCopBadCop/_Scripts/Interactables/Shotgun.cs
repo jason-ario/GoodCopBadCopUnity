@@ -129,7 +129,89 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         Camera cam = Camera.main;
         if (cam != null)
-            FireServerRpc(cam.transform.position, cam.transform.forward);
+        {
+            // Client-authoritative hitscan: the pellet cone is traced here, against the world as
+            // this player sees it, and the resolved per-target pellet counts are reported to the
+            // server. The server used to re-trace the cone from the reported origin — a different
+            // random spread against already-moved targets — so a blast that clearly connected
+            // locally could deal little or nothing. See FireServerRpc.
+            ResolveBlast(cam.transform.position, cam.transform.forward,
+                out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
+                out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+                out bool hitGlass);
+
+            FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, playerRefs, playerPellets, hitGlass);
+        }
+    }
+
+    /// <summary>
+    /// Traces the pellet cone locally on the shooter's machine and accumulates how many pellets
+    /// landed on each mutant and each fellow player, plus whether the booth glass was struck.
+    /// Runs on the shooter only — the spread the player sees is the spread that is reported.
+    /// </summary>
+    private void ResolveBlast(Vector3 rayOrigin, Vector3 rayDirection,
+        out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
+        out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+        out bool hitGlass)
+    {
+        Dictionary<NetworkObject, int> mutantHits = new();
+        Dictionary<NetworkObject, int> playerHits = new();
+        hitGlass = false;
+
+        ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
+
+        for (int i = 0; i < _pelletCount; i++)
+        {
+            Vector3 pelletDirection = RandomConeDirection(rayDirection, _spreadAngle);
+
+            if (!Physics.Raycast(rayOrigin, pelletDirection, out RaycastHit hit, _bulletRange))
+                continue;
+
+            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+            if (enemy != null && enemy.NetworkObject != null)
+            {
+                mutantHits.TryGetValue(enemy.NetworkObject, out int mCount);
+                mutantHits[enemy.NetworkObject] = mCount + 1;
+                continue;
+            }
+
+            Transform root = hit.collider.transform.root;
+            if (root.CompareTag("Player"))
+            {
+                NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
+                if (playerNetObj == null || playerNetObj.OwnerClientId == localClientId)
+                    continue;
+
+                if (hit.collider.GetComponentInParent<PlayerHealth>() != null)
+                {
+                    playerHits.TryGetValue(playerNetObj, out int pCount);
+                    playerHits[playerNetObj] = pCount + 1;
+                }
+                continue;
+            }
+
+            BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
+            if (glassHit != null && !glassHit.IsSmashed)
+                hitGlass = true;
+        }
+
+        ToArrays(mutantHits, out mutantRefs, out mutantPellets);
+        ToArrays(playerHits, out playerRefs, out playerPellets);
+    }
+
+    private static void ToArrays(Dictionary<NetworkObject, int> hits,
+        out NetworkObjectReference[] refs, out int[] counts)
+    {
+        refs   = new NetworkObjectReference[hits.Count];
+        counts = new int[hits.Count];
+
+        int index = 0;
+        foreach (var kvp in hits)
+        {
+            refs[index]   = new NetworkObjectReference(kvp.Key);
+            counts[index] = kvp.Value;
+            index++;
+        }
     }
 
     public void ShootFX()
@@ -159,16 +241,20 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     // ── Combat ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Server-side: fires <see cref="_pelletCount"/> pellets in a short-range cone around the
-    /// shooter's aim direction. Each pellet independently raycasts and can land on a mutant,
-    /// a fellow player (friendly fire, skipping the shooter via <see cref="NetworkObject.OwnerClientId"/>),
-    /// or the breakable booth glass. Damage from multiple pellets hitting the same mutant/player is
-    /// accumulated and applied once; the glass registers at most one hit per blast, mirroring
-    /// <see cref="MutantSuspectBehaviour"/>'s hit pattern.
+    /// Server-side: validates the shooter, spends a round, then applies the per-target pellet counts
+    /// the CLIENT resolved in <see cref="ResolveBlast"/>. Damage from multiple pellets hitting the
+    /// same mutant/player is accumulated into one call; the glass registers at most one hit per
+    /// blast, mirroring <see cref="MutantSuspectBehaviour"/>'s hit pattern.
+    /// The server does not re-trace the cone — it trusts what the shooter's own machine hit, so a
+    /// blast that visibly connected always lands. Damage/health/death stay server-owned, and the
+    /// pellet counts are clamped so a bad report can't inflate damage.
     /// RequireOwnership = false because ownership transfer may still be in flight when the RPC lands.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void FireServerRpc(Vector3 rayOrigin, Vector3 rayDirection, ServerRpcParams rpcParams = default)
+    private void FireServerRpc(Vector3 rayDirection,
+        NetworkObjectReference[] mutantRefs, int[] mutantPellets,
+        NetworkObjectReference[] playerRefs, int[] playerPellets,
+        bool hitGlass, ServerRpcParams rpcParams = default)
     {
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
 
@@ -184,51 +270,42 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         _roundsRemaining.Value--;
 
-        Dictionary<MutantEnemy, int> mutantHits = new();
-        Dictionary<PlayerHealth, int> playerHits = new();
-        bool hitGlass = false;
-
-        for (int i = 0; i < _pelletCount; i++)
+        if (mutantRefs != null && mutantPellets != null)
         {
-            Vector3 pelletDirection = RandomConeDirection(rayDirection, _spreadAngle);
-
-            if (!Physics.Raycast(rayOrigin, pelletDirection, out RaycastHit hit, _bulletRange))
-                continue;
-
-            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null)
+            int count = Mathf.Min(mutantRefs.Length, mutantPellets.Length);
+            for (int i = 0; i < count; i++)
             {
-                mutantHits.TryGetValue(enemy, out int mCount);
-                mutantHits[enemy] = mCount + 1;
-                continue;
+                if (!mutantRefs[i].TryGet(out NetworkObject targetObj) || targetObj == null) continue;
+
+                MutantEnemy enemy = targetObj.GetComponent<MutantEnemy>() ?? targetObj.GetComponentInChildren<MutantEnemy>();
+                if (enemy == null) continue;
+
+                int pellets = Mathf.Clamp(mutantPellets[i], 0, _pelletCount);
+                if (pellets <= 0) continue;
+
+                enemy.TakeDamage(_mutantPelletDamage * pellets, enemy.transform.position);
             }
-
-            Transform root = hit.collider.transform.root;
-            if (root.CompareTag("Player"))
-            {
-                NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
-                if (playerNetObj != null && playerNetObj.OwnerClientId == shooterClientId)
-                    continue;
-
-                PlayerHealth playerHealth = hit.collider.GetComponentInParent<PlayerHealth>();
-                if (playerHealth != null)
-                {
-                    playerHits.TryGetValue(playerHealth, out int pCount);
-                    playerHits[playerHealth] = pCount + 1;
-                }
-                continue;
-            }
-
-            BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
-            if (glassHit != null && !glassHit.IsSmashed)
-                hitGlass = true;
         }
 
-        foreach (var kvp in mutantHits)
-            kvp.Key.TakeDamage(_mutantPelletDamage * kvp.Value, kvp.Key.transform.position);
+        if (playerRefs != null && playerPellets != null)
+        {
+            int count = Mathf.Min(playerRefs.Length, playerPellets.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (!playerRefs[i].TryGet(out NetworkObject targetObj) || targetObj == null) continue;
 
-        foreach (var kvp in playerHits)
-            kvp.Key.TakeDamage(_playerPelletDamage * kvp.Value, EffectKeys.FriendlyGunshotDamage);
+                // Never let a blast hurt the shooter, whatever the client claims.
+                if (targetObj.OwnerClientId == shooterClientId) continue;
+
+                PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
+                if (playerHealth == null) continue;
+
+                int pellets = Mathf.Clamp(playerPellets[i], 0, _pelletCount);
+                if (pellets <= 0) continue;
+
+                playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage);
+            }
+        }
 
         if (hitGlass)
         {

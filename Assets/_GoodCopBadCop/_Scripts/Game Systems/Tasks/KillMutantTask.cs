@@ -51,28 +51,36 @@ public class KillMutantTask : ISystemicThreat
     /// registers it with <see cref="TaskRegistry"/>.
     /// If an instance is already active, updates its count instead of creating a duplicate.
     /// Called on all clients via the <see cref="FollowTrailThreat"/> NetworkVariable callback.
+    ///
+    /// Self-healing on purpose: <see cref="Current"/> is a static that outlives any single
+    /// networking session, and <see cref="TaskRegistry"/> is cleared between sessions/scene
+    /// reloads. A left-over <see cref="Current"/> from a previous session used to make this method
+    /// silently update a task that no registry knew about, so the row never reappeared and the
+    /// count looked frozen. Re-registering unconditionally fixes that —
+    /// <see cref="TaskRegistry.AddThreat"/> already ignores duplicates.
     /// </summary>
     public static KillMutantTask CreateAndRegister(int killCount)
     {
-        if (Current != null)
-        {
-            Current._killsRemaining = killCount;
-            return Current;
-        }
+        Current ??= new KillMutantTask();
+        Current._killsRemaining = Mathf.Max(0, killCount);
 
-        Current = new KillMutantTask { _killsRemaining = killCount };
-        TaskRegistry.Instance.AddThreat(Current);
+        // Null-safe: a client can hit this from FollowTrailThreat.OnNetworkSpawn before the
+        // registry exists. Throwing there used to abort the rest of OnNetworkSpawn (skipping the
+        // trail VFX rebuild) and leave Current pointing at an unregistered task.
+        TaskRegistry.Instance?.AddThreat(Current);
         return Current;
     }
 
     /// <summary>
     /// Updates the displayed kill count on all clients without recreating the task.
     /// Called by the <see cref="FollowTrailThreat"/> NetworkVariable callback mid-combat.
+    /// Creates the task when it doesn't exist yet, so a peer that missed the 0 -> N transition
+    /// (late joiner, or a registry that wasn't ready) still ends up with a row showing the live
+    /// count rather than silently dropping every subsequent kill.
     /// </summary>
     public static void UpdateCount(int killCount)
     {
-        if (Current == null) return;
-        Current._killsRemaining = killCount;
+        CreateAndRegister(killCount);
     }
 
     /// <summary>
@@ -84,7 +92,7 @@ public class KillMutantTask : ISystemicThreat
     {
         if (Current == null) return;
 
-        TaskRegistry.Instance.RemoveThreat(Current);
+        TaskRegistry.Instance?.RemoveThreat(Current);
         Current = null;
     }
 

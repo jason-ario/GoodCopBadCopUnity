@@ -41,6 +41,9 @@ public class MutantBreachManager : NetworkBehaviour
     /// the initial report right after spawning finishes, and the final 0-remaining report).
     /// A mutant counts as resolved the instant it dies OR begins fleeing — see
     /// <see cref="AllBreachMutantsDefeated"/>/<see cref="MutantEnemy.IsDead"/>.
+    /// Driven by the replicated <see cref="BreachRemaining"/>/<see cref="BreachTotal"/> pair, so a
+    /// subscriber that came late can always read the current values instead of waiting for the next
+    /// kill (or missing it entirely).
     /// </summary>
     public static event Action<int, int> OnBreachCountChangedAllClients;
 
@@ -109,6 +112,57 @@ public class MutantBreachManager : NetworkBehaviour
     private Coroutine _breachCoroutine;
     private readonly List<NetworkObject> _activeBreachMutants = new List<NetworkObject>();
 
+    /// <summary>Finale flee handlers subscribed for the current breach, so they can be removed when it ends.</summary>
+    private readonly List<MutantEnemy> _finaleFleeSubscriptions = new List<MutantEnemy>();
+
+    // ── Replicated breach progress ───────────────────────────────────────────
+
+    // The remaining/total breach mutant counts used to be broadcast with a plain ClientRpc, which
+    // is delivered ONCE to whoever happens to be connected AND already subscribed at that instant.
+    // Two ways a kill then failed to show up in the "Repel the mutants" objective:
+    //   • a client that joined mid-breach (or whose day script subscribed to
+    //     OnBreachCountChangedAllClients after the RPC went out) never received the count at all;
+    //   • because the RPC only fires when the number CHANGES, a single missed report leaves the
+    //     objective stuck on a stale value until the *next* kill happens — and if that was the
+    //     last kill of the breach, it never updates again.
+    // NetworkVariables are delivered as part of ordinary spawn synchronization, so late joiners
+    // and late subscribers can always read the authoritative current value (see BreachRemaining /
+    // BreachTotal / IsBreachRunning). Same reasoning as FollowTrailThreat's trail-particle
+    // NetworkList replacing its ClientRpc.
+    //
+    // _breachTotal is declared BEFORE _breachRemaining on purpose: netcode applies a behaviour's
+    // NetworkVariable deltas in field order within a single message, so by the time
+    // _breachRemaining's OnValueChanged runs, _breachTotal already holds the matching total.
+
+    private readonly NetworkVariable<int> _breachTotal = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<int> _breachRemaining = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<bool> _breachRunning = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Number of breach mutants still active. Valid on every peer while <see cref="IsBreachRunning"/> is true.</summary>
+    public int BreachRemaining => _breachRemaining.Value;
+
+    /// <summary>Total number of mutants spawned for the running breach. Valid on every peer.</summary>
+    public int BreachTotal => _breachTotal.Value;
+
+    /// <summary>
+    /// True on EVERY peer while a breach is actively running (from the alarm until the last mutant
+    /// is resolved). Unlike <see cref="IsBreachPendingOrActiveForToday"/> — which is server-only
+    /// state — this is replicated, so a client that joined mid-breach can rebuild its HUD/objective
+    /// row from it.
+    /// </summary>
+    public bool IsBreachRunning => _breachRunning.Value;
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -120,8 +174,19 @@ public class MutantBreachManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        // Runs on every peer — this is what makes the count reach clients (including late joiners).
+        _breachRemaining.OnValueChanged += OnBreachRemainingChanged;
+
         if (!IsServer)
+        {
+            // A client that joined mid-breach already has the authoritative values from spawn
+            // synchronization — replay them locally so any listener that is already subscribed
+            // sees the current count instead of waiting for the next kill.
+            if (_breachRunning.Value && _breachTotal.Value > 0)
+                OnBreachCountChangedAllClients?.Invoke(_breachRemaining.Value, _breachTotal.Value);
+
             return;
+        }
 
         CampaignManager.OnDayChanged += OnDayChanged;
         ShiftManager.OnPostShiftTasksComplete += OnPostShiftTasksComplete;
@@ -134,10 +199,47 @@ public class MutantBreachManager : NetworkBehaviour
     {
         base.OnNetworkDespawn();
 
+        _breachRemaining.OnValueChanged -= OnBreachRemainingChanged;
+
         CampaignManager.OnDayChanged -= OnDayChanged;
         ShiftManager.OnPostShiftTasksComplete -= OnPostShiftTasksComplete;
 
+        ClearFinaleFleeSubscriptions();
         CancelSchedule();
+    }
+
+    /// <summary>
+    /// Fires on EVERY peer (server included) whenever the replicated remaining count changes.
+    /// Forwards to <see cref="OnBreachCountChangedAllClients"/>, which day scripts use to drive
+    /// their objective row.
+    /// </summary>
+    private void OnBreachRemainingChanged(int previous, int current)
+    {
+        if (_breachTotal.Value <= 0)
+            return;
+
+        OnBreachCountChangedAllClients?.Invoke(current, _breachTotal.Value);
+    }
+
+    /// <summary>
+    /// Server-only. Publishes the authoritative remaining/total breach mutant count to every peer.
+    /// Writing total first keeps the pair consistent for <see cref="OnBreachRemainingChanged"/>;
+    /// the final invoke covers the case where <paramref name="remaining"/> did not actually change
+    /// (e.g. the very first report, where the variable is already at its default).
+    /// </summary>
+    private void PublishBreachCount(int remaining, int total)
+    {
+        if (!IsServer) return;
+
+        bool remainingChanged = _breachRemaining.Value != remaining;
+
+        _breachTotal.Value = total;
+        _breachRemaining.Value = remaining;
+
+        // OnValueChanged never fires for a write that doesn't change the value, so the initial
+        // report of a breach whose count already equals the stored value would otherwise be lost.
+        if (!remainingChanged)
+            OnBreachCountChangedAllClients?.Invoke(remaining, total);
     }
 
     /// <summary>
@@ -309,6 +411,7 @@ public class MutantBreachManager : NetworkBehaviour
 
         _isBreachActive = true;
         _hasTriggeredToday = true;
+        _breachRunning.Value = true;
 
         Debug.Log($"[MutantBreachManager] Breach triggered: '{data.breachName}' — {spawnQueue.Count} mutant(s).");
         TriggerBreachEffectsClientRpc(data.notificationMessage, data.notificationHoldDuration, IndexOfBreachPreset(data));
@@ -318,22 +421,26 @@ public class MutantBreachManager : NetworkBehaviour
         yield return StartCoroutine(SpawnBreachMutants(data, spawnQueue));
 
         int total = spawnQueue.Count;
-        int lastRemaining = _activeBreachMutants.Count;
-        ReportBreachCountClientRpc(lastRemaining, total);
 
-        while (!AllBreachMutantsDefeated())
+        // Prune first: mutants spawn staggered, so anything killed DURING the spawn sequence is
+        // still sitting in _activeBreachMutants and would make the first report over-count.
+        bool alreadyClear = AllBreachMutantsDefeated();
+        int lastRemaining = _activeBreachMutants.Count;
+        PublishBreachCount(lastRemaining, total);
+
+        while (!alreadyClear && !AllBreachMutantsDefeated())
         {
             int remaining = _activeBreachMutants.Count;
             if (remaining != lastRemaining)
             {
                 lastRemaining = remaining;
-                ReportBreachCountClientRpc(remaining, total);
+                PublishBreachCount(remaining, total);
             }
             yield return null;
         }
 
         if (lastRemaining != 0)
-            ReportBreachCountClientRpc(0, total);
+            PublishBreachCount(0, total);
 
         Debug.Log("[MutantBreachManager] Breach cleared — ending alarm.");
         EndBreachEffectsClientRpc();
@@ -347,7 +454,9 @@ public class MutantBreachManager : NetworkBehaviour
 
         _isBreachActive = false;
         _breachCoroutine = null;
+        _breachRunning.Value = false;
         _activeBreachMutants.Clear();
+        ClearFinaleFleeSubscriptions();
 
         // Let ShiftManager re-evaluate clock-out now that this breach is fully resolved — it may
         // have been withheld solely because this breach was pending/active (see
@@ -428,7 +537,10 @@ public class MutantBreachManager : NetworkBehaviour
                 enemy?.SetForceAggro(true);
 
             if (data.showThanksForPlayingOnFlee && enemy != null)
+            {
                 enemy.OnFleeStarted += HandleFinaleMutantFleeStarted;
+                _finaleFleeSubscriptions.Add(enemy);
+            }
 
             netObj.Spawn(true);
             _activeBreachMutants.Add(netObj);
@@ -436,16 +548,6 @@ public class MutantBreachManager : NetworkBehaviour
             if (i < spawnQueue.Count - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);
         }
-    }
-
-    /// <summary>
-    /// Broadcasts the current remaining/total breach mutant count to all clients so day
-    /// scripts can drive a HUD checklist (e.g. Day_01's "Repel the mutants" tutorial objective).
-    /// </summary>
-    [ClientRpc]
-    private void ReportBreachCountClientRpc(int remaining, int total)
-    {
-        OnBreachCountChangedAllClients?.Invoke(remaining, total);
     }
 
     /// <summary>
@@ -464,6 +566,18 @@ public class MutantBreachManager : NetworkBehaviour
         });
 
         return _activeBreachMutants.Count == 0;
+    }
+
+    /// <summary>Removes every finale flee handler subscribed for the last breach. Safe to call repeatedly.</summary>
+    private void ClearFinaleFleeSubscriptions()
+    {
+        foreach (MutantEnemy enemy in _finaleFleeSubscriptions)
+        {
+            if (enemy != null)
+                enemy.OnFleeStarted -= HandleFinaleMutantFleeStarted;
+        }
+
+        _finaleFleeSubscriptions.Clear();
     }
 
     // ── Campaign Finale ─────────────────────────────────────────────────────────
