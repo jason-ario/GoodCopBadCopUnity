@@ -104,6 +104,44 @@ public class PickableObjectRegistry : MonoBehaviour
         return result.ToArray();
     }
 
+    /// <summary>Resolves a currently spawned pickable by its durable workday save identifier.</summary>
+    public bool TryGetPickable(string saveId, out PickableObject pickable)
+    {
+        pickable = null;
+        return !string.IsNullOrEmpty(saveId) &&
+               _pickables.TryGetValue(saveId, out pickable) &&
+               pickable != null;
+    }
+
+    /// <summary>Returns whether a snapshot explicitly records this pickable as live.</summary>
+    public static bool IsMarkedExisting(PickableObjectSaveData[] data, string saveId)
+    {
+        if (data == null || string.IsNullOrEmpty(saveId)) return false;
+        foreach (PickableObjectSaveData entry in data)
+        {
+            if (entry != null && entry.Id == saveId)
+                return !entry.HasExistenceState || entry.Exists;
+        }
+        return false;
+    }
+
+    /// <summary>Restores backpack membership after all saved world poses and item state are applied.</summary>
+    public void RestoreBackpackContents(PickableObjectSaveData[] data)
+    {
+        if (data == null) return;
+
+        foreach (PickableObjectSaveData entry in data)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.Id) || entry.StringState == null || entry.StringState.Length == 0)
+                continue;
+            if (!TryGetPickable(entry.Id, out PickableObject pickable) || pickable is not BackpackPickable backpack)
+                continue;
+
+            backpack.RestoreStoredItemsServer(entry.StringState);
+        }
+    }
+
+
     /// <summary>
     /// Restores every registered pickable that has a matching saved entry to its saved
     /// position/rotation. Entries for pickables no longer present in the scene are ignored.

@@ -232,10 +232,9 @@ public class CorpseResurrectionController : NetworkBehaviour
     // ── Detach from reviving player (server-only) ───────────────────────────────
 
     /// <summary>
-    /// Called by <see cref="ReviveManager"/> on the server, immediately after this
-    /// NetworkObject has been despawned (without destroying it) but before it is
-    /// respawned as an independent, server-owned NetworkObject. Nothing further needs to
-    /// change here — RagdollController/Resurrect() have already left the Animator,
+    /// Called by <see cref="ReviveManager"/> after Netcode has replaced the former owner's
+    /// PlayerObject and transferred this retained corpse to server ownership. Nothing further
+    /// needs to change here — RagdollController/Resurrect() have already left the Animator,
     /// NavMeshAgent, and NetworkTransform in whatever state is correct for this corpse's
     /// current stage (inert corpse vs. actively resurrected mutant); this hook exists so
     /// the detach moment is explicit and easy to extend later (e.g. renaming the object,
@@ -248,6 +247,24 @@ public class CorpseResurrectionController : NetworkBehaviour
         Debug.Log($"[CorpseResurrection] {gameObject.name} detached from its former player — " +
                    $"will persist in the world as an independent {(_isResurrected.Value ? "resurrected mutant" : "corpse")} until killed by fire.");
     }
+
+    /// <summary>
+    /// Clears client-local player state before this retained corpse is demoted from a
+    /// PlayerObject and a replacement player object is spawned for its former owner.
+    /// SERVER ONLY.
+    /// </summary>
+    public void PrepareForPlayerObjectReplacement()
+    {
+        if (IsServer)
+            PrepareForPlayerObjectReplacementClientRpc();
+    }
+
+    [ClientRpc]
+    private void PrepareForPlayerObjectReplacementClientRpc()
+    {
+        GetComponent<PlayerInstance>()?.DetachFromPlayerObject();
+    }
+
 
     // ── Burn API (server-only) ─────────────────────────────────────────────────
 

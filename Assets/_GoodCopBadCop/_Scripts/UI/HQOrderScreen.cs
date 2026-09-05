@@ -35,7 +35,7 @@ public class HQOrderScreen : MonoBehaviour
 
     private void UpdateRespawnButton()
     {
-        if (_respawnButton == null) return;
+        if (_respawnButton == null || NetworkManager.Singleton == null) return;
 
         bool hasFunds = GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value >= RespawnCost;
         bool hasTeammate = false;
@@ -49,7 +49,7 @@ public class HQOrderScreen : MonoBehaviour
                 if (player != null && player != PlayerInstance.Instance)
                 {
                     hasTeammate = true;
-                    if (player.PlayerHealth.IsDead)
+                    if (player.PlayerHealth != null && player.PlayerHealth.IsDead)
                         hasDeadTeammate = true;
                 }
             }
@@ -66,7 +66,17 @@ public class HQOrderScreen : MonoBehaviour
     /// </summary>
     public void CallInBackup()
     {
-        if (GlobalHostVariables.Instance == null || PlayerInstance.Instance == null) return;
+        if (GlobalHostVariables.Instance == null ||
+            PlayerInstance.Instance == null ||
+            ReviveManager.Instance == null ||
+            NetworkManager.Singleton == null)
+        {
+            return;
+        }
+
+        // Prevent duplicate click events while the authoritative revive request is in flight.
+        if (_respawnButton != null)
+            _respawnButton.interactable = false;
 
         // Find the first dead teammate
         ulong targetClientId = ulong.MaxValue;
@@ -77,7 +87,10 @@ public class HQOrderScreen : MonoBehaviour
             if (client.PlayerObject != null)
             {
                 var player = client.PlayerObject.GetComponent<PlayerInstance>();
-                if (player != null && player != PlayerInstance.Instance && player.PlayerHealth.IsDead)
+                if (player != null &&
+                    player != PlayerInstance.Instance &&
+                    player.PlayerHealth != null &&
+                    player.PlayerHealth.IsDead)
                 {
                     targetClientId = client.ClientId;
                     corpse = player;

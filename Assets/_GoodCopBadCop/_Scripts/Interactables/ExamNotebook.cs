@@ -836,8 +836,26 @@ public class ExamNotebook : PickableObject
 
     void ExitDrawMode()
     {
+        ExitDrawMode(restorePlayerControl: true);
+    }
+
+    /// <summary>
+    /// Closes draw mode because another system (such as dialogue) is taking ownership of player
+    /// control. Unlike the player-facing Back action, this intentionally does not restore
+    /// CanControl: the interrupting system applies its own lock immediately afterwards.
+    /// </summary>
+    public void CancelDrawModeForExternalInterrupt()
+    {
+        ExitDrawMode(restorePlayerControl: false);
+    }
+
+    private void ExitDrawMode(bool restorePlayerControl)
+    {
+        if (!_isInDrawMode) return;
+
         playerPickupController.CanPickUpAndPlace = true;
-        playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(true);
+        if (restorePlayerControl)
+            playerPickupController.GetComponent<PlayerMovementController>().SetCanControl(true);
         playerPickupController.GetComponent<PlayerMovementController>().SetCanMove(true);
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
 

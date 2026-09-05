@@ -119,7 +119,6 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
     }
 
     private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
-    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
 
     // ── Update ────────────────────────────────────────────────────────────────
 
@@ -128,19 +127,23 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        if (LmbHeld)
-        {
-            // Dragging down = positive Mouse Y maps to negative because "down" is visually pulling.
-            _dragT = Mathf.Clamp01(_dragT - Input.GetAxis("Mouse Y") * _dragSensitivity);
-            ApplyDragRotation();
-            CheckAudioThreshold();
-        }
+        // See Lever.Update: pause must not allow this interaction's delayed restore to race
+        // against the pause menu's saved control state.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
-        if (LmbUp)
+        // Use current button state so a release consumed by pause/focus changes is recovered
+        // on the first gameplay frame instead of leaving this interaction latched forever.
+        if (!LmbHeld)
         {
             CommitSwitch();
             _exitCoroutine = StartCoroutine(ExitSwitchView());
+            return;
         }
+
+        // Dragging down = positive Mouse Y maps to negative because "down" is visually pulling.
+        _dragT = Mathf.Clamp01(_dragT - Input.GetAxis("Mouse Y") * _dragSensitivity);
+        ApplyDragRotation();
+        CheckAudioThreshold();
     }
 
     // ── Interact ──────────────────────────────────────────────────────────────
@@ -262,6 +265,11 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         movement.ResetCameraPos(false, _cameraReturnDuration);
 
         yield return new WaitForSeconds(_cameraReturnDuration);
+
+        // Let the pause menu restore its captured state before this interaction releases the
+        // player; otherwise ClosePauseMenu can overwrite this restore with its stale lock.
+        while (UIController.Instance != null && UIController.Instance.IsPaused)
+            yield return null;
 
         movement.SetCanControl(true);
         _exitCoroutine = null;

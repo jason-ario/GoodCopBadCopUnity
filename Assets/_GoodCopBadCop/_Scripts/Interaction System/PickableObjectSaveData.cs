@@ -26,6 +26,7 @@ public class PickableObjectSaveData
     public bool HasDurability;
     public int Durability;
     public int SecondaryState;
+    public string[] StringState = Array.Empty<string>();
     public int[] IntegerState = Array.Empty<int>();
     public bool[] BooleanState = Array.Empty<bool>();
 }

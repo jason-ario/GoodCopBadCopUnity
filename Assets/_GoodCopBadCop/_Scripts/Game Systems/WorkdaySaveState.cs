@@ -27,6 +27,7 @@ public class WorkdaySaveState
     public int SuspectIndex;
     public int Cash;
     public PickableObjectSaveData[] Pickables = Array.Empty<PickableObjectSaveData>();
+    public string[] PlayerInventoryItemIds = Array.Empty<string>();
     public bool DailyPickupsInitialized;
     public DailyPickupSaveData[] DailyPickups = Array.Empty<DailyPickupSaveData>();
     public ProcessResidentsTaskSaveState ProcessResidents = new();

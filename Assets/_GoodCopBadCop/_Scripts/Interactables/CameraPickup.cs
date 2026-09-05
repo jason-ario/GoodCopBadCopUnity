@@ -192,7 +192,7 @@ public class CameraPickup : PickableObject
         _interactionController ??= playerPickupController.GetComponent<PlayerInteractionController>();
         _interactionController?.SetSuspectCamMode(true);
         SubscribeToCutsceneState();
-        UIController.Instance?.ShowBackButton(ExitCameraMode);
+        UIController.Instance?.ShowBackButton(() => ExitCameraMode());
     }
 
     private void SubscribeToCutsceneState()
@@ -217,7 +217,7 @@ public class CameraPickup : PickableObject
     }
 
 
-    private void ExitCameraMode()
+    private void ExitCameraMode(bool restoreInteractionImmediately = false)
     {
         _inCameraMode = false;
         isUsing = false;
@@ -233,6 +233,12 @@ public class CameraPickup : PickableObject
             playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolBool, false);
 
         UIController.Instance?.HideBackButton();
+
+        if (restoreInteractionImmediately)
+        {
+            _interactionController?.SetSuspectCamMode(false);
+            return;
+        }
 
         // Defer re-enabling interaction by one frame.
         // If we restore _canInteract immediately, PlayerInteractionController.Update() may
@@ -250,6 +256,14 @@ public class CameraPickup : PickableObject
     }
 
     // ── Equip / Unequip ───────────────────────────────────────────────────────
+
+    public override void OnStowed()
+    {
+        // Stowing immediately deactivates this GameObject. Restore interaction now rather than
+        // via the normal next-frame coroutine, which would be stopped by that deactivation.
+        if (_inCameraMode)
+            ExitCameraMode(restoreInteractionImmediately: true);
+    }
 
     public override void OnEquipped(PlayerPickupController player)
     {

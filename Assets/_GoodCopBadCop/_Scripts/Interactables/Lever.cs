@@ -102,33 +102,37 @@ public class Lever : Interactable, IHeldItemPassthrough
     }
 
     private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
-    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
 
     private void Update()
     {
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        // Drag while LMB / RT is held — accumulate into _dragT.
-        // Mouse Y is already a per-frame delta; controller stick is continuous so scale by Time.deltaTime.
-        if (LmbHeld)
-        {
-            float mouseY = Input.GetAxis("Mouse Y");
-            float stickY = Gamepad.current?.rightStick.ReadValue().y ?? 0f;
-            float delta  = Mathf.Abs(mouseY) > 0.001f
-                ? mouseY * _dragSensitivity
-                : stickY * _controllerDragSpeed * Time.deltaTime;
-            _dragT = Mathf.Clamp01(_dragT + delta);
-            ApplyDragRotation();
-            CheckShutterThreshold();
-        }
+        // The pause menu captures the control state that existed when it opened. Do not run
+        // this interaction's exit while paused, or its delayed restore can be overwritten by
+        // the pause menu's saved "control disabled" state on unpause.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
-        // Release → commit position and exit.
-        if (LmbUp)
+        // Test the current held state instead of relying solely on the one-frame release event.
+        // Release events can be missed while focus or pause input is captured; once gameplay
+        // resumes, an inactive button must still complete this interaction and restore control.
+        if (!LmbHeld)
         {
             CommitLever();
             _exitCoroutine = StartCoroutine(ExitLeverView());
+            return;
         }
+
+        // Drag while LMB / RT is held — accumulate into _dragT.
+        // Mouse Y is already a per-frame delta; controller stick is continuous so scale by Time.deltaTime.
+        float mouseY = Input.GetAxis("Mouse Y");
+        float stickY = Gamepad.current?.rightStick.ReadValue().y ?? 0f;
+        float delta  = Mathf.Abs(mouseY) > 0.001f
+            ? mouseY * _dragSensitivity
+            : stickY * _controllerDragSpeed * Time.deltaTime;
+        _dragT = Mathf.Clamp01(_dragT + delta);
+        ApplyDragRotation();
+        CheckShutterThreshold();
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -258,6 +262,11 @@ public class Lever : Interactable, IHeldItemPassthrough
 
         // Wait for the camera return tween before re-enabling controls.
         yield return new WaitForSeconds(_cameraReturnDuration);
+
+        // If pause opened during the return tween, it captured this interaction's disabled
+        // state. Restoring now would be overwritten by ClosePauseMenu and strand the player.
+        while (UIController.Instance != null && UIController.Instance.IsPaused)
+            yield return null;
 
         movement.SetCanControl(true);
         _exitCoroutine = null;

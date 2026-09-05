@@ -820,7 +820,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _clientIsWaitingForInput = false;
 
         DeactivateOverrideCam();
-        UIController.Instance?.ShowPlayerUI();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
 
         // Unconditional clear — mirrors ExitScriptedModeClientRpc so a player who leaves early
@@ -828,12 +827,20 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // stay permanently immune/untargetable.
         PlayerInstance.Instance?.SetIsInCutscene(false);
 
-        if (PlayerInstance.Instance == null) return;
+        if (PlayerInstance.Instance == null)
+        {
+            UIController.Instance?.ShowPlayerUI();
+            return;
+        }
 
         if (PlayerInstance.Instance.IsOutsideLocal)
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
         else
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueMode();
+
+        // ExitScriptedDialogueMode clears the dialogue flag that ShowPlayerUI guards against.
+        // Restoring the HUD before that exit can leave it hidden after a player leaves early.
+        UIController.Instance?.ShowPlayerUI();
     }
 
     /// <summary>

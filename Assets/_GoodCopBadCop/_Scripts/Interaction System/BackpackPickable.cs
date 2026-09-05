@@ -40,7 +40,81 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
         NetworkVariableWritePermission.Server);
 
     public bool IsEquipped       => _wearingPlayerId.Value != ulong.MaxValue;
+    public ulong WearingPlayerId => _wearingPlayerId.Value;
     public int  StoredItemCount  => _storedItems?.Count ?? 0;
+
+    /// <summary>
+    /// Clears the worn state before the base recovery path returns this backpack to the world.
+    /// This also restores the wearer's character mesh visibility through the replicated state.
+    /// </summary>
+    public override void ForceReleaseToWorldServer(Vector3 position, Quaternion rotation)
+    {
+        if (IsServer && _wearingPlayerId.Value != ulong.MaxValue)
+            _wearingPlayerId.Value = ulong.MaxValue;
+
+        base.ForceReleaseToWorldServer(position, rotation);
+    }
+
+
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        var storedIds = new System.Collections.Generic.List<string>(_storedItems.Count);
+        foreach (NetworkObjectReference itemRef in _storedItems)
+        {
+            if (!itemRef.TryGet(out NetworkObject itemNetworkObject)) continue;
+            PickableObject item = itemNetworkObject.GetComponent<PickableObject>();
+            if (item != null)
+                storedIds.Add(item.SaveId);
+        }
+
+        data.StringState = storedIds.ToArray();
+    }
+
+    /// <summary>
+    /// Server-only: rebuilds this backpack's FIFO membership after all world pickables have
+    /// registered. Stored items stay hidden, non-interactable, and parent-constrained locally.
+    /// </summary>
+    public void RestoreStoredItemsServer(string[] savedItemIds)
+    {
+        if (!IsServer || savedItemIds == null) return;
+
+        _storedItems.Clear();
+        foreach (string itemId in savedItemIds)
+        {
+            if (!PickableObjectRegistry.Instance.TryGetPickable(itemId, out PickableObject item) || item == null || item == this)
+                continue;
+
+            NetworkObject itemNetworkObject = item.NetworkObject;
+            if (itemNetworkObject == null || !itemNetworkObject.IsSpawned)
+                continue;
+
+            item.ForceReleaseToWorldServer();
+            itemNetworkObject.RemoveOwnership();
+            NetworkTransform itemTransform = itemNetworkObject.GetComponent<NetworkTransform>();
+            if (itemTransform != null) itemTransform.enabled = false;
+            item.SetInteractableNetworked(false);
+            _storedItems.Add(new NetworkObjectReference(itemNetworkObject));
+            StoreRestoredItemClientRpc(new NetworkObjectReference(itemNetworkObject));
+        }
+    }
+
+    [ClientRpc]
+    private void StoreRestoredItemClientRpc(NetworkObjectReference itemRef)
+    {
+        if (!itemRef.TryGet(out NetworkObject itemNetworkObject)) return;
+        PickableObject item = itemNetworkObject.GetComponent<PickableObject>();
+        if (item == null) return;
+
+        Rigidbody rb = itemNetworkObject.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+        NetworkTransform itemTransform = itemNetworkObject.GetComponent<NetworkTransform>();
+        if (itemTransform != null) itemTransform.enabled = false;
+        item.NetworkObject.AutoObjectParentSync = false;
+        item.transform.position = transform.position;
+        item.transform.rotation = transform.rotation;
+        item.SetParent(transform);
+        ApplyStoredItemVisuals(itemRef);
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 

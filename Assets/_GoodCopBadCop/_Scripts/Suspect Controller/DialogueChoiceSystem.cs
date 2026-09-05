@@ -75,6 +75,35 @@ public class DialogueChoiceSystem : NetworkBehaviour
         IsInDialogueMode = false;
     }
 
+
+    /// <summary>
+    /// Clears an ordinary local dialogue session when its player object is being replaced after
+    /// death. A scripted sequence is intentionally left intact because it can still govern the
+    /// whole session and will release its controls through the normal exit path.
+    /// </summary>
+    public void AbortForPlayerObjectReplacement()
+    {
+        if (!IsInDialogueMode || ScriptedDialogueRunner.IsScriptedModeActive)
+            return;
+
+        IsInDialogueMode = false;
+        _scriptedChoiceCallback = null;
+        _localChoiceLocked = false;
+
+        if (_reshowCoroutine != null)
+        {
+            StopCoroutine(_reshowCoroutine);
+            _reshowCoroutine = null;
+        }
+
+        if (dialogueChoiceContainer != null)
+            dialogueChoiceContainer.SetActive(false);
+
+        UIController.Instance?.HideBackButton();
+        UIController.Instance?.HideCursor();
+        PlayerInstance.Instance?.SetIsInCutscene(false);
+    }
+
     /// <summary>
     /// Opens the dialogue choice UI. On the first call, enters dialogue mode: locks movement
     /// and activates the suspect cam. Safe to call if already in mode.
@@ -644,7 +673,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         var player = PlayerInstance.Instance;
         if (player == null) return;
-        player.GetComponent<PlayerPickupController>()?.ForceStopUse();
+
+        PlayerPickupController pickup = player.GetComponent<PlayerPickupController>();
+        pickup?.ForceStopUse();
+
+        // The notebook's checklist view is not a normal held-item use: it deliberately stays
+        // open after the click is released and therefore is not reported by IsBeingUsed.
+        // Close it explicitly before dialogue takes over, otherwise its CanMove=false latch
+        // outlives the dialogue and the player can look but cannot move after the conversation.
+        if (pickup?.HeldObject is ExamNotebook notebook)
+            notebook.CancelDrawModeForExternalInterrupt();
     }
 
     /// <summary>

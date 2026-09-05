@@ -127,6 +127,8 @@ public class ShiftManager : NetworkBehaviour
 
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
+    [Tooltip("Tabletop anchor where items recovered from a saved player inventory are released on load.")]
+    [SerializeField] private Transform inventoryRecoveryDropPoint;
     [SerializeField] private WindowLampController windowLampController;
     [SerializeField] private DoorController _doorController;
     [SerializeField] private BunkerDoorController _bunkerDoorController;
@@ -503,6 +505,7 @@ public class ShiftManager : NetworkBehaviour
             SuspectIndex = SuspectController.Instance != null ? SuspectController.Instance.SuspectIndex : -1,
             Cash = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
             Pickables = PickableObjectRegistry.Instance.CaptureAll(),
+            PlayerInventoryItemIds = CapturePlayerInventoryItemIds(),
             DailyPickupsInitialized = DailyPickupSpawnManager.Instance != null && DailyPickupSpawnManager.Instance.HasInitializedForDay,
             DailyPickups = DailyPickupSpawnManager.Instance != null
                 ? DailyPickupSpawnManager.Instance.CaptureSaveData()
@@ -517,6 +520,89 @@ public class ShiftManager : NetworkBehaviour
             BoothMess = CleanBoothMessTask.Instance != null ? CleanBoothMessTask.Instance.CaptureSaveState() : new BoothMessTaskSaveState(),
             PendingDailyTaskIds = CapturePendingDailyTaskIds()
         };
+    }
+
+    /// <summary>
+    /// Captures the stable IDs of every item in a connected player's hotbar or hand. Inventory UI
+    /// remains client-owned; its owner-write object references merely let the host include those
+    /// items in the resumable workday snapshot.
+    /// </summary>
+    private static string[] CapturePlayerInventoryItemIds()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsServer)
+            return Array.Empty<string>();
+
+        var itemIds = new HashSet<string>();
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+            client.PlayerObject.GetComponent<PlayerInventory>()?.AppendSaveItemIds(itemIds);
+        }
+
+        // An equipped backpack is no longer held or slotted, but it is still a player-owned
+        // pickable that must be released at recovery along with its stored-item membership.
+        foreach (BackpackPickable backpack in FindObjectsByType<BackpackPickable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (backpack.IsEquipped && !string.IsNullOrEmpty(backpack.SaveId))
+                itemIds.Add(backpack.SaveId);
+        }
+
+        if (itemIds.Count == 0)
+            return Array.Empty<string>();
+
+        var sortedItemIds = new List<string>(itemIds);
+        sortedItemIds.Sort(StringComparer.Ordinal);
+        return sortedItemIds.ToArray();
+    }
+
+    private Transform ResolveInventoryRecoveryDropPoint()
+    {
+        if (inventoryRecoveryDropPoint != null)
+            return inventoryRecoveryDropPoint;
+
+        GameObject recoveryAnchor = GameObject.Find("Inventory Recovery Drop Point");
+        return recoveryAnchor != null ? recoveryAnchor.transform : null;
+    }
+
+    /// <summary>
+    /// Releases saved player-held and stowed items into the booth after their normal world state
+    /// has been restored. This deliberately does not rebuild a client-owned hotbar: the recovered
+    /// items are loose, host-authoritative world objects for every player to pick up.
+    /// </summary>
+    private void RestorePlayerInventoryAtRecoveryDropPoint(string[] savedItemIds)
+    {
+        if (!IsServer || savedItemIds == null || savedItemIds.Length == 0) return;
+
+        Transform recoveryDropPoint = ResolveInventoryRecoveryDropPoint();
+        if (recoveryDropPoint == null)
+        {
+            Debug.LogError("[ShiftManager] Inventory recovery drop point is not assigned; saved inventory items were not evacuated.");
+            return;
+        }
+
+        var recoveredIds = new HashSet<string>();
+        int recoveredCount = 0;
+        foreach (string itemId in savedItemIds)
+        {
+            if (string.IsNullOrEmpty(itemId) || !recoveredIds.Add(itemId)) continue;
+            if (!PickableObjectRegistry.Instance.TryGetPickable(itemId, out PickableObject pickable) ||
+                pickable == null || !pickable.IsSpawned)
+                continue;
+
+            int column = recoveredCount % 3;
+            int row = recoveredCount / 3;
+            Vector3 position = recoveryDropPoint.position +
+                               recoveryDropPoint.right * ((column - 1) * 0.22f) +
+                               recoveryDropPoint.forward * (row * 0.22f) +
+                               recoveryDropPoint.up * 0.08f;
+            Quaternion rotation = Quaternion.Euler(0f, recoveryDropPoint.eulerAngles.y, 0f);
+            pickable.ForceReleaseToWorldServer(position, rotation);
+            recoveredCount++;
+        }
+
+        if (recoveredCount > 0)
+            Debug.Log($"[ShiftManager] Recovered {recoveredCount} saved inventory item(s) at the booth drop point.");
     }
 
     /// <summary>
@@ -552,6 +638,8 @@ public class ShiftManager : NetworkBehaviour
         CurrentPhase = (DayPhase)Mathf.Clamp(state.Phase, (int)DayPhase.PreShift, (int)DayPhase.PostShift);
         GlobalHostVariables.Instance?.SetMoney(state.Cash);
         PickableObjectRegistry.Instance?.RestoreAll(state.Pickables);
+        PickableObjectRegistry.Instance?.RestoreBackpackContents(state.Pickables);
+        RestorePlayerInventoryAtRecoveryDropPoint(state.PlayerInventoryItemIds);
 
         ProcessResidentsTask.Instance?.RestoreSaveState(state.ProcessResidents);
         CleanGraffitiTask.Instance?.RestoreSaveState(state.Graffiti);

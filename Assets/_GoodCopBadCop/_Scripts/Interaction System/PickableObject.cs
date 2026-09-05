@@ -547,6 +547,15 @@ public class PickableObject : Interactable
     /// </summary>
     public void ForceReleaseToWorldServer()
     {
+        ForceReleaseToWorldServer(transform.position, transform.rotation);
+    }
+
+    /// <summary>
+    /// Server-only forced release that also assigns the final world pose. Used by the workday
+    /// restore path to evacuate saved player inventory items to a deterministic recovery point.
+    /// </summary>
+    public virtual void ForceReleaseToWorldServer(Vector3 position, Quaternion rotation)
+    {
         if (!IsServer)
         {
             Debug.LogWarning($"[PickableObject] ForceReleaseToWorldServer called on non-server for {name}; ignoring.");
@@ -561,9 +570,15 @@ public class PickableObject : Interactable
 
         RemoveParent();
         ClearSocketFollow();
+        transform.position = position;
+        transform.rotation = rotation;
 
-        Vector3 position = transform.position;
-        Quaternion rotation = transform.rotation;
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic = true;
+        }
 
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;

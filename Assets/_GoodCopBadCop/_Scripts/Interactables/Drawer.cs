@@ -150,7 +150,6 @@ public class Drawer : Interactable, IHeldItemPassthrough
     }
 
     private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
-    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame ?? false);
 
     // ── Input loop ────────────────────────────────────────────────────────────
 
@@ -167,20 +166,23 @@ public class Drawer : Interactable, IHeldItemPassthrough
         if (!_inControl) return;
         if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
 
-        // Held → scrub drawer position. Accept both LMB / RT and E so either input can drag.
-        if (LmbHeld || Input.GetKey(KeyCode.E))
-        {
-            _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
-            ApplyDragPosition();
-            SyncDragTIfNeeded();
-        }
+        // Do not let a drag interaction restore state while the pause menu still owns it.
+        // Once unpaused, the current held-state check below also recovers a release that was
+        // consumed while paused or while the application was unfocused.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
-        // Released → commit and exit. Fire when whichever input triggered the grab is released.
-        if (LmbUp || Input.GetKeyUp(KeyCode.E))
+        bool dragHeld = LmbHeld || Input.GetKey(KeyCode.E);
+        if (!dragHeld)
         {
             CommitDrawer();
             _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
+            return;
         }
+
+        // Held → scrub drawer position. Accept both LMB / RT and E so either input can drag.
+        _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
+        ApplyDragPosition();
+        SyncDragTIfNeeded();
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────

@@ -49,8 +49,29 @@ public class PlayerSpawner : NetworkBehaviour
     /// </summary>
     public void SpawnPlayerAtLobby(ulong clientId, bool isSinglePlayer)
     {
-        SpawnPlayerAtPoint(clientId, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true);
+        if (SpawnPlayerAtPoint(clientId, GetLobbySpawnPoint(clientId, isSinglePlayer), isOutside: true) != null)
+            OnPlayerSpawnedAtLobby?.Invoke(clientId);
+    }
+
+    /// <summary>
+    /// Replaces a client's current player object with a newly spawned player at the lobby.
+    /// The previous player object remains spawned as a regular NetworkObject, which lets a
+    /// dead body persist safely as a server-owned corpse.
+    /// SERVER ONLY.
+    /// </summary>
+    public bool ReplacePlayerAtLobby(ulong clientId, bool isSinglePlayer)
+    {
+        NetworkObject replacement = SpawnPlayerAtPoint(
+            clientId,
+            GetLobbySpawnPoint(clientId, isSinglePlayer),
+            isOutside: true,
+            replaceExistingPlayerObject: true);
+
+        if (replacement == null)
+            return false;
+
         OnPlayerSpawnedAtLobby?.Invoke(clientId);
+        return true;
     }
 
     /// <summary>
@@ -82,6 +103,20 @@ public class PlayerSpawner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Replaces a client's current player object with a newly spawned player at the
+    /// outside-bunker point while keeping the previous object spawned as a corpse.
+    /// SERVER ONLY.
+    /// </summary>
+    public bool ReplacePlayerAtOutsideBunker(ulong clientId)
+    {
+        return SpawnPlayerAtPoint(
+            clientId,
+            GetOutsideBunkerSpawnPoint(clientId),
+            isOutside: false,
+            replaceExistingPlayerObject: true) != null;
+    }
+
+    /// <summary>
     /// Spawns the player prefab for the given client at the inside-bunker spawn point.
     /// Used for late joiners entering an already-running Day 2+ session.
     /// SERVER ONLY.
@@ -91,31 +126,46 @@ public class PlayerSpawner : NetworkBehaviour
         SpawnPlayerAtPoint(clientId, GetInsideBunkerSpawnPoint(clientId), isOutside: false);
     }
 
-    private void SpawnPlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside)
+    private NetworkObject SpawnPlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside, bool replaceExistingPlayerObject = false)
     {
         if (!NetworkManager.Singleton.IsServer)
         {
             Debug.LogWarning("[PlayerSpawner] SpawnPlayerAtPoint called on client. Ignored.");
-            return;
+            return null;
         }
 
-        // Guard against race conditions where two code paths both attempt to spawn the same client
-        // (e.g. SpawnAllPlayersAtLobby and OnClientConnected overlapping during LobbyTransitionSequence).
-        if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var existingClient) &&
+        // Normal spawns must not create a second player object. Intentional replacements are
+        // supported by Netcode: SpawnAsPlayerObject demotes the previous object to a regular
+        // NetworkObject while atomically assigning the new PlayerObject to the client.
+        if (!replaceExistingPlayerObject &&
+            NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var existingClient) &&
             existingClient.PlayerObject != null)
         {
             Debug.LogWarning($"[PlayerSpawner] Client {clientId} already has a player object — skipping duplicate spawn.");
-            return;
+            return null;
         }
 
         if (playerPrefab == null)
         {
             Debug.LogError("[PlayerSpawner] playerPrefab is not assigned.");
-            return;
+            return null;
+        }
+
+        if (spawnPoint == null)
+        {
+            Debug.LogError($"[PlayerSpawner] No spawn point is configured for client {clientId}.");
+            return null;
         }
 
         var go = Instantiate(playerPrefab, spawnPoint.position, spawnPoint.rotation);
         var networkObject = go.GetComponent<NetworkObject>();
+        if (networkObject == null)
+        {
+            Debug.LogError($"[PlayerSpawner] Player prefab {playerPrefab.name} has no NetworkObject component.");
+            Destroy(go);
+            return null;
+        }
+
         networkObject.SpawnAsPlayerObject(clientId);
 
         var playerInstance = go.GetComponent<PlayerInstance>();
@@ -123,6 +173,7 @@ public class PlayerSpawner : NetworkBehaviour
             playerInstance.SetIsOutside(isOutside);
 
         Debug.Log($"[PlayerSpawner] Spawned player for client {clientId} at {spawnPoint.name} (isOutside: {isOutside})");
+        return networkObject;
     }
 
     /// <summary>

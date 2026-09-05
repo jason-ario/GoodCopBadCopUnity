@@ -137,48 +137,86 @@ public class PlayerInstance : NetworkBehaviour
                     _characterController.enabled = true;
             }
 
-            _playerMovementController.CanControl = true;
             Instance = this;
 
             if (deathCamera != null) deathCamera.gameObject.SetActive(false);
             if (spectateCamera != null) spectateCamera.gameObject.SetActive(false);
 
-            PlayerHealth.OnDeath += Die;
-            PlayerHealth.OnRespawn += Respawn;
+            if (PlayerHealth != null)
+            {
+                PlayerHealth.OnDeath += Die;
+                PlayerHealth.OnRespawn += Respawn;
+            }
 
             SpectateManager.Instance?.StopSpectating();
             UIController.Instance?.HideDeathScreen();
-
-            EnableReticle();
-            SetCanInteract(true);
+            RestoreLocalGameplayStateAfterSpawn();
 
             OnLocalPlayerSpawned?.Invoke();
         }
     }
 
+    /// <summary>
+    /// Restores the complete local gameplay state on a fresh player object. Revives create a
+    /// replacement PlayerObject, so relying on the new prefab's serialized defaults is unsafe:
+    /// the death path may have independently disabled movement, look, interaction, HUD, and
+    /// spectator state on the client. Active scripted dialogue remains authoritative and keeps
+    /// the replacement locked until its normal exit path runs.
+    /// </summary>
+    private void RestoreLocalGameplayStateAfterSpawn()
+    {
+        if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
+            return;
+
+        if (_characterController != null)
+            _characterController.enabled = true;
+
+        if (_playerMovementController != null)
+        {
+            _playerMovementController.SetCanMove(true);
+            _playerMovementController.SetCanLook(true);
+            _playerMovementController.SetCanControl(true);
+        }
+
+        SetCanInteract(true);
+        EnableReticle();
+        UIController.Instance?.ShowPlayerUI();
+    }
+
+
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+        DetachFromPlayerObject();
+    }
 
+    /// <summary>
+    /// Releases local-player-only state when this object is retained as a corpse while a
+    /// replacement player object is spawned for the same client.
+    /// </summary>
+    public void DetachFromPlayerObject()
+    {
         if (PlayerHealth != null)
         {
             PlayerHealth.OnDeath -= OnAnyPlayerDeath;
             PlayerHealth.OnRespawn -= OnAnyPlayerRespawn;
         }
 
-        if (IsLocalPlayer)
-        {
-            if (PlayerHealth != null)
-            {
-                PlayerHealth.OnDeath -= Die;
-                PlayerHealth.OnRespawn -= Respawn;
-            }
+        if (deathCamera != null) deathCamera.gameObject.SetActive(false);
+        if (spectateCamera != null) spectateCamera.gameObject.SetActive(false);
 
-            if (Instance == this)
-            {
-                Instance = null;
-            }
+        if (Instance != this)
+            return;
+
+        DialogueChoiceSystem.Instance?.AbortForPlayerObjectReplacement();
+
+        if (PlayerHealth != null)
+        {
+            PlayerHealth.OnDeath -= Die;
+            PlayerHealth.OnRespawn -= Respawn;
         }
+
+        Instance = null;
     }
 
     private void OnAnyPlayerDeath()

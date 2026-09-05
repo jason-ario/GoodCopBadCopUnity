@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -24,6 +25,18 @@ public class PlayerInventory : NetworkBehaviour
 
     private readonly PickableObject[] _slots  = new PickableObject[2];
     private readonly bool[]           _stowed = new bool[2];   // true = item at stowPoint, not in hand
+
+    // The hotbar is managed by its owner, but the host needs the authoritative references when
+    // it serializes a resumable workday. These owner-write mirrors make stowed items visible to
+    // the server without making the host responsible for reconstructing client-local hotbar UI.
+    private readonly NetworkVariable<NetworkObjectReference> _firstSlotRef = new(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner);
+    private readonly NetworkVariable<NetworkObjectReference> _secondSlotRef = new(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner);
 
     private int _activeSlot = -1;   // -1 = hand empty
 
@@ -71,6 +84,50 @@ public class PlayerInventory : NetworkBehaviour
     public bool IsFullFor(PickableObject obj) =>
         IsStowable(obj) && SlotOf(obj) < 0 && FreeSlot() < 0;
 
+    /// <summary>
+    /// Adds every item currently owned by this inventory to a host-side workday snapshot. The
+    /// local arrays cover the host player's immediate state, while the replicated references
+    /// cover remote players whose local hotbar arrays are intentionally private to their owner.
+    /// </summary>
+    public void AppendSaveItemIds(HashSet<string> itemIds)
+    {
+        if (itemIds == null) return;
+
+        AddSaveId(_slots[0], itemIds);
+        AddSaveId(_slots[1], itemIds);
+        AddSaveId(_unstowableHeld, itemIds);
+        AddSaveId(_firstSlotRef.Value, itemIds);
+        AddSaveId(_secondSlotRef.Value, itemIds);
+        if (_pickup != null)
+            AddSaveId(_pickup.HeldObjectRef, itemIds);
+    }
+
+    private static void AddSaveId(PickableObject item, HashSet<string> itemIds)
+    {
+        if (item != null && !string.IsNullOrEmpty(item.SaveId))
+            itemIds.Add(item.SaveId);
+    }
+
+    private static void AddSaveId(NetworkObjectReference itemRef, HashSet<string> itemIds)
+    {
+        if (!itemRef.TryGet(out NetworkObject itemObject)) return;
+        AddSaveId(itemObject.GetComponent<PickableObject>(), itemIds);
+    }
+
+    private void SetSlotReference(int index, PickableObject item)
+    {
+        if (!IsOwner) return;
+
+        NetworkObjectReference itemRef = item != null && item.NetworkObject != null
+            ? new NetworkObjectReference(item.NetworkObject)
+            : default;
+
+        if (index == 0)
+            _firstSlotRef.Value = itemRef;
+        else if (index == 1)
+            _secondSlotRef.Value = itemRef;
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private void Awake() => _pickup = GetComponent<PlayerPickupController>();
@@ -102,6 +159,16 @@ public class PlayerInventory : NetworkBehaviour
     private void Update()
     {
         if (!IsOwner) return;
+
+        // The HUD is hidden and interaction is suspended during scripted dialogue, but this
+        // component still receives legacy hotkey and wheel input. Ignore it so an unseen 1/2 or
+        // wheel press cannot stow/swap an item and leave the hotbar in an unexpected state when
+        // normal gameplay resumes.
+        if (PlayerInstance.Instance != null &&
+            (PlayerInstance.Instance.IsInCutscene ||
+             ScriptedDialogueRunner.IsScriptedModeActive ||
+             DialogueChoiceSystem.IsInDialogueMode))
+            return;
 
         if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
         if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
@@ -220,6 +287,7 @@ public class PlayerInventory : NetworkBehaviour
 
             _slots[free]  = obj;
             _stowed[free] = false;
+            SetSlotReference(free, obj);
             OnSlotChanged?.Invoke(free, obj);
             SetActiveSlot(free);
         }
@@ -317,6 +385,7 @@ public class PlayerInventory : NetworkBehaviour
     {
         _slots[index]  = null;
         _stowed[index] = false;
+        SetSlotReference(index, null);
         OnSlotChanged?.Invoke(index, null);
     }
 

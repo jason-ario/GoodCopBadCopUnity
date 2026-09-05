@@ -85,42 +85,72 @@ public class ReviveManager : NetworkBehaviour
 
     private void RevivePlayerServer(ulong clientId, bool isNewDay)
     {
+        if (!IsServer || NetworkManager.Singleton == null)
+            return;
+
         if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
         {
             Debug.LogWarning($"[ReviveManager] Cannot revive client {clientId} — client not connected.");
             return;
         }
 
-        if (client.PlayerObject != null)
+        if (PlayerSpawner.Instance == null)
         {
-            NetworkObject deadPlayerObject = client.PlayerObject;
-            CorpseResurrectionController corpse = deadPlayerObject.GetComponent<CorpseResurrectionController>();
+            Debug.LogError($"[ReviveManager] Cannot revive client {clientId} — PlayerSpawner is unavailable.");
+            return;
+        }
 
-            if (corpse != null && corpse.HasActiveCorpse)
-            {
-                // The corpse (still inert, or already resurrected into a chasing mutant) must
-                // stay behind in the world until it's killed by fire. Despawn it as a
-                // non-player object without destroying it, then immediately respawn it as an
-                // independent, server-owned NetworkObject so it keeps running its
-                // NavMeshAgent/MutantEnemy chase logic while the client gets a fresh PlayerObject.
-                Debug.Log($"[ReviveManager] Detaching active corpse for client {clientId} instead of destroying it.");
-                deadPlayerObject.Despawn(false);
-                corpse.DetachFromPlayer();
-                deadPlayerObject.Spawn();
-            }
-            else
+        NetworkObject deadPlayerObject = client.PlayerObject;
+        if (deadPlayerObject == null)
+        {
+            Debug.LogWarning($"[ReviveManager] Cannot revive client {clientId} — no player object is assigned.");
+            return;
+        }
+
+        PlayerHealth health = deadPlayerObject.GetComponent<PlayerHealth>();
+        if (health == null || !health.IsDead)
+        {
+            Debug.LogWarning($"[ReviveManager] Ignoring revive request for client {clientId} — their player is not dead.");
+            return;
+        }
+
+        CorpseResurrectionController corpse = deadPlayerObject.GetComponent<CorpseResurrectionController>();
+        bool hasActiveCorpse = corpse != null && corpse.HasActiveCorpse;
+        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+
+        if (hasActiveCorpse)
+        {
+            // Do not despawn and immediately respawn the same player object. Death disables
+            // network behaviours (such as NetworkTransform), and a respawn with a different
+            // behaviour layout can corrupt the spawn payload received by other clients.
+            // SpawnAsPlayerObject safely replaces the client's PlayerObject and automatically
+            // demotes this existing corpse to a normal NetworkObject.
+            // Clear client-local state on the old PlayerObject before replacing it.
+            corpse.PrepareForPlayerObjectReplacement();
+
+            bool replacementSpawned = isNewDay
+                ? PlayerSpawner.Instance.ReplacePlayerAtOutsideBunker(clientId)
+                : PlayerSpawner.Instance.ReplacePlayerAtLobby(clientId, isSinglePlayer);
+            if (!replacementSpawned)
+                return;
+
+            // The retained corpse must be controlled by the server, not by the revived client.
+            deadPlayerObject.ChangeOwnership(NetworkManager.ServerClientId);
+            corpse.DetachFromPlayer();
+        }
+        else
+        {
+            if (deadPlayerObject != null)
             {
                 Debug.Log($"[ReviveManager] Despawning dead player object for client {clientId}.");
                 deadPlayerObject.Despawn(true);
             }
+
+            if (isNewDay)
+                PlayerSpawner.Instance.SpawnPlayerAtOutsideBunker(clientId);
+            else
+                PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
         }
-
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
-
-        if (isNewDay)
-            PlayerSpawner.Instance.SpawnPlayerAtOutsideBunker(clientId);
-        else
-            PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
 
         OnPlayerRevived?.Invoke(clientId);
         Debug.Log($"[ReviveManager] Revived client {clientId} (isNewDay: {isNewDay}).");
