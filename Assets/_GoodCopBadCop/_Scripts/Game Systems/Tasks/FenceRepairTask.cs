@@ -83,6 +83,65 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// <summary>Number of fences broken this round (the round's target).</summary>
     public int TotalCount => _targetFenceCount.Value;
 
+    /// <summary>Captures the visual damage state of each authored fence in stable inspector order.</summary>
+    public FenceTaskSaveState CaptureSaveState()
+    {
+        int count = _allFences?.Length ?? 0;
+        var damageStates = new int[count];
+        for (int i = 0; i < count; i++)
+            damageStates[i] = _allFences[i] != null ? _allFences[i].DamageState : 0;
+
+        return new FenceTaskSaveState
+        {
+            IsActive = _isActive.Value,
+            IsComplete = _isComplete.Value,
+            DamageStates = damageStates
+        };
+    }
+
+    /// <summary>
+    /// Restores the authoritative fence damage states and rebuilds live observation from that
+    /// restored world state, so a save can never retain a fence objective for a repaired/missing
+    /// segment or omit a visibly broken segment from the count.
+    /// </summary>
+    public void RestoreSaveState(FenceTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+
+        StopObservingFences();
+        _trackedFences.Clear();
+        int count = Mathf.Min(_allFences?.Length ?? 0, state.DamageStates?.Length ?? 0);
+        for (int i = 0; i < count; i++)
+        {
+            if (_allFences[i] != null)
+                _allFences[i].SetDamageLevelServer(state.DamageStates[i]);
+        }
+
+        _isComplete.Value = false;
+        _isActive.Value = state.IsActive;
+        if (!_isActive.Value)
+        {
+            _targetFenceCount.Value = 0;
+            _fencesRepaired.Value = 0;
+            _isComplete.Value = state.IsComplete;
+            return;
+        }
+
+        StartObservingFences();
+        RebuildTrackedFences();
+        if (_trackedFences.Count == 0)
+        {
+            StopObservingFences();
+            _isActive.Value = false;
+            _isComplete.Value = state.IsComplete;
+            _targetFenceCount.Value = 0;
+            _fencesRepaired.Value = 0;
+            return;
+        }
+
+        RecomputeProgress();
+    }
+
     /// <summary>Dynamic description updated as fences are repaired.</summary>
     public string TaskDescription =>
         IsComplete
@@ -264,6 +323,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
         // A trigger that broke nothing is immediately satisfied.
         RecomputeProgress();
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 
     // ── Repair flow ──────────────────────────────────────────────────────────
@@ -303,6 +363,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
         _targetFenceCount.Value = total;
         _fencesRepaired.Value   = Mathf.Clamp(repaired, 0, total);
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         if (total <= 0 || repaired < total) return;
 

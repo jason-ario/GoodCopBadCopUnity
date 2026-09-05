@@ -99,6 +99,7 @@ public class MailPackageItem : PickableObject
     public string ResidentName => _residentName.Value.ToString();
     public string GoodsLabel   => _goodsLabel.Value.ToString();
     public MailSortBinType CorrectBin => (MailSortBinType)_correctBin.Value;
+    public int ResidentPoolIndex => _residentPoolIndex.Value;
 
     public override void OnNetworkSpawn()
     {

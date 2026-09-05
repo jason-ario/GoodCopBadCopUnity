@@ -20,6 +20,7 @@ public class PickableObjectRegistry : MonoBehaviour
     private static PickableObjectRegistry _instance;
 
     private readonly Dictionary<string, PickableObject> _pickables = new();
+    private readonly HashSet<string> _knownPickableIds = new();
 
     private static PickableObjectRegistry GetOrCreate()
     {
@@ -57,6 +58,7 @@ public class PickableObjectRegistry : MonoBehaviour
     {
         if (pickable == null || string.IsNullOrEmpty(pickable.SaveId)) return;
         _pickables[pickable.SaveId] = pickable;
+        _knownPickableIds.Add(pickable.SaveId);
 
         // Hook the disconnect sweep here rather than in Awake: this registry self-instantiates
         // before NetworkManager.Singleton necessarily exists, whereas a pickable registering
@@ -71,15 +73,32 @@ public class PickableObjectRegistry : MonoBehaviour
         _pickables.Remove(pickable.SaveId);
     }
 
-    /// <summary>Captures the current position/rotation of every registered pickable.</summary>
+    /// <summary>
+    /// Captures the current transform and existence of every pickable observed this session.
+    /// Keeping tombstones for despawned scene items prevents a scene reload from silently
+    /// recreating an item that was consumed earlier in the workday.
+    /// </summary>
     public PickableObjectSaveData[] CaptureAll()
     {
-        var result = new List<PickableObjectSaveData>(_pickables.Count);
+        var result = new List<PickableObjectSaveData>(_knownPickableIds.Count);
+        var liveIds = new HashSet<string>();
 
         foreach (KeyValuePair<string, PickableObject> kvp in _pickables)
         {
             if (kvp.Value == null) continue;
+            liveIds.Add(kvp.Key);
             result.Add(kvp.Value.CaptureSaveData());
+        }
+
+        foreach (string id in _knownPickableIds)
+        {
+            if (liveIds.Contains(id)) continue;
+            result.Add(new PickableObjectSaveData
+            {
+                HasExistenceState = true,
+                Exists = false,
+                Id = id
+            });
         }
 
         return result.ToArray();

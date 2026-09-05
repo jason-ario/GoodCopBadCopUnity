@@ -84,6 +84,20 @@ public class TrashBag : PickableObject, IAmmoProvider
     public float MaxAmmo => _maxJunkCapacity;
     public event Action OnAmmoChanged;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _junkCount.Value;
+        data.SecondaryState = IsDeposited ? 1 : 0;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _junkCount.Value = Mathf.Clamp(Mathf.RoundToInt(data.ResourceAmount), 0, _maxJunkCapacity);
+        IsDeposited = data.SecondaryState != 0;
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()

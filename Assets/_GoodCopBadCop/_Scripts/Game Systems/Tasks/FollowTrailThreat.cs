@@ -246,6 +246,20 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <inheritdoc/>
     public event Action OnDailyTaskCompleted;
 
+    /// <summary>
+    /// Captures whether the trail is still being followed or its spawned pack has advanced to the
+    /// kill objective. Pack actors are scene-lifetime objects, so a resumed outstanding event is
+    /// restarted by the owning task source rather than retaining stale actor references.
+    /// </summary>
+    public FollowTrailTaskSaveState CaptureSaveState() => new()
+    {
+        IsFollowTrailActive = _followTrailActive.Value,
+        KillMutantCount = _killMutantCount.Value
+    };
+
+    public bool HasOutstandingObjective(FollowTrailTaskSaveState state) =>
+        state != null && (state.IsFollowTrailActive || state.KillMutantCount > 0);
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()

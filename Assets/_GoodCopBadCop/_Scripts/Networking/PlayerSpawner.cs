@@ -81,6 +81,16 @@ public class PlayerSpawner : NetworkBehaviour
         SpawnPlayerAtPoint(clientId, GetOutsideBunkerSpawnPoint(clientId), isOutside: false);
     }
 
+    /// <summary>
+    /// Spawns the player prefab for the given client at the inside-bunker spawn point.
+    /// Used for late joiners entering an already-running Day 2+ session.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnPlayerAtInsideBunker(ulong clientId)
+    {
+        SpawnPlayerAtPoint(clientId, GetInsideBunkerSpawnPoint(clientId), isOutside: false);
+    }
+
     private void SpawnPlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside)
     {
         if (!NetworkManager.Singleton.IsServer)

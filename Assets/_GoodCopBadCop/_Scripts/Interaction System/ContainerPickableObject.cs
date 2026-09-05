@@ -50,6 +50,18 @@ public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
     public float MaxAmmo => _capacity;
     public event Action OnAmmoChanged;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _itemsRemaining.Value;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _itemsRemaining.Value = Mathf.Clamp(Mathf.RoundToInt(data.ResourceAmount), 0, _capacity);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()

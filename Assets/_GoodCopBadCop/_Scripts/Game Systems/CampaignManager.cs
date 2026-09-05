@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using GoodCopBadCop.Population;
 using Unity.Netcode;
@@ -27,6 +28,8 @@ public class CampaignManager : NetworkBehaviour
     );
 
     private int _currentDay = 1;
+    private WorkdaySaveState _pendingWorkdayRestore;
+    public bool HasPendingWorkdayRestore => _pendingWorkdayRestore != null;
 
     /// <summary>The current 1-based day number.</summary>
     public int CurrentDay => _currentDay;
@@ -196,9 +199,37 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer)
             TryEnsurePopulationInitialized();
 
+        // Keep an immutable reference before day activation. Activation may schedule a fresh task
+        // and autosave it, but it must never replace the state selected for this resume.
+        _pendingWorkdayRestore = IsServer ? SaveDataManager.Instance?.GetWorkdayState(_currentDay) : null;
         ApplyDay(_currentDay);
 
+        if (IsServer && _pendingWorkdayRestore != null)
+            StartCoroutine(RestoreSavedWorkdayAfterDayBootstrap());
+        else if (IsServer)
+            StartCoroutine(CaptureDayStartWorkdayAfterBootstrap());
+
         Debug.Log($"[CampaignManager] Campaign started on Day {_currentDay}.");
+    }
+
+    private IEnumerator RestoreSavedWorkdayAfterDayBootstrap()
+    {
+        // Day activation and schedule handlers may perform their setup over one frame. Waiting
+        // ensures their scene references are live; the shift manager then replaces any freshly
+        // rolled dynamic task output with the persisted authoritative snapshot.
+        yield return null;
+        WorkdaySaveState state = _pendingWorkdayRestore;
+        _pendingWorkdayRestore = null;
+        ShiftManager.Instance?.RestoreWorkdaySaveState(state);
+    }
+
+    private IEnumerator CaptureDayStartWorkdayAfterBootstrap()
+    {
+        // Day scripts and task schedulers create their initial objects synchronously during
+        // activation; wait one frame for NetworkObject registration before freezing the baseline.
+        yield return null;
+        if (SaveDataManager.Instance != null && ShiftManager.Instance != null)
+            SaveDataManager.Instance.SaveDayStartWorkdayState(ShiftManager.Instance.CaptureWorkdaySaveState());
     }
 
     /// <summary>
@@ -260,6 +291,7 @@ public class CampaignManager : NetworkBehaviour
             return;
         }
 
+        SaveDataManager.Instance.ClearWorkdayState();
         SaveDataManager.Instance.CurrentDay = nextDay;
         _networkCurrentDay.Value = nextDay;
 

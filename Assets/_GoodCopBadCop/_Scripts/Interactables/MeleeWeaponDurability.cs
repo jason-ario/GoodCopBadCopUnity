@@ -96,6 +96,17 @@ public class MeleeWeaponDurability : NetworkBehaviour
         return Mathf.Clamp01((float)_currentDurability.Value / weaponData.maxDurability);
     }
 
+    /// <summary>Captures this server-authoritative durability value for its owning pickable snapshot.</summary>
+    public int CaptureDurability() => _currentDurability.Value;
+
+    /// <summary>Server-only restore entry point used by the workday item snapshot.</summary>
+    public void RestoreDurabilityServer(int value)
+    {
+        if (!IsServer || weaponData == null) return;
+        _currentDurability.Value = Mathf.Clamp(value, 0, weaponData.maxDurability);
+        UpdateMaterial();
+    }
+
     // ── Server ─────────────────────────────────────────────────────────────────
 
     [Rpc(SendTo.Server)]

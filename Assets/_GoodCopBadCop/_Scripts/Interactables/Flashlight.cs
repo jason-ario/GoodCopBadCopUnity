@@ -46,6 +46,17 @@ public class Flashlight : PickableObject
     [SerializeField] Material onMaterial;
     [SerializeField] Material uvMaterial;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.SecondaryState = _lightState.Value;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        _lightState.Value = Mathf.Clamp(data.SecondaryState, 0, 2);
+    }
+
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();

@@ -66,6 +66,18 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     public float MaxAmmo => MaxRounds;
     public event Action OnAmmoChanged;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _roundsRemaining.Value;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _roundsRemaining.Value = Mathf.Clamp(Mathf.RoundToInt(data.ResourceAmount), 0, MaxRounds);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()

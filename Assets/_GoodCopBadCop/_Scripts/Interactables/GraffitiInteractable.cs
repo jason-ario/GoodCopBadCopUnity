@@ -59,6 +59,16 @@ public class GraffitiInteractable : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>Current replicated scrub progress for persistence and late restoration.</summary>
+    public float ScrubProgress => _scrubProgress.Value;
+
+    /// <summary>Sets an unfinished piece's progress while rebuilding an authoritative save snapshot.</summary>
+    public void RestoreScrubProgress(float progress)
+    {
+        if (!IsServer) return;
+        _scrubProgress.Value = Mathf.Clamp01(progress);
+    }
+
     // ── Scrub completion callback ──────────────────────────────────────────────
 
     /// <summary>

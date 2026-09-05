@@ -126,8 +126,10 @@ public class ExamNotebook : PickableObject
     private NetworkVariable<int> _pageBitmask2 = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private NetworkVariable<int> _pageBitmask3 = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private NetworkVariable<int> _pageBitmask4 = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private NetworkVariable<int> _rippedPageMask = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private NetworkVariable<int>[] _pageBitmasks;
+    private bool[] _pendingRippedPages;
     [SerializeField] private AudioClip ripOutSound;
 
     // ── Controller checklist navigation ─────────────────────────────────────────
@@ -198,6 +200,43 @@ public class ExamNotebook : PickableObject
         OverrideInteractableColliders(notebookOnly);
     }
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.IntegerState = new[]
+        {
+            _currentPage.Value,
+            _pageBitmask0.Value,
+            _pageBitmask1.Value,
+            _pageBitmask2.Value,
+            _pageBitmask3.Value,
+            _pageBitmask4.Value
+        };
+
+        data.BooleanState = new bool[Mathf.Min(pages?.Length ?? 0, 5)];
+        for (int i = 0; i < data.BooleanState.Length; i++)
+            data.BooleanState[i] = pages[i] != null && pages[i].isRippedOut;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.IntegerState != null && data.IntegerState.Length >= 6)
+        {
+            _currentPage.Value = Mathf.Clamp(data.IntegerState[0], 0, 4);
+            _pageBitmask0.Value = data.IntegerState[1];
+            _pageBitmask1.Value = data.IntegerState[2];
+            _pageBitmask2.Value = data.IntegerState[3];
+            _pageBitmask3.Value = data.IntegerState[4];
+            _pageBitmask4.Value = data.IntegerState[5];
+        }
+
+        _pendingRippedPages = data.BooleanState ?? System.Array.Empty<bool>();
+        int mask = 0;
+        for (int i = 0; i < _pendingRippedPages.Length && i < 5; i++)
+            if (_pendingRippedPages[i]) mask |= 1 << i;
+        _rippedPageMask.Value = mask;
+        ApplyRippedPages();
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -247,6 +286,7 @@ public class ExamNotebook : PickableObject
         // pages are separate NetworkObjects and would otherwise stay visible, floating at
         // the stow point, for every client (including the owner).
         OnStowedNetworked += OnStowedAllClients;
+        _rippedPageMask.OnValueChanged += OnRippedPageMaskChanged;
     }
 
     /// <summary>
@@ -291,6 +331,7 @@ public class ExamNotebook : PickableObject
         base.OnNetworkDespawn();
         OnPickedUpNetworked -= OnPickedUpAllClients;
         OnStowedNetworked   -= OnStowedAllClients;
+        _rippedPageMask.OnValueChanged -= OnRippedPageMaskChanged;
     }
 
     /// <summary>
@@ -525,6 +566,7 @@ public class ExamNotebook : PickableObject
         }
 
         ApplyCurrentPage(_currentPage.Value);
+        ApplyRippedPages();
         _currentPage.OnValueChanged += (_, newValue) => ApplyCurrentPage(newValue);
 
         // The loop above already fired an immediate (possibly overlapping) capture per page via
@@ -549,6 +591,26 @@ public class ExamNotebook : PickableObject
         {
             if (pages[i] == null) continue;
             pages[i].SetChecklistInteractable(i == currentPage && !pages[i].isRippedOut);
+        }
+    }
+
+    private void OnRippedPageMaskChanged(int _, int __) => ApplyRippedPages();
+
+    /// <summary>Applies the replicated/persisted ripped-page state after page references are available.</summary>
+    private void ApplyRippedPages()
+    {
+        if (pages == null) return;
+
+        for (int i = 0; i < pages.Length && i < 5; i++)
+        {
+            bool ripped = ((_rippedPageMask.Value & (1 << i)) != 0) ||
+                          (_pendingRippedPages != null && i < _pendingRippedPages.Length && _pendingRippedPages[i]);
+            if (!ripped || pages[i] == null) continue;
+
+            pages[i].isRippedOut = true;
+            pages[i].CanPickUpManually = true;
+            if (pagePositions != null && i < pagePositions.Length && pagePositions[i] != null)
+                pagePositions[i].gameObject.SetActive(false);
         }
     }
 
@@ -1096,6 +1158,8 @@ public class ExamNotebook : PickableObject
     [ServerRpc(RequireOwnership = false)]
     private void BroadcastRipOutPageServerRpc(int pageIndex)
     {
+        if (pageIndex < 0 || pageIndex >= 5) return;
+        _rippedPageMask.Value |= 1 << pageIndex;
         RipOutPageClientRpc(pageIndex);
     }
 

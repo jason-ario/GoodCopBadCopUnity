@@ -61,6 +61,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Local state ───────────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedGraffiti = new();
+    private readonly Dictionary<NetworkObject, GraffitiPlacementSaveData> _graffitiPlacements = new();
     private bool _isComplete;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
@@ -151,6 +152,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _isActive.Value = true;
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 
     /// <summary>
@@ -179,6 +181,52 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Debug.Log($"[CleanGraffitiTask] SpawnGraffitiEarly — pre-spawned {spawnedCount} graffiti " +
                   "piece(s) for early visibility; task remains inactive until TriggerDailyTask.");
+    }
+
+    /// <summary>Captures the active graffiti world objects and their partial scrub progress.</summary>
+    public GraffitiTaskSaveState CaptureSaveState()
+    {
+        var placements = new List<GraffitiPlacementSaveData>();
+        foreach (NetworkObject netObj in _spawnedGraffiti)
+        {
+            if (netObj == null || !netObj.IsSpawned || !_graffitiPlacements.TryGetValue(netObj, out GraffitiPlacementSaveData placement))
+                continue;
+
+            GraffitiInteractable interactable = netObj.GetComponent<GraffitiInteractable>();
+            placements.Add(new GraffitiPlacementSaveData
+            {
+                PrefabIndex = placement.PrefabIndex,
+                SpawnPointIndex = placement.SpawnPointIndex,
+                ScrubProgress = interactable != null ? interactable.ScrubProgress : 0f
+            });
+        }
+
+        return new GraffitiTaskSaveState
+        {
+            IsActive = _isActive.Value,
+            IsComplete = _isComplete,
+            ScrubbedCount = _scrubbed.Value,
+            TotalCount = _totalCount.Value,
+            Placements = placements.ToArray()
+        };
+    }
+
+    /// <summary>Rebuilds saved graffiti on the host before NGO replicates the objects to clients.</summary>
+    public void RestoreSaveState(GraffitiTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+
+        DespawnExistingGraffiti();
+        _scrubbed.Value = Mathf.Max(0, state.ScrubbedCount);
+        _totalCount.Value = Mathf.Max(_scrubbed.Value, state.TotalCount);
+        _isComplete = state.IsComplete;
+
+        foreach (GraffitiPlacementSaveData placement in state.Placements ?? Array.Empty<GraffitiPlacementSaveData>())
+            SpawnSavedGraffiti(placement);
+
+        _isActive.Value = state.IsActive && !_isComplete;
+        if (_isActive.Value)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
     }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -262,6 +310,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Hide from HUD once all pieces are clean.
         _isActive.Value = false;
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log("[CleanGraffitiTask] All graffiti scrubbed — task complete.");
     }
@@ -344,8 +393,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             int pointIndex = availableIndices[listIndex];
             availableIndices.RemoveAt(listIndex);
 
-            Transform  point  = _spawnPoints[pointIndex];
-            GameObject prefab = _graffitiPrefabs[Random.Range(0, _graffitiPrefabs.Length)];
+            Transform point = _spawnPoints[pointIndex];
+            int prefabIndex = Random.Range(0, _graffitiPrefabs.Length);
+            GameObject prefab = _graffitiPrefabs[prefabIndex];
 
             GameObject go = Instantiate(prefab, point.position, point.rotation);
             NetworkObject netObj = go.GetComponent<NetworkObject>();
@@ -366,10 +416,45 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
             netObj.Spawn(destroyWithScene: true);
             _spawnedGraffiti.Add(netObj);
+            _graffitiPlacements[netObj] = new GraffitiPlacementSaveData
+            {
+                PrefabIndex = prefabIndex,
+                SpawnPointIndex = pointIndex
+            };
             spawnedCount++;
         }
 
         return spawnedCount;
+    }
+
+    private void SpawnSavedGraffiti(GraffitiPlacementSaveData placement)
+    {
+        if (placement == null || _graffitiPrefabs == null || _spawnPoints == null ||
+            placement.PrefabIndex < 0 || placement.PrefabIndex >= _graffitiPrefabs.Length ||
+            placement.SpawnPointIndex < 0 || placement.SpawnPointIndex >= _spawnPoints.Length)
+            return;
+
+        GameObject prefab = _graffitiPrefabs[placement.PrefabIndex];
+        Transform point = _spawnPoints[placement.SpawnPointIndex];
+        if (prefab == null || point == null) return;
+
+        GameObject go = Instantiate(prefab, point.position, point.rotation);
+        NetworkObject netObj = go.GetComponent<NetworkObject>();
+        if (netObj == null)
+        {
+            Destroy(go);
+            return;
+        }
+
+        GraffitiInteractable interactable = go.GetComponent<GraffitiInteractable>();
+        if (interactable != null)
+            interactable.OnScrubCompleted = OnGraffitiScrubbed;
+
+        netObj.Spawn(destroyWithScene: true);
+        if (interactable != null)
+            interactable.RestoreScrubProgress(placement.ScrubProgress);
+        _spawnedGraffiti.Add(netObj);
+        _graffitiPlacements[netObj] = placement;
     }
 
     private void DespawnExistingGraffiti()
@@ -380,6 +465,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
         }
         _spawnedGraffiti.Clear();
+        _graffitiPlacements.Clear();
     }
 
     // ── Registry management ───────────────────────────────────────────────────

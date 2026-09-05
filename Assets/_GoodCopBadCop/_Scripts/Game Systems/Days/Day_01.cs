@@ -497,6 +497,13 @@ public class Day_01 : DayBase
     private bool _goreResolved;
     private bool _bloodResolved;
 
+    // Once-per-day latches for the clock-out step. The post-breach barrier above is polled from
+    // every cleanup event (fence repaired, gore deposited, blood scrubbed), so once all three
+    // flags are true ANY further event would re-run the epilogue and add a second identical
+    // "Clock out for the day" row to the shared task list. Cleared in DayDeactivated.
+    private bool _breachEpilogueAdvanced;
+    private bool _clockOutTaskShown;
+
     // Guards OnMutantBreachCleared against running more than once per breach — e.g. if
     // MutantBreachManager.OnBreachClearedAllClients ever fires twice for one breach, or this
     // handler ends up subscribed more than once (DayActivated re-subscribing without a matching
@@ -790,6 +797,9 @@ public class Day_01 : DayBase
         _lastBreachTotal = 0;
         _taskTakeOutGore = null;
         _taskCleanBloodSplatter = null;
+        _taskClockOut = null;
+        _breachEpilogueAdvanced = false;
+        _clockOutTaskShown = false;
 
         // Release the trash/graffiti/fence/blood objectives so Day 2+ get their rows from the
         // generic HUDTaskList/TaskRegistry bridge again (see HasCustomTutorialRow, set in DayActivated).
@@ -2523,15 +2533,43 @@ public class Day_01 : DayBase
     /// Time Card Machine. Called as the onComplete of HideAndClear once the trash and graffiti
     /// tasks both finish. The bunker sequence is deliberately withheld until the player clocks
     /// out — see <see cref="OnClockedOutForBunker"/>.
+    ///
+    /// Guarded so it can only ever produce ONE row per player: the post-breach barrier that
+    /// leads here (<see cref="TryCompleteMutantBreachGate"/>) is polled from every cleanup
+    /// event, so without the latch a late gore pickup or fence repair arriving after the
+    /// barrier already opened would add a second identical "Clock out for the day" row and
+    /// double-subscribe the clock-out handler.
     /// </summary>
     private void ShowClockOutTask()
     {
+        if (_clockOutTaskShown)
+        {
+            Debug.Log("[Day_01] ShowClockOutTask — already shown this day, ignored.");
+            return;
+        }
+        _clockOutTaskShown = true;
+
+        // A player who joined after the team already punched out (or who somehow reaches this
+        // step post-punch) must not be told to clock out again — the machine's networked
+        // ground-truth flag is readable on every peer, including late joiners. Skip straight to
+        // the bunker step instead.
+        if (TimecardMachine.HasClockedOutThisCycle)
+        {
+            Debug.Log("[Day_01] ShowClockOutTask — clock-out already registered for this cycle, " +
+                      "advancing straight to the bunker step.");
+            WaitForShiftEndThenOpenBunker();
+            return;
+        }
+
         _taskClockOut = TutorialObjectiveList.Instance?.AddObjective(_taskClockOutText);
 
         // Reuse the same arrow/machine from the morning clock-in tutorial.
         ShowClockInArrow(true);
         _timeCardMachine?.Highlight(true);
 
+        // Unsubscribe first: this static event is shared across every peer's Day_01 instance and
+        // double-subscribing would run the bunker advance twice off a single punch.
+        TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
         TimecardMachine.OnClockOutAllClients += OnClockedOutForBunker;
 
         Debug.Log($"[Day_01] ShowClockOutTask — objective added (null? {_taskClockOut == null}), " +
@@ -3123,10 +3161,14 @@ public class Day_01 : DayBase
     /// <summary>
     /// Resolves the timecard-machine gate and proceeds to the normal end-of-shift clock-out
     /// flow. Called once the breach has cleared and either no fences were damaged or every
-    /// damaged fence has been repaired.
+    /// damaged fence has been repaired. Latched so the barrier that leads here can only ever
+    /// advance the day once, no matter how many cleanup events re-poll it.
     /// </summary>
     private void CompleteMutantBreachGateAndAdvance()
     {
+        if (_breachEpilogueAdvanced) return;
+        _breachEpilogueAdvanced = true;
+
         _breachGateTask?.Complete();
         _breachGateTask = null;
 
@@ -3141,6 +3183,27 @@ public class Day_01 : DayBase
     /// DayActivated) guarantees it survives that reset and stays pending for the rest of the day,
     /// no matter how quickly trash/graffiti finish. Safe to call more than once.
     /// </summary>
+    /// <summary>
+    /// Recreates Day 1's non-MonoBehaviour clock-out gate after a workday resume. The actual
+    /// breach state remains server-authoritative in MutantBreachManager; this only restores the
+    /// completion subscription that prevents its resolved sequence from leaving the timecard
+    /// permanently locked.
+    /// </summary>
+    public void EnsureMutantBreachGateForRestore()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        RegisterMutantBreachGate();
+
+        // The breach manager's spawned wave is scene-lifetime state, so it cannot survive a
+        // scene reload by itself. A saved PostShift gate therefore needs a new authoritative
+        // breach trigger; otherwise the restored gate has no event left that can ever complete.
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentPhase == ShiftManager.DayPhase.PostShift &&
+            MutantBreachManager.Instance != null && !MutantBreachManager.Instance.IsBreachRunning)
+        {
+            MutantBreachManager.Instance.TriggerBreach(_firstBreachData);
+        }
+    }
+
     private void RegisterMutantBreachGate()
     {
         if (_breachGateTask != null) return;

@@ -431,9 +431,99 @@ public class SaveDataManager : MonoBehaviour
         Debug.Log($"[SaveDataManager] Glass smashed state saved: {smashed}.");
     }
 
-    // ---------------------------------------------------------------------------
-    // Unity Lifecycle
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Resumable Workday State
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns the active slot's in-progress day snapshot, if it belongs to the requested day.</summary>
+    public WorkdaySaveState GetWorkdayState(int day)
+    {
+        WorkdaySaveState state = ActiveSlot?.WorkdayState;
+        return state != null && state.IsValid && state.Day == day ? state : null;
+    }
+
+    /// <summary>Writes the host-authoritative in-progress day snapshot to the active save slot.</summary>
+    public void SaveWorkdayState(WorkdaySaveState state)
+    {
+        if (ActiveSlot == null || state == null) return;
+        state.IsValid = true;
+        ActiveSlot.WorkdayState = state;
+        ActiveSlot.LastSaved = DateTime.UtcNow;
+        Save();
+    }
+
+    /// <summary>Captures every resumable live workday system from the authoritative host.</summary>
+    public void SaveCurrentWorkdayState()
+    {
+        if (ActiveSlot == null || !CanSave() || ShiftManager.Instance == null || ShiftManager.Instance.IsRestoringWorkdayState) return;
+        SaveWorkdayState(ShiftManager.Instance.CaptureWorkdaySaveState());
+    }
+
+    /// <summary>Returns the immutable baseline captured when the requested day began.</summary>
+    public WorkdaySaveState GetDayStartWorkdayState(int day)
+    {
+        WorkdaySaveState state = ActiveSlot?.DayStartWorkdayState;
+        return state != null && state.IsValid && state.Day == day ? state : null;
+    }
+
+    /// <summary>Captures the starting baseline of a newly entered day for full day-loss retries.</summary>
+    public void SaveDayStartWorkdayState(WorkdaySaveState state)
+    {
+        if (ActiveSlot == null || state == null) return;
+        ActiveSlot.DayStartWorkdayState = CloneWorkdayState(state);
+        Save();
+    }
+
+    /// <summary>
+    /// Completes the immutable day-start baseline once the daily pickup roll has occurred.
+    /// It writes exactly once so later resumes and retries retain the original selection.
+    /// </summary>
+    public void SaveDayStartDailyPickupState(int day, DailyPickupSaveData[] pickups)
+    {
+        WorkdaySaveState baseline = GetDayStartWorkdayState(day);
+        if (baseline == null || baseline.DailyPickupsInitialized)
+            return;
+
+        baseline.DailyPickupsInitialized = true;
+        baseline.DailyPickups = pickups ?? Array.Empty<DailyPickupSaveData>();
+        ActiveSlot.DayStartWorkdayState = CloneWorkdayState(baseline);
+        Save();
+    }
+
+
+    /// <summary>
+    /// Replaces the active snapshot with the current day's immutable baseline. Called before the
+    /// scene reload after the team loses the day, so the normal load path restores day-start state.
+    /// </summary>
+    public void ResetCurrentWorkdayToDayStart()
+    {
+        if (ActiveSlot == null) return;
+
+        WorkdaySaveState baseline = GetDayStartWorkdayState(CurrentDay);
+        ActiveSlot.WorkdayState = baseline != null ? CloneWorkdayState(baseline) : new WorkdaySaveState();
+        if (baseline != null)
+        {
+            // Keep legacy day-start consumers (CampaignManager and the old retry helpers) aligned
+            // with the reset snapshot rather than leaving stale Dusk money/object transforms behind.
+            ActiveSlot.TotalCashEarned = baseline.Cash;
+            ActiveSlot.PickableObjects = baseline.Pickables ?? new PickableObjectSaveData[0];
+        }
+        Save();
+    }
+
+    private static WorkdaySaveState CloneWorkdayState(WorkdaySaveState state)
+    {
+        return JsonUtility.FromJson<WorkdaySaveState>(JsonUtility.ToJson(state));
+    }
+
+    public void ClearWorkdayState()
+    {
+        if (ActiveSlot == null || ActiveSlot.WorkdayState == null) return;
+        ActiveSlot.WorkdayState = new WorkdaySaveState();
+        ActiveSlot.DayStartWorkdayState = new WorkdaySaveState();
+        Save();
+    }
+
 
     private void Awake()
     {
@@ -448,6 +538,17 @@ public class SaveDataManager : MonoBehaviour
 
         _savePath = Path.Combine(Application.persistentDataPath, SaveFileName);
         Load();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused)
+            SaveCurrentWorkdayState();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveCurrentWorkdayState();
     }
 
     // ---------------------------------------------------------------------------
@@ -803,13 +904,24 @@ public class SaveSlot
     public string LastSavedRaw;
 
     /// <summary>
-    /// Snapshot of every pickable's position/rotation, captured at the Dusk checkpoint (see
-    /// <see cref="ShiftManager.HandleAllSuspectsProcessed"/>). Restored on a death-retry that
-    /// fast-forwards back into the post-shift phase (see <see cref="ShiftManager.RestartIntoPostShiftPhase"/>)
-    /// so world clutter resets to where it was when Dusk began, instead of wherever it ended up
-    /// during the failed attempt.
+    /// Legacy Dusk checkpoint used by older restart helpers. Full day-loss retries now restore
+    /// <see cref="DayStartWorkdayState"/> instead, so this data is retained for compatibility
+    /// but never defines the all-players-dead restart point.
     /// </summary>
     public PickableObjectSaveData[] PickableObjects = new PickableObjectSaveData[0];
+
+    /// <summary>
+    /// In-progress state for the currently loaded campaign day. Unlike permanent progression this
+    /// snapshot is cleared when the campaign advances, allowing a loaded save to resume the exact
+    /// day phase, tasks, and dynamic cleanup objects instead of replaying day initialization.
+    /// </summary>
+    public WorkdaySaveState WorkdayState = new WorkdaySaveState();
+
+    /// <summary>
+    /// Immutable snapshot captured after a new day's initial setup. Used only when the whole team
+    /// loses the day, ensuring Retry restarts this day rather than restoring partial task progress.
+    /// </summary>
+    public WorkdaySaveState DayStartWorkdayState = new WorkdaySaveState();
 
     [NonSerialized]
     private DateTime _lastSaved;

@@ -266,15 +266,22 @@ public class Day_03 : DayBase, IDailyTask
         // skip re-triggering Day 3) before arming everything fresh.
         UnsubscribeAll();
 
-        // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
-        // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
-        CleanBloodTask.Instance?.TriggerTask();
-        TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
+        // These are random/dynamic task sources. The host restores their saved object state after
+        // bootstrap, so replaying them during a resume would overwrite the saved task with a new
+        // roll before that restoration begins.
+        bool restoringWorkday = CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore;
+        if (!restoringWorkday)
+        {
+            // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
+            // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
+            CleanBloodTask.Instance?.TriggerTask();
+            TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
 
-        // Randomly breaks a batch of perimeter fence segments so the yard has repair work
-        // waiting alongside the gore/blood, mirroring the post-breach fence damage from Day 1
-        // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
-        FenceRepairTask.Instance?.TriggerTask();
+            // Randomly breaks a batch of perimeter fence segments so the yard has repair work
+            // waiting alongside the gore/blood, mirroring the post-breach fence damage from Day 1
+            // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
+            FenceRepairTask.Instance?.TriggerTask();
+        }
 
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
         // bunker for Day 3 -- see OchoEatingVladCutscene for the full sequence. TriggerTask()

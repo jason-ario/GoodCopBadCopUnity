@@ -159,7 +159,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private readonly List<NetworkObject> _spawnedItems = new();
     private readonly List<NetworkObject> _spawnedDecals = new();
+    private readonly Dictionary<NetworkObject, WorldObjectPlacementSaveData> _itemPlacements = new();
+    private readonly Dictionary<NetworkObject, WorldObjectPlacementSaveData> _decalPlacements = new();
     private bool _taskActive;
+    private bool _isGoreTask;
 
     /// <summary>
     /// Pre-existing scene <see cref="JunkItem"/>s counted into <see cref="_totalCount"/> by
@@ -235,6 +238,71 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <inheritdoc/>
     public event Action OnDailyTaskCompleted;
+
+    /// <summary>Captures live trash/gore and blood-decals so the host can reconstruct the workday.</summary>
+    public TrashTaskSaveState CaptureSaveState()
+    {
+        return new TrashTaskSaveState
+        {
+            IsActive = _isActive.Value,
+            IsGoreTask = _isGoreTask,
+            DepositedCount = _depositedCount.Value,
+            TotalCount = _totalCount.Value,
+            PendingBonusCollected = _pendingBonusCollected,
+            Items = CapturePlacements(_spawnedItems, _itemPlacements),
+            BloodDecals = CapturePlacements(_spawnedDecals, _decalPlacements)
+        };
+    }
+
+    /// <summary>Recreates saved dynamic trash, gore, and decals on the authoritative host.</summary>
+    public void RestoreSaveState(TrashTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+
+        DespawnExistingItems();
+        _isGoreTask = state.IsGoreTask;
+        _taskActive = state.IsActive;
+        _depositedCount.Value = Mathf.Max(0, state.DepositedCount);
+        _totalCount.Value = Mathf.Max(_depositedCount.Value, state.TotalCount);
+        _pendingBonusCollected = Mathf.Max(0, state.PendingBonusCollected);
+
+        foreach (WorldObjectPlacementSaveData placement in state.Items ?? Array.Empty<WorldObjectPlacementSaveData>())
+            SpawnSavedItem(placement, _isGoreTask);
+        foreach (WorldObjectPlacementSaveData placement in state.BloodDecals ?? Array.Empty<WorldObjectPlacementSaveData>())
+            SpawnSavedBloodDecal(placement);
+
+        UpdateThreatLevel();
+        _isActive.Value = state.IsActive;
+        if (_taskActive)
+        {
+            JunkItem.OnAnyJunkItemCollected += OnJunkItemCollected;
+            DumpsterInteractable.OnTrashBagDeposited += OnTrashBagDeposited;
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        }
+    }
+
+    private static WorldObjectPlacementSaveData[] CapturePlacements(
+        List<NetworkObject> objects,
+        Dictionary<NetworkObject, WorldObjectPlacementSaveData> placements)
+    {
+        var result = new List<WorldObjectPlacementSaveData>();
+        foreach (NetworkObject netObj in objects)
+        {
+            if (netObj == null || !netObj.IsSpawned || !placements.TryGetValue(netObj, out WorldObjectPlacementSaveData placement))
+                continue;
+
+            WorldObjectPlacementSaveData copy = new WorldObjectPlacementSaveData
+            {
+                PrefabIndex = placement.PrefabIndex,
+                Position = netObj.transform.position,
+                RotationEuler = netObj.transform.eulerAngles,
+                LocalScale = netObj.transform.localScale,
+                ScrubProgress = netObj.TryGetComponent(out GraffitiInteractable scrub) ? scrub.ScrubProgress : 0f
+            };
+            result.Add(copy);
+        }
+        return result.ToArray();
+    }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -404,6 +472,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
 
         DespawnExistingItems();
+        _isGoreTask = useGorePrefabs;
         _taskActive = true;
         _depositedCount.Value = 0;
         _pendingBonusCollected = 0;
@@ -442,6 +511,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         RegisterInTaskRegistryClientRpc();
 
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[TakeOutTrashTask] Task triggered ({(useGorePrefabs ? "gore" : "trash")} pool) — " +
                   $"spawned {_spawnedItems.Count}, pre-existing {preExistingCount}, total {_totalCount.Value}.");
@@ -766,6 +836,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
         _isActive.Value = false;
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         // Broadcast completion to every client, not just wherever this ServerRpc-triggered
         // code happens to run (the server/host process). Day_01 subscribes to these events
@@ -835,7 +906,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return;
         }
 
-        GameObject prefab = prefabPool[Random.Range(0, prefabPool.Length)];
+        int prefabIndex = Random.Range(0, prefabPool.Length);
+        GameObject prefab = prefabPool[prefabIndex];
         if (prefab == null) return;
 
         Vector3    spawnPos = GetRandomSpawnPosition(out Vector3 groundNormal);
@@ -853,6 +925,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedItems.Add(netObj);
+        _itemPlacements[netObj] = new WorldObjectPlacementSaveData
+        {
+            PrefabIndex = prefabIndex,
+            Position = spawnPos,
+            RotationEuler = spawnRot.eulerAngles,
+            LocalScale = itemGo.transform.localScale
+        };
 
         if (spawnBloodDecal)
         {
@@ -1013,7 +1092,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (_bloodDecalPrefabs == null || _bloodDecalPrefabs.Length == 0)
             return;
 
-        GameObject prefab = _bloodDecalPrefabs[Random.Range(0, _bloodDecalPrefabs.Length)];
+        int prefabIndex = Random.Range(0, _bloodDecalPrefabs.Length);
+        GameObject prefab = _bloodDecalPrefabs[prefabIndex];
         if (prefab == null) return;
 
         // TODO: BloodDecalUtility.GetGroundDecalRotation(groundNormal) was producing incorrect
@@ -1031,6 +1111,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedDecals.Add(netObj);
+        _decalPlacements[netObj] = new WorldObjectPlacementSaveData
+        {
+            PrefabIndex = prefabIndex,
+            Position = position,
+            RotationEuler = rotation.eulerAngles,
+            LocalScale = decalGo.transform.localScale
+        };
 
         CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
 
@@ -1047,6 +1134,58 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void SpawnBloodParticleClientRpc(Vector3 position, Quaternion rotation)
     {
         BloodDecalUtility.SpawnAlignedParticle(_bloodParticlePrefab, position, rotation, _bloodParticleLifetime);
+    }
+
+    private void SpawnSavedItem(WorldObjectPlacementSaveData placement, bool useGorePrefabs)
+    {
+        GameObject[] pool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
+        if (placement == null || pool == null || placement.PrefabIndex < 0 || placement.PrefabIndex >= pool.Length)
+            return;
+
+        GameObject prefab = pool[placement.PrefabIndex];
+        if (prefab == null) return;
+
+        GameObject go = Instantiate(prefab, placement.Position, Quaternion.Euler(placement.RotationEuler));
+        go.transform.localScale = placement.LocalScale;
+        NetworkObject netObj = go.GetComponent<NetworkObject>();
+        if (netObj == null)
+        {
+            Destroy(go);
+            return;
+        }
+
+        netObj.Spawn(destroyWithScene: true);
+        _spawnedItems.Add(netObj);
+        _itemPlacements[netObj] = placement;
+        if (useGorePrefabs)
+            BeginGoreSettleWatchdog(go, placement.Position);
+    }
+
+    private void SpawnSavedBloodDecal(WorldObjectPlacementSaveData placement)
+    {
+        if (placement == null || _bloodDecalPrefabs == null || placement.PrefabIndex < 0 ||
+            placement.PrefabIndex >= _bloodDecalPrefabs.Length)
+            return;
+
+        GameObject prefab = _bloodDecalPrefabs[placement.PrefabIndex];
+        if (prefab == null) return;
+
+        GameObject go = Instantiate(prefab, placement.Position, Quaternion.Euler(placement.RotationEuler));
+        go.transform.localScale = placement.LocalScale;
+        NetworkObject netObj = go.GetComponent<NetworkObject>();
+        if (netObj == null)
+        {
+            Destroy(go);
+            return;
+        }
+
+        netObj.Spawn(destroyWithScene: true);
+        GraffitiInteractable scrub = go.GetComponent<GraffitiInteractable>();
+        if (scrub != null)
+            scrub.RestoreScrubProgress(placement.ScrubProgress);
+        _spawnedDecals.Add(netObj);
+        _decalPlacements[netObj] = placement;
+        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
     }
 
     private void PruneCollectedItems()
@@ -1071,6 +1210,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
         }
         _spawnedItems.Clear();
+        _itemPlacements.Clear();
 
         foreach (NetworkObject netObj in _spawnedDecals)
         {
@@ -1083,6 +1223,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
         }
         _spawnedDecals.Clear();
+        _decalPlacements.Clear();
 
         _networkThreatLevel.Value = 0f;
     }

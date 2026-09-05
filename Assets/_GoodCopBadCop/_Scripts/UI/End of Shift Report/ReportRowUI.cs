@@ -47,7 +47,7 @@ public class EndOfShiftReportRow : MonoBehaviour
             root.SetActive(true);
     }
 
-    public IEnumerator RevealLabel(string text, TMPWobbleProfile wobbleProfile)
+    public IEnumerator RevealLabel(string text, TMPWobbleProfile wobbleProfile, float timeout = 6f)
     {
         labelText.text = "";
         
@@ -57,16 +57,16 @@ public class EndOfShiftReportRow : MonoBehaviour
             labelWobble.StartWobble();
         }
 
+        // Bounded + caller-driven: never yield on a Coroutine owned by the child text object, or a
+        // deactivation mid-reveal deadlocks the whole report. See TMPTextReveal.RevealTextBounded.
         if (labelReveal != null)
-            yield return labelReveal.RevealText(text);
+            yield return labelReveal.RevealTextBounded(text, timeout);
         else if (labelText != null)
             labelText.text = text;
     }
 
-    public IEnumerator RevealValue(string text, Color color, TMPWobbleProfile wobbleProfile)
+    public IEnumerator RevealValue(string text, Color color, TMPWobbleProfile wobbleProfile, float timeout = 6f)
     {
-        text = text;
-        
         if (valueText != null)
             valueText.color = color;
 
@@ -77,9 +77,37 @@ public class EndOfShiftReportRow : MonoBehaviour
         }
 
         if (valueReveal != null)
-            yield return valueReveal.RevealText(text);
+            yield return valueReveal.RevealTextBounded(text, timeout);
         else if (valueText != null)
             valueText.text = text;
+
+        if (couponIcon != null)
+            couponIcon.SetActive(true);
+    }
+
+    /// <summary>
+    /// Fills the row instantly, skipping all animation. Used by the report's failsafe path so a
+    /// stalled or skipped reveal still ends up showing the player their actual results.
+    /// </summary>
+    public void SetInstant(string label, string value, Color valueColor, bool showValue)
+    {
+        Show();
+
+        if (labelReveal != null)
+            labelReveal.SetTextInstant(label);
+        else if (labelText != null)
+            labelText.text = label;
+
+        if (!showValue)
+            return;
+
+        if (valueText != null)
+            valueText.color = valueColor;
+
+        if (valueReveal != null)
+            valueReveal.SetTextInstant(value);
+        else if (valueText != null)
+            valueText.text = value;
 
         if (couponIcon != null)
             couponIcon.SetActive(true);

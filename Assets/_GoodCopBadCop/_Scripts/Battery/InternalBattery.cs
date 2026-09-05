@@ -93,6 +93,13 @@ public class InternalBattery : NetworkBehaviour
         return currentBatteryJuice.Value;
     }
 
+    /// <summary>Server-only restore entry point used by the workday item snapshot.</summary>
+    public void RestoreBatteryLevelServer(float value)
+    {
+        if (!IsServer) return;
+        currentBatteryJuice.Value = Mathf.Clamp(value, 0f, maxBatteryCapacity);
+    }
+
     public float GetMaxCapacity()
     {
         return maxBatteryCapacity;

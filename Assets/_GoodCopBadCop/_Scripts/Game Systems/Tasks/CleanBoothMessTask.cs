@@ -80,6 +80,30 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     public float  ScoreWeight => _scoreWeight;
     public float  ThreatLevel => _networkThreatLevel.Value;
 
+    public BoothMessTaskSaveState CaptureSaveState() => new()
+    {
+        IsActive = _isActive.Value
+    };
+
+    /// <summary>
+    /// Scene-reload-safe restore for the booth cleanup. Its objects are generated from authored
+    /// markers, so an active snapshot is recreated by the normal server trigger and then
+    /// replicated as fresh NetworkObjects to all peers.
+    /// </summary>
+    public void RestoreSaveState(BoothMessTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+        if (state.IsActive)
+        {
+            TriggerTask();
+            return;
+        }
+
+        EndNightPhase();
+        if (_boothMessRoot != null)
+            _boothMessRoot.SetActive(false);
+    }
+
     public string ThreatDescription =>
         (_networkRemainingBlood.Value + _networkRemainingJunk.Value) > 0
             ? $"Blood to scrub: {_networkRemainingBlood.Value}  |  Junk to bag: {_networkRemainingJunk.Value}"
@@ -160,6 +184,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         // (see OnActiveChanged), so the remaining-blood/junk counts must already be correct or the
         // freshly-added row would render "nothing left to clean" for a frame.
         _isActive.Value = true;
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[CleanBoothMessTask] Task triggered. {_networkRemainingBlood.Value} splatter(s), {_networkRemainingJunk.Value} junk item(s) spawned.");
     }
@@ -172,6 +197,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (!IsServer) return;
         _networkRemainingBlood.Value = Mathf.Max(0, _networkRemainingBlood.Value - 1);
         UpdateThreatLevel();
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         CheckCompletion();
     }
 
@@ -181,6 +207,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (!IsServer) return;
         _networkRemainingJunk.Value = Mathf.Max(0, _networkRemainingJunk.Value - 1);
         UpdateThreatLevel();
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         CheckCompletion();
     }
 

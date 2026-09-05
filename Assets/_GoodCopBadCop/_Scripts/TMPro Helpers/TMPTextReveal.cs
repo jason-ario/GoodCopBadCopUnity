@@ -123,6 +123,46 @@ public class TMPTextReveal : MonoBehaviour
     public bool IsRevealing => revealRoutine != null;
 
     /// <summary>
+    /// Reveals <paramref name="text"/> and yields until the typewriter finishes, or until
+    /// <paramref name="timeout"/> seconds have elapsed, whichever comes first. On timeout (or if
+    /// this object is not active) the text is snapped to its final state.
+    ///
+    /// Prefer this over <c>yield return RevealText(...)</c> whenever the caller lives on a
+    /// *different* GameObject. Yielding on the returned <see cref="Coroutine"/> handle couples the
+    /// caller's lifetime to this object's: Unity destroys a coroutine when its owning GameObject is
+    /// deactivated, and a caller waiting on that handle is never resumed — it hangs forever with no
+    /// error. That is how the end-of-shift report used to strand players, since the reveal chain
+    /// gated the Continue button and any child deactivation mid-reveal killed it silently.
+    /// This method is driven by the *caller's* coroutine and only ever polls state, so a
+    /// deactivated or stalled reveal degrades to an instant text set instead of a deadlock.
+    /// </summary>
+    public IEnumerator RevealTextBounded(string text, float timeout)
+    {
+        // StartCoroutine fails on an inactive GameObject; snap instead of pretending to animate.
+        if (!gameObject.activeInHierarchy)
+        {
+            SetTextInstant(text);
+            yield break;
+        }
+
+        RevealText(text);
+
+        float elapsed = 0f;
+        while (IsRevealing)
+        {
+            if (elapsed >= timeout || !gameObject.activeInHierarchy)
+            {
+                CompleteReveal();
+                SetTextInstant(text);
+                yield break;
+            }
+
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    /// <summary>
     /// Immediately completes the typewriter animation, showing the full text at once.
     /// Does nothing if no reveal is in progress.
     /// </summary>

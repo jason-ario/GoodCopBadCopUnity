@@ -192,6 +192,35 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>Total blood splatters registered for this task run.</summary>
     public int TotalCount => _totalCount.Value;
 
+    /// <summary>Captures blood-cleanup progress; decal placement is owned by TakeOutTrashTask.</summary>
+    public BloodTaskSaveState CaptureSaveState() => new()
+    {
+        IsActive = _isActive.Value,
+        IsComplete = _isComplete,
+        ScrubbedCount = _scrubbed.Value,
+        TotalCount = _totalCount.Value
+    };
+
+    /// <summary>
+    /// Applies saved logical progress after the trash task has rebuilt and registered its blood
+    /// decals. The count remains authoritative even if an older snapshot lacks a decal prefab.
+    /// </summary>
+    public void RestoreSaveState(BloodTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+        _taskActive = state.IsActive;
+        _isComplete = state.IsComplete;
+        _hasRegisteredThisRun = state.TotalCount > 0;
+        _scrubbed.Value = Mathf.Max(0, state.ScrubbedCount);
+        _totalCount.Value = Mathf.Max(_scrubbed.Value, state.TotalCount);
+        _isActive.Value = state.IsActive && !state.IsComplete;
+        if (_taskActive)
+        {
+            EnsureReconcileRoutine();
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        }
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -281,6 +310,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Block clock-out until every splatter registered this cycle is scrubbed clean —
         // same gating TakeOutTrashTask uses for trash.
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log("[CleanBloodTask] Task triggered — awaiting blood splatter registrations.");
     }
@@ -529,6 +559,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // re-adds this as a new task via ActivateDynamically — that's a genuinely new cleanup job,
         // not a duplicate of this one.
         _isActive.Value = false;
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[CleanBloodTask] All required blood scrubbed ({_scrubbed.Value}/{RequiredCount}) — task complete.");
     }

@@ -79,6 +79,20 @@ public class Flamethrower : PickableObject, IAmmoProvider
     public float MaxAmmo => MaxFuel;
     public event Action OnAmmoChanged;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _fuel.Value;
+        data.SecondaryState = _isFiring.Value ? 1 : 0;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _fuel.Value = Mathf.Clamp(data.ResourceAmount, 0f, MaxFuel);
+        _isFiring.Value = data.SecondaryState != 0 && _fuel.Value > 0f;
+    }
+
     // ── Hit check throttle (owner only) ───────────────────────────────────────
 
     private const float HitCheckInterval = 0.2f;

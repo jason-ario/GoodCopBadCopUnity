@@ -24,6 +24,14 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
         NetworkVariableWritePermission.Server
     );
 
+    // Claimed by the first Day 1 player to interact with the gate. This is networked so
+    // late joiners and other clients cannot open a duplicate start-shift screen.
+    private NetworkVariable<bool> _introScreenClaimed = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     [Header("Gate Animation")]
     [SerializeField] private Animator gateAnimator;
     [SerializeField] private Transform forwardMarker;
@@ -66,6 +74,11 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
             ShiftManager.Instance.OnShiftReady += OnIntroComplete;
         CampaignManager.OnDayChanged += OnDayChanged;
 
+        // A gate which becomes visible after campaign initialization must immediately reflect
+        // that all days after Day 1 use regular gate interaction.
+        if (CampaignManager.Instance != null)
+            _introComplete = CampaignManager.Instance.CurrentDay != 1;
+
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
     }
@@ -84,22 +97,58 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
 
     private void OnDayChanged(int day)
     {
-        _introComplete = false;
+        // The start-shift screen belongs exclusively to unstarted Day 1 onboarding.
+        // Every later day uses this as a regular open/close gate for all players.
+        _introComplete = day != 1;
+
+        // Permit a deliberate debug return to Day 1 to run onboarding again. Normal campaign
+        // progression never returns to Day 1, so this does not reopen the screen mid-session.
+        if (IsServer && day == 1)
+            _introScreenClaimed.Value = false;
     }
 
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
 
-        if (!_introComplete)
+        if (CanOfferDayOneStartShift())
         {
-            UIController.Instance.OpenStartShiftScreen();
+            RequestStartShiftScreenServerRpc();
+            return;
         }
-        else
+
+        if (!_beingInteractedWith)
+            StartCoroutine(WaitAndToggleGate(player));
+    }
+
+    private bool CanOfferDayOneStartShift()
+    {
+        return CampaignManager.Instance != null &&
+               CampaignManager.Instance.CurrentDay == 1 &&
+               !_introComplete &&
+               !_introScreenClaimed.Value &&
+               GameManager.Instance != null &&
+               !GameManager.Instance.HasIntroCutsceneStarted;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestStartShiftScreenServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (!CanOfferDayOneStartShift())
+            return;
+
+        _introScreenClaimed.Value = true;
+        ClientRpcParams targetPlayer = new ClientRpcParams
         {
-            if (!_beingInteractedWith)
-                StartCoroutine(WaitAndToggleGate(player));
-        }
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+        };
+        OpenStartShiftScreenClientRpc(targetPlayer);
+    }
+
+    [ClientRpc]
+    private void OpenStartShiftScreenClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.OpenStartShiftScreen();
     }
 
     private IEnumerator WaitAndToggleGate(PlayerInteractionController player)

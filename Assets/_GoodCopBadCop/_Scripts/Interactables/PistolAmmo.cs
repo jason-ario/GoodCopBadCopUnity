@@ -39,6 +39,18 @@ public class PistolAmmo : PickableObject, IAmmoProvider
     public float MaxAmmo => MaxRoundsPerClip;
     public event Action OnAmmoChanged;
 
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _roundsInClip.Value;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _roundsInClip.Value = Mathf.Clamp(Mathf.RoundToInt(data.ResourceAmount), 0, MaxRoundsPerClip);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()

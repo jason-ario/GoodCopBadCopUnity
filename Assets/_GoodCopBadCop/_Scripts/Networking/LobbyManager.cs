@@ -531,8 +531,17 @@ public class LobbyManager : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[Host] Game started, host is at booth — spawning client at booth for clientId={clientId}");
-                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+                bool isLaterDay = CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay > 1;
+                if (isLaterDay)
+                {
+                    Debug.Log($"[Host] Game started on Day {CampaignManager.Instance.CurrentDay} — spawning late joiner inside bunker for clientId={clientId}");
+                    PlayerSpawner.Instance.SpawnPlayerAtInsideBunker(clientId);
+                }
+                else
+                {
+                    Debug.Log($"[Host] Game started, host is at booth — spawning client at booth for clientId={clientId}");
+                    PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
+                }
             }
             GameManager.Instance.InitializeLateJoinClient(clientId);
         }

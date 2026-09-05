@@ -266,6 +266,13 @@ public class UIController : MonoBehaviour
     /// — already black (progress ≥ 0.99): returns immediately.
     /// — already animating: waits for the in-progress animation to finish without restarting it.
     /// — idle at 0: starts the animation and waits for it.
+    ///
+    /// Every wait here is hard-capped by <see cref="FadeWaitTimeout"/>. An unbounded wait on a
+    /// completion callback is a trap: if the blackout never reports done (callback dropped, its
+    /// GameObject deactivated mid-animation), the *caller* hangs. For
+    /// <see cref="ShiftManager.InBetweenShiftSequence"/> that means hanging before it tears down
+    /// the end-of-shift report, leaving the player staring at a report they cannot dismiss.
+    /// Timing out costs at worst a visible pop; hanging costs the player their session.
     /// </summary>
     public IEnumerator FadeInAndWait()
     {
@@ -279,7 +286,8 @@ public class UIController : MonoBehaviour
             // instead of restarting it from the beginning (which would cause a visible flash)
             if (_tentacleBlackout.IsPlaying)
             {
-                yield return new WaitUntil(() => !_tentacleBlackout.IsPlaying);
+                yield return WaitUntilOrTimeout(() => !_tentacleBlackout.IsPlaying, FadeWaitTimeout,
+                    "fade-to-black already in progress");
                 yield break;
             }
         }
@@ -288,9 +296,38 @@ public class UIController : MonoBehaviour
         FadeIn(onComplete: () => done = true);
 
         if (_tentacleBlackout != null)
-            yield return new WaitUntil(() => done);
+            yield return WaitUntilOrTimeout(() => done, FadeWaitTimeout, "fade-to-black completion");
         else
             yield return new WaitForSeconds(2f); // legacy animator fallback
+    }
+
+    /// <summary>
+    /// Generous upper bound for any fade wait — the configured duration plus slack, never under
+    /// three seconds.
+    /// </summary>
+    private float FadeWaitTimeout => Mathf.Max(_fadeInDuration + 2f, 3f);
+
+    /// <summary>
+    /// Waits until <paramref name="predicate"/> is true or <paramref name="timeout"/> seconds have
+    /// passed, whichever comes first. Uses unscaled time so a paused game (timeScale 0) still
+    /// releases the wait. Logs a warning when it gives up so the underlying stall is traceable.
+    /// </summary>
+    private static IEnumerator WaitUntilOrTimeout(Func<bool> predicate, float timeout, string description)
+    {
+        float elapsed = 0f;
+        while (!predicate())
+        {
+            if (elapsed >= timeout)
+            {
+                Debug.LogWarning(
+                    $"[UIController] Timed out after {timeout:0.#}s waiting for {description}. " +
+                    "Continuing anyway to avoid stalling the caller.");
+                yield break;
+            }
+
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
     }
 
     public void FadeOut()
@@ -343,6 +380,35 @@ public class UIController : MonoBehaviour
         HideCursor();
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(true, string.Empty);
         OnReportHidden?.Invoke();
+    }
+
+    /// <summary>True while the end-of-shift report is on screen for the local player.</summary>
+    public bool IsEndOfShiftReportVisible =>
+        endOfShiftReportUI != null && endOfShiftReportUI.gameObject.activeInHierarchy;
+
+    /// <summary>
+    /// Last-resort teardown for the end-of-shift report, used when the normal transition failed to
+    /// dismiss it (see the watchdogs in <see cref="EndOfShiftReportUI"/>).
+    ///
+    /// This differs from <see cref="HideEndOfShiftReport"/> in one important way: it also restores
+    /// player control. The normal path deliberately leaves control disabled because it runs while
+    /// the screen is black, mid-transition, and
+    /// <see cref="ShiftManager.InBetweenShiftSequence"/> re-enables control at the end. When that
+    /// coroutine never gets there, nothing restores control — so the failsafe must do it itself,
+    /// otherwise dismissing the report just swaps one trap (a stuck screen) for another
+    /// (a frozen player).
+    /// </summary>
+    public void ForceDismissEndOfShiftReport()
+    {
+        if (endOfShiftReportUI == null)
+            return;
+
+        Debug.LogWarning("[UIController] Force-dismissing the end-of-shift report and restoring control (failsafe).");
+
+        HideEndOfShiftReport();
+
+        if (PlayerInstance.Instance != null)
+            PlayerInstance.Instance.CanControl = true;
     }
 
     public void OpenStartShiftScreen()

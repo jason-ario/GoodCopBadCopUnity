@@ -215,6 +215,90 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public int SortedCount => _sortedCount.Value;
     public int TotalCount  => _totalCount.Value;
 
+    /// <summary>Captures every unresolved package with its authoritative labels and placement.</summary>
+    public MailTaskSaveState CaptureSaveState()
+    {
+        var packages = new List<MailPackageSaveData>(_spawnedPackages.Count);
+        foreach (NetworkObject netObj in _spawnedPackages)
+        {
+            if (netObj == null || !netObj.IsSpawned) continue;
+            MailPackageItem package = netObj.GetComponent<MailPackageItem>();
+            if (package == null || package.IsResolved) continue;
+
+            packages.Add(new MailPackageSaveData
+            {
+                ResidentPoolIndex = package.ResidentPoolIndex,
+                ResidentName = package.ResidentName,
+                GoodsLabel = package.GoodsLabel,
+                CorrectBin = (int)package.CorrectBin,
+                Position = netObj.transform.position,
+                RotationEuler = netObj.transform.eulerAngles
+            });
+        }
+
+        return new MailTaskSaveState
+        {
+            IsActive = _isActive.Value,
+            SortedCount = _sortedCount.Value,
+            TotalCount = _totalCount.Value,
+            Packages = packages.ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Recreates only the unresolved packages from a host snapshot. Package identity is preserved
+    /// through the replicated resident-pool index and labels, avoiding a new mail roll on resume.
+    /// </summary>
+    public void RestoreSaveState(MailTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+
+        DespawnExistingPackages();
+        _resolvedPackages.Clear();
+        _sortedCount.Value = Mathf.Max(0, state.SortedCount);
+
+        if (state.Packages != null)
+        {
+            foreach (MailPackageSaveData packageState in state.Packages)
+                SpawnSavedPackage(packageState);
+        }
+
+        // The only finishable total is completed packages plus packages actually rebuilt. This
+        // also repairs older/incomplete saves that recorded a stale total without every package.
+        _totalCount.Value = _sortedCount.Value + _spawnedPackages.Count;
+        _taskActive = state.IsActive && _spawnedPackages.Count > 0;
+        _isActive.Value = _taskActive;
+        UpdateThreatLevel();
+
+        if (_taskActive)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+    }
+
+    private void SpawnSavedPackage(MailPackageSaveData state)
+    {
+        if (_packagePrefab == null || state == null) return;
+
+        SuspectData resident = MailCubbyManager.Instance?.ResolveResident(state.ResidentPoolIndex);
+        if (resident == null)
+        {
+            Debug.LogWarning($"[SortMailTask] Skipped saved package for missing resident-pool index {state.ResidentPoolIndex}.");
+            return;
+        }
+
+        GameObject itemGo = Instantiate(_packagePrefab, state.Position, Quaternion.Euler(state.RotationEuler));
+        NetworkObject netObj = itemGo.GetComponent<NetworkObject>();
+        MailPackageItem package = itemGo.GetComponent<MailPackageItem>();
+        if (netObj == null || package == null)
+        {
+            Destroy(itemGo);
+            return;
+        }
+
+        netObj.Spawn(destroyWithScene: true);
+        package.ServerInitialize(resident, state.ResidentName, state.GoodsLabel, (MailSortBinType)state.CorrectBin);
+        _spawnedPackages.Add(netObj);
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -299,6 +383,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void OnDayChanged(int day)
     {
         if (!IsServer) return;
+
+        // The saved workday owns its active delivery. Avoid clearing it or rolling a new package
+        // set while CampaignManager is preparing the host-side restore; ShiftManager will replay
+        // this task only when the persisted blocker journal says it was still incomplete.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore)
+            return;
 
         // Clear out any packages left sitting in mailboxes/bins from the previous day's delivery.
         DespawnResolvedPackages();
@@ -443,6 +533,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         NotifyDeliveryAlertClientRpc();
 
         OnMailDelivered?.Invoke();
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[SortMailTask] Delivery triggered — spawned {_spawnedPackages.Count} package(s). " +
                   $"Prohibited today: {string.Join(", ", _todaysProhibitedGoods)}");
@@ -514,6 +605,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             _resolvedPackages.Add(package.NetworkObject);
 
             _sortedCount.Value = Mathf.Min(_sortedCount.Value + 1, _totalCount.Value);
+            SaveDataManager.Instance?.SaveCurrentWorkdayState();
             Debug.Log($"[SortMailTask] Correctly sorted '{package.ResidentName}' ({package.GoodsLabel}) into {binType}. " +
                       $"{_sortedCount.Value}/{_totalCount.Value}");
 

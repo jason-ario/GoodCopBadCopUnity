@@ -221,6 +221,15 @@ public class PickableObject : Interactable
 
     private string _cachedSaveId;
 
+    /// <summary>Assigns the durable identity of a runtime-spawned item before NGO registers it.</summary>
+    public void SetRuntimeSaveId(string saveId)
+    {
+        if (string.IsNullOrWhiteSpace(saveId))
+            throw new ArgumentException("A runtime pickable save id is required.", nameof(saveId));
+
+        _cachedSaveId = saveId;
+    }
+
     private string BuildHierarchyPath()
     {
         var path = name;
@@ -232,13 +241,39 @@ public class PickableObject : Interactable
     /// <summary>Captures this object's current position/rotation for checkpoint saving.</summary>
     public PickableObjectSaveData CaptureSaveData()
     {
-        return new PickableObjectSaveData
+        var data = new PickableObjectSaveData
         {
+            HasExistenceState = true,
+            Exists = true,
             Id = SaveId,
             Position = transform.position,
             EulerRotation = transform.eulerAngles
         };
+
+        InternalBattery battery = GetComponent<InternalBattery>();
+        if (battery != null)
+        {
+            data.HasInternalBatteryCharge = true;
+            data.InternalBatteryCharge = battery.GetBatteryLevel();
+        }
+
+        MeleeWeaponDurability durability = GetComponent<MeleeWeaponDurability>();
+        if (durability != null)
+        {
+            data.HasDurability = true;
+            data.Durability = durability.CaptureDurability();
+        }
+
+        CaptureMutableSaveData(data);
+        return data;
     }
+
+    /// <summary>Subclass hook for saveable mutable item state such as ammo, contents, or mode.</summary>
+    protected virtual void CaptureMutableSaveData(PickableObjectSaveData data) { }
+
+    /// <summary>Server-only subclass hook that reapplies saved mutable item state.</summary>
+    protected virtual void RestoreMutableSaveData(PickableObjectSaveData data) { }
+
 
     /// <summary>
     /// Server-only: forces this object back to a saved position/rotation, releasing any
@@ -255,6 +290,16 @@ public class PickableObject : Interactable
             return;
         }
 
+        if (data.HasExistenceState && !data.Exists)
+        {
+            if (NetworkObject != null && NetworkObject.IsSpawned)
+                NetworkHelper.Despawn(NetworkObject);
+            return;
+        }
+
+        if (_isStowed.Value)
+            _isStowed.Value = false;
+        gameObject.SetActive(true);
         RemoveParent();
 
         _holdingClientId.Value = ulong.MaxValue;
@@ -273,6 +318,15 @@ public class PickableObject : Interactable
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;
 
+        InternalBattery battery = GetComponent<InternalBattery>();
+        if (data.HasInternalBatteryCharge && battery != null)
+            battery.RestoreBatteryLevelServer(data.InternalBatteryCharge);
+
+        MeleeWeaponDurability durability = GetComponent<MeleeWeaponDurability>();
+        if (data.HasDurability && durability != null)
+            durability.RestoreDurabilityServer(data.Durability);
+
+        RestoreMutableSaveData(data);
         ApplySaveDataBroadcastClientRpc(data.Position, data.EulerRotation);
     }
 

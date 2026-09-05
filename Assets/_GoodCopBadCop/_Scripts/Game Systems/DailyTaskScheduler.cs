@@ -149,6 +149,11 @@ public class DailyTaskScheduler : MonoBehaviour
         // Task triggering is server-authoritative — clients only need their unlocked state loaded.
         if (!IsServer) return;
 
+        // A resumed day restores its previously selected task from WorkdaySaveState. Do not roll
+        // another task during DayActivated(), otherwise it would replace the player’s saved work.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore)
+            return;
+
         // Build the list of eligible (unlocked and valid) entries.
         var eligible = new List<DailyTaskEntry>();
         foreach (DailyTaskEntry entry in _taskPool)

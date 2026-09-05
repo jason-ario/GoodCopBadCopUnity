@@ -5,14 +5,34 @@ using UnityEngine;
 
 /// <summary>
 /// A timecard machine the player interacts with to clock in at the start of a shift
-/// and clock out at the end.
+/// and clock out at the end. Shared by every player in the session — either cop can punch
+/// the card, and the punch resolves once for the whole team.
 ///
-/// Clock-in: enabled by <see cref="EnableClockIn"/> (server). Fires
+/// Clock-in: armed by <see cref="EnableClockIn"/> (server). Fires
 /// <see cref="OnClockInAllClients"/> on every client when the punch lands.
 ///
-/// Clock-out: enabled by <see cref="EnableClockOut"/> (server) when ShiftManager signals
-/// all suspects have been processed. Fires <see cref="OnClockOutServer"/> on the server
-/// then triggers EndShift after a short delay.
+/// Clock-out: armed by <see cref="EnableClockOut"/> (server) when ShiftManager signals
+/// all suspects and post-shift tasks are done. Fires <see cref="OnClockOutServer"/> on the
+/// server then triggers EndShift after a short delay.
+///
+/// STATE OWNERSHIP: the armed/punched state lives in server-written
+/// <see cref="NetworkVariable{T}"/>s, NOT in plain bools set by ClientRpc. This is what makes
+/// the machine behave correctly in multiplayer:
+/// <list type="bullet">
+/// <item>A ClientRpc only reaches clients connected at the moment it is sent, so a late joiner
+/// used to spawn with both flags false — unable to punch the card at all, and with no
+/// objective row telling them to. NetworkVariables are part of the spawn payload, so a late
+/// joiner inherits the exact current state.</item>
+/// <item>NetworkVariables only raise <c>OnValueChanged</c> on an actual value CHANGE, so the
+/// server re-arming clock-out (which <see cref="ShiftManager.TryEnableClockOut"/> can attempt
+/// many times per day) can no longer stack duplicate "Clock out for the day" rows on the task
+/// list the way a re-sent ClientRpc did.</item>
+/// <item>Both players read the same authoritative flag, so whichever one punches, every peer
+/// (including the one who didn't) resolves the clock-out identically.</item>
+/// </list>
+/// The remaining ClientRpcs carry ONLY one-shot feedback (punch audio/animation) and the
+/// static events, which are inherently "at the moment it happened" and meaningless to replay
+/// for someone who joined afterwards.
 /// </summary>
 public class TimecardMachine : Interactable
 {
@@ -48,15 +68,37 @@ public class TimecardMachine : Interactable
     public static event Action OnClockOutAllClients;
 
     /// <summary>
-    /// Ground-truth, always-current record of whether the player has punched the clock-out
-    /// card for the current shift cycle. Unlike subscribing to <see cref="OnClockOutAllClients"/>
-    /// (a fire-once event that a late subscriber can simply miss — e.g. an object that
-    /// (re)spawns or resubscribes after the punch already landed), this flag can always be
-    /// read directly to answer "has the player clocked out yet?" with no risk of desync.
-    /// Set true the instant the clock-out punch animation fires on each client, reset false by
-    /// <see cref="Reset"/> at the start of each new shift.
+    /// Raised on every peer whenever the networked clocked-out flag CHANGES — and, critically,
+    /// once at spawn on a late joiner so it inherits the current value too. The bool is the new
+    /// value of <see cref="HasClockedOutThisCycle"/>.
+    ///
+    /// Use this instead of <see cref="OnClockOutAllClients"/> for anything that must be correct
+    /// for a player who joined after the punch (e.g. <see cref="BunkBedInteractable"/> deciding
+    /// whether sleeping is allowed). <c>OnClockOutAllClients</c> is a fire-once "it happened
+    /// right now" notification and is simply never delivered to a late joiner; this one is
+    /// state-driven, so it always converges.
     /// </summary>
-    public static bool HasClockedOutThisCycle { get; private set; }
+    public static event Action<bool> OnClockedOutStateChanged;
+
+    /// <summary>
+    /// The spawned machine, so the static <see cref="HasClockedOutThisCycle"/> can read the
+    /// networked flag without every caller needing a reference.
+    /// </summary>
+    private static TimecardMachine _instance;
+
+    /// <summary>
+    /// Ground-truth, always-current record of whether the team has punched the clock-out card
+    /// for the current shift cycle. Unlike subscribing to <see cref="OnClockOutAllClients"/>
+    /// (a fire-once event that a late subscriber can simply miss — e.g. an object that
+    /// (re)spawns or resubscribes after the punch already landed), this can always be read
+    /// directly to answer "has the team clocked out yet?" with no risk of desync.
+    ///
+    /// Backed by a server-written <see cref="NetworkVariable{T}"/> rather than a local static
+    /// bool, so it is correct on EVERY peer — including a player who joined after the punch
+    /// landed and therefore never received <see cref="PunchCardClientRpc"/>.
+    /// </summary>
+    public static bool HasClockedOutThisCycle =>
+        _instance != null && _instance.IsSpawned && _instance._clockedOutThisCycle.Value;
 
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
@@ -90,12 +132,30 @@ public class TimecardMachine : Interactable
     private static readonly int PunchTrigger = Animator.StringToHash("Punch");
     private static readonly int ReadyBool    = Animator.StringToHash("Ready");
 
-    private bool _clockOutReady = false;
-    private bool _clockInReady  = false;
+    /// <summary>
+    /// Server-owned: true while the machine will accept a clock-in punch from any player.
+    /// Read directly by <see cref="Interact"/> on every peer, so a late joiner can punch too.
+    /// </summary>
+    private readonly NetworkVariable<bool> _clockInArmed = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Server-owned: true while the machine will accept a clock-out punch from any player.
+    /// Because this only raises OnValueChanged on a real transition, repeated
+    /// <see cref="EnableClockOut"/> calls are idempotent and cannot duplicate the objective row.
+    /// </summary>
+    private readonly NetworkVariable<bool> _clockOutArmed = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>Server-owned backing flag for <see cref="HasClockedOutThisCycle"/>.</summary>
+    private readonly NetworkVariable<bool> _clockedOutThisCycle = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // Tracks the tutorial objective overlay rows added while each punch is armed. Day 1 drives
     // its own scripted objective sequence for clock-in/out (see Day_01.ShowClockOutTask and its
     // arrow-based clock-in tutorial), so these are only added on days other than Day 1.
+    // A non-null slot is also the per-player "a row already exists" guard that stops the list
+    // from ever showing the same objective twice — see AddObjectiveIfNotDay1.
     private TutorialObjectiveItem _clockInObjective;
     private TutorialObjectiveItem _clockOutObjective;
 
@@ -105,7 +165,26 @@ public class TimecardMachine : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        _instance = this;
         _clockOutInteractText = interactText;
+
+        _clockInArmed.OnValueChanged  += OnClockInArmedChanged;
+        _clockOutArmed.OnValueChanged += OnClockOutArmedChanged;
+        _clockedOutThisCycle.OnValueChanged += OnClockedOutChanged;
+
+        // LATE JOINERS: the NetworkVariables above arrive already populated with the current
+        // shift's authoritative state, so replay it into this client's local presentation
+        // (reticle text, ready light, objective row) right now. `playFeedback: false` because
+        // the fanfare/punch are one-shot moments that already happened — a player joining
+        // mid-shift should inherit the state, not hear the stinger for it again.
+        ApplyClockInArmed(_clockInArmed.Value, playFeedback: false);
+        ApplyClockOutArmed(_clockOutArmed.Value, playFeedback: false);
+
+        // Announce the inherited clocked-out state so state-driven listeners (the bunk bed's
+        // "can I sleep?" gate) are correct on a peer that joined AFTER the punch landed and
+        // therefore never received OnClockOutAllClients.
+        OnClockedOutStateChanged?.Invoke(_clockedOutThisCycle.Value);
 
         // Days other than Day 1 have no scripted opening sequence, so nothing else ever
         // arms clock-in for them — arm it here the instant the shift is reset and ready.
@@ -125,8 +204,17 @@ public class TimecardMachine : Interactable
 
     public override void OnNetworkDespawn()
     {
+        _clockInArmed.OnValueChanged  -= OnClockInArmedChanged;
+        _clockOutArmed.OnValueChanged -= OnClockOutArmedChanged;
+        _clockedOutThisCycle.OnValueChanged -= OnClockedOutChanged;
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftReady -= OnShiftReady;
+
+        if (_instance == this)
+            _instance = null;
+
+        base.OnNetworkDespawn();
     }
 
     private void OnShiftReady()
@@ -145,7 +233,10 @@ public class TimecardMachine : Interactable
         // checking clock-in first would silently reinterpret the player's clock-OUT tap as a
         // clock-in — re-running TryStartShift() and re-populating the suspect lineup. Clock-out
         // must win that race since it always represents finishing the day already in progress.
-        if (_clockOutReady)
+        //
+        // Both branches test the networked flag rather than a locally-cached bool, so EVERY
+        // player (host, remote client, late joiner) agrees on whether the machine is punchable.
+        if (_clockOutArmed.Value)
         {
             base.Interact(player);
 
@@ -156,7 +247,7 @@ public class TimecardMachine : Interactable
             return;
         }
 
-        if (!_clockInReady) return;
+        if (!_clockInArmed.Value) return;
 
         base.Interact(player);
 
@@ -170,22 +261,28 @@ public class TimecardMachine : Interactable
 
     /// <summary>
     /// Called by the server (e.g. Day_01) when it is time for the player to clock in.
-    /// Enables the clock-in interaction on all clients.
+    /// Arms the clock-in interaction for every player, now and for anyone who joins later.
+    /// Safe to call repeatedly — writing the same value raises no change notification.
     /// </summary>
     public void EnableClockIn()
     {
-        if (!IsServer) return;
-        _clockInReady = true;
-        EnableClockInClientRpc();
+        if (!IsServer || !IsSpawned) return;
+        _clockInArmed.Value = true;
     }
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestClockInServerRpc() => HandleClockIn();
 
+    /// <summary>
+    /// Server-side resolution of a clock-in punch. The <see cref="_clockInArmed"/> test is the
+    /// race guard: if both cops tap the machine on the same frame, the first request clears the
+    /// flag synchronously here so the second one is dropped instead of clocking in twice.
+    /// </summary>
     private void HandleClockIn()
     {
-        if (!_clockInReady) return;
-        _clockInReady = false;
+        if (!IsServer || !_clockInArmed.Value) return;
+
+        _clockInArmed.Value = false;
         OnClockInServer?.Invoke();
         PunchClockInClientRpc();
 
@@ -197,23 +294,36 @@ public class TimecardMachine : Interactable
             ShiftManager.Instance.TryStartShift();
     }
 
-    [ClientRpc]
-    private void EnableClockInClientRpc()
+    private void OnClockInArmedChanged(bool previous, bool current)
     {
-        _clockInReady = true;
-        interactText  = _clockInInteractText;
-        SetLightReady(true);
-        AddObjectiveIfNotDay1(ref _clockInObjective, _clockInObjectiveText);
+        if (previous == current) return;
+        ApplyClockInArmed(current, playFeedback: true);
     }
 
+    /// <summary>
+    /// Mirrors the networked clock-in armed state into this client's local presentation.
+    /// Idempotent: safe to call with the same value repeatedly, and safe to call at spawn time
+    /// for a late joiner (see <see cref="OnNetworkSpawn"/>).
+    /// </summary>
+    private void ApplyClockInArmed(bool armed, bool playFeedback)
+    {
+        interactText = armed ? _clockInInteractText : _clockOutInteractText;
+        SetLightReady(armed || _clockOutArmed.Value);
+
+        if (armed)
+            AddObjectiveIfNotDay1(ref _clockInObjective, _clockInObjectiveText);
+        else
+            CompleteObjective(ref _clockInObjective);
+    }
+
+    /// <summary>
+    /// One-shot clock-in feedback for the players who were connected when the punch landed.
+    /// All persistent state (armed flags, reticle text, objective row) is handled by
+    /// <see cref="_clockInArmed"/>'s change handler so late joiners stay correct.
+    /// </summary>
     [ClientRpc]
     private void PunchClockInClientRpc()
     {
-        _clockInReady = false;
-        interactText  = _clockOutInteractText;
-        SetLightReady(false);
-        CompleteObjective(ref _clockInObjective);
-
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
 
@@ -231,11 +341,24 @@ public class TimecardMachine : Interactable
         HandleClockOut();
     }
 
+    /// <summary>
+    /// Server-side resolution of a clock-out punch, whichever player triggered it. Clearing
+    /// <see cref="_clockOutArmed"/> before doing anything else is what makes this safe when
+    /// both cops slap the machine simultaneously: the second request finds it already false and
+    /// returns, so EndShift is only ever scheduled once.
+    /// </summary>
     private void HandleClockOut()
     {
-        if (!_clockOutReady) return;
+        if (!IsServer || !_clockOutArmed.Value) return;
 
-        _clockOutReady = false;
+        _clockOutArmed.Value = false;
+
+        // Ground truth for the whole session, replicated to everyone — including anyone who
+        // joins after this point (see HasClockedOutThisCycle). Set before the event/RPC so
+        // anything reacting to the punch can safely read it.
+        _clockedOutThisCycle.Value = true;
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
+
         OnClockOutServer?.Invoke();
         PunchCardClientRpc();
         StartCoroutine(EndShiftAfterDelay(_punchToReportDelay));
@@ -248,54 +371,117 @@ public class TimecardMachine : Interactable
     }
 
     /// <summary>
-    /// Called by ShiftManager on the server when all suspects have been processed.
-    /// Enables clock-out interaction on all clients and triggers the fanfare and light.
+    /// Called by ShiftManager on the server when all suspects and post-shift tasks are done.
+    /// Arms clock-out for every player — including future late joiners — and triggers the
+    /// fanfare and ready light. Safe to call repeatedly: writing the same value raises no
+    /// change notification, so the "Clock out for the day" objective row can never be added
+    /// twice (which is exactly what the old re-sent ClientRpc did).
     /// </summary>
     public void EnableClockOut()
     {
-        if (!IsServer) return;
+        if (!IsServer || !IsSpawned) return;
 
-        _clockOutReady = true;
-        EnableClockOutClientRpc();
+        // Never re-arm after the team has already punched out this cycle — a stray
+        // RecheckClockOutGate() landing after the punch would otherwise light the machine back
+        // up and hand out a second clock-out objective while the shift is already ending.
+        if (_clockedOutThisCycle.Value) return;
+
+        _clockOutArmed.Value = true;
     }
 
-    /// <summary>Resets the machine to its default inactive state. Call at the start of each shift.</summary>
+    /// <summary>True when the machine is currently ready to accept a clock-out punch.</summary>
+    public bool IsClockOutArmed => _clockOutArmed.Value;
+
+    /// <summary>True when the machine is currently ready to accept a clock-in punch.</summary>
+    public bool IsClockInArmed => _clockInArmed.Value;
+
+    /// <summary>
+    /// Rehydrates persistent punch state on the host before NGO distributes it to all clients.
+    /// Presentation is driven from the NetworkVariables, so late joiners and existing peers share
+    /// the same restored result.
+    /// </summary>
+    public void RestoreWorkdayState(bool clockInArmed, bool clockOutArmed, bool clockedOut)
+    {
+        if (!IsServer || !IsSpawned) return;
+        _clockInArmed.Value = clockInArmed;
+        _clockOutArmed.Value = clockOutArmed;
+        _clockedOutThisCycle.Value = clockedOut;
+    }
+
+    /// <summary>
+    /// Resets the machine to its default inactive state. Call at the start of each shift.
+    /// Runs on every peer for local presentation cleanup; the authoritative flags are only
+    /// written by the server, which replicates the clean state to everyone automatically.
+    /// </summary>
     public void Reset()
     {
-        _clockOutReady = false;
-        _clockInReady  = false;
         SetLightReady(false);
-        _clockInObjective  = null;
-        _clockOutObjective = null;
-        HasClockedOutThisCycle = false;
+        CompleteObjective(ref _clockInObjective);
+        CompleteObjective(ref _clockOutObjective);
+
+        if (!string.IsNullOrEmpty(_clockOutInteractText))
+            interactText = _clockOutInteractText;
+
+        if (!IsSpawned || !IsServer) return;
+
+        _clockInArmed.Value        = false;
+        _clockOutArmed.Value       = false;
+        _clockedOutThisCycle.Value = false;
     }
 
-    [ClientRpc]
-    private void EnableClockOutClientRpc()
+    private void OnClockOutArmedChanged(bool previous, bool current)
     {
-        _clockOutReady = true;
-        SetLightReady(true);
-        AddObjectiveIfNotDay1(ref _clockOutObjective, _clockOutObjectiveText);
-
-        if (_fanfareSource != null && _fanfareClip != null)
-            _fanfareSource.PlayOneShot(_fanfareClip);
+        if (previous == current) return;
+        ApplyClockOutArmed(current, playFeedback: true);
     }
 
+    /// <summary>
+    /// Relays the replicated clocked-out flag to every peer, whichever player punched the card.
+    /// This is the sync point that guarantees a clock-out "registers for both players".
+    /// </summary>
+    private void OnClockedOutChanged(bool previous, bool current)
+    {
+        if (previous == current) return;
+
+        Debug.Log($"[TimecardMachine] Clocked-out state -> {current} (replicated to this peer).");
+        OnClockedOutStateChanged?.Invoke(current);
+    }
+
+    /// <summary>
+    /// Mirrors the networked clock-out armed state into this client's local presentation.
+    /// Because it is driven off a value CHANGE (or a one-time spawn replay), the objective row
+    /// is added exactly once per player per shift and removed exactly once.
+    /// </summary>
+    private void ApplyClockOutArmed(bool armed, bool playFeedback)
+    {
+        SetLightReady(armed || _clockInArmed.Value);
+
+        if (armed)
+        {
+            AddObjectiveIfNotDay1(ref _clockOutObjective, _clockOutObjectiveText);
+
+            if (playFeedback && _fanfareSource != null && _fanfareClip != null)
+                _fanfareSource.PlayOneShot(_fanfareClip);
+
+            return;
+        }
+
+        // Disarmed — either the punch landed or the shift was reset. Either way this player's
+        // row is done, on the punching client and the watching one alike.
+        CompleteObjective(ref _clockOutObjective);
+
+        if (playFeedback && _fanfareSource != null)
+            _fanfareSource.Stop();
+    }
+
+    /// <summary>
+    /// One-shot clock-out feedback for the players who were connected when the punch landed.
+    /// All persistent state (armed flag, clocked-out flag, objective row) is handled by the
+    /// NetworkVariables so both players — and late joiners — agree on the outcome.
+    /// </summary>
     [ClientRpc]
     private void PunchCardClientRpc()
     {
-        _clockOutReady = false;
-        SetLightReady(false);
-        CompleteObjective(ref _clockOutObjective);
-
-        // Ground truth: the punch has landed on this client, full stop. Set this before firing
-        // OnClockOutAllClients so anything reacting to the event can also safely read this flag.
-        HasClockedOutThisCycle = true;
-
-        // Silence the fanfare immediately so the power-cut feels like a direct consequence.
-        if (_fanfareSource != null)
-            _fanfareSource.Stop();
-
         if (_audioSource != null && _clockOutSound != null)
             _audioSource.PlayOneShot(_clockOutSound);
 
@@ -313,12 +499,20 @@ public class TimecardMachine : Interactable
     }
 
     /// <summary>
-    /// Adds a row to the tutorial objective overlay, unless the current day is Day 1 — Day 1
-    /// drives its own scripted objective sequence for clock-in/out (see Day_01.ShowClockOutTask
-    /// and its arrow-based clock-in tutorial), so adding a duplicate row here would conflict.
+    /// Adds a row to the tutorial objective overlay, unless:
+    /// <list type="bullet">
+    /// <item><paramref name="slot"/> already holds a row — one objective per player, never a
+    /// stack of identical "Clock out for the day" lines no matter how many times the server
+    /// re-arms the machine.</item>
+    /// <item>the current day is Day 1 — Day 1 drives its own scripted objective sequence for
+    /// clock-in/out (see <c>Day_01.ShowClockOutTask</c> and its arrow-based clock-in tutorial),
+    /// so adding a row here would duplicate it.</item>
+    /// </list>
     /// </summary>
     private static void AddObjectiveIfNotDay1(ref TutorialObjectiveItem slot, string text)
     {
+        if (slot != null) return;
+
         int day = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : -1;
         Debug.Log($"[TimecardMachine] AddObjectiveIfNotDay1(\"{text}\") -- CurrentDay={day}, " +
                   $"TutorialObjectiveList.Instance={(TutorialObjectiveList.Instance != null)}.");

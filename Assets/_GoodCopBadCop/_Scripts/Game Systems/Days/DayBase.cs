@@ -382,6 +382,12 @@ public abstract class DayBase : MonoBehaviour
 
     private void TriggerTaskList(MonoBehaviour[] tasks, string scheduleLabel)
     {
+        // A resumable workday already owns the authoritative task set captured by the host.
+        // Replaying scheduled triggers here would reroll or duplicate their dynamic objectives
+        // before ShiftManager can restore the saved state one frame later.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore)
+            return;
+
         if (tasks == null) return;
 
         foreach (MonoBehaviour behaviour in tasks)

@@ -25,6 +25,29 @@ public class PickupSpawnPoint : MonoBehaviour
         return _spawnablePrefabs[Random.Range(0, _spawnablePrefabs.Length)];
     }
 
+    /// <summary>Returns the configured prefab at a durable pool index, or null when the index is invalid.</summary>
+    public GameObject GetPrefab(int index)
+    {
+        return _spawnablePrefabs != null && index >= 0 && index < _spawnablePrefabs.Length
+            ? _spawnablePrefabs[index]
+            : null;
+    }
+
+    /// <summary>Returns the pool index for a configured prefab, or -1 when it is not configured here.</summary>
+    public int GetPrefabIndex(GameObject prefab)
+    {
+        if (_spawnablePrefabs == null || prefab == null)
+            return -1;
+
+        for (int i = 0; i < _spawnablePrefabs.Length; i++)
+        {
+            if (_spawnablePrefabs[i] == prefab)
+                return i;
+        }
+
+        return -1;
+    }
+
 #if UNITY_EDITOR
     private static readonly Color GizmoColorFill     = new Color(1f, 0.85f, 0f, 0.30f);
     private static readonly Color GizmoColorWire     = new Color(1f, 0.85f, 0f, 0.95f);

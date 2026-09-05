@@ -1,18 +1,12 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Server-authoritative manager that spawns networked prefabs at the start of each day.
-/// A random subset of the registered <see cref="PickupSpawnPoint"/> transforms is chosen
-/// each day. Each point defines its own prefab pool and provides the prefab to spawn via
-/// <see cref="PickupSpawnPoint.GetRandomPrefab"/>.
-///
-/// Prefab setup:
-///   - This GameObject requires a NetworkObject component.
-///   - All prefabs referenced by the spawn points must have a NetworkObject and be registered
-///     in the NetworkManager prefab list.
-///   - Assign all candidate <see cref="PickupSpawnPoint"/> scene objects to <see cref="_spawnPoints"/>.
+/// Server-authoritative manager for the daily runtime pickup set. The host records which
+/// spawn-point/prefab combinations exist and their transforms, recreates that set on resume,
+/// and lets NGO distribute the reconstructed objects to connected and late-joining clients.
 /// </summary>
 public class DailyPickupSpawnManager : NetworkBehaviour
 {
@@ -26,14 +20,24 @@ public class DailyPickupSpawnManager : NetworkBehaviour
     [Tooltip("Maximum number of items spawned at day start. Clamped to the number of available spawn points.")]
     [SerializeField] private int _maxSpawnsPerDay = 3;
 
-    // Tracks all currently active spawned NetworkObjects so they can be cleaned up the next day.
-    private readonly List<NetworkObject> _activeSpawns = new List<NetworkObject>();
+    public static DailyPickupSpawnManager Instance { get; private set; }
+    public bool HasInitializedForDay => ShiftManager.Instance != null && _initializedDay == ShiftManager.Instance.CurrentDay;
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────
+    private sealed class ActiveSpawn
+    {
+        public NetworkObject NetworkObject;
+        public int SpawnPointIndex;
+        public int PrefabIndex;
+        public string SaveId;
+    }
+
+    private readonly List<ActiveSpawn> _activeSpawns = new();
+    private int _initializedDay = -1;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        Instance = this;
 
         if (!IsServer)
             return;
@@ -46,40 +50,94 @@ public class DailyPickupSpawnManager : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        base.OnNetworkDespawn();
-
         if (IsServer && ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
+
+        if (Instance == this)
+            Instance = null;
+        base.OnNetworkDespawn();
     }
 
-    // ── Day Start ────────────────────────────────────────────────────────────
+    /// <summary>Captures the live runtime pickup set. Despawned entries are intentionally omitted.</summary>
+    public DailyPickupSaveData[] CaptureSaveData()
+    {
+        var results = new List<DailyPickupSaveData>(_activeSpawns.Count);
+        foreach (ActiveSpawn spawn in _activeSpawns)
+        {
+            if (spawn?.NetworkObject == null || !spawn.NetworkObject.IsSpawned)
+                continue;
 
-    /// <summary>
-    /// Called by <see cref="ShiftManager.OnDayStart"/> on the server.
-    /// Despawns any leftover items from the previous day, then spawns a fresh random selection.
-    /// </summary>
+            results.Add(new DailyPickupSaveData
+            {
+                SpawnPointIndex = spawn.SpawnPointIndex,
+                PrefabIndex = spawn.PrefabIndex,
+                SaveId = spawn.SaveId,
+                Position = spawn.NetworkObject.transform.position,
+                RotationEuler = spawn.NetworkObject.transform.eulerAngles
+            });
+        }
+
+        return results.ToArray();
+    }
+
     private void OnDayStart()
     {
-        DespawnLeftovers();
-        SpawnDailyPickups();
+        if (!IsServer)
+            return;
+
+        int day = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 0;
+        if (_initializedDay == day)
+            return;
+
+        WorkdaySaveState savedState = SaveDataManager.Instance?.GetWorkdayState(day);
+
+        if (savedState != null && savedState.DailyPickupsInitialized)
+            RestoreSavedPickups(savedState.DailyPickups);
+        else
+            SpawnFreshPickups();
+
+        _initializedDay = day;
+        DailyPickupSaveData[] snapshot = CaptureSaveData();
+        SaveDataManager.Instance?.SaveDayStartDailyPickupState(day, snapshot);
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
+        Debug.Log($"[DailyPickupSpawnManager] Initialized {snapshot.Length} persistent daily pickup(s) for Day {day}.");
     }
 
-    // ── Despawn ──────────────────────────────────────────────────────────────
+    private void RestoreSavedPickups(DailyPickupSaveData[] savedPickups)
+    {
+        DespawnLeftovers();
+        if (savedPickups == null)
+            return;
+
+        foreach (DailyPickupSaveData saved in savedPickups)
+        {
+            if (saved == null || saved.SpawnPointIndex < 0 || saved.SpawnPointIndex >= (_spawnPoints?.Length ?? 0))
+                continue;
+
+            PickupSpawnPoint point = _spawnPoints[saved.SpawnPointIndex];
+            GameObject prefab = point != null ? point.GetPrefab(saved.PrefabIndex) : null;
+            if (prefab == null)
+            {
+                Debug.LogWarning($"[DailyPickupSpawnManager] Cannot restore daily pickup at point {saved.SpawnPointIndex}: configured prefab {saved.PrefabIndex} is unavailable.", this);
+                continue;
+            }
+
+            SpawnAt(point, prefab, saved.SpawnPointIndex, saved.PrefabIndex, saved.SaveId, saved.Position, Quaternion.Euler(saved.RotationEuler));
+        }
+    }
 
     private void DespawnLeftovers()
     {
-        foreach (NetworkObject netObj in _activeSpawns)
+        foreach (ActiveSpawn spawn in _activeSpawns)
         {
-            if (netObj != null && netObj.IsSpawned)
-                netObj.Despawn();
+            if (spawn?.NetworkObject != null && spawn.NetworkObject.IsSpawned)
+                spawn.NetworkObject.Despawn();
         }
 
         _activeSpawns.Clear();
     }
 
-    // ── Spawn ────────────────────────────────────────────────────────────────
-
-    private void SpawnDailyPickups()
+    private void SpawnFreshPickups()
     {
         if (_spawnPoints == null || _spawnPoints.Length == 0)
         {
@@ -87,60 +145,65 @@ public class DailyPickupSpawnManager : NetworkBehaviour
             return;
         }
 
-        int available  = _spawnPoints.Length;
-        int spawnCount = Mathf.Clamp(Random.Range(_minSpawnsPerDay, _maxSpawnsPerDay + 1), 0, available);
-
-        List<PickupSpawnPoint> shuffledPoints = ShuffledCopy(_spawnPoints);
+        int available = _spawnPoints.Length;
+        int spawnCount = Mathf.Clamp(UnityEngine.Random.Range(_minSpawnsPerDay, _maxSpawnsPerDay + 1), 0, available);
+        List<int> shuffledPointIndices = ShuffledIndices(available);
 
         for (int i = 0; i < spawnCount; i++)
         {
-            PickupSpawnPoint point = shuffledPoints[i];
-            GameObject prefab = point.GetRandomPrefab();
+            int spawnPointIndex = shuffledPointIndices[i];
+            PickupSpawnPoint point = _spawnPoints[spawnPointIndex];
+            GameObject prefab = point != null ? point.GetRandomPrefab() : null;
+            int prefabIndex = point != null ? point.GetPrefabIndex(prefab) : -1;
 
-            if (prefab == null)
+            if (prefab == null || prefabIndex < 0)
             {
-                Debug.LogWarning($"[DailyPickupSpawnManager] Spawn point '{point.name}' has no prefabs assigned — skipping.", this);
+                Debug.LogWarning($"[DailyPickupSpawnManager] Spawn point '{point?.name ?? "<missing>"}' has no valid prefab — skipping.", this);
                 continue;
             }
 
-            SpawnAt(point, prefab);
+            SpawnAt(point, prefab, spawnPointIndex, prefabIndex, BuildSaveId(spawnPointIndex), point.transform.position, point.transform.rotation);
         }
-
-        Debug.Log($"[DailyPickupSpawnManager] Spawned {spawnCount} item(s) for today.");
     }
 
-    private void SpawnAt(PickupSpawnPoint spawnPoint, GameObject prefab)
+    private void SpawnAt(PickupSpawnPoint spawnPoint, GameObject prefab, int spawnPointIndex, int prefabIndex, string saveId, Vector3 position, Quaternion rotation)
     {
-        if (spawnPoint == null || prefab == null)
-            return;
+        GameObject instance = Instantiate(prefab, position, rotation);
+        NetworkObject networkObject = instance.GetComponent<NetworkObject>();
+        PickableObject pickable = instance.GetComponent<PickableObject>();
 
-        GameObject instance = Instantiate(prefab, spawnPoint.transform.position, spawnPoint.transform.rotation);
-        NetworkObject netObj = instance.GetComponent<NetworkObject>();
-
-        if (netObj == null)
+        if (networkObject == null || pickable == null)
         {
-            Debug.LogError($"[DailyPickupSpawnManager] Prefab '{prefab.name}' is missing a NetworkObject component.", this);
+            Debug.LogError($"[DailyPickupSpawnManager] Prefab '{prefab.name}' must contain NetworkObject and PickableObject components.", this);
             Destroy(instance);
             return;
         }
 
-        netObj.Spawn(true);
-        _activeSpawns.Add(netObj);
+        pickable.SetRuntimeSaveId(string.IsNullOrEmpty(saveId) ? BuildSaveId(spawnPointIndex) : saveId);
+        networkObject.Spawn(true);
+        _activeSpawns.Add(new ActiveSpawn
+        {
+            NetworkObject = networkObject,
+            SpawnPointIndex = spawnPointIndex,
+            PrefabIndex = prefabIndex,
+            SaveId = pickable.SaveId
+        });
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    private static string BuildSaveId(int spawnPointIndex) => $"DailyPickup/{spawnPointIndex}";
 
-    /// <summary>Returns a new list containing all elements of <paramref name="source"/> in a random order (Fisher-Yates).</summary>
-    private static List<T> ShuffledCopy<T>(T[] source)
+    private static List<int> ShuffledIndices(int count)
     {
-        List<T> list = new List<T>(source);
+        var indices = new List<int>(count);
+        for (int i = 0; i < count; i++)
+            indices.Add(i);
 
-        for (int i = list.Count - 1; i > 0; i--)
+        for (int i = indices.Count - 1; i > 0; i--)
         {
-            int j = Random.Range(0, i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
+            int swapIndex = UnityEngine.Random.Range(0, i + 1);
+            (indices[i], indices[swapIndex]) = (indices[swapIndex], indices[i]);
         }
 
-        return list;
+        return indices;
     }
 }

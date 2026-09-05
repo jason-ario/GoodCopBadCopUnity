@@ -70,6 +70,23 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     /// <summary>No-op.</summary>
     public void EndNightPhase() { }
 
+    /// <summary>Captures the replicated counter state used to resume an in-progress shift.</summary>
+    public ProcessResidentsTaskSaveState CaptureSaveState() => new()
+    {
+        IsActive = _isActive.Value,
+        ProcessedCount = _processedCount.Value,
+        TotalCount = _totalCount.Value
+    };
+
+    /// <summary>Restores the shift counter on the server; NGO then distributes it to every peer.</summary>
+    public void RestoreSaveState(ProcessResidentsTaskSaveState state)
+    {
+        if (!IsServer || state == null) return;
+        _processedCount.Value = Mathf.Max(0, state.ProcessedCount);
+        _totalCount.Value = Mathf.Max(_processedCount.Value, state.TotalCount);
+        _isActive.Value = state.IsActive && _processedCount.Value < _totalCount.Value;
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -197,5 +214,7 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
 
         if (_totalCount.Value > 0 && _processedCount.Value >= _totalCount.Value)
             _isActive.Value = false;
+
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 }

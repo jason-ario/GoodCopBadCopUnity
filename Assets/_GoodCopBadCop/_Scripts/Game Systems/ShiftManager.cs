@@ -101,6 +101,30 @@ public class ShiftManager : NetworkBehaviour
     private int _taskCompletedCount = 0;
     private bool _campaignAdvancedForCurrentReport;
 
+    /// <summary>
+    /// True on the server once the end-of-shift report has been broadcast for the current cycle.
+    /// Both players can confirm end-of-day at their own bunk bed, so without this a simultaneous
+    /// pair of confirmations broadcasts two reports and advances the campaign twice. Cleared in
+    /// <see cref="ResetSuspectsProcessed"/> when the next shift is set up.
+    /// </summary>
+    private bool _endOfShiftReportBroadcast;
+
+    /// <summary>
+    /// True on the server from the moment the in-between-shift transition starts until the next
+    /// report is broadcast. Prevents overlapping transitions now that either player can press
+    /// Continue on the end-of-shift report. Cleared in
+    /// <see cref="TriggerEndOfShiftReportServerRpc"/> and <see cref="DebugShowEndOfShiftReport"/>,
+    /// i.e. when a fresh report cycle begins — deliberately *not* in
+    /// <see cref="ResetSuspectsProcessed"/>, which runs midway through the transition itself.
+    /// </summary>
+    private bool _inBetweenShiftStarted;
+
+    /// <summary>
+    /// Per-peer guard so a repeated <c>StartInBetweenShiftSequenceClientRpc</c> cannot run a second
+    /// copy of the transition on top of the first.
+    /// </summary>
+    private bool _transitionRunningLocally;
+
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
     [SerializeField] private WindowLampController windowLampController;
@@ -161,6 +185,30 @@ public class ShiftManager : NetworkBehaviour
     private bool _suspectsComplete;
 
     /// <summary>
+    /// True on the server once clock-out has already been armed for the current shift cycle.
+    ///
+    /// <see cref="TryEnableClockOut"/> is legitimately re-entered many times per day — once per
+    /// pending daily task completion (<see cref="CompletePendingDailyTask"/>), once from
+    /// <see cref="HandleAllSuspectsProcessed"/>, and again from <see cref="RecheckClockOutGate"/>
+    /// after a mutant breach resolves. Any of those re-entries that happen AFTER the gate has
+    /// already opened (e.g. a task registered late, or a breach recheck firing once the machine
+    /// is already primed) used to re-arm the timecard machine and re-bark the megaphone line,
+    /// which is what stacked multiple "Clock out for the day" rows onto the task list.
+    /// Reset per shift by <see cref="ResetSuspectsProcessed"/>.
+    /// </summary>
+    private bool _clockOutEnabledThisCycle;
+
+    /// <summary>
+    /// True on the server once <see cref="OnPostShiftTasksComplete"/> has fired for the current
+    /// shift cycle. Guarded separately from <see cref="_clockOutEnabledThisCycle"/> because the
+    /// event fires BEFORE the mutant-breach withhold check, so it would otherwise re-fire on
+    /// every re-entry made while a breach is still blocking clock-out — re-rolling
+    /// <c>MutantBreachManager</c>'s breach event each time. Reset per shift by
+    /// <see cref="ResetSuspectsProcessed"/>.
+    /// </summary>
+    private bool _postShiftTasksCompleteFired;
+
+    /// <summary>
     /// Daily tasks (trash, graffiti, mail, etc.) that have been triggered for the current day
     /// and have not yet fired <see cref="IDailyTask.OnDailyTaskCompleted"/>. Clock-out is only
     /// enabled once this set is empty AND <see cref="_suspectsComplete"/> is true.
@@ -205,6 +253,80 @@ public class ShiftManager : NetworkBehaviour
         TryEnableClockOut();
     }
 
+    private string[] CapturePendingDailyTaskIds()
+    {
+        if (_pendingDailyTasks.Count == 0)
+            return Array.Empty<string>();
+
+        var ids = new List<string>(_pendingDailyTasks.Count);
+        foreach (IDailyTask task in _pendingDailyTasks)
+        {
+            if (task != null && !string.IsNullOrEmpty(task.DailyTaskId))
+                ids.Add(task.DailyTaskId);
+        }
+
+        return ids.ToArray();
+    }
+
+    /// <summary>
+    /// Re-arms task sources that do not have an object-level snapshot of their own. Persistent
+    /// cleanup tasks restore their exact dynamic objects separately; all other incomplete
+    /// clock-out blockers are restarted from their normal server-authoritative trigger so no
+    /// save can strand the day with an empty task source and a locked timecard.
+    /// </summary>
+    private void RestorePendingDailyTaskFallbacks(WorkdaySaveState state)
+    {
+        if (!IsServer || state?.PendingDailyTaskIds == null || state.PendingDailyTaskIds.Length == 0)
+            return;
+
+        var pendingIds = new HashSet<string>(state.PendingDailyTaskIds);
+        pendingIds.Remove("CleanGraffiti");
+        pendingIds.Remove("TakeOutTrash");
+        pendingIds.Remove("CleanBlood");
+        pendingIds.Remove("SortMail");
+
+        // Day 1's breach gate is a non-MonoBehaviour adapter, so it cannot be found alongside
+        // regular IDailyTask sources. Re-register the same gate through its owning day.
+        if (pendingIds.Remove("Day1_MutantBreachGate"))
+            Day_01.Instance?.EnsureMutantBreachGateForRestore();
+
+        if (pendingIds.Count == 0)
+            return;
+
+        MonoBehaviour[] behaviours = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
+        foreach (MonoBehaviour behaviour in behaviours)
+        {
+            if (behaviour is not IDailyTask task || !pendingIds.Remove(task.DailyTaskId))
+                continue;
+
+            // Some scripted day tasks expect their owner to register the blocker before starting
+            // their sequence; ordinary tasks already do this internally, and the registration is
+            // idempotent in either case.
+            RegisterPendingDailyTask(task);
+            task.TriggerDailyTask();
+        }
+
+        foreach (string missingId in pendingIds)
+            Debug.LogWarning($"[ShiftManager] Saved pending task '{missingId}' has no active restore trigger.");
+    }
+
+    private void RestoreOutstandingFollowTrailFallback(WorkdaySaveState state)
+    {
+        FollowTrailThreat trail = FollowTrailThreat.Instance;
+        if (trail == null || !trail.HasOutstandingObjective(state?.FollowTrail))
+            return;
+
+        var pendingIds = new HashSet<string>(state.PendingDailyTaskIds ?? Array.Empty<string>());
+        // These source tasks have already been restarted from the blocker journal.
+        if (pendingIds.Contains("FollowTrail") || pendingIds.Contains("Day2VladFollowTrail"))
+            return;
+
+        // A discovered trail's kill-objective is no longer a daily-task blocker, so it does not
+        // appear in the journal. Recreate a finishable, authoritative trail event rather than
+        // leaving a stale client-only kill row pointing at actors that died with the scene.
+        trail.TriggerDailyTask();
+    }
+
     /// <summary>
     /// Clears all pending daily task tracking without waiting for completion. Call at the start
     /// of each shift/day so leftover subscriptions from a previous day never linger.
@@ -222,17 +344,28 @@ public class ShiftManager : NetworkBehaviour
     /// Enables clock-out only once every suspect for the day has been processed AND every
     /// registered daily task (trash, graffiti, mail, follow-trail, etc.) has been completed.
     /// Server-only.
+    ///
+    /// Idempotent: safe to call as many times as the day's task completions demand. Everything
+    /// with a side effect is behind a once-per-cycle latch, because the un-latched version armed
+    /// the timecard machine (and barked the megaphone line) repeatedly — the cause of duplicate
+    /// "Clock out for the day" rows appearing on the task list.
     /// </summary>
     private void TryEnableClockOut()
     {
         if (!IsServer || !_suspectsComplete || _pendingDailyTasks.Count > 0) return;
+        if (_clockOutEnabledThisCycle) return;
 
         // End of the day's schedule — suspects processed AND every post-shift task complete.
         // MutantBreachManager listens here to roll this day's breach event, if it has one. Fire
         // this BEFORE the breach-pending check below so the roll (and its scheduling coroutine)
         // actually happens — otherwise a pending breach would block this method from ever
-        // reaching the point that triggers it.
-        OnPostShiftTasksComplete?.Invoke();
+        // reaching the point that triggers it. Latched so the roll happens exactly once even
+        // though the breach check below keeps sending us back through here.
+        if (!_postShiftTasksCompleteFired)
+        {
+            _postShiftTasksCompleteFired = true;
+            OnPostShiftTasksComplete?.Invoke();
+        }
 
         // Withhold clock-out while today's mutant breach (if any) is scheduled/active — the
         // player should only be able to clock out once there is no breach left to deal with.
@@ -243,9 +376,12 @@ public class ShiftManager : NetworkBehaviour
             return;
         }
 
+        _clockOutEnabledThisCycle = true;
+
         if (_timecardMachine != null)
             _timecardMachine.EnableClockOut();
 
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         NotifyClockOutReadyClientRpc();
 
         Debug.Log("[ShiftManager] TryEnableClockOut: all tasks complete — timecard machine primed for clock-out.");
@@ -340,6 +476,132 @@ public class ShiftManager : NetworkBehaviour
             OnDoorUnlock?.Invoke();
     }
     #endregion
+
+    /// <summary>True while the host is rebuilding an in-progress day from disk.</summary>
+    public bool IsRestoringWorkdayState { get; private set; }
+
+    /// <summary>Captures all state required to continue the active day without rerunning its tasks.</summary>
+    public WorkdaySaveState CaptureWorkdaySaveState()
+    {
+        return new WorkdaySaveState
+        {
+            IsValid = true,
+            Day = _currentDay,
+            Phase = (int)CurrentPhase,
+            ShiftStarted = shiftStarted.Value,
+            SuspectsComplete = _suspectsComplete,
+            ClockInArmed = _timecardMachine != null && _timecardMachine.IsClockInArmed,
+            ClockOutEnabled = _clockOutEnabledThisCycle,
+            ClockedOut = TimecardMachine.HasClockedOutThisCycle,
+            SuspectsProcessed = suspectsProcessed,
+            SuspectsPassedCorrect = suspectsPassedCorrect,
+            SuspectsPassedWrong = suspectsPassedWrong,
+            SuspectsQuarantined = suspectsQuarantined,
+            SuspectsKilledCorrect = suspectsKilledCorrect,
+            SuspectsKilledWrong = suspectsKilledWrong,
+            SuspectsFled = suspectsFled,
+            SuspectIndex = SuspectController.Instance != null ? SuspectController.Instance.SuspectIndex : -1,
+            Cash = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
+            Pickables = PickableObjectRegistry.Instance.CaptureAll(),
+            DailyPickupsInitialized = DailyPickupSpawnManager.Instance != null && DailyPickupSpawnManager.Instance.HasInitializedForDay,
+            DailyPickups = DailyPickupSpawnManager.Instance != null
+                ? DailyPickupSpawnManager.Instance.CaptureSaveData()
+                : Array.Empty<DailyPickupSaveData>(),
+            ProcessResidents = ProcessResidentsTask.Instance != null ? ProcessResidentsTask.Instance.CaptureSaveState() : new ProcessResidentsTaskSaveState(),
+            Graffiti = CleanGraffitiTask.Instance != null ? CleanGraffitiTask.Instance.CaptureSaveState() : new GraffitiTaskSaveState(),
+            Trash = TakeOutTrashTask.Instance != null ? TakeOutTrashTask.Instance.CaptureSaveState() : new TrashTaskSaveState(),
+            Blood = CleanBloodTask.Instance != null ? CleanBloodTask.Instance.CaptureSaveState() : new BloodTaskSaveState(),
+            Mail = SortMailTask.Instance != null ? SortMailTask.Instance.CaptureSaveState() : new MailTaskSaveState(),
+            FenceRepair = FenceRepairTask.Instance != null ? FenceRepairTask.Instance.CaptureSaveState() : new FenceTaskSaveState(),
+            FollowTrail = FollowTrailThreat.Instance != null ? FollowTrailThreat.Instance.CaptureSaveState() : new FollowTrailTaskSaveState(),
+            BoothMess = CleanBoothMessTask.Instance != null ? CleanBoothMessTask.Instance.CaptureSaveState() : new BoothMessTaskSaveState(),
+            PendingDailyTaskIds = CapturePendingDailyTaskIds()
+        };
+    }
+
+    /// <summary>
+    /// Rehydrates the active workday on the authoritative host. Dynamic objects are re-spawned by
+    /// the task owners and ordinary NGO replication brings the restored state to every client.
+    /// </summary>
+    public void RestoreWorkdaySaveState(WorkdaySaveState state)
+    {
+        if (!IsServer || state == null || !state.IsValid || state.Day != _currentDay) return;
+        StartCoroutine(RestoreWorkdaySaveStateRoutine(state));
+    }
+
+    private IEnumerator RestoreWorkdaySaveStateRoutine(WorkdaySaveState state)
+    {
+        IsRestoringWorkdayState = true;
+        ClearPendingDailyTasks();
+
+        // Let the day own its normal registration/subscription setup first. We replace its
+        // randomized task output below, before the player can interact with the world.
+        if (state.Phase == (int)DayPhase.Shift)
+            OnShiftStart?.Invoke();
+        yield return null;
+
+        suspectsProcessed = state.SuspectsProcessed;
+        suspectsPassedCorrect = state.SuspectsPassedCorrect;
+        suspectsPassedWrong = state.SuspectsPassedWrong;
+        suspectsQuarantined = state.SuspectsQuarantined;
+        suspectsKilledCorrect = state.SuspectsKilledCorrect;
+        suspectsKilledWrong = state.SuspectsKilledWrong;
+        suspectsFled = state.SuspectsFled;
+        _suspectsComplete = state.SuspectsComplete;
+        _clockOutEnabledThisCycle = state.ClockOutEnabled;
+        CurrentPhase = (DayPhase)Mathf.Clamp(state.Phase, (int)DayPhase.PreShift, (int)DayPhase.PostShift);
+        GlobalHostVariables.Instance?.SetMoney(state.Cash);
+        PickableObjectRegistry.Instance?.RestoreAll(state.Pickables);
+
+        ProcessResidentsTask.Instance?.RestoreSaveState(state.ProcessResidents);
+        CleanGraffitiTask.Instance?.RestoreSaveState(state.Graffiti);
+        TakeOutTrashTask.Instance?.RestoreSaveState(state.Trash);
+        CleanBloodTask.Instance?.RestoreSaveState(state.Blood);
+        SortMailTask.Instance?.RestoreSaveState(state.Mail);
+        FenceRepairTask.Instance?.RestoreSaveState(state.FenceRepair);
+        CleanBoothMessTask.Instance?.RestoreSaveState(state.BoothMess);
+        RestorePendingDailyTaskFallbacks(state);
+        RestoreOutstandingFollowTrailFallback(state);
+
+        _timecardMachine?.RestoreWorkdayState(
+            state.ClockInArmed && CurrentPhase == DayPhase.PreShift,
+            state.ClockOutEnabled && !state.ClockedOut,
+            state.ClockedOut);
+
+        if (CurrentPhase == DayPhase.Shift)
+        {
+            shiftStarted.Value = true;
+            if (SuspectController.Instance != null)
+            {
+                // The currently inspecting character is not persisted; resume at the next
+                // unprocessed lineup slot while retaining the exact authoritative remaining count.
+                SuspectController.Instance.suspectIndex.Value = Mathf.Max(-1, state.SuspectsProcessed - 1);
+                NextSuspectReadyForBell = true;
+                OnNextSuspectReadyForBell?.Invoke();
+            }
+            StartCoroutine(PositionPlayerForShiftResume());
+        }
+        else
+        {
+            shiftStarted.Value = false;
+            if (CurrentPhase == DayPhase.PostShift)
+                StartCoroutine(PositionPlayerForPostShiftRetry());
+            if (state.ClockedOut)
+                SignalShiftEndClientRpc();
+        }
+
+        IsRestoringWorkdayState = false;
+
+        // A save can occur after the final suspect is processed but before the normal clock-out
+        // gate gets its next callback (notably while a breach roll is pending). Re-evaluate the
+        // host gate once task sources have been rebuilt so resume cannot leave the day in an
+        // otherwise-empty PostShift state with no path to clock out.
+        if (CurrentPhase == DayPhase.PostShift && !state.ClockedOut && !_clockOutEnabledThisCycle && _pendingDailyTasks.Count == 0)
+            TryEnableClockOut();
+
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
+        Debug.Log($"[ShiftManager] Restored in-progress Day {_currentDay} ({CurrentPhase}) from save state.");
+    }
 
     private void Awake()
     {
@@ -474,6 +736,7 @@ public class ShiftManager : NetworkBehaviour
 
         NotifyDuskBeginClientRpc();
         CampaignManager.Instance?.ActiveDay?.TriggerPostShiftTasks();
+        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         TryEnableClockOut();
     }
@@ -536,6 +799,15 @@ public class ShiftManager : NetworkBehaviour
 
         GlobalHostVariables.Instance?.SetMoney(slot.TotalCashEarned);
         PickableObjectRegistry.Instance.RestoreAll(slot.PickableObjects);
+    }
+
+    private IEnumerator PositionPlayerForShiftResume()
+    {
+        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+        Transform spawn = PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        PlayerInstance.Instance.SetPosition(spawn);
+        PlayerInstance.Instance.SetIsOutside(false);
+        OnDoorLock?.Invoke();
     }
 
     private IEnumerator PositionPlayerForPostShiftRetry()
@@ -843,9 +1115,24 @@ public class ShiftManager : NetworkBehaviour
     /// <summary>
     /// Starts the transition locally on the host, then notifies all other clients so the
     /// end-of-shift report closes and the next day starts for everyone at the same time.
+    ///
+    /// Latched by <see cref="_inBetweenShiftStarted"/>: the Continue button is now available to both
+    /// players, so two presses (or a press racing a debug skip) would otherwise run two overlapping
+    /// <see cref="InBetweenShiftSequence"/> coroutines — double-fading, double-advancing the day, and
+    /// racing each other's control restore, which can strand a player on a black or frozen screen.
+    /// The latch is cleared when the next report is broadcast, not here, so it stays closed for the
+    /// entire transition.
     /// </summary>
     private void StartInBetweenShiftSequenceOnServer()
     {
+        if (_inBetweenShiftStarted)
+        {
+            Debug.Log("[ShiftManager] StartInBetweenShiftSequence: transition already running for this " +
+                      "report — duplicate request ignored.");
+            return;
+        }
+        _inBetweenShiftStarted = true;
+
         StartCoroutine(InBetweenShiftSequence());
         StartInBetweenShiftSequenceClientRpc();
     }
@@ -869,6 +1156,11 @@ public class ShiftManager : NetworkBehaviour
     private void StartInBetweenShiftSequenceClientRpc()
     {
         if (IsServer) return; // Host already ran the sequence locally above.
+        if (_transitionRunningLocally)
+        {
+            Debug.Log("[ShiftManager] In-between-shift transition already running locally — ignored.");
+            return;
+        }
         StartCoroutine(InBetweenShiftSequence());
     }
 
@@ -936,6 +1228,9 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public void DebugShowEndOfShiftReport()
     {
+        // A fresh report means a fresh transition is allowed again.
+        _inBetweenShiftStarted = false;
+
         ShowEndOfShiftReportClientRpc(
             suspectsProcessed,
             suspectsPassedCorrect,
@@ -954,10 +1249,26 @@ public class ShiftManager : NetworkBehaviour
     /// Broadcasts the end-of-shift report to all clients so both players see it simultaneously.
     /// The tracked counters are passed as ints (NGO-serializable); each client rebuilds
     /// the report rows using its own reward config and server-authored population values.
+    ///
+    /// Idempotent per report: <see cref="_endOfShiftReportBroadcast"/> drops a second request, so
+    /// two players confirming end-of-day at the same moment cannot stack two reports (or advance
+    /// the campaign twice). <see cref="BunkBedInteractable"/> also latches its own confirmation,
+    /// making this the second line of defence for the other callers.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void TriggerEndOfShiftReportServerRpc()
     {
+        if (_endOfShiftReportBroadcast)
+        {
+            Debug.Log("[ShiftManager] TriggerEndOfShiftReport: report already broadcast this cycle — ignored.");
+            return;
+        }
+        _endOfShiftReportBroadcast = true;
+
+        // A new report opens a new transition window — re-arm the Continue latch. Both players can
+        // press Continue, and the first press through wins.
+        _inBetweenShiftStarted = false;
+
         if (!_campaignAdvancedForCurrentReport && CampaignManager.Instance != null)
         {
             CampaignManager.Instance.AdvanceDay();
@@ -1036,6 +1347,8 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator InBetweenShiftSequence()
     {
+        _transitionRunningLocally = true;
+
         // Make every connected player invincible for the whole transition, starting right now —
         // before the fade-in even begins. CampaignManager.ResetAllPlayersHealthAndRadiation()
         // (called later, once the screen is fully black) only guards against damage applied
@@ -1106,6 +1419,7 @@ public class ShiftManager : NetworkBehaviour
         // instead of starting the next shift.
         if (CampaignManager.Instance != null && CampaignManager.Instance.IsCampaignComplete)
         {
+            _transitionRunningLocally = false;
             UIController.Instance.ShowThanksForPlayingScreen();
             yield break;
         }
@@ -1115,6 +1429,8 @@ public class ShiftManager : NetworkBehaviour
         OnShiftReady?.Invoke();
         OnDayStart?.Invoke();
         PlayShiftStartFanfare();
+
+        _transitionRunningLocally = false;
     }
 
     [ClientRpc]
@@ -1262,6 +1578,9 @@ public class ShiftManager : NetworkBehaviour
         suspectsFled = 0;
 
         _suspectsComplete = false;
+        _clockOutEnabledThisCycle = false;
+        _postShiftTasksCompleteFired = false;
+        _endOfShiftReportBroadcast = false;
         ClearPendingDailyTasks();
     }
 
@@ -2021,6 +2340,16 @@ public class ShiftManager : NetworkBehaviour
     public void DebugEnableClockOut()
     {
         if (!IsServer) return;
+
+        // Latch the same guard the normal path uses, so a debug prime followed by a real
+        // TryEnableClockOut() (or vice versa) can't hand out a second clock-out objective.
+        if (_clockOutEnabledThisCycle)
+        {
+            Debug.Log("[ShiftManager] DebugEnableClockOut: already primed this cycle — ignored.");
+            return;
+        }
+
+        _clockOutEnabledThisCycle = true;
 
         if (_timecardMachine != null)
             _timecardMachine.EnableClockOut();

@@ -12,7 +12,20 @@ using UnityEngine;
 [Serializable]
 public class PickableObjectSaveData
 {
+    public bool HasExistenceState;
+    public bool Exists;
     public string Id;
     public Vector3 Position;
     public Vector3 EulerRotation;
+
+    // Optional, type-specific state. Values are only interpreted by the matching pickable type.
+    public bool HasResourceAmount;
+    public float ResourceAmount;
+    public bool HasInternalBatteryCharge;
+    public float InternalBatteryCharge;
+    public bool HasDurability;
+    public int Durability;
+    public int SecondaryState;
+    public int[] IntegerState = Array.Empty<int>();
+    public bool[] BooleanState = Array.Empty<bool>();
 }

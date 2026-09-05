@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 public class PillBottle : PickableObject, IAmmoProvider
@@ -7,14 +8,40 @@ public class PillBottle : PickableObject, IAmmoProvider
     private const int MaxUses = 3;
 
     [SerializeField] Animator _animator;
-    private int _usesRemaining = MaxUses;
+    private readonly NetworkVariable<int> _usesRemaining = new(MaxUses, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     [SerializeField] private AudioClip drinkSound;
 
     // ── IAmmoProvider ─────────────────────────────────────────────────────────
 
-    public float CurrentAmmo => _usesRemaining;
+    public float CurrentAmmo => _usesRemaining.Value;
     public float MaxAmmo => MaxUses;
     public event Action OnAmmoChanged;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _usesRemaining.OnValueChanged += OnUsesRemainingChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _usesRemaining.OnValueChanged -= OnUsesRemainingChanged;
+        base.OnNetworkDespawn();
+    }
+
+    private void OnUsesRemainingChanged(int _, int __) => OnAmmoChanged?.Invoke();
+
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.HasResourceAmount = true;
+        data.ResourceAmount = _usesRemaining.Value;
+    }
+
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        if (data.HasResourceAmount)
+            _usesRemaining.Value = Mathf.Clamp(Mathf.RoundToInt(data.ResourceAmount), 0, MaxUses);
+    }
 
     /// <summary>
     /// Initiates a pill use if the bottle still has doses and is not already in use.
@@ -22,7 +49,7 @@ public class PillBottle : PickableObject, IAmmoProvider
     /// </summary>
     public override void OnStartUse()
     {
-        if (isUsing || _usesRemaining <= 0) return;
+        if (isUsing || _usesRemaining.Value <= 0) return;
 
         base.OnStartUse();
         StartCoroutine(UsePillBottle());
@@ -39,16 +66,19 @@ public class PillBottle : PickableObject, IAmmoProvider
         playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
         _animator.SetBool("TakePill", false);
 
-        _usesRemaining--;
-        OnAmmoChanged?.Invoke();
-
-        if (_usesRemaining <= 0)
-        {
-            playerPickupController.DestroyEquippedItem();
-            yield break;
-        }
+        ConsumePillServerRpc();
 
         playerPickupController.PlayerAnimationController.EnableRightArmMask();
         isUsing = false;
+    }
+
+    [Rpc(SendTo.Server)]
+    private void ConsumePillServerRpc()
+    {
+        if (_usesRemaining.Value <= 0) return;
+
+        _usesRemaining.Value--;
+        if (_usesRemaining.Value <= 0 && NetworkObject != null && NetworkObject.IsSpawned)
+            NetworkHelper.Despawn(NetworkObject);
     }
 }
