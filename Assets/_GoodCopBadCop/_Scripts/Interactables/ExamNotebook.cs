@@ -136,6 +136,9 @@ public class ExamNotebook : PickableObject
     /// <summary>True while the "draw mode" checklist view is open (see OnStartUse/ExitDrawMode).</summary>
     private bool _isInDrawMode;
 
+    /// <summary>The player whose cutscene state interrupts this locally held notebook.</summary>
+    private PlayerInstance _cutscenePlayer;
+
     /// <summary>The checklist item currently highlighted by controller navigation, if any.</summary>
     private ChecklistItem _controllerSelectedItem;
 
@@ -167,6 +170,8 @@ public class ExamNotebook : PickableObject
 
     private void OnDestroy()
     {
+        UnsubscribeFromCutsceneState();
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
     }
@@ -328,6 +333,7 @@ public class ExamNotebook : PickableObject
 
     public override void OnNetworkDespawn()
     {
+        UnsubscribeFromCutsceneState();
         base.OnNetworkDespawn();
         OnPickedUpNetworked -= OnPickedUpAllClients;
         OnStowedNetworked   -= OnStowedAllClients;
@@ -742,6 +748,39 @@ public class ExamNotebook : PickableObject
         SetPagesActive(!IsInSupplyBox());
     }
 
+    public override void OnStowed()
+    {
+        base.OnStowed();
+        ExitDrawMode(restorePlayerControl: !IsDialogueCutsceneActive());
+    }
+
+    private void SubscribeToCutsceneState()
+    {
+        PlayerInstance player = PlayerInstance.Instance;
+        if (player == null || _cutscenePlayer == player) return;
+
+        UnsubscribeFromCutsceneState();
+        _cutscenePlayer = player;
+        _cutscenePlayer.OnCutsceneStateChanged += HandleCutsceneStateChanged;
+    }
+
+    private void UnsubscribeFromCutsceneState()
+    {
+        if (_cutscenePlayer != null)
+            _cutscenePlayer.OnCutsceneStateChanged -= HandleCutsceneStateChanged;
+
+        _cutscenePlayer = null;
+    }
+
+    private void HandleCutsceneStateChanged(bool isInCutscene)
+    {
+        if (isInCutscene)
+            CancelDrawModeForExternalInterrupt();
+    }
+
+    private static bool IsDialogueCutsceneActive() =>
+        PlayerInstance.Instance != null && PlayerInstance.Instance.IsInCutscene;
+
 
     IEnumerator TurnRightArmRigOff()
     {
@@ -753,12 +792,17 @@ public class ExamNotebook : PickableObject
     public override void OnEquipped(PlayerPickupController player)
     {
         base.OnEquipped(player);
+        SubscribeToCutsceneState();
 
         SetRedPencilActive(player, true);
     }
 
     public override void OnUnequip(PlayerPickupController player)
     {
+        // Item removal is another external interrupt: never leave its inspection input/UI state
+        // active after the notebook is no longer in the player's hand.
+        ExitDrawMode(restorePlayerControl: !IsDialogueCutsceneActive());
+        UnsubscribeFromCutsceneState();
         base.OnUnequip(player);
 
         // base.OnUnequip calls SetInteractable(true), which walks GetComponentsInChildren<InteractableCollider>
