@@ -343,6 +343,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
         ShowPlayerBody();
         player.SetPlayerLightActive(true);
 
+        // This must be last: restoring the player and its UI can update cursor state as part
+        // of their own teardown. Outside-world dialogue always returns to locked mouse look.
+        UIController.Instance.HideCursor();
+
         Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored, interaction enabled, light on.");
     }
 

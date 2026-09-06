@@ -44,7 +44,12 @@ public class GameManager : NetworkBehaviour
     private static bool _isRestartingDay;
 
 
-    public bool HasGameStarted { get; private set; }
+    private readonly NetworkVariable<bool> _networkHasGameStarted = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public bool HasGameStarted => _networkHasGameStarted.Value;
 
     /// <summary>
     /// Whether the Day 1 intro cutscene has been initiated. Server-authoritative so late joiners
@@ -218,7 +223,7 @@ public class GameManager : NetworkBehaviour
     private void StartGameServer(bool skipTransition = false)
     {
         if (!IsServer) return;
-        HasGameStarted = true;
+        _networkHasGameStarted.Value = true;
         StartGameClientRpc(skipTransition);
     }
 

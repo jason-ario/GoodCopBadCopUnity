@@ -26,7 +26,10 @@ public class QuitSurveyLauncher : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        OpenSurveyOnce();
+        if (GameSettings.Instance.OpenSurveyOnGameExit)
+        {
+            OpenSurveyOnce();
+        }
     }
 
     private static void OpenSurveyOnce()

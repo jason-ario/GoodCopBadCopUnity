@@ -24,13 +24,12 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
         NetworkVariableWritePermission.Server
     );
 
-    // Claimed by the first Day 1 player to interact with the gate. This is networked so
-    // late joiners and other clients cannot open a duplicate start-shift screen.
-    private NetworkVariable<bool> _introScreenClaimed = new NetworkVariable<bool>(
+    // Server-authoritative completion state. Until the Day 1 intro finishes, every player
+    // interaction opens that player's own start-shift screen rather than toggling this gate.
+    private readonly NetworkVariable<bool> _introComplete = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
+        NetworkVariableWritePermission.Server);
 
     [Header("Gate Animation")]
     [SerializeField] private Animator gateAnimator;
@@ -44,8 +43,12 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     [Header("Gate Settings")]
     [SerializeField] private float waitDelay = 0.5f;
 
-    private bool _introComplete = false;
     private bool _beingInteractedWith = false;
+
+    public override bool IsInteractable => base.IsInteractable && HasCampaignStarted;
+
+    private bool HasCampaignStarted =>
+        GameManager.Instance != null && GameManager.Instance.HasGameStarted;
 
     protected override void Awake()
     {
@@ -76,8 +79,8 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
 
         // A gate which becomes visible after campaign initialization must immediately reflect
         // that all days after Day 1 use regular gate interaction.
-        if (CampaignManager.Instance != null)
-            _introComplete = CampaignManager.Instance.CurrentDay != 1;
+        if (IsServer && CampaignManager.Instance != null)
+            _introComplete.Value = CampaignManager.Instance.CurrentDay != 1;
 
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
@@ -97,21 +100,19 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
 
     private void OnDayChanged(int day)
     {
-        // The start-shift screen belongs exclusively to unstarted Day 1 onboarding.
-        // Every later day uses this as a regular open/close gate for all players.
-        _introComplete = day != 1;
-
-        // Permit a deliberate debug return to Day 1 to run onboarding again. Normal campaign
-        // progression never returns to Day 1, so this does not reopen the screen mid-session.
-        if (IsServer && day == 1)
-            _introScreenClaimed.Value = false;
+        // The Day 1 start-shift screen remains available to every player until the intro ends.
+        if (IsServer)
+            _introComplete.Value = day != 1;
     }
 
     public override void Interact(PlayerInteractionController player)
     {
+        if (!HasCampaignStarted)
+            return;
+
         base.Interact(player);
 
-        if (CanOfferDayOneStartShift())
+        if (IsDayOneIntroPending())
         {
             RequestStartShiftScreenServerRpc();
             return;
@@ -121,15 +122,18 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
             StartCoroutine(WaitAndToggleGate(player));
     }
 
-    private bool CanOfferDayOneStartShift()
+    private bool IsDayOneIntroPending()
     {
         return CampaignManager.Instance != null &&
                CampaignManager.Instance.CurrentDay == 1 &&
-               !_introComplete &&
-               !_introScreenClaimed.Value &&
-               GameManager.Instance != null &&
-               !GameManager.Instance.HasIntroCutsceneStarted;
+               !_introComplete.Value;
     }
+
+    private bool CanOfferDayOneStartShift() =>
+        HasCampaignStarted && IsDayOneIntroPending();
+
+    private bool CanToggleGate() =>
+        HasCampaignStarted && !IsDayOneIntroPending();
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestStartShiftScreenServerRpc(ServerRpcParams rpcParams = default)
@@ -137,7 +141,6 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
         if (!CanOfferDayOneStartShift())
             return;
 
-        _introScreenClaimed.Value = true;
         ClientRpcParams targetPlayer = new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
@@ -185,6 +188,15 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     [ServerRpc(RequireOwnership = false)]
     private void ToggleGateServerRpc(bool openedIn, ulong senderClientId)
     {
+        if (!CanToggleGate())
+        {
+            SendGateStateToClientRpc(_gateOpen.Value, _openedIn.Value, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { senderClientId } }
+            });
+            return;
+        }
+
         if (_gateOpen.Value)
         {
             _gateOpen.Value = false;
@@ -197,6 +209,12 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
 
         // Broadcast to all clients except the one that already predicted locally.
         BroadcastGateStateClientRpc(_gateOpen.Value, _openedIn.Value, senderClientId);
+    }
+
+    [ClientRpc]
+    private void SendGateStateToClientRpc(bool isOpen, bool openedIn, ClientRpcParams clientRpcParams = default)
+    {
+        ApplyGateVisuals(isOpen, openedIn);
     }
 
     /// <summary>Applies gate visuals on all clients except the one that predicted locally.</summary>
@@ -261,7 +279,8 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     /// </summary>
     private void OnIntroComplete()
     {
-        _introComplete = true;
+        if (IsServer)
+            _introComplete.Value = true;
     }
 
     /// <summary>
@@ -271,6 +290,7 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     /// </summary>
     public void ForceIntroComplete()
     {
-        _introComplete = true;
+        if (IsServer)
+            _introComplete.Value = true;
     }
 }

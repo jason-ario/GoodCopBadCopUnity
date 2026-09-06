@@ -49,7 +49,17 @@ public class GameSettings : ScriptableObject
              "AnomalyDebugUI [`], VFXDebugConsoleUI [F11]) are ignored — no need to manually deactivate the Debug Console GameObject.")]
     [SerializeField] private bool _debugConsoleEnabled = true;
 
-    /// <summary>Whether the guidebook can be opened/closed by player input.</summary>
+    [Header("Survey")]
+    [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits.")]
+    [SerializeField] private bool _openSurveyOnGameExit = true;
+
+    /// <summary>Whether the playtest survey opens automatically when the application exits.</summary>
+    public bool OpenSurveyOnGameExit
+    {
+        get => _openSurveyOnGameExit;
+        set => _openSurveyOnGameExit = value;
+    }
+
     public bool GuidebookEnabled
     {
         get => _guidebookEnabled;

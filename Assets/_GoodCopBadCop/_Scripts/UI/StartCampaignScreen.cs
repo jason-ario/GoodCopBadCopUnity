@@ -297,7 +297,7 @@ public class StartCampaignScreen : MonoBehaviour
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Host-only. Starts the game for all connected players.
+    /// Starts the game for all connected players. Either the host or a client may initiate this.
     /// Runs the full transition: fades out the menu, spawns every connected player into the
     /// lobby, switches cameras, then starts the campaign — all via ClientRpc broadcasts, so
     /// every currently connected client (including anyone who joined while ready-ing up)

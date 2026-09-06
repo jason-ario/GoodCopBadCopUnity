@@ -1,3 +1,4 @@
+using System.Collections;
 using FIMSpace.FLook;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -276,6 +277,17 @@ public class SuspectWorldDialogue : MonoBehaviour
             ShowOptions();
     }
 
+    private IEnumerator RestoreGameplayCursorAfterExit()
+    {
+        // Escape invokes the Back button during this frame, and Unity can release a locked
+        // cursor as part of handling that same key press. Reapply the gameplay cursor state
+        // on the following frame, unless another dialogue or scripted sequence took over.
+        yield return null;
+
+        if (!DialogueChoiceSystem.IsInDialogueMode && !ScriptedDialogueRunner.IsScriptedModeActive)
+            UIController.Instance?.HideCursor();
+    }
+
     /// <summary>
     /// Returns true if any gamepad button other than East (B) was pressed this frame. Used to
     /// advance/skip the NPC's greeting or response line with a controller, mirroring the E-key /
@@ -318,6 +330,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         DialogueManager.Instance?.ClearHistory();
         DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
         UIController.Instance.ShowPlayerUI();
+        StartCoroutine(RestoreGameplayCursorAfterExit());
 
         if (_restoreObjectToFollow && lookAnimator != null)
         {
