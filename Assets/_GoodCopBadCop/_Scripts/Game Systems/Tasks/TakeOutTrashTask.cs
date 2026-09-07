@@ -467,6 +467,25 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// When true, items are spawned from <see cref="_goreJunkPrefabs"/> (gore/body parts)
     /// instead of the standard <see cref="_trashPrefabs"/> pool.
     /// </param>
+    /// <summary>
+    /// Rolls a spawn count between <paramref name="min"/> and <paramref name="max"/>, halved
+    /// (minimum 1) when only a single player is connected — the full range is tuned for
+    /// 2 players and is excessive solo.
+    /// </summary>
+    private static int RollScaledSpawnCount(int min, int max)
+    {
+        bool isSinglePlayer = NetworkManager.Singleton == null
+            || NetworkManager.Singleton.ConnectedClients.Count <= 1;
+
+        if (isSinglePlayer)
+        {
+            min = Mathf.Max(1, min / 2);
+            max = Mathf.Max(min, max / 2);
+        }
+
+        return Random.Range(min, max + 1);
+    }
+
     public void TriggerTask(bool useGorePrefabs)
     {
         if (!IsServer) return;
@@ -486,8 +505,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
 
         int spawnCount = useGorePrefabs
-            ? Random.Range(_minGoreSpawnCount, _maxGoreSpawnCount + 1)
-            : Random.Range(_minSpawnCount, _maxSpawnCount + 1);
+            ? RollScaledSpawnCount(_minGoreSpawnCount, _maxGoreSpawnCount)
+            : RollScaledSpawnCount(_minSpawnCount, _maxSpawnCount);
         for (int i = 0; i < spawnCount; i++)
             SpawnSingleItem(prefabPool, spawnBloodDecal: useGorePrefabs);
 

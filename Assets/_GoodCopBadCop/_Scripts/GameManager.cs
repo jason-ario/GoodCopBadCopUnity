@@ -143,6 +143,18 @@ public class GameManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Hides the main menu screen on every client immediately, for the Day 2+ resumed-day retry
+    /// path (see <see cref="RestartDaySequence"/>), which does not run the Day 1
+    /// <see cref="LobbyTransitionSequence"/> that would otherwise hide it.
+    /// </summary>
+    [ClientRpc]
+    private void HideMainMenuForResumedDayClientRpc()
+    {
+        MainMenuController.Instance?.TransitionToGameplay();
+        MainMenuController.Instance?.StopMainMenuMusic();
+    }
+
+    /// <summary>
     /// Set to true by <see cref="LobbySpawnCompleteClientRpc"/> once the server has finished
     /// spawning all players. Clients wait on this before starting the fade-out so the camera
     /// never switches mid-reveal.
@@ -507,6 +519,15 @@ public class GameManager : NetworkBehaviour
         // could move them into the bunker.
         if (SaveDataManager.Instance != null && SaveDataManager.Instance.CurrentDay > 1)
         {
+            // The main menu screen is visible by default after every scene reload (see
+            // MainMenuController.Start). The Day 1 lobby-transition path hides it via
+            // LobbyTransitionSequence -> MainMenuController.TransitionToGameplay on every client
+            // (via TransitionToLobbyClientRpc), but this resumed-day path skips that coroutine
+            // entirely — without hiding it here on every client, retrying on Day 2+ reloaded the
+            // scene but left all players (host and party members alike) staring at the main menu
+            // instead of gameplay, even though the network session and party were preserved.
+            HideMainMenuForResumedDayClientRpc();
+
             TryStartGame();
             CancelLobbyTransition();
             SpawnAllPlayersForResumedDay();

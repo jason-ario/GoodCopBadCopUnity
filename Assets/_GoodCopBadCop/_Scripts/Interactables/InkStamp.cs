@@ -212,6 +212,14 @@ public class InkStamp : Interactable, IPickupSlot
     /// <summary>True while the stamp is sitting in its slot; false once the player has picked it up.</summary>
     public bool IsStampInSlot => _isPlaced.Value;
 
+    /// <summary>
+    /// Fired on the local client the moment the player picks the ink stamp pickup up out of
+    /// this station's slot. Passes this <see cref="InkStamp"/> station so subscribers can tell
+    /// which color was grabbed (e.g. compare against a specific station reference).
+    /// Subscribe in tutorial scripts to react when the player grabs a stamp from its slot.
+    /// </summary>
+    public static event System.Action<InkStamp> OnAnyStampPickedUp;
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
@@ -242,6 +250,8 @@ public class InkStamp : Interactable, IPickupSlot
             spawnedInkStamp.SetInteractable(true);
 
             player.pickupController.PickUpObject(spawnedInkStamp);
+
+            OnAnyStampPickedUp?.Invoke(this);
         }
     }
 

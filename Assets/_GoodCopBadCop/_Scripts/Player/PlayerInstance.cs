@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
@@ -162,11 +163,34 @@ public class PlayerInstance : NetworkBehaviour
     /// the death path may have independently disabled movement, look, interaction, HUD, and
     /// spectator state on the client. Active scripted dialogue remains authoritative and keeps
     /// the replacement locked until its normal exit path runs.
+    ///
+    /// Because the old PlayerObject's detach (which clears dialogue/cutscene flags) and this new
+    /// PlayerObject's spawn happen via separate network messages, the dialogue/cutscene flags can
+    /// still briefly read "active" on the exact frame this runs. A one-shot check here would then
+    /// silently and permanently skip restoring control/interaction/HUD with nothing left to retry
+    /// it — leaving the revived player stuck. Poll for a few frames instead of bailing out once.
     /// </summary>
     private void RestoreLocalGameplayStateAfterSpawn()
     {
+        StartCoroutine(RestoreLocalGameplayStateAfterSpawnRoutine());
+    }
+
+    private IEnumerator RestoreLocalGameplayStateAfterSpawnRoutine()
+    {
+        const int maxAttempts = 30; // ~0.5s at 60fps — generous margin over the detach/spawn race.
+        int attempts = 0;
+
+        while ((ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
+               && attempts < maxAttempts)
+        {
+            attempts++;
+            yield return null;
+        }
+
+        // If scripted/dialogue mode is genuinely still active after the grace period, respect it —
+        // its own exit path is responsible for restoring state once it actually finishes.
         if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
-            return;
+            yield break;
 
         if (_characterController != null)
             _characterController.enabled = true;

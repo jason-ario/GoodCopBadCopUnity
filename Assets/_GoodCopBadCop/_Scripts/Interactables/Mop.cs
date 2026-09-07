@@ -1,4 +1,5 @@
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 // All PickableObject, Interactable, and NetworkBehaviour base types are in the project's global
@@ -74,6 +75,94 @@ public class Mop : PickableObject
     private BoxCollider _autoScrubBounds;
     private bool _autoScrubBoundsResolved;
 
+    /// <summary>
+    /// Authoritative "is this mop currently being scrubbed" flag, owner-writable so it can be
+    /// set directly without a round trip through the server. Watched by non-owning clients so
+    /// they mirror the scrub particles/audio locally — the owner's <see cref="_scrubParticles"/>
+    /// and <see cref="_scrubAudio"/> are plain unnetworked components, so without this every other
+    /// player only ever sees the mop move with no VFX/SFX.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isScrubbing = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner);
+
+    /// <summary>Mirror loop run on non-owning clients while <see cref="_isScrubbing"/> is true.</summary>
+    private Coroutine _remoteScrubVisualRoutine;
+
+    // ── Network lifecycle ───────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        _isScrubbing.OnValueChanged += OnIsScrubbingChanged;
+
+        // Late-join sync: a non-owner who spawns in mid-scrub needs to start the mirror loop
+        // immediately instead of waiting for the next OnValueChanged (which may never fire again
+        // if scrubbing was already in progress before this client connected).
+        if (!IsOwner && _isScrubbing.Value)
+            StartRemoteScrubVisuals();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+
+        _isScrubbing.OnValueChanged -= OnIsScrubbingChanged;
+    }
+
+    private void OnIsScrubbingChanged(bool previous, bool current)
+    {
+        // The owner drives its own particles/audio directly from ScrubRoutine for instant,
+        // lag-free feedback — this callback only ever mirrors the effect for everyone else.
+        if (IsOwner) return;
+
+        if (current)
+            StartRemoteScrubVisuals();
+        else
+            StopRemoteScrubVisuals();
+    }
+
+    private void StartRemoteScrubVisuals()
+    {
+        if (_remoteScrubVisualRoutine == null)
+            _remoteScrubVisualRoutine = StartCoroutine(RemoteScrubVisualRoutine());
+    }
+
+    private void StopRemoteScrubVisuals()
+    {
+        if (_remoteScrubVisualRoutine != null)
+        {
+            StopCoroutine(_remoteScrubVisualRoutine);
+            _remoteScrubVisualRoutine = null;
+        }
+
+        StopScrubVisuals();
+    }
+
+    /// <summary>
+    /// Runs on non-owning clients only. Repeats the same local detection/placement the owner
+    /// uses (see <see cref="ScrubRoutine"/>) against this mop's NetworkTransform-replicated
+    /// position, so every client independently renders the splash under its own copy of the
+    /// mop with no extra position traffic. Never touches graffiti scrub progress — that
+    /// remains solely the owner's responsibility via <see cref="GraffitiInteractable"/> RPCs.
+    /// </summary>
+    private IEnumerator RemoteScrubVisualRoutine()
+    {
+        while (_isScrubbing.Value)
+        {
+            FindGraffitiInRange(out Collider hitCollider);
+            Collider particleCollider = hitCollider ?? FindSurfaceInRange();
+            UpdateScrubVisuals(particleCollider);
+
+            yield return null;
+        }
+
+        StopScrubVisuals();
+        _remoteScrubVisualRoutine = null;
+    }
+
     // ── PickableObject overrides ───────────────────────────────────────────────
 
     /// <summary>
@@ -87,6 +176,8 @@ public class Mop : PickableObject
 
         playerPickupController?.PlayerAnimationController.SetAnimBool(UsingToolAnimBool, true);
         _scrubRoutine = StartCoroutine(ScrubRoutine());
+
+        if (IsOwner) _isScrubbing.Value = true;
     }
 
     /// <summary>
@@ -105,11 +196,12 @@ public class Mop : PickableObject
             _scrubRoutine = null;
         }
 
-        _scrubParticles?.Stop();
-        _scrubAudio?.Stop();
+        StopScrubVisuals();
 
         // Notify the graffiti that this mop is no longer contributing.
         NotifyStopScrubbing();
+
+        if (IsOwner) _isScrubbing.Value = false;
     }
 
     // ── Scrub loop ─────────────────────────────────────────────────────────────
@@ -130,9 +222,10 @@ public class Mop : PickableObject
             _scrubRoutine = null;
         }
 
-        _scrubParticles?.Stop();
-        _scrubAudio?.Stop();
+        StopScrubVisuals();
         NotifyStopScrubbing();
+
+        if (IsOwner) _isScrubbing.Value = false;
 
         if (playerPickupController != null)
             playerPickupController.PlayerAnimationController.SetAnimBool(UsingToolAnimBool, false);
@@ -161,59 +254,92 @@ public class Mop : PickableObject
             // Position particles at the closest surface point — graffiti takes priority,
             // but any surface collider in range will do.
             Collider particleCollider = hitCollider ?? FindSurfaceInRange();
-            if (particleCollider != null)
-            {
-                if (_scrubParticles != null)
-                {
-                    // Origin is the point on the mop shaft nearest the contacted surface, so the
-                    // splash lands under the mop head instead of at the pivot in the player's hand.
-                    Vector3 origin       = GetShaftContactOrigin(particleCollider);
-                    Vector3 closestPoint = particleCollider.ClosestPoint(origin);
-                    Vector3 toSurface    = closestPoint - origin;
-                    float   dist         = toSurface.magnitude;
-
-                    // Raycast from the shaft toward the surface to get the real normal.
-                    // This correctly handles angled contact (e.g. mopping the floor while
-                    // holding the handle at an angle), unlike the mop-to-surface approximation.
-                    Vector3 hitPoint      = closestPoint;
-                    Vector3 surfaceNormal = dist > 0.001f ? -toSurface.normalized : Vector3.up;
-                    if (dist > 0.001f)
-                    {
-                        RaycastHit hit;
-                        if (Physics.Raycast(origin, toSurface.normalized,
-                                            out hit, dist + 0.05f,
-                                            _graffitiLayerMask | _surfaceLayerMask))
-                        {
-                            hitPoint      = hit.point;
-                            surfaceNormal = hit.normal;
-                        }
-                    }
-
-                    _scrubParticles.transform.position = hitPoint;
-                    if (surfaceNormal != Vector3.zero)
-                        _scrubParticles.transform.rotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
-                    if (!_scrubParticles.isPlaying)
-                    {
-                        _scrubParticles.Play();
-                        if (_scrubAudio != null && !_scrubAudio.isPlaying)
-                            _scrubAudio.Play();
-                    }
-                }
-            }
-            else if (_scrubParticles != null && _scrubParticles.isPlaying)
-            {
-                _scrubParticles.Stop();
-                _scrubAudio?.Stop();
-            }
+            UpdateScrubVisuals(particleCollider);
 
             yield return null;
         }
 
         // Clean up after the loop exits (isUsing became false).
-        _scrubParticles?.Stop();
-        _scrubAudio?.Stop();
+        StopScrubVisuals();
         NotifyStopScrubbing();
         _scrubRoutine = null;
+    }
+
+    /// <summary>
+    /// Repositions/plays (or stops) <see cref="_scrubParticles"/> and <see cref="_scrubAudio"/>
+    /// against <paramref name="particleCollider"/>. Shared by the owner's <see cref="ScrubRoutine"/>
+    /// and the non-owner <see cref="RemoteScrubVisualRoutine"/> mirror so both compute the exact
+    /// same placement logic from their own locally-replicated view of the mop.
+    /// </summary>
+    private void UpdateScrubVisuals(Collider particleCollider)
+    {
+        if (particleCollider == null)
+        {
+            StopScrubVisuals();
+            return;
+        }
+
+        if (_scrubParticles == null) return;
+
+        // Origin is the point on the mop shaft nearest the contacted surface, so the
+        // splash lands under the mop head instead of at the pivot in the player's hand.
+        Vector3 origin       = GetShaftContactOrigin(particleCollider);
+        Vector3 closestPoint = particleCollider.ClosestPoint(origin);
+        Vector3 toSurface    = closestPoint - origin;
+        float   dist         = toSurface.magnitude;
+
+        // Raycast from the shaft toward the surface to get the real normal.
+        // This correctly handles angled contact (e.g. mopping the floor while
+        // holding the handle at an angle), unlike the mop-to-surface approximation.
+        // Physics.Raycast alone can return a hit on the mop's OWN collider (_scrubBounds sits
+        // right next to — sometimes overlapping — the shaft-to-surface ray, and both layer masks
+        // default to "Everything"), which pins the splash to the mop instead of the target
+        // surface. RaycastAll + skipping anything under this transform mirrors the same
+        // self-filtering FindGraffitiInRange/FindSurfaceInRange already do for the overlap query.
+        Vector3 hitPoint      = closestPoint;
+        Vector3 surfaceNormal = dist > 0.001f ? -toSurface.normalized : Vector3.up;
+        if (dist > 0.001f)
+        {
+            RaycastHit[] hits = Physics.RaycastAll(origin, toSurface.normalized,
+                                                    dist + 0.05f,
+                                                    _graffitiLayerMask | _surfaceLayerMask);
+
+            RaycastHit? closestHit = null;
+            float closestHitDist = float.MaxValue;
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider.transform.IsChildOf(transform)) continue; // skip the mop itself
+                if (hit.distance < closestHitDist)
+                {
+                    closestHitDist = hit.distance;
+                    closestHit = hit;
+                }
+            }
+
+            if (closestHit.HasValue)
+            {
+                hitPoint      = closestHit.Value.point;
+                surfaceNormal = closestHit.Value.normal;
+            }
+        }
+
+        _scrubParticles.transform.position = hitPoint;
+        if (surfaceNormal != Vector3.zero)
+            _scrubParticles.transform.rotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
+        if (!_scrubParticles.isPlaying)
+        {
+            _scrubParticles.Play();
+            if (_scrubAudio != null && !_scrubAudio.isPlaying)
+                _scrubAudio.Play();
+        }
+    }
+
+    /// <summary>Stops <see cref="_scrubParticles"/> and <see cref="_scrubAudio"/> if playing.</summary>
+    private void StopScrubVisuals()
+    {
+        if (_scrubParticles != null && _scrubParticles.isPlaying)
+            _scrubParticles.Stop();
+        _scrubAudio?.Stop();
     }
 
     /// <summary>

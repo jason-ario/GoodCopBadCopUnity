@@ -139,7 +139,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             DespawnExistingGraffiti();
 
-            int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+            int count = RollGraffitiCount();
 
             int spawnedCount = SpawnGraffiti(count);
             _totalCount.Value = spawnedCount;
@@ -174,13 +174,35 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return;
         }
 
-        int count = Random.Range(_minGraffitiCount, _maxGraffitiCount + 1);
+        int count = RollGraffitiCount();
 
         int spawnedCount = SpawnGraffiti(count);
         _totalCount.Value = spawnedCount;
 
         Debug.Log($"[CleanGraffitiTask] SpawnGraffitiEarly — pre-spawned {spawnedCount} graffiti " +
                   "piece(s) for early visibility; task remains inactive until TriggerDailyTask.");
+    }
+
+    /// <summary>
+    /// Rolls a graffiti spawn count between <see cref="_minGraffitiCount"/> and
+    /// <see cref="_maxGraffitiCount"/>, halved (minimum 1) when only a single player is
+    /// connected — the full range is tuned for 2 players and is excessive solo.
+    /// </summary>
+    private int RollGraffitiCount()
+    {
+        bool isSinglePlayer = NetworkManager.Singleton == null
+            || NetworkManager.Singleton.ConnectedClients.Count <= 1;
+
+        int minCount = _minGraffitiCount;
+        int maxCount = _maxGraffitiCount;
+
+        if (isSinglePlayer)
+        {
+            minCount = Mathf.Max(1, minCount / 2);
+            maxCount = Mathf.Max(minCount, maxCount / 2);
+        }
+
+        return Random.Range(minCount, maxCount + 1);
     }
 
     /// <summary>Captures the active graffiti world objects and their partial scrub progress.</summary>

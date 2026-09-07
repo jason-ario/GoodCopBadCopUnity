@@ -1,6 +1,7 @@
 using GoodCopBadCop.Effects;
 using Unity.Collections;
 using Unity.Netcode;
+using UnityEngine;
 using UnityEngine.Events;
 
 /// <summary>
@@ -17,6 +18,16 @@ public class PlayerHealth : NetworkBehaviour
     private const float DefaultMaxHealth = 100f;
 
     public float MaxHealth => DefaultMaxHealth;
+
+    [Header("Hit Effects")]
+    [Tooltip("Particle prefab (e.g. blood spray) instantiated on all clients at the point of " +
+             "impact whenever this player takes damage — mirrors MutantEnemy/SuspectCharacter's " +
+             "hit-particle behaviour. Plays whether the hit kills the player or not. Optional.")]
+    [SerializeField] private GameObject _hitParticlePrefab;
+
+    [Tooltip("Random hurt/pain sound played on all clients (at the hit point) whenever this " +
+             "player takes damage. Optional.")]
+    [SerializeField] private AudioClip[] _hurtSounds;
 
 
     // Events
@@ -101,10 +112,21 @@ public class PlayerHealth : NetworkBehaviour
     /// </summary>
     public void TakeDamage(float damage, string effectKey)
     {
+        TakeDamage(damage, effectKey, transform.position);
+    }
+
+    /// <summary>
+    /// Reduces health by the given amount, spawning the hit particle/sound at
+    /// <paramref name="hitPoint"/> (e.g. the exact spot a shovel swing or gunshot connected)
+    /// instead of the player's own position.
+    /// Can be called from any client - routes through a ServerRpc when not on the server.
+    /// </summary>
+    public void TakeDamage(float damage, string effectKey, Vector3 hitPoint)
+    {
         if (IsServer)
-            ApplyDamageServer(damage, effectKey);
+            ApplyDamageServer(damage, effectKey, hitPoint);
         else
-            TakeDamageServerRpc(damage, effectKey);
+            TakeDamageServerRpc(damage, effectKey, hitPoint);
     }
 
     /// <summary>Restores health by the given amount. Has no effect while the player is dead.</summary>
@@ -134,9 +156,9 @@ public class PlayerHealth : NetworkBehaviour
     // ServerRpcs
 
     [ServerRpc(RequireOwnership = false)]
-    private void TakeDamageServerRpc(float damage, FixedString64Bytes effectKey)
+    private void TakeDamageServerRpc(float damage, FixedString64Bytes effectKey, Vector3 hitPoint)
     {
-        ApplyDamageServer(damage, effectKey.ToString());
+        ApplyDamageServer(damage, effectKey.ToString(), hitPoint);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -154,7 +176,7 @@ public class PlayerHealth : NetworkBehaviour
 
     // Server-only logic
 
-    private void ApplyDamageServer(float damage, string effectKey)
+    private void ApplyDamageServer(float damage, string effectKey, Vector3 hitPoint)
     {
         if (_networkIsDead.Value)
             return;
@@ -171,6 +193,10 @@ public class PlayerHealth : NetworkBehaviour
 
         _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage);
         _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value - damage, 0f, DefaultMaxHealth);
+
+        // Blood/impact feedback plays on every real hit, whether or not it's the killing blow —
+        // mirrors MutantEnemy.TakeDamage / SuspectCharacter.TakeDamage.
+        SpawnHitEffectClientRpc(hitPoint);
 
         if (_networkHealth.Value <= 0f)
             _networkIsDead.Value = true;
@@ -196,6 +222,32 @@ public class PlayerHealth : NetworkBehaviour
     {
         string safeKey = string.IsNullOrWhiteSpace(effectKey) ? fallback : effectKey;
         return safeKey.Length > 63 ? safeKey.Substring(0, 63) : safeKey;
+    }
+
+
+    // Effects
+
+    /// <summary>
+    /// Spawns the hit particle (e.g. blood spray) and plays a random hurt sound at
+    /// <paramref name="hitPoint"/> on all clients. Fires on every damage-dealing hit regardless
+    /// of whether the player survives it — mirrors MutantEnemy/SuspectCharacter's hit feedback.
+    /// </summary>
+    [ClientRpc]
+    private void SpawnHitEffectClientRpc(Vector3 hitPoint)
+    {
+        if (_hitParticlePrefab != null)
+        {
+            GameObject fx = Instantiate(_hitParticlePrefab, hitPoint, Quaternion.identity);
+            if (fx.GetComponentInChildren<AutoDestroy>() == null)
+                fx.AddComponent<AutoDestroy>();
+        }
+
+        if (_hurtSounds != null && _hurtSounds.Length > 0)
+        {
+            AudioClip clip = _hurtSounds[UnityEngine.Random.Range(0, _hurtSounds.Length)];
+            if (clip != null)
+                SFXController.Instance?.PlayAtPosition(clip, hitPoint);
+        }
     }
 
 

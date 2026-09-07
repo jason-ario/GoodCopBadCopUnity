@@ -51,12 +51,6 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Number of coupons the ATM dispenses when all blood has been scrubbed.")]
     [SerializeField] private int _couponReward = 10;
 
-    [Tooltip("Forgiveness buffer: this many splatters are allowed to remain unscrubbed and the " +
-             "task still completes. Helps when the last splatter or two is hard to spot/reach. " +
-             "0 = must scrub every splatter. Never reduces the requirement below 1 splatter " +
-             "(as long as at least one was registered).")]
-    [SerializeField] private int _completionBuffer = 1;
-
     [Header("Daily Task")]
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool, if this task is ever added to it.")]
     [SerializeField] private string _dailyTaskId = "CleanBlood";
@@ -144,12 +138,9 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Number of splatters that must actually be scrubbed to complete the task this cycle —
-    /// the registered total minus <see cref="_completionBuffer"/>, floored at 1 splatter as long
-    /// as at least one was ever registered.
+    /// simply the registered total.
     /// </summary>
-    public int RequiredCount => _totalCount.Value > 0
-        ? Mathf.Max(_totalCount.Value - _completionBuffer, 1)
-        : 0;
+    public int RequiredCount => _totalCount.Value;
 
     public float ThreatLevel => RequiredCount > 0
         ? 1f - Mathf.Clamp01((float)_scrubbed.Value / RequiredCount)
@@ -491,10 +482,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Called by a registered splatter's <see cref="GraffitiInteractable"/> on the server once it has
     /// been fully scrubbed. Credits the scrub and re-evaluates completion.
     ///
-    /// The scrub is credited even after the task has already completed. <see cref="_completionBuffer"/>
-    /// means the task finishes with a splatter or two still on the ground, and swallowing those scrubs
-    /// (as this used to) is precisely what made players report that cleaning blood "didn't register" —
-    /// they mopped a splatter they could plainly see and nothing moved. Only the completion
+    /// The scrub is credited even after the task has already completed. Only the completion
     /// side-effects are one-shot.
     /// </summary>
     private void OnBloodScrubbed(NetworkObject netObj)

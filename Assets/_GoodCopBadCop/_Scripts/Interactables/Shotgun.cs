@@ -315,7 +315,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 int pellets = Mathf.Clamp(playerPellets[i], 0, _pelletCount);
                 if (pellets <= 0) continue;
 
-                playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage);
+                playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage, targetObj.transform.position);
             }
         }
 

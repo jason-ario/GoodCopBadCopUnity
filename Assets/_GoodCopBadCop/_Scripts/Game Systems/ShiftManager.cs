@@ -1839,6 +1839,16 @@ public class ShiftManager : NetworkBehaviour
     {
         yield return new WaitUntil(() => PlayerInstance.Instance != null);
 
+        // Either player can press Start Shift while the start-shift screen is open on their own
+        // screen only (see GateStartShiftController — each player gets their own targeted
+        // open). This RPC fires on every client, so close it here for whichever player(s) still
+        // have it open — including a second player who never pressed the button themselves.
+        // CloseStartShiftScreen's ClosedUIPanel() call is immediately superseded a few lines
+        // below by the explicit SetCanInteract(false)/SetCanMove(false)/CanControl = false, so
+        // this never leaves that player able to move — they end up disabled exactly as if they
+        // had pressed Start Shift too.
+        UIController.Instance.CloseStartShiftScreen();
+
         // Disable the local player's own CinemachineCamera immediately, in the same frame the
         // cutscene sequence begins — before the screen fade even starts. ForceExitSoldierDialogueBeforeCutscene
         // (called moments earlier on the server, same RPC batch as this sequence's trigger) may have just

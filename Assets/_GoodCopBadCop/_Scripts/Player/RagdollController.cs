@@ -179,6 +179,16 @@ public class RagdollController : MonoBehaviour
     {
         if (animator != null) animator.enabled = !active;
 
+        // Symmetric counterpart to ActivateRagdoll()'s disable: this is the only place the
+        // root CharacterController gets re-enabled after death. Without it, a corpse that is
+        // later resurrected into a MutantEnemy (see CorpseResurrectionController.ResurrectClientRpc)
+        // is left with no enabled collider anywhere on it — every ragdoll bone collider below is
+        // switched off by the loop further down, and the root CharacterController was disabled by
+        // ActivateRagdoll() and never re-enabled — so weapon raycasts/OverlapSpheres (which resolve
+        // hits via GetComponentInParent<MutantEnemy>()) can never find a collider to hit it with.
+        if (_characterController != null)
+            _characterController.enabled = !active;
+
         foreach (var rb in ragdollRigidbodies)
             rb.isKinematic = !active;
 

@@ -369,7 +369,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             if (targetObj.OwnerClientId == shooterClientId) return;
 
             PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
-            playerHealth?.TakeDamage(_damage, EffectKeys.FriendlyGunshotDamage);
+            playerHealth?.TakeDamage(_damage, EffectKeys.FriendlyGunshotDamage, hitPoint);
         }
     }
 

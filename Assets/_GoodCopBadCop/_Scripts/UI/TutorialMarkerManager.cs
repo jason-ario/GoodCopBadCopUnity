@@ -92,6 +92,13 @@ public class TutorialMarkerManager : MonoBehaviour
     /// <summary>Returns whether <paramref name="target"/> currently has an active marker.</summary>
     public bool IsMarked(Transform target) => target != null && _active.ContainsKey(target);
 
+    /// <summary>
+    /// Returns a live view of every Transform currently marked (i.e. every active tutorial
+    /// objective). Used by <see cref="CompassController"/> to render a directional pip for each
+    /// one on the bottom-of-screen compass. Do not mutate the returned collection.
+    /// </summary>
+    public IReadOnlyCollection<Transform> GetMarkedTargets() => _active.Keys;
+
     // ── Internals ────────────────────────────────────────────────────────────
 
     private TutorialMarker GetFromPool()

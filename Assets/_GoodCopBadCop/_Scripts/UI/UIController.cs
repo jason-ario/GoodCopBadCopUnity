@@ -101,6 +101,31 @@ public class UIController : MonoBehaviour
         // KeyBackButtonActivator / GamepadBackButtonActivator components on the back
         // button itself, so no manual polling is needed here.
 
+        // Escape is shared between "Pause" and any currently-shown Back button (the Back
+        // button's own KeyBackButtonActivator consumes Escape directly). If a Back button
+        // is active and interactable right now, let it own Escape instead of also pausing.
+        // Evaluated unconditionally (i.e. even while playerUI/HUD happens to be hidden, e.g.
+        // right after a revive) so the player is never stuck unable to pause. Closing the
+        // pause menu when it's already open must also stay available regardless of HUD state.
+        bool escapePausePressed = Input.GetButtonDown("Pause")
+                                   && !KeyBackButtonActivator.AnyEscapeBackButtonInteractable;
+        if (KeyBackButtonActivator.EscapeBackButtonPressedThisFrame)
+            escapePausePressed = false;
+
+        bool pauseInput = escapePausePressed
+                          || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
+        if (pauseInput)
+        {
+            if (pauseMenuOpened)
+            {
+                ClosePauseMenu();
+            }
+            else
+            {
+                OpenPauseMenu();
+            }
+        }
+
         if (playerUI.activeSelf == false)
         {
             return;
@@ -121,29 +146,6 @@ public class UIController : MonoBehaviour
             }
         }
 
-        // Escape is shared between "Pause" and any currently-shown Back button (the Back
-        // button's own KeyBackButtonActivator consumes Escape directly). If a Back button
-        // is active and interactable right now, let it own Escape instead of also pausing.
-        bool escapePausePressed = Input.GetButtonDown("Pause")
-                                   && !KeyBackButtonActivator.AnyEscapeBackButtonInteractable;
-        if (KeyBackButtonActivator.EscapeBackButtonPressedThisFrame)
-            escapePausePressed = false;
-
-
-        bool pauseInput = escapePausePressed
-                          || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
-        if (pauseInput)
-        {
-            if (pauseMenuOpened)
-            {
-                ClosePauseMenu();
-            }
-            else
-            {
-                OpenPauseMenu();
-            }
-        }
-        
         if(PlayerInstance.Instance.CanControl == false) return;
     }
     

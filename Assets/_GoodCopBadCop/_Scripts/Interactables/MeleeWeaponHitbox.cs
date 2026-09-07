@@ -323,7 +323,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 PlayerHealth playerHealth = FindOn<PlayerHealth>(targetObj);
                 if (playerHealth == null) return;
 
-                playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage);
+                playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage, hitPoint);
                 Debug.Log($"[MeleeWeaponHitbox] Friendly fire: client {senderClientId} hit player '{targetObj.name}' for {damage} damage.", this);
                 break;
             }

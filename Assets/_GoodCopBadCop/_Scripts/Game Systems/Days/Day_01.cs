@@ -433,6 +433,11 @@ public class Day_01 : DayBase
     // Tracks how many of Vlad's documents have been filed into a folder.
     private int _docsFiledCount;
 
+    // The most recently equipped tutorial folder — used so a stamp-station arrow can be
+    // swapped onto the folder itself the moment the player grabs a stamp (see
+    // OnGreenStampGrabbedForFolderArrow / OnYellowStampGrabbedForFolderArrow).
+    private FolderController _currentFolder;
+
     // Active tutorial task entries — created when each step begins, completed when done.
     // Note: the initial "pick up Vlad's documents" step is intentionally NOT added to the
     // objective list (see ShowVladPickUpTask) — only the world-space marker guides it.
@@ -632,6 +637,7 @@ public class Day_01 : DayBase
         FolderController.OnDocumentAdded += OnDocumentFiledInFolder;
         FolderController.OnAnyFolderStamped += OnTutorialFolderStamped;
         FolderController.OnFolderHandedOff += OnVladFolderHandedOff_OneShot; // fires once after Vlad's deferred verdict
+        FolderController.OnFolderEquipped += TrackCurrentFolder;
         SuspectEncounterManager.OnFirstEncounterDialogueComplete += OnSuspectFirstEncounterComplete;
 
         // Clock-in tutorial: hide the arrow on every client the instant the punch lands.
@@ -729,6 +735,10 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff -= OnVladFolderHandedOff_OneShot;
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
+        FolderController.OnFolderEquipped -= TrackCurrentFolder;
+        FolderController.OnFolderEquipped -= OnFolderGrabbedForDeskArrow;
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
+        InkStamp.OnAnyStampPickedUp -= OnYellowStampGrabbedForFolderArrow;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
         ExamNotebook.OnAnyNotebookPageFiled    -= OnQuarantinePageFiledLocal;
@@ -854,6 +864,10 @@ public class Day_01 : DayBase
         FolderController.OnFolderHandedOff -= OnVladFolderHandedOff_OneShot;
         FolderController.OnFolderHandedOff -= OnSubjectProcessed;
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
+        FolderController.OnFolderEquipped -= TrackCurrentFolder;
+        FolderController.OnFolderEquipped -= OnFolderGrabbedForDeskArrow;
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
+        InkStamp.OnAnyStampPickedUp -= OnYellowStampGrabbedForFolderArrow;
         FolderController.OnFolderHandedOff  -= OnQuarantineFolderHandedOff;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
         ExamNotebook.OnAnyNotebookPageFiled    -= OnQuarantinePageFiledLocal;
@@ -1373,9 +1387,39 @@ public class Day_01 : DayBase
 
         _taskFolder = TutorialObjectiveList.Instance?.AddObjective(_taskFolderDocs);
 
+        // Swap the arrow from the drawer onto the desk the instant the player actually grabs
+        // a folder, so it's clear where the folder should go next — see
+        // OnFolderGrabbedForDeskArrow.
+        FolderController.OnFolderEquipped += OnFolderGrabbedForDeskArrow;
+
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             StartCoroutine(VladFolderBarkRoutine());
     }
+
+    /// <summary>
+    /// Fires on the local client the moment the player equips ANY <see cref="FolderController"/>
+    /// (kept updated for the entire day) so later steps can point a tutorial arrow at whichever
+    /// folder is currently held — see <see cref="OnGreenStampGrabbedForFolderArrow"/> and
+    /// <see cref="OnYellowStampGrabbedForFolderArrow"/>.
+    /// </summary>
+    private void TrackCurrentFolder(FolderController folder) => _currentFolder = folder;
+
+    /// <summary>
+    /// One-shot: fires the first time the player grabs a folder during the "grab a folder and
+    /// place it on the desk" tutorial step. Moves the hovering arrow from the drawer to the
+    /// desk placement board so the player immediately knows where the folder should go.
+    /// </summary>
+    private void OnFolderGrabbedForDeskArrow(FolderController folder)
+    {
+        FolderController.OnFolderEquipped -= OnFolderGrabbedForDeskArrow;
+
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_markerDrawer != null)    TutorialMarkerManager.Instance.Unmark(_markerDrawer);
+            if (_markerDeskBoard != null) TutorialMarkerManager.Instance.Mark(_markerDeskBoard);
+        }
+    }
+
 
     /// <summary>
     /// Fires on all clients when the quarantine tutorial suspect's documentation tutorial begins.
@@ -1475,7 +1519,29 @@ public class Day_01 : DayBase
         // is impossible before this point because the stamp itself cannot be picked up.
         _yellowStampSlot?.SetSlotInteractable(true);
 
+        // Once the player actually grabs the quarantine stamp, swap the arrow onto the folder
+        // itself so it's clear where the stamp should be applied — see
+        // OnYellowStampGrabbedForFolderArrow.
+        InkStamp.OnAnyStampPickedUp += OnYellowStampGrabbedForFolderArrow;
+
         FolderController.OnAnyFolderStamped += OnQuarantineFolderStamped;
+    }
+
+    /// <summary>
+    /// One-shot: fires the first time the player grabs the yellow quarantine stamp out of its
+    /// slot. Moves the hovering arrow from the stamp station onto the currently held folder so
+    /// the player immediately knows where to apply it.
+    /// </summary>
+    private void OnYellowStampGrabbedForFolderArrow(InkStamp stamp)
+    {
+        if (stamp != _yellowStampSlot) return;
+        InkStamp.OnAnyStampPickedUp -= OnYellowStampGrabbedForFolderArrow;
+
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_markerYellowStamp != null) TutorialMarkerManager.Instance.Unmark(_markerYellowStamp);
+            if (_currentFolder != null)     TutorialMarkerManager.Instance.Mark(_currentFolder.transform);
+        }
     }
 
     /// <summary>
@@ -1485,6 +1551,7 @@ public class Day_01 : DayBase
     private void OnQuarantineFolderStamped()
     {
         FolderController.OnAnyFolderStamped -= OnQuarantineFolderStamped;
+        InkStamp.OnAnyStampPickedUp -= OnYellowStampGrabbedForFolderArrow;
 
         if (_taskQuarantineStamp != null)
         {
@@ -1492,8 +1559,11 @@ public class Day_01 : DayBase
             _taskQuarantineStamp = null;
         }
 
-        if (TutorialMarkerManager.Instance != null && _markerYellowStamp != null)
-            TutorialMarkerManager.Instance.Unmark(_markerYellowStamp);
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_markerYellowStamp != null) TutorialMarkerManager.Instance.Unmark(_markerYellowStamp);
+            if (_currentFolder != null)     TutorialMarkerManager.Instance.Unmark(_currentFolder.transform);
+        }
 
         _taskQuarantineHandOff = TutorialObjectiveList.Instance?.AddObjective(_taskQuarantineHandOffText);
 
@@ -1664,6 +1734,28 @@ public class Day_01 : DayBase
         }
 
         _greenStampSlot?.SetSlotInteractable(true);
+
+        // Once the player actually grabs the green stamp, swap the arrow onto the folder
+        // itself so it's clear where the stamp should be applied — see
+        // OnGreenStampGrabbedForFolderArrow.
+        InkStamp.OnAnyStampPickedUp += OnGreenStampGrabbedForFolderArrow;
+    }
+
+    /// <summary>
+    /// One-shot: fires the first time the player grabs the green stamp out of its slot.
+    /// Moves the hovering arrow from the stamp station onto the currently held folder so
+    /// the player immediately knows where to apply it.
+    /// </summary>
+    private void OnGreenStampGrabbedForFolderArrow(InkStamp stamp)
+    {
+        if (stamp != _greenStampSlot) return;
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
+
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_markerGreenStamp != null) TutorialMarkerManager.Instance.Unmark(_markerGreenStamp);
+            if (_currentFolder != null)    TutorialMarkerManager.Instance.Mark(_currentFolder.transform);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1677,6 +1769,7 @@ public class Day_01 : DayBase
     private void OnTutorialFolderStamped()
     {
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
 
         if (_taskStamp != null)
         {
@@ -1687,6 +1780,7 @@ public class Day_01 : DayBase
         if (TutorialMarkerManager.Instance != null)
         {
             if (_markerGreenStamp != null)  TutorialMarkerManager.Instance.Unmark(_markerGreenStamp);
+            if (_currentFolder != null)     TutorialMarkerManager.Instance.Unmark(_currentFolder.transform);
             if (_markerWindowBoard != null) TutorialMarkerManager.Instance.Mark(_markerWindowBoard);
         }
 

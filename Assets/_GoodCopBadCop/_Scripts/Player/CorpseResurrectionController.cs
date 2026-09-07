@@ -342,8 +342,17 @@ public class CorpseResurrectionController : NetworkBehaviour
     [ClientRpc]
     private void ResurrectClientRpc()
     {
-        // Deactivate ragdoll physics and re-enable the Animator.
+        // Deactivate ragdoll physics and re-enable the Animator. This also re-enables the root
+        // CharacterController (the corpse's only hittable collider — every ragdoll bone collider
+        // stays disabled), so weapon hit-scans can find this GameObject via
+        // GetComponentInParent<MutantEnemy>() on every client, not just the server.
         _ragdollController?.SetRagdollActive(false);
+
+        // Re-enable NetworkTransform locally on every client too — not just the server (see
+        // Resurrect()) — so each client actually applies the server's authoritative position/
+        // rotation updates instead of leaving the ragdoll's last transform frozen in place.
+        if (_networkTransform != null)
+            _networkTransform.enabled = true;
 
         if (_animator != null)
         {
@@ -357,6 +366,14 @@ public class CorpseResurrectionController : NetworkBehaviour
             _animator.Rebind();
             _animator.Update(0f);
         }
+
+        // MutantEnemy's speed/grounded/attack/death animation syncing (driven by NetworkVariables
+        // and ClientRpcs) writes directly to its own cached Animator reference. SetAnimator() was
+        // only called server-side by Resurrect() — without also calling it here, every remote
+        // client's MutantEnemy.animator field stays null and all of its animation updates silently
+        // no-op on those clients.
+        if (mutantEnemy != null)
+            mutantEnemy.SetAnimator(_animator);
 
         // Swap face materials on this client's renderer instances.
         foreach (FaceMaterialSwap swap in faceMaterialSwaps)
@@ -376,12 +393,25 @@ public class CorpseResurrectionController : NetworkBehaviour
     {
         // Late-joiner sync: ensure the Animator is running (with the mutant controller) so
         // LateUpdate can distort bones and MutantEnemy's animation syncing takes effect.
-        if (current && !previous && _animator != null)
+        if (current && !previous)
         {
-            if (resurrectedAnimatorController != null)
-                _animator.runtimeAnimatorController = resurrectedAnimatorController;
+            _ragdollController?.SetRagdollActive(false);
 
-            _animator.enabled = true;
+            if (_networkTransform != null)
+                _networkTransform.enabled = true;
+
+            if (_animator != null)
+            {
+                if (resurrectedAnimatorController != null)
+                    _animator.runtimeAnimatorController = resurrectedAnimatorController;
+
+                _animator.enabled = true;
+            }
+
+            // Same reasoning as ResurrectClientRpc(): a late joiner never received that RPC, so
+            // its own MutantEnemy.animator field would otherwise stay null forever.
+            if (mutantEnemy != null)
+                mutantEnemy.SetAnimator(_animator);
         }
     }
 
