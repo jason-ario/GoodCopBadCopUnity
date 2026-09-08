@@ -6,6 +6,9 @@ using UnityEngine;
 /// local player's radiation is at or above <see cref="_highRadiationThreshold"/>. The alert
 /// keeps resurfacing (same looping style as the "shipment is waiting at the gate" alert) until
 /// radiation drops back below the threshold, at which point it is hidden.
+///
+/// The alert is always suppressed while the local player is dead, while the pause menu is
+/// open, or while the main menu is showing — see <see cref="RefreshVisibility"/>.
 /// </summary>
 public class RadiationAlertUI : MonoBehaviour
 {
@@ -15,51 +18,102 @@ public class RadiationAlertUI : MonoBehaviour
     [SerializeField] private string _alertMessage = "Radiation high. Take pills to reduce.";
 
     private PlayerRadiation _playerRadiation;
+    private PlayerHealth _playerHealth;
+
+    /// <summary>Whether radiation is currently high enough to warrant the alert, ignoring menus/death.</summary>
+    private bool _radiationIsHigh;
+
+    /// <summary>Whether the alert is currently being displayed via the UIController.</summary>
     private bool _alertShown;
 
     private void OnEnable()
     {
-        if (PlayerInstance.Instance == null) return;
+        UIController.OnPauseMenuOpened += HandlePauseMenuOpened;
 
-        SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
+        if (PlayerInstance.Instance != null)
+            SubscribeTo(PlayerInstance.Instance);
     }
 
     private void Update()
     {
-        if (_playerRadiation != null) return;
-        if (PlayerInstance.Instance == null) return;
+        if (_playerRadiation == null || _playerHealth == null)
+        {
+            if (PlayerInstance.Instance != null)
+                SubscribeTo(PlayerInstance.Instance);
+        }
 
-        SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
+        // Pause menu / main menu visibility can change without firing a dedicated event this
+        // script listens to (e.g. closing the pause menu), so re-evaluate every frame.
+        RefreshVisibility();
     }
 
     private void OnDisable()
     {
+        UIController.OnPauseMenuOpened -= HandlePauseMenuOpened;
+
         if (_playerRadiation != null)
         {
             _playerRadiation.OnRadiationChanged.RemoveListener(OnRadiationChanged);
             _playerRadiation = null;
         }
 
-        if (_alertShown)
+        if (_playerHealth != null)
         {
-            _alertShown = false;
-            UIController.Instance?.HideRadiationAlert();
+            _playerHealth.OnDeath -= HandlePlayerDeath;
+            _playerHealth = null;
         }
+
+        ForceHide();
     }
 
-    private void SubscribeTo(PlayerRadiation playerRadiation)
+    private void SubscribeTo(PlayerInstance playerInstance)
     {
-        _playerRadiation = playerRadiation;
-        _playerRadiation.OnRadiationChanged.AddListener(OnRadiationChanged);
-        OnRadiationChanged(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
+        if (_playerRadiation == null && playerInstance.PlayerRadiation != null)
+        {
+            _playerRadiation = playerInstance.PlayerRadiation;
+            _playerRadiation.OnRadiationChanged.AddListener(OnRadiationChanged);
+            OnRadiationChanged(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
+        }
+
+        if (_playerHealth == null && playerInstance.PlayerHealth != null)
+        {
+            _playerHealth = playerInstance.PlayerHealth;
+            _playerHealth.OnDeath += HandlePlayerDeath;
+        }
     }
 
     private void OnRadiationChanged(float current, float max)
     {
-        if (max <= 0f) return;
+        _radiationIsHigh = max > 0f && (current / max) >= _highRadiationThreshold;
+        RefreshVisibility();
+    }
 
-        float normalized = current / max;
-        bool shouldShow = normalized >= _highRadiationThreshold;
+    /// <summary>Immediately drops the "high radiation" flag on death so the alert can't resurface until it's earned again.</summary>
+    private void HandlePlayerDeath()
+    {
+        _radiationIsHigh = false;
+        RefreshVisibility();
+    }
+
+    private void HandlePauseMenuOpened()
+    {
+        RefreshVisibility();
+    }
+
+    /// <summary>
+    /// Recomputes whether the alert should currently be visible and syncs it with the
+    /// UIController, suppressing it whenever the local player is dead or a menu (pause or main
+    /// menu) is covering the screen.
+    /// </summary>
+    private void RefreshVisibility()
+    {
+        bool isDead = _playerHealth != null && _playerHealth.IsDead;
+        bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
+        bool isMainMenuActive = MainMenuController.Instance != null &&
+                                 MainMenuController.Instance.mainMenu != null &&
+                                 MainMenuController.Instance.mainMenu.activeSelf;
+
+        bool shouldShow = _radiationIsHigh && !isDead && !isPaused && !isMainMenuActive;
 
         if (shouldShow == _alertShown) return;
 
@@ -69,5 +123,13 @@ public class RadiationAlertUI : MonoBehaviour
             UIController.Instance?.ShowRadiationAlert(_alertMessage);
         else
             UIController.Instance?.HideRadiationAlert();
+    }
+
+    private void ForceHide()
+    {
+        if (!_alertShown) return;
+
+        _alertShown = false;
+        UIController.Instance?.HideRadiationAlert();
     }
 }

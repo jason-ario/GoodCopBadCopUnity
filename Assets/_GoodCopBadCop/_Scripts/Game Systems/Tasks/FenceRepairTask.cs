@@ -66,6 +66,10 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
              "Min 1 (slightly damaged) — must not exceed the fence's MaxDamageLevel.")]
     [SerializeField] private Vector2Int _damageRange = new Vector2Int(1, 3);
 
+    [Tooltip("Whether broken fence segments show a compass highlight while this task is active. " +
+             "See CompassController.IsCategoryTaskActive.")]
+    [SerializeField] private bool _showRepairHighlights = true;
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>Display name for this task.</summary>
@@ -213,6 +217,13 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// and this task actually being triggered).
     /// </summary>
     public bool IsActive => _isActive.Value;
+
+    /// <summary>
+    /// Whether broken fence segments should show a compass highlight while this task is active
+    /// (see <see cref="CompassController.IsCategoryTaskActive"/>). Toggle off to run the fence
+    /// repair objective without pointing players at every broken segment.
+    /// </summary>
+    public bool ShowRepairHighlights => _showRepairHighlights;
 
     /// <summary>
     /// Replicated completion latch. Networked (rather than a local bool set by a ClientRpc) so a

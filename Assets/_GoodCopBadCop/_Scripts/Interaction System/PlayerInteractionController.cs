@@ -168,6 +168,15 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        // Blocked while pickup/place input is locked (e.g. exam notebook inspection mode,
+        // dialogue, cutscene) so the held item can't be thrown out of the player's hand
+        // while they're focused on an inspection UI.
+        if (!_playerPickupController.CanPickUpAndPlace)
+        {
+            if (_throwController.IsCharging) _throwController.CancelCharge();
+            return;
+        }
+
         if (MmbDown)
             _throwController.StartCharge();
 

@@ -203,7 +203,8 @@ public class CompassController : MonoBehaviour
             case CompassMarkerCategory.Graffiti:
                 return CleanGraffitiTask.Instance != null && CleanGraffitiTask.Instance.IsActive;
             case CompassMarkerCategory.Fence:
-                return FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
+                return FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive
+                    && FenceRepairTask.Instance.ShowRepairHighlights;
             case CompassMarkerCategory.Blood:
                 return CleanBloodTask.Instance != null && CleanBloodTask.Instance.IsActive;
             default:
